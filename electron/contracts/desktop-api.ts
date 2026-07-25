@@ -15,4 +15,8 @@ export interface OsumiDesktopApi {
   readonly system: {
     getAppInfo(): Promise<AppInfo>;
   };
+
+  readonly configuration: {
+    isConfigured(): Promise<boolean>;
+  };
 }

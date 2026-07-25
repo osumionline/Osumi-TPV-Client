@@ -17,7 +17,12 @@
     "module": "es2022",
     "paths": {
       "@env/*": ["./src/environments/*"],
-      "@app/*": ["./src/app/*"]
+      "@app/*": ["./src/app/*"],
+      "@guards/*": ["./src/app/guards/*"],
+      "@interfaces/*": ["./src/app/interfaces/*"],
+      "@pages/*": ["./src/app/pages/*"],
+      "@services/*": ["./src/app/services/*"],
+      "@desktop-contracts/*": ["./electron/contracts/*"]
     }
   },
   "angularCompilerOptions": {
