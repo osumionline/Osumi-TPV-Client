@@ -1,0 +1,85 @@
+import type ConfigurationService from '@backend/application/configuration/configuration.service';
+import createAppData from '@backend/application/configuration/installation-app-data.mapper';
+import {
+  isInstallationCommand,
+  validateInstallationCommand,
+} from '@backend/application/configuration/installation-command.validator';
+import type InstallationStaging from '@backend/contracts/installation-staging.interface';
+import type AppData from '@desktop-contracts/configuration/app-data.interface';
+import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
+import type {
+  InstallationResult,
+  InstallationValidationError,
+} from '@desktop-contracts/configuration/installation-result.interface';
+
+export default class InstallationService {
+  constructor(
+    private readonly configurationService: ConfigurationService,
+    private readonly staging: InstallationStaging,
+  ) {}
+
+  async install(value: unknown): Promise<InstallationResult> {
+    if (!isInstallationCommand(value)) {
+      const validationError: InstallationValidationError = {
+        field: 'command',
+        message: 'El comando de instalación no tiene una estructura válida.',
+      };
+
+      return {
+        status: 'error',
+        message: 'Los datos de instalación recibidos no son válidos.',
+        validationErrors: [validationError],
+      };
+    }
+
+    const validationErrors: InstallationValidationError[] = validateInstallationCommand(value);
+
+    if (validationErrors.length > 0) {
+      return {
+        status: 'error',
+        message: 'Algunos datos de instalación no son válidos.',
+        validationErrors,
+      };
+    }
+
+    try {
+      const configured: boolean = await this.configurationService.isConfigured();
+
+      if (configured) {
+        return {
+          status: 'error',
+          message: 'La aplicación ya está configurada.',
+          validationErrors: [
+            {
+              field: 'installation',
+              message:
+                'No se puede iniciar una nueva instalación porque la aplicación ya está configurada.',
+            },
+          ],
+        };
+      }
+
+      const command: InstallationCommand = value;
+
+      const installedAt: string = new Date().toISOString();
+
+      const appData: AppData = createAppData(command, installedAt);
+
+      await this.staging.prepare(appData, command.logo, command.secretos);
+
+      return {
+        status: 'prepared',
+        message: 'Los archivos de instalación se han preparado correctamente.',
+        validationErrors: [],
+      };
+    } catch (error: unknown) {
+      console.error('Error preparando la instalación:', error);
+
+      return {
+        status: 'error',
+        message: 'No se han podido preparar los archivos de instalación.',
+        validationErrors: [],
+      };
+    }
+  }
+}

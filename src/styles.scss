@@ -1,39 +1,171 @@
-// Include theming for Angular Material with `mat.theme()`.
-// This Sass mixin will define CSS variables that are used for styling Angular Material
-// components according to the Material 3 design spec.
-// Learn more about theming and how to use it for your application's
-// custom components at https://material.angular.dev/guide/theming
 @use '@angular/material' as mat;
+@use "./styles/modals.scss";
+@use "./styles/ventas.scss";
+@use "./styles/forms.scss";
+@use "./styles/tables.scss";
+@use "./styles/sections.scss";
+
+:root {
+  --bg-color: #eee;
+  --main-color: #026e00 !important;
+  --oat-modals-color-blue: #026e00 !important;
+  --main-color-light: #99bb99;
+  --main-color-contrast: #fff;
+  --modal-bg-color: rgba(0, 0, 0, 0.6);
+  --modal-alt-bg-color: rgba(255, 255, 255, 0.6);
+  --close-icon: #000;
+  --close-icon-hover: #f00;
+  --table-border: #888;
+  --table-data-border: rgba(0, 0, 0, 0.12);
+  --table-header-bg: #ddd;
+  --table-row-selected: #7ad782;
+  --table-row-mark: rgb(166 222 238 / 30%);
+  --table-row-warn: rgb(255, 193, 7);
+  --table-row-disabled: #eee;
+  --separator-color: #ccc;
+  --disabled-color: #888;
+  --form-modified: #00f;
+  --color-yellow: #ffd82c;
+  --color-red: #ff3333;
+  --color-white: #fff;
+  --color-black: #000;
+  --color-very-light-grey: #eee;
+  --color-medium-light-grey: #ddd;
+  --color-light-grey: #ccc;
+  --color-dark-grey: #888;
+  --color-light-green: #7ad782;
+  --color-green: #19e062;
+  --color-dark-green: #026e00;
+
+  @include mat.toolbar-overrides((container-background-color: var(--main-color),
+      container-text-color: var(--color-white),
+    ));
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
 html {
-  height: 100%;
-  @include mat.theme(
-    (
-      color: (
-        primary: mat.$azure-palette,
-        tertiary: mat.$blue-palette,
-      ),
+  @include mat.theme((color: mat.$green-palette,
       typography: Roboto,
-      density: 0,
-    )
-  );
+      density: 0));
+}
+
+html,
+body {
+  height: 100%;
 }
 
 body {
-  // Default the application to a light color theme. This can be changed to
-  // `dark` to enable the dark color theme, or to `light dark` to defer to the
-  // user's system settings.
-  color-scheme: light;
-
-  // Set a default background, font and text colors for the application using
-  // Angular Material's system-level CSS variables. Learn more about these
-  // variables at https://material.angular.dev/guide/system-variables
-  background-color: var(--mat-sys-surface);
-  color: var(--mat-sys-on-surface);
-  font: var(--mat-sys-body-medium);
-
-  // Reset the user agent margin.
   margin: 0;
+  font-family: Roboto, "Helvetica Neue", sans-serif;
+  background-color: var(--bg-color);
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  border-radius: 0;
+}
+
+.white-bg {
+  background-color: var(--color-white);
+}
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  -webkit-appearance: textfield;
+}
+
+.loading {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  background-color: var(--modal-alt-bg-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+mat-tab-body {
+  padding: 16px;
+}
+
+mat-card-content {
+  width: 100%;
+}
+
+.mat-mdc-tab-body-wrapper {
+  height: calc(100% - 48px);
+}
+
+.flex-content {
+  display: flex;
+  flex-direction: row;
   height: 100%;
 }
-/* You can add global styles to this file, and also import other style files */
+
+.toolbar-title {
+  flex: 1;
+}
+
+.mat-mdc-card-header-text {
+  width: 100%;
+}
+
+.mat-mdc-table .mdc-data-table__row {
+  height: 40px;
+}
+
+.mat-mdc-table .mdc-data-table__header-row {
+  height: 45px;
+}
+
+.mat-mdc-card-content {
+  background-color: var(--color-white);
+}
+
+.mat-mdc-form-field-text-suffix {
+  margin-left: 8px;
+}
+
+*[aria-labelledby='hidden'] {
+  display: none !important;
+}
+
+.qr-fill {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  svg {
+    width: 90%;
+    height: 90%;
+  }
+}
+
+.full-width {
+  width: 100%;
+}
+
+@media print {
+  .mat-mdc-table .mdc-data-table__row {
+    height: 30px;
+  }
+
+  .mat-mdc-table .mdc-data-table__header-row {
+    height: 35px;
+  }
+}

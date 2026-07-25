@@ -1,0 +1,614 @@
+<mat-toolbar class="toolbar">
+  <span class="toolbar-title">
+    Osumi TPV - Instalación - Paso {{ paso() }}/3
+  </span>
+</mat-toolbar>
+
+<form novalidate>
+  @if (paso() === 1) {
+  <p class="title">
+    Antes de empezar tenemos que configurar ciertos valores
+    que se usarán en toda la aplicación:
+  </p>
+
+  <mat-card class="main">
+    <mat-card-content>
+      <p>
+        <strong>Datos del negocio</strong>
+      </p>
+
+      <div class="row">
+        <mat-form-field class="three">
+          <mat-label>Nombre</mat-label>
+          <input matInput
+                 placeholder="Nombre"
+                 [formField]="installationForm.negocio.nombre">
+          @if (
+          installationForm.negocio.nombre().touched() &&
+          installationForm.negocio.nombre().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.negocio.nombre().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field class="three">
+          <mat-label>Nombre comercial</mat-label>
+          <input matInput
+                 placeholder="Nombre comercial"
+                 [formField]="installationForm.negocio.nombreComercial">
+          @if (
+          installationForm.negocio.nombreComercial().touched() &&
+          installationForm.negocio.nombreComercial().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.negocio.nombreComercial().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <div class="row">
+        <mat-form-field class="three">
+          <mat-label>CIF</mat-label>
+          <input matInput
+                 placeholder="CIF"
+                 [formField]="installationForm.negocio.cif">
+          @if (
+          installationForm.negocio.cif().touched() &&
+          installationForm.negocio.cif().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.negocio.cif().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field class="three">
+          <mat-label>Teléfono</mat-label>
+          <input matInput
+                 placeholder="Teléfono"
+                 [formField]="installationForm.negocio.telefono">
+        </mat-form-field>
+
+        <mat-form-field class="three">
+          <mat-label>Email</mat-label>
+          <input matInput
+                 type="email"
+                 placeholder="Email"
+                 [formField]="installationForm.negocio.email">
+          @if (
+          installationForm.negocio.email().touched() &&
+          installationForm.negocio.email().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.negocio.email().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <div class="row">
+        <mat-form-field class="two">
+          <mat-label>Dirección</mat-label>
+          <input matInput
+                 placeholder="Dirección"
+                 [formField]="installationForm.negocio.direccion">
+        </mat-form-field>
+
+        <mat-form-field class="two">
+          <mat-label>Población</mat-label>
+          <input matInput
+                 placeholder="Población"
+                 [formField]="installationForm.negocio.poblacion">
+        </mat-form-field>
+      </div>
+
+      <p>
+        <strong>Logo</strong>
+      </p>
+
+      <div class="logo-row">
+        <input #logoInput
+               type="file"
+               name="logo-file"
+               id="logo-file"
+               accept="image/png,image/jpeg"
+               (change)="onLogoChange($event)">
+        @if (installationForm.negocio.logoDataUrl().value() !== '') {
+        <img [src]="installationForm.negocio.logoDataUrl().value()"
+             alt="Logo del negocio">
+        }
+        <button mat-flat-button
+                type="button"
+                color="primary"
+                (click)="addLogo()">
+          <mat-icon>add_photo_alternate</mat-icon>
+          Añadir logo
+        </button>
+        @if (installationForm.negocio.logoDataUrl().value() !== '') {
+        <button mat-button
+                type="button"
+                (click)="removeLogo()">
+          <mat-icon>delete</mat-icon>
+          Quitar logo
+        </button>
+        }
+      </div>
+
+      @if (logoFileName() !== '') {
+      <p class="logo-file-name">
+        {{ logoFileName() }}
+      </p>
+      }
+
+      @if (logoError() !== '') {
+      <p class="form-error">
+        {{ logoError() }}
+      </p>
+      }
+
+      @if (
+      installationForm.negocio.logoDataUrl().touched() &&
+      installationForm.negocio.logoDataUrl().invalid()
+      ) {
+      <p class="form-error">
+        {{ installationForm.negocio.logoDataUrl().errors()[0]?.message }}
+      </p>
+      }
+
+      <p>
+        <strong>Datos del empleado inicial</strong>
+      </p>
+
+      <div class="row">
+        <mat-form-field class="four">
+          <mat-label>Nombre de usuario</mat-label>
+          <input matInput
+                 placeholder="Nombre de usuario"
+                 [formField]="installationForm.empleado.nombre">
+          @if (
+          installationForm.empleado.nombre().touched() &&
+          installationForm.empleado.nombre().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.empleado.nombre().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field class="four">
+          <mat-label>
+            Contraseña del administrador
+          </mat-label>
+          <input matInput
+                 type="password"
+                 placeholder="Contraseña del administrador"
+                 [formField]="installationForm.empleado.password">
+          @if (
+          installationForm.empleado.password().touched() &&
+          installationForm.empleado.password().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.empleado.password().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field class="four">
+          <mat-label>Confirmar contraseña</mat-label>
+          <input matInput
+                 type="password"
+                 placeholder="Confirmar contraseña"
+                 [formField]="installationForm.empleado.confirmPassword">
+          @if (
+          installationForm.empleado.confirmPassword().touched() &&
+          installationForm.empleado.confirmPassword().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.empleado.confirmPassword().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field class="four">
+          <mat-label>Color</mat-label>
+          <input matInput
+                 type="color"
+                 [formField]="installationForm.empleado.color">
+          @if (
+          installationForm.empleado.color().touched() &&
+          installationForm.empleado.color().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.empleado.color().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <p>
+        <strong>Redes</strong>
+      </p>
+
+      <div class="row">
+        <mat-form-field class="four">
+          <mat-label>Twitter / X</mat-label>
+          <input matInput
+                 placeholder="Twitter / X"
+                 [formField]="installationForm.redes.twitter">
+          <img src="/icons/twitter.svg"
+               alt="Twitter / X">
+        </mat-form-field>
+
+        <mat-form-field class="four">
+          <mat-label>Facebook</mat-label>
+          <input matInput
+                 placeholder="Facebook"
+                 [formField]="installationForm.redes.facebook">
+          <img src="/icons/facebook.svg"
+               alt="Facebook">
+        </mat-form-field>
+
+        <mat-form-field class="four">
+          <mat-label>Instagram</mat-label>
+          <input matInput
+                 placeholder="Instagram"
+                 [formField]="installationForm.redes.instagram">
+          <img src="/icons/instagram.svg"
+               alt="Instagram">
+        </mat-form-field>
+
+        <mat-form-field class="four">
+          <mat-label>Web</mat-label>
+          <input matInput
+                 placeholder="Web"
+                 [formField]="installationForm.redes.web">
+          <img src="/icons/web.svg"
+               alt="Web">
+        </mat-form-field>
+      </div>
+
+      <p>
+        <strong>Caja inicial</strong>
+      </p>
+
+      <div class="row">
+        <mat-form-field class="money">
+          <mat-label>Caja inicial</mat-label>
+          <input matInput
+                 type="number"
+                 placeholder="Caja inicial"
+                 [formField]="installationForm.valoresIniciales.cajaInicial">
+          <span matTextSuffix>€</span>
+          @if (
+          installationForm.valoresIniciales.cajaInicial().touched() &&
+          installationForm.valoresIniciales.cajaInicial().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.valoresIniciales.cajaInicial().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <p>
+        <strong>Valores iniciales</strong>
+      </p>
+
+      <div class="row">
+        <mat-form-field class="money">
+          <mat-label>Num. ticket inicial</mat-label>
+          <input matInput
+                 type="number"
+                 step="1"
+                 placeholder="Num. ticket inicial"
+                 [formField]="installationForm.valoresIniciales.ticketInicial">
+          @if (
+          installationForm.valoresIniciales.ticketInicial().touched() &&
+          installationForm.valoresIniciales.ticketInicial().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.valoresIniciales.ticketInicial().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field class="money">
+          <mat-label>Num. factura inicial</mat-label>
+          <input matInput
+                 type="number"
+                 step="1"
+                 placeholder="Num. factura inicial"
+                 [formField]="installationForm.valoresIniciales.facturaInicial">
+          @if (
+          installationForm.valoresIniciales.facturaInicial().touched() &&
+          installationForm.valoresIniciales.facturaInicial().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.valoresIniciales.facturaInicial().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+      </div>
+    </mat-card-content>
+
+    <mat-card-actions class="end-actions">
+      <button mat-flat-button
+              type="button"
+              color="primary"
+              [disabled]="saving()"
+              (click)="irAPaso(2)">
+        Continuar
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+    </mat-card-actions>
+  </mat-card>
+  }
+
+  @if (paso() === 2) {
+  <mat-card class="main">
+    <mat-card-content>
+      <p>
+        ¿Quieres usar IVA o Recargo de equivalencia?
+      </p>
+
+      <mat-radio-group class="option-margin"
+                       aria-label="IVA / RE"
+                       [formField]="installationForm.fiscalidad.tipoIva">
+        <mat-radio-button value="iva">
+          IVA
+        </mat-radio-button>
+        <mat-radio-button value="re">
+          IVA + Recargo de equivalencia
+        </mat-radio-button>
+      </mat-radio-group>
+
+      <p>
+        Elige los tipos de IVA
+
+        @if (installationForm.fiscalidad.tipoIva().value() === 're') {
+        <span>
+          + Recargo de Equivalencia
+        </span>
+        }
+
+        que quieres usar en la aplicación:
+      </p>
+
+      <ul class="margin-list">
+        @for (option of installationForm.fiscalidad.ivaOptions; track option) {
+        <li>
+          <mat-checkbox [formField]="option.selected">
+            {{ option.iva().value() }}
+
+            @if (installationForm.fiscalidad.tipoIva().value() === 're') {
+            + {{ option.re().value() }}
+            }
+
+            %
+          </mat-checkbox>
+        </li>
+        }
+      </ul>
+
+      @if (
+      installationForm.fiscalidad.ivaOptions().touched() &&
+      installationForm.fiscalidad.ivaOptions().invalid()
+      ) {
+      <p class="form-error">
+        {{ installationForm.fiscalidad.ivaOptions().errors()[0]?.message }}
+      </p>
+      }
+
+      <p>
+        <button mat-flat-button
+                type="button"
+                class="option-margin"
+                color="primary"
+                (click)="selectAllIvas()">
+          Marcar todos
+        </button>
+
+        <button mat-flat-button
+                type="button"
+                class="option-margin"
+                color="primary"
+                (click)="selectNoneIvas()">
+          Desmarcar todos
+        </button>
+      </p>
+
+      <p>
+        La aplicación muestra sugerencias de márgenes de
+        beneficio. Elige los diferentes márgenes con los que
+        quieres trabajar:
+      </p>
+
+      <ul class="margin-list">
+        @for (option of installationForm.fiscalidad.marginOptions; track option) {
+        <li>
+          <mat-checkbox [formField]="option.selected">
+            {{ option.value().value() }} %
+          </mat-checkbox>
+        </li>
+        }
+      </ul>
+
+      @if (
+      installationForm.fiscalidad.marginOptions().touched() &&
+      installationForm.fiscalidad.marginOptions().invalid()
+      ) {
+      <p class="form-error">
+        {{ installationForm.fiscalidad.marginOptions().errors()[0]?.message }}
+      </p>
+      }
+
+      <p>
+        <button mat-flat-button
+                type="button"
+                class="option-margin"
+                color="primary"
+                (click)="selectAllMargins()">
+          Marcar todos
+        </button>
+
+        <button mat-flat-button
+                type="button"
+                class="option-margin"
+                color="primary"
+                (click)="selectNoneMargins()">
+          Desmarcar todos
+        </button>
+      </p>
+    </mat-card-content>
+
+    <mat-card-actions class="end-actions">
+      <button mat-flat-button
+              type="button"
+              color="primary"
+              [disabled]="saving()"
+              (click)="irAPaso(1)">
+        <mat-icon>chevron_left</mat-icon>
+        Atrás
+      </button>
+
+      <button mat-flat-button
+              type="button"
+              color="primary"
+              [disabled]="saving()"
+              (click)="irAPaso(3)">
+        Continuar
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+    </mat-card-actions>
+  </mat-card>
+  }
+
+  @if (paso() === 3) {
+  <mat-card class="main">
+    <mat-card-content>
+      <p>
+        ¿La aplicación se enlazará con una tienda online?
+      </p>
+
+      <mat-radio-group class="option-margin"
+                       aria-label="Venta online"
+                       [formField]="installationForm.ventaOnline.active">
+        <mat-radio-button [value]="false">
+          No
+        </mat-radio-button>
+        <mat-radio-button [value]="true">
+          Sí
+        </mat-radio-button>
+      </mat-radio-group>
+
+      @if (installationForm.ventaOnline.active().value()) {
+      <div>
+        <mat-form-field class="url-api-field">
+          <mat-label>
+            URL base de la API de la tienda
+          </mat-label>
+
+          <input matInput
+                 placeholder="URL base de la API de la tienda"
+                 [formField]="installationForm.ventaOnline.urlApi">
+          @if (
+          installationForm.ventaOnline.urlApi().touched() &&
+          installationForm.ventaOnline.urlApi().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.ventaOnline.urlApi().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field class="url-api-field">
+          <mat-label>
+            Secreto de la API de la tienda
+          </mat-label>
+          <input matInput
+                 placeholder="Secreto de la API de la tienda"
+                 [formField]="installationForm.ventaOnline.secretApi">
+          @if (
+          installationForm.ventaOnline.secretApi().touched() &&
+          installationForm.ventaOnline.secretApi().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.ventaOnline.secretApi().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+      </div>
+      }
+
+      <p>
+        ¿Los artículos de la aplicación tienen fecha de
+        caducidad?
+      </p>
+
+      <mat-radio-group class="option-margin"
+                       aria-label="Fecha de caducidad"
+                       [formField]="installationForm.opciones.fechaCaducidad">
+        <mat-radio-button [value]="false">
+          No
+        </mat-radio-button>
+        <mat-radio-button [value]="true">
+          Sí
+        </mat-radio-button>
+      </mat-radio-group>
+
+      <p>
+        ¿La aplicación será usada por varios empleados?
+      </p>
+
+      <mat-radio-group class="option-margin"
+                       aria-label="Empleados"
+                       [formField]="installationForm.opciones.empleados">
+        <mat-radio-button [value]="false">
+          No
+        </mat-radio-button>
+        <mat-radio-button [value]="true">
+          Sí
+        </mat-radio-button>
+      </mat-radio-group>
+
+      <p>
+        Si tienes una suscripción con TPV Backup,
+        introduce la clave API para realizar las copias de
+        seguridad.
+      </p>
+
+      <div class="row">
+        <mat-form-field class="three">
+          <mat-label>Backup API key</mat-label>
+          <input matInput
+                 placeholder="Backup API key"
+                 [formField]="installationForm.opciones.backupApiKey">
+        </mat-form-field>
+      </div>
+    </mat-card-content>
+
+    <mat-card-actions class="end-actions">
+      <button mat-flat-button
+              type="button"
+              color="primary"
+              [disabled]="saving()"
+              (click)="irAPaso(2)">
+        <mat-icon>chevron_left</mat-icon>
+        Atrás
+      </button>
+
+      <button mat-flat-button
+              type="button"
+              color="primary"
+              [disabled]="saving()"
+              (click)="saveConfiguration()">
+        Guardar configuración
+        <mat-icon>done</mat-icon>
+      </button>
+    </mat-card-actions>
+  </mat-card>
+  }
+</form>

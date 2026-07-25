@@ -1,0 +1,105 @@
+:host {
+    background-color: var(--color-very-light-grey);
+}
+
+.toolbar {
+    justify-content: space-between;
+}
+
+.title {
+    margin: 16px;
+}
+
+.main {
+    margin: 16px;
+
+    p {
+        margin: 16px 0;
+    }
+
+    .row {
+        .two {
+            width: calc(50% - 32px);
+            margin-right: 32px;
+        }
+
+        .three {
+            width: calc(33% - 32px);
+            margin-right: 32px;
+        }
+
+        .four {
+            width: calc(25% - 32px);
+            margin-right: 32px;
+            position: relative;
+
+            img {
+                width: 24px;
+                position: absolute;
+                right: 10px;
+                top: 16px;
+            }
+        }
+
+        .money {
+            width: 10%;
+            margin-right: 32px;
+        }
+
+        .full {
+            width: calc(100% - 32px);
+        }
+    }
+
+    .logo-row {
+        display: flex;
+        align-items: center;
+
+        #logo-file {
+            display: none;
+        }
+
+        img {
+            display: block;
+            max-height: 100px;
+            margin-right: 16px;
+        }
+    }
+
+    .mat-radio-button~.mat-radio-button {
+        margin-left: 16px;
+    }
+
+    .option-margin {
+        margin-left: 16px;
+    }
+
+    .margin-list {
+        margin: 16px;
+        padding: 0;
+        list-style-type: none;
+
+        li {
+            margin-bottom: 8px;
+        }
+    }
+
+    .url-api-field {
+        margin-left: 32px;
+        width: calc(33% - 32px);
+    }
+
+    .end-actions {
+        padding: 16px;
+        display: flex;
+        justify-content: flex-end;
+
+        img {
+            width: 24px;
+        }
+
+        button {
+            margin-left: 16px;
+        }
+    }
+}

@@ -1,0 +1,14 @@
+/* Estilos para ventanas modales */
+.modal-wide {
+  width: 95%;
+  height: 95%;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+
+  &.multiple-actions {
+    justify-content: space-between;
+  }
+}

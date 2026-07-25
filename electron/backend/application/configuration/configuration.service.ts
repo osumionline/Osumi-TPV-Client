@@ -1,9 +1,16 @@
-import type { AppDataRepository } from '@backend/contracts/app-data.repository';
+import type AppDataRepository from '@backend/contracts/app-data.repository';
+import type AppData from '@desktop-contracts/configuration/app-data.interface';
 
-export class ConfigurationService {
+export default class ConfigurationService {
   constructor(private readonly appDataRepository: AppDataRepository) {}
 
-  isConfigured(): Promise<boolean> {
-    return this.appDataRepository.exists();
+  async isConfigured(): Promise<boolean> {
+    const appData: AppData | null = await this.appDataRepository.load();
+
+    return appData !== null;
+  }
+
+  load(): Promise<AppData | null> {
+    return this.appDataRepository.load();
   }
 }

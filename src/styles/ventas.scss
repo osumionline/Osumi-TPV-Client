@@ -1,0 +1,97 @@
+/* Estilos para líneas de ventas */
+
+.col-localizador {
+  width: 10%;
+  border-right: 1px solid var(--table-border);
+  border-bottom: 1px solid var(--table-border);
+  box-sizing: border-box;
+  position: relative;
+}
+
+.col-descripcion {
+  width: 42%;
+  border-right: 1px solid var(--table-border);
+  border-bottom: 1px solid var(--table-border);
+  box-sizing: border-box;
+  user-select: none;
+
+  span {
+    display: block;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    text-align: left;
+    box-sizing: border-box;
+    padding-left: 16px;
+
+    &:hover {
+      cursor: pointer;
+      background-color: var(--main-color);
+      color: var(--main-color-contrast);
+    }
+
+    mat-icon {
+      cursor: pointer;
+      position: absolute;
+      right: 3px;
+      top: 3px;
+    }
+
+    &:hover mat-icon {
+      color: var(--main-color-contrast);
+    }
+  }
+}
+
+.col-marca {
+  width: 10%;
+  border-bottom: 1px solid var(--table-border);
+  border-right: 1px solid var(--table-border);
+  box-sizing: border-box;
+}
+
+.col-cantidad {
+  width: 5%;
+  border-right: 1px solid var(--table-border);
+  border-bottom: 1px solid var(--table-border);
+  box-sizing: border-box;
+}
+
+.col-pvp {
+  width: 10%;
+  border-right: 1px solid var(--table-border);
+  border-bottom: 1px solid var(--table-border);
+  box-sizing: border-box;
+  position: relative;
+
+  mat-icon {
+    position: absolute;
+    cursor: pointer;
+    right: 4px;
+    top: 4px;
+
+    &.selected {
+      color: blue;
+    }
+  }
+}
+
+.col-importe {
+  width: 10%;
+  border-right: 1px solid var(--table-border);
+  border-bottom: 1px solid var(--table-border);
+  box-sizing: border-box;
+}
+
+.col-descuentos {
+  width: 8%;
+  border-bottom: 1px solid var(--table-border);
+  border-right: 1px solid var(--table-border);
+  box-sizing: border-box;
+}
+
+.col-stock {
+  width: 5%;
+  border-bottom: 1px solid var(--table-border);
+  box-sizing: border-box;
+}

@@ -20,6 +20,7 @@
       "@app/*": ["./src/app/*"],
       "@guards/*": ["./src/app/guards/*"],
       "@interfaces/*": ["./src/app/interfaces/*"],
+      "@model/*": ["./src/app/model/*"],
       "@pages/*": ["./src/app/pages/*"],
       "@services/*": ["./src/app/services/*"],
       "@desktop-contracts/*": ["./electron/contracts/*"]

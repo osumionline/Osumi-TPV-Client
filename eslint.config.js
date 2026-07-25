@@ -15,11 +15,12 @@ module.exports = defineConfig([
     ],
     processor: angular.processInlineTemplates,
     rules: {
+      '@typescript-eslint/no-inferrable-types': 'off',
       '@angular-eslint/directive-selector': [
         'error',
         {
           type: 'attribute',
-          prefix: 'app',
+          prefix: 'otpv',
           style: 'camelCase',
         },
       ],
@@ -27,7 +28,7 @@ module.exports = defineConfig([
         'error',
         {
           type: 'element',
-          prefix: 'app',
+          prefix: 'otpv',
           style: 'kebab-case',
         },
       ],

@@ -1,11 +1,34 @@
-import { ConfigurationService } from '@backend/application/configuration/configuration.service';
+import ConfigurationService from '@backend/application/configuration/configuration.service';
+import InstallationService from '@backend/application/configuration/installation.service';
 import { SystemService } from '@backend/application/system/system.service';
+import type AppDataRepository from '@backend/contracts/app-data.repository';
+import type ApplicationPaths from '@backend/contracts/application-paths.interface';
+import type InstallationStaging from '@backend/contracts/installation-staging.interface';
+import type LogoStorage from '@backend/contracts/logo-storage.interface';
+import type SecretStorage from '@backend/contracts/secret-storage.interface';
+import ElectronApplicationPathsProvider from '@infrastructure/electron/electron-application-paths.provider';
+import ElectronLogoStorage from '@infrastructure/electron/electron-logo.storage';
 import { ElectronRuntimeInfoProvider } from '@infrastructure/electron/electron-runtime-info.provider';
-import { JsonAppDataRepository } from '@infrastructure/filesystem/json-app-data.repository';
-import { registerConfigurationIpc } from '@ipc/register-configuration-ipc';
+import ElectronSafeStorageSecretStorage from '@infrastructure/electron/electron-safe-storage-secret-storage';
+import registerAssetsProtocol from '@infrastructure/electron/register-assets-protocol';
+import ApplicationDirectoriesService from '@infrastructure/filesystem/application-directories.service';
+import FileInstallationStaging from '@infrastructure/filesystem/file-installation-staging';
+import JsonAppDataRepository from '@infrastructure/filesystem/json-app-data.repository';
+import registerConfigurationIpc from '@ipc/register-configuration-ipc';
 import { registerSystemIpc } from '@ipc/register-system-ipc';
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, protocol } from 'electron';
 import { join } from 'node:path';
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'osumi',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+    },
+  },
+]);
 
 const DEV_SERVER_URL = process.env['OSUMI_TPV_RENDERER_URL'];
 
@@ -53,15 +76,42 @@ app.enableSandbox();
 app
   .whenReady()
   .then(async () => {
-    const appDataRepository = new JsonAppDataRepository(
-      join(app.getPath('userData'), 'app_data.json'),
+    const pathsProvider: ElectronApplicationPathsProvider = new ElectronApplicationPathsProvider();
+    const applicationPaths: ApplicationPaths = pathsProvider.getPaths();
+    const directoriesService: ApplicationDirectoriesService = new ApplicationDirectoriesService(
+      applicationPaths,
     );
 
-    const configurationService = new ConfigurationService(appDataRepository);
+    await directoriesService.ensureDirectories();
+    app.setAppLogsPath(applicationPaths.logsDirectory);
+    registerAssetsProtocol(applicationPaths);
+
+    const appDataRepository: AppDataRepository = new JsonAppDataRepository(
+      applicationPaths.appDataFile,
+    );
+    const configurationService: ConfigurationService = new ConfigurationService(appDataRepository);
+    const stagingAppDataRepository: AppDataRepository = new JsonAppDataRepository(
+      applicationPaths.stagingAppDataFile,
+    );
+    const stagingLogoStorage: LogoStorage = new ElectronLogoStorage(
+      applicationPaths.stagingLogoFile,
+    );
+    const stagingSecretStorage: SecretStorage = new ElectronSafeStorageSecretStorage(
+      applicationPaths.stagingSecretsFile,
+    );
+    const installationStaging: InstallationStaging = new FileInstallationStaging(
+      applicationPaths.stagingDirectory,
+      stagingAppDataRepository,
+      stagingLogoStorage,
+      stagingSecretStorage,
+    );
+    const installationService: InstallationService = new InstallationService(
+      configurationService,
+      installationStaging,
+    );
 
     registerSystemIpc(() => mainWindow, systemService);
-
-    registerConfigurationIpc(() => mainWindow, configurationService);
+    registerConfigurationIpc(() => mainWindow, configurationService, installationService);
 
     await createWindow();
 

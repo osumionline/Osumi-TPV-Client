@@ -1,6 +1,6 @@
 import type { SystemService } from '@backend/application/system/system.service';
 import { assertTrustedSender, type MainWindowProvider } from '@ipc/assert-trusted-sender';
-import { IPC_CHANNELS } from '@ipc/channels';
+import IPC_CHANNELS from '@ipc/channels';
 import { ipcMain } from 'electron';
 
 export function registerSystemIpc(

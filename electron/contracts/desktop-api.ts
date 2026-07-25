@@ -1,3 +1,6 @@
+import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
+import type { InstallationResult } from '@desktop-contracts/configuration/installation-result.interface';
+
 export interface AppInfo {
   readonly name: string;
   readonly version: string;
@@ -18,5 +21,7 @@ export interface OsumiDesktopApi {
 
   readonly configuration: {
     isConfigured(): Promise<boolean>;
+
+    install(command: InstallationCommand): Promise<InstallationResult>;
   };
 }

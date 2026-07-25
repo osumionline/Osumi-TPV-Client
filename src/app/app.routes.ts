@@ -5,7 +5,7 @@ const routes: Routes = [
   {
     path: 'installation',
     canActivate: [notConfiguredGuard],
-    loadComponent: () => import('@pages/installation/installation'),
+    loadComponent: () => import('@pages/installation/installation.component'),
   },
   {
     path: '',
