@@ -3,21 +3,29 @@ import InstallationService from '@backend/application/configuration/installation
 import { SystemService } from '@backend/application/system/system.service';
 import type AppDataRepository from '@backend/contracts/app-data.repository';
 import type ApplicationPaths from '@backend/contracts/application-paths.interface';
+import type InstallationDatabase from '@backend/contracts/installation-database.interface';
+import type InstallationFinalizer from '@backend/contracts/installation-finalizer.interface';
 import type InstallationStaging from '@backend/contracts/installation-staging.interface';
 import type LogoStorage from '@backend/contracts/logo-storage.interface';
+import type PasswordHasher from '@backend/contracts/password-hasher.interface';
 import type SecretStorage from '@backend/contracts/secret-storage.interface';
+import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
+import TypeOrmInstallationDatabase from '@infrastructure/database/typeorm/typeorm-installation-database';
 import ElectronApplicationPathsProvider from '@infrastructure/electron/electron-application-paths.provider';
 import ElectronLogoStorage from '@infrastructure/electron/electron-logo.storage';
 import { ElectronRuntimeInfoProvider } from '@infrastructure/electron/electron-runtime-info.provider';
 import ElectronSafeStorageSecretStorage from '@infrastructure/electron/electron-safe-storage-secret-storage';
 import registerAssetsProtocol from '@infrastructure/electron/register-assets-protocol';
 import ApplicationDirectoriesService from '@infrastructure/filesystem/application-directories.service';
+import FileInstallationFinalizer from '@infrastructure/filesystem/file-installation-finalizer';
 import FileInstallationStaging from '@infrastructure/filesystem/file-installation-staging';
 import JsonAppDataRepository from '@infrastructure/filesystem/json-app-data.repository';
+import NodeScryptPasswordHasher from '@infrastructure/security/node-scrypt-password-hasher';
 import registerConfigurationIpc from '@ipc/register-configuration-ipc';
 import { registerSystemIpc } from '@ipc/register-system-ipc';
 import { app, BrowserWindow, protocol } from 'electron';
 import { join } from 'node:path';
+import 'reflect-metadata';
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -83,6 +91,11 @@ app
     );
 
     await directoriesService.ensureDirectories();
+    const installationFinalizer: InstallationFinalizer = new FileInstallationFinalizer(
+      applicationPaths,
+    );
+
+    await installationFinalizer.recover();
     app.setAppLogsPath(applicationPaths.logsDirectory);
     registerAssetsProtocol(applicationPaths);
 
@@ -105,9 +118,18 @@ app
       stagingLogoStorage,
       stagingSecretStorage,
     );
+    const passwordHasher: PasswordHasher = new NodeScryptPasswordHasher();
+    const dataSourceFactory: TypeOrmDataSourceFactory = new TypeOrmDataSourceFactory();
+    const installationDatabase: InstallationDatabase = new TypeOrmInstallationDatabase(
+      applicationPaths.stagingDatabaseFile,
+      passwordHasher,
+      dataSourceFactory,
+    );
     const installationService: InstallationService = new InstallationService(
       configurationService,
       installationStaging,
+      installationDatabase,
+      installationFinalizer,
     );
 
     registerSystemIpc(() => mainWindow, systemService);

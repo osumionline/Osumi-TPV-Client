@@ -4,6 +4,8 @@ import {
   isInstallationCommand,
   validateInstallationCommand,
 } from '@backend/application/configuration/installation-command.validator';
+import type InstallationDatabase from '@backend/contracts/installation-database.interface';
+import type InstallationFinalizer from '@backend/contracts/installation-finalizer.interface';
 import type InstallationStaging from '@backend/contracts/installation-staging.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
@@ -16,6 +18,8 @@ export default class InstallationService {
   constructor(
     private readonly configurationService: ConfigurationService,
     private readonly staging: InstallationStaging,
+    private readonly installationDatabase: InstallationDatabase,
+    private readonly installationFinalizer: InstallationFinalizer,
   ) {}
 
   async install(value: unknown): Promise<InstallationResult> {
@@ -67,17 +71,27 @@ export default class InstallationService {
 
       await this.staging.prepare(appData, command.logo, command.secretos);
 
+      await this.installationDatabase.prepare(command);
+
+      await this.installationFinalizer.finalize();
+
       return {
-        status: 'prepared',
-        message: 'Los archivos de instalación se han preparado correctamente.',
+        status: 'installed',
+        message: 'La aplicación se ha instalado correctamente.',
         validationErrors: [],
       };
     } catch (error: unknown) {
-      console.error('Error preparando la instalación:', error);
+      console.error('Error completando la instalación:', error);
+
+      try {
+        await this.installationFinalizer.recover();
+      } catch (recoveryError: unknown) {
+        console.error('No se ha podido recuperar la instalación incompleta:', recoveryError);
+      }
 
       return {
         status: 'error',
-        message: 'No se han podido preparar los archivos de instalación.',
+        message: 'No se ha podido completar la instalación.',
         validationErrors: [],
       };
     }

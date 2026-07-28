@@ -20,7 +20,7 @@ const buildOptions = {
   minify: false,
   keepNames: true,
 
-  external: ['electron'],
+  external: ['electron', 'typeorm', 'typeorm/*', 'reflect-metadata', 'better-sqlite3'],
 
   tsconfig: 'electron/tsconfig.json',
   logLevel: 'info',

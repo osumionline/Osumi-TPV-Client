@@ -1,4 +1,4 @@
-export type InstallationResultStatus = 'validated' | 'prepared' | 'installed' | 'error';
+export type InstallationResultStatus = 'installed' | 'error';
 
 export interface InstallationValidationError {
   readonly field: string;

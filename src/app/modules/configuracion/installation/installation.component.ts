@@ -17,6 +17,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatToolbar } from '@angular/material/toolbar';
+import { Router } from '@angular/router';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type {
   InstallationResult,
@@ -54,6 +55,7 @@ export default class InstallationComponent {
     DesktopConfigurationService,
   );
   private readonly dialog: DialogService = inject(DialogService);
+  private readonly router: Router = inject(Router);
 
   private readonly acceptedLogoTypes: readonly string[] = ['image/jpeg', 'image/png'];
 
@@ -196,14 +198,18 @@ export default class InstallationComponent {
         return;
       }
 
-      /*
-       * Mensaje temporal para comprobar la Fase 2.
-       * Se eliminará al implementar la instalación real.
-       */
-      this.dialog.alert({
-        title: 'Información',
-        content: result.message,
+      this.clearSensitiveData();
+
+      const navigated: boolean = await this.router.navigateByUrl('/', {
+        replaceUrl: true,
       });
+
+      if (!navigated) {
+        this.dialog.alert({
+          title: 'Información',
+          content: 'La instalación ha terminado, pero no se ha podido abrir la pantalla principal.',
+        });
+      }
     } catch (error: unknown) {
       console.error('Error comunicando con el backend:', error);
 
@@ -289,5 +295,15 @@ export default class InstallationComponent {
         reader.readAsDataURL(file);
       },
     );
+  }
+
+  private clearSensitiveData(): void {
+    this.installationForm.empleado.password().value.set('');
+    this.installationForm.empleado.confirmPassword().value.set('');
+    this.installationForm.ventaOnline.secretApi().value.set('');
+    this.installationForm.opciones.backupApiKey().value.set('');
+    this.installationForm.negocio.logoDataUrl().value.set('');
+    this.logoFileName.set('');
+    this.logoMimeType.set('');
   }
 }

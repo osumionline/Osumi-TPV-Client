@@ -143,8 +143,8 @@ export function validateInstallationCommand(
     addError('empleadoInicial.password', 'La contraseña del empleado inicial es obligatoria.');
   }
 
-  if (command.empleadoInicial.color.trim() === '') {
-    addError('empleadoInicial.color', 'El color del empleado inicial es obligatorio.');
+  if (!/^#[0-9a-fA-F]{6}$/.test(command.empleadoInicial.color)) {
+    addError('empleadoInicial.color', 'El color del empleado inicial no es válido.');
   }
 
   if (command.fiscalidad.tipoIva !== 'iva' && command.fiscalidad.tipoIva !== 're') {

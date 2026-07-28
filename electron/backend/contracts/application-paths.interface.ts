@@ -16,4 +16,5 @@ export default interface ApplicationPaths {
   readonly stagingAppDataFile: string;
   readonly stagingLogoFile: string;
   readonly stagingSecretsFile: string;
+  readonly stagingDatabaseFile: string;
 }
