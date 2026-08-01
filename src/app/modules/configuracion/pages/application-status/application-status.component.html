@@ -1,0 +1,65 @@
+<main class="application-status">
+    <section class="application-status__card">
+        <h1>
+            No se puede iniciar Osumi TPV
+        </h1>
+
+        @if (result(); as currentResult) {
+        @switch (currentResult.reason) {
+        @case ('orphaned-configuration') {
+        <p>
+            Se ha encontrado la configuración
+            de la aplicación, pero no existe la
+            base de datos.
+        </p>
+
+        <p>
+            No se realizará una instalación nueva
+            automáticamente para evitar sobrescribir
+            o perder información.
+        </p>
+        }
+
+        @case ('configuration-not-found') {
+        <p>
+            Se ha encontrado la base de datos,
+            pero falta el archivo de configuración
+            de la aplicación.
+        </p>
+        }
+
+        @case ('database-invalid') {
+        <p>
+            La base de datos existe, pero no tiene
+            una estructura válida o no ha superado
+            la comprobación de integridad.
+        </p>
+        }
+
+        @default {
+        <p>
+            El estado actual de la aplicación
+            no permite continuar.
+        </p>
+        }
+        }
+        }
+
+        @if (error(); as errorMessage) {
+        <p class="application-status__error">
+            {{ errorMessage }}
+        </p>
+        }
+
+        <button type="button"
+                [disabled]="loading()"
+                (click)="retry()">
+            @if (loading()) {
+            Comprobando…
+            }
+            @else {
+            Volver a comprobar
+            }
+        </button>
+    </section>
+</main>

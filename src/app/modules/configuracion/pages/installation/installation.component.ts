@@ -1,5 +1,4 @@
 import {
-  ChangeDetectionStrategy,
   Component,
   ElementRef,
   Signal,
@@ -29,13 +28,13 @@ import { InstallationFormModel } from '@model/configuracion/installation-form.mo
 import installationFormSchema from '@model/configuracion/installation-form.schema';
 import InstallationStep from '@model/configuracion/installation-step.type';
 import { DialogService } from '@osumi/angular-tools';
+import ApplicationStateService from '@services/application-state.service';
 import DesktopConfigurationService from '@services/desktop-configuration.service';
 
 @Component({
   selector: 'otpv-installation',
   templateUrl: './installation.component.html',
   styleUrl: './installation.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormField,
     MatToolbar,
@@ -51,11 +50,13 @@ import DesktopConfigurationService from '@services/desktop-configuration.service
   ],
 })
 export default class InstallationComponent {
-  private readonly configurationService: DesktopConfigurationService = inject(
+  private readonly desktopConfigurationService: DesktopConfigurationService = inject(
     DesktopConfigurationService,
   );
   private readonly dialog: DialogService = inject(DialogService);
   private readonly router: Router = inject(Router);
+  private readonly applicationStateService: ApplicationStateService =
+    inject(ApplicationStateService);
 
   private readonly acceptedLogoTypes: readonly string[] = ['image/jpeg', 'image/png'];
 
@@ -185,9 +186,9 @@ export default class InstallationComponent {
     this.saving.set(true);
 
     try {
-      const result: InstallationResult = await this.configurationService.install(command);
+      const result: InstallationResult = await this.desktopConfigurationService.install(command);
 
-      if (result.status === 'error') {
+      if (result.status !== 'installed') {
         const validationMessage: string = this.getValidationMessage(result.validationErrors);
 
         this.dialog.alert({
@@ -197,19 +198,11 @@ export default class InstallationComponent {
 
         return;
       }
+      await this.applicationStateService.refresh();
 
       this.clearSensitiveData();
 
-      const navigated: boolean = await this.router.navigateByUrl('/', {
-        replaceUrl: true,
-      });
-
-      if (!navigated) {
-        this.dialog.alert({
-          title: 'Información',
-          content: 'La instalación ha terminado, pero no se ha podido abrir la pantalla principal.',
-        });
-      }
+      await this.router.navigateByUrl('/ventas');
     } catch (error: unknown) {
       console.error('Error comunicando con el backend:', error);
 

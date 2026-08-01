@@ -1,6 +1,12 @@
 import { registerLocaleData } from '@angular/common';
 import localeEs from '@angular/common/locales/es';
-import { ApplicationConfig, LOCALE_ID, provideBrowserGlobalErrorListeners } from '@angular/core';
+import {
+  ApplicationConfig,
+  inject,
+  LOCALE_ID,
+  provideAppInitializer,
+  provideBrowserGlobalErrorListeners,
+} from '@angular/core';
 import { MAT_DATE_LOCALE } from '@angular/material/core';
 import {
   MAT_FORM_FIELD_DEFAULT_OPTIONS,
@@ -14,6 +20,8 @@ import {
   withViewTransitions,
 } from '@angular/router';
 import routes from '@app/app.routes';
+import type ApplicationStateResult from '@desktop-contracts/application/application-state-result.interface';
+import ApplicationStateService from '@services/application-state.service';
 
 registerLocaleData(localeEs);
 
@@ -27,6 +35,9 @@ const scrollConfig: InMemoryScrollingOptions = {
 
 const appConfig: ApplicationConfig = {
   providers: [
+    provideAppInitializer((): Promise<ApplicationStateResult> => {
+      return inject(ApplicationStateService).load();
+    }),
     { provide: LOCALE_ID, useValue: 'es-ES' },
     { provide: MAT_DATE_LOCALE, useValue: 'es-ES' },
     { provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: appearance },

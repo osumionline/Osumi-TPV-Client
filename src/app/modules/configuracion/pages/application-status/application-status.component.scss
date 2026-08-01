@@ -1,0 +1,38 @@
+:host {
+    display: block;
+    min-height: 100%;
+}
+
+.application-status {
+    display: grid;
+    min-height: 100%;
+    place-items: center;
+    padding: 32px;
+}
+
+.application-status__card {
+    width: min(100%, 680px);
+    padding: 32px;
+    border: 1px solid var(--mat-sys-outline-variant);
+    box-sizing: border-box;
+    border-radius: 16px;
+    background:
+        var(--mat-sys-surface-container);
+}
+
+h1 {
+    margin: 0 0 24px;
+}
+
+p {
+    line-height: 1.6;
+}
+
+button {
+    margin-top: 16px;
+}
+
+.application-status__error {
+    color:
+        var(--mat-sys-error);
+}

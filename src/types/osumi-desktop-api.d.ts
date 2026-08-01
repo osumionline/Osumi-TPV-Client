@@ -4,6 +4,6 @@ export {};
 
 declare global {
   interface Window {
-    readonly osumiDesktop?: OsumiDesktopApi;
+    readonly osumiDesktop: OsumiDesktopApi;
   }
 }

@@ -18,8 +18,6 @@ import type LogoStorage from '@backend/contracts/logo-storage.interface';
 import type PasswordHasher from '@backend/contracts/password-hasher.interface';
 import type SecretStorage from '@backend/contracts/secret-storage.interface';
 
-import type ApplicationStateResult from '@desktop-contracts/application/application-state-result.interface';
-
 import NewInstallationDataService from '@infrastructure/database/initial-data/new-installation-data.service';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
 import completeDatabaseSchemaTables from '@infrastructure/database/schema/complete-database-schema.tables';
@@ -40,6 +38,7 @@ import JsonAppDataRepository from '@infrastructure/filesystem/json-app-data.repo
 
 import NodeScryptPasswordHasher from '@infrastructure/security/node-scrypt-password-hasher';
 
+import registerApplicationIpc from '@ipc/register-application-ipc';
 import registerConfigurationIpc from '@ipc/register-configuration-ipc';
 import { registerSystemIpc } from '@ipc/register-system-ipc';
 
@@ -195,10 +194,6 @@ app
       databaseSchemaService,
     );
 
-    const applicationState: ApplicationStateResult = await applicationStateService.getState();
-
-    console.log('[Application state]', applicationState);
-
     /*
      * Creación de una nueva instalación.
      */
@@ -222,6 +217,8 @@ app
     /*
      * Canales IPC.
      */
+    registerApplicationIpc(applicationStateService);
+
     registerSystemIpc(
       (): BrowserWindow | null => mainWindow,
 
