@@ -35,21 +35,21 @@
         </section>
 
         <section class="legacy-import__selection">
-            <label class="file-selector">
-                <input #fileInput
-                       type="file"
-                       accept=".otpv"
-                       (change)="selectFile($event)">
+            <button type="button"
+                    matButton="filled"
+                    [disabled]="selecting()"
+                    (click)="selectPackage()">
+                <mat-icon>
+                    folder_open
+                </mat-icon>
 
-                <span class="file-selector__title">
-                    Seleccionar archivo .otpv
-                </span>
-
-                <span class="file-selector__description">
-                    Pulsa aquí para buscar el paquete
-                    exportado en tu equipo.
-                </span>
-            </label>
+                @if (selecting()) {
+                Analizando paquete…
+                }
+                @else {
+                Seleccionar archivo .otpv
+                }
+            </button>
 
             @if (
             selectionError();
@@ -62,31 +62,151 @@
             }
 
             @if (
-            selectedFile();
-            as file
+            selectedPackage();
+            as package
             ) {
-            <article class="selected-file">
-                <div class="selected-file__information">
-                    <strong>
-                        {{ file.name }}
-                    </strong>
+            <article class="selected-package">
+                <header class="selected-package__header">
+                    <div>
+                        <p class="selected-package__label">
+                            Paquete válido
+                        </p>
 
-                    <span>
-                        {{ selectedFileSize() }}
-                    </span>
-                </div>
+                        <h2>
+                            {{ package.fileName }}
+                        </h2>
+                    </div>
 
-                <button type="button"
-                        class="selected-file__remove"
-                        (click)="clearSelection(fileInput)">
-                    Quitar
-                </button>
+                    <mat-icon class="selected-package__valid-icon"
+                              aria-label="Paquete válido">
+                        verified
+                    </mat-icon>
+                </header>
+
+                <dl class="selected-package__details">
+                    <div>
+                        <dt>
+                            Tamaño
+                        </dt>
+
+                        <dd>
+                            {{ formatSize(package.packageSize) }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>
+                            Creado
+                        </dt>
+
+                        <dd>
+                            {{ formatDate(package.createdAt) }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>
+                            Versión de Osumi TPV
+                        </dt>
+
+                        <dd>
+                            {{ package.applicationVersion }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>
+                            Esquema
+                        </dt>
+
+                        <dd>
+                            {{ package.schemaVersion }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>
+                            Tablas
+                        </dt>
+
+                        <dd>
+                            {{ package.tables }}
+                            de
+                            {{ package.expectedTables }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>
+                            Registros
+                        </dt>
+
+                        <dd>
+                            {{ package.totalRows }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>
+                            Archivos incluidos
+                        </dt>
+
+                        <dd>
+                            {{ package.includedFiles }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>
+                            Tamaño descomprimido
+                        </dt>
+
+                        <dd>
+                            {{ formatSize(package.uncompressedSize) }}
+                        </dd>
+                    </div>
+                </dl>
+
+                @if (package.warnings.length > 0) {
+                <section class="selected-package__warnings">
+                    <h3>
+                        Advertencias del exportador
+                    </h3>
+
+                    <ul>
+                        @for (
+                        warning of package.warnings;
+                        track warning
+                        ) {
+                        <li>
+                            {{ warning }}
+                        </li>
+                        }
+                    </ul>
+                </section>
+                }
+
+                <footer class="selected-package__actions">
+                    <button type="button"
+                            matButton
+                            (click)="clearSelection()">
+                        <mat-icon>
+                            close
+                        </mat-icon>
+
+                        Quitar selección
+                    </button>
+
+                    <button type="button"
+                            matButton="filled">
+                        <mat-icon>
+                            arrow_forward
+                        </mat-icon>
+
+                        Continuar
+                    </button>
+                </footer>
             </article>
-
-            <p class="legacy-import__next-step">
-                El archivo está preparado para ser
-                analizado.
-            </p>
             }
         </section>
     </section>

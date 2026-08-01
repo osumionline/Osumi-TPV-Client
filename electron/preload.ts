@@ -2,6 +2,7 @@ import type ApplicationStateResult from '@desktop-contracts/application/applicat
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type { InstallationResult } from '@desktop-contracts/configuration/installation-result.interface';
 import type { AppInfo, OsumiDesktopApi } from '@desktop-contracts/desktop-api';
+import type LegacyImportPackageSelectionResult from '@desktop-contracts/legacy-import/legacy-import-package-selection-result.type';
 import IPC_CHANNELS from '@ipc/channels';
 import { contextBridge, ipcRenderer } from 'electron';
 
@@ -13,14 +14,21 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
       ipcRenderer.invoke(IPC_CHANNELS.applicationGetState) as Promise<ApplicationStateResult>,
   },
 
-  system: Object.freeze({
-    getAppInfo: (): Promise<AppInfo> =>
-      ipcRenderer.invoke(IPC_CHANNELS.systemGetAppInfo) as Promise<AppInfo>,
-  }),
-
   configuration: Object.freeze({
     install: (command: InstallationCommand): Promise<InstallationResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.configurationInstall, command) as Promise<InstallationResult>,
+  }),
+
+  legacyImport: {
+    selectPackage: (): Promise<LegacyImportPackageSelectionResult> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.legacyImportSelectPackage,
+      ) as Promise<LegacyImportPackageSelectionResult>,
+  },
+
+  system: Object.freeze({
+    getAppInfo: (): Promise<AppInfo> =>
+      ipcRenderer.invoke(IPC_CHANNELS.systemGetAppInfo) as Promise<AppInfo>,
   }),
 });
 

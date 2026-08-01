@@ -42,6 +42,12 @@ import registerApplicationIpc from '@ipc/register-application-ipc';
 import registerConfigurationIpc from '@ipc/register-configuration-ipc';
 import { registerSystemIpc } from '@ipc/register-system-ipc';
 
+import LegacyImportService from '@backend/application/legacy-import/legacy-import.service';
+import ElectronLegacyImportDialog from '@infrastructure/electron/electron-legacy-import-dialog';
+import InMemoryLegacyImportSelectionStore from '@infrastructure/legacy-import/in-memory-legacy-import-selection.store';
+import YauzlLegacyImportPackageInspector from '@infrastructure/legacy-import/yauzl-legacy-import-package.inspector';
+import registerLegacyImportIpc from '@ipc/register-legacy-import-ipc';
+
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'osumi',
@@ -194,6 +200,22 @@ app
       databaseSchemaService,
     );
 
+    const legacyImportDialog: ElectronLegacyImportDialog = new ElectronLegacyImportDialog(
+      (): BrowserWindow | null => mainWindow,
+    );
+
+    const legacyImportPackageInspector: YauzlLegacyImportPackageInspector =
+      new YauzlLegacyImportPackageInspector();
+
+    const legacyImportSelectionStore: InMemoryLegacyImportSelectionStore =
+      new InMemoryLegacyImportSelectionStore();
+
+    const legacyImportService: LegacyImportService = new LegacyImportService(
+      legacyImportDialog,
+      legacyImportPackageInspector,
+      legacyImportSelectionStore,
+    );
+
     /*
      * Creación de una nueva instalación.
      */
@@ -218,6 +240,8 @@ app
      * Canales IPC.
      */
     registerApplicationIpc(applicationStateService);
+
+    registerLegacyImportIpc(legacyImportService);
 
     registerSystemIpc(
       (): BrowserWindow | null => mainWindow,

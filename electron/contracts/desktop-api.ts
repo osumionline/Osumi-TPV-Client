@@ -1,6 +1,7 @@
 import ApplicationStateResult from '@desktop-contracts/application/application-state-result.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type { InstallationResult } from '@desktop-contracts/configuration/installation-result.interface';
+import type LegacyImportApi from '@desktop-contracts/legacy-import/legacy-import-api.interface';
 
 export interface AppInfo {
   readonly name: string;
@@ -23,6 +24,8 @@ export interface OsumiDesktopApi {
   readonly system: {
     getAppInfo(): Promise<AppInfo>;
   };
+
+  readonly legacyImport: LegacyImportApi;
 
   readonly configuration: {
     install(command: InstallationCommand): Promise<InstallationResult>;
