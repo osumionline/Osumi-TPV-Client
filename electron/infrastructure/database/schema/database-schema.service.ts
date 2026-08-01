@@ -94,6 +94,8 @@ export default class DatabaseSchemaService {
   }
 
   async validate(queryRunner: QueryRunner): Promise<void> {
+    await this.configureConnection(queryRunner);
+
     await this.assertForeignKeysEnabled(queryRunner);
 
     await this.assertDatabaseIdentity(queryRunner);
