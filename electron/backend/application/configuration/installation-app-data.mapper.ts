@@ -19,10 +19,6 @@ export default function createAppData(command: InstallationCommand, installedAt:
     instagram: command.redes.instagram,
     web: command.redes.web,
 
-    cajaInicial: command.valoresIniciales.cajaInicial,
-    ticketInicial: command.valoresIniciales.ticketInicial,
-    facturaInicial: command.valoresIniciales.facturaInicial,
-
     tipoIva: command.fiscalidad.tipoIva,
     ivaList: [...command.fiscalidad.ivaList],
     reList: [...command.fiscalidad.reList],

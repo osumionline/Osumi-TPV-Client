@@ -1,52 +1,73 @@
 import type InstallationDatabase from '@backend/contracts/installation-database.interface';
 import type PasswordHasher from '@backend/contracts/password-hasher.interface';
-import type Caja from '@backend/domain/caja/caja.interface';
-import type Empleado from '@backend/domain/empleados/empleado.interface';
+import type { DatabaseCreationOptions } from '@backend/domain/database/database-creation-options.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
-import cajaSchema from '@infrastructure/database/typeorm/schemas/caja.schema';
-import empleadoSchema from '@infrastructure/database/typeorm/schemas/empleado.schema';
+import NewInstallationDataService from '@infrastructure/database/initial-data/new-installation-data.service';
+import DatabaseSchemaService from '@infrastructure/database/schema/database-schema.service';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import { rm } from 'node:fs/promises';
-import type { DataSource, DeepPartial, EntityManager } from 'typeorm';
+import type { DataSource, QueryRunner } from 'typeorm';
 
 export default class TypeOrmInstallationDatabase implements InstallationDatabase {
   constructor(
     private readonly databaseFile: string,
+    private readonly applicationVersion: string,
     private readonly passwordHasher: PasswordHasher,
     private readonly dataSourceFactory: TypeOrmDataSourceFactory,
+    private readonly databaseSchemaService: DatabaseSchemaService,
+    private readonly newInstallationDataService: NewInstallationDataService,
   ) {}
 
   async prepare(command: InstallationCommand): Promise<void> {
     await this.delete();
 
+    const createdAt: string = new Date().toISOString();
+
+    const passwordHash: string = await this.passwordHasher.hash(command.empleadoInicial.password);
+
+    const creationOptions: DatabaseCreationOptions = {
+      applicationVersion: this.applicationVersion,
+      installationType: 'new',
+      createdAt,
+      importedAt: null,
+    };
+
     const dataSource: DataSource = this.dataSourceFactory.create(this.databaseFile);
+
+    let queryRunner: QueryRunner | null = null;
 
     try {
       await dataSource.initialize();
 
-      await dataSource.query('PRAGMA foreign_keys = ON');
+      queryRunner = dataSource.createQueryRunner();
 
-      await dataSource.runMigrations();
+      await queryRunner.connect();
 
-      const passwordHash: string = await this.passwordHasher.hash(command.empleadoInicial.password);
+      await this.databaseSchemaService.create(queryRunner, creationOptions);
 
-      await dataSource.transaction(async (manager: EntityManager): Promise<void> => {
-        await this.createInitialEmployee(manager, command, passwordHash);
+      await this.newInstallationDataService.create(queryRunner, command, passwordHash, createdAt);
 
-        await this.createInitialCashRegister(manager, command);
-      });
+      /*
+       * Volvemos a validar después de insertar los
+       * datos iniciales para comprobar también las
+       * claves foráneas creadas por esos registros.
+       */
+      await this.databaseSchemaService.validate(queryRunner);
 
-      await this.checkpointDatabase(dataSource);
-    } catch (error: unknown) {
-      await this.destroyDataSource(dataSource);
+      await this.checkpointDatabase(queryRunner);
+
+      await this.closeDatabase(queryRunner, dataSource);
+
+      queryRunner = null;
+
       await this.deleteAuxiliaryFiles();
+    } catch (error: unknown) {
+      await this.closeDatabaseSafely(queryRunner, dataSource);
 
       await this.delete();
 
       throw error;
     }
-
-    await this.destroyDataSource(dataSource);
   }
 
   async delete(): Promise<void> {
@@ -65,78 +86,8 @@ export default class TypeOrmInstallationDatabase implements InstallationDatabase
     );
   }
 
-  private async createInitialEmployee(
-    manager: EntityManager,
-    command: InstallationCommand,
-    passwordHash: string,
-  ): Promise<void> {
-    const normalizedColor: string = command.empleadoInicial.color.replace(/^#/, '').toUpperCase();
-
-    const empleado: DeepPartial<Empleado> = {
-      nombre: command.empleadoInicial.nombre,
-      passwordHash,
-      color: normalizedColor,
-      admin: true,
-      activo: true,
-      deletedAt: null,
-    };
-
-    await manager.save(empleadoSchema, empleado);
-  }
-
-  private async createInitialCashRegister(
-    manager: EntityManager,
-    command: InstallationCommand,
-  ): Promise<void> {
-    const openingAmountCents: number = this.toCents(command.valoresIniciales.cajaInicial);
-
-    const caja: DeepPartial<Caja> = {
-      apertura: new Date(),
-      cierre: null,
-
-      ventasCents: 0,
-      beneficiosCents: 0,
-
-      ventaEfectivoCents: 0,
-      operacionesEfectivo: 0,
-      descuentoEfectivoCents: 0,
-
-      ventaOtrosCents: 0,
-      operacionesOtros: 0,
-      descuentoOtrosCents: 0,
-
-      importePagosCajaCents: 0,
-      numPagosCaja: 0,
-
-      importeAperturaCents: openingAmountCents,
-      importeCierreCents: 0,
-      importeCierreRealCents: 0,
-      importeRetiradoCents: 0,
-    };
-
-    await manager.save(cajaSchema, caja);
-  }
-
-  private toCents(amount: number): number {
-    const cents: number = Math.round(amount * 100);
-
-    if (!Number.isSafeInteger(cents)) {
-      throw new Error('El importe inicial de caja no es válido.');
-    }
-
-    return cents;
-  }
-
-  private async destroyDataSource(dataSource: DataSource): Promise<void> {
-    if (!dataSource.isInitialized) {
-      return;
-    }
-
-    await dataSource.destroy();
-  }
-
-  private async checkpointDatabase(dataSource: DataSource): Promise<void> {
-    await dataSource.query('PRAGMA wal_checkpoint(TRUNCATE)');
+  private async checkpointDatabase(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query('PRAGMA wal_checkpoint(TRUNCATE)');
   }
 
   private async deleteAuxiliaryFiles(): Promise<void> {
@@ -152,5 +103,36 @@ export default class TypeOrmInstallationDatabase implements InstallationDatabase
         }),
       ),
     );
+  }
+
+  private async closeDatabase(queryRunner: QueryRunner, dataSource: DataSource): Promise<void> {
+    if (!queryRunner.isReleased) {
+      await queryRunner.release();
+    }
+
+    if (dataSource.isInitialized) {
+      await dataSource.destroy();
+    }
+  }
+
+  private async closeDatabaseSafely(
+    queryRunner: QueryRunner | null,
+    dataSource: DataSource,
+  ): Promise<void> {
+    try {
+      if (queryRunner !== null && !queryRunner.isReleased) {
+        await queryRunner.release();
+      }
+    } catch (error: unknown) {
+      console.error('No se ha podido liberar el QueryRunner:', error);
+    }
+
+    try {
+      if (dataSource.isInitialized) {
+        await dataSource.destroy();
+      }
+    } catch (error: unknown) {
+      console.error('No se ha podido cerrar la conexión SQLite:', error);
+    }
   }
 }

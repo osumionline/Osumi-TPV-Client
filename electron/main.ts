@@ -9,6 +9,10 @@ import type InstallationStaging from '@backend/contracts/installation-staging.in
 import type LogoStorage from '@backend/contracts/logo-storage.interface';
 import type PasswordHasher from '@backend/contracts/password-hasher.interface';
 import type SecretStorage from '@backend/contracts/secret-storage.interface';
+import NewInstallationDataService from '@infrastructure/database/initial-data/new-installation-data.service';
+import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
+import completeDatabaseSchemaTables from '@infrastructure/database/schema/complete-database-schema.tables';
+import DatabaseSchemaService from '@infrastructure/database/schema/database-schema.service';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import TypeOrmInstallationDatabase from '@infrastructure/database/typeorm/typeorm-installation-database';
 import ElectronApplicationPathsProvider from '@infrastructure/electron/electron-application-paths.provider';
@@ -84,6 +88,7 @@ app.enableSandbox();
 app
   .whenReady()
   .then(async () => {
+    const applicationVersion: string = app.getVersion();
     const pathsProvider: ElectronApplicationPathsProvider = new ElectronApplicationPathsProvider();
     const applicationPaths: ApplicationPaths = pathsProvider.getPaths();
     const directoriesService: ApplicationDirectoriesService = new ApplicationDirectoriesService(
@@ -120,10 +125,19 @@ app
     );
     const passwordHasher: PasswordHasher = new NodeScryptPasswordHasher();
     const dataSourceFactory: TypeOrmDataSourceFactory = new TypeOrmDataSourceFactory();
+    const databaseSchemaService: DatabaseSchemaService = new DatabaseSchemaService(
+      completeDatabaseSchema,
+      completeDatabaseSchemaTables,
+    );
+
+    const newInstallationDataService: NewInstallationDataService = new NewInstallationDataService();
     const installationDatabase: InstallationDatabase = new TypeOrmInstallationDatabase(
       applicationPaths.stagingDatabaseFile,
+      applicationVersion,
       passwordHasher,
       dataSourceFactory,
+      databaseSchemaService,
+      newInstallationDataService,
     );
     const installationService: InstallationService = new InstallationService(
       configurationService,

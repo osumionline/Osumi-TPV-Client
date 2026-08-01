@@ -39,12 +39,7 @@ function isAppData(value: unknown): value is AppData {
 
   const booleanProperties: readonly string[] = ['ventaOnline', 'fechaCad', 'empleados'];
 
-  const numberProperties: readonly string[] = [
-    'schemaVersion',
-    'cajaInicial',
-    'ticketInicial',
-    'facturaInicial',
-  ];
+  const numberProperties: readonly string[] = ['schemaVersion'];
 
   const validStrings: boolean = stringProperties.every(
     (property: string): boolean => typeof data[property] === 'string',

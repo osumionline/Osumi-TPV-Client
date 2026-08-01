@@ -17,10 +17,6 @@ export default interface AppData {
   readonly instagram: string;
   readonly web: string;
 
-  readonly cajaInicial: number;
-  readonly ticketInicial: number;
-  readonly facturaInicial: number;
-
   readonly tipoIva: TipoIva;
   readonly ivaList: readonly number[];
   readonly reList: readonly number[];
