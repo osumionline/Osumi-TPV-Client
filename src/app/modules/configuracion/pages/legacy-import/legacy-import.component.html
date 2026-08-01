@@ -1,0 +1,93 @@
+<main class="legacy-import">
+    <section class="legacy-import__content">
+        <header class="legacy-import__header">
+            <p class="legacy-import__eyebrow">
+                Importación de datos
+            </p>
+
+            <h1>
+                Selecciona tu archivo .otpv
+            </h1>
+
+            <p>
+                El paquete debe haberse generado desde
+                la versión anterior de Osumi TPV mediante
+                el exportador de migración.
+            </p>
+        </header>
+
+        <section class="legacy-import__information">
+            <h2>
+                Antes de importar
+            </h2>
+
+            <p>
+                Osumi TPV comprobará la estructura del
+                paquete, sus firmas de integridad, las
+                versiones de origen y el contenido de la
+                base de datos antes de crear ningún archivo
+                definitivo.
+            </p>
+
+            <p>
+                La instalación anterior no se modificará.
+            </p>
+        </section>
+
+        <section class="legacy-import__selection">
+            <label class="file-selector">
+                <input #fileInput
+                       type="file"
+                       accept=".otpv"
+                       (change)="selectFile($event)">
+
+                <span class="file-selector__title">
+                    Seleccionar archivo .otpv
+                </span>
+
+                <span class="file-selector__description">
+                    Pulsa aquí para buscar el paquete
+                    exportado en tu equipo.
+                </span>
+            </label>
+
+            @if (
+            selectionError();
+            as errorMessage
+            ) {
+            <p class="legacy-import__error"
+               role="alert">
+                {{ errorMessage }}
+            </p>
+            }
+
+            @if (
+            selectedFile();
+            as file
+            ) {
+            <article class="selected-file">
+                <div class="selected-file__information">
+                    <strong>
+                        {{ file.name }}
+                    </strong>
+
+                    <span>
+                        {{ selectedFileSize() }}
+                    </span>
+                </div>
+
+                <button type="button"
+                        class="selected-file__remove"
+                        (click)="clearSelection(fileInput)">
+                    Quitar
+                </button>
+            </article>
+
+            <p class="legacy-import__next-step">
+                El archivo está preparado para ser
+                analizado.
+            </p>
+            }
+        </section>
+    </section>
+</main>
