@@ -1,5 +1,301 @@
 <main class="legacy-import">
     <section class="legacy-import__content">
+        @if (analysisReport(); as report) {
+        <header class="legacy-import__header">
+            <p class="legacy-import__eyebrow">
+                Análisis completado
+            </p>
+
+            <h1>
+                Informe previo a la importación
+            </h1>
+
+            <p>
+                El paquete se ha analizado sin modificar
+                ningún archivo ni crear todavía la base
+                de datos de la nueva instalación.
+            </p>
+        </header>
+
+        <section class="analysis-summary"
+                 aria-label="Resumen del análisis">
+            <article>
+                <span>
+                    Tablas
+                </span>
+
+                <strong>
+                    {{ formatInteger(report.tables.length) }}
+                </strong>
+            </article>
+
+            <article>
+                <span>
+                    Registros
+                </span>
+
+                <strong>
+                    {{ formatInteger(report.totalRows) }}
+                </strong>
+            </article>
+
+            <article>
+                <span>
+                    Reparaciones automáticas
+                </span>
+
+                <strong>
+                    {{ formatInteger(report.automaticRepairIssues) }}
+                </strong>
+            </article>
+
+            <article>
+                <span>
+                    Problemas para revisar
+                </span>
+
+                <strong>
+                    {{ formatInteger(report.reviewIssues) }}
+                </strong>
+            </article>
+        </section>
+
+        @if (automaticIssues().length > 0) {
+        <section class="analysis-section">
+            <header class="analysis-section__header">
+                <mat-icon aria-hidden="true">
+                    auto_fix_high
+                </mat-icon>
+
+                <div>
+                    <h2>
+                        Reparaciones automáticas
+                    </h2>
+
+                    <p>
+                        Estas incidencias pueden resolverse
+                        aplicando reglas deterministas durante
+                        la migración.
+                    </p>
+                </div>
+            </header>
+
+            <div class="analysis-section__issues">
+                @for (
+                issue of automaticIssues();
+                track issue.code
+                ) {
+                <mat-card appearance="outlined"
+                          class="issue-card issue-card--automatic">
+                    <mat-card-header>
+                        <mat-icon mat-card-avatar
+                                  aria-hidden="true">
+                            build_circle
+                        </mat-icon>
+
+                        <mat-card-title>
+                            {{ issue.title }}
+                        </mat-card-title>
+
+                        <mat-card-subtitle>
+                            {{ formatInteger(issue.affectedRows) }}
+                            registros afectados
+                        </mat-card-subtitle>
+                    </mat-card-header>
+
+                    <mat-card-content>
+                        <p>
+                            {{ issue.description }}
+                        </p>
+
+                        <div class="issue-card__resolution">
+                            <strong>
+                                Resolución prevista
+                            </strong>
+
+                            <p>
+                                {{ issue.resolution }}
+                            </p>
+                        </div>
+
+                        @if (issue.samples.length > 0) {
+                        <details class="issue-card__samples">
+                            <summary>
+                                Ver ejemplos
+                            </summary>
+
+                            <ul>
+                                @for (
+                                sample of issue.samples;
+                                track sample
+                                ) {
+                                <li>
+                                    {{ sample }}
+                                </li>
+                                }
+                            </ul>
+                        </details>
+                        }
+                    </mat-card-content>
+                </mat-card>
+                }
+            </div>
+        </section>
+        }
+
+        @if (reviewIssues().length > 0) {
+        <section class="analysis-section">
+            <header class="analysis-section__header">
+                <mat-icon aria-hidden="true">
+                    rule
+                </mat-icon>
+
+                <div>
+                    <h2>
+                        Requieren revisión
+                    </h2>
+
+                    <p>
+                        Estas incidencias necesitan una decisión
+                        antes de poder iniciar la importación.
+                    </p>
+                </div>
+            </header>
+
+            <div class="analysis-section__issues">
+                @for (
+                issue of reviewIssues();
+                track issue.code
+                ) {
+                <mat-card appearance="outlined"
+                          class="issue-card issue-card--review">
+                    <mat-card-header>
+                        <mat-icon mat-card-avatar
+                                  aria-hidden="true">
+                            warning
+                        </mat-icon>
+
+                        <mat-card-title>
+                            {{ issue.title }}
+                        </mat-card-title>
+
+                        <mat-card-subtitle>
+                            {{ formatInteger(issue.affectedRows) }}
+                            registros en
+                            {{ formatInteger(issue.affectedGroups) }}
+                            grupos
+                        </mat-card-subtitle>
+                    </mat-card-header>
+
+                    <mat-card-content>
+                        <p>
+                            {{ issue.description }}
+                        </p>
+
+                        <div class="issue-card__resolution">
+                            <strong>
+                                Decisión necesaria
+                            </strong>
+
+                            <p>
+                                {{ issue.resolution }}
+                            </p>
+                        </div>
+
+                        @if (issue.samples.length > 0) {
+                        <details class="issue-card__samples">
+                            <summary>
+                                Ver ejemplos
+                            </summary>
+
+                            <ul>
+                                @for (
+                                sample of issue.samples;
+                                track sample
+                                ) {
+                                <li>
+                                    {{ sample }}
+                                </li>
+                                }
+                            </ul>
+                        </details>
+                        }
+                    </mat-card-content>
+                </mat-card>
+                }
+            </div>
+        </section>
+        }
+
+        @if (report.issues.length === 0) {
+        <section class="analysis-clean">
+            <mat-icon aria-hidden="true">
+                verified
+            </mat-icon>
+
+            <div>
+                <h2>
+                    No se han encontrado incompatibilidades
+                </h2>
+
+                <p>
+                    El paquete puede pasar directamente
+                    a la fase de importación.
+                </p>
+            </div>
+        </section>
+        }
+        @else if (report.requiresReview) {
+        <section class="analysis-result analysis-result--review">
+            <mat-icon aria-hidden="true">
+                assignment
+            </mat-icon>
+
+            <div>
+                <h2>
+                    El análisis ha terminado
+                </h2>
+
+                <p>
+                    El siguiente paso permitirá resolver
+                    individualmente los conflictos indicados.
+                </p>
+            </div>
+        </section>
+        }
+        @else {
+        <section class="analysis-result analysis-result--ready">
+            <mat-icon aria-hidden="true">
+                task_alt
+            </mat-icon>
+
+            <div>
+                <h2>
+                    El paquete está preparado
+                </h2>
+
+                <p>
+                    Todas las incidencias detectadas pueden
+                    corregirse automáticamente durante la
+                    importación.
+                </p>
+            </div>
+        </section>
+        }
+
+        <footer class="legacy-import__actions">
+            <button type="button"
+                    matButton
+                    (click)="returnToPackageSummary()">
+                <mat-icon>
+                    arrow_back
+                </mat-icon>
+
+                Volver al paquete
+            </button>
+        </footer>
+        }
+        @else {
         <header class="legacy-import__header">
             <p class="legacy-import__eyebrow">
                 Importación de datos
@@ -35,6 +331,129 @@
         </section>
 
         <section class="legacy-import__selection">
+            @if (selectedPackage(); as selectedPackage) {
+            <mat-card appearance="outlined"
+                      class="selected-package">
+                <mat-card-header>
+                    <mat-icon mat-card-avatar
+                              aria-hidden="true">
+                        inventory_2
+                    </mat-icon>
+
+                    <mat-card-title>
+                        {{ selectedPackage.fileName }}
+                    </mat-card-title>
+
+                    <mat-card-subtitle>
+                        Paquete .otpv válido
+                    </mat-card-subtitle>
+                </mat-card-header>
+
+                <mat-card-content>
+                    <dl class="selected-package__details">
+                        <div>
+                            <dt>
+                                Tamaño
+                            </dt>
+
+                            <dd>
+                                {{ formatSize(selectedPackage.packageSize) }}
+                            </dd>
+                        </div>
+
+                        <div>
+                            <dt>
+                                Creado
+                            </dt>
+
+                            <dd>
+                                {{ formatDate(selectedPackage.createdAt) }}
+                            </dd>
+                        </div>
+
+                        <div>
+                            <dt>
+                                Versión de Osumi TPV
+                            </dt>
+
+                            <dd>
+                                {{ selectedPackage.applicationVersion }}
+                            </dd>
+                        </div>
+
+                        <div>
+                            <dt>
+                                Tablas declaradas
+                            </dt>
+
+                            <dd>
+                                {{ formatInteger(selectedPackage.tables) }}
+                                de
+                                {{ formatInteger(selectedPackage.expectedTables) }}
+                            </dd>
+                        </div>
+
+                        <div>
+                            <dt>
+                                Registros declarados
+                            </dt>
+
+                            <dd>
+                                {{ formatInteger(selectedPackage.totalRows) }}
+                            </dd>
+                        </div>
+
+                        <div>
+                            <dt>
+                                Tamaño descomprimido
+                            </dt>
+
+                            <dd>
+                                {{ formatSize(selectedPackage.uncompressedSize) }}
+                            </dd>
+                        </div>
+                    </dl>
+                </mat-card-content>
+
+                <mat-card-actions align="end">
+                    <button type="button"
+                            matButton
+                            [disabled]="analyzing()"
+                            (click)="clearSelection()">
+                        <mat-icon>
+                            close
+                        </mat-icon>
+
+                        Quitar
+                    </button>
+
+                    <button type="button"
+                            matButton="filled"
+                            [disabled]="analyzing()"
+                            (click)="analyzePackage()">
+                        @if (analyzing()) {
+                        <mat-spinner matButtonIcon
+                                     class="button-spinner"
+                                     diameter="20" />
+                        }
+                        @else {
+                        <mat-icon>
+                            analytics
+                        </mat-icon>
+                        }
+
+                        <span>
+                            {{
+                          analyzing()
+                            ? 'Analizando…'
+                            : 'Analizar contenido'
+                        }}
+                        </span>
+                    </button>
+                </mat-card-actions>
+            </mat-card>
+            }
+            @else {
             <button type="button"
                     matButton="filled"
                     [disabled]="selecting()"
@@ -44,170 +463,28 @@
                 </mat-icon>
 
                 @if (selecting()) {
-                Analizando paquete…
+                Seleccionando…
                 }
                 @else {
                 Seleccionar archivo .otpv
                 }
             </button>
+            }
 
-            @if (
-            selectionError();
-            as errorMessage
-            ) {
+            @if (selectionError(); as errorMessage) {
             <p class="legacy-import__error"
                role="alert">
                 {{ errorMessage }}
             </p>
             }
 
-            @if (
-            selectedPackage();
-            as package
-            ) {
-            <article class="selected-package">
-                <header class="selected-package__header">
-                    <div>
-                        <p class="selected-package__label">
-                            Paquete válido
-                        </p>
-
-                        <h2>
-                            {{ package.fileName }}
-                        </h2>
-                    </div>
-
-                    <mat-icon class="selected-package__valid-icon"
-                              aria-label="Paquete válido">
-                        verified
-                    </mat-icon>
-                </header>
-
-                <dl class="selected-package__details">
-                    <div>
-                        <dt>
-                            Tamaño
-                        </dt>
-
-                        <dd>
-                            {{ formatSize(package.packageSize) }}
-                        </dd>
-                    </div>
-
-                    <div>
-                        <dt>
-                            Creado
-                        </dt>
-
-                        <dd>
-                            {{ formatDate(package.createdAt) }}
-                        </dd>
-                    </div>
-
-                    <div>
-                        <dt>
-                            Versión de Osumi TPV
-                        </dt>
-
-                        <dd>
-                            {{ package.applicationVersion }}
-                        </dd>
-                    </div>
-
-                    <div>
-                        <dt>
-                            Esquema
-                        </dt>
-
-                        <dd>
-                            {{ package.schemaVersion }}
-                        </dd>
-                    </div>
-
-                    <div>
-                        <dt>
-                            Tablas
-                        </dt>
-
-                        <dd>
-                            {{ package.tables }}
-                            de
-                            {{ package.expectedTables }}
-                        </dd>
-                    </div>
-
-                    <div>
-                        <dt>
-                            Registros
-                        </dt>
-
-                        <dd>
-                            {{ package.totalRows }}
-                        </dd>
-                    </div>
-
-                    <div>
-                        <dt>
-                            Archivos incluidos
-                        </dt>
-
-                        <dd>
-                            {{ package.includedFiles }}
-                        </dd>
-                    </div>
-
-                    <div>
-                        <dt>
-                            Tamaño descomprimido
-                        </dt>
-
-                        <dd>
-                            {{ formatSize(package.uncompressedSize) }}
-                        </dd>
-                    </div>
-                </dl>
-
-                @if (package.warnings.length > 0) {
-                <section class="selected-package__warnings">
-                    <h3>
-                        Advertencias del exportador
-                    </h3>
-
-                    <ul>
-                        @for (
-                        warning of package.warnings;
-                        track warning
-                        ) {
-                        <li>
-                            {{ warning }}
-                        </li>
-                        }
-                    </ul>
-                </section>
-                }
-
-                <footer class="selected-package__actions">
-                    <button type="button"
-                            matButton
-                            (click)="clearSelection()">
-                        <mat-icon>
-                            close
-                        </mat-icon>
-
-                        Quitar selección
-                    </button>
-
-                    <button type="button"
-                            matButton="filled">
-                        <mat-icon>
-                            arrow_forward
-                        </mat-icon>
-
-                        Continuar
-                    </button>
-                </footer>
-            </article>
+            @if (analysisError(); as errorMessage) {
+            <p class="legacy-import__error"
+               role="alert">
+                {{ errorMessage }}
+            </p>
             }
         </section>
+        }
     </section>
 </main>
