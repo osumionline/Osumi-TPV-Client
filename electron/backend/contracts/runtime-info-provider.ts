@@ -1,4 +1,4 @@
-import type { AppInfo } from '@desktop-contracts/desktop-api';
+import AppInfo from '@desktop-contracts/system/app-info.interface';
 
 export interface RuntimeInfoProvider {
   getAppInfo(): AppInfo;

@@ -1,5 +1,5 @@
 import type { RuntimeInfoProvider } from '@backend/contracts/runtime-info-provider';
-import type { AppInfo } from '@desktop-contracts/desktop-api';
+import AppInfo from '@desktop-contracts/system/app-info.interface';
 import { app } from 'electron';
 
 export class ElectronRuntimeInfoProvider implements RuntimeInfoProvider {

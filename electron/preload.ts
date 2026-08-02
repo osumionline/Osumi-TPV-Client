@@ -1,8 +1,10 @@
 import type ApplicationStateResult from '@desktop-contracts/application/application-state-result.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type { InstallationResult } from '@desktop-contracts/configuration/installation-result.interface';
-import type { AppInfo, OsumiDesktopApi } from '@desktop-contracts/desktop-api';
+import OsumiDesktopApi from '@desktop-contracts/desktop-api';
+import type LegacyImportAnalysisReport from '@desktop-contracts/legacy-import/legacy-import-analysis-report.interface';
 import type LegacyImportPackageSelectionResult from '@desktop-contracts/legacy-import/legacy-import-package-selection-result.type';
+import AppInfo from '@desktop-contracts/system/app-info.interface';
 import IPC_CHANNELS from '@ipc/channels';
 import { contextBridge, ipcRenderer } from 'electron';
 
@@ -24,6 +26,13 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
       ipcRenderer.invoke(
         IPC_CHANNELS.legacyImportSelectPackage,
       ) as Promise<LegacyImportPackageSelectionResult>,
+
+    analyzePackage: (selectionId: string): Promise<LegacyImportAnalysisReport> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.legacyImportAnalyzePackage,
+
+        selectionId,
+      ) as Promise<LegacyImportAnalysisReport>,
   },
 
   system: Object.freeze({

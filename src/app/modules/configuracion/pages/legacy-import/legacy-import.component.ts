@@ -40,6 +40,7 @@ export default class LegacyImportComponent {
       if (result.status === 'cancelled') {
         return;
       }
+      console.log('Selection ID:', result.package.selectionId);
 
       this.selectedPackage.set(result.package);
     } catch (error: unknown) {

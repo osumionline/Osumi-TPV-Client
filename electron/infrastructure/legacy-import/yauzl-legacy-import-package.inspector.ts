@@ -1,5 +1,5 @@
 import type LegacyImportPackageInspector from '@backend/contracts/legacy-import-package-inspector.interface';
-import type LegacyImportPackageInspection from '@backend/domain/legacy-import/legacy-import-package-inspection.type';
+import type LegacyImportPackageInspection from '@backend/domain/legacy-import/legacy-import-package-inspection.interface';
 import {
   LEGACY_IMPORT_APPLICATION_NAME,
   LEGACY_IMPORT_MAX_ENTRY_COUNT,
@@ -17,6 +17,24 @@ import { basename, extname } from 'node:path';
 import type { Readable } from 'node:stream';
 import type { Entry, Options, ZipFile } from 'yauzl';
 import { open } from 'yauzl';
+
+interface LegacyExportReportData {
+  readonly tables: number;
+
+  readonly expectedTables: number;
+
+  readonly totalRows: number;
+
+  readonly dumpSize: number;
+
+  readonly includedFiles: number;
+
+  readonly optionalFilesNotPresent: number;
+
+  readonly warnings: readonly string[];
+
+  readonly tableRows: Readonly<Record<string, number>>;
+}
 
 export default class YauzlLegacyImportPackageInspector implements LegacyImportPackageInspector {
   async inspect(packagePath: string): Promise<LegacyImportPackageInspection> {
@@ -61,15 +79,7 @@ export default class YauzlLegacyImportPackageInspector implements LegacyImportPa
         readonly createdAt: string;
       } = this.validateManifest(manifest);
 
-      const reportData: {
-        readonly tables: number;
-        readonly expectedTables: number;
-        readonly totalRows: number;
-        readonly dumpSize: number;
-        readonly includedFiles: number;
-        readonly optionalFilesNotPresent: number;
-        readonly warnings: readonly string[];
-      } = this.validateExportReport(exportReport);
+      const reportData: LegacyExportReportData = this.validateExportReport(exportReport);
 
       const databaseEntry: Entry = this.getRequiredEntry(entriesByName, 'database.sql');
 
@@ -86,39 +96,43 @@ export default class YauzlLegacyImportPackageInspector implements LegacyImportPa
       await this.verifyChecksums(zipFile, entriesByName, checksumFiles);
 
       return {
-        fileName: basename(packagePath),
+        summary: {
+          fileName: basename(packagePath),
 
-        packageSize: packageStats.size,
+          packageSize: packageStats.size,
 
-        archiveEntries: entriesByName.size,
+          archiveEntries: entriesByName.size,
 
-        uncompressedSize: totalUncompressedSize,
+          uncompressedSize: totalUncompressedSize,
 
-        formatVersion: manifestData.formatVersion,
+          formatVersion: manifestData.formatVersion,
 
-        applicationVersion: manifestData.applicationVersion,
+          applicationVersion: manifestData.applicationVersion,
 
-        frameworkVersion: manifestData.frameworkVersion,
+          frameworkVersion: manifestData.frameworkVersion,
 
-        databaseVersion: manifestData.databaseVersion,
+          databaseVersion: manifestData.databaseVersion,
 
-        schemaVersion: manifestData.schemaVersion,
+          schemaVersion: manifestData.schemaVersion,
 
-        createdAt: manifestData.createdAt,
+          createdAt: manifestData.createdAt,
 
-        tables: reportData.tables,
+          tables: reportData.tables,
 
-        expectedTables: reportData.expectedTables,
+          expectedTables: reportData.expectedTables,
 
-        totalRows: reportData.totalRows,
+          totalRows: reportData.totalRows,
 
-        dumpSize: reportData.dumpSize,
+          dumpSize: reportData.dumpSize,
 
-        includedFiles: reportData.includedFiles,
+          includedFiles: reportData.includedFiles,
 
-        optionalFilesNotPresent: reportData.optionalFilesNotPresent,
+          optionalFilesNotPresent: reportData.optionalFilesNotPresent,
 
-        warnings: reportData.warnings,
+          warnings: reportData.warnings,
+        },
+
+        tableRows: reportData.tableRows,
       };
     } finally {
       zipFile.close();
@@ -489,15 +503,7 @@ export default class YauzlLegacyImportPackageInspector implements LegacyImportPa
     };
   }
 
-  private validateExportReport(report: Record<string, unknown>): {
-    readonly tables: number;
-    readonly expectedTables: number;
-    readonly totalRows: number;
-    readonly dumpSize: number;
-    readonly includedFiles: number;
-    readonly optionalFilesNotPresent: number;
-    readonly warnings: readonly string[];
-  } {
+  private validateExportReport(report: Record<string, unknown>): LegacyExportReportData {
     const status: string = this.getString(report, 'status', 'export-report.json');
 
     if (status !== 'success') {
@@ -509,6 +515,28 @@ export default class YauzlLegacyImportPackageInspector implements LegacyImportPa
       'database',
       'export-report.json',
     );
+
+    const tableRowsValue: Record<string, unknown> = this.getRecord(
+      database,
+      'tableRows',
+      'export-report.json',
+    );
+
+    const tableRows: Record<string, number> = {};
+
+    for (const [tableName, rowCountValue] of Object.entries(tableRowsValue)) {
+      if (
+        typeof rowCountValue !== 'number' ||
+        !Number.isSafeInteger(rowCountValue) ||
+        rowCountValue < 0
+      ) {
+        throw new Error(
+          ['El número de registros de la tabla', `${tableName} no es válido.`].join(' '),
+        );
+      }
+
+      tableRows[tableName] = rowCountValue;
+    }
 
     const files: Record<string, unknown> = this.getRecord(report, 'files', 'export-report.json');
 
@@ -532,18 +560,13 @@ export default class YauzlLegacyImportPackageInspector implements LegacyImportPa
 
     return {
       tables: this.getNumber(database, 'tables', 'export-report.json'),
-
       expectedTables: this.getNumber(database, 'expectedTables', 'export-report.json'),
-
       totalRows: this.getNumber(database, 'totalRows', 'export-report.json'),
-
       dumpSize: this.getNumber(database, 'dumpSize', 'export-report.json'),
-
       includedFiles: this.getNumber(files, 'included', 'export-report.json'),
-
       optionalFilesNotPresent: this.getNumber(files, 'optionalNotPresent', 'export-report.json'),
-
       warnings: this.getStringArray(report, 'warnings', 'export-report.json'),
+      tableRows,
     };
   }
 

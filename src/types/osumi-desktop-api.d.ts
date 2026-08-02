@@ -1,4 +1,4 @@
-import type { OsumiDesktopApi } from '@desktop-contracts/desktop-api';
+import type OsumiDesktopApi from '@desktop-contracts/desktop-api';
 
 export {};
 
