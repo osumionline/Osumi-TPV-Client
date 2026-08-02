@@ -2,6 +2,15 @@ import type LegacyImportDumpAnalyzer from '@backend/contracts/legacy-import-dump
 import type LegacyImportPackageAnalysis from '@backend/domain/legacy-import/legacy-import-package-analysis.type';
 import type LegacySqlInsert from '@backend/domain/legacy-import/legacy-sql-insert.interface';
 import type LegacyImportAnalysisIssue from '@desktop-contracts/legacy-import/legacy-import-analysis-issue.interface';
+import type {
+  LegacyImportAccessLocatorConflict,
+  LegacyImportArticleReference,
+  LegacyImportBarcodeConflict,
+  LegacyImportDuplicateDirectAccessConflict,
+  LegacyImportDuplicateLocatorConflict,
+  LegacyImportReviewConflict,
+  LegacyImportSaleDeliveredConflict,
+} from '@desktop-contracts/legacy-import/legacy-import-review-conflict.type';
 import type LegacyImportTableSummary from '@desktop-contracts/legacy-import/legacy-import-table-summary.interface';
 import MariaDbInsertParser from '@infrastructure/legacy-import/maria-db-insert.parser';
 import type { Interface as ReadLineInterface } from 'node:readline';
@@ -113,6 +122,9 @@ export default class YauzlLegacyImportDumpAnalyzer implements LegacyImportDumpAn
 
       const issues: readonly LegacyImportAnalysisIssue[] = this.createIssues(state);
 
+      const reviewConflicts: readonly LegacyImportReviewConflict[] =
+        this.createReviewConflicts(state);
+
       const automaticRepairIssues: number = issues.filter(
         (issue: LegacyImportAnalysisIssue): boolean => issue.kind === 'automatic-repair',
       ).length;
@@ -131,6 +143,7 @@ export default class YauzlLegacyImportDumpAnalyzer implements LegacyImportDumpAn
         requiresReview: reviewIssues > 0,
 
         issues,
+        reviewConflicts,
       };
     } finally {
       zipFile.close();
@@ -918,6 +931,280 @@ export default class YauzlLegacyImportDumpAnalyzer implements LegacyImportDumpAn
           ].join(', '),
         ),
     });
+  }
+
+  private createReviewConflicts(state: LegacyAnalysisState): readonly LegacyImportReviewConflict[] {
+    const activeArticles: readonly LegacyArticle[] = state.articles.filter(
+      (article: LegacyArticle): boolean => article.active,
+    );
+
+    const conflicts: LegacyImportReviewConflict[] = [
+      ...this.createDuplicateLocatorConflicts(activeArticles),
+
+      ...this.createDuplicateDirectAccessConflicts(activeArticles),
+
+      ...this.createAccessLocatorConflicts(activeArticles),
+
+      ...this.createBarcodeConflicts(state, activeArticles),
+
+      ...this.createSaleDeliveredConflicts(state.sales),
+    ];
+
+    return conflicts.sort(
+      (
+        first: LegacyImportReviewConflict,
+
+        second: LegacyImportReviewConflict,
+      ): number => first.id.localeCompare(second.id, 'es'),
+    );
+  }
+
+  private createDuplicateLocatorConflicts(
+    activeArticles: readonly LegacyArticle[],
+  ): readonly LegacyImportDuplicateLocatorConflict[] {
+    const groups: Map<number, LegacyArticle[]> = this.groupArticlesByNumber(
+      activeArticles,
+      'locator',
+    );
+
+    const conflicts: LegacyImportDuplicateLocatorConflict[] = [];
+
+    for (const [value, articles] of groups) {
+      if (articles.length < 2) {
+        continue;
+      }
+
+      conflicts.push({
+        id: `locator:${value}`,
+
+        code: 'duplicate-active-article-locators',
+
+        value,
+
+        articles: articles
+          .map((article: LegacyArticle): LegacyImportArticleReference =>
+            this.toArticleReference(article),
+          )
+          .sort(
+            (
+              first: LegacyImportArticleReference,
+
+              second: LegacyImportArticleReference,
+            ): number => first.articleId - second.articleId,
+          ),
+      });
+    }
+
+    return conflicts;
+  }
+
+  private createDuplicateDirectAccessConflicts(
+    activeArticles: readonly LegacyArticle[],
+  ): readonly LegacyImportDuplicateDirectAccessConflict[] {
+    const groups: Map<number, LegacyArticle[]> = this.groupArticlesByNumber(
+      activeArticles,
+      'directAccess',
+    );
+
+    const conflicts: LegacyImportDuplicateDirectAccessConflict[] = [];
+
+    for (const [value, articles] of groups) {
+      if (articles.length < 2) {
+        continue;
+      }
+
+      conflicts.push({
+        id: `direct-access:${value}`,
+
+        code: 'duplicate-active-direct-access-codes',
+
+        value,
+
+        articles: articles
+          .map((article: LegacyArticle): LegacyImportArticleReference =>
+            this.toArticleReference(article),
+          )
+          .sort(
+            (
+              first: LegacyImportArticleReference,
+
+              second: LegacyImportArticleReference,
+            ): number => first.articleId - second.articleId,
+          ),
+      });
+    }
+
+    return conflicts;
+  }
+
+  private createAccessLocatorConflicts(
+    activeArticles: readonly LegacyArticle[],
+  ): readonly LegacyImportAccessLocatorConflict[] {
+    const locatorGroups: Map<number, LegacyArticle[]> = this.groupArticlesByNumber(
+      activeArticles,
+      'locator',
+    );
+
+    const directAccessGroups: Map<number, LegacyArticle[]> = this.groupArticlesByNumber(
+      activeArticles,
+      'directAccess',
+    );
+
+    const conflicts: LegacyImportAccessLocatorConflict[] = [];
+
+    for (const [value, directAccessArticles] of directAccessGroups) {
+      const locatorArticles: readonly LegacyArticle[] = locatorGroups.get(value) ?? [];
+
+      if (locatorArticles.length === 0) {
+        continue;
+      }
+
+      conflicts.push({
+        id: `access-locator:${value}`,
+
+        code: 'direct-access-locator-collisions',
+
+        value,
+
+        locatorArticles: locatorArticles.map(
+          (article: LegacyArticle): LegacyImportArticleReference =>
+            this.toArticleReference(article),
+        ),
+
+        directAccessArticles: directAccessArticles.map(
+          (article: LegacyArticle): LegacyImportArticleReference =>
+            this.toArticleReference(article),
+        ),
+      });
+    }
+
+    return conflicts;
+  }
+
+  private createBarcodeConflicts(
+    state: LegacyAnalysisState,
+
+    activeArticles: readonly LegacyArticle[],
+  ): readonly LegacyImportBarcodeConflict[] {
+    const activeArticlesById: Map<number, LegacyArticle> = new Map<number, LegacyArticle>(
+      activeArticles.map((article: LegacyArticle): [number, LegacyArticle] => [
+        article.id,
+        article,
+      ]),
+    );
+
+    const barcodeGroups: Map<string, LegacyBarcode[]> = new Map<string, LegacyBarcode[]>();
+
+    for (const barcode of state.barcodes) {
+      const normalizedCode: string = this.normalizeText(barcode.code);
+
+      if (normalizedCode.length === 0) {
+        continue;
+      }
+
+      const currentGroup: LegacyBarcode[] = barcodeGroups.get(normalizedCode) ?? [];
+
+      currentGroup.push(barcode);
+
+      barcodeGroups.set(normalizedCode, currentGroup);
+    }
+
+    const conflicts: LegacyImportBarcodeConflict[] = [];
+
+    for (const group of barcodeGroups.values()) {
+      const articleIds: readonly number[] = [
+        ...new Set<number>(
+          group
+            .filter((barcode: LegacyBarcode): boolean => activeArticlesById.has(barcode.articleId))
+            .map((barcode: LegacyBarcode): number => barcode.articleId),
+        ),
+      ];
+
+      if (articleIds.length < 2) {
+        continue;
+      }
+
+      const articles: LegacyImportArticleReference[] = [];
+
+      for (const articleId of articleIds) {
+        const article: LegacyArticle | undefined = activeArticlesById.get(articleId);
+
+        if (article === undefined) {
+          continue;
+        }
+
+        articles.push(this.toArticleReference(article));
+      }
+
+      const barcodeIds: readonly number[] = group
+        .map((barcode: LegacyBarcode): number => barcode.id)
+        .sort(
+          (
+            first: number,
+
+            second: number,
+          ): number => first - second,
+        );
+
+      const firstBarcode: LegacyBarcode | undefined = group[0];
+
+      if (firstBarcode === undefined) {
+        continue;
+      }
+
+      conflicts.push({
+        id: `barcode:${barcodeIds.join('-')}`,
+
+        code: 'active-article-barcode-conflicts',
+
+        barcode: firstBarcode.code.trim(),
+
+        articles: articles.sort(
+          (
+            first: LegacyImportArticleReference,
+
+            second: LegacyImportArticleReference,
+          ): number => first.articleId - second.articleId,
+        ),
+      });
+    }
+
+    return conflicts;
+  }
+
+  private createSaleDeliveredConflicts(
+    sales: readonly LegacySale[],
+  ): readonly LegacyImportSaleDeliveredConflict[] {
+    return sales
+      .filter(
+        (sale: LegacySale): boolean =>
+          Math.abs(sale.delivered) > MAXIMUM_REASONABLE_DELIVERED_AMOUNT,
+      )
+      .map((sale: LegacySale): LegacyImportSaleDeliveredConflict => ({
+        id: `sale-delivered:${sale.id}`,
+
+        code: 'anomalous-sale-delivered-amounts',
+
+        saleId: sale.id,
+
+        saleNumber: sale.saleNumber,
+
+        total: sale.total,
+
+        delivered: sale.delivered,
+      }));
+  }
+
+  private toArticleReference(article: LegacyArticle): LegacyImportArticleReference {
+    return {
+      articleId: article.id,
+
+      name: article.name,
+
+      locator: article.locator,
+
+      directAccess: article.directAccess,
+    };
   }
 
   private normalizeText(value: string): string {

@@ -63,7 +63,8 @@
 
     &__actions {
         display: flex;
-        justify-content: flex-start;
+        justify-content: space-between;
+        gap: 16px;
     }
 }
 
@@ -146,7 +147,7 @@
         align-items: flex-start;
         gap: 16px;
 
-        > mat-icon {
+        >mat-icon {
             flex: 0 0 auto;
             color: var(--mat-sys-primary);
         }
@@ -192,7 +193,7 @@
     mat-card-content {
         padding-top: 16px;
 
-        > p {
+        >p {
             margin: 0;
             line-height: 1.6;
         }

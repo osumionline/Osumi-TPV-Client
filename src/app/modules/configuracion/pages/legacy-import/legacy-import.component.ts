@@ -15,6 +15,8 @@ import type LegacyImportAnalysisIssue from '@desktop-contracts/legacy-import/leg
 import type LegacyImportAnalysisReport from '@desktop-contracts/legacy-import/legacy-import-analysis-report.interface';
 import type LegacyImportPackageSelectionResult from '@desktop-contracts/legacy-import/legacy-import-package-selection-result.type';
 import type LegacyImportPackageSummary from '@desktop-contracts/legacy-import/legacy-import-package-summary.interface';
+import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-import/legacy-import-review-decision.type';
+import LegacyImportConflictResolutionComponent from '@modules/configuracion/components/legacy-import-conflict-resolution/legacy-import-conflict-resolution.component';
 import DesktopLegacyImportService from '@services/desktop-legacy-import.service';
 
 @Component({
@@ -29,6 +31,7 @@ import DesktopLegacyImportService from '@services/desktop-legacy-import.service'
     MatCardTitle,
     MatIcon,
     MatProgressSpinner,
+    LegacyImportConflictResolutionComponent,
   ],
   templateUrl: './legacy-import.component.html',
   styleUrl: './legacy-import.component.scss',
@@ -73,16 +76,22 @@ export default class LegacyImportComponent {
       ) ?? [],
   );
 
+  readonly resolvingConflicts: WritableSignal<boolean> = signal<boolean>(false);
+
+  readonly reviewDecisions: WritableSignal<readonly LegacyImportReviewDecision[]> = signal<
+    readonly LegacyImportReviewDecision[]
+  >([]);
+
   async selectPackage(): Promise<void> {
     if (this.selecting()) {
       return;
     }
 
     this.selecting.set(true);
-
     this.selectionError.set(null);
-
     this.analysisError.set(null);
+    this.resolvingConflicts.set(false);
+    this.reviewDecisions.set([]);
 
     try {
       const result: LegacyImportPackageSelectionResult =
@@ -114,8 +123,9 @@ export default class LegacyImportComponent {
     }
 
     this.analyzing.set(true);
-
     this.analysisError.set(null);
+    this.resolvingConflicts.set(false);
+    this.reviewDecisions.set([]);
 
     try {
       const report: LegacyImportAnalysisReport =
@@ -133,12 +143,11 @@ export default class LegacyImportComponent {
 
   clearSelection(): void {
     this.selectedPackage.set(null);
-
     this.analysisReport.set(null);
-
     this.selectionError.set(null);
-
     this.analysisError.set(null);
+    this.resolvingConflicts.set(false);
+    this.reviewDecisions.set([]);
   }
 
   returnToPackageSummary(): void {
@@ -186,5 +195,25 @@ export default class LegacyImportComponent {
     }
 
     return String(error);
+  }
+
+  openConflictResolution(): void {
+    const report: LegacyImportAnalysisReport | null = this.analysisReport();
+
+    if (report === null || report.reviewConflicts.length === 0) {
+      return;
+    }
+
+    this.resolvingConflicts.set(true);
+  }
+
+  cancelConflictResolution(): void {
+    this.resolvingConflicts.set(false);
+  }
+
+  saveReviewDecisions(decisions: readonly LegacyImportReviewDecision[]): void {
+    this.reviewDecisions.set(decisions);
+
+    this.resolvingConflicts.set(false);
   }
 }

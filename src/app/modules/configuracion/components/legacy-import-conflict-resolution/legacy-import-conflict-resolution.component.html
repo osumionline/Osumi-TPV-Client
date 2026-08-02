@@ -1,0 +1,199 @@
+<section class="conflict-resolution">
+    <header class="conflict-resolution__header">
+        <p class="conflict-resolution__eyebrow">
+            Resolución de conflictos
+        </p>
+
+        <h1>
+            Revisa las decisiones necesarias
+        </h1>
+
+        <p>
+            Ningún cambio se aplicará hasta confirmar
+            todas las decisiones y comenzar la importación.
+        </p>
+    </header>
+
+    <section class="conflict-resolution__list">
+        @for (conflict of conflicts(); track conflict.id) {
+        <mat-card appearance="outlined"
+                  class="conflict-card">
+            <mat-card-header>
+                <mat-icon mat-card-avatar>
+                    rule
+                </mat-icon>
+
+                <mat-card-title>
+                    {{ getConflictTitle(conflict) }}
+                </mat-card-title>
+
+                <mat-card-subtitle>
+                    {{ getConflictSubtitle(conflict) }}
+                </mat-card-subtitle>
+            </mat-card-header>
+
+            <mat-card-content>
+                @switch (conflict.code) {
+                @case ('duplicate-active-article-locators') {
+                <mat-radio-group [value]="selectedArticleId(conflict.id)"
+                                 (change)="setLocatorOwner(conflict.id, $event.value)">
+                    @for (article of conflict.articles; track article.articleId) {
+                    <mat-radio-button [value]="article.articleId">
+                        {{ article.name }}
+                        — artículo {{ article.articleId }}
+                    </mat-radio-button>
+                    }
+                </mat-radio-group>
+
+                <p class="conflict-card__help">
+                    Los demás artículos recibirán nuevos
+                    localizadores durante la importación.
+                </p>
+                }
+
+                @case ('duplicate-active-direct-access-codes') {
+                <mat-radio-group [value]="selectedArticleId(conflict.id)"
+                                 (change)="setDirectAccessOwner(conflict.id, $event.value)">
+                    @for (article of conflict.articles; track article.articleId) {
+                    <mat-radio-button [value]="article.articleId">
+                        {{ article.name }}
+                        — artículo {{ article.articleId }}
+                    </mat-radio-button>
+                    }
+
+                    <mat-radio-button [value]="null">
+                        Eliminar este acceso directo de todos
+                    </mat-radio-button>
+                </mat-radio-group>
+                }
+
+                @case ('active-article-barcode-conflicts') {
+                <mat-radio-group [value]="selectedArticleId(conflict.id)"
+                                 (change)="setBarcodeOwner(conflict.id, $event.value)">
+                    @for (article of conflict.articles; track article.articleId) {
+                    <mat-radio-button [value]="article.articleId">
+                        {{ article.name }}
+                        — artículo {{ article.articleId }}
+                    </mat-radio-button>
+                    }
+
+                    <mat-radio-button [value]="null">
+                        No importar este código de barras
+                    </mat-radio-button>
+                </mat-radio-group>
+                }
+
+                @case ('direct-access-locator-collisions') {
+                <div class="conflict-card__comparison">
+                    <section>
+                        <strong>
+                            Usado como localizador
+                        </strong>
+
+                        <ul>
+                            @for (
+                            article of conflict.locatorArticles;
+                            track article.articleId
+                            ) {
+                            <li>
+                                {{ article.name }}
+                                — artículo {{ article.articleId }}
+                            </li>
+                            }
+                        </ul>
+                    </section>
+
+                    <section>
+                        <strong>
+                            Usado como acceso directo
+                        </strong>
+
+                        <ul>
+                            @for (
+                            article of conflict.directAccessArticles;
+                            track article.articleId
+                            ) {
+                            <li>
+                                {{ article.name }}
+                                — artículo {{ article.articleId }}
+                            </li>
+                            }
+                        </ul>
+                    </section>
+                </div>
+
+                <mat-radio-group [value]="selectedAccessLocatorAction(conflict.id)"
+                                 (change)="setAccessLocatorAction(conflict.id, $event.value)">
+                    <mat-radio-button value="clear-direct-access">
+                        Eliminar el acceso directo conflictivo
+                    </mat-radio-button>
+
+                    <mat-radio-button value="reassign-direct-access">
+                        Asignar un nuevo acceso directo automáticamente
+                    </mat-radio-button>
+                </mat-radio-group>
+                }
+
+                @case ('anomalous-sale-delivered-amounts') {
+                <dl class="conflict-card__sale">
+                    <div>
+                        <dt>
+                            Total de la venta
+                        </dt>
+
+                        <dd>
+                            {{ formatCurrency(conflict.total) }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>
+                            Importe entregado original
+                        </dt>
+
+                        <dd>
+                            {{ formatCurrency(conflict.delivered) }}
+                        </dd>
+                    </div>
+                </dl>
+
+                <mat-radio-group [value]="selectedSaleAction(conflict.id)"
+                                 (change)="setSaleAction(conflict.id, $event.value)">
+                    <mat-radio-button value="use-sale-total">
+                        Sustituirlo por el total de la venta
+                    </mat-radio-button>
+
+                    <mat-radio-button value="use-zero">
+                        Sustituirlo por cero
+                    </mat-radio-button>
+                </mat-radio-group>
+                }
+                }
+            </mat-card-content>
+        </mat-card>
+        }
+    </section>
+
+    <footer class="conflict-resolution__actions">
+        <button type="button"
+                matButton
+                (click)="cancel()">
+            <mat-icon>
+                arrow_back
+            </mat-icon>
+
+            Volver al informe
+        </button>
+
+        <button type="button"
+                matButton="filled"
+                [disabled]="!allResolved()"
+                (click)="submit()">
+            <mat-icon>
+                done_all
+            </mat-icon>
+
+            Confirmar decisiones
+        </button>
+    </footer>
+</section>
