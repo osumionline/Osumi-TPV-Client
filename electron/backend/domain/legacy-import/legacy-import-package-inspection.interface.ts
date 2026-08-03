@@ -4,4 +4,6 @@ export default interface LegacyImportPackageInspection {
   readonly summary: Omit<LegacyImportPackageSummary, 'selectionId'>;
 
   readonly tableRows: Readonly<Record<string, number>>;
+
+  readonly packageSha256: string;
 }

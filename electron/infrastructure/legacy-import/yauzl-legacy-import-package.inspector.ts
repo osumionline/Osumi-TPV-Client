@@ -12,6 +12,7 @@ import {
 } from '@backend/domain/legacy-import/legacy-import.constants';
 import { createHash } from 'node:crypto';
 import type { Stats } from 'node:fs';
+import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { basename, extname } from 'node:path';
 import type { Readable } from 'node:stream';
@@ -41,6 +42,8 @@ export default class YauzlLegacyImportPackageInspector implements LegacyImportPa
     const packageStats: Stats = await stat(packagePath);
 
     this.assertPackageFile(packagePath, packageStats);
+
+    const packageSha256: string = await this.hashFile(packagePath);
 
     const zipFile: ZipFile = await this.openArchive(packagePath);
 
@@ -98,41 +101,25 @@ export default class YauzlLegacyImportPackageInspector implements LegacyImportPa
       return {
         summary: {
           fileName: basename(packagePath),
-
           packageSize: packageStats.size,
-
           archiveEntries: entriesByName.size,
-
           uncompressedSize: totalUncompressedSize,
-
           formatVersion: manifestData.formatVersion,
-
           applicationVersion: manifestData.applicationVersion,
-
           frameworkVersion: manifestData.frameworkVersion,
-
           databaseVersion: manifestData.databaseVersion,
-
           schemaVersion: manifestData.schemaVersion,
-
           createdAt: manifestData.createdAt,
-
           tables: reportData.tables,
-
           expectedTables: reportData.expectedTables,
-
           totalRows: reportData.totalRows,
-
           dumpSize: reportData.dumpSize,
-
           includedFiles: reportData.includedFiles,
-
           optionalFilesNotPresent: reportData.optionalFilesNotPresent,
-
           warnings: reportData.warnings,
         },
-
         tableRows: reportData.tableRows,
+        packageSha256,
       };
     } finally {
       zipFile.close();
@@ -628,6 +615,35 @@ export default class YauzlLegacyImportPackageInspector implements LegacyImportPa
         throw new Error(`checksums.json referencia un archivo inexistente: ${fileName}.`);
       }
     }
+  }
+
+  private hashFile(filePath: string): Promise<string> {
+    return new Promise<string>(
+      (
+        resolve: (checksum: string) => void,
+
+        reject: (reason?: unknown) => void,
+      ): void => {
+        const hash: ReturnType<typeof createHash> = createHash('sha256');
+        const readStream: ReturnType<typeof createReadStream> = createReadStream(filePath);
+
+        readStream.on('data', (chunk: Buffer | string): void => {
+          hash.update(chunk);
+        });
+
+        readStream.once('error', (error: Error): void => {
+          reject(
+            new Error('No se ha podido calcular el hash del paquete .otpv.', {
+              cause: error,
+            }),
+          );
+        });
+
+        readStream.once('end', (): void => {
+          resolve(hash.digest('hex'));
+        });
+      },
+    );
   }
 
   private hashEntry(zipFile: ZipFile, entry: Entry): Promise<string> {

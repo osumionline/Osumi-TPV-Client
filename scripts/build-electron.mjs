@@ -6,6 +6,7 @@ const buildOptions = {
   entryPoints: {
     main: 'electron/main.ts',
     preload: 'electron/preload.ts',
+    'legacy-import-worker': 'electron/workers/legacy-import-worker.ts',
   },
 
   bundle: true,

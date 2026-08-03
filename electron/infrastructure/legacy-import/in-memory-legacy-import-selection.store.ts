@@ -2,6 +2,7 @@ import type LegacyImportSelectionStore from '@backend/contracts/legacy-import-se
 import type LegacyImportPackageAnalysis from '@backend/domain/legacy-import/legacy-import-package-analysis.type';
 import type LegacyImportSelection from '@backend/domain/legacy-import/legacy-import-selection.interface';
 import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-import/legacy-import-review-decision.type';
+import type LegacyImportStartResult from '@desktop-contracts/legacy-import/legacy-import-start-result.interface';
 import { randomUUID } from 'node:crypto';
 
 export default class InMemoryLegacyImportSelectionStore implements LegacyImportSelectionStore {
@@ -24,11 +25,7 @@ export default class InMemoryLegacyImportSelectionStore implements LegacyImportS
     return this.selections.get(selectionId) ?? null;
   }
 
-  setAnalysis(
-    selectionId: string,
-
-    analysis: LegacyImportPackageAnalysis,
-  ): void {
+  setAnalysis(selectionId: string, analysis: LegacyImportPackageAnalysis): void {
     const selection: LegacyImportSelection = this.getRequiredSelection(selectionId);
 
     this.selections.set(selectionId, {
@@ -36,6 +33,7 @@ export default class InMemoryLegacyImportSelectionStore implements LegacyImportS
       analysis,
       reviewDecisions: [],
       reviewConfirmedAt: null,
+      executionResult: null,
     });
   }
 
@@ -54,6 +52,17 @@ export default class InMemoryLegacyImportSelectionStore implements LegacyImportS
       ...selection,
       reviewDecisions: [...decisions],
       reviewConfirmedAt: confirmedAt,
+      executionResult: null,
+    });
+  }
+
+  setExecutionResult(selectionId: string, result: LegacyImportStartResult): void {
+    const selection: LegacyImportSelection = this.getRequiredSelection(selectionId);
+
+    this.selections.set(selectionId, {
+      ...selection,
+
+      executionResult: result,
     });
   }
 

@@ -309,6 +309,62 @@
         </section>
         }
 
+        @if (importProgress(); as progress) {
+        <section class="import-execution">
+            <header class="import-execution__header">
+                <div>
+                    <h2>
+                        Preparando la importación
+                    </h2>
+
+                    <p>
+                        {{ progress.message }}
+                    </p>
+                </div>
+
+                <strong>
+                    {{ progress.percentage }} %
+                </strong>
+            </header>
+
+            <mat-progress-bar mode="determinate"
+                              [value]="progress.percentage" />
+        </section>
+        }
+
+        @if (importResult(); as result) {
+        <section class="import-staging-ready">
+            <mat-icon aria-hidden="true">
+                database
+            </mat-icon>
+
+            <div>
+                <h2>
+                    Base temporal preparada
+                </h2>
+
+                <p>
+                    Se ha creado y validado la base SQLite
+                    de staging para
+                    {{ formatInteger(result.sourceRows) }}
+                    registros de origen.
+                </p>
+
+                <p>
+                    La instalación definitiva todavía no
+                    se ha activado.
+                </p>
+            </div>
+        </section>
+        }
+
+        @if (importError(); as errorMessage) {
+        <p class="legacy-import__error"
+           role="alert">
+            {{ errorMessage }}
+        </p>
+        }
+
         @if (!resolvingConflicts() && reviewSubmissionError(); as errorMessage) {
         <p class="legacy-import__error"
            role="alert">
@@ -319,6 +375,7 @@
         <footer class="legacy-import__actions">
             <button type="button"
                     matButton
+                    [disabled]="importing()"
                     (click)="returnToPackageSummary()">
                 <mat-icon>
                     arrow_back
@@ -329,6 +386,7 @@
             @if (report.requiresReview) {
             <button type="button"
                     matButton="filled"
+                    [disabled]="importing()"
                     (click)="openConflictResolution()">
                 <mat-icon>
                     rule
@@ -353,6 +411,28 @@
                     {{ savingReviewDecisions()
                                 ? 'Preparando…'
                                 : 'Preparar importación'
+                        }}
+                </span>
+            </button>
+            }
+            @if (preparationResult() !== null && importResult() === null) {
+            <button type="button"
+                    matButton="filled"
+                    [disabled]="importing()"
+                    (click)="startImport()">
+                @if (importing()) {
+                <mat-spinner matButtonIcon
+                             diameter="20" />
+                }
+                @else {
+                <mat-icon>
+                    database
+                </mat-icon>
+                }
+                <span>
+                    {{ importing()
+                                ? 'Preparando base temporal…'
+                                : 'Iniciar importación'
                         }}
                 </span>
             </button>

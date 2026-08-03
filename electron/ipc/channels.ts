@@ -3,6 +3,8 @@ const IPC_CHANNELS = {
   legacyImportSelectPackage: 'legacy-import:select-package',
   legacyImportAnalyzePackage: 'legacy-import:analyze-package',
   legacyImportConfirmReviewDecisions: 'legacy-import:confirm-review-decisions',
+  legacyImportStart: 'legacy-import:start',
+  legacyImportProgress: 'legacy-import:progress',
   configurationInstall: 'configuration:install',
   applicationGetState: 'application:get-state',
 } as const;

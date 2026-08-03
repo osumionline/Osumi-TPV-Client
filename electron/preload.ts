@@ -5,9 +5,12 @@ import OsumiDesktopApi from '@desktop-contracts/desktop-api';
 import type LegacyImportAnalysisReport from '@desktop-contracts/legacy-import/legacy-import-analysis-report.interface';
 import type LegacyImportPackageSelectionResult from '@desktop-contracts/legacy-import/legacy-import-package-selection-result.type';
 import type LegacyImportPreparationResult from '@desktop-contracts/legacy-import/legacy-import-preparation-result.interface';
+import type LegacyImportProgress from '@desktop-contracts/legacy-import/legacy-import-progress.interface';
 import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-import/legacy-import-review-decision.type';
+import type LegacyImportStartResult from '@desktop-contracts/legacy-import/legacy-import-start-result.interface';
 import AppInfo from '@desktop-contracts/system/app-info.interface';
 import IPC_CHANNELS from '@ipc/channels';
+import type { IpcRendererEvent } from 'electron';
 import { contextBridge, ipcRenderer } from 'electron';
 
 const desktopApi: OsumiDesktopApi = Object.freeze({
@@ -44,6 +47,37 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         selectionId,
         decisions,
       ) as Promise<LegacyImportPreparationResult>,
+
+    startImport: (selectionId: string): Promise<LegacyImportStartResult> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.legacyImportStart,
+
+        selectionId,
+      ) as Promise<LegacyImportStartResult>,
+
+    onImportProgress: (listener: (progress: LegacyImportProgress) => void): (() => void) => {
+      const wrappedListener = (
+        _event: IpcRendererEvent,
+
+        progress: LegacyImportProgress,
+      ): void => {
+        listener(progress);
+      };
+
+      ipcRenderer.on(
+        IPC_CHANNELS.legacyImportProgress,
+
+        wrappedListener,
+      );
+
+      return (): void => {
+        ipcRenderer.removeListener(
+          IPC_CHANNELS.legacyImportProgress,
+
+          wrappedListener,
+        );
+      };
+    },
   },
 
   system: Object.freeze({

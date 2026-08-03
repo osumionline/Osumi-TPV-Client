@@ -1,5 +1,5 @@
 import type { Signal, WritableSignal } from '@angular/core';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import {
   MatCard,
@@ -10,13 +10,16 @@ import {
   MatCardTitle,
 } from '@angular/material/card';
 import { MatIcon } from '@angular/material/icon';
+import { MatProgressBar } from '@angular/material/progress-bar';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import type LegacyImportAnalysisIssue from '@desktop-contracts/legacy-import/legacy-import-analysis-issue.interface';
 import type LegacyImportAnalysisReport from '@desktop-contracts/legacy-import/legacy-import-analysis-report.interface';
 import type LegacyImportPackageSelectionResult from '@desktop-contracts/legacy-import/legacy-import-package-selection-result.type';
 import type LegacyImportPackageSummary from '@desktop-contracts/legacy-import/legacy-import-package-summary.interface';
 import type LegacyImportPreparationResult from '@desktop-contracts/legacy-import/legacy-import-preparation-result.interface';
+import LegacyImportProgress from '@desktop-contracts/legacy-import/legacy-import-progress.interface';
 import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-import/legacy-import-review-decision.type';
+import LegacyImportStartResult from '@desktop-contracts/legacy-import/legacy-import-start-result.interface';
 import LegacyImportConflictResolutionComponent from '@modules/configuracion/components/legacy-import-conflict-resolution/legacy-import-conflict-resolution.component';
 import DesktopLegacyImportService from '@services/desktop-legacy-import.service';
 
@@ -32,6 +35,7 @@ import DesktopLegacyImportService from '@services/desktop-legacy-import.service'
     MatCardTitle,
     MatIcon,
     MatProgressSpinner,
+    MatProgressBar,
     LegacyImportConflictResolutionComponent,
   ],
   templateUrl: './legacy-import.component.html',
@@ -41,6 +45,7 @@ export default class LegacyImportComponent {
   private readonly desktopLegacyImportService: DesktopLegacyImportService = inject(
     DesktopLegacyImportService,
   );
+  private readonly destroyRef: DestroyRef = inject(DestroyRef);
 
   private readonly integerFormatter: Intl.NumberFormat = new Intl.NumberFormat('es-ES');
 
@@ -90,6 +95,32 @@ export default class LegacyImportComponent {
   readonly preparationResult: WritableSignal<LegacyImportPreparationResult | null> =
     signal<LegacyImportPreparationResult | null>(null);
 
+  readonly importing: WritableSignal<boolean> = signal<boolean>(false);
+
+  readonly importProgress: WritableSignal<LegacyImportProgress | null> =
+    signal<LegacyImportProgress | null>(null);
+
+  readonly importResult: WritableSignal<LegacyImportStartResult | null> =
+    signal<LegacyImportStartResult | null>(null);
+
+  readonly importError: WritableSignal<string | null> = signal<string | null>(null);
+
+  constructor() {
+    const unsubscribe: () => void = this.desktopLegacyImportService.onImportProgress(
+      (progress: LegacyImportProgress): void => {
+        const report: LegacyImportAnalysisReport | null = this.analysisReport();
+
+        if (report === null || report.selectionId !== progress.selectionId) {
+          return;
+        }
+
+        this.importProgress.set(progress);
+      },
+    );
+
+    this.destroyRef.onDestroy(unsubscribe);
+  }
+
   async selectPackage(): Promise<void> {
     if (this.selecting()) {
       return;
@@ -100,6 +131,10 @@ export default class LegacyImportComponent {
     this.analysisError.set(null);
     this.resolvingConflicts.set(false);
     this.reviewDecisions.set([]);
+    this.importing.set(false);
+    this.importProgress.set(null);
+    this.importResult.set(null);
+    this.importError.set(null);
 
     try {
       const result: LegacyImportPackageSelectionResult =
@@ -134,6 +169,10 @@ export default class LegacyImportComponent {
     this.analysisError.set(null);
     this.resolvingConflicts.set(false);
     this.reviewDecisions.set([]);
+    this.importing.set(false);
+    this.importProgress.set(null);
+    this.importResult.set(null);
+    this.importError.set(null);
 
     try {
       const report: LegacyImportAnalysisReport =
@@ -156,6 +195,10 @@ export default class LegacyImportComponent {
     this.analysisError.set(null);
     this.resolvingConflicts.set(false);
     this.reviewDecisions.set([]);
+    this.importing.set(false);
+    this.importProgress.set(null);
+    this.importResult.set(null);
+    this.importError.set(null);
   }
 
   returnToPackageSummary(): void {
@@ -248,5 +291,38 @@ export default class LegacyImportComponent {
 
   async prepareWithoutReview(): Promise<void> {
     await this.confirmReviewDecisions([]);
+  }
+
+  async startImport(): Promise<void> {
+    const report: LegacyImportAnalysisReport | null = this.analysisReport();
+
+    if (report === null || this.preparationResult() === null || this.importing()) {
+      return;
+    }
+
+    this.importing.set(true);
+
+    this.importError.set(null);
+
+    this.importResult.set(null);
+
+    this.importProgress.set({
+      selectionId: report.selectionId,
+      stage: 'preparing-staging',
+      percentage: 0,
+      message: 'Iniciando la importación…',
+    });
+
+    try {
+      const result: LegacyImportStartResult = await this.desktopLegacyImportService.startImport(
+        report.selectionId,
+      );
+
+      this.importResult.set(result);
+    } catch (error: unknown) {
+      this.importError.set(this.getErrorMessage(error));
+    } finally {
+      this.importing.set(false);
+    }
   }
 }
