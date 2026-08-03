@@ -1,6 +1,9 @@
+import type LegacyImportPhaseImporter from '@backend/contracts/legacy-import-phase-importer.interface';
 import type LegacyImportProgressListener from '@backend/contracts/legacy-import-progress-listener.type';
 import type { DatabaseCreationOptions } from '@backend/domain/database/database-creation-options.interface';
 import type LegacyImportExecutionCommand from '@backend/domain/legacy-import/legacy-import-execution-command.interface';
+import type LegacyImportExecutionSummary from '@backend/domain/legacy-import/legacy-import-execution-summary.interface';
+import type LegacyImportPhaseResult from '@backend/domain/legacy-import/legacy-import-phase-result.interface';
 import DatabaseSchemaService from '@infrastructure/database/schema/database-schema.service';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import { rm } from 'node:fs/promises';
@@ -12,12 +15,13 @@ export default class TypeOrmLegacyImportDatabase {
     private readonly applicationVersion: string,
     private readonly dataSourceFactory: TypeOrmDataSourceFactory,
     private readonly databaseSchemaService: DatabaseSchemaService,
+    private readonly phaseImporters: readonly LegacyImportPhaseImporter[],
   ) {}
 
   async prepare(
     command: LegacyImportExecutionCommand,
     progressListener: LegacyImportProgressListener,
-  ): Promise<void> {
+  ): Promise<LegacyImportExecutionSummary> {
     await this.delete();
 
     this.reportProgress(
@@ -31,6 +35,16 @@ export default class TypeOrmLegacyImportDatabase {
     const dataSource: DataSource = this.dataSourceFactory.create(this.databaseFile);
 
     let queryRunner: QueryRunner | null = null;
+
+    const mutableExecutionSummary: {
+      importedRows: number;
+      skippedRows: number;
+      warningCount: number;
+    } = {
+      importedRows: 0,
+      skippedRows: 0,
+      warningCount: command.warningCount,
+    };
 
     try {
       await dataSource.initialize();
@@ -66,6 +80,24 @@ export default class TypeOrmLegacyImportDatabase {
 
       await this.insertImportRecord(queryRunner, command);
 
+      for (const phaseImporter of this.phaseImporters) {
+        const phaseResult: LegacyImportPhaseResult = await phaseImporter.import(
+          queryRunner,
+          command,
+          progressListener,
+        );
+
+        mutableExecutionSummary.importedRows += phaseResult.importedRows;
+        mutableExecutionSummary.skippedRows += phaseResult.skippedRows;
+        mutableExecutionSummary.warningCount += phaseResult.warningCount;
+      }
+
+      await this.updateImportWarningCount(
+        queryRunner,
+        command.sourceHash,
+        mutableExecutionSummary.warningCount,
+      );
+
       this.reportProgress(
         command,
         progressListener,
@@ -83,6 +115,12 @@ export default class TypeOrmLegacyImportDatabase {
       queryRunner = null;
 
       await this.deleteAuxiliaryFiles();
+
+      return {
+        importedRows: mutableExecutionSummary.importedRows,
+        skippedRows: mutableExecutionSummary.skippedRows,
+        warningCount: mutableExecutionSummary.warningCount,
+      };
     } catch (error: unknown) {
       await this.closeDatabaseSafely(queryRunner, dataSource);
 
@@ -160,6 +198,23 @@ export default class TypeOrmLegacyImportDatabase {
 
       throw error;
     }
+  }
+
+  private async updateImportWarningCount(
+    queryRunner: QueryRunner,
+    sourceHash: string,
+    warningCount: number,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+      UPDATE legacy_import
+      SET
+        warning_count = ?
+      WHERE
+        source_hash = ?
+    `,
+      [warningCount, sourceHash.toLowerCase()],
+    );
   }
 
   private reportProgress(

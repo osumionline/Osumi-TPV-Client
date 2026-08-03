@@ -152,7 +152,6 @@ export default class LegacyImportService {
 
   async startImport(
     selectionId: string,
-
     progressListener: LegacyImportProgressListener,
   ): Promise<LegacyImportStartResult> {
     const selection: LegacyImportSelection | null = this.selectionStore.resolve(selectionId);
@@ -187,19 +186,15 @@ export default class LegacyImportService {
 
     const command: LegacyImportExecutionCommand = {
       selectionId,
-
+      packagePath: selection.packagePath,
       sourceApplication: LEGACY_IMPORT_APPLICATION_NAME,
-
       sourceVersion: selection.inspection.summary.applicationVersion,
-
       sourceSchemaVersion: selection.inspection.summary.schemaVersion,
-
       sourceHash: selection.inspection.packageSha256,
-
       sourceRows: selection.inspection.summary.totalRows,
-
+      expectedTableRows: selection.inspection.tableRows,
+      reviewDecisions: selection.reviewDecisions,
       warningCount: selection.inspection.summary.warnings.length,
-
       startedAt,
     };
 

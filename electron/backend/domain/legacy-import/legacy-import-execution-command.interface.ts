@@ -1,5 +1,9 @@
+import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-import/legacy-import-review-decision.type';
+
 export default interface LegacyImportExecutionCommand {
   readonly selectionId: string;
+
+  readonly packagePath: string;
 
   readonly sourceApplication: string;
 
@@ -10,6 +14,10 @@ export default interface LegacyImportExecutionCommand {
   readonly sourceHash: string;
 
   readonly sourceRows: number;
+
+  readonly expectedTableRows: Readonly<Record<string, number>>;
+
+  readonly reviewDecisions: readonly LegacyImportReviewDecision[];
 
   readonly warningCount: number;
 

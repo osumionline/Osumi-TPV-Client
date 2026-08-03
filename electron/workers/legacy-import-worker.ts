@@ -1,4 +1,5 @@
 import type LegacyImportProgressListener from '@backend/contracts/legacy-import-progress-listener.type';
+import type LegacyImportExecutionSummary from '@backend/domain/legacy-import/legacy-import-execution-summary.interface';
 import type {
   LegacyImportWorkerData,
   LegacyImportWorkerFailedMessage,
@@ -11,6 +12,11 @@ import completeDatabaseSchemaTables from '@infrastructure/database/schema/comple
 import DatabaseSchemaService from '@infrastructure/database/schema/database-schema.service';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import TypeOrmLegacyImportDatabase from '@infrastructure/database/typeorm/typeorm-legacy-import-database';
+import LegacyImportMasterDataImporter from '@infrastructure/legacy-import/legacy-import-master-data.importer';
+import LegacyImportPublicIdFactory from '@infrastructure/legacy-import/legacy-import-public-id.factory';
+import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value.reader';
+import MariaDbInsertParser from '@infrastructure/legacy-import/maria-db-insert.parser';
+import YauzlLegacyImportDumpReader from '@infrastructure/legacy-import/yauzl-legacy-import-dump.reader';
 import { parentPort, workerData } from 'node:worker_threads';
 
 async function run(): Promise<void> {
@@ -29,11 +35,30 @@ async function run(): Promise<void> {
     completeDatabaseSchemaTables,
   );
 
+  const mariaDbInsertParser: MariaDbInsertParser = new MariaDbInsertParser();
+
+  const legacyImportDumpReader: YauzlLegacyImportDumpReader = new YauzlLegacyImportDumpReader(
+    mariaDbInsertParser,
+  );
+
+  const legacySqlValueReader: LegacySqlValueReader = new LegacySqlValueReader();
+
+  const legacyImportPublicIdFactory: LegacyImportPublicIdFactory =
+    new LegacyImportPublicIdFactory();
+
+  const legacyImportMasterDataImporter: LegacyImportMasterDataImporter =
+    new LegacyImportMasterDataImporter(
+      legacyImportDumpReader,
+      legacySqlValueReader,
+      legacyImportPublicIdFactory,
+    );
+
   const legacyImportDatabase: TypeOrmLegacyImportDatabase = new TypeOrmLegacyImportDatabase(
     data.databaseFile,
     data.applicationVersion,
     dataSourceFactory,
     databaseSchemaService,
+    [legacyImportMasterDataImporter],
   );
 
   const progressListener: LegacyImportProgressListener = (progress: LegacyImportProgress): void => {
@@ -46,7 +71,10 @@ async function run(): Promise<void> {
   };
 
   try {
-    await legacyImportDatabase.prepare(data.command, progressListener);
+    const executionSummary: LegacyImportExecutionSummary = await legacyImportDatabase.prepare(
+      data.command,
+      progressListener,
+    );
 
     const completedAt: string = new Date().toISOString();
 
@@ -63,7 +91,9 @@ async function run(): Promise<void> {
       startedAt: data.command.startedAt,
       completedAt,
       sourceRows: data.command.sourceRows,
-      warningCount: data.command.warningCount,
+      importedRows: executionSummary.importedRows,
+      skippedRows: executionSummary.skippedRows,
+      warningCount: executionSummary.warningCount,
     };
 
     const message: LegacyImportWorkerMessage = {

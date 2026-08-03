@@ -9,5 +9,9 @@ export default interface LegacyImportStartResult {
 
   readonly sourceRows: number;
 
+  readonly importedRows: number;
+
+  readonly skippedRows: number;
+
   readonly warningCount: number;
 }

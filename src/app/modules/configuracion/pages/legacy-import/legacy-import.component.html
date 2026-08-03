@@ -169,10 +169,7 @@
             </header>
 
             <div class="analysis-section__issues">
-                @for (
-                issue of reviewIssues();
-                track issue.code
-                ) {
+                @for (issue of reviewIssues(); track issue.code) {
                 <mat-card appearance="outlined"
                           class="issue-card issue-card--review">
                     <mat-card-header>
@@ -345,10 +342,28 @@
 
                 <p>
                     Se ha creado y validado la base SQLite
-                    de staging para
+                    de staging. En esta fase se han importado
+                    {{ formatInteger(result.importedRows) }}
+                    registros maestros de
                     {{ formatInteger(result.sourceRows) }}
-                    registros de origen.
+                    registros totales del paquete.
                 </p>
+
+                @if (result.skippedRows > 0) {
+                <p>
+                    Se han omitido
+                    {{ formatInteger(result.skippedRows) }}
+                    registros inválidos o huérfanos.
+                </p>
+                }
+
+                @if (result.warningCount > 0) {
+                <p>
+                    La importación acumula
+                    {{ formatInteger(result.warningCount) }}
+                    advertencias.
+                </p>
+                }
 
                 <p>
                     La instalación definitiva todavía no
