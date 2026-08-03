@@ -3,8 +3,11 @@
         @if (analysisReport(); as report) {
         @if (resolvingConflicts()) {
         <otpv-legacy-import-conflict-resolution [conflicts]="report.reviewConflicts"
+                                                [initialDecisions]="reviewDecisions()"
+                                                [saving]="savingReviewDecisions()"
+                                                [submissionError]="reviewSubmissionError()"
                                                 (cancelled)="cancelConflictResolution()"
-                                                (completed)="saveReviewDecisions($event)" />
+                                                (completed)="confirmReviewDecisions($event)" />
         }
         @else {
         <header class="legacy-import__header">
@@ -87,10 +90,7 @@
             </header>
 
             <div class="analysis-section__issues">
-                @for (
-                issue of automaticIssues();
-                track issue.code
-                ) {
+                @for (issue of automaticIssues(); track issue.code) {
                 <mat-card appearance="outlined"
                           class="issue-card issue-card--automatic">
                     <mat-card-header>
@@ -215,10 +215,7 @@
                             </summary>
 
                             <ul>
-                                @for (
-                                sample of issue.samples;
-                                track sample
-                                ) {
+                                @for (sample of issue.samples; track sample) {
                                 <li>
                                     {{ sample }}
                                 </li>
@@ -289,6 +286,36 @@
         </section>
         }
 
+        @if (preparationResult(); as preparation) {
+        <section class="import-prepared">
+            <mat-icon aria-hidden="true">
+                verified
+            </mat-icon>
+
+            <div>
+                <h2>
+                    Decisiones validadas
+                </h2>
+
+                <p>
+                    El paquete está preparado para iniciar
+                    la importación. Se han validado
+                    {{ preparation.decisions }}
+                    decisiones para
+                    {{ preparation.conflicts }}
+                    conflictos.
+                </p>
+            </div>
+        </section>
+        }
+
+        @if (!resolvingConflicts() && reviewSubmissionError(); as errorMessage) {
+        <p class="legacy-import__error"
+           role="alert">
+            {{ errorMessage }}
+        </p>
+        }
+
         <footer class="legacy-import__actions">
             <button type="button"
                     matButton
@@ -296,7 +323,6 @@
                 <mat-icon>
                     arrow_back
                 </mat-icon>
-
                 Volver al paquete
             </button>
 
@@ -307,13 +333,28 @@
                 <mat-icon>
                     rule
                 </mat-icon>
-
                 @if (reviewDecisions().length > 0) {
                 Revisar decisiones
                 }
                 @else {
                 Resolver conflictos
                 }
+            </button>
+            }
+            @else if (preparationResult() === null) {
+            <button type="button"
+                    matButton="filled"
+                    [disabled]="savingReviewDecisions()"
+                    (click)="prepareWithoutReview()">
+                <mat-icon>
+                    task_alt
+                </mat-icon>
+                <span>
+                    {{ savingReviewDecisions()
+                                ? 'Preparando…'
+                                : 'Preparar importación'
+                        }}
+                </span>
             </button>
             }
         </footer>

@@ -37,6 +37,15 @@
         justify-content: space-between;
         gap: 16px;
     }
+
+    &__error {
+        margin: 0;
+        padding: 16px;
+        border-radius: 12px;
+        background: var(--mat-sys-error-container);
+        color: var(--mat-sys-on-error-container);
+        line-height: 1.5;
+    }
 }
 
 .conflict-card {

@@ -1,5 +1,5 @@
 import type { Signal, WritableSignal } from '@angular/core';
-import { Component, computed, input, output, signal } from '@angular/core';
+import { Component, computed, effect, input, output, signal } from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import {
   MatCard,
@@ -57,6 +57,25 @@ export default class LegacyImportConflictResolutionComponent {
     );
   });
 
+  readonly initialDecisions = input<readonly LegacyImportReviewDecision[]>([]);
+
+  readonly saving = input<boolean>(false);
+
+  readonly submissionError = input<string | null>(null);
+
+  constructor() {
+    effect((): void => {
+      const initialDecisions: readonly LegacyImportReviewDecision[] = this.initialDecisions();
+      const decisions: Record<string, LegacyImportReviewDecision> = {};
+
+      for (const decision of initialDecisions) {
+        decisions[decision.conflictId] = decision;
+      }
+
+      this.decisions.set(decisions);
+    });
+  }
+
   selectedArticleId(conflictId: string): number | null | undefined {
     const decision: LegacyImportReviewDecision | undefined = this.decisions()[conflictId];
 
@@ -89,11 +108,7 @@ export default class LegacyImportConflictResolutionComponent {
     return decision.action;
   }
 
-  setLocatorOwner(
-    conflictId: string,
-
-    articleId: number,
-  ): void {
+  setLocatorOwner(conflictId: string, articleId: number): void {
     this.setDecision({
       conflictId,
 
@@ -103,11 +118,7 @@ export default class LegacyImportConflictResolutionComponent {
     });
   }
 
-  setDirectAccessOwner(
-    conflictId: string,
-
-    articleId: number | null,
-  ): void {
+  setDirectAccessOwner(conflictId: string, articleId: number | null): void {
     this.setDecision({
       conflictId,
 
@@ -117,11 +128,7 @@ export default class LegacyImportConflictResolutionComponent {
     });
   }
 
-  setBarcodeOwner(
-    conflictId: string,
-
-    articleId: number | null,
-  ): void {
+  setBarcodeOwner(conflictId: string, articleId: number | null): void {
     this.setDecision({
       conflictId,
 
@@ -133,7 +140,6 @@ export default class LegacyImportConflictResolutionComponent {
 
   setAccessLocatorAction(
     conflictId: string,
-
     action: 'clear-direct-access' | 'reassign-direct-access',
   ): void {
     this.setDecision({
@@ -145,11 +151,7 @@ export default class LegacyImportConflictResolutionComponent {
     });
   }
 
-  setSaleAction(
-    conflictId: string,
-
-    action: 'use-sale-total' | 'use-zero',
-  ): void {
+  setSaleAction(conflictId: string, action: 'use-sale-total' | 'use-zero'): void {
     this.setDecision({
       conflictId,
 
@@ -164,16 +166,19 @@ export default class LegacyImportConflictResolutionComponent {
   }
 
   cancel(): void {
+    if (this.saving()) {
+      return;
+    }
+
     this.cancelled.emit();
   }
 
   submit(): void {
-    if (!this.allResolved()) {
+    if (this.saving() || !this.allResolved()) {
       return;
     }
 
     const currentDecisions: Readonly<Record<string, LegacyImportReviewDecision>> = this.decisions();
-
     const result: LegacyImportReviewDecision[] = [];
 
     for (const conflict of this.conflicts()) {
@@ -195,7 +200,6 @@ export default class LegacyImportConflictResolutionComponent {
         currentDecisions: Readonly<Record<string, LegacyImportReviewDecision>>,
       ): Readonly<Record<string, LegacyImportReviewDecision>> => ({
         ...currentDecisions,
-
         [decision.conflictId]: decision,
       }),
     );
@@ -203,7 +207,6 @@ export default class LegacyImportConflictResolutionComponent {
 
   private isDecisionValid(
     conflict: LegacyImportReviewConflict,
-
     decision: LegacyImportReviewDecision | undefined,
   ): boolean {
     if (

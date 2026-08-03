@@ -43,6 +43,7 @@ import registerConfigurationIpc from '@ipc/register-configuration-ipc';
 import { registerSystemIpc } from '@ipc/register-system-ipc';
 
 import LegacyImportService from '@backend/application/legacy-import/legacy-import.service';
+import DefaultLegacyImportReviewDecisionValidator from '@backend/domain/legacy-import/default-legacy-import-review-decision.validator';
 import ElectronLegacyImportDialog from '@infrastructure/electron/electron-legacy-import-dialog';
 import InMemoryLegacyImportSelectionStore from '@infrastructure/legacy-import/in-memory-legacy-import-selection.store';
 import MariaDbInsertParser from '@infrastructure/legacy-import/maria-db-insert.parser';
@@ -217,10 +218,14 @@ app
     const legacyImportDumpAnalyzer: YauzlLegacyImportDumpAnalyzer =
       new YauzlLegacyImportDumpAnalyzer(mariaDbInsertParser);
 
+    const legacyImportReviewDecisionValidator: DefaultLegacyImportReviewDecisionValidator =
+      new DefaultLegacyImportReviewDecisionValidator();
+
     const legacyImportService: LegacyImportService = new LegacyImportService(
       legacyImportDialog,
       legacyImportPackageInspector,
       legacyImportDumpAnalyzer,
+      legacyImportReviewDecisionValidator,
       legacyImportSelectionStore,
     );
 

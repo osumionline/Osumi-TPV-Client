@@ -15,6 +15,7 @@ import type LegacyImportAnalysisIssue from '@desktop-contracts/legacy-import/leg
 import type LegacyImportAnalysisReport from '@desktop-contracts/legacy-import/legacy-import-analysis-report.interface';
 import type LegacyImportPackageSelectionResult from '@desktop-contracts/legacy-import/legacy-import-package-selection-result.type';
 import type LegacyImportPackageSummary from '@desktop-contracts/legacy-import/legacy-import-package-summary.interface';
+import type LegacyImportPreparationResult from '@desktop-contracts/legacy-import/legacy-import-preparation-result.interface';
 import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-import/legacy-import-review-decision.type';
 import LegacyImportConflictResolutionComponent from '@modules/configuracion/components/legacy-import-conflict-resolution/legacy-import-conflict-resolution.component';
 import DesktopLegacyImportService from '@services/desktop-legacy-import.service';
@@ -81,6 +82,13 @@ export default class LegacyImportComponent {
   readonly reviewDecisions: WritableSignal<readonly LegacyImportReviewDecision[]> = signal<
     readonly LegacyImportReviewDecision[]
   >([]);
+
+  readonly savingReviewDecisions: WritableSignal<boolean> = signal<boolean>(false);
+
+  readonly reviewSubmissionError: WritableSignal<string | null> = signal<string | null>(null);
+
+  readonly preparationResult: WritableSignal<LegacyImportPreparationResult | null> =
+    signal<LegacyImportPreparationResult | null>(null);
 
   async selectPackage(): Promise<void> {
     if (this.selecting()) {
@@ -198,11 +206,14 @@ export default class LegacyImportComponent {
   }
 
   openConflictResolution(): void {
+    this.reviewSubmissionError.set(null);
     const report: LegacyImportAnalysisReport | null = this.analysisReport();
 
     if (report === null || report.reviewConflicts.length === 0) {
       return;
     }
+    this.preparationResult.set(null);
+    this.reviewSubmissionError.set(null);
 
     this.resolvingConflicts.set(true);
   }
@@ -211,9 +222,31 @@ export default class LegacyImportComponent {
     this.resolvingConflicts.set(false);
   }
 
-  saveReviewDecisions(decisions: readonly LegacyImportReviewDecision[]): void {
-    this.reviewDecisions.set(decisions);
+  async confirmReviewDecisions(decisions: readonly LegacyImportReviewDecision[]): Promise<void> {
+    const report: LegacyImportAnalysisReport | null = this.analysisReport();
 
-    this.resolvingConflicts.set(false);
+    if (report === null || this.savingReviewDecisions()) {
+      return;
+    }
+
+    this.savingReviewDecisions.set(true);
+    this.reviewSubmissionError.set(null);
+
+    try {
+      const result: LegacyImportPreparationResult =
+        await this.desktopLegacyImportService.confirmReviewDecisions(report.selectionId, decisions);
+
+      this.reviewDecisions.set(decisions);
+      this.preparationResult.set(result);
+      this.resolvingConflicts.set(false);
+    } catch (error: unknown) {
+      this.reviewSubmissionError.set(this.getErrorMessage(error));
+    } finally {
+      this.savingReviewDecisions.set(false);
+    }
+  }
+
+  async prepareWithoutReview(): Promise<void> {
+    await this.confirmReviewDecisions([]);
   }
 }

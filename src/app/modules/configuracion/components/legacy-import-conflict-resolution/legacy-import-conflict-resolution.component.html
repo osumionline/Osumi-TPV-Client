@@ -174,26 +174,37 @@
         }
     </section>
 
+    @if (submissionError(); as errorMessage) {
+    <p class="conflict-resolution__error"
+       role="alert">
+        {{ errorMessage }}
+    </p>
+    }
+
     <footer class="conflict-resolution__actions">
         <button type="button"
                 matButton
+                [disabled]="saving()"
                 (click)="cancel()">
             <mat-icon>
                 arrow_back
             </mat-icon>
-
             Volver al informe
         </button>
 
         <button type="button"
                 matButton="filled"
-                [disabled]="!allResolved()"
+                [disabled]="!allResolved() || saving()"
                 (click)="submit()">
             <mat-icon>
                 done_all
             </mat-icon>
-
-            Confirmar decisiones
+            <span>
+                {{ saving()
+                        ? 'Guardando decisiones…'
+                        : 'Confirmar decisiones'
+                }}
+            </span>
         </button>
     </footer>
 </section>
