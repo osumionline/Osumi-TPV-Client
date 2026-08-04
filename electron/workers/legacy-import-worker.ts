@@ -1,4 +1,5 @@
 import type LegacyImportProgressListener from '@backend/contracts/legacy-import-progress-listener.type';
+import DefaultLegacyImportCatalogValidator from '@backend/domain/legacy-import/default-legacy-import-catalog.validator';
 import type LegacyImportExecutionSummary from '@backend/domain/legacy-import/legacy-import-execution-summary.interface';
 import type {
   LegacyImportWorkerData,
@@ -12,6 +13,8 @@ import completeDatabaseSchemaTables from '@infrastructure/database/schema/comple
 import DatabaseSchemaService from '@infrastructure/database/schema/database-schema.service';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import TypeOrmLegacyImportDatabase from '@infrastructure/database/typeorm/typeorm-legacy-import-database';
+import DefaultLegacyImportCatalogReader from '@infrastructure/legacy-import/default-legacy-import-catalog.reader';
+import LegacyImportCatalogValidationImporter from '@infrastructure/legacy-import/legacy-import-catalog-validation.importer';
 import LegacyImportMasterDataImporter from '@infrastructure/legacy-import/legacy-import-master-data.importer';
 import LegacyImportPublicIdFactory from '@infrastructure/legacy-import/legacy-import-public-id.factory';
 import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value.reader';
@@ -53,12 +56,24 @@ async function run(): Promise<void> {
       legacyImportPublicIdFactory,
     );
 
+  const legacyImportCatalogReader: DefaultLegacyImportCatalogReader =
+    new DefaultLegacyImportCatalogReader(legacyImportDumpReader, legacySqlValueReader);
+
+  const legacyImportCatalogValidator: DefaultLegacyImportCatalogValidator =
+    new DefaultLegacyImportCatalogValidator();
+
+  const legacyImportCatalogValidationImporter: LegacyImportCatalogValidationImporter =
+    new LegacyImportCatalogValidationImporter(
+      legacyImportCatalogReader,
+      legacyImportCatalogValidator,
+    );
+
   const legacyImportDatabase: TypeOrmLegacyImportDatabase = new TypeOrmLegacyImportDatabase(
     data.databaseFile,
     data.applicationVersion,
     dataSourceFactory,
     databaseSchemaService,
-    [legacyImportMasterDataImporter],
+    [legacyImportMasterDataImporter, legacyImportCatalogValidationImporter],
   );
 
   const progressListener: LegacyImportProgressListener = (progress: LegacyImportProgress): void => {

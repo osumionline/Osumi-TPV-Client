@@ -6,6 +6,8 @@ type LegacyImportExecutionStage =
   | 'importing-employees'
   | 'importing-payment-types'
   | 'importing-catalog'
+  | 'reading-catalog'
+  | 'validating-catalog'
   | 'validating-database'
   | 'completed';
 

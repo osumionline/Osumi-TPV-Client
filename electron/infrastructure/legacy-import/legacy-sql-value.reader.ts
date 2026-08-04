@@ -33,6 +33,30 @@ export default class LegacySqlValueReader {
     return this.parseInteger(insert, columnName, value);
   }
 
+  getRequiredNumber(
+    insert: LegacySqlInsert,
+
+    columnName: string,
+  ): number {
+    const value: string = this.getRequiredText(insert, columnName);
+
+    return this.parseNumber(insert, columnName, value);
+  }
+
+  getOptionalNumber(
+    insert: LegacySqlInsert,
+
+    columnName: string,
+  ): number | null {
+    const value: string | null = this.getValue(insert, columnName);
+
+    if (value === null) {
+      return null;
+    }
+
+    return this.parseNumber(insert, columnName, value);
+  }
+
   getRequiredBoolean(insert: LegacySqlInsert, columnName: string): boolean {
     const value: string = this.getRequiredText(insert, columnName);
 
@@ -57,6 +81,18 @@ export default class LegacySqlValueReader {
     }
 
     return insert.values.get(columnName) ?? null;
+  }
+
+  private parseNumber(insert: LegacySqlInsert, columnName: string, value: string): number {
+    const result: number = Number(value);
+
+    if (!Number.isFinite(result)) {
+      throw new Error(
+        [`El valor ${insert.tableName}.${columnName}`, `no es numérico: ${value}.`].join(' '),
+      );
+    }
+
+    return result;
   }
 
   private parseInteger(insert: LegacySqlInsert, columnName: string, value: string): number {
