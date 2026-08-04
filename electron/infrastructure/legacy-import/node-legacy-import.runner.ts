@@ -12,6 +12,7 @@ export default class NodeLegacyImportRunner implements LegacyImportRunner {
   constructor(
     private readonly workerPath: string,
     private readonly databaseFile: string,
+    private readonly stagingFilesDirectory: string,
     private readonly applicationVersion: string,
   ) {}
 
@@ -22,6 +23,7 @@ export default class NodeLegacyImportRunner implements LegacyImportRunner {
     const data: LegacyImportWorkerData = {
       command,
       databaseFile: this.databaseFile,
+      stagingFilesDirectory: this.stagingFilesDirectory,
       applicationVersion: this.applicationVersion,
     };
 

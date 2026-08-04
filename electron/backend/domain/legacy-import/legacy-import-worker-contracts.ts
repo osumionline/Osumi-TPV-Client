@@ -7,6 +7,8 @@ export interface LegacyImportWorkerData {
 
   readonly databaseFile: string;
 
+  readonly stagingFilesDirectory: string;
+
   readonly applicationVersion: string;
 }
 

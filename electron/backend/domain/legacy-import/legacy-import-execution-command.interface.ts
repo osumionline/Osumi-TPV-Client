@@ -1,3 +1,4 @@
+import type LegacyImportFileInventoryItem from '@backend/domain/legacy-import/legacy-import-file-inventory-item.interface';
 import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-import/legacy-import-review-decision.type';
 
 export default interface LegacyImportExecutionCommand {
@@ -16,6 +17,8 @@ export default interface LegacyImportExecutionCommand {
   readonly sourceRows: number;
 
   readonly expectedTableRows: Readonly<Record<string, number>>;
+
+  readonly fileInventory: readonly LegacyImportFileInventoryItem[];
 
   readonly reviewDecisions: readonly LegacyImportReviewDecision[];
 

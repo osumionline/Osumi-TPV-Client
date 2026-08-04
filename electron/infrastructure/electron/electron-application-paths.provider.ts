@@ -8,21 +8,25 @@ export default class ElectronApplicationPathsProvider implements ApplicationPath
     const rootDirectory: string = join(app.getPath('userData'), 'osumi-tpv');
     const configDirectory: string = join(rootDirectory, 'config');
     const assetsDirectory: string = join(rootDirectory, 'assets');
+    const filesDirectory: string = join(assetsDirectory, 'files');
     const databaseDirectory: string = join(rootDirectory, 'database');
     const backupsDirectory: string = join(rootDirectory, 'backups');
     const logsDirectory: string = join(rootDirectory, 'logs');
     const secretsDirectory: string = join(rootDirectory, 'secrets');
     const stagingDirectory: string = join(rootDirectory, 'staging');
+    const stagingFilesDirectory: string = join(stagingDirectory, 'files');
 
     return {
       rootDirectory,
       configDirectory,
       assetsDirectory,
+      filesDirectory,
       databaseDirectory,
       backupsDirectory,
       logsDirectory,
       secretsDirectory,
       stagingDirectory,
+      stagingFilesDirectory,
 
       appDataFile: join(configDirectory, 'app_data.json'),
       logoFile: join(assetsDirectory, 'logo.png'),

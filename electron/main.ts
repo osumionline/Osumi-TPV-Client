@@ -171,7 +171,7 @@ app
 
     const installationStaging: InstallationStaging = new FileInstallationStaging(
       applicationPaths.stagingDirectory,
-
+      applicationPaths.stagingFilesDirectory,
       stagingAppDataRepository,
       stagingLogoStorage,
       stagingSecretStorage,
@@ -224,9 +224,8 @@ app
 
     const legacyImportRunner: NodeLegacyImportRunner = new NodeLegacyImportRunner(
       join(__dirname, 'legacy-import-worker.js'),
-
       applicationPaths.stagingDatabaseFile,
-
+      applicationPaths.stagingFilesDirectory,
       applicationVersion,
     );
 

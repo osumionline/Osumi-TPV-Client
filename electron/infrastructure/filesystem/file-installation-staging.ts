@@ -12,6 +12,7 @@ import { mkdir, rm } from 'node:fs/promises';
 export default class FileInstallationStaging implements InstallationStaging {
   constructor(
     private readonly stagingDirectory: string,
+    private readonly stagingFilesDirectory: string,
     private readonly appDataRepository: AppDataRepository,
     private readonly logoStorage: LogoStorage,
     private readonly secretStorage: SecretStorage,
@@ -24,6 +25,9 @@ export default class FileInstallationStaging implements InstallationStaging {
     });
 
     await mkdir(this.stagingDirectory, {
+      recursive: true,
+    });
+    await mkdir(this.stagingFilesDirectory, {
       recursive: true,
     });
   }

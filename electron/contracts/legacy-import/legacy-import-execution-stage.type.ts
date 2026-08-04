@@ -13,6 +13,10 @@ type LegacyImportExecutionStage =
   | 'importing-barcodes'
   | 'importing-tags'
   | 'importing-expirations'
+  | 'verifying-package-files'
+  | 'extracting-files'
+  | 'registering-files'
+  | 'linking-files'
   | 'validating-database'
   | 'completed';
 

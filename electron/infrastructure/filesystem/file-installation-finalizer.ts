@@ -20,6 +20,11 @@ export default class FileInstallationFinalizer implements InstallationFinalizer 
         destination: this.paths.databaseFile,
       },
       {
+        source: this.paths.stagingFilesDirectory,
+
+        destination: this.paths.filesDirectory,
+      },
+      {
         source: this.paths.stagingLogoFile,
         destination: this.paths.logoFile,
       },
@@ -117,6 +122,7 @@ export default class FileInstallationFinalizer implements InstallationFinalizer 
       `${this.paths.databaseFile}-wal`,
       `${this.paths.databaseFile}-shm`,
 
+      this.paths.filesDirectory,
       this.paths.logoFile,
       this.paths.secretsFile,
 
@@ -128,6 +134,7 @@ export default class FileInstallationFinalizer implements InstallationFinalizer 
     await Promise.all(
       files.map((filePath: string): Promise<void> =>
         rm(filePath, {
+          recursive: true,
           force: true,
         }),
       ),

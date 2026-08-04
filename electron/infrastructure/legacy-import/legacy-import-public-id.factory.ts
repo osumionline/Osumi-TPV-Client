@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 
 export default class LegacyImportPublicIdFactory {
-  create(sourceHash: string, entity: string, legacyId: number): string {
+  create(sourceHash: string, entity: string, sourceKey: number | string): string {
     const hash: string = createHash('sha256')
-      .update([sourceHash, entity, legacyId].join(':'))
+      .update([sourceHash, entity, sourceKey].join(':'))
       .digest('hex')
       .slice(0, 32);
 

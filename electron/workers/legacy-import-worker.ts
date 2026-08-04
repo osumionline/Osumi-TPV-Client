@@ -16,6 +16,7 @@ import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-d
 import TypeOrmLegacyImportDatabase from '@infrastructure/database/typeorm/typeorm-legacy-import-database';
 import DefaultLegacyImportCatalogReader from '@infrastructure/legacy-import/default-legacy-import-catalog.reader';
 import LegacyImportCatalogImporter from '@infrastructure/legacy-import/legacy-import-catalog.importer';
+import LegacyImportFilesImporter from '@infrastructure/legacy-import/legacy-import-files.importer';
 import LegacyImportMasterDataImporter from '@infrastructure/legacy-import/legacy-import-master-data.importer';
 import LegacyImportNumberConverter from '@infrastructure/legacy-import/legacy-import-number.converter';
 import LegacyImportPublicIdFactory from '@infrastructure/legacy-import/legacy-import-public-id.factory';
@@ -100,12 +101,18 @@ async function run(): Promise<void> {
     legacyImportPublicIdFactory,
   );
 
+  const legacyImportFilesImporter: LegacyImportFilesImporter = new LegacyImportFilesImporter(
+    data.stagingFilesDirectory,
+    legacyImportCatalogReader,
+    legacyImportPublicIdFactory,
+  );
+
   const legacyImportDatabase: TypeOrmLegacyImportDatabase = new TypeOrmLegacyImportDatabase(
     data.databaseFile,
     data.applicationVersion,
     dataSourceFactory,
     databaseSchemaService,
-    [legacyImportMasterDataImporter, legacyImportCatalogImporter],
+    [legacyImportMasterDataImporter, legacyImportCatalogImporter, legacyImportFilesImporter],
   );
 
   const progressListener: LegacyImportProgressListener = (progress: LegacyImportProgress): void => {

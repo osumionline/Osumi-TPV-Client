@@ -1,4 +1,6 @@
 import type LegacyImportPackageInspector from '@backend/contracts/legacy-import-package-inspector.interface';
+import type LegacyImportFileInventoryItem from '@backend/domain/legacy-import/legacy-import-file-inventory-item.interface';
+import type LegacyImportFileInventoryStatus from '@backend/domain/legacy-import/legacy-import-file-inventory-status.type';
 import type LegacyImportPackageInspection from '@backend/domain/legacy-import/legacy-import-package-inspection.interface';
 import {
   LEGACY_IMPORT_APPLICATION_NAME,
@@ -35,6 +37,8 @@ interface LegacyExportReportData {
   readonly warnings: readonly string[];
 
   readonly tableRows: Readonly<Record<string, number>>;
+
+  readonly fileInventory: readonly LegacyImportFileInventoryItem[];
 }
 
 export default class YauzlLegacyImportPackageInspector implements LegacyImportPackageInspector {
@@ -119,6 +123,7 @@ export default class YauzlLegacyImportPackageInspector implements LegacyImportPa
           warnings: reportData.warnings,
         },
         tableRows: reportData.tableRows,
+        fileInventory: reportData.fileInventory,
         packageSha256,
       };
     } finally {
@@ -527,6 +532,9 @@ export default class YauzlLegacyImportPackageInspector implements LegacyImportPa
 
     const files: Record<string, unknown> = this.getRecord(report, 'files', 'export-report.json');
 
+    const fileInventory: readonly LegacyImportFileInventoryItem[] =
+      this.validateFileInventory(files);
+
     const missingTables: readonly string[] = this.getStringArray(
       database,
       'missingTables',
@@ -554,7 +562,124 @@ export default class YauzlLegacyImportPackageInspector implements LegacyImportPa
       optionalFilesNotPresent: this.getNumber(files, 'optionalNotPresent', 'export-report.json'),
       warnings: this.getStringArray(report, 'warnings', 'export-report.json'),
       tableRows,
+      fileInventory,
     };
+  }
+
+  private validateFileInventory(
+    files: Record<string, unknown>,
+  ): readonly LegacyImportFileInventoryItem[] {
+    const inventoryValue: unknown = files['inventory'];
+
+    if (!Array.isArray(inventoryValue)) {
+      throw new Error('El inventario de archivos de export-report.json no es válido.');
+    }
+
+    return inventoryValue.map(
+      (
+        value: unknown,
+
+        index: number,
+      ): LegacyImportFileInventoryItem => {
+        if (!this.isRecord(value)) {
+          throw new Error(`El elemento ${index} del inventario de archivos no es válido.`);
+        }
+
+        const status: LegacyImportFileInventoryStatus = this.getFileInventoryStatus(value, index);
+
+        const packagePath: string | null = this.getNullableString(
+          value,
+          'packagePath',
+          `files.inventory[${index}]`,
+        );
+
+        if (packagePath !== null) {
+          this.assertEntryName(packagePath);
+        }
+
+        const size: number | null = this.getNullableInteger(
+          value,
+          'size',
+          `files.inventory[${index}]`,
+        );
+
+        const sha256Value: string | null = this.getNullableString(
+          value,
+          'sha256',
+          `files.inventory[${index}]`,
+        );
+
+        const sha256: string | null = sha256Value === null ? null : sha256Value.toLowerCase();
+
+        if (sha256 !== null && !/^[0-9a-f]{64}$/.test(sha256)) {
+          throw new Error(`El hash del elemento ${index} del inventario no es válido.`);
+        }
+
+        const item: LegacyImportFileInventoryItem = {
+          logicalCategory: this.getString(value, 'logicalCategory', `files.inventory[${index}]`),
+
+          sourceTable: this.getNullableString(value, 'sourceTable', `files.inventory[${index}]`),
+
+          legacyId: this.getNullableInteger(value, 'legacyId', `files.inventory[${index}]`),
+
+          relatedId: this.getNullableInteger(value, 'relatedId', `files.inventory[${index}]`),
+
+          packagePath,
+
+          originalName: this.getNullableString(value, 'originalName', `files.inventory[${index}]`),
+
+          storedName: this.getNullableString(value, 'storedName', `files.inventory[${index}]`),
+
+          size,
+
+          mimeType: this.getNullableString(value, 'mimeType', `files.inventory[${index}]`),
+
+          sha256,
+          status,
+        };
+
+        if (status === 'included' || status === 'included_reference') {
+          if (
+            item.packagePath === null ||
+            item.storedName === null ||
+            item.size === null ||
+            item.mimeType === null ||
+            item.sha256 === null
+          ) {
+            throw new Error(
+              [
+                `El elemento ${index} del inventario`,
+                'está incluido pero sus metadatos están incompletos.',
+              ].join(' '),
+            );
+          }
+        }
+
+        return item;
+      },
+    );
+  }
+
+  private getFileInventoryStatus(
+    source: Record<string, unknown>,
+    index: number,
+  ): LegacyImportFileInventoryStatus {
+    const status: string = this.getString(source, 'status', `files.inventory[${index}]`);
+
+    const validStatuses: readonly LegacyImportFileInventoryStatus[] = [
+      'included',
+      'included_reference',
+      'absent',
+      'not_present',
+      'unreadable',
+      'invalid_reference',
+    ];
+
+    if (!validStatuses.includes(status as LegacyImportFileInventoryStatus)) {
+      throw new Error(`El estado del elemento ${index} del inventario no es válido.`);
+    }
+
+    return status as LegacyImportFileInventoryStatus;
   }
 
   private validateChecksums(checksums: Record<string, unknown>): Readonly<Record<string, string>> {
@@ -718,6 +843,46 @@ export default class YauzlLegacyImportPackageInspector implements LegacyImportPa
     const value: unknown = source[property];
 
     if (!this.isRecord(value)) {
+      throw new Error(`La propiedad ${property} de ${sourceName} no es válida.`);
+    }
+
+    return value;
+  }
+
+  private getNullableString(
+    source: Record<string, unknown>,
+
+    property: string,
+
+    sourceName: string,
+  ): string | null {
+    const value: unknown = source[property];
+
+    if (value === null) {
+      return null;
+    }
+
+    if (typeof value !== 'string') {
+      throw new Error(`La propiedad ${property} de ${sourceName} no es válida.`);
+    }
+
+    return value;
+  }
+
+  private getNullableInteger(
+    source: Record<string, unknown>,
+
+    property: string,
+
+    sourceName: string,
+  ): number | null {
+    const value: unknown = source[property];
+
+    if (value === null) {
+      return null;
+    }
+
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
       throw new Error(`La propiedad ${property} de ${sourceName} no es válida.`);
     }
 

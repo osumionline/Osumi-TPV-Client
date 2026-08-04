@@ -193,6 +193,7 @@ export default class LegacyImportService {
       sourceHash: selection.inspection.packageSha256,
       sourceRows: selection.inspection.summary.totalRows,
       expectedTableRows: selection.inspection.tableRows,
+      fileInventory: selection.inspection.fileInventory,
       reviewDecisions: selection.reviewDecisions,
       warningCount: selection.inspection.summary.warnings.length,
       startedAt,
