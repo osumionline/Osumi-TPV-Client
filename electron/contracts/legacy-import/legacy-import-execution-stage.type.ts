@@ -17,6 +17,10 @@ type LegacyImportExecutionStage =
   | 'extracting-files'
   | 'registering-files'
   | 'linking-files'
+  | 'reading-customer-data'
+  | 'importing-customers'
+  | 'importing-reservations'
+  | 'importing-invoices'
   | 'validating-database'
   | 'completed';
 

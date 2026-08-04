@@ -102,7 +102,7 @@ export default class TypeOrmLegacyImportDatabase {
         command,
         progressListener,
         'validating-database',
-        95,
+        98,
         'Validando la base de datos temporal…',
       );
 
