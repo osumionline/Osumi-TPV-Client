@@ -1,4 +1,5 @@
 import type LegacyImportProgressListener from '@backend/contracts/legacy-import-progress-listener.type';
+import DefaultLegacyImportCatalogNormalizer from '@backend/domain/legacy-import/default-legacy-import-catalog.normalizer';
 import DefaultLegacyImportCatalogValidator from '@backend/domain/legacy-import/default-legacy-import-catalog.validator';
 import type LegacyImportExecutionSummary from '@backend/domain/legacy-import/legacy-import-execution-summary.interface';
 import type {
@@ -14,13 +15,34 @@ import DatabaseSchemaService from '@infrastructure/database/schema/database-sche
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import TypeOrmLegacyImportDatabase from '@infrastructure/database/typeorm/typeorm-legacy-import-database';
 import DefaultLegacyImportCatalogReader from '@infrastructure/legacy-import/default-legacy-import-catalog.reader';
-import LegacyImportCatalogValidationImporter from '@infrastructure/legacy-import/legacy-import-catalog-validation.importer';
+import LegacyImportCatalogImporter from '@infrastructure/legacy-import/legacy-import-catalog.importer';
 import LegacyImportMasterDataImporter from '@infrastructure/legacy-import/legacy-import-master-data.importer';
+import LegacyImportNumberConverter from '@infrastructure/legacy-import/legacy-import-number.converter';
 import LegacyImportPublicIdFactory from '@infrastructure/legacy-import/legacy-import-public-id.factory';
 import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value.reader';
 import MariaDbInsertParser from '@infrastructure/legacy-import/maria-db-insert.parser';
 import YauzlLegacyImportDumpReader from '@infrastructure/legacy-import/yauzl-legacy-import-dump.reader';
 import { parentPort, workerData } from 'node:worker_threads';
+
+function getErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+
+  const messages: string[] = [error.message];
+
+  let cause: unknown = error.cause;
+
+  while (cause instanceof Error) {
+    if (!messages.includes(cause.message)) {
+      messages.push(cause.message);
+    }
+
+    cause = cause.cause;
+  }
+
+  return messages.join(' Detalle: ');
+}
 
 async function run(): Promise<void> {
   if (parentPort === null) {
@@ -62,18 +84,28 @@ async function run(): Promise<void> {
   const legacyImportCatalogValidator: DefaultLegacyImportCatalogValidator =
     new DefaultLegacyImportCatalogValidator();
 
-  const legacyImportCatalogValidationImporter: LegacyImportCatalogValidationImporter =
-    new LegacyImportCatalogValidationImporter(
-      legacyImportCatalogReader,
-      legacyImportCatalogValidator,
+  const legacyImportNumberConverter: LegacyImportNumberConverter =
+    new LegacyImportNumberConverter();
+
+  const legacyImportCatalogNormalizer: DefaultLegacyImportCatalogNormalizer =
+    new DefaultLegacyImportCatalogNormalizer(
+      legacyImportNumberConverter,
+      legacyImportPublicIdFactory,
     );
+
+  const legacyImportCatalogImporter: LegacyImportCatalogImporter = new LegacyImportCatalogImporter(
+    legacyImportCatalogReader,
+    legacyImportCatalogValidator,
+    legacyImportCatalogNormalizer,
+    legacyImportPublicIdFactory,
+  );
 
   const legacyImportDatabase: TypeOrmLegacyImportDatabase = new TypeOrmLegacyImportDatabase(
     data.databaseFile,
     data.applicationVersion,
     dataSourceFactory,
     databaseSchemaService,
-    [legacyImportMasterDataImporter, legacyImportCatalogValidationImporter],
+    [legacyImportMasterDataImporter, legacyImportCatalogImporter],
   );
 
   const progressListener: LegacyImportProgressListener = (progress: LegacyImportProgress): void => {
@@ -120,7 +152,7 @@ async function run(): Promise<void> {
   } catch (error: unknown) {
     const failure: LegacyImportWorkerFailedMessage = {
       type: 'failed',
-      message: error instanceof Error ? error.message : String(error),
+      message: getErrorMessage(error),
       stack: error instanceof Error ? (error.stack ?? null) : null,
     };
 

@@ -8,6 +8,11 @@ type LegacyImportExecutionStage =
   | 'importing-catalog'
   | 'reading-catalog'
   | 'validating-catalog'
+  | 'normalizing-catalog'
+  | 'importing-articles'
+  | 'importing-barcodes'
+  | 'importing-tags'
+  | 'importing-expirations'
   | 'validating-database'
   | 'completed';
 
