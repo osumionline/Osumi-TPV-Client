@@ -21,6 +21,10 @@ type LegacyImportExecutionStage =
   | 'importing-customers'
   | 'importing-reservations'
   | 'importing-invoices'
+  | 'reading-cash-data'
+  | 'importing-cash-registers'
+  | 'importing-cash-breakdowns'
+  | 'importing-cash-movements'
   | 'validating-database'
   | 'completed';
 
