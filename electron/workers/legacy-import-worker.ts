@@ -15,17 +15,18 @@ import DatabaseSchemaService from '@infrastructure/database/schema/database-sche
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import TypeOrmLegacyImportDatabase from '@infrastructure/database/typeorm/typeorm-legacy-import-database';
 import DefaultLegacyImportCatalogReader from '@infrastructure/legacy-import/default-legacy-import-catalog.reader';
+import LegacyImportCashDataImporter from '@infrastructure/legacy-import/legacy-import-cash-data.importer';
 import LegacyImportCatalogImporter from '@infrastructure/legacy-import/legacy-import-catalog.importer';
 import LegacyImportCustomerDataImporter from '@infrastructure/legacy-import/legacy-import-customer-data.importer';
 import LegacyImportFilesImporter from '@infrastructure/legacy-import/legacy-import-files.importer';
 import LegacyImportMasterDataImporter from '@infrastructure/legacy-import/legacy-import-master-data.importer';
 import LegacyImportNumberConverter from '@infrastructure/legacy-import/legacy-import-number.converter';
 import LegacyImportPublicIdFactory from '@infrastructure/legacy-import/legacy-import-public-id.factory';
+import LegacyImportSalesDataImporter from '@infrastructure/legacy-import/legacy-import-sales-data.importer';
 import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value.reader';
 import MariaDbInsertParser from '@infrastructure/legacy-import/maria-db-insert.parser';
 import YauzlLegacyImportDumpReader from '@infrastructure/legacy-import/yauzl-legacy-import-dump.reader';
 import { parentPort, workerData } from 'node:worker_threads';
-import LegacyImportCashDataImporter from '@infrastructure/legacy-import/legacy-import-cash-data.importer';
 
 function getErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) {
@@ -125,6 +126,14 @@ async function run(): Promise<void> {
       legacyImportPublicIdFactory,
     );
 
+  const legacyImportSalesDataImporter: LegacyImportSalesDataImporter =
+    new LegacyImportSalesDataImporter(
+      legacyImportDumpReader,
+      legacySqlValueReader,
+      legacyImportNumberConverter,
+      legacyImportPublicIdFactory,
+    );
+
   const legacyImportDatabase: TypeOrmLegacyImportDatabase = new TypeOrmLegacyImportDatabase(
     data.databaseFile,
     data.applicationVersion,
@@ -136,6 +145,7 @@ async function run(): Promise<void> {
       legacyImportFilesImporter,
       legacyImportCustomerDataImporter,
       legacyImportCashDataImporter,
+      legacyImportSalesDataImporter,
     ],
   );
 

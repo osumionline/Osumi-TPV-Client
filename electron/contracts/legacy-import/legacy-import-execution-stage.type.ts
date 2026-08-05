@@ -25,6 +25,9 @@ type LegacyImportExecutionStage =
   | 'importing-cash-registers'
   | 'importing-cash-breakdowns'
   | 'importing-cash-movements'
+  | 'reading-sales-data'
+  | 'importing-sales'
+  | 'importing-sale-lines'
   | 'validating-database'
   | 'completed';
 
