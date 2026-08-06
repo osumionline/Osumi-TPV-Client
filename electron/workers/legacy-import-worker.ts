@@ -21,14 +21,15 @@ import LegacyImportCustomerDataImporter from '@infrastructure/legacy-import/lega
 import LegacyImportFilesImporter from '@infrastructure/legacy-import/legacy-import-files.importer';
 import LegacyImportMasterDataImporter from '@infrastructure/legacy-import/legacy-import-master-data.importer';
 import LegacyImportNumberConverter from '@infrastructure/legacy-import/legacy-import-number.converter';
+import LegacyImportOrderFilesImporter from '@infrastructure/legacy-import/legacy-import-order-files.importer';
 import LegacyImportPublicIdFactory from '@infrastructure/legacy-import/legacy-import-public-id.factory';
+import LegacyImportPurchaseDataImporter from '@infrastructure/legacy-import/legacy-import-purchase-data.importer';
 import LegacyImportSalePaymentDataImporter from '@infrastructure/legacy-import/legacy-import-sale-payment-data.importer';
 import LegacyImportSalesDataImporter from '@infrastructure/legacy-import/legacy-import-sales-data.importer';
 import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value.reader';
 import MariaDbInsertParser from '@infrastructure/legacy-import/maria-db-insert.parser';
 import YauzlLegacyImportDumpReader from '@infrastructure/legacy-import/yauzl-legacy-import-dump.reader';
 import { parentPort, workerData } from 'node:worker_threads';
-import LegacyImportPurchaseDataImporter from '@infrastructure/legacy-import/legacy-import-purchase-data.importer';
 
 function getErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) {
@@ -152,6 +153,9 @@ async function run(): Promise<void> {
       legacyImportPublicIdFactory,
     );
 
+  const legacyImportOrderFilesImporter: LegacyImportOrderFilesImporter =
+    new LegacyImportOrderFilesImporter(data.stagingFilesDirectory, legacyImportPublicIdFactory);
+
   const legacyImportDatabase: TypeOrmLegacyImportDatabase = new TypeOrmLegacyImportDatabase(
     data.databaseFile,
     data.applicationVersion,
@@ -166,6 +170,7 @@ async function run(): Promise<void> {
       legacyImportSalesDataImporter,
       legacyImportSalePaymentDataImporter,
       legacyImportPurchaseDataImporter,
+      legacyImportOrderFilesImporter,
     ],
   );
 

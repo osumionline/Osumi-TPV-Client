@@ -36,6 +36,10 @@ type LegacyImportExecutionStage =
   | 'importing-orders'
   | 'importing-order-lines'
   | 'importing-order-views'
+  | 'reading-order-files'
+  | 'extracting-order-files'
+  | 'registering-order-files'
+  | 'linking-order-files'
   | 'validating-database'
   | 'completed';
 
