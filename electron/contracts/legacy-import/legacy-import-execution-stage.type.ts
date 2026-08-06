@@ -28,6 +28,10 @@ type LegacyImportExecutionStage =
   | 'reading-sales-data'
   | 'importing-sales'
   | 'importing-sale-lines'
+  | 'reading-sale-payment-data'
+  | 'importing-sale-payments'
+  | 'importing-ticketbai'
+  | 'linking-invoice-sales'
   | 'validating-database'
   | 'completed';
 

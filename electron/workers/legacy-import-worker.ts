@@ -22,6 +22,7 @@ import LegacyImportFilesImporter from '@infrastructure/legacy-import/legacy-impo
 import LegacyImportMasterDataImporter from '@infrastructure/legacy-import/legacy-import-master-data.importer';
 import LegacyImportNumberConverter from '@infrastructure/legacy-import/legacy-import-number.converter';
 import LegacyImportPublicIdFactory from '@infrastructure/legacy-import/legacy-import-public-id.factory';
+import LegacyImportSalePaymentDataImporter from '@infrastructure/legacy-import/legacy-import-sale-payment-data.importer';
 import LegacyImportSalesDataImporter from '@infrastructure/legacy-import/legacy-import-sales-data.importer';
 import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value.reader';
 import MariaDbInsertParser from '@infrastructure/legacy-import/maria-db-insert.parser';
@@ -134,6 +135,14 @@ async function run(): Promise<void> {
       legacyImportPublicIdFactory,
     );
 
+  const legacyImportSalePaymentDataImporter: LegacyImportSalePaymentDataImporter =
+    new LegacyImportSalePaymentDataImporter(
+      legacyImportDumpReader,
+      legacySqlValueReader,
+      legacyImportNumberConverter,
+      legacyImportPublicIdFactory,
+    );
+
   const legacyImportDatabase: TypeOrmLegacyImportDatabase = new TypeOrmLegacyImportDatabase(
     data.databaseFile,
     data.applicationVersion,
@@ -146,6 +155,7 @@ async function run(): Promise<void> {
       legacyImportCustomerDataImporter,
       legacyImportCashDataImporter,
       legacyImportSalesDataImporter,
+      legacyImportSalePaymentDataImporter,
     ],
   );
 
