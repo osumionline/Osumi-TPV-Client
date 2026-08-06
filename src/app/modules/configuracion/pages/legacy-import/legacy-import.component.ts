@@ -1,5 +1,14 @@
-import type { Signal, WritableSignal } from '@angular/core';
-import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
+import type { ElementRef, Signal, WritableSignal } from '@angular/core';
+import {
+  afterNextRender,
+  Component,
+  computed,
+  DestroyRef,
+  inject,
+  Injector,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import {
   MatCard,
@@ -46,6 +55,20 @@ export default class LegacyImportComponent {
     DesktopLegacyImportService,
   );
   private readonly destroyRef: DestroyRef = inject(DestroyRef);
+
+  private readonly injector: Injector = inject(Injector);
+
+  private readonly pageTop: Signal<ElementRef<HTMLElement> | undefined> =
+    viewChild<ElementRef<HTMLElement>>('pageTop');
+
+  private readonly validatedDecisions: Signal<ElementRef<HTMLElement> | undefined> =
+    viewChild<ElementRef<HTMLElement>>('validatedDecisions');
+
+  private readonly importExecution: Signal<ElementRef<HTMLElement> | undefined> =
+    viewChild<ElementRef<HTMLElement>>('importExecution');
+
+  private readonly importResultSection: Signal<ElementRef<HTMLElement> | undefined> =
+    viewChild<ElementRef<HTMLElement>>('importResultSection');
 
   private readonly integerFormatter: Intl.NumberFormat = new Intl.NumberFormat('es-ES');
 
@@ -179,6 +202,7 @@ export default class LegacyImportComponent {
         await this.desktopLegacyImportService.analyzePackage(selectedPackage.selectionId);
 
       this.analysisReport.set(report);
+      this.scrollToSection(this.pageTop, 'start');
     } catch (error: unknown) {
       this.analysisReport.set(null);
 
@@ -244,6 +268,38 @@ export default class LegacyImportComponent {
     window.location.reload();
   }
 
+  private scrollToSection(
+    target: Signal<ElementRef<HTMLElement> | undefined>,
+    block: ScrollLogicalPosition,
+  ): void {
+    afterNextRender(
+      {
+        write: (): void => {
+          const element: HTMLElement | undefined = target()?.nativeElement;
+
+          if (element === undefined) {
+            return;
+          }
+
+          element.focus({
+            preventScroll: true,
+          });
+
+          element.scrollIntoView({
+            behavior: 'smooth',
+
+            block,
+
+            inline: 'nearest',
+          });
+        },
+      },
+      {
+        injector: this.injector,
+      },
+    );
+  }
+
   private getErrorMessage(error: unknown): string {
     if (error instanceof Error) {
       return error.message;
@@ -263,6 +319,7 @@ export default class LegacyImportComponent {
     this.reviewSubmissionError.set(null);
 
     this.resolvingConflicts.set(true);
+    this.scrollToSection(this.pageTop, 'start');
   }
 
   cancelConflictResolution(): void {
@@ -286,6 +343,7 @@ export default class LegacyImportComponent {
       this.reviewDecisions.set(decisions);
       this.preparationResult.set(result);
       this.resolvingConflicts.set(false);
+      this.scrollToSection(this.validatedDecisions, 'end');
     } catch (error: unknown) {
       this.reviewSubmissionError.set(this.getErrorMessage(error));
     } finally {
@@ -316,6 +374,7 @@ export default class LegacyImportComponent {
       percentage: 0,
       message: 'Iniciando la importación…',
     });
+    this.scrollToSection(this.importExecution, 'end');
 
     try {
       const result: LegacyImportStartResult = await this.desktopLegacyImportService.startImport(
@@ -323,6 +382,7 @@ export default class LegacyImportComponent {
       );
 
       this.importResult.set(result);
+      this.scrollToSection(this.importResultSection, 'end');
     } catch (error: unknown) {
       this.importError.set(this.getErrorMessage(error));
     } finally {

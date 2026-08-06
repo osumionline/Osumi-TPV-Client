@@ -1,4 +1,6 @@
-<main class="legacy-import">
+<main #pageTop
+      class="legacy-import"
+      tabindex="-1">
     <section class="legacy-import__content">
         @if (analysisReport(); as report) {
         @if (resolvingConflicts()) {
@@ -284,7 +286,9 @@
         }
 
         @if (preparationResult(); as preparation) {
-        <section class="import-prepared">
+        <section #validatedDecisions
+                 class="import-prepared"
+                 tabindex="-1">
             <mat-icon aria-hidden="true">
                 verified
             </mat-icon>
@@ -307,7 +311,9 @@
         }
 
         @if (importProgress(); as progress) {
-        <section class="import-execution">
+        <section #importExecution
+                 class="import-execution"
+                 tabindex="-1">
             <header class="import-execution__header">
                 <div>
                     <h2>
@@ -330,7 +336,9 @@
         }
 
         @if (importResult(); as result) {
-        <section class="import-staging-ready">
+        <section #importResultSection
+                 class="import-staging-ready"
+                 tabindex="-1">
             <mat-icon aria-hidden="true">
                 task_alt
             </mat-icon>
