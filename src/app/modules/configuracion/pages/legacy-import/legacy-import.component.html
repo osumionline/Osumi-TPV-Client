@@ -332,17 +332,22 @@
         @if (importResult(); as result) {
         <section class="import-staging-ready">
             <mat-icon aria-hidden="true">
-                database
+                task_alt
             </mat-icon>
 
             <div>
                 <h2>
-                    Datos importados en la base temporal
+                    Importación completada
                 </h2>
 
                 <p>
-                    Se ha creado y validado la base SQLite
-                    de staging. Se han transformado e importado
+                    La base de datos, la configuración y los
+                    archivos se han importado correctamente.
+                    La instalación definitiva ya está activa.
+                </p>
+
+                <p>
+                    Se han transformado e importado
                     {{ formatInteger(result.importedRows) }}
                     registros de
                     {{ formatInteger(result.sourceRows) }}
@@ -353,22 +358,27 @@
                 <p>
                     Se han omitido
                     {{ formatInteger(result.skippedRows) }}
-                    registros inválidos o huérfanos.
+                    registros inválidos, duplicados o huérfanos.
                 </p>
                 }
 
                 @if (result.warningCount > 0) {
                 <p>
-                    La importación acumula
+                    La importación ha finalizado con
                     {{ formatInteger(result.warningCount) }}
-                    advertencias.
+                    advertencias no bloqueantes.
                 </p>
                 }
 
-                <p>
-                    La instalación definitiva todavía no
-                    se ha activado.
-                </p>
+                <button type="button"
+                        matButton="filled"
+                        (click)="finishImport()">
+                    <mat-icon>
+                        login
+                    </mat-icon>
+
+                    Entrar en Osumi TPV
+                </button>
             </div>
         </section>
         }
@@ -387,6 +397,7 @@
         </p>
         }
 
+        @if (importResult() === null) {
         <footer class="legacy-import__actions">
             <button type="button"
                     matButton
@@ -446,13 +457,14 @@
                 }
                 <span>
                     {{ importing()
-                                ? 'Preparando base temporal…'
+                                ? 'Importando e instalando…'
                                 : 'Iniciar importación'
                         }}
                 </span>
             </button>
             }
         </footer>
+        }
         }
         }
         @else {

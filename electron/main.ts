@@ -49,6 +49,7 @@ import InMemoryLegacyImportSelectionStore from '@infrastructure/legacy-import/in
 import MariaDbInsertParser from '@infrastructure/legacy-import/maria-db-insert.parser';
 import NodeLegacyImportRunner from '@infrastructure/legacy-import/node-legacy-import.runner';
 import YauzlLegacyImportDumpAnalyzer from '@infrastructure/legacy-import/yauzl-legacy-import-dump.analyzer';
+import YauzlLegacyImportPackageConfigurationReader from '@infrastructure/legacy-import/yauzl-legacy-import-package-configuration.reader';
 import YauzlLegacyImportPackageInspector from '@infrastructure/legacy-import/yauzl-legacy-import-package.inspector';
 import registerLegacyImportIpc from '@ipc/register-legacy-import-ipc';
 
@@ -211,6 +212,9 @@ app
     const legacyImportPackageInspector: YauzlLegacyImportPackageInspector =
       new YauzlLegacyImportPackageInspector();
 
+    const legacyImportPackageConfigurationReader: YauzlLegacyImportPackageConfigurationReader =
+      new YauzlLegacyImportPackageConfigurationReader();
+
     const legacyImportSelectionStore: InMemoryLegacyImportSelectionStore =
       new InMemoryLegacyImportSelectionStore();
 
@@ -232,10 +236,15 @@ app
     const legacyImportService: LegacyImportService = new LegacyImportService(
       legacyImportDialog,
       legacyImportPackageInspector,
+      legacyImportPackageConfigurationReader,
       legacyImportDumpAnalyzer,
       legacyImportReviewDecisionValidator,
       legacyImportRunner,
       legacyImportSelectionStore,
+      stagingAppDataRepository,
+      stagingLogoStorage,
+      stagingSecretStorage,
+      installationFinalizer,
     );
 
     /*

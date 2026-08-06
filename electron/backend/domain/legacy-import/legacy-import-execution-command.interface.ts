@@ -16,6 +16,10 @@ export default interface LegacyImportExecutionCommand {
 
   readonly sourceRows: number;
 
+  readonly initialSaleNumber: number;
+
+  readonly initialInvoiceNumber: number;
+
   readonly expectedTableRows: Readonly<Record<string, number>>;
 
   readonly fileInventory: readonly LegacyImportFileInventoryItem[];

@@ -1,5 +1,5 @@
 export default interface LegacyImportStartResult {
-  readonly status: 'database-prepared';
+  readonly status: 'database-prepared' | 'installed';
 
   readonly selectionId: string;
 

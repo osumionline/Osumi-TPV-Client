@@ -1,12 +1,18 @@
+import type AppDataRepository from '@backend/contracts/app-data.repository';
+import type InstallationFinalizer from '@backend/contracts/installation-finalizer.interface';
 import type LegacyImportDialog from '@backend/contracts/legacy-import-dialog.interface';
 import type LegacyImportDumpAnalyzer from '@backend/contracts/legacy-import-dump-analyzer.interface';
+import type LegacyImportPackageConfigurationReader from '@backend/contracts/legacy-import-package-configuration-reader.interface';
 import type LegacyImportPackageInspector from '@backend/contracts/legacy-import-package-inspector.interface';
 import type LegacyImportProgressListener from '@backend/contracts/legacy-import-progress-listener.type';
 import type LegacyImportReviewDecisionValidator from '@backend/contracts/legacy-import-review-decision-validator.interface';
 import type LegacyImportRunner from '@backend/contracts/legacy-import-runner.interface';
 import type LegacyImportSelectionStore from '@backend/contracts/legacy-import-selection-store.interface';
+import type LogoStorage from '@backend/contracts/logo-storage.interface';
+import type SecretStorage from '@backend/contracts/secret-storage.interface';
 import type LegacyImportExecutionCommand from '@backend/domain/legacy-import/legacy-import-execution-command.interface';
 import type LegacyImportPackageAnalysis from '@backend/domain/legacy-import/legacy-import-package-analysis.type';
+import LegacyImportPackageConfiguration from '@backend/domain/legacy-import/legacy-import-package-configuration.interface';
 import type LegacyImportPackageInspection from '@backend/domain/legacy-import/legacy-import-package-inspection.interface';
 import type LegacyImportSelection from '@backend/domain/legacy-import/legacy-import-selection.interface';
 import { LEGACY_IMPORT_APPLICATION_NAME } from '@backend/domain/legacy-import/legacy-import.constants';
@@ -22,10 +28,15 @@ export default class LegacyImportService {
   constructor(
     private readonly dialog: LegacyImportDialog,
     private readonly packageInspector: LegacyImportPackageInspector,
+    private readonly packageConfigurationReader: LegacyImportPackageConfigurationReader,
     private readonly dumpAnalyzer: LegacyImportDumpAnalyzer,
     private readonly reviewDecisionValidator: LegacyImportReviewDecisionValidator,
     private readonly importRunner: LegacyImportRunner,
     private readonly selectionStore: LegacyImportSelectionStore,
+    private readonly stagingAppDataRepository: AppDataRepository,
+    private readonly stagingLogoStorage: LogoStorage,
+    private readonly stagingSecretStorage: SecretStorage,
+    private readonly installationFinalizer: InstallationFinalizer,
   ) {}
 
   async selectPackage(): Promise<LegacyImportPackageSelectionResult> {
@@ -184,34 +195,102 @@ export default class LegacyImportService {
 
     const startedAt: string = new Date().toISOString();
 
-    const command: LegacyImportExecutionCommand = {
-      selectionId,
-      packagePath: selection.packagePath,
-      sourceApplication: LEGACY_IMPORT_APPLICATION_NAME,
-      sourceVersion: selection.inspection.summary.applicationVersion,
-      sourceSchemaVersion: selection.inspection.summary.schemaVersion,
-      sourceHash: selection.inspection.packageSha256,
-      sourceRows: selection.inspection.summary.totalRows,
-      expectedTableRows: selection.inspection.tableRows,
-      fileInventory: selection.inspection.fileInventory,
-      reviewDecisions: selection.reviewDecisions,
-      warningCount: selection.inspection.summary.warnings.length,
-      startedAt,
-    };
-
     try {
-      const result: LegacyImportStartResult = await this.importRunner.run(
+      progressListener({
+        selectionId,
+        stage: 'reading-package-configuration',
+        percentage: 5,
+        message: 'Leyendo la configuración y el logo del paquete…',
+      });
+
+      const packageConfiguration: LegacyImportPackageConfiguration =
+        await this.packageConfigurationReader.read(
+          selection.packagePath,
+          selection.inspection.packageSha256,
+          selection.inspection.fileInventory,
+          startedAt,
+        );
+
+      const command: LegacyImportExecutionCommand = {
+        selectionId,
+        packagePath: selection.packagePath,
+        sourceApplication: LEGACY_IMPORT_APPLICATION_NAME,
+        sourceVersion: selection.inspection.summary.applicationVersion,
+        sourceSchemaVersion: selection.inspection.summary.schemaVersion,
+        sourceHash: selection.inspection.packageSha256,
+        sourceRows: selection.inspection.summary.totalRows,
+        initialSaleNumber: packageConfiguration.initialSaleNumber,
+        initialInvoiceNumber: packageConfiguration.initialInvoiceNumber,
+        expectedTableRows: selection.inspection.tableRows,
+        fileInventory: selection.inspection.fileInventory,
+        reviewDecisions: selection.reviewDecisions,
+        warningCount: selection.inspection.summary.warnings.length,
+        startedAt,
+      };
+
+      const stagingResult: LegacyImportStartResult = await this.importRunner.run(
         command,
         progressListener,
       );
 
+      progressListener({
+        selectionId,
+        stage: 'preparing-application-files',
+        percentage: 99,
+        message: 'Preparando configuración, logo y secretos…',
+      });
+
+      /*
+       * No se utiliza InstallationStaging.prepare()
+       * porque borraría la base y los archivos que el
+       * Worker acaba de crear.
+       *
+       * app_data.json se escribe el último y actúa como
+       * marcador de que el staging está completo.
+       */
+      await this.stagingLogoStorage.save(packageConfiguration.logo);
+
+      await this.stagingSecretStorage.save(packageConfiguration.secrets);
+
+      await this.stagingAppDataRepository.save(packageConfiguration.appData);
+
+      progressListener({
+        selectionId,
+        stage: 'promoting-installation',
+        percentage: 99,
+        message: 'Activando la instalación importada…',
+      });
+
+      await this.installationFinalizer.finalize();
+
+      const completedAt: string = new Date().toISOString();
+
+      const result: LegacyImportStartResult = {
+        ...stagingResult,
+        status: 'installed',
+        completedAt,
+      };
+
       this.selectionStore.setExecutionResult(selectionId, result);
+
+      progressListener({
+        selectionId,
+        stage: 'completed',
+        percentage: 100,
+        message: 'La importación se ha completado y la instalación está activa.',
+      });
 
       return result;
     } catch (error: unknown) {
-      console.error('Error preparando la importación legacy:', error);
+      console.error('Error completando la importación legacy:', error);
 
-      throw new Error('No se ha podido preparar la base de datos temporal de importación.', {
+      try {
+        await this.installationFinalizer.recover();
+      } catch (recoveryError: unknown) {
+        console.error('No se ha podido recuperar la instalación interrumpida:', recoveryError);
+      }
+
+      throw new Error('No se ha podido completar la importación e instalación.', {
         cause: error,
       });
     } finally {

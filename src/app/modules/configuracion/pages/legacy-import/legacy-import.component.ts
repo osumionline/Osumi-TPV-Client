@@ -240,6 +240,10 @@ export default class LegacyImportComponent {
     return this.integerFormatter.format(value);
   }
 
+  finishImport(): void {
+    window.location.reload();
+  }
+
   private getErrorMessage(error: unknown): string {
     if (error instanceof Error) {
       return error.message;

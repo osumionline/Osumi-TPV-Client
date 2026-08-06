@@ -19,6 +19,7 @@ import LegacyImportCashDataImporter from '@infrastructure/legacy-import/legacy-i
 import LegacyImportCatalogImporter from '@infrastructure/legacy-import/legacy-import-catalog.importer';
 import LegacyImportCustomerDataImporter from '@infrastructure/legacy-import/legacy-import-customer-data.importer';
 import LegacyImportFilesImporter from '@infrastructure/legacy-import/legacy-import-files.importer';
+import LegacyImportHistoryDataImporter from '@infrastructure/legacy-import/legacy-import-history-data.importer';
 import LegacyImportMasterDataImporter from '@infrastructure/legacy-import/legacy-import-master-data.importer';
 import LegacyImportNumberConverter from '@infrastructure/legacy-import/legacy-import-number.converter';
 import LegacyImportOrderFilesImporter from '@infrastructure/legacy-import/legacy-import-order-files.importer';
@@ -30,7 +31,6 @@ import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value
 import MariaDbInsertParser from '@infrastructure/legacy-import/maria-db-insert.parser';
 import YauzlLegacyImportDumpReader from '@infrastructure/legacy-import/yauzl-legacy-import-dump.reader';
 import { parentPort, workerData } from 'node:worker_threads';
-import LegacyImportHistoryDataImporter from '@infrastructure/legacy-import/legacy-import-history-data.importer';
 
 function getErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) {
@@ -200,13 +200,6 @@ async function run(): Promise<void> {
     );
 
     const completedAt: string = new Date().toISOString();
-
-    progressListener({
-      selectionId: data.command.selectionId,
-      stage: 'completed',
-      percentage: 100,
-      message: 'La base de datos temporal está preparada.',
-    });
 
     const result: LegacyImportStartResult = {
       status: 'database-prepared',

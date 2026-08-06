@@ -1,4 +1,5 @@
 type LegacyImportExecutionStage =
+  | 'reading-package-configuration'
   | 'preparing-staging'
   | 'creating-schema'
   | 'registering-import'
@@ -43,7 +44,11 @@ type LegacyImportExecutionStage =
   | 'reading-history-data'
   | 'importing-article-history'
   | 'importing-warehouse-history'
+  | 'preparing-document-sequences'
+  | 'completing-import-record'
   | 'validating-database'
+  | 'preparing-application-files'
+  | 'promoting-installation'
   | 'completed';
 
 export default LegacyImportExecutionStage;
