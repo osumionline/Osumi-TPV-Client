@@ -30,6 +30,7 @@ import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value
 import MariaDbInsertParser from '@infrastructure/legacy-import/maria-db-insert.parser';
 import YauzlLegacyImportDumpReader from '@infrastructure/legacy-import/yauzl-legacy-import-dump.reader';
 import { parentPort, workerData } from 'node:worker_threads';
+import LegacyImportHistoryDataImporter from '@infrastructure/legacy-import/legacy-import-history-data.importer';
 
 function getErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) {
@@ -156,6 +157,14 @@ async function run(): Promise<void> {
   const legacyImportOrderFilesImporter: LegacyImportOrderFilesImporter =
     new LegacyImportOrderFilesImporter(data.stagingFilesDirectory, legacyImportPublicIdFactory);
 
+  const legacyImportHistoryDataImporter: LegacyImportHistoryDataImporter =
+    new LegacyImportHistoryDataImporter(
+      legacyImportDumpReader,
+      legacySqlValueReader,
+      legacyImportNumberConverter,
+      legacyImportPublicIdFactory,
+    );
+
   const legacyImportDatabase: TypeOrmLegacyImportDatabase = new TypeOrmLegacyImportDatabase(
     data.databaseFile,
     data.applicationVersion,
@@ -171,6 +180,7 @@ async function run(): Promise<void> {
       legacyImportSalePaymentDataImporter,
       legacyImportPurchaseDataImporter,
       legacyImportOrderFilesImporter,
+      legacyImportHistoryDataImporter,
     ],
   );
 

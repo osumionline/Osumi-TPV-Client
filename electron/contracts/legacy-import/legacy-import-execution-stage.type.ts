@@ -40,6 +40,9 @@ type LegacyImportExecutionStage =
   | 'extracting-order-files'
   | 'registering-order-files'
   | 'linking-order-files'
+  | 'reading-history-data'
+  | 'importing-article-history'
+  | 'importing-warehouse-history'
   | 'validating-database'
   | 'completed';
 
