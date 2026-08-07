@@ -1,0 +1,51 @@
+<main class="startup">
+    <section class="startup__content">
+        @if (startupService.hasError()) {
+        <div class="startup__error">
+            <h1>
+                No se ha podido iniciar Osumi TPV
+            </h1>
+
+            <p>
+                {{ startupService.error() }}
+            </p>
+
+            <button type="button"
+                    matButton="filled"
+                    (click)="retry()">
+                Reintentar
+            </button>
+        </div>
+        }
+        @else {
+        <mat-spinner diameter="64"></mat-spinner>
+
+        <h1>
+            Arrancando Osumi TPV
+        </h1>
+
+        <p class="startup__step">
+            {{ startupService.currentStep() ?? 'Preparando la aplicación…' }}
+        </p>
+
+        <mat-progress-bar mode="determinate"
+                          [value]="startupService.percentage()">
+        </mat-progress-bar>
+
+        <div class="startup__progress-info">
+            <strong>
+                {{ startupService.percentage() }} %
+            </strong>
+
+            @if (startupService.totalSteps() > 0) {
+            <span>
+                {{ startupService.completedSteps() }}
+                de
+                {{ startupService.totalSteps() }}
+                tareas completadas
+            </span>
+            }
+        </div>
+        }
+    </section>
+</main>

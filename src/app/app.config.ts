@@ -35,9 +35,9 @@ const scrollConfig: InMemoryScrollingOptions = {
 
 const appConfig: ApplicationConfig = {
   providers: [
-    provideAppInitializer((): Promise<ApplicationStateResult> => {
-      return inject(ApplicationStateService).load();
-    }),
+    provideAppInitializer((): Promise<ApplicationStateResult> =>
+      inject(ApplicationStateService).load(),
+    ),
     { provide: LOCALE_ID, useValue: 'es-ES' },
     { provide: MAT_DATE_LOCALE, useValue: 'es-ES' },
     { provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: appearance },

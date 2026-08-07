@@ -2,6 +2,7 @@ import type { Routes } from '@angular/router';
 import applicationProblemGuard from '@guards/application-problem.guard';
 import notInstalledGuard from '@guards/not-installed.guard';
 import readyApplicationGuard from '@guards/ready-application.guard';
+import startupGuard from '@guards/startup.guard';
 
 const routes: Routes = [
   {
@@ -16,6 +17,11 @@ const routes: Routes = [
       import('@modules/configuracion/pages/application-status/application-status.component'),
   },
   {
+    path: 'startup',
+    canActivate: [startupGuard],
+    loadComponent: () => import('@modules/startup/pages/startup/startup.component'),
+  },
+  {
     path: 'ventas',
     canActivate: [readyApplicationGuard],
     loadComponent: () => import('@modules/ventas/pages/sales/sales.component'),
@@ -23,11 +29,11 @@ const routes: Routes = [
   {
     path: '',
     pathMatch: 'full',
-    redirectTo: 'ventas',
+    redirectTo: 'startup',
   },
   {
     path: '**',
-    redirectTo: 'ventas',
+    redirectTo: 'startup',
   },
 ];
 

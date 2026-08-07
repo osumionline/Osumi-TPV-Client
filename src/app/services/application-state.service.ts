@@ -1,9 +1,6 @@
 import { computed, Injectable, signal } from '@angular/core';
-
 import type { Signal, WritableSignal } from '@angular/core';
-
 import type ApplicationStateResult from '@desktop-contracts/application/application-state-result.interface';
-
 import type { ApplicationState } from '@desktop-contracts/application/application-state.type';
 
 @Injectable({
