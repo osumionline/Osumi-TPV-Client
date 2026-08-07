@@ -2,12 +2,14 @@ import type { Signal, WritableSignal } from '@angular/core';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import type ApplicationStartupStatus from '@app/model/startup/application-startup-status.type';
 import MarcasService from '@services/marcas.service';
+import ProveedoresService from '@services/proveedores.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export default class ApplicationStartupService {
   private readonly marcasService: MarcasService = inject(MarcasService);
+  private readonly proveedoresService: ProveedoresService = inject(ProveedoresService);
 
   private readonly statusSignal: WritableSignal<ApplicationStartupStatus> =
     signal<ApplicationStartupStatus>('idle');
@@ -97,23 +99,18 @@ export default class ApplicationStartupService {
   }
 
   private async runStartupSteps(): Promise<void> {
-    /*
-     * Por ahora existe una única tarea real.
-     *
-     * Este total irá aumentando conforme incorporemos:
-     *
-     * 2. Proveedores
-     * 3. Empleados
-     * 4. Clientes
-     * 5. Categorías
-     * 6. Provincias
-     */
-    this.totalStepsSignal.set(1);
+    this.totalStepsSignal.set(2);
 
     this.currentStepSignal.set('Cargando marcas…');
 
     await this.marcasService.load();
 
     this.completedStepsSignal.set(1);
+
+    this.currentStepSignal.set('Cargando proveedores…');
+
+    await this.proveedoresService.load();
+
+    this.completedStepsSignal.set(2);
   }
 }

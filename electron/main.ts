@@ -8,16 +8,19 @@ import ApplicationStateService from '@backend/application/application/applicatio
 import ConfigurationService from '@backend/application/configuration/configuration.service';
 import InstallationService from '@backend/application/configuration/installation.service';
 import MarcasService from '@backend/application/marcas/marcas.service';
+import ProveedoresService from '@backend/application/proveedores/proveedores.service';
 import { SystemService } from '@backend/application/system/system.service';
 
 import type AppDataRepository from '@backend/contracts/app-data.repository';
 import type ApplicationPaths from '@backend/contracts/application-paths.interface';
+import type AssetUrlBuilder from '@backend/contracts/asset-url-builder.interface';
 import type InstallationDatabase from '@backend/contracts/installation-database.interface';
 import type InstallationFinalizer from '@backend/contracts/installation-finalizer.interface';
 import type InstallationStaging from '@backend/contracts/installation-staging.interface';
 import type LogoStorage from '@backend/contracts/logo-storage.interface';
 import type MarcaRepository from '@backend/contracts/marca.repository.interface';
 import type PasswordHasher from '@backend/contracts/password-hasher.interface';
+import type ProveedorRepository from '@backend/contracts/proveedor.repository.interface';
 import type SecretStorage from '@backend/contracts/secret-storage.interface';
 
 import NewInstallationDataService from '@infrastructure/database/initial-data/new-installation-data.service';
@@ -28,8 +31,10 @@ import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import TypeOrmInstallationDatabase from '@infrastructure/database/typeorm/typeorm-installation-database';
 import TypeOrmMarcaRepository from '@infrastructure/database/typeorm/typeorm-marca.repository';
+import TypeOrmProveedorRepository from '@infrastructure/database/typeorm/typeorm-proveedor.repository';
 
 import ElectronApplicationPathsProvider from '@infrastructure/electron/electron-application-paths.provider';
+import ElectronAssetUrlBuilder from '@infrastructure/electron/electron-asset-url.builder';
 import ElectronLogoStorage from '@infrastructure/electron/electron-logo.storage';
 import { ElectronRuntimeInfoProvider } from '@infrastructure/electron/electron-runtime-info.provider';
 import ElectronSafeStorageSecretStorage from '@infrastructure/electron/electron-safe-storage-secret-storage';
@@ -45,6 +50,7 @@ import NodeScryptPasswordHasher from '@infrastructure/security/node-scrypt-passw
 import registerApplicationIpc from '@ipc/register-application-ipc';
 import registerConfigurationIpc from '@ipc/register-configuration-ipc';
 import registerMarcasIpc from '@ipc/register-marcas-ipc';
+import registerProveedoresIpc from '@ipc/register-proveedores-ipc';
 import { registerSystemIpc } from '@ipc/register-system-ipc';
 
 import LegacyImportService from '@backend/application/legacy-import/legacy-import.service';
@@ -224,9 +230,20 @@ app
     /*
      * Servicios operativos de catálogo.
      */
+    const assetUrlBuilder: AssetUrlBuilder = new ElectronAssetUrlBuilder();
+
     const marcaRepository: MarcaRepository = new TypeOrmMarcaRepository(operationalDatabase);
 
-    const marcasService: MarcasService = new MarcasService(marcaRepository);
+    const marcasService: MarcasService = new MarcasService(marcaRepository, assetUrlBuilder);
+
+    const proveedorRepository: ProveedorRepository = new TypeOrmProveedorRepository(
+      operationalDatabase,
+    );
+
+    const proveedoresService: ProveedoresService = new ProveedoresService(
+      proveedorRepository,
+      assetUrlBuilder,
+    );
 
     const legacyImportDialog: ElectronLegacyImportDialog = new ElectronLegacyImportDialog(
       (): BrowserWindow | null => mainWindow,
@@ -299,6 +316,12 @@ app
       (): BrowserWindow | null => mainWindow,
 
       marcasService,
+    );
+
+    registerProveedoresIpc(
+      (): BrowserWindow | null => mainWindow,
+
+      proveedoresService,
     );
 
     registerLegacyImportIpc(legacyImportService);

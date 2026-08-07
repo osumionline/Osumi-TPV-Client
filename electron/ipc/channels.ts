@@ -8,6 +8,7 @@ const IPC_CHANNELS = {
   configurationInstall: 'configuration:install',
   applicationGetState: 'application:get-state',
   marcasGetAll: 'marcas:get-all',
+  proveedoresGetAll: 'proveedores:get-all',
 } as const;
 
 export default IPC_CHANNELS;
