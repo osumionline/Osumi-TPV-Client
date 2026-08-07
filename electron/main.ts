@@ -24,6 +24,7 @@ import completeDatabaseSchemaTables from '@infrastructure/database/schema/comple
 import DatabaseSchemaService from '@infrastructure/database/schema/database-schema.service';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import TypeOrmInstallationDatabase from '@infrastructure/database/typeorm/typeorm-installation-database';
+import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 
 import ElectronApplicationPathsProvider from '@infrastructure/electron/electron-application-paths.provider';
 import ElectronLogoStorage from '@infrastructure/electron/electron-logo.storage';
@@ -67,6 +68,10 @@ protocol.registerSchemesAsPrivileged([
 const DEV_SERVER_URL: string | undefined = process.env['OSUMI_TPV_RENDERER_URL'];
 
 let mainWindow: BrowserWindow | null = null;
+
+let applicationDatabase: TypeOrmApplicationDatabase | null = null;
+
+let applicationQuitPrepared: boolean = false;
 
 const runtimeInfoProvider: ElectronRuntimeInfoProvider = new ElectronRuntimeInfoProvider();
 
@@ -184,6 +189,11 @@ app
     const passwordHasher: PasswordHasher = new NodeScryptPasswordHasher();
 
     const dataSourceFactory: TypeOrmDataSourceFactory = new TypeOrmDataSourceFactory();
+
+    applicationDatabase = new TypeOrmApplicationDatabase(
+      applicationPaths.databaseFile,
+      dataSourceFactory,
+    );
 
     const databaseSchemaService: DatabaseSchemaService = new DatabaseSchemaService(
       completeDatabaseSchema,
@@ -303,6 +313,29 @@ app
 
     app.quit();
   });
+
+app.on(
+  'before-quit',
+
+  (event): void => {
+    if (applicationQuitPrepared || applicationDatabase === null) {
+      return;
+    }
+
+    event.preventDefault();
+
+    void applicationDatabase
+      .disconnect()
+      .catch((error: unknown): void => {
+        console.error('No se ha podido cerrar la base de datos de la aplicación:', error);
+      })
+      .finally((): void => {
+        applicationQuitPrepared = true;
+
+        app.quit();
+      });
+  },
+);
 
 app.on('window-all-closed', (): void => {
   if (process.platform !== 'darwin') {
