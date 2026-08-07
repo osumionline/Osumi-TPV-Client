@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import ApplicationStateService from '@backend/application/application/application-state.service';
 import ConfigurationService from '@backend/application/configuration/configuration.service';
 import InstallationService from '@backend/application/configuration/installation.service';
+import MarcasService from '@backend/application/marcas/marcas.service';
 import { SystemService } from '@backend/application/system/system.service';
 
 import type AppDataRepository from '@backend/contracts/app-data.repository';
@@ -15,6 +16,7 @@ import type InstallationDatabase from '@backend/contracts/installation-database.
 import type InstallationFinalizer from '@backend/contracts/installation-finalizer.interface';
 import type InstallationStaging from '@backend/contracts/installation-staging.interface';
 import type LogoStorage from '@backend/contracts/logo-storage.interface';
+import type MarcaRepository from '@backend/contracts/marca.repository.interface';
 import type PasswordHasher from '@backend/contracts/password-hasher.interface';
 import type SecretStorage from '@backend/contracts/secret-storage.interface';
 
@@ -22,9 +24,10 @@ import NewInstallationDataService from '@infrastructure/database/initial-data/ne
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
 import completeDatabaseSchemaTables from '@infrastructure/database/schema/complete-database-schema.tables';
 import DatabaseSchemaService from '@infrastructure/database/schema/database-schema.service';
+import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import TypeOrmInstallationDatabase from '@infrastructure/database/typeorm/typeorm-installation-database';
-import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
+import TypeOrmMarcaRepository from '@infrastructure/database/typeorm/typeorm-marca.repository';
 
 import ElectronApplicationPathsProvider from '@infrastructure/electron/electron-application-paths.provider';
 import ElectronLogoStorage from '@infrastructure/electron/electron-logo.storage';
@@ -41,6 +44,7 @@ import NodeScryptPasswordHasher from '@infrastructure/security/node-scrypt-passw
 
 import registerApplicationIpc from '@ipc/register-application-ipc';
 import registerConfigurationIpc from '@ipc/register-configuration-ipc';
+import registerMarcasIpc from '@ipc/register-marcas-ipc';
 import { registerSystemIpc } from '@ipc/register-system-ipc';
 
 import LegacyImportService from '@backend/application/legacy-import/legacy-import.service';
@@ -190,10 +194,12 @@ app
 
     const dataSourceFactory: TypeOrmDataSourceFactory = new TypeOrmDataSourceFactory();
 
-    applicationDatabase = new TypeOrmApplicationDatabase(
+    const operationalDatabase: TypeOrmApplicationDatabase = new TypeOrmApplicationDatabase(
       applicationPaths.databaseFile,
       dataSourceFactory,
     );
+
+    applicationDatabase = operationalDatabase;
 
     const databaseSchemaService: DatabaseSchemaService = new DatabaseSchemaService(
       completeDatabaseSchema,
@@ -214,6 +220,13 @@ app
       dataSourceFactory,
       databaseSchemaService,
     );
+
+    /*
+     * Servicios operativos de catálogo.
+     */
+    const marcaRepository: MarcaRepository = new TypeOrmMarcaRepository(operationalDatabase);
+
+    const marcasService: MarcasService = new MarcasService(marcaRepository);
 
     const legacyImportDialog: ElectronLegacyImportDialog = new ElectronLegacyImportDialog(
       (): BrowserWindow | null => mainWindow,
@@ -281,6 +294,12 @@ app
      * Canales IPC.
      */
     registerApplicationIpc(applicationStateService);
+
+    registerMarcasIpc(
+      (): BrowserWindow | null => mainWindow,
+
+      marcasService,
+    );
 
     registerLegacyImportIpc(legacyImportService);
 

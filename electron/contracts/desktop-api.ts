@@ -1,6 +1,7 @@
 import type ApplicationApi from '@desktop-contracts/application/application-api.interface';
 import type ConfigurationApi from '@desktop-contracts/configuration/configuration-api.interface';
 import type LegacyImportApi from '@desktop-contracts/legacy-import/legacy-import-api.interface';
+import type MarcasApi from '@desktop-contracts/marcas/marcas-api.interface';
 import type SystemApi from '@desktop-contracts/system/system-api.interface';
 
 export default interface OsumiDesktopApi {
@@ -13,4 +14,6 @@ export default interface OsumiDesktopApi {
   readonly legacyImport: LegacyImportApi;
 
   readonly configuration: ConfigurationApi;
+
+  readonly marcas: MarcasApi;
 }

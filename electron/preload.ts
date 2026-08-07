@@ -8,6 +8,7 @@ import type LegacyImportPreparationResult from '@desktop-contracts/legacy-import
 import type LegacyImportProgress from '@desktop-contracts/legacy-import/legacy-import-progress.interface';
 import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-import/legacy-import-review-decision.type';
 import type LegacyImportStartResult from '@desktop-contracts/legacy-import/legacy-import-start-result.interface';
+import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
 import AppInfo from '@desktop-contracts/system/app-info.interface';
 import IPC_CHANNELS from '@ipc/channels';
 import type { IpcRendererEvent } from 'electron';
@@ -20,6 +21,11 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
     getState: (): Promise<ApplicationStateResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.applicationGetState) as Promise<ApplicationStateResult>,
   },
+
+  marcas: Object.freeze({
+    getAll: (): Promise<readonly MarcaInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.marcasGetAll) as Promise<readonly MarcaInterface[]>,
+  }),
 
   configuration: Object.freeze({
     install: (command: InstallationCommand): Promise<InstallationResult> =>

@@ -1,11 +1,14 @@
 import type { Signal, WritableSignal } from '@angular/core';
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import type ApplicationStartupStatus from '@app/model/startup/application-startup-status.type';
+import MarcasService from '@services/marcas.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export default class ApplicationStartupService {
+  private readonly marcasService: MarcasService = inject(MarcasService);
+
   private readonly statusSignal: WritableSignal<ApplicationStartupStatus> =
     signal<ApplicationStartupStatus>('idle');
 
@@ -95,12 +98,10 @@ export default class ApplicationStartupService {
 
   private async runStartupSteps(): Promise<void> {
     /*
-     * Paso temporal.
+     * Por ahora existe una única tarea real.
      *
-     * En los siguientes bloques se sustituirá por
-     * las cargas reales:
+     * Este total irá aumentando conforme incorporemos:
      *
-     * 1. Marcas
      * 2. Proveedores
      * 3. Empleados
      * 4. Clientes
@@ -109,9 +110,9 @@ export default class ApplicationStartupService {
      */
     this.totalStepsSignal.set(1);
 
-    this.currentStepSignal.set('Preparando la aplicación…');
+    this.currentStepSignal.set('Cargando marcas…');
 
-    await Promise.resolve();
+    await this.marcasService.load();
 
     this.completedStepsSignal.set(1);
   }

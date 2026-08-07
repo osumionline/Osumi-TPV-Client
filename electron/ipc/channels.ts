@@ -7,6 +7,7 @@ const IPC_CHANNELS = {
   legacyImportProgress: 'legacy-import:progress',
   configurationInstall: 'configuration:install',
   applicationGetState: 'application:get-state',
+  marcasGetAll: 'marcas:get-all',
 } as const;
 
 export default IPC_CHANNELS;
