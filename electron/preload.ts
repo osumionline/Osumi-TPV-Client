@@ -14,6 +14,7 @@ import type LegacyImportStartResult from '@desktop-contracts/legacy-import/legac
 import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
 import type { ProveedorInterface } from '@desktop-contracts/proveedores/proveedor.interface';
 import AppInfo from '@desktop-contracts/system/app-info.interface';
+import type VentasContextInterface from '@desktop-contracts/ventas/ventas-context.interface';
 import IPC_CHANNELS from '@ipc/channels';
 import type { IpcRendererEvent } from 'electron';
 import { contextBridge, ipcRenderer } from 'electron';
@@ -26,34 +27,9 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
       ipcRenderer.invoke(IPC_CHANNELS.applicationGetState) as Promise<ApplicationStateResult>,
   },
 
-  marcas: Object.freeze({
-    getAll: (): Promise<readonly MarcaInterface[]> =>
-      ipcRenderer.invoke(IPC_CHANNELS.marcasGetAll) as Promise<readonly MarcaInterface[]>,
-  }),
-
-  proveedores: Object.freeze({
-    getAll: (): Promise<readonly ProveedorInterface[]> =>
-      ipcRenderer.invoke(IPC_CHANNELS.proveedoresGetAll) as Promise<readonly ProveedorInterface[]>,
-  }),
-
-  empleados: Object.freeze({
-    getAll: (): Promise<readonly EmpleadoInterface[]> =>
-      ipcRenderer.invoke(IPC_CHANNELS.empleadosGetAll) as Promise<readonly EmpleadoInterface[]>,
-  }),
-
-  clientes: Object.freeze({
-    getAll: (): Promise<readonly ClienteInterface[]> =>
-      ipcRenderer.invoke(IPC_CHANNELS.clientesGetAll) as Promise<readonly ClienteInterface[]>,
-  }),
-
-  categorias: Object.freeze({
-    getAll: (): Promise<readonly CategoriaInterface[]> =>
-      ipcRenderer.invoke(IPC_CHANNELS.categoriasGetAll) as Promise<readonly CategoriaInterface[]>,
-  }),
-
-  configuration: Object.freeze({
-    install: (command: InstallationCommand): Promise<InstallationResult> =>
-      ipcRenderer.invoke(IPC_CHANNELS.configurationInstall, command) as Promise<InstallationResult>,
+  system: Object.freeze({
+    getAppInfo: (): Promise<AppInfo> =>
+      ipcRenderer.invoke(IPC_CHANNELS.systemGetAppInfo) as Promise<AppInfo>,
   }),
 
   legacyImport: {
@@ -110,9 +86,39 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
     },
   },
 
-  system: Object.freeze({
-    getAppInfo: (): Promise<AppInfo> =>
-      ipcRenderer.invoke(IPC_CHANNELS.systemGetAppInfo) as Promise<AppInfo>,
+  configuration: Object.freeze({
+    install: (command: InstallationCommand): Promise<InstallationResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.configurationInstall, command) as Promise<InstallationResult>,
+  }),
+
+  marcas: Object.freeze({
+    getAll: (): Promise<readonly MarcaInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.marcasGetAll) as Promise<readonly MarcaInterface[]>,
+  }),
+
+  proveedores: Object.freeze({
+    getAll: (): Promise<readonly ProveedorInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.proveedoresGetAll) as Promise<readonly ProveedorInterface[]>,
+  }),
+
+  empleados: Object.freeze({
+    getAll: (): Promise<readonly EmpleadoInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.empleadosGetAll) as Promise<readonly EmpleadoInterface[]>,
+  }),
+
+  categorias: Object.freeze({
+    getAll: (): Promise<readonly CategoriaInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.categoriasGetAll) as Promise<readonly CategoriaInterface[]>,
+  }),
+
+  clientes: Object.freeze({
+    getAll: (): Promise<readonly ClienteInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.clientesGetAll) as Promise<readonly ClienteInterface[]>,
+  }),
+
+  ventas: Object.freeze({
+    getContext: (): Promise<VentasContextInterface> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ventasGetContext) as Promise<VentasContextInterface>,
   }),
 });
 

@@ -12,6 +12,7 @@ const IPC_CHANNELS = {
   empleadosGetAll: 'empleados:get-all',
   clientesGetAll: 'clientes:get-all',
   categoriasGetAll: 'categorias:get-all',
+  ventasGetContext: 'ventas:get-context',
 } as const;
 
 export default IPC_CHANNELS;

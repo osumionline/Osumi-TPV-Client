@@ -13,6 +13,7 @@ import EmpleadosService from '@backend/application/empleados/empleados.service';
 import MarcasService from '@backend/application/marcas/marcas.service';
 import ProveedoresService from '@backend/application/proveedores/proveedores.service';
 import { SystemService } from '@backend/application/system/system.service';
+import VentasContextService from '@backend/application/ventas/ventas-context.service';
 
 import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';
 import type ClienteRepository from '@backend/contracts/clientes/cliente.repository.interface';
@@ -28,6 +29,7 @@ import type ProveedorRepository from '@backend/contracts/proveedores/proveedor.r
 import type PasswordHasher from '@backend/contracts/security/password-hasher.interface';
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
+import type VentasContextRepository from '@backend/contracts/ventas/ventas-context.repository.interface';
 
 import NewInstallationDataService from '@infrastructure/database/initial-data/new-installation-data.service';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
@@ -41,6 +43,7 @@ import TypeOrmEmpleadoRepository from '@infrastructure/database/typeorm/typeorm-
 import TypeOrmInstallationDatabase from '@infrastructure/database/typeorm/typeorm-installation-database';
 import TypeOrmMarcaRepository from '@infrastructure/database/typeorm/typeorm-marca.repository';
 import TypeOrmProveedorRepository from '@infrastructure/database/typeorm/typeorm-proveedor.repository';
+import TypeOrmVentasContextRepository from '@infrastructure/database/typeorm/typeorm-ventas-context.repository';
 
 import ElectronApplicationPathsProvider from '@infrastructure/electron/electron-application-paths.provider';
 import ElectronAssetUrlBuilder from '@infrastructure/electron/electron-asset-url.builder';
@@ -64,6 +67,7 @@ import registerEmpleadosIpc from '@ipc/register-empleados-ipc';
 import registerMarcasIpc from '@ipc/register-marcas-ipc';
 import registerProveedoresIpc from '@ipc/register-proveedores-ipc';
 import { registerSystemIpc } from '@ipc/register-system-ipc';
+import registerVentasIpc from '@ipc/register-ventas-ipc';
 
 import LegacyImportService from '@backend/application/legacy-import/legacy-import.service';
 import DefaultLegacyImportReviewDecisionValidator from '@backend/domain/legacy-import/default-legacy-import-review-decision.validator';
@@ -273,6 +277,16 @@ app
 
     const categoriasService: CategoriasService = new CategoriasService(categoriaRepository);
 
+    const ventasContextRepository: VentasContextRepository = new TypeOrmVentasContextRepository(
+      operationalDatabase,
+    );
+
+    const ventasContextService: VentasContextService = new VentasContextService(
+      configurationService,
+      ventasContextRepository,
+      assetUrlBuilder,
+    );
+
     const legacyImportDialog: ElectronLegacyImportDialog = new ElectronLegacyImportDialog(
       (): BrowserWindow | null => mainWindow,
     );
@@ -357,6 +371,8 @@ app
     registerClientesIpc((): BrowserWindow | null => mainWindow, clientesService);
 
     registerCategoriasIpc((): BrowserWindow | null => mainWindow, categoriasService);
+
+    registerVentasIpc((): BrowserWindow | null => mainWindow, ventasContextService);
 
     registerLegacyImportIpc(legacyImportService);
 
