@@ -5,6 +5,7 @@ import { app, BrowserWindow, protocol } from 'electron';
 import { join } from 'node:path';
 
 import ApplicationStateService from '@backend/application/application/application-state.service';
+import CategoriasService from '@backend/application/categorias/categorias.service';
 import ClientesService from '@backend/application/clientes/clientes.service';
 import ConfigurationService from '@backend/application/configuration/configuration.service';
 import InstallationService from '@backend/application/configuration/installation.service';
@@ -13,6 +14,7 @@ import MarcasService from '@backend/application/marcas/marcas.service';
 import ProveedoresService from '@backend/application/proveedores/proveedores.service';
 import { SystemService } from '@backend/application/system/system.service';
 
+import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';
 import type ClienteRepository from '@backend/contracts/clientes/cliente.repository.interface';
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
 import type InstallationDatabase from '@backend/contracts/configuration/installation-database.interface';
@@ -32,6 +34,7 @@ import completeDatabaseSchema from '@infrastructure/database/schema/complete-dat
 import completeDatabaseSchemaTables from '@infrastructure/database/schema/complete-database-schema.tables';
 import DatabaseSchemaService from '@infrastructure/database/schema/database-schema.service';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
+import TypeOrmCategoriaRepository from '@infrastructure/database/typeorm/typeorm-categoria.repository';
 import TypeOrmClienteRepository from '@infrastructure/database/typeorm/typeorm-cliente.repository';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import TypeOrmEmpleadoRepository from '@infrastructure/database/typeorm/typeorm-empleado.repository';
@@ -54,6 +57,7 @@ import JsonAppDataRepository from '@infrastructure/filesystem/json-app-data.repo
 import NodeScryptPasswordHasher from '@infrastructure/security/node-scrypt-password-hasher';
 
 import registerApplicationIpc from '@ipc/register-application-ipc';
+import registerCategoriasIpc from '@ipc/register-categorias-ipc';
 import registerClientesIpc from '@ipc/register-clientes-ipc';
 import registerConfigurationIpc from '@ipc/register-configuration-ipc';
 import registerEmpleadosIpc from '@ipc/register-empleados-ipc';
@@ -263,6 +267,12 @@ app
 
     const clientesService: ClientesService = new ClientesService(clienteRepository);
 
+    const categoriaRepository: CategoriaRepository = new TypeOrmCategoriaRepository(
+      operationalDatabase,
+    );
+
+    const categoriasService: CategoriasService = new CategoriasService(categoriaRepository);
+
     const legacyImportDialog: ElectronLegacyImportDialog = new ElectronLegacyImportDialog(
       (): BrowserWindow | null => mainWindow,
     );
@@ -345,6 +355,8 @@ app
     registerEmpleadosIpc((): BrowserWindow | null => mainWindow, empleadosService);
 
     registerClientesIpc((): BrowserWindow | null => mainWindow, clientesService);
+
+    registerCategoriasIpc((): BrowserWindow | null => mainWindow, categoriasService);
 
     registerLegacyImportIpc(legacyImportService);
 
