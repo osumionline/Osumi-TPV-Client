@@ -6,6 +6,7 @@ import ClientesService from '@services/clientes.service';
 import EmpleadosService from '@services/empleados.service';
 import MarcasService from '@services/marcas.service';
 import ProveedoresService from '@services/proveedores.service';
+import ProvinciasService from '@services/provincias.service';
 
 const STARTUP_DEMO_DELAY_MS: number = 700;
 
@@ -18,6 +19,7 @@ export default class ApplicationStartupService {
   private readonly empleadosService: EmpleadosService = inject(EmpleadosService);
   private readonly clientesService: ClientesService = inject(ClientesService);
   private readonly categoriasService: CategoriasService = inject(CategoriasService);
+  private readonly provinciasService: ProvinciasService = inject(ProvinciasService);
 
   private readonly statusSignal: WritableSignal<ApplicationStartupStatus> =
     signal<ApplicationStartupStatus>('idle');
@@ -117,7 +119,7 @@ export default class ApplicationStartupService {
   }
 
   private async runStartupSteps(): Promise<void> {
-    this.totalStepsSignal.set(5);
+    this.totalStepsSignal.set(6);
 
     this.currentStepSignal.set('Cargando marcas…');
     await this.demoDelay();
@@ -143,5 +145,10 @@ export default class ApplicationStartupService {
     await this.demoDelay();
     await this.categoriasService.load();
     this.completedStepsSignal.set(5);
+
+    this.currentStepSignal.set('Cargando provincias…');
+    await this.demoDelay();
+    await this.provinciasService.load();
+    this.completedStepsSignal.set(6);
   }
 }
