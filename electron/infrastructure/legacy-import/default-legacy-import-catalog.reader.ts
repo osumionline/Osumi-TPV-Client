@@ -1,5 +1,5 @@
-import type LegacyImportCatalogReader from '@backend/contracts/legacy-import-catalog-reader.interface';
-import type LegacyImportDumpReader from '@backend/contracts/legacy-import-dump-reader.interface';
+import type LegacyImportCatalogReader from '@backend/contracts/legacy-import/legacy-import-catalog-reader.interface';
+import type LegacyImportDumpReader from '@backend/contracts/legacy-import/legacy-import-dump-reader.interface';
 import type LegacyImportCatalogSnapshot from '@backend/domain/legacy-import/legacy-import-catalog-snapshot';
 import type {
   LegacyCatalogArticle,

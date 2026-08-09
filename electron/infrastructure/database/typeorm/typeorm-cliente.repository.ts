@@ -1,4 +1,4 @@
-import type ClienteRepository from '@backend/contracts/cliente.repository.interface';
+import type ClienteRepository from '@backend/contracts/clientes/cliente.repository.interface';
 import type ClienteRecord from '@backend/domain/clientes/cliente-record.interface';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import type { DataSource } from 'typeorm';

@@ -1,4 +1,4 @@
-import type ApplicationPaths from '@backend/contracts/application-paths.interface';
+import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
 import { net, protocol } from 'electron';
 import { realpath, stat } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'node:path';

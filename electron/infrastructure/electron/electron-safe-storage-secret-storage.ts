@@ -1,4 +1,4 @@
-import type SecretStorage from '@backend/contracts/secret-storage.interface';
+import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
 import type { InstallationSecretsData } from '@desktop-contracts/configuration/installation-command.interface';
 import { safeStorage } from 'electron';
 import { readFile, rename, rm, writeFile } from 'node:fs/promises';

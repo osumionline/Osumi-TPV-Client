@@ -1,5 +1,5 @@
-import type AssetUrlBuilder from '@backend/contracts/asset-url-builder.interface';
-import type ProveedorRepository from '@backend/contracts/proveedor.repository.interface';
+import type ProveedorRepository from '@backend/contracts/proveedores/proveedor.repository.interface';
+import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
 import type ComercialRecord from '@backend/domain/proveedores/comercial-record.interface';
 import type ProveedorRecord from '@backend/domain/proveedores/proveedor-record.interface';
 

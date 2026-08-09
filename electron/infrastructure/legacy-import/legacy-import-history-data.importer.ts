@@ -1,6 +1,6 @@
-import type LegacyImportDumpReader from '@backend/contracts/legacy-import-dump-reader.interface';
-import type LegacyImportPhaseImporter from '@backend/contracts/legacy-import-phase-importer.interface';
-import type LegacyImportProgressListener from '@backend/contracts/legacy-import-progress-listener.type';
+import type LegacyImportDumpReader from '@backend/contracts/legacy-import/legacy-import-dump-reader.interface';
+import type LegacyImportPhaseImporter from '@backend/contracts/legacy-import/legacy-import-phase-importer.interface';
+import type LegacyImportProgressListener from '@backend/contracts/legacy-import/legacy-import-progress-listener.type';
 import type LegacyImportExecutionCommand from '@backend/domain/legacy-import/legacy-import-execution-command.interface';
 import type LegacyImportPhaseResult from '@backend/domain/legacy-import/legacy-import-phase-result.interface';
 import type LegacySqlInsert from '@backend/domain/legacy-import/legacy-sql-insert.interface';

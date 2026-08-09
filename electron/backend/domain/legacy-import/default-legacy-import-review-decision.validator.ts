@@ -1,4 +1,4 @@
-import type LegacyImportReviewDecisionValidator from '@backend/contracts/legacy-import-review-decision-validator.interface';
+import type LegacyImportReviewDecisionValidator from '@backend/contracts/legacy-import/legacy-import-review-decision-validator.interface';
 import type {
   LegacyImportArticleReference,
   LegacyImportReviewConflict,

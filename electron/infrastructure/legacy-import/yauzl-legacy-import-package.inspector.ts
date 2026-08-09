@@ -1,4 +1,4 @@
-import type LegacyImportPackageInspector from '@backend/contracts/legacy-import-package-inspector.interface';
+import type LegacyImportPackageInspector from '@backend/contracts/legacy-import/legacy-import-package-inspector.interface';
 import type LegacyImportFileInventoryItem from '@backend/domain/legacy-import/legacy-import-file-inventory-item.interface';
 import type LegacyImportFileInventoryStatus from '@backend/domain/legacy-import/legacy-import-file-inventory-status.type';
 import type LegacyImportPackageInspection from '@backend/domain/legacy-import/legacy-import-package-inspection.interface';

@@ -1,5 +1,5 @@
-import type LegacyImportPhaseImporter from '@backend/contracts/legacy-import-phase-importer.interface';
-import type LegacyImportProgressListener from '@backend/contracts/legacy-import-progress-listener.type';
+import type LegacyImportPhaseImporter from '@backend/contracts/legacy-import/legacy-import-phase-importer.interface';
+import type LegacyImportProgressListener from '@backend/contracts/legacy-import/legacy-import-progress-listener.type';
 import type { DatabaseCreationOptions } from '@backend/domain/database/database-creation-options.interface';
 import type LegacyImportExecutionCommand from '@backend/domain/legacy-import/legacy-import-execution-command.interface';
 import type LegacyImportExecutionSummary from '@backend/domain/legacy-import/legacy-import-execution-summary.interface';

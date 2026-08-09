@@ -1,4 +1,4 @@
-import type LegacyImportDialog from '@backend/contracts/legacy-import-dialog.interface';
+import type LegacyImportDialog from '@backend/contracts/legacy-import/legacy-import-dialog.interface';
 import type { BrowserWindow, OpenDialogOptions, OpenDialogReturnValue } from 'electron';
 import { dialog } from 'electron';
 

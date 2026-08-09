@@ -1,5 +1,5 @@
-import type LegacyImportDumpReader from '@backend/contracts/legacy-import-dump-reader.interface';
-import type LegacyImportSqlInsertListener from '@backend/contracts/legacy-import-sql-insert-listener.type';
+import type LegacyImportDumpReader from '@backend/contracts/legacy-import/legacy-import-dump-reader.interface';
+import type LegacyImportSqlInsertListener from '@backend/contracts/legacy-import/legacy-import-sql-insert-listener.type';
 import type LegacySqlInsert from '@backend/domain/legacy-import/legacy-sql-insert.interface';
 import MariaDbInsertParser from '@infrastructure/legacy-import/maria-db-insert.parser';
 import type { Interface as ReadLineInterface } from 'node:readline';

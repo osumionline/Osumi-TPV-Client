@@ -1,5 +1,5 @@
-import type LegacyImportProgressListener from '@backend/contracts/legacy-import-progress-listener.type';
-import type LegacyImportRunner from '@backend/contracts/legacy-import-runner.interface';
+import type LegacyImportProgressListener from '@backend/contracts/legacy-import/legacy-import-progress-listener.type';
+import type LegacyImportRunner from '@backend/contracts/legacy-import/legacy-import-runner.interface';
 import type LegacyImportExecutionCommand from '@backend/domain/legacy-import/legacy-import-execution-command.interface';
 import type {
   LegacyImportWorkerData,

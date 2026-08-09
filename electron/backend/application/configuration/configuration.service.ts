@@ -1,4 +1,4 @@
-import type AppDataRepository from '@backend/contracts/app-data.repository';
+import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 
 export default class ConfigurationService {

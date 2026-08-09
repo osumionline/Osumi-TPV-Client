@@ -1,4 +1,4 @@
-import type MarcaRepository from '@backend/contracts/marca.repository.interface';
+import type MarcaRepository from '@backend/contracts/marcas/marca.repository.interface';
 import type MarcaRecord from '@backend/domain/marcas/marca-record.interface';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import type { DataSource } from 'typeorm';

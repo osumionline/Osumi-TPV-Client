@@ -1,4 +1,4 @@
-import type ClienteRepository from '@backend/contracts/cliente.repository.interface';
+import type ClienteRepository from '@backend/contracts/clientes/cliente.repository.interface';
 import type ClienteRecord from '@backend/domain/clientes/cliente-record.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 

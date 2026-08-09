@@ -1,5 +1,5 @@
-import type AssetUrlBuilder from '@backend/contracts/asset-url-builder.interface';
-import type MarcaRepository from '@backend/contracts/marca.repository.interface';
+import type MarcaRepository from '@backend/contracts/marcas/marca.repository.interface';
+import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
 import type MarcaRecord from '@backend/domain/marcas/marca-record.interface';
 import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
 

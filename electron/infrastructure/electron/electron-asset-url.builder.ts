@@ -1,4 +1,4 @@
-import type AssetUrlBuilder from '@backend/contracts/asset-url-builder.interface';
+import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
 
 const FILES_PATH_PREFIX: string = 'files/';
 

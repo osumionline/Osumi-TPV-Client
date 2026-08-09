@@ -1,4 +1,4 @@
-import type PasswordHasher from '@backend/contracts/password-hasher.interface';
+import type PasswordHasher from '@backend/contracts/security/password-hasher.interface';
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 
 interface ScryptParameters {

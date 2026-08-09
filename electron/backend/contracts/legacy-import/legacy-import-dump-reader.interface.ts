@@ -1,4 +1,4 @@
-import type LegacyImportSqlInsertListener from '@backend/contracts/legacy-import-sql-insert-listener.type';
+import type LegacyImportSqlInsertListener from '@backend/contracts/legacy-import/legacy-import-sql-insert-listener.type';
 
 export default interface LegacyImportDumpReader {
   read(

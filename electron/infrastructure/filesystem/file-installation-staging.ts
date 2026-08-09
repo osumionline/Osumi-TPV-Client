@@ -1,7 +1,7 @@
-import type AppDataRepository from '@backend/contracts/app-data.repository';
-import type InstallationStaging from '@backend/contracts/installation-staging.interface';
-import type LogoStorage from '@backend/contracts/logo-storage.interface';
-import type SecretStorage from '@backend/contracts/secret-storage.interface';
+import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
+import type InstallationStaging from '@backend/contracts/configuration/installation-staging.interface';
+import type LogoStorage from '@backend/contracts/configuration/logo-storage.interface';
+import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type {
   InstallationLogoData,

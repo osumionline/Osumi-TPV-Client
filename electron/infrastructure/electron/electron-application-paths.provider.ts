@@ -1,5 +1,5 @@
-import type ApplicationPathsProvider from '@backend/contracts/application-paths-provider.interface';
-import type ApplicationPaths from '@backend/contracts/application-paths.interface';
+import type ApplicationPathsProvider from '@backend/contracts/system/application-paths-provider.interface';
+import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
 import { app } from 'electron';
 import { join } from 'node:path';
 

@@ -1,4 +1,4 @@
-import type LegacyImportCatalogNormalizer from '@backend/contracts/legacy-import-catalog-normalizer.interface';
+import type LegacyImportCatalogNormalizer from '@backend/contracts/legacy-import/legacy-import-catalog-normalizer.interface';
 import type LegacyImportCatalogSnapshot from '@backend/domain/legacy-import/legacy-import-catalog-snapshot';
 import type {
   LegacyCatalogArticle,

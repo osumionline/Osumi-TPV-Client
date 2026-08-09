@@ -1,8 +1,8 @@
-import type LegacyImportCatalogNormalizer from '@backend/contracts/legacy-import-catalog-normalizer.interface';
-import type LegacyImportCatalogReader from '@backend/contracts/legacy-import-catalog-reader.interface';
-import type LegacyImportCatalogValidator from '@backend/contracts/legacy-import-catalog-validator.interface';
-import type LegacyImportPhaseImporter from '@backend/contracts/legacy-import-phase-importer.interface';
-import type LegacyImportProgressListener from '@backend/contracts/legacy-import-progress-listener.type';
+import type LegacyImportCatalogNormalizer from '@backend/contracts/legacy-import/legacy-import-catalog-normalizer.interface';
+import type LegacyImportCatalogReader from '@backend/contracts/legacy-import/legacy-import-catalog-reader.interface';
+import type LegacyImportCatalogValidator from '@backend/contracts/legacy-import/legacy-import-catalog-validator.interface';
+import type LegacyImportPhaseImporter from '@backend/contracts/legacy-import/legacy-import-phase-importer.interface';
+import type LegacyImportProgressListener from '@backend/contracts/legacy-import/legacy-import-progress-listener.type';
 import type LegacyImportCatalogSnapshot from '@backend/domain/legacy-import/legacy-import-catalog-snapshot';
 import type LegacyImportExecutionCommand from '@backend/domain/legacy-import/legacy-import-execution-command.interface';
 import type LegacyImportNormalizedCatalog from '@backend/domain/legacy-import/legacy-import-normalized-catalog';

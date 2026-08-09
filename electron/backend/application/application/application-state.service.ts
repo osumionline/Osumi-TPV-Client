@@ -1,4 +1,4 @@
-import type ApplicationStateReader from '@backend/contracts/application-state-reader.interface';
+import type ApplicationStateReader from '@backend/contracts/application/application-state-reader.interface';
 import type ApplicationStateResult from '@desktop-contracts/application/application-state-result.interface';
 import DatabaseSchemaService from '@infrastructure/database/schema/database-schema.service';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';

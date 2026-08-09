@@ -1,4 +1,4 @@
-import type LegacyImportDumpAnalyzer from '@backend/contracts/legacy-import-dump-analyzer.interface';
+import type LegacyImportDumpAnalyzer from '@backend/contracts/legacy-import/legacy-import-dump-analyzer.interface';
 import type LegacyImportPackageAnalysis from '@backend/domain/legacy-import/legacy-import-package-analysis.type';
 import type LegacySqlInsert from '@backend/domain/legacy-import/legacy-sql-insert.interface';
 import type LegacyImportAnalysisIssue from '@desktop-contracts/legacy-import/legacy-import-analysis-issue.interface';

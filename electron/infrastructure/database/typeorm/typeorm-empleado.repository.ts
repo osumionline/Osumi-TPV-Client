@@ -1,4 +1,4 @@
-import type EmpleadoRepository from '@backend/contracts/empleado.repository.interface';
+import type EmpleadoRepository from '@backend/contracts/empleados/empleado.repository.interface';
 import type EmpleadoRecord from '@backend/domain/empleados/empleado-record.interface';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import DISABLED_LEGACY_PASSWORD_HASH from '@infrastructure/security/disabled-legacy-password-hash.constant';

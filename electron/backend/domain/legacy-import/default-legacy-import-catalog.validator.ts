@@ -1,4 +1,4 @@
-import type LegacyImportCatalogValidator from '@backend/contracts/legacy-import-catalog-validator.interface';
+import type LegacyImportCatalogValidator from '@backend/contracts/legacy-import/legacy-import-catalog-validator.interface';
 import type LegacyImportCatalogSnapshot from '@backend/domain/legacy-import/legacy-import-catalog-snapshot';
 import type {
   LegacyCatalogArticlePhoto,

@@ -1,6 +1,6 @@
 import { mkdir } from 'node:fs/promises';
 
-import type ApplicationPaths from '@backend/contracts/application-paths.interface';
+import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
 
 export default class ApplicationDirectoriesService {
   constructor(private readonly paths: ApplicationPaths) {}

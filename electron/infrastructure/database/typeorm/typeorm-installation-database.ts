@@ -1,5 +1,5 @@
-import type InstallationDatabase from '@backend/contracts/installation-database.interface';
-import type PasswordHasher from '@backend/contracts/password-hasher.interface';
+import type InstallationDatabase from '@backend/contracts/configuration/installation-database.interface';
+import type PasswordHasher from '@backend/contracts/security/password-hasher.interface';
 import type { DatabaseCreationOptions } from '@backend/domain/database/database-creation-options.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import NewInstallationDataService from '@infrastructure/database/initial-data/new-installation-data.service';

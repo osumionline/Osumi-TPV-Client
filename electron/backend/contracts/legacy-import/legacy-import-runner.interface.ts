@@ -1,4 +1,4 @@
-import type LegacyImportProgressListener from '@backend/contracts/legacy-import-progress-listener.type';
+import type LegacyImportProgressListener from '@backend/contracts/legacy-import/legacy-import-progress-listener.type';
 import type LegacyImportExecutionCommand from '@backend/domain/legacy-import/legacy-import-execution-command.interface';
 import type LegacyImportStartResult from '@desktop-contracts/legacy-import/legacy-import-start-result.interface';
 

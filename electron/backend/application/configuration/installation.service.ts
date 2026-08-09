@@ -4,9 +4,9 @@ import {
   isInstallationCommand,
   validateInstallationCommand,
 } from '@backend/application/configuration/installation-command.validator';
-import type InstallationDatabase from '@backend/contracts/installation-database.interface';
-import type InstallationFinalizer from '@backend/contracts/installation-finalizer.interface';
-import type InstallationStaging from '@backend/contracts/installation-staging.interface';
+import type InstallationDatabase from '@backend/contracts/configuration/installation-database.interface';
+import type InstallationFinalizer from '@backend/contracts/configuration/installation-finalizer.interface';
+import type InstallationStaging from '@backend/contracts/configuration/installation-staging.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type {

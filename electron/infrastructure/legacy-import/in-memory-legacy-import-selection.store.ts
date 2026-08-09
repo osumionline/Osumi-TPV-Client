@@ -1,4 +1,4 @@
-import type LegacyImportSelectionStore from '@backend/contracts/legacy-import-selection-store.interface';
+import type LegacyImportSelectionStore from '@backend/contracts/legacy-import/legacy-import-selection-store.interface';
 import type LegacyImportPackageAnalysis from '@backend/domain/legacy-import/legacy-import-package-analysis.type';
 import type LegacyImportSelection from '@backend/domain/legacy-import/legacy-import-selection.interface';
 import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-import/legacy-import-review-decision.type';

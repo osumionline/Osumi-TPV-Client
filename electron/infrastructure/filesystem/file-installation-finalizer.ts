@@ -1,5 +1,5 @@
-import type ApplicationPaths from '@backend/contracts/application-paths.interface';
-import type InstallationFinalizer from '@backend/contracts/installation-finalizer.interface';
+import type InstallationFinalizer from '@backend/contracts/configuration/installation-finalizer.interface';
+import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
 import { access, mkdir, rename, rm } from 'node:fs/promises';
 
 interface FilePromotion {

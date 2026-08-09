@@ -1,4 +1,4 @@
-import type { RuntimeInfoProvider } from '@backend/contracts/runtime-info-provider';
+import type { RuntimeInfoProvider } from '@backend/contracts/system/runtime-info-provider';
 import AppInfo from '@desktop-contracts/system/app-info.interface';
 import { app } from 'electron';
 

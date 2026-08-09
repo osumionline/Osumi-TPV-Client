@@ -1,4 +1,4 @@
-import type LogoStorage from '@backend/contracts/logo-storage.interface';
+import type LogoStorage from '@backend/contracts/configuration/logo-storage.interface';
 import type { InstallationLogoData } from '@desktop-contracts/configuration/installation-command.interface';
 import { nativeImage } from 'electron';
 import { access, rename, rm, writeFile } from 'node:fs/promises';

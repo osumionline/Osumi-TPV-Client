@@ -1,4 +1,4 @@
-import type LegacyImportProgressListener from '@backend/contracts/legacy-import-progress-listener.type';
+import type LegacyImportProgressListener from '@backend/contracts/legacy-import/legacy-import-progress-listener.type';
 import DefaultLegacyImportCatalogNormalizer from '@backend/domain/legacy-import/default-legacy-import-catalog.normalizer';
 import DefaultLegacyImportCatalogValidator from '@backend/domain/legacy-import/default-legacy-import-catalog.validator';
 import type LegacyImportExecutionSummary from '@backend/domain/legacy-import/legacy-import-execution-summary.interface';
