@@ -1,10 +1,12 @@
 import type { Signal, WritableSignal } from '@angular/core';
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, isDevMode, signal } from '@angular/core';
 import type ApplicationStartupStatus from '@app/model/startup/application-startup-status.type';
 import ClientesService from '@services/clientes.service';
 import EmpleadosService from '@services/empleados.service';
 import MarcasService from '@services/marcas.service';
 import ProveedoresService from '@services/proveedores.service';
+
+const STARTUP_DEMO_DELAY_MS: number = 700;
 
 @Injectable({
   providedIn: 'root',
@@ -102,31 +104,37 @@ export default class ApplicationStartupService {
     }
   }
 
+  private async demoDelay(): Promise<void> {
+    if (!isDevMode()) {
+      return;
+    }
+
+    await new Promise<void>((resolve: () => void): void => {
+      window.setTimeout(resolve, STARTUP_DEMO_DELAY_MS);
+    });
+  }
+
   private async runStartupSteps(): Promise<void> {
     this.totalStepsSignal.set(4);
 
     this.currentStepSignal.set('Cargando marcas…');
-
+    await this.demoDelay();
     await this.marcasService.load();
-
     this.completedStepsSignal.set(1);
 
     this.currentStepSignal.set('Cargando proveedores…');
-
+    await this.demoDelay();
     await this.proveedoresService.load();
-
     this.completedStepsSignal.set(2);
 
     this.currentStepSignal.set('Cargando empleados…');
-
+    await this.demoDelay();
     await this.empleadosService.load();
-
     this.completedStepsSignal.set(3);
 
     this.currentStepSignal.set('Cargando clientes…');
-
+    await this.demoDelay();
     await this.clientesService.load();
-
     this.completedStepsSignal.set(4);
   }
 }
