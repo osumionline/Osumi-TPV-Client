@@ -1,16 +1,10 @@
+import type CajaAbiertaRecord from '@backend/domain/caja/caja-abierta-record.interface';
+
 export interface TerminalRecord {
   readonly id: number;
   readonly publicId: string;
   readonly nombre: string;
   readonly codigo: string;
-}
-
-export interface CajaAbiertaRecord {
-  readonly id: number;
-  readonly publicId: string;
-  readonly idTerminal: number;
-  readonly apertura: string;
-  readonly importeAperturaCents: number;
 }
 
 export interface TipoPagoRecord {

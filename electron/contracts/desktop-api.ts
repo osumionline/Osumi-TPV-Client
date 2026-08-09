@@ -1,4 +1,5 @@
 import type ApplicationApi from '@desktop-contracts/application/application-api.interface';
+import type CajaApi from '@desktop-contracts/caja/caja-api.interface';
 import type CategoriasApi from '@desktop-contracts/categorias/categorias-api.interface';
 import type ClientesApi from '@desktop-contracts/clientes/clientes-api.interface';
 import type ConfigurationApi from '@desktop-contracts/configuration/configuration-api.interface';
@@ -20,5 +21,6 @@ export default interface OsumiDesktopApi {
   readonly empleados: EmpleadosApi;
   readonly categorias: CategoriasApi;
   readonly clientes: ClientesApi;
+  readonly caja: CajaApi;
   readonly ventas: VentasApi;
 }

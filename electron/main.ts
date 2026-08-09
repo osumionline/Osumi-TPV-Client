@@ -5,6 +5,7 @@ import { app, BrowserWindow, protocol } from 'electron';
 import { join } from 'node:path';
 
 import ApplicationStateService from '@backend/application/application/application-state.service';
+import CajaService from '@backend/application/caja/caja.service';
 import CategoriasService from '@backend/application/categorias/categorias.service';
 import ClientesService from '@backend/application/clientes/clientes.service';
 import ConfigurationService from '@backend/application/configuration/configuration.service';
@@ -15,6 +16,7 @@ import ProveedoresService from '@backend/application/proveedores/proveedores.ser
 import { SystemService } from '@backend/application/system/system.service';
 import VentasContextService from '@backend/application/ventas/ventas-context.service';
 
+import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';
 import type ClienteRepository from '@backend/contracts/clientes/cliente.repository.interface';
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
@@ -36,6 +38,7 @@ import completeDatabaseSchema from '@infrastructure/database/schema/complete-dat
 import completeDatabaseSchemaTables from '@infrastructure/database/schema/complete-database-schema.tables';
 import DatabaseSchemaService from '@infrastructure/database/schema/database-schema.service';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
+import TypeOrmCajaRepository from '@infrastructure/database/typeorm/typeorm-caja.repository';
 import TypeOrmCategoriaRepository from '@infrastructure/database/typeorm/typeorm-categoria.repository';
 import TypeOrmClienteRepository from '@infrastructure/database/typeorm/typeorm-cliente.repository';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
@@ -60,6 +63,7 @@ import JsonAppDataRepository from '@infrastructure/filesystem/json-app-data.repo
 import NodeScryptPasswordHasher from '@infrastructure/security/node-scrypt-password-hasher';
 
 import registerApplicationIpc from '@ipc/register-application-ipc';
+import registerCajaIpc from '@ipc/register-caja-ipc';
 import registerCategoriasIpc from '@ipc/register-categorias-ipc';
 import registerClientesIpc from '@ipc/register-clientes-ipc';
 import registerConfigurationIpc from '@ipc/register-configuration-ipc';
@@ -244,7 +248,7 @@ app
     );
 
     /*
-     * Servicios operativos de catálogo.
+     * Servicios operativos.
      */
     const assetUrlBuilder: AssetUrlBuilder = new ElectronAssetUrlBuilder();
 
@@ -276,6 +280,10 @@ app
     );
 
     const categoriasService: CategoriasService = new CategoriasService(categoriaRepository);
+
+    const cajaRepository: CajaRepository = new TypeOrmCajaRepository(operationalDatabase);
+
+    const cajaService: CajaService = new CajaService(cajaRepository);
 
     const ventasContextRepository: VentasContextRepository = new TypeOrmVentasContextRepository(
       operationalDatabase,
@@ -371,6 +379,8 @@ app
     registerClientesIpc((): BrowserWindow | null => mainWindow, clientesService);
 
     registerCategoriasIpc((): BrowserWindow | null => mainWindow, categoriasService);
+
+    registerCajaIpc((): BrowserWindow | null => mainWindow, cajaService);
 
     registerVentasIpc((): BrowserWindow | null => mainWindow, ventasContextService);
 

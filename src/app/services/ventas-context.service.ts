@@ -23,20 +23,31 @@ export default class VentasContextService {
     readonly TipoPago[]
   >([]);
   private readonly loadedSignal: WritableSignal<boolean> = signal<boolean>(false);
+  private readonly openingCajaSignal: WritableSignal<boolean> = signal<boolean>(false);
   private readonly errorSignal: WritableSignal<string | null> = signal<string | null>(null);
 
   private pendingRequest: Promise<void> | null = null;
+  private pendingOpenCajaRequest: Promise<void> | null = null;
 
   readonly appData: Signal<AppData | null> = this.appDataSignal.asReadonly();
   readonly terminal: Signal<TerminalInterface | null> = this.terminalSignal.asReadonly();
   readonly cajaAbierta: Signal<CajaAbiertaInterface | null> = this.cajaAbiertaSignal.asReadonly();
   readonly tiposPago: Signal<readonly TipoPago[]> = this.tiposPagoSignal.asReadonly();
   readonly loaded: Signal<boolean> = this.loadedSignal.asReadonly();
+  readonly openingCaja: Signal<boolean> = this.openingCajaSignal.asReadonly();
   readonly error: Signal<string | null> = this.errorSignal.asReadonly();
 
   readonly efectivo: Signal<TipoPago | null> = computed(
     (): TipoPago | null =>
       this.tiposPago().find((tipoPago: TipoPago): boolean => tipoPago.slug === 'efectivo') ?? null,
+  );
+
+  readonly puedeAbrirCaja: Signal<boolean> = computed(
+    (): boolean =>
+      this.loaded() &&
+      this.terminal() !== null &&
+      this.cajaAbierta() === null &&
+      !this.openingCaja(),
   );
 
   readonly puedeVender: Signal<boolean> = computed(
@@ -66,10 +77,36 @@ export default class VentasContextService {
   }
 
   /**
+   * Abre la caja del terminal actual y actualiza el contexto en memoria.
+   */
+  abrirCaja(): Promise<void> {
+    if (this.cajaAbierta() !== null) {
+      return Promise.resolve();
+    }
+
+    if (this.pendingOpenCajaRequest !== null) {
+      return this.pendingOpenCajaRequest;
+    }
+
+    const terminal: TerminalInterface | null = this.terminal();
+
+    if (!this.loaded() || terminal === null) {
+      return Promise.reject(
+        new Error('No se puede abrir la caja sin haber cargado el contexto operativo.'),
+      );
+    }
+
+    this.pendingOpenCajaRequest = this.requestAbrirCaja(terminal.publicId);
+
+    return this.pendingOpenCajaRequest;
+  }
+
+  /**
    * Elimina de memoria el contexto operativo actual.
    */
   clear(): void {
     this.resetData();
+    this.openingCajaSignal.set(false);
     this.errorSignal.set(null);
   }
 
@@ -114,6 +151,31 @@ export default class VentasContextService {
       throw error;
     } finally {
       this.pendingRequest = null;
+    }
+  }
+
+  /**
+   * Solicita la apertura de caja para el terminal actual.
+   */
+  private async requestAbrirCaja(terminalPublicId: string): Promise<void> {
+    this.openingCajaSignal.set(true);
+    this.errorSignal.set(null);
+
+    try {
+      const cajaAbierta: CajaAbiertaInterface = await window.osumiDesktop.caja.open({
+        terminalPublicId,
+      });
+
+      this.cajaAbiertaSignal.set(cajaAbierta);
+    } catch (error: unknown) {
+      const message: string = error instanceof Error ? error.message : String(error);
+
+      this.errorSignal.set(message);
+
+      throw error;
+    } finally {
+      this.openingCajaSignal.set(false);
+      this.pendingOpenCajaRequest = null;
     }
   }
 

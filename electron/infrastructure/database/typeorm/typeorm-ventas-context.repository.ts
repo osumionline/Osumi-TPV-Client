@@ -1,6 +1,6 @@
 import type VentasContextRepository from '@backend/contracts/ventas/ventas-context.repository.interface';
+import type CajaAbiertaRecord from '@backend/domain/caja/caja-abierta-record.interface';
 import type {
-  CajaAbiertaRecord,
   TerminalRecord,
   TipoPagoRecord,
   VentasContextRecord,
