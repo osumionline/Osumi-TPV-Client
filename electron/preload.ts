@@ -1,4 +1,5 @@
 import type ApplicationStateResult from '@desktop-contracts/application/application-state-result.interface';
+import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type { InstallationResult } from '@desktop-contracts/configuration/installation-result.interface';
 import OsumiDesktopApi from '@desktop-contracts/desktop-api';
@@ -37,6 +38,11 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
   empleados: Object.freeze({
     getAll: (): Promise<readonly EmpleadoInterface[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.empleadosGetAll) as Promise<readonly EmpleadoInterface[]>,
+  }),
+
+  clientes: Object.freeze({
+    getAll: (): Promise<readonly ClienteInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.clientesGetAll) as Promise<readonly ClienteInterface[]>,
   }),
 
   configuration: Object.freeze({

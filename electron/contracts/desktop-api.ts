@@ -1,4 +1,5 @@
 import type ApplicationApi from '@desktop-contracts/application/application-api.interface';
+import type ClientesApi from '@desktop-contracts/clientes/clientes-api.interface';
 import type ConfigurationApi from '@desktop-contracts/configuration/configuration-api.interface';
 import type EmpleadosApi from '@desktop-contracts/empleados/empleados-api.interface';
 import type LegacyImportApi from '@desktop-contracts/legacy-import/legacy-import-api.interface';
@@ -22,4 +23,6 @@ export default interface OsumiDesktopApi {
   readonly proveedores: ProveedoresApi;
 
   readonly empleados: EmpleadosApi;
+
+  readonly clientes: ClientesApi;
 }

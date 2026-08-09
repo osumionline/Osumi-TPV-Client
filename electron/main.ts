@@ -5,6 +5,7 @@ import { app, BrowserWindow, protocol } from 'electron';
 import { join } from 'node:path';
 
 import ApplicationStateService from '@backend/application/application/application-state.service';
+import ClientesService from '@backend/application/clientes/clientes.service';
 import ConfigurationService from '@backend/application/configuration/configuration.service';
 import InstallationService from '@backend/application/configuration/installation.service';
 import EmpleadosService from '@backend/application/empleados/empleados.service';
@@ -15,6 +16,7 @@ import { SystemService } from '@backend/application/system/system.service';
 import type AppDataRepository from '@backend/contracts/app-data.repository';
 import type ApplicationPaths from '@backend/contracts/application-paths.interface';
 import type AssetUrlBuilder from '@backend/contracts/asset-url-builder.interface';
+import type ClienteRepository from '@backend/contracts/cliente.repository.interface';
 import type EmpleadoRepository from '@backend/contracts/empleado.repository.interface';
 import type InstallationDatabase from '@backend/contracts/installation-database.interface';
 import type InstallationFinalizer from '@backend/contracts/installation-finalizer.interface';
@@ -30,6 +32,7 @@ import completeDatabaseSchema from '@infrastructure/database/schema/complete-dat
 import completeDatabaseSchemaTables from '@infrastructure/database/schema/complete-database-schema.tables';
 import DatabaseSchemaService from '@infrastructure/database/schema/database-schema.service';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
+import TypeOrmClienteRepository from '@infrastructure/database/typeorm/typeorm-cliente.repository';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import TypeOrmEmpleadoRepository from '@infrastructure/database/typeorm/typeorm-empleado.repository';
 import TypeOrmInstallationDatabase from '@infrastructure/database/typeorm/typeorm-installation-database';
@@ -51,6 +54,7 @@ import JsonAppDataRepository from '@infrastructure/filesystem/json-app-data.repo
 import NodeScryptPasswordHasher from '@infrastructure/security/node-scrypt-password-hasher';
 
 import registerApplicationIpc from '@ipc/register-application-ipc';
+import registerClientesIpc from '@ipc/register-clientes-ipc';
 import registerConfigurationIpc from '@ipc/register-configuration-ipc';
 import registerEmpleadosIpc from '@ipc/register-empleados-ipc';
 import registerMarcasIpc from '@ipc/register-marcas-ipc';
@@ -255,6 +259,10 @@ app
 
     const empleadosService: EmpleadosService = new EmpleadosService(empleadoRepository);
 
+    const clienteRepository: ClienteRepository = new TypeOrmClienteRepository(operationalDatabase);
+
+    const clientesService: ClientesService = new ClientesService(clienteRepository);
+
     const legacyImportDialog: ElectronLegacyImportDialog = new ElectronLegacyImportDialog(
       (): BrowserWindow | null => mainWindow,
     );
@@ -335,6 +343,8 @@ app
     );
 
     registerEmpleadosIpc((): BrowserWindow | null => mainWindow, empleadosService);
+
+    registerClientesIpc((): BrowserWindow | null => mainWindow, clientesService);
 
     registerLegacyImportIpc(legacyImportService);
 
