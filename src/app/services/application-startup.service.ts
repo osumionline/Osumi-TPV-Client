@@ -1,6 +1,7 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import type ApplicationStartupStatus from '@app/model/startup/application-startup-status.type';
+import EmpleadosService from '@services/empleados.service';
 import MarcasService from '@services/marcas.service';
 import ProveedoresService from '@services/proveedores.service';
 
@@ -10,6 +11,7 @@ import ProveedoresService from '@services/proveedores.service';
 export default class ApplicationStartupService {
   private readonly marcasService: MarcasService = inject(MarcasService);
   private readonly proveedoresService: ProveedoresService = inject(ProveedoresService);
+  private readonly empleadosService: EmpleadosService = inject(EmpleadosService);
 
   private readonly statusSignal: WritableSignal<ApplicationStartupStatus> =
     signal<ApplicationStartupStatus>('idle');
@@ -99,7 +101,7 @@ export default class ApplicationStartupService {
   }
 
   private async runStartupSteps(): Promise<void> {
-    this.totalStepsSignal.set(2);
+    this.totalStepsSignal.set(3);
 
     this.currentStepSignal.set('Cargando marcas…');
 
@@ -112,5 +114,11 @@ export default class ApplicationStartupService {
     await this.proveedoresService.load();
 
     this.completedStepsSignal.set(2);
+
+    this.currentStepSignal.set('Cargando empleados…');
+
+    await this.empleadosService.load();
+
+    this.completedStepsSignal.set(3);
   }
 }

@@ -2,6 +2,7 @@ import type ApplicationStateResult from '@desktop-contracts/application/applicat
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type { InstallationResult } from '@desktop-contracts/configuration/installation-result.interface';
 import OsumiDesktopApi from '@desktop-contracts/desktop-api';
+import type EmpleadoInterface from '@desktop-contracts/empleados/empleado.interface';
 import type LegacyImportAnalysisReport from '@desktop-contracts/legacy-import/legacy-import-analysis-report.interface';
 import type LegacyImportPackageSelectionResult from '@desktop-contracts/legacy-import/legacy-import-package-selection-result.type';
 import type LegacyImportPreparationResult from '@desktop-contracts/legacy-import/legacy-import-preparation-result.interface';
@@ -31,6 +32,11 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
   proveedores: Object.freeze({
     getAll: (): Promise<readonly ProveedorInterface[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.proveedoresGetAll) as Promise<readonly ProveedorInterface[]>,
+  }),
+
+  empleados: Object.freeze({
+    getAll: (): Promise<readonly EmpleadoInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.empleadosGetAll) as Promise<readonly EmpleadoInterface[]>,
   }),
 
   configuration: Object.freeze({

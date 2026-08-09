@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import ApplicationStateService from '@backend/application/application/application-state.service';
 import ConfigurationService from '@backend/application/configuration/configuration.service';
 import InstallationService from '@backend/application/configuration/installation.service';
+import EmpleadosService from '@backend/application/empleados/empleados.service';
 import MarcasService from '@backend/application/marcas/marcas.service';
 import ProveedoresService from '@backend/application/proveedores/proveedores.service';
 import { SystemService } from '@backend/application/system/system.service';
@@ -14,6 +15,7 @@ import { SystemService } from '@backend/application/system/system.service';
 import type AppDataRepository from '@backend/contracts/app-data.repository';
 import type ApplicationPaths from '@backend/contracts/application-paths.interface';
 import type AssetUrlBuilder from '@backend/contracts/asset-url-builder.interface';
+import type EmpleadoRepository from '@backend/contracts/empleado.repository.interface';
 import type InstallationDatabase from '@backend/contracts/installation-database.interface';
 import type InstallationFinalizer from '@backend/contracts/installation-finalizer.interface';
 import type InstallationStaging from '@backend/contracts/installation-staging.interface';
@@ -29,6 +31,7 @@ import completeDatabaseSchemaTables from '@infrastructure/database/schema/comple
 import DatabaseSchemaService from '@infrastructure/database/schema/database-schema.service';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
+import TypeOrmEmpleadoRepository from '@infrastructure/database/typeorm/typeorm-empleado.repository';
 import TypeOrmInstallationDatabase from '@infrastructure/database/typeorm/typeorm-installation-database';
 import TypeOrmMarcaRepository from '@infrastructure/database/typeorm/typeorm-marca.repository';
 import TypeOrmProveedorRepository from '@infrastructure/database/typeorm/typeorm-proveedor.repository';
@@ -49,6 +52,7 @@ import NodeScryptPasswordHasher from '@infrastructure/security/node-scrypt-passw
 
 import registerApplicationIpc from '@ipc/register-application-ipc';
 import registerConfigurationIpc from '@ipc/register-configuration-ipc';
+import registerEmpleadosIpc from '@ipc/register-empleados-ipc';
 import registerMarcasIpc from '@ipc/register-marcas-ipc';
 import registerProveedoresIpc from '@ipc/register-proveedores-ipc';
 import { registerSystemIpc } from '@ipc/register-system-ipc';
@@ -245,6 +249,12 @@ app
       assetUrlBuilder,
     );
 
+    const empleadoRepository: EmpleadoRepository = new TypeOrmEmpleadoRepository(
+      operationalDatabase,
+    );
+
+    const empleadosService: EmpleadosService = new EmpleadosService(empleadoRepository);
+
     const legacyImportDialog: ElectronLegacyImportDialog = new ElectronLegacyImportDialog(
       (): BrowserWindow | null => mainWindow,
     );
@@ -323,6 +333,8 @@ app
 
       proveedoresService,
     );
+
+    registerEmpleadosIpc((): BrowserWindow | null => mainWindow, empleadosService);
 
     registerLegacyImportIpc(legacyImportService);
 

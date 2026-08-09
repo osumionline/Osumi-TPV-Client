@@ -6,6 +6,7 @@ import type LegacyImportPhaseResult from '@backend/domain/legacy-import/legacy-i
 import type LegacySqlInsert from '@backend/domain/legacy-import/legacy-sql-insert.interface';
 import LegacyImportPublicIdFactory from '@infrastructure/legacy-import/legacy-import-public-id.factory';
 import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value.reader';
+import DISABLED_LEGACY_PASSWORD_HASH from '@infrastructure/security/disabled-legacy-password-hash.constant';
 import type { QueryRunner } from 'typeorm';
 
 interface LegacyEmployeeRow {
@@ -116,9 +117,6 @@ const MASTER_DATA_TABLES: readonly string[] = [
   'comercial',
   'proveedor_marca',
 ];
-
-const DISABLED_LEGACY_PASSWORD_HASH: string =
-  '$2b$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW';
 
 export default class LegacyImportMasterDataImporter implements LegacyImportPhaseImporter {
   constructor(

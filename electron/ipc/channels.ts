@@ -9,6 +9,7 @@ const IPC_CHANNELS = {
   applicationGetState: 'application:get-state',
   marcasGetAll: 'marcas:get-all',
   proveedoresGetAll: 'proveedores:get-all',
+  empleadosGetAll: 'empleados:get-all',
 } as const;
 
 export default IPC_CHANNELS;
