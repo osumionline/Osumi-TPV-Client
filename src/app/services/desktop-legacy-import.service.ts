@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Service } from '@angular/core';
 import type LegacyImportAnalysisReport from '@desktop-contracts/legacy-import/legacy-import-analysis-report.interface';
 import type LegacyImportPackageSelectionResult from '@desktop-contracts/legacy-import/legacy-import-package-selection-result.type';
 import type LegacyImportPreparationResult from '@desktop-contracts/legacy-import/legacy-import-preparation-result.interface';
@@ -6,9 +6,7 @@ import type LegacyImportProgress from '@desktop-contracts/legacy-import/legacy-i
 import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-import/legacy-import-review-decision.type';
 import type LegacyImportStartResult from '@desktop-contracts/legacy-import/legacy-import-start-result.interface';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export default class DesktopLegacyImportService {
   selectPackage(): Promise<LegacyImportPackageSelectionResult> {
     return window.osumiDesktop.legacyImport.selectPackage();

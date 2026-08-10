@@ -1,5 +1,5 @@
 import type { Signal, WritableSignal } from '@angular/core';
-import { Injectable, signal } from '@angular/core';
+import { Service, signal } from '@angular/core';
 import type CategoriaInterface from '@desktop-contracts/categorias/categoria.interface';
 import Categoria from '@model/categorias/categoria.model';
 
@@ -8,9 +8,7 @@ interface CategoriasState {
   readonly plain: readonly Categoria[];
 }
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export default class CategoriasService {
   private readonly categoriasSignal: WritableSignal<readonly Categoria[]> = signal<
     readonly Categoria[]

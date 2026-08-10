@@ -1,11 +1,9 @@
 import type { Signal, WritableSignal } from '@angular/core';
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, Service, signal } from '@angular/core';
 import type EmpleadoInterface from '@desktop-contracts/empleados/empleado.interface';
 import Empleado from '@model/empleados/empleado.model';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export default class EmpleadosService {
   private readonly empleadosSignal: WritableSignal<readonly Empleado[]> = signal<
     readonly Empleado[]

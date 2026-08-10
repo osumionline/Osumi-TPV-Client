@@ -1,5 +1,5 @@
 import type { Signal, WritableSignal } from '@angular/core';
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { computed, inject, Service, signal } from '@angular/core';
 import type ApplicationStartupStatus from '@app/model/startup/application-startup-status.type';
 import CategoriasService from '@services/categorias.service';
 import ClientesService from '@services/clientes.service';
@@ -8,9 +8,7 @@ import MarcasService from '@services/marcas.service';
 import ProveedoresService from '@services/proveedores.service';
 import ProvinciasService from '@services/provincias.service';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export default class ApplicationStartupService {
   private readonly marcasService: MarcasService = inject(MarcasService);
   private readonly proveedoresService: ProveedoresService = inject(ProveedoresService);

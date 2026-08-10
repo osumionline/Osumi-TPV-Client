@@ -1,14 +1,12 @@
 import type { Signal, WritableSignal } from '@angular/core';
-import { Injectable, signal } from '@angular/core';
+import { Service, signal } from '@angular/core';
 import type {
   ComunidadAutonomaInterface,
   ProvinciaInterface,
 } from '@model/provincias/provincia.interface';
 import PROVINCIAS_AGRUPADAS from '@model/provincias/provincias.constant';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export default class ProvinciasService {
   private readonly provinciasAgrupadasSignal: WritableSignal<
     readonly ComunidadAutonomaInterface[]

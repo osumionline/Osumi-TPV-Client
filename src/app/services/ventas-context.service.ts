@@ -1,5 +1,5 @@
 import type { Signal, WritableSignal } from '@angular/core';
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, Service, signal } from '@angular/core';
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type TerminalInterface from '@desktop-contracts/terminales/terminal.interface';
@@ -10,9 +10,7 @@ import TipoPago from '@model/tipos-pago/tipo-pago.model';
 /**
  * Mantiene el contexto operativo actual necesario para trabajar en el módulo de ventas.
  */
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export default class VentasContextService {
   private readonly appDataSignal: WritableSignal<AppData | null> = signal<AppData | null>(null);
   private readonly terminalSignal: WritableSignal<TerminalInterface | null> =

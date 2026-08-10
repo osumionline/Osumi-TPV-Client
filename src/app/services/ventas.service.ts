@@ -1,5 +1,5 @@
 import type { Signal, WritableSignal } from '@angular/core';
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, Service, signal } from '@angular/core';
 import type Empleado from '@model/empleados/empleado.model';
 import VentaEnCurso from '@model/ventas/venta-en-curso.model';
 import type VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
@@ -11,9 +11,7 @@ import type {
 /**
  * Mantiene las ventas abiertas y su workspace durante toda la sesión de la aplicación.
  */
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export default class VentasService {
   private readonly ventasSignal: WritableSignal<readonly VentaEnCurso[]> = signal<
     readonly VentaEnCurso[]

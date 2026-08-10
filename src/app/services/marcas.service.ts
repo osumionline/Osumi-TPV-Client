@@ -1,11 +1,9 @@
 import type { Signal, WritableSignal } from '@angular/core';
-import { Injectable, signal } from '@angular/core';
+import { Service, signal } from '@angular/core';
 import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
 import Marca from '@model/marcas/marca.model';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export default class MarcasService {
   private readonly marcasSignal: WritableSignal<readonly Marca[]> = signal<readonly Marca[]>([]);
 
