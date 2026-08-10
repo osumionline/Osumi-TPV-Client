@@ -1,0 +1,61 @@
+<div class="overlay">
+    <section class="selector"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="direct-access-title">
+        <header class="selector__header">
+            <h2 id="direct-access-title">
+                Accesos directos
+            </h2>
+
+            <button type="button"
+                    class="selector__close"
+                    (click)="close()">
+                <mat-icon>close</mat-icon>
+            </button>
+        </header>
+
+        @if (error() !== null) {
+        <div class="selector__error">
+            {{ error() }}
+        </div>
+        }
+
+        <div class="selector__list">
+            @if (loading()) {
+            <div class="selector__empty">
+                Cargando…
+            </div>
+            } @else {
+            @for (
+            acceso of accesos();
+            track acceso.publicId
+            ) {
+            <button type="button"
+                    class="selector__item"
+                    (click)="select(acceso)">
+                <strong>
+                    {{ acceso.accesoDirecto }}
+                </strong>
+
+                <span>
+                    {{ acceso.nombre }}
+                </span>
+            </button>
+            } @empty {
+            <div class="selector__empty">
+                No hay accesos directos definidos.
+            </div>
+            }
+            }
+        </div>
+
+        <footer class="selector__actions">
+            <button mat-stroked-button
+                    type="button"
+                    (click)="close()">
+                Cerrar
+            </button>
+        </footer>
+    </section>
+</div>

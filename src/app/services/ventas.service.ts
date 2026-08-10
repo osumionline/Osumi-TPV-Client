@@ -1,8 +1,9 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { computed, Service, signal } from '@angular/core';
 import type Empleado from '@model/empleados/empleado.model';
+import type ArticuloVenta from '@model/ventas/articulo-venta.model';
 import VentaEnCurso from '@model/ventas/venta-en-curso.model';
-import type VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
+import VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
 import type {
   VentaFocusTarget,
   VentaWorkspaceState,
@@ -76,6 +77,10 @@ export default class VentasService {
     workspaces.set(venta.idTemporal, {
       focusTarget: {
         type: 'localizador',
+      },
+      totalPosition: {
+        x: 0,
+        y: 0,
       },
     });
 
@@ -157,6 +162,32 @@ export default class VentasService {
   }
 
   /**
+   * Añade uno o varios artículos a una venta incrementando la cantidad si ya estaban presentes.
+   */
+  agregarArticulos(ventaIdTemporal: string, articulos: readonly ArticuloVenta[]): void {
+    const venta: VentaEnCurso = this.requireVenta(ventaIdTemporal);
+
+    for (const articulo of articulos) {
+      const lineaExistente: VentaLineaEnCurso | undefined = venta.lineas.find(
+        (linea: VentaLineaEnCurso): boolean => linea.articuloPublicId === articulo.publicId,
+      );
+
+      if (lineaExistente !== undefined) {
+        lineaExistente.cantidad++;
+        continue;
+      }
+
+      venta.addLinea(new VentaLineaEnCurso().fromArticulo(articulo));
+    }
+
+    this.notifyVentasChanged();
+
+    this.setFocusTarget(ventaIdTemporal, {
+      type: 'localizador',
+    });
+  }
+
+  /**
    * Elimina una línea de una venta y restablece el foco si apuntaba a esa línea.
    */
   eliminarLinea(ventaIdTemporal: string, lineaIdTemporal: string): void {
@@ -183,12 +214,46 @@ export default class VentasService {
   setFocusTarget(ventaIdTemporal: string, focusTarget: VentaFocusTarget): void {
     this.requireVenta(ventaIdTemporal);
 
+    const workspace: VentaWorkspaceState | null = this.getWorkspace(ventaIdTemporal);
+
+    if (workspace === null) {
+      throw new Error('La venta indicada no dispone de workspace.');
+    }
+
     const workspaces: Map<string, VentaWorkspaceState> = new Map<string, VentaWorkspaceState>(
       this.workspacesSignal(),
     );
 
     workspaces.set(ventaIdTemporal, {
+      ...workspace,
       focusTarget,
+    });
+
+    this.workspacesSignal.set(workspaces);
+  }
+
+  /**
+   * Guarda la posición del panel flotante del total para una venta.
+   */
+  setTotalPosition(ventaIdTemporal: string, x: number, y: number): void {
+    this.requireVenta(ventaIdTemporal);
+
+    const workspace: VentaWorkspaceState | null = this.getWorkspace(ventaIdTemporal);
+
+    if (workspace === null) {
+      throw new Error('La venta indicada no dispone de workspace.');
+    }
+
+    const workspaces: Map<string, VentaWorkspaceState> = new Map<string, VentaWorkspaceState>(
+      this.workspacesSignal(),
+    );
+
+    workspaces.set(ventaIdTemporal, {
+      ...workspace,
+      totalPosition: {
+        x,
+        y,
+      },
     });
 
     this.workspacesSignal.set(workspaces);

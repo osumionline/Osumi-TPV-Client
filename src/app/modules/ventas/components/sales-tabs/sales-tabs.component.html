@@ -1,0 +1,46 @@
+<div class="tabs">
+    <div class="tabs__sales">
+        @for (venta of ventas(); track venta.idTemporal) {
+        <button class="tabs__sale"
+                type="button"
+                [class.tabs__sale--selected]="selectedId() === venta.idTemporal"
+                [style.background-color]="venta.empleado?.color ?? '#ffffff'"
+                [style.color]="venta.empleado?.textColor ?? '#000000'"
+                (click)="selectTab(venta.idTemporal)">
+            <span>
+                VENTA {{ venta.numero }}
+            </span>
+
+            <mat-icon class="tabs__close"
+                      matTooltip="Cerrar venta"
+                      (click)="closeTab($event, venta.idTemporal)">
+                close
+            </mat-icon>
+        </button>
+        }
+
+        <button class="tabs__new"
+                type="button"
+                [disabled]="!canCreate()"
+                matTooltip="Nueva venta"
+                (click)="newTab()">
+            <mat-icon>add</mat-icon>
+        </button>
+    </div>
+
+    <div class="tabs__actions">
+        <button mat-button
+                disabled
+                matTooltip="Se activará en Ventas 6">
+            <mat-icon>person_add</mat-icon>
+            Cliente
+        </button>
+
+        <button mat-button
+                disabled
+                matTooltip="Se activará en Ventas 9">
+            <mat-icon>grading</mat-icon>
+            Reservas
+        </button>
+    </div>
+</div>

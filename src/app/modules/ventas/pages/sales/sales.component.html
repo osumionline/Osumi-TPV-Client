@@ -1,10 +1,85 @@
+<otpv-header selectedOption="ventas"
+             [appName]="appName()" />
+
 <main class="sales">
-  <section class="sales__content">
-    <h1>Ventas</h1>
+  @if (initializing()) {
+  <section class="sales__state">
+    <mat-spinner diameter="40" />
 
     <p>
-      El módulo de ventas será la página
-      principal de Osumi TPV.
+      Preparando ventas…
     </p>
   </section>
+  } @else if (ventasContextService.error() !== null) {
+  <section class="sales__state sales__state--error">
+    <h2>
+      No se ha podido preparar el módulo de ventas
+    </h2>
+
+    <p>
+      {{ ventasContextService.error() }}
+    </p>
+  </section>
+  } @else if (ventasContextService.cajaAbierta() === null) {
+  <section class="sales__state">
+    <h2>
+      La caja está cerrada
+    </h2>
+
+    <p>
+      Es necesario abrir una caja antes de comenzar a vender.
+    </p>
+
+    <button mat-flat-button
+            type="button"
+            [disabled]="!ventasContextService.puedeAbrirCaja()"
+            (click)="abrirCaja()">
+      {{
+          ventasContextService.openingCaja()
+            ? 'Abriendo caja…'
+            : 'Abrir caja'
+        }}
+    </button>
+  </section>
+  } @else if (!ventasContextService.puedeVender()) {
+  <section class="sales__state sales__state--error">
+    <h2>
+      No se puede iniciar una venta
+    </h2>
+
+    <p>
+      Revisa el terminal, la caja y los tipos de pago configurados.
+    </p>
+  </section>
+  } @else {
+  <otpv-sales-tabs [ventas]="ventasService.ventas()"
+                   [selectedId]="ventasService.ventaActivaId()"
+                   [canCreate]="ventasContextService.puedeVender()"
+                   (selectTabEvent)="selectVenta($event)"
+                   (closeTabEvent)="cerrarVenta($event)"
+                   (newTabEvent)="nuevaVenta()" />
+
+  @if (ventasService.ventaActiva(); as venta) {
+  <otpv-sale-workspace [venta]="venta"
+                       (cancelEvent)="cancelarVentaActiva()" />
+  } @else {
+  <section class="sales__state">
+    <h2>
+      No hay ninguna venta abierta
+    </h2>
+
+    <button mat-flat-button
+            type="button"
+            (click)="nuevaVenta()">
+      Nueva venta
+    </button>
+  </section>
+  }
+  }
 </main>
+
+@if (selectingEmployee()) {
+<otpv-employee-selector [empleados]="empleadosService.empleados()"
+                        (selectEvent)="selectEmpleado($event)"
+                        (cancelEvent)="cancelEmployeeSelection()" />
+}

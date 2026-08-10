@@ -1,0 +1,45 @@
+.overlay {
+    position: fixed;
+    z-index: 100;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background-color: var(--modal-bg-color);
+
+    .selector {
+        width: min(560px, 100%);
+        padding: 24px;
+        box-sizing: border-box;
+        border-radius: 8px;
+        background-color: var(--color-white);
+        box-shadow: 0 8px 32px rgb(0 0 0 / 35%);
+
+        h2 {
+            margin-bottom: 24px;
+        }
+    }
+
+    .selector__employees {
+        display: grid;
+        grid-template-columns: repeat(auto-fit,
+                minmax(150px, 1fr));
+        gap: 12px;
+    }
+
+    .selector__employee {
+        min-height: 72px;
+        padding: 12px;
+        border: 0;
+        border-radius: 6px;
+        font: inherit;
+        font-weight: 500;
+        cursor: pointer;
+    }
+
+    .selector__actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 24px;
+    }
+}

@@ -1,0 +1,174 @@
+<section class="sale">
+    <div class="sale__header">
+        <div class="col-localizador">
+            Localizador
+        </div>
+
+        <div class="col-descripcion">
+            Descripción
+        </div>
+
+        <div class="col-marca">
+            Marca
+        </div>
+
+        <div class="col-cantidad">
+            Cantidad
+        </div>
+
+        <div class="col-pvp">
+            PVP
+        </div>
+
+        <div class="col-importe">
+            Importe
+        </div>
+
+        <div class="col-descuentos">
+            Descuento
+        </div>
+
+        <div class="col-stock">
+            Stock
+        </div>
+    </div>
+
+    <div class="sale__lines">
+        @for (
+        linea of venta().lineas;
+        track linea.idTemporal
+        ) {
+        <div class="sale__line">
+            <div class="col-localizador">
+                <button class="sale__delete"
+                        type="button"
+                        matTooltip="Borrar línea"
+                        (click)="deleteLinea(linea)">
+                    <mat-icon>delete</mat-icon>
+                </button>
+
+                <span>
+                    {{ linea.localizador }}
+                </span>
+            </div>
+
+            <div class="col-descripcion">
+                <span>
+                    {{ linea.descripcion }}
+
+                    @if (linea.observaciones !== null) {
+                    <mat-icon [matTooltip]="linea.observaciones">
+                        info_outline
+                    </mat-icon>
+                    }
+                </span>
+            </div>
+
+            <div class="col-marca">
+                {{ linea.marca }}
+            </div>
+
+            <div class="col-cantidad">
+                {{ linea.cantidad }}
+            </div>
+
+            <div class="col-pvp">
+                {{
+            (linea.pvpMicros / 1_000_000)
+              | currency:'EUR':'symbol':'1.2-2'
+          }}
+            </div>
+
+            <div class="col-importe">
+                {{
+            (linea.importeFinalMicros / 1_000_000)
+              | currency:'EUR':'symbol':'1.2-2'
+          }}
+            </div>
+
+            <div class="col-descuentos">
+                {{ linea.descuentoBps / 100 }} %
+            </div>
+
+            <div class="col-stock">
+                {{ linea.stock }}
+            </div>
+        </div>
+        }
+
+        <div class="sale__line sale__line--input">
+            <div class="col-localizador">
+                <input #localizadorInput
+                       class="sale__locator-input"
+                       type="text"
+                       autocomplete="off"
+                       [disabled]="searching()"
+                       [value]="localizador()"
+                       (focus)="onLocalizadorFocus()"
+                       (input)="onLocalizadorInput($event)"
+                       (keydown)="onLocalizadorKeydown($event)">
+
+                <button class="sale__direct-access"
+                        type="button"
+                        matTooltip="Abrir accesos directos"
+                        (click)="openDirectAccess()">
+                    <mat-icon>launch</mat-icon>
+                </button>
+            </div>
+
+            <div class="col-descripcion">&nbsp;</div>
+            <div class="col-marca">&nbsp;</div>
+            <div class="col-cantidad">&nbsp;</div>
+            <div class="col-pvp">&nbsp;</div>
+            <div class="col-importe">&nbsp;</div>
+            <div class="col-descuentos">&nbsp;</div>
+            <div class="col-stock">&nbsp;</div>
+        </div>
+    </div>
+
+    @if (ventasService.workspaceActivo(); as workspace) {
+    <aside class="sale__total"
+           cdkDrag
+           [cdkDragFreeDragPosition]="workspace.totalPosition"
+           (cdkDragEnded)="onTotalDragEnded($event)">
+        <div class="sale__amount">
+            {{
+          (venta().totalCents / 100)
+            | currency:'EUR':'symbol':'1.2-2'
+        }}
+        </div>
+
+        <div class="sale__controls">
+            <mat-icon class="sale__drag-handle"
+                      cdkDragHandle
+                      matTooltip="Mover">
+                drag_indicator
+            </mat-icon>
+
+            <button mat-stroked-button
+                    type="button"
+                    [disabled]="venta().lineas.length === 0"
+                    (click)="cancelVenta()">
+                Cancelar
+            </button>
+
+            <button mat-flat-button
+                    type="button"
+                    disabled>
+                Terminar
+            </button>
+        </div>
+    </aside>
+    }
+
+    @if (searchOpen()) {
+    <otpv-article-search [initialQuery]="searchInitialQuery()"
+                         (selectEvent)="onSearchSelected($event)"
+                         (closeEvent)="closeSearch()" />
+    }
+
+    @if (directAccessOpen()) {
+    <otpv-direct-access-selector (selectEvent)="onDirectAccessSelected($event)"
+                                 (closeEvent)="closeDirectAccess()" />
+    }
+</section>

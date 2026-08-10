@@ -1,0 +1,112 @@
+<div class="overlay">
+    <section class="search"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="article-search-title">
+        <header class="search__header">
+            <h2 id="article-search-title">
+                Buscar artículos
+            </h2>
+
+            <button type="button"
+                    class="search__close"
+                    (click)="close()">
+                <mat-icon>close</mat-icon>
+            </button>
+        </header>
+
+        <input class="search__input"
+               type="search"
+               autocomplete="off"
+               placeholder="Buscar por nombre"
+               [value]="query()"
+               (input)="updateQuery($event)"
+               autofocus>
+
+        @if (error() !== null) {
+        <div class="search__error">
+            {{ error() }}
+        </div>
+        }
+
+        <div class="search__results">
+            @if (loading()) {
+            <div class="search__empty">
+                Buscando…
+            </div>
+            } @else {
+            @for (
+            articulo of results();
+            track articulo.publicId
+            ) {
+            <button type="button"
+                    class="search__result"
+                    [class.search__result--selected]="
+              selectedPublicIds().has(articulo.publicId)
+            "
+                    (click)="toggleArticulo(articulo)">
+                <span class="search__check">
+                    <mat-icon>
+                        {{
+                  selectedPublicIds().has(articulo.publicId)
+                    ? 'check_box'
+                    : 'check_box_outline_blank'
+                }}
+                    </mat-icon>
+                </span>
+
+                <span class="search__locator">
+                    {{ articulo.localizador }}
+                </span>
+
+                <span class="search__name">
+                    {{ articulo.nombre }}
+                </span>
+
+                <span class="search__brand">
+                    {{ articulo.marca }}
+                </span>
+
+                <span class="search__price">
+                    {{
+                (
+                  (
+                    articulo.pvpDescuentoCents
+                    ?? articulo.pvpCents
+                  ) / 100
+                )
+                  | currency:'EUR':'symbol':'1.2-2'
+              }}
+                </span>
+
+                <span class="search__stock">
+                    {{ articulo.stock }}
+                </span>
+            </button>
+            } @empty {
+            <div class="search__empty">
+                No se han encontrado artículos.
+            </div>
+            }
+            }
+        </div>
+
+        <footer class="search__actions">
+            <button mat-stroked-button
+                    type="button"
+                    (click)="close()">
+                Cancelar
+            </button>
+
+            <button mat-flat-button
+                    type="button"
+                    [disabled]="selectedPublicIds().size === 0"
+                    (click)="confirm()">
+                Añadir
+                @if (selectedPublicIds().size > 0) {
+                ({{ selectedPublicIds().size }})
+                }
+            </button>
+        </footer>
+    </section>
+</div>

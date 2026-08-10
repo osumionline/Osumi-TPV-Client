@@ -1,0 +1,29 @@
+<header class="header">
+    <div class="header__brand">
+        <mat-icon>storefront</mat-icon>
+
+        <span>
+            {{ appName() }}
+        </span>
+    </div>
+
+    <nav class="header__navigation">
+        @for (item of items; track item.id) {
+        @if (item.route !== null) {
+        <a mat-button
+           [routerLink]="item.route"
+           [class.header__item--selected]="selectedOption() === item.id">
+            <mat-icon>{{ item.icon }}</mat-icon>
+            {{ item.label }}
+        </a>
+        } @else {
+        <button mat-button
+                disabled
+                [matTooltip]="item.label + ' estará disponible al migrar el módulo'">
+            <mat-icon>{{ item.icon }}</mat-icon>
+            {{ item.label }}
+        </button>
+        }
+        }
+    </nav>
+</header>

@@ -1,0 +1,118 @@
+:host {
+    display: block;
+}
+
+.sale {
+    position: relative;
+    min-height: calc(100vh - 104px);
+    background-color: var(--color-white);
+
+    .sale__header,
+    .sale__line {
+        display: flex;
+        width: 100%;
+
+        >div {
+            display: flex;
+            min-height: 34px;
+            align-items: center;
+            justify-content: center;
+        }
+    }
+
+    .sale__header {
+        font-weight: 500;
+
+        >div {
+            background-color: var(--table-header-bg);
+        }
+    }
+
+    .sale__line {
+        >div {
+            position: relative;
+            background-color: var(--color-white);
+        }
+    }
+
+    .sale__line--input {
+        .sale__locator-input {
+            width: 100%;
+            height: 33px;
+            padding: 0 36px 0 8px;
+            border: 0;
+            background-color: transparent;
+            font: inherit;
+            outline: 0;
+
+            &:disabled {
+                background-color: var(--color-light-grey);
+            }
+        }
+    }
+
+    .sale__delete,
+    .sale__direct-access {
+        position: absolute;
+        z-index: 1;
+        display: grid;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        padding: 0;
+        border: 0;
+        background-color: transparent;
+        cursor: pointer;
+
+        mat-icon {
+            font-size: 20px;
+        }
+    }
+
+    .sale__delete {
+        left: 2px;
+    }
+
+    .sale__direct-access {
+        right: 2px;
+    }
+
+    .sale__total {
+        position: fixed;
+        right: 12px;
+        bottom: 12px;
+        z-index: 20;
+        width: min(320px, 28vw);
+        min-width: 260px;
+        border: 1px solid var(--color-dark-grey);
+        box-sizing: border-box;
+        border-radius: 8px;
+        background-color: var(--color-white);
+        box-shadow: 0 4px 16px rgb(0 0 0 / 20%);
+    }
+
+    .sale__amount {
+        margin: 10px;
+        padding: 12px;
+        background-color: var(--color-very-light-grey);
+        font-size: 2rem;
+        font-weight: 500;
+        text-align: right;
+    }
+
+    .sale__controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 10px 10px;
+
+        .sale__drag-handle {
+            cursor: grab;
+            color: var(--disabled-color);
+        }
+
+        button:first-of-type {
+            margin-left: auto;
+        }
+    }
+}
