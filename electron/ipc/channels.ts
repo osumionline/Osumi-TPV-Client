@@ -14,6 +14,9 @@ const IPC_CHANNELS = {
   categoriasGetAll: 'categorias:get-all',
   cajaOpen: 'caja:open',
   ventasGetContext: 'ventas:get-context',
+  ventasResolveArticulo: 'ventas:resolve-articulo',
+  ventasSearchArticulos: 'ventas:search-articulos',
+  ventasGetAccesosDirectos: 'ventas:get-accesos-directos',
 } as const;
 
 export default IPC_CHANNELS;

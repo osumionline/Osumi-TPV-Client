@@ -16,6 +16,8 @@ import type LegacyImportStartResult from '@desktop-contracts/legacy-import/legac
 import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
 import type { ProveedorInterface } from '@desktop-contracts/proveedores/proveedor.interface';
 import AppInfo from '@desktop-contracts/system/app-info.interface';
+import type AccesoDirectoVentaInterface from '@desktop-contracts/ventas/acceso-directo-venta.interface';
+import type ArticuloVentaInterface from '@desktop-contracts/ventas/articulo-venta.interface';
 import type VentasContextInterface from '@desktop-contracts/ventas/ventas-context.interface';
 import IPC_CHANNELS from '@ipc/channels';
 import type { IpcRendererEvent } from 'electron';
@@ -126,6 +128,22 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
   ventas: Object.freeze({
     getContext: (): Promise<VentasContextInterface> =>
       ipcRenderer.invoke(IPC_CHANNELS.ventasGetContext) as Promise<VentasContextInterface>,
+
+    resolveArticulo: (codigo: string): Promise<ArticuloVentaInterface | null> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.ventasResolveArticulo,
+        codigo,
+      ) as Promise<ArticuloVentaInterface | null>,
+
+    searchArticulos: (query: string): Promise<readonly ArticuloVentaInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ventasSearchArticulos, query) as Promise<
+        readonly ArticuloVentaInterface[]
+      >,
+
+    getAccesosDirectos: (): Promise<readonly AccesoDirectoVentaInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ventasGetAccesosDirectos) as Promise<
+        readonly AccesoDirectoVentaInterface[]
+      >,
   }),
 });
 

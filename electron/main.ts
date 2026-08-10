@@ -14,6 +14,7 @@ import EmpleadosService from '@backend/application/empleados/empleados.service';
 import MarcasService from '@backend/application/marcas/marcas.service';
 import ProveedoresService from '@backend/application/proveedores/proveedores.service';
 import { SystemService } from '@backend/application/system/system.service';
+import VentasArticulosService from '@backend/application/ventas/ventas-articulos.service';
 import VentasContextService from '@backend/application/ventas/ventas-context.service';
 
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
@@ -31,6 +32,7 @@ import type ProveedorRepository from '@backend/contracts/proveedores/proveedor.r
 import type PasswordHasher from '@backend/contracts/security/password-hasher.interface';
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
+import type VentasArticulosRepository from '@backend/contracts/ventas/ventas-articulos.repository.interface';
 import type VentasContextRepository from '@backend/contracts/ventas/ventas-context.repository.interface';
 
 import NewInstallationDataService from '@infrastructure/database/initial-data/new-installation-data.service';
@@ -46,6 +48,7 @@ import TypeOrmEmpleadoRepository from '@infrastructure/database/typeorm/typeorm-
 import TypeOrmInstallationDatabase from '@infrastructure/database/typeorm/typeorm-installation-database';
 import TypeOrmMarcaRepository from '@infrastructure/database/typeorm/typeorm-marca.repository';
 import TypeOrmProveedorRepository from '@infrastructure/database/typeorm/typeorm-proveedor.repository';
+import TypeOrmVentasArticulosRepository from '@infrastructure/database/typeorm/typeorm-ventas-articulos.repository';
 import TypeOrmVentasContextRepository from '@infrastructure/database/typeorm/typeorm-ventas-context.repository';
 
 import ElectronApplicationPathsProvider from '@infrastructure/electron/electron-application-paths.provider';
@@ -285,6 +288,13 @@ app
 
     const cajaService: CajaService = new CajaService(cajaRepository);
 
+    const ventasArticulosRepository: VentasArticulosRepository =
+      new TypeOrmVentasArticulosRepository(operationalDatabase);
+
+    const ventasArticulosService: VentasArticulosService = new VentasArticulosService(
+      ventasArticulosRepository,
+    );
+
     const ventasContextRepository: VentasContextRepository = new TypeOrmVentasContextRepository(
       operationalDatabase,
     );
@@ -382,7 +392,11 @@ app
 
     registerCajaIpc((): BrowserWindow | null => mainWindow, cajaService);
 
-    registerVentasIpc((): BrowserWindow | null => mainWindow, ventasContextService);
+    registerVentasIpc(
+      (): BrowserWindow | null => mainWindow,
+      ventasContextService,
+      ventasArticulosService,
+    );
 
     registerLegacyImportIpc(legacyImportService);
 
