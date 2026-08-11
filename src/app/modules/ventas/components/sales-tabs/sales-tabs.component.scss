@@ -15,6 +15,12 @@
         min-width: 0;
         flex: 1;
         overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: none;
+
+        &::-webkit-scrollbar {
+            display: none;
+        }
     }
 
     .tabs__sale,
