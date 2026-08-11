@@ -1,5 +1,6 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { computed, Service, signal } from '@angular/core';
+import type Cliente from '@model/clientes/cliente.model';
 import type Empleado from '@model/empleados/empleado.model';
 import type ArticuloVenta from '@model/ventas/articulo-venta.model';
 import VentaEnCurso from '@model/ventas/venta-en-curso.model';
@@ -151,6 +152,28 @@ export default class VentasService {
   }
 
   /**
+   * Asigna o cambia el cliente de una venta abierta.
+   */
+  asignarCliente(ventaIdTemporal: string, cliente: Cliente): void {
+    const venta: VentaEnCurso = this.requireVenta(ventaIdTemporal);
+
+    venta.setCliente(cliente);
+
+    this.notifyVentasChanged();
+  }
+
+  /**
+   * Elimina el cliente asociado a una venta abierta.
+   */
+  quitarCliente(ventaIdTemporal: string): void {
+    const venta: VentaEnCurso = this.requireVenta(ventaIdTemporal);
+
+    venta.clearCliente();
+
+    this.notifyVentasChanged();
+  }
+
+  /**
    * Añade una línea real a una venta abierta.
    */
   agregarLinea(ventaIdTemporal: string, linea: VentaLineaEnCurso): void {
@@ -251,7 +274,18 @@ export default class VentasService {
   ): void {
     const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
 
-    linea.setDescuentoBps(descuentoBps);
+    linea.setDescuentoManualBps(descuentoBps);
+    this.notifyVentasChanged();
+  }
+
+  /**
+   * Elimina el descuento porcentual manual y recupera el descuento del cliente.
+   */
+  quitarDescuentoPorcentajeManual(ventaIdTemporal: string, lineaIdTemporal: string): void {
+    const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
+
+    linea.clearDescuentoManual();
+
     this.notifyVentasChanged();
   }
 

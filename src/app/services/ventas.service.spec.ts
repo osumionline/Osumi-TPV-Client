@@ -1,3 +1,4 @@
+import Cliente from '@model/clientes/cliente.model';
 import ArticuloVenta from '@model/ventas/articulo-venta.model';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
 import type VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
@@ -19,6 +20,17 @@ const createArticulo = (publicId: string, pvpCents: number = 1_000): ArticuloVen
   articulo.stock = 10;
 
   return articulo;
+};
+
+const createCliente = (publicId: string, descuento: number): Cliente => {
+  const cliente: Cliente = new Cliente();
+
+  cliente.id = Number(publicId.replace(/\D/g, '')) || 1;
+  cliente.publicId = publicId;
+  cliente.nombreApellidos = `Cliente ${publicId}`;
+  cliente.descuento = descuento;
+
+  return cliente;
 };
 
 describe('VentasService', (): void => {
@@ -140,5 +152,65 @@ describe('VentasService', (): void => {
       lineaIdTemporal: primeraLinea.idTemporal,
       field: 'descuento-porcentaje',
     });
+  });
+
+  it('aplica el descuento del cliente a las líneas existentes y a las nuevas', (): void => {
+    const service: VentasService = new VentasService();
+    const venta: VentaEnCurso = service.crearVenta();
+
+    service.agregarArticulos(venta.idTemporal, [createArticulo('articulo-1', 1_000)]);
+
+    const cliente: Cliente = createCliente('cliente-1', 10);
+
+    service.asignarCliente(venta.idTemporal, cliente);
+
+    const primeraLinea: VentaLineaEnCurso = venta.lineas[0]!;
+
+    expect(venta.cliente).toBe(cliente);
+    expect(primeraLinea.descuentoClienteBps).toBe(1_000);
+    expect(primeraLinea.importeFinalMicros).toBe(9_000_000);
+
+    service.agregarArticulos(venta.idTemporal, [createArticulo('articulo-2', 2_000)]);
+
+    const segundaLinea: VentaLineaEnCurso = venta.lineas[1]!;
+
+    expect(segundaLinea.descuentoClienteBps).toBe(1_000);
+    expect(segundaLinea.importeFinalMicros).toBe(18_000_000);
+    expect(venta.totalCents).toBe(2_700);
+  });
+
+  it('cambia y elimina el descuento del cliente sin destruir un override manual', (): void => {
+    const service: VentasService = new VentasService();
+    const venta: VentaEnCurso = service.crearVenta();
+
+    service.agregarArticulos(venta.idTemporal, [createArticulo('articulo-1', 1_000)]);
+
+    const linea: VentaLineaEnCurso = venta.lineas[0]!;
+
+    service.asignarCliente(venta.idTemporal, createCliente('cliente-1', 10));
+
+    service.establecerDescuentoPorcentaje(venta.idTemporal, linea.idTemporal, 2_500);
+
+    expect(linea.descuentoClienteBps).toBe(1_000);
+    expect(linea.descuentoManualBps).toBe(2_500);
+    expect(linea.importeFinalMicros).toBe(7_500_000);
+
+    service.asignarCliente(venta.idTemporal, createCliente('cliente-2', 5));
+
+    expect(linea.descuentoClienteBps).toBe(500);
+    expect(linea.descuentoManualBps).toBe(2_500);
+    expect(linea.importeFinalMicros).toBe(7_500_000);
+
+    service.quitarDescuentoPorcentajeManual(venta.idTemporal, linea.idTemporal);
+
+    expect(linea.descuentoBps).toBe(500);
+    expect(linea.importeFinalMicros).toBe(9_500_000);
+
+    service.quitarCliente(venta.idTemporal);
+
+    expect(venta.cliente).toBeNull();
+    expect(linea.descuentoClienteBps).toBe(0);
+    expect(linea.descuentoBps).toBe(0);
+    expect(linea.importeFinalMicros).toBe(10_000_000);
   });
 });

@@ -35,7 +35,7 @@ describe('VentaLineaEnCurso', (): void => {
     const linea: VentaLineaEnCurso = createLinea();
 
     linea.setCantidad(2);
-    linea.setDescuentoBps(1_000);
+    linea.setDescuentoManualBps(1_000);
 
     expect(linea.importeBaseMicros).toBe(20_000_000);
     expect(linea.importeDescuentoMicros).toBe(2_000_000);
@@ -55,7 +55,7 @@ describe('VentaLineaEnCurso', (): void => {
   it('conserva el descuento existente mientras la línea está marcada como regalo', (): void => {
     const linea: VentaLineaEnCurso = createLinea();
 
-    linea.setDescuentoBps(1_000);
+    linea.setDescuentoManualBps(1_000);
 
     expect(linea.importeFinalMicros).toBe(9_000_000);
 
@@ -87,7 +87,7 @@ describe('VentaLineaEnCurso', (): void => {
   it('permite que un importe manual oculte temporalmente un descuento porcentual', (): void => {
     const linea: VentaLineaEnCurso = createLinea();
 
-    linea.setDescuentoBps(1_000);
+    linea.setDescuentoManualBps(1_000);
     linea.setImporteManualMicros(7_500_000);
 
     expect(linea.descuentoBps).toBe(1_000);
@@ -101,7 +101,7 @@ describe('VentaLineaEnCurso', (): void => {
   it('sustituye el descuento porcentual al aplicar un descuento directo', (): void => {
     const linea: VentaLineaEnCurso = createLinea();
 
-    linea.setDescuentoBps(1_000);
+    linea.setDescuentoManualBps(1_000);
     linea.setDescuentoDirectoMicros(2_000_000);
 
     expect(linea.descuentoBps).toBe(0);
@@ -148,7 +148,7 @@ describe('VentaLineaEnCurso', (): void => {
     const linea: VentaLineaEnCurso = createLinea(1_000, 800);
 
     expect((): void => linea.setImporteManualMicros(7_000_000)).toThrow();
-    expect((): void => linea.setDescuentoBps(1_000)).toThrow();
+    expect((): void => linea.setDescuentoManualBps(1_000)).toThrow();
     expect((): void => linea.setDescuentoDirectoMicros(1_000_000)).toThrow();
 
     expect(linea.importeFinalMicros).toBe(8_000_000);
@@ -158,10 +158,56 @@ describe('VentaLineaEnCurso', (): void => {
     const linea: VentaLineaEnCurso = createLinea(1_000, 800);
 
     linea.clearDescuentoPromocional();
-    linea.setDescuentoBps(1_000);
+    linea.setDescuentoManualBps(1_000);
 
     expect(linea.tieneDescuentoPromocional).toBe(false);
     expect(linea.importeDescuentoMicros).toBe(1_000_000);
+    expect(linea.importeFinalMicros).toBe(9_000_000);
+  });
+
+  it('aplica el descuento del cliente cuando no existe un porcentaje manual', (): void => {
+    const linea: VentaLineaEnCurso = createLinea();
+
+    linea.setDescuentoClienteBps(1_000);
+
+    expect(linea.descuentoClienteBps).toBe(1_000);
+    expect(linea.descuentoManualBps).toBeNull();
+    expect(linea.descuentoBps).toBe(1_000);
+    expect(linea.importeFinalMicros).toBe(9_000_000);
+  });
+
+  it('permite que un descuento manual oculte temporalmente el descuento del cliente', (): void => {
+    const linea: VentaLineaEnCurso = createLinea();
+
+    linea.setDescuentoClienteBps(1_000);
+    linea.setDescuentoManualBps(2_500);
+
+    expect(linea.descuentoClienteBps).toBe(1_000);
+    expect(linea.descuentoManualBps).toBe(2_500);
+    expect(linea.descuentoBps).toBe(2_500);
+    expect(linea.importeFinalMicros).toBe(7_500_000);
+
+    linea.clearDescuentoManual();
+
+    expect(linea.descuentoManualBps).toBeNull();
+    expect(linea.descuentoBps).toBe(1_000);
+    expect(linea.importeFinalMicros).toBe(9_000_000);
+  });
+
+  it('recupera el descuento del cliente al retirar un descuento directo', (): void => {
+    const linea: VentaLineaEnCurso = createLinea();
+
+    linea.setDescuentoClienteBps(1_000);
+    linea.setDescuentoManualBps(2_500);
+    linea.setDescuentoDirectoMicros(2_000_000);
+
+    expect(linea.descuentoManualBps).toBeNull();
+    expect(linea.descuentoClienteBps).toBe(1_000);
+    expect(linea.importeFinalMicros).toBe(8_000_000);
+
+    linea.clearDescuentoDirecto();
+
+    expect(linea.descuentoBps).toBe(1_000);
     expect(linea.importeFinalMicros).toBe(9_000_000);
   });
 

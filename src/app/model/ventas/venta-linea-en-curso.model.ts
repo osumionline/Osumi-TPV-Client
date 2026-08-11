@@ -19,7 +19,8 @@ export default class VentaLineaEnCurso {
   pvpMicros: number = 0;
   pvpDescuentoMicros: number | null = null;
   importeManualMicros: number | null = null;
-  descuentoBps: number = 0;
+  descuentoClienteBps: number = 0;
+  descuentoManualBps: number | null = null;
   descuentoDirectoMicros: number | null = null;
 
   ivaBps: number = 0;
@@ -65,6 +66,22 @@ export default class VentaLineaEnCurso {
     const descuentoUnitarioMicros: number = this.pvpMicros - this.pvpDescuentoMicros;
 
     return this.cantidad * descuentoUnitarioMicros;
+  }
+
+  /**
+   * Obtiene el descuento porcentual efectivo de la línea.
+   *
+   * El descuento manual, cuando existe, tiene prioridad sobre el descuento del cliente.
+   */
+  get descuentoBps(): number {
+    return this.descuentoManualBps ?? this.descuentoClienteBps;
+  }
+
+  /**
+   * Indica si existe un descuento porcentual introducido manualmente.
+   */
+  get tieneDescuentoManual(): boolean {
+    return this.descuentoManualBps !== null;
   }
 
   /**
@@ -133,16 +150,23 @@ export default class VentaLineaEnCurso {
   }
 
   /**
-   * Establece el descuento porcentual de la línea en puntos básicos.
+   * Establece el descuento porcentual procedente del cliente de la venta.
+   *
+   * Esta capa puede cambiar independientemente del resto de modificaciones
+   * económicas porque queda oculta mientras exista una capa con mayor prioridad.
    */
-  setDescuentoBps(descuentoBps: number): void {
-    if (
-      !Number.isSafeInteger(descuentoBps) ||
-      descuentoBps < 0 ||
-      descuentoBps > BASIS_POINTS_TOTAL
-    ) {
-      throw new RangeError('El descuento porcentual debe estar comprendido entre 0 y 100 %.');
-    }
+  setDescuentoClienteBps(descuentoClienteBps: number): void {
+    this.requireValidDescuentoBps(descuentoClienteBps, 'descuento del cliente');
+
+    this.descuentoClienteBps = descuentoClienteBps;
+  }
+
+  /**
+   * Establece un descuento porcentual manual sobre la línea.
+   */
+  setDescuentoManualBps(descuentoManualBps: number): void {
+    this.requireValidDescuentoBps(descuentoManualBps, 'descuento porcentual');
+
     if (this.regalo) {
       throw new Error('No se puede modificar el descuento de una línea marcada como regalo.');
     }
@@ -160,7 +184,14 @@ export default class VentaLineaEnCurso {
       );
     }
 
-    this.descuentoBps = descuentoBps;
+    this.descuentoManualBps = descuentoManualBps;
+  }
+
+  /**
+   * Elimina el descuento porcentual manual y recupera el descuento del cliente.
+   */
+  clearDescuentoManual(): void {
+    this.descuentoManualBps = null;
   }
 
   /**
@@ -189,7 +220,7 @@ export default class VentaLineaEnCurso {
       );
     }
 
-    this.descuentoBps = 0;
+    this.descuentoManualBps = null;
     this.descuentoDirectoMicros = descuentoDirectoMicros;
   }
 
@@ -248,6 +279,19 @@ export default class VentaLineaEnCurso {
     }
 
     return this.importeBaseMicros - this.importeDescuentoMicros;
+  }
+
+  /**
+   * Comprueba que un descuento expresado en puntos básicos sea válido.
+   */
+  private requireValidDescuentoBps(descuentoBps: number, field: string): void {
+    if (
+      !Number.isSafeInteger(descuentoBps) ||
+      descuentoBps < 0 ||
+      descuentoBps > BASIS_POINTS_TOTAL
+    ) {
+      throw new RangeError(`El ${field} debe estar comprendido entre 0 y 100 %.`);
+    }
   }
 
   /**
