@@ -1,5 +1,5 @@
 import { Component, input, output, type InputSignal, type OutputEmitterRef } from '@angular/core';
-import { MatButton } from '@angular/material/button';
+import { MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
@@ -11,7 +11,7 @@ import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
   selector: 'otpv-sales-tabs',
   templateUrl: './sales-tabs.component.html',
   styleUrl: './sales-tabs.component.scss',
-  imports: [MatButton, MatIcon, MatTooltip],
+  imports: [MatIconButton, MatIcon, MatTooltip],
 })
 export default class SalesTabsComponent {
   readonly ventas: InputSignal<readonly VentaEnCurso[]> = input.required<readonly VentaEnCurso[]>();
