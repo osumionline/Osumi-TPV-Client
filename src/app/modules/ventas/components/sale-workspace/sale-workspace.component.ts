@@ -9,6 +9,7 @@ import {
   output,
   signal,
   viewChild,
+  viewChildren,
   type InputSignal,
   type OutputEmitterRef,
   type Signal,
@@ -21,7 +22,11 @@ import type AccesoDirectoVenta from '@model/ventas/acceso-directo-venta.model';
 import type ArticuloVenta from '@model/ventas/articulo-venta.model';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
 import type VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
-import type { VentaWorkspaceState } from '@model/ventas/venta-workspace.interface';
+import type {
+  VentaEditableField,
+  VentaFocusTarget,
+  VentaWorkspaceState,
+} from '@model/ventas/venta-workspace.interface';
 import ArticleSearchComponent from '@modules/ventas/components/article-search/article-search.component';
 import DirectAccessSelectorComponent from '@modules/ventas/components/direct-access-selector/direct-access-selector.component';
 import { DialogService } from '@osumi/angular-tools';
@@ -69,26 +74,45 @@ export default class SaleWorkspaceComponent {
 
   readonly localizadorInput: Signal<ElementRef<HTMLInputElement> | undefined> =
     viewChild<ElementRef<HTMLInputElement>>('localizadorInput');
+  readonly editableInputs: Signal<readonly ElementRef<HTMLInputElement>[]> =
+    viewChildren<ElementRef<HTMLInputElement>>('editableInput');
 
   private readonly restoreFocusRef = afterRenderEffect({
     write: (): void => {
       const venta: VentaEnCurso = this.venta();
-
       const workspace: VentaWorkspaceState | null = this.ventasService.workspaceActivo();
-
-      const localizadorInput: ElementRef<HTMLInputElement> | undefined = this.localizadorInput();
 
       if (
         this.ventasService.ventaActivaId() !== venta.idTemporal ||
-        workspace?.focusTarget.type !== 'localizador' ||
+        workspace === null ||
         this.searchOpen() ||
-        this.directAccessOpen() ||
-        localizadorInput === undefined
+        this.directAccessOpen()
       ) {
         return;
       }
 
-      localizadorInput.nativeElement.focus();
+      const focusTarget: VentaFocusTarget = workspace.focusTarget;
+
+      if (focusTarget.type === 'localizador') {
+        const localizadorInput: ElementRef<HTMLInputElement> | undefined = this.localizadorInput();
+
+        localizadorInput?.nativeElement.focus();
+
+        return;
+      }
+
+      const editableInput: ElementRef<HTMLInputElement> | undefined = this.editableInputs().find(
+        (input: ElementRef<HTMLInputElement>): boolean =>
+          input.nativeElement.dataset['lineaIdTemporal'] === focusTarget.lineaIdTemporal &&
+          input.nativeElement.dataset['field'] === focusTarget.field,
+      );
+
+      if (editableInput === undefined) {
+        return;
+      }
+
+      editableInput.nativeElement.focus();
+      editableInput.nativeElement.select();
     },
   });
 
@@ -99,6 +123,62 @@ export default class SaleWorkspaceComponent {
     this.ventasService.setFocusTarget(this.venta().idTemporal, {
       type: 'localizador',
     });
+  }
+
+  /**
+   * Indica si un campo concreto de una línea se encuentra en edición.
+   */
+  isEditing(lineaIdTemporal: string, field: VentaEditableField): boolean {
+    const workspace: VentaWorkspaceState | null = this.ventasService.getWorkspace(
+      this.venta().idTemporal,
+    );
+
+    if (workspace?.focusTarget.type !== 'linea') {
+      return false;
+    }
+
+    return (
+      workspace.focusTarget.lineaIdTemporal === lineaIdTemporal &&
+      workspace.focusTarget.field === field
+    );
+  }
+
+  /**
+   * Inicia la edición de un campo concreto de una línea.
+   */
+  editLinea(lineaIdTemporal: string, field: VentaEditableField): void {
+    this.ventasService.setFocusTarget(this.venta().idTemporal, {
+      type: 'linea',
+      lineaIdTemporal,
+      field,
+    });
+  }
+
+  /**
+   * Confirma la cantidad introducida para una línea.
+   */
+  commitCantidad(linea: VentaLineaEnCurso, event: Event, returnToLocalizador: boolean): void {
+    if (!this.isEditing(linea.idTemporal, 'cantidad')) {
+      return;
+    }
+
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+    const inputValue: number = inputElement.valueAsNumber;
+
+    const cantidad: number = Number.isNaN(inputValue) || inputValue <= 0 ? 1 : inputValue;
+
+    try {
+      this.ventasService.cambiarCantidad(this.venta().idTemporal, linea.idTemporal, cantidad);
+    } catch (error: unknown) {
+      inputElement.value = String(linea.cantidad);
+      this.showLineOperationError(error, linea.idTemporal, 'cantidad');
+
+      return;
+    }
+
+    if (returnToLocalizador) {
+      this.focusLocalizador();
+    }
   }
 
   /**
@@ -292,6 +372,40 @@ export default class SaleWorkspaceComponent {
 
         this.ventasService.setFocusTarget(this.venta().idTemporal, {
           type: 'localizador',
+        });
+      });
+  }
+
+  /**
+   * Devuelve el foco al localizador de la venta actual.
+   */
+  private focusLocalizador(): void {
+    this.ventasService.setFocusTarget(this.venta().idTemporal, {
+      type: 'localizador',
+    });
+  }
+
+  /**
+   * Muestra un error producido al modificar una línea y restaura su edición.
+   */
+  private showLineOperationError(
+    error: unknown,
+    lineaIdTemporal: string,
+    field: VentaEditableField,
+  ): void {
+    const message: string =
+      error instanceof Error ? error.message : 'No se ha podido modificar la línea de venta.';
+
+    this.dialog
+      .alert({
+        title: 'Atención',
+        content: message,
+      })
+      .subscribe((): void => {
+        this.ventasService.setFocusTarget(this.venta().idTemporal, {
+          type: 'linea',
+          lineaIdTemporal,
+          field,
         });
       });
   }

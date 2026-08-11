@@ -51,6 +51,31 @@
         }
     }
 
+    .sale__editable-value {
+        width: 100%;
+        min-height: 34px;
+        padding: 0 4px;
+        border: 0;
+        background-color: transparent;
+        font: inherit;
+        text-align: center;
+        cursor: text;
+
+        &:hover {
+            background-color: var(--color-very-light-grey);
+        }
+    }
+
+    .sale__inline-input {
+        width: calc(100% - 8px);
+        height: 28px;
+        padding: 0 4px;
+        border: 1px solid var(--color-dark-grey);
+        box-sizing: border-box;
+        font: inherit;
+        text-align: center;
+    }
+
     .sale__delete,
     .sale__direct-access {
         position: absolute;

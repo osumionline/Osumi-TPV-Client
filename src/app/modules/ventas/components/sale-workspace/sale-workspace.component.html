@@ -69,7 +69,28 @@
             </div>
 
             <div class="col-cantidad">
-                {{ linea.cantidad }}
+                @if (isEditing(linea.idTemporal, 'cantidad')) {
+                <input #editableInput
+                       class="sale__inline-input"
+                       type="number"
+                       inputmode="numeric"
+                       min="1"
+                       step="1"
+                       aria-label="Cantidad"
+                       [attr.data-linea-id-temporal]="linea.idTemporal"
+                       data-field="cantidad"
+                       [value]="linea.cantidad"
+                       (keydown.enter)="commitCantidad(linea, $event, true)"
+                       (blur)="commitCantidad(linea, $event, false)">
+                }
+                @else {
+                <button class="sale__editable-value"
+                        type="button"
+                        matTooltip="Modificar cantidad"
+                        (click)="editLinea(linea.idTemporal, 'cantidad')">
+                    {{ linea.cantidad }}
+                </button>
+                }
             </div>
 
             <div class="col-pvp">
