@@ -352,6 +352,116 @@ export default class SaleWorkspaceComponent {
   }
 
   /**
+   * Inicia la edición de un descuento directo expresado en euros.
+   */
+  editDescuentoDirecto(linea: VentaLineaEnCurso): void {
+    if (!this.canModifyAmounts()) {
+      return;
+    }
+
+    if (linea.regalo) {
+      this.showLineEditBlocked(
+        'La línea está marcada como regalo y no se puede modificar su descuento.',
+      );
+
+      return;
+    }
+
+    if (linea.importeManualMicros !== null) {
+      this.showLineEditBlocked(
+        'La línea tiene un importe manual. Debes retirarlo antes de aplicar un descuento directo.',
+      );
+
+      return;
+    }
+
+    if (linea.tieneDescuentoPromocional) {
+      this.showLineEditBlocked(
+        'La línea tiene un precio promocional. Debes retirarlo antes de aplicar un descuento directo.',
+      );
+
+      return;
+    }
+
+    this.editLinea(linea.idTemporal, 'descuento-importe');
+  }
+
+  /**
+   * Confirma el descuento directo introducido para una línea.
+   */
+  commitDescuentoDirecto(
+    linea: VentaLineaEnCurso,
+    event: Event,
+    returnToLocalizador: boolean,
+  ): void {
+    if (!this.isEditing(linea.idTemporal, 'descuento-importe')) {
+      return;
+    }
+
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+    const inputValue: number = inputElement.valueAsNumber;
+
+    if (Number.isNaN(inputValue) || inputValue <= 0) {
+      this.focusLocalizador();
+
+      return;
+    }
+
+    const descuentoDirectoMicros: number = Math.round(inputValue * 100) * MICROS_PER_CENT;
+
+    try {
+      this.ventasService.establecerDescuentoDirecto(
+        this.venta().idTemporal,
+        linea.idTemporal,
+        descuentoDirectoMicros,
+      );
+    } catch (error: unknown) {
+      inputElement.value =
+        linea.descuentoDirectoMicros === null
+          ? ''
+          : String(linea.descuentoDirectoMicros / (100 * MICROS_PER_CENT));
+
+      this.showLineOperationError(error, linea.idTemporal, 'descuento-importe');
+
+      return;
+    }
+
+    if (returnToLocalizador) {
+      this.focusLocalizador();
+    }
+  }
+
+  /**
+   * Retira el descuento directo aplicado manualmente a una línea.
+   */
+  clearDescuentoDirecto(linea: VentaLineaEnCurso, event: MouseEvent): void {
+    event.stopPropagation();
+
+    if (!this.canModifyAmounts()) {
+      return;
+    }
+
+    this.ventasService.quitarDescuentoDirecto(this.venta().idTemporal, linea.idTemporal);
+
+    this.focusLocalizador();
+  }
+
+  /**
+   * Retira el precio promocional con el que el artículo entró en la venta.
+   */
+  clearDescuentoPromocional(linea: VentaLineaEnCurso, event: MouseEvent): void {
+    event.stopPropagation();
+
+    if (!this.canModifyAmounts()) {
+      return;
+    }
+
+    this.ventasService.quitarDescuentoPromocional(this.venta().idTemporal, linea.idTemporal);
+
+    this.focusLocalizador();
+  }
+
+  /**
    * Confirma la cantidad introducida para una línea.
    */
   commitCantidad(linea: VentaLineaEnCurso, event: Event, returnToLocalizador: boolean): void {

@@ -89,6 +89,14 @@
         }
     }
 
+    .sale__discount-value {
+        display: flex;
+        min-height: 34px;
+        flex: 1;
+        align-items: center;
+        justify-content: center;
+    }
+
     .sale__inline-editor {
         display: flex;
         width: 100%;

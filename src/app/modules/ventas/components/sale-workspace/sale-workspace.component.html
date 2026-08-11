@@ -153,20 +153,70 @@
 
             <div class="col-descuentos">
                 @if (linea.tieneDescuentoPromocional) {
-                <span>
-                    {{
-                        (linea.importeDescuentoPromocionalMicros / 1_000_000)
-                            | currency:'EUR':'symbol':'1.2-2'
-                    }}
-                </span>
+                <div class="sale__editable-cell">
+                    <span class="sale__discount-value"
+                          matTooltip="Descuento promocional del artículo">
+                        {{
+                            (linea.importeDescuentoPromocionalMicros / 1_000_000)
+                                | currency:'EUR':'symbol':'1.2-2'
+                        }}
+                    </span>
+
+                    @if (canModifyAmounts()) {
+                    <button class="sale__inline-action"
+                            type="button"
+                            matTooltip="Quitar descuento promocional"
+                            aria-label="Quitar descuento promocional"
+                            (click)="clearDescuentoPromocional(linea, $event)">
+                        <mat-icon>close</mat-icon>
+                    </button>
+                    }
+                </div>
+                }
+                @else if (isEditing(linea.idTemporal, 'descuento-importe')) {
+                <div class="sale__inline-editor">
+                    <input #editableInput
+                           class="sale__inline-input"
+                           type="number"
+                           inputmode="decimal"
+                           min="0"
+                           step="0.01"
+                           aria-label="Descuento directo"
+                           [attr.data-linea-id-temporal]="linea.idTemporal"
+                           data-field="descuento-importe"
+                           [value]="
+                               linea.descuentoDirectoMicros === null
+                                   ? ''
+                                   : linea.descuentoDirectoMicros / 1_000_000
+                           "
+                           (keydown.enter)="commitDescuentoDirecto(linea, $event, true)"
+                           (blur)="commitDescuentoDirecto(linea, $event, false)">
+                    <span>€</span>
+                </div>
                 }
                 @else if (linea.descuentoDirectoMicros !== null) {
-                <span>
-                    {{
-                        (linea.descuentoDirectoMicros / 1_000_000)
-                            | currency:'EUR':'symbol':'1.2-2'
-                    }}
-                </span>
+                <div class="sale__editable-cell">
+                    <button class="sale__editable-value"
+                            type="button"
+                            [disabled]="!canModifyAmounts()"
+                            matTooltip="Modificar descuento directo"
+                            (click)="editDescuentoDirecto(linea)">
+                        {{
+                            (linea.descuentoDirectoMicros / 1_000_000)
+                                | currency:'EUR':'symbol':'1.2-2'
+                        }}
+                    </button>
+
+                    @if (canModifyAmounts()) {
+                    <button class="sale__inline-action"
+                            type="button"
+                            matTooltip="Quitar descuento directo"
+                            aria-label="Quitar descuento directo"
+                            (click)="clearDescuentoDirecto(linea, $event)">
+                        <mat-icon>close</mat-icon>
+                    </button>
+                    }
+                </div>
                 }
                 @else if (isEditing(linea.idTemporal, 'descuento-porcentaje')) {
                 <div class="sale__inline-editor">
@@ -187,12 +237,24 @@
                 </div>
                 }
                 @else {
-                <button class="sale__editable-value"
-                        type="button"
-                        matTooltip="Modificar descuento"
-                        (click)="editDescuentoPorcentaje(linea)">
-                    {{ linea.descuentoBps / 100 }} %
-                </button>
+                <div class="sale__editable-cell">
+                    <button class="sale__editable-value"
+                            type="button"
+                            matTooltip="Modificar descuento porcentual"
+                            (click)="editDescuentoPorcentaje(linea)">
+                        {{ linea.descuentoBps / 100 }} %
+                    </button>
+
+                    @if (canModifyAmounts()) {
+                    <button class="sale__inline-action"
+                            type="button"
+                            matTooltip="Introducir descuento en euros"
+                            aria-label="Introducir descuento en euros"
+                            (click)="editDescuentoDirecto(linea)">
+                        <mat-icon>euro</mat-icon>
+                    </button>
+                    }
+                </div>
                 }
             </div>
 
