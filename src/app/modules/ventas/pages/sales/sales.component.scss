@@ -1,10 +1,12 @@
 :host {
     display: block;
-    min-height: 100vh;
+    height: 100vh;
+    overflow-x: hidden;
 }
 
 .sales {
-    min-height: calc(100vh - 56px);
+    height: calc(100vh - 56px);
+    min-height: 0;
     background-color: var(--color-white);
 
     .sales__state {

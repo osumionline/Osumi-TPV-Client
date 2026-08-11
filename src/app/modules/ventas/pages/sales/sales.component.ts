@@ -52,7 +52,7 @@ export default class SalesComponent implements OnInit {
   readonly appName: Signal<string> = computed((): string => {
     const appData = this.ventasContextService.appData();
 
-    return appData?.nombreComercial || appData?.nombre || 'Osumi TPV';
+    return appData?.nombre || appData?.nombreComercial || 'Osumi TPV';
   });
 
   /**
