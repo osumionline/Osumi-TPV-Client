@@ -4,7 +4,8 @@
 
 .sale {
     position: relative;
-    min-height: calc(100vh - 104px);
+    height: calc(100vh - 104px);
+    min-height: 0;
     background-color: var(--color-white);
 
     .sale__header,
