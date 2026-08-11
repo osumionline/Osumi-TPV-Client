@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 
-import { app, BrowserWindow, protocol } from 'electron';
+import { app, BrowserWindow, Menu, protocol } from 'electron';
 
 import { join } from 'node:path';
 
@@ -114,16 +114,11 @@ async function createWindow(): Promise<void> {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
-
     minWidth: 1024,
     minHeight: 700,
-
     show: false,
-    autoHideMenuBar: true,
-
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
-
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -155,6 +150,8 @@ app.enableSandbox();
 app
   .whenReady()
   .then(async (): Promise<void> => {
+    Menu.setApplicationMenu(null);
+
     const applicationVersion: string = app.getVersion();
 
     /*
