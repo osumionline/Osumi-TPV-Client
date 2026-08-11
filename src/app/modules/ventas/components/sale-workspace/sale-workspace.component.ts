@@ -18,6 +18,7 @@ import {
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
+import permissionIds from '@desktop-contracts/permissions/permission-ids.constants';
 import type AccesoDirectoVenta from '@model/ventas/acceso-directo-venta.model';
 import type ArticuloVenta from '@model/ventas/articulo-venta.model';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
@@ -27,6 +28,7 @@ import type {
   VentaFocusTarget,
   VentaWorkspaceState,
 } from '@model/ventas/venta-workspace.interface';
+import { MICROS_PER_CENT } from '@model/ventas/ventas-money.constants';
 import ArticleSearchComponent from '@modules/ventas/components/article-search/article-search.component';
 import DirectAccessSelectorComponent from '@modules/ventas/components/direct-access-selector/direct-access-selector.component';
 import { DialogService } from '@osumi/angular-tools';
@@ -152,6 +154,201 @@ export default class SaleWorkspaceComponent {
       lineaIdTemporal,
       field,
     });
+  }
+
+  /**
+   * Indica si el empleado actual puede modificar importes económicos directos.
+   */
+  canModifyAmounts(): boolean {
+    const empleado = this.venta().empleado;
+
+    if (empleado === null) {
+      return false;
+    }
+
+    return empleado.admin || empleado.hasPerm(permissionIds.ventas.modificarImportes);
+  }
+
+  /**
+   * Inicia la edición manual del importe de una línea.
+   */
+  editImporte(linea: VentaLineaEnCurso): void {
+    if (!this.canModifyAmounts()) {
+      return;
+    }
+
+    if (linea.regalo) {
+      this.showLineEditBlocked(
+        'La línea está marcada como regalo y no se puede modificar su importe.',
+      );
+
+      return;
+    }
+
+    if (linea.tieneDescuentoPromocional) {
+      this.showLineEditBlocked(
+        'La línea tiene un precio promocional. Debes retirar primero ese descuento para modificar su importe.',
+      );
+
+      return;
+    }
+
+    if (linea.descuentoDirectoMicros !== null) {
+      this.showLineEditBlocked(
+        'La línea tiene un descuento directo. Debes retirarlo antes de modificar su importe.',
+      );
+
+      return;
+    }
+
+    this.editLinea(linea.idTemporal, 'importe');
+  }
+
+  /**
+   * Confirma el importe manual introducido para una línea.
+   */
+  commitImporte(linea: VentaLineaEnCurso, event: Event, returnToLocalizador: boolean): void {
+    if (!this.isEditing(linea.idTemporal, 'importe')) {
+      return;
+    }
+
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+    const inputValue: number = inputElement.valueAsNumber;
+
+    if (Number.isNaN(inputValue) || inputValue < 0) {
+      inputElement.value = String(linea.importeFinalMicros / (100 * MICROS_PER_CENT));
+
+      this.showLineOperationError(
+        new RangeError('El importe debe ser mayor o igual que cero.'),
+        linea.idTemporal,
+        'importe',
+      );
+
+      return;
+    }
+
+    const importeManualMicros: number = Math.round(inputValue * 100) * MICROS_PER_CENT;
+
+    try {
+      this.ventasService.establecerImporteManual(
+        this.venta().idTemporal,
+        linea.idTemporal,
+        importeManualMicros,
+      );
+    } catch (error: unknown) {
+      inputElement.value = String(linea.importeFinalMicros / (100 * MICROS_PER_CENT));
+
+      this.showLineOperationError(error, linea.idTemporal, 'importe');
+
+      return;
+    }
+
+    if (returnToLocalizador) {
+      this.focusLocalizador();
+    }
+  }
+
+  /**
+   * Retira el importe manual y recupera el cálculo normal de la línea.
+   */
+  clearImporteManual(linea: VentaLineaEnCurso, event: MouseEvent): void {
+    event.stopPropagation();
+
+    if (!this.canModifyAmounts()) {
+      return;
+    }
+
+    this.ventasService.quitarImporteManual(this.venta().idTemporal, linea.idTemporal);
+
+    this.focusLocalizador();
+  }
+
+  /**
+   * Inicia la edición del descuento porcentual de una línea.
+   */
+  editDescuentoPorcentaje(linea: VentaLineaEnCurso): void {
+    if (linea.regalo) {
+      this.showLineEditBlocked(
+        'La línea está marcada como regalo y no se puede modificar su descuento.',
+      );
+
+      return;
+    }
+
+    if (linea.importeManualMicros !== null) {
+      this.showLineEditBlocked(
+        'La línea tiene un importe manual. Debes retirarlo antes de modificar su descuento.',
+      );
+
+      return;
+    }
+
+    if (linea.tieneDescuentoPromocional) {
+      this.showLineEditBlocked(
+        'La línea tiene un precio promocional. Debes retirarlo antes de aplicar un descuento porcentual.',
+      );
+
+      return;
+    }
+
+    if (linea.descuentoDirectoMicros !== null) {
+      this.showLineEditBlocked(
+        'La línea tiene un descuento directo. Debes retirarlo antes de aplicar un descuento porcentual.',
+      );
+
+      return;
+    }
+
+    this.editLinea(linea.idTemporal, 'descuento-porcentaje');
+  }
+
+  /**
+   * Confirma el descuento porcentual introducido para una línea.
+   */
+  commitDescuentoPorcentaje(
+    linea: VentaLineaEnCurso,
+    event: Event,
+    returnToLocalizador: boolean,
+  ): void {
+    if (!this.isEditing(linea.idTemporal, 'descuento-porcentaje')) {
+      return;
+    }
+
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+    const inputValue: number = inputElement.valueAsNumber;
+    const porcentaje: number = Number.isNaN(inputValue) ? 0 : inputValue;
+
+    if (porcentaje < 0 || porcentaje > 100) {
+      inputElement.value = String(linea.descuentoBps / 100);
+
+      this.showLineOperationError(
+        new RangeError('El descuento debe estar comprendido entre 0 y 100 %.'),
+        linea.idTemporal,
+        'descuento-porcentaje',
+      );
+
+      return;
+    }
+
+    const descuentoBps: number = Math.round(porcentaje * 100);
+
+    try {
+      this.ventasService.establecerDescuentoPorcentaje(
+        this.venta().idTemporal,
+        linea.idTemporal,
+        descuentoBps,
+      );
+    } catch (error: unknown) {
+      inputElement.value = String(linea.descuentoBps / 100);
+
+      this.showLineOperationError(error, linea.idTemporal, 'descuento-porcentaje');
+
+      return;
+    }
+
+    if (returnToLocalizador) {
+      this.focusLocalizador();
+    }
   }
 
   /**
@@ -407,6 +604,20 @@ export default class SaleWorkspaceComponent {
           lineaIdTemporal,
           field,
         });
+      });
+  }
+
+  /**
+   * Informa de que una modificación no está disponible para el estado actual de la línea.
+   */
+  private showLineEditBlocked(message: string): void {
+    this.dialog
+      .alert({
+        title: 'Atención',
+        content: message,
+      })
+      .subscribe((): void => {
+        this.focusLocalizador();
       });
   }
 }

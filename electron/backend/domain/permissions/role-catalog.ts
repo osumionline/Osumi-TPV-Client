@@ -1,11 +1,12 @@
 import RoleGroup from '@backend/domain/permissions/role-group.interface';
+import permissionIds from '@desktop-contracts/permissions/permission-ids.constants';
 
 const roleCatalog: Readonly<Record<string, RoleGroup>> = {
   ventas: {
     name: 'Ventas',
     roles: {
       modificarImportes: {
-        id: 1,
+        id: permissionIds.ventas.modificarImportes,
         name: 'Modificar importes, descuentos o descuentos directos.',
         description:
           'Indica si un empleado puede modificar el importe directo de un artículo en una venta o si puede aplicar descuentos directos.',

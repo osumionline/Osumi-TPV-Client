@@ -63,6 +63,7 @@
 
         &:hover {
             background-color: var(--color-very-light-grey);
+            cursor: pointer;
         }
     }
 
@@ -74,6 +75,47 @@
         box-sizing: border-box;
         font: inherit;
         text-align: center;
+    }
+
+    .sale__editable-cell {
+        display: flex;
+        width: 100%;
+        align-items: center;
+
+        .sale__editable-value {
+            width: auto;
+            flex: 1;
+        }
+    }
+
+    .sale__inline-editor {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        gap: 4px;
+
+        .sale__inline-input {
+            flex: 1;
+            min-width: 0;
+        }
+    }
+
+    .sale__inline-action {
+        display: inline-flex;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        border: 0;
+        align-items: center;
+        justify-content: center;
+        background-color: transparent;
+        cursor: pointer;
+
+        mat-icon {
+            width: 18px;
+            height: 18px;
+            font-size: 18px;
+        }
     }
 
     .sale__delete,

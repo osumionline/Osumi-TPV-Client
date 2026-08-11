@@ -13,7 +13,7 @@
         </div>
 
         <div class="col-cantidad">
-            Cantidad
+            Cant.
         </div>
 
         <div class="col-pvp">
@@ -101,14 +101,88 @@
             </div>
 
             <div class="col-importe">
-                {{
-            (linea.importeFinalMicros / 1_000_000)
-              | currency:'EUR':'symbol':'1.2-2'
-          }}
+                @if (isEditing(linea.idTemporal, 'importe')) {
+                <input #editableInput
+                       class="sale__inline-input"
+                       type="number"
+                       inputmode="decimal"
+                       min="0"
+                       step="0.01"
+                       aria-label="Importe"
+                       [attr.data-linea-id-temporal]="linea.idTemporal"
+                       data-field="importe"
+                       [value]="linea.importeFinalMicros / 1_000_000"
+                       (keydown.enter)="commitImporte(linea, $event, true)"
+                       (blur)="commitImporte(linea, $event, false)">
+                }
+                @else {
+                <div class="sale__editable-cell">
+                    <button class="sale__editable-value"
+                            type="button"
+                            [disabled]="!canModifyAmounts()"
+                            (click)="editImporte(linea)">
+                        {{
+                            (linea.importeFinalMicros / 1_000_000)
+                                | currency:'EUR':'symbol':'1.2-2'
+                        }}
+                    </button>
+
+                    @if (linea.importeManualMicros !== null && canModifyAmounts()) {
+                    <button class="sale__inline-action"
+                            type="button"
+                            matTooltip="Quitar importe manual"
+                            aria-label="Quitar importe manual"
+                            (click)="clearImporteManual(linea, $event)">
+                        <mat-icon>close</mat-icon>
+                    </button>
+                    }
+                </div>
+                }
             </div>
 
             <div class="col-descuentos">
-                {{ linea.descuentoBps / 100 }} %
+                @if (linea.tieneDescuentoPromocional) {
+                <span>
+                    {{
+                        (linea.importeDescuentoPromocionalMicros / 1_000_000)
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
+                </span>
+                }
+                @else if (linea.descuentoDirectoMicros !== null) {
+                <span>
+                    {{
+                        (linea.descuentoDirectoMicros / 1_000_000)
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
+                </span>
+                }
+                @else if (isEditing(linea.idTemporal, 'descuento-porcentaje')) {
+                <div class="sale__inline-editor">
+                    <input #editableInput
+                           class="sale__inline-input"
+                           type="number"
+                           inputmode="decimal"
+                           min="0"
+                           max="100"
+                           step="0.01"
+                           aria-label="Descuento porcentual"
+                           [attr.data-linea-id-temporal]="linea.idTemporal"
+                           data-field="descuento-porcentaje"
+                           [value]="linea.descuentoBps / 100"
+                           (keydown.enter)="commitDescuentoPorcentaje(linea, $event, true)"
+                           (blur)="commitDescuentoPorcentaje(linea, $event, false)">
+                    <span>%</span>
+                </div>
+                }
+                @else {
+                <button class="sale__editable-value"
+                        type="button"
+                        matTooltip="Modificar descuento"
+                        (click)="editDescuentoPorcentaje(linea)">
+                    {{ linea.descuentoBps / 100 }} %
+                </button>
+                }
             </div>
 
             <div class="col-stock">
