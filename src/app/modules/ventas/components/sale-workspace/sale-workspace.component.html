@@ -94,10 +94,21 @@
             </div>
 
             <div class="col-pvp">
-                {{
-            (linea.pvpMicros / 1_000_000)
-              | currency:'EUR':'symbol':'1.2-2'
-          }}
+                <span>
+                    {{
+                        (linea.pvpMicros / 1_000_000)
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
+                </span>
+
+                <button class="sale__gift"
+                        type="button"
+                        [class.sale__gift--active]="linea.regalo"
+                        [attr.aria-pressed]="linea.regalo"
+                        [matTooltip]="linea.regalo ? 'Quitar regalo' : 'Marcar como regalo'"
+                        (click)="alternarRegalo(linea)">
+                    <mat-icon>loyalty</mat-icon>
+                </button>
             </div>
 
             <div class="col-importe">

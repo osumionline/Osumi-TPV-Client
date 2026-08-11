@@ -119,6 +119,32 @@
         }
     }
 
+    .sale__gift {
+        display: inline-flex;
+        width: 28px;
+        height: 28px;
+        margin-left: 4px;
+        padding: 0;
+        border: 0;
+        align-items: center;
+        justify-content: center;
+        background-color: transparent;
+        cursor: pointer;
+
+        mat-icon {
+            width: 20px;
+            height: 20px;
+            color: var(--disabled-color);
+            font-size: 20px;
+        }
+
+        &.sale__gift--active {
+            mat-icon {
+                color: var(--main-color);
+            }
+        }
+    }
+
     .sale__delete,
     .sale__direct-access {
         position: absolute;

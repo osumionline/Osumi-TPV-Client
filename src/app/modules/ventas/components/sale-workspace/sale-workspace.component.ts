@@ -379,6 +379,15 @@ export default class SaleWorkspaceComponent {
   }
 
   /**
+   * Activa o desactiva el estado de regalo de una línea.
+   */
+  alternarRegalo(linea: VentaLineaEnCurso): void {
+    this.ventasService.alternarRegalo(this.venta().idTemporal, linea.idTemporal);
+
+    this.focusLocalizador();
+  }
+
+  /**
    * Actualiza el valor que se está introduciendo en el localizador.
    */
   onLocalizadorInput(event: Event): void {
