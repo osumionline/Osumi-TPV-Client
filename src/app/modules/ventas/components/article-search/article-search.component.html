@@ -15,13 +15,12 @@
             </button>
         </header>
 
-        <input class="search__input"
+        <input #searchInput class="search__input"
                type="search"
                autocomplete="off"
                placeholder="Buscar por nombre"
                [value]="query()"
-               (input)="updateQuery($event)"
-               autofocus>
+               (input)="updateQuery($event)">
 
         @if (error() !== null) {
         <div class="search__error">

@@ -1,12 +1,16 @@
 import { CurrencyPipe } from '@angular/common';
 import {
+  afterNextRender,
   Component,
+  ElementRef,
   inject,
   input,
   OnDestroy,
   OnInit,
   output,
+  Signal,
   signal,
+  viewChild,
   type InputSignal,
   type OutputEmitterRef,
   type WritableSignal,
@@ -31,6 +35,9 @@ export default class ArticleSearchComponent implements OnInit, OnDestroy {
   private searchTimeoutId: number | null = null;
   private searchVersion: number = 0;
 
+  private readonly searchInput: Signal<ElementRef<HTMLInputElement>> =
+    viewChild.required<ElementRef<HTMLInputElement>>('searchInput');
+
   readonly initialQuery: InputSignal<string> = input<string>('');
 
   readonly selectEvent: OutputEmitterRef<readonly ArticuloVenta[]> =
@@ -49,6 +56,12 @@ export default class ArticleSearchComponent implements OnInit, OnDestroy {
   readonly loading: WritableSignal<boolean> = signal<boolean>(false);
 
   readonly error: WritableSignal<string | null> = signal<string | null>(null);
+
+  constructor() {
+    afterNextRender((): void => {
+      this.searchInput().nativeElement.focus();
+    });
+  }
 
   /**
    * Ejecuta la primera búsqueda utilizando el texto recibido.

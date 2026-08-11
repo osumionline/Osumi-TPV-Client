@@ -48,6 +48,166 @@ export default class VentaLineaEnCurso {
   }
 
   /**
+   * Indica si la línea conserva el precio promocional del artículo.
+   */
+  get tieneDescuentoPromocional(): boolean {
+    return this.pvpDescuentoMicros !== null;
+  }
+
+  /**
+   * Obtiene el descuento derivado del precio promocional para todas las unidades de la línea.
+   */
+  get importeDescuentoPromocionalMicros(): number {
+    if (this.pvpDescuentoMicros === null) {
+      return 0;
+    }
+
+    const descuentoUnitarioMicros: number = this.pvpMicros - this.pvpDescuentoMicros;
+
+    return this.cantidad * descuentoUnitarioMicros;
+  }
+
+  /**
+   * Establece la cantidad de unidades de la línea.
+   */
+  setCantidad(cantidad: number): void {
+    if (!Number.isSafeInteger(cantidad) || cantidad <= 0) {
+      throw new RangeError('La cantidad de una línea de venta debe ser un entero mayor que cero.');
+    }
+
+    const importeBaseMicros: number = cantidad * this.pvpMicros;
+    if (this.descuentoDirectoMicros !== null && this.descuentoDirectoMicros > importeBaseMicros) {
+      throw new RangeError(
+        'La cantidad indicada dejaría el descuento directo por encima del importe de la línea.',
+      );
+    }
+
+    this.cantidad = cantidad;
+  }
+
+  /**
+   * Incrementa la cantidad de unidades de la línea.
+   */
+  incrementCantidad(): void {
+    this.setCantidad(this.cantidad + 1);
+  }
+
+  /**
+   * Activa o desactiva el estado de regalo.
+   *
+   * El resto de modificaciones económicas se conservan para poder
+   * recuperarlas si posteriormente se desmarca el regalo.
+   */
+  setRegalo(regalo: boolean): void {
+    this.regalo = regalo;
+  }
+
+  /**
+   * Sustituye el importe calculado de la línea por un importe manual.
+   */
+  setImporteManualMicros(importeManualMicros: number): void {
+    this.requireNonNegativeMicros(importeManualMicros, 'importe manual');
+
+    if (this.regalo) {
+      throw new Error('No se puede modificar el importe de una línea marcada como regalo.');
+    }
+    if (this.tieneDescuentoPromocional) {
+      throw new Error(
+        'No se puede establecer un importe manual mientras exista un descuento promocional.',
+      );
+    }
+    if (this.descuentoDirectoMicros !== null) {
+      throw new Error(
+        'No se puede establecer un importe manual mientras exista un descuento directo.',
+      );
+    }
+
+    this.importeManualMicros = importeManualMicros;
+  }
+
+  /**
+   * Elimina el importe manual y recupera el cálculo normal de la línea.
+   */
+  clearImporteManual(): void {
+    this.importeManualMicros = null;
+  }
+
+  /**
+   * Establece el descuento porcentual de la línea en puntos básicos.
+   */
+  setDescuentoBps(descuentoBps: number): void {
+    if (
+      !Number.isSafeInteger(descuentoBps) ||
+      descuentoBps < 0 ||
+      descuentoBps > BASIS_POINTS_TOTAL
+    ) {
+      throw new RangeError('El descuento porcentual debe estar comprendido entre 0 y 100 %.');
+    }
+    if (this.regalo) {
+      throw new Error('No se puede modificar el descuento de una línea marcada como regalo.');
+    }
+    if (this.tieneDescuentoPromocional) {
+      throw new Error(
+        'No se puede establecer un descuento porcentual mientras exista un descuento promocional.',
+      );
+    }
+    if (this.importeManualMicros !== null) {
+      throw new Error('No se puede modificar el descuento mientras exista un importe manual.');
+    }
+    if (this.descuentoDirectoMicros !== null) {
+      throw new Error(
+        'No se puede modificar el descuento porcentual mientras exista un descuento directo.',
+      );
+    }
+
+    this.descuentoBps = descuentoBps;
+  }
+
+  /**
+   * Establece un importe fijo de descuento sobre la línea.
+   */
+  setDescuentoDirectoMicros(descuentoDirectoMicros: number): void {
+    this.requireNonNegativeMicros(descuentoDirectoMicros, 'descuento directo');
+
+    if (descuentoDirectoMicros === 0) {
+      throw new RangeError('El descuento directo debe ser mayor que cero.');
+    }
+    if (descuentoDirectoMicros > this.importeBaseMicros) {
+      throw new RangeError('El descuento directo no puede superar el importe base de la línea.');
+    }
+    if (this.regalo) {
+      throw new Error('No se puede modificar el descuento de una línea marcada como regalo.');
+    }
+    if (this.tieneDescuentoPromocional) {
+      throw new Error(
+        'No se puede establecer un descuento directo mientras exista un descuento promocional.',
+      );
+    }
+    if (this.importeManualMicros !== null) {
+      throw new Error(
+        'No se puede establecer un descuento directo mientras exista un importe manual.',
+      );
+    }
+
+    this.descuentoBps = 0;
+    this.descuentoDirectoMicros = descuentoDirectoMicros;
+  }
+
+  /**
+   * Elimina el descuento directo aplicado a la línea.
+   */
+  clearDescuentoDirecto(): void {
+    this.descuentoDirectoMicros = null;
+  }
+
+  /**
+   * Elimina el precio promocional con el que el artículo entró en la venta.
+   */
+  clearDescuentoPromocional(): void {
+    this.pvpDescuentoMicros = null;
+  }
+
+  /**
    * Obtiene el importe de la línea antes de aplicar descuentos o modificaciones manuales.
    */
   get importeBaseMicros(): number {
@@ -60,6 +220,10 @@ export default class VentaLineaEnCurso {
   get importeDescuentoMicros(): number {
     if (this.regalo || this.importeManualMicros !== null) {
       return 0;
+    }
+
+    if (this.tieneDescuentoPromocional) {
+      return this.importeDescuentoPromocionalMicros;
     }
 
     if (this.descuentoDirectoMicros !== null) {
@@ -84,6 +248,17 @@ export default class VentaLineaEnCurso {
     }
 
     return this.importeBaseMicros - this.importeDescuentoMicros;
+  }
+
+  /**
+   * Comprueba que un importe expresado en microeuros sea válido.
+   */
+  private requireNonNegativeMicros(value: number, field: string): void {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new RangeError(
+        `El ${field} debe ser un número entero de microeuros mayor o igual a cero.`,
+      );
+    }
   }
 
   /**

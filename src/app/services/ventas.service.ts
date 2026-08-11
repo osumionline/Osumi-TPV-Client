@@ -173,7 +173,7 @@ export default class VentasService {
       );
 
       if (lineaExistente !== undefined) {
-        lineaExistente.cantidad++;
+        lineaExistente.incrementCantidad();
         continue;
       }
 
@@ -185,6 +185,98 @@ export default class VentasService {
     this.setFocusTarget(ventaIdTemporal, {
       type: 'localizador',
     });
+  }
+
+  /**
+   * Cambia la cantidad de unidades de una línea.
+   */
+  cambiarCantidad(ventaIdTemporal: string, lineaIdTemporal: string, cantidad: number): void {
+    const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
+
+    linea.setCantidad(cantidad);
+    this.notifyVentasChanged();
+  }
+
+  /**
+   * Activa o desactiva el estado de regalo de una línea.
+   */
+  alternarRegalo(ventaIdTemporal: string, lineaIdTemporal: string): void {
+    const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
+
+    linea.setRegalo(!linea.regalo);
+    this.notifyVentasChanged();
+  }
+
+  /**
+   * Sustituye el importe calculado de una línea por un importe manual.
+   */
+  establecerImporteManual(
+    ventaIdTemporal: string,
+    lineaIdTemporal: string,
+    importeManualMicros: number,
+  ): void {
+    const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
+
+    linea.setImporteManualMicros(importeManualMicros);
+    this.notifyVentasChanged();
+  }
+
+  /**
+   * Elimina el importe manual de una línea.
+   */
+  quitarImporteManual(ventaIdTemporal: string, lineaIdTemporal: string): void {
+    const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
+
+    linea.clearImporteManual();
+    this.notifyVentasChanged();
+  }
+
+  /**
+   * Elimina el descuento promocional con el que un artículo entró en la venta.
+   */
+  quitarDescuentoPromocional(ventaIdTemporal: string, lineaIdTemporal: string): void {
+    const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
+
+    linea.clearDescuentoPromocional();
+    this.notifyVentasChanged();
+  }
+
+  /**
+   * Establece el descuento porcentual de una línea en puntos básicos.
+   */
+  establecerDescuentoPorcentaje(
+    ventaIdTemporal: string,
+    lineaIdTemporal: string,
+    descuentoBps: number,
+  ): void {
+    const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
+
+    linea.setDescuentoBps(descuentoBps);
+    this.notifyVentasChanged();
+  }
+
+  /**
+   * Establece un importe fijo de descuento sobre una línea.
+   */
+  establecerDescuentoDirecto(
+    ventaIdTemporal: string,
+    lineaIdTemporal: string,
+    descuentoDirectoMicros: number,
+  ): void {
+    const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
+
+    linea.setDescuentoDirectoMicros(descuentoDirectoMicros);
+    this.notifyVentasChanged();
+  }
+
+  /**
+   * Elimina el descuento directo de una línea.
+   */
+  quitarDescuentoDirecto(ventaIdTemporal: string, lineaIdTemporal: string): void {
+    const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
+
+    linea.clearDescuentoDirecto();
+    this.notifyVentasChanged();
   }
 
   /**
@@ -297,6 +389,22 @@ export default class VentasService {
     }
 
     return venta;
+  }
+
+  /**
+   * Obtiene una línea perteneciente a una venta abierta o detiene la operación si no existe.
+   */
+  private requireLinea(ventaIdTemporal: string, lineaIdTemporal: string): VentaLineaEnCurso {
+    const venta: VentaEnCurso = this.requireVenta(ventaIdTemporal);
+    const linea: VentaLineaEnCurso | undefined = venta.lineas.find(
+      (item: VentaLineaEnCurso): boolean => item.idTemporal === lineaIdTemporal,
+    );
+
+    if (linea === undefined) {
+      throw new Error('La línea indicada no pertenece a la venta.');
+    }
+
+    return linea;
   }
 
   /**
