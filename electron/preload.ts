@@ -3,6 +3,7 @@ import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.in
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
 import type CategoriaInterface from '@desktop-contracts/categorias/categoria.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
+import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type { InstallationResult } from '@desktop-contracts/configuration/installation-result.interface';
 import OsumiDesktopApi from '@desktop-contracts/desktop-api';
@@ -118,6 +119,9 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
   clientes: Object.freeze({
     getAll: (): Promise<readonly ClienteInterface[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.clientesGetAll) as Promise<readonly ClienteInterface[]>,
+
+    create: (command: CrearClienteCommand): Promise<ClienteInterface> =>
+      ipcRenderer.invoke(IPC_CHANNELS.clientesCreate, command) as Promise<ClienteInterface>,
   }),
 
   caja: Object.freeze({

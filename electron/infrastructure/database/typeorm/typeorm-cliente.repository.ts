@@ -1,51 +1,32 @@
 import type ClienteRepository from '@backend/contracts/clientes/cliente.repository.interface';
+import type CrearClienteRecordCommand from '@backend/contracts/clientes/crear-cliente-record-command.interface';
 import type ClienteRecord from '@backend/domain/clientes/cliente-record.interface';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
+import { randomUUID } from 'node:crypto';
 import type { DataSource } from 'typeorm';
 
 interface ClienteDatabaseRow {
   readonly id: number;
-
   readonly public_id: string;
-
   readonly nombre_apellidos: string;
-
   readonly dni_cif: string | null;
-
   readonly telefono: string | null;
-
   readonly email: string | null;
-
   readonly direccion: string | null;
-
   readonly codigo_postal: string | null;
-
   readonly poblacion: string | null;
-
   readonly id_provincia: number | null;
-
   readonly datos_facturacion_iguales: number;
-
   readonly fact_nombre_apellidos: string | null;
-
   readonly fact_dni_cif: string | null;
-
   readonly fact_telefono: string | null;
-
   readonly fact_email: string | null;
-
   readonly fact_direccion: string | null;
-
   readonly fact_codigo_postal: string | null;
-
   readonly fact_poblacion: string | null;
-
   readonly fact_id_provincia: number | null;
-
   readonly observaciones: string | null;
-
   readonly descuento_bps: number;
-
   readonly ultima_venta: string | null;
 }
 
@@ -125,5 +106,136 @@ export default class TypeOrmClienteRepository implements ClienteRepository {
       descuentoBps: row.descuento_bps,
       ultimaVenta: row.ultima_venta,
     }));
+  }
+
+  /**
+   * Comprueba si existe un cliente activo con el DNI/CIF indicado.
+   */
+  async existsActiveByDniCif(dniCif: string): Promise<boolean> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const rows: readonly { readonly total: number }[] = (await dataSource.query(
+      `
+        SELECT
+          COUNT(*) AS total
+        FROM cliente
+        WHERE
+          dni_cif = ? COLLATE NOCASE
+          AND deleted_at IS NULL
+      `,
+      [dniCif],
+    )) as readonly { readonly total: number }[];
+
+    return (rows[0]?.total ?? 0) > 0;
+  }
+
+  /**
+   * Persiste un nuevo cliente.
+   */
+  async create(command: CrearClienteRecordCommand): Promise<ClienteRecord> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const publicId: string = randomUUID();
+    const timestamp: string = new Date().toISOString();
+
+    await dataSource.query(
+      `
+      INSERT INTO cliente (
+        public_id,
+        nombre_apellidos,
+        dni_cif,
+        telefono,
+        email,
+        direccion,
+        codigo_postal,
+        poblacion,
+        id_provincia,
+        datos_facturacion_iguales,
+        fact_nombre_apellidos,
+        fact_dni_cif,
+        fact_telefono,
+        fact_email,
+        fact_direccion,
+        fact_codigo_postal,
+        fact_poblacion,
+        fact_id_provincia,
+        observaciones,
+        descuento_bps,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?
+      )
+    `,
+      [
+        publicId,
+        command.nombreApellidos,
+        command.dniCif,
+        command.telefono,
+        command.email,
+        command.direccion,
+        command.codigoPostal,
+        command.poblacion,
+        command.provincia,
+        command.factIgual ? 1 : 0,
+        command.factNombreApellidos,
+        command.factDniCif,
+        command.factTelefono,
+        command.factEmail,
+        command.factDireccion,
+        command.factCodigoPostal,
+        command.factPoblacion,
+        command.factProvincia,
+        command.observaciones,
+        command.descuentoBps,
+        timestamp,
+        timestamp,
+      ],
+    );
+
+    const rows: readonly { readonly id: number }[] = (await dataSource.query(
+      `
+        SELECT
+          id
+        FROM cliente
+        WHERE public_id = ?
+        LIMIT 1
+      `,
+      [publicId],
+    )) as readonly { readonly id: number }[];
+
+    const id: number | undefined = rows[0]?.id;
+
+    if (id === undefined || !Number.isSafeInteger(id) || id <= 0) {
+      throw new Error('No se ha podido obtener el identificador del cliente creado.');
+    }
+
+    return {
+      id,
+      publicId,
+      nombreApellidos: command.nombreApellidos,
+      dniCif: command.dniCif,
+      telefono: command.telefono,
+      email: command.email,
+      direccion: command.direccion,
+      codigoPostal: command.codigoPostal,
+      poblacion: command.poblacion,
+      provincia: command.provincia,
+      factIgual: command.factIgual,
+      factNombreApellidos: command.factNombreApellidos,
+      factDniCif: command.factDniCif,
+      factTelefono: command.factTelefono,
+      factEmail: command.factEmail,
+      factDireccion: command.factDireccion,
+      factCodigoPostal: command.factCodigoPostal,
+      factPoblacion: command.factPoblacion,
+      factProvincia: command.factProvincia,
+      observaciones: command.observaciones,
+      descuentoBps: command.descuentoBps,
+      ultimaVenta: null,
+    };
   }
 }
