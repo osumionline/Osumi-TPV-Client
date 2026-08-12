@@ -1,0 +1,325 @@
+<form class="client-form"
+      novalidate
+      (submit)="save($event)">
+    <section class="client-form__section">
+        <h3>Datos del cliente</h3>
+
+        <div class="client-form__row client-form__row--2">
+            <mat-form-field>
+                <mat-label>Nombre y apellidos</mat-label>
+
+                <input #nameInput
+                       matInput
+                       autocomplete="name"
+                       [formField]="clienteForm.nombreApellidos">
+
+                @if (
+                clienteForm.nombreApellidos().touched() &&
+                clienteForm.nombreApellidos().invalid()
+                ) {
+                <mat-error>
+                    {{ clienteForm.nombreApellidos().errors()[0]?.message }}
+                </mat-error>
+                }
+            </mat-form-field>
+
+            <mat-form-field>
+                <mat-label>Email</mat-label>
+
+                <input matInput
+                       type="email"
+                       autocomplete="email"
+                       [formField]="clienteForm.email">
+
+                @if (
+                clienteForm.email().touched() &&
+                clienteForm.email().invalid()
+                ) {
+                <mat-error>
+                    {{ clienteForm.email().errors()[0]?.message }}
+                </mat-error>
+                }
+            </mat-form-field>
+        </div>
+
+        <div class="client-form__row client-form__row--3">
+            <mat-form-field>
+                <mat-label>DNI / CIF</mat-label>
+
+                <input matInput
+                       [formField]="clienteForm.dniCif">
+
+                @if (
+                clienteForm.dniCif().touched() &&
+                clienteForm.dniCif().invalid()
+                ) {
+                <mat-error>
+                    {{ clienteForm.dniCif().errors()[0]?.message }}
+                </mat-error>
+                }
+            </mat-form-field>
+
+            <mat-form-field>
+                <mat-label>Teléfono</mat-label>
+
+                <input matInput
+                       type="tel"
+                       autocomplete="tel"
+                       [formField]="clienteForm.telefono">
+
+                @if (
+                clienteForm.telefono().touched() &&
+                clienteForm.telefono().invalid()
+                ) {
+                <mat-error>
+                    {{ clienteForm.telefono().errors()[0]?.message }}
+                </mat-error>
+                }
+            </mat-form-field>
+
+            <mat-form-field>
+                <mat-label>Descuento</mat-label>
+
+                <input matInput
+                       type="number"
+                       step="0.01"
+                       [formField]="clienteForm.descuento">
+
+                <span matTextSuffix>%</span>
+
+                @if (
+                clienteForm.descuento().touched() &&
+                clienteForm.descuento().invalid()
+                ) {
+                <mat-error>
+                    {{ clienteForm.descuento().errors()[0]?.message }}
+                </mat-error>
+                }
+            </mat-form-field>
+        </div>
+    </section>
+
+    <section class="client-form__section">
+        <h3>Dirección</h3>
+
+        <mat-form-field class="client-form__full">
+            <mat-label>Dirección</mat-label>
+
+            <input matInput
+                   autocomplete="street-address"
+                   [formField]="clienteForm.direccion">
+        </mat-form-field>
+
+        <div class="client-form__row client-form__row--3">
+            <mat-form-field>
+                <mat-label>Código postal</mat-label>
+
+                <input matInput
+                       autocomplete="postal-code"
+                       [formField]="clienteForm.codigoPostal">
+            </mat-form-field>
+
+            <mat-form-field>
+                <mat-label>Población</mat-label>
+
+                <input matInput
+                       [formField]="clienteForm.poblacion">
+            </mat-form-field>
+
+            <mat-form-field>
+                <mat-label>Provincia</mat-label>
+
+                <select matNativeControl
+                        [formField]="clienteForm.provincia">
+                    <option value="">
+                        Sin provincia
+                    </option>
+
+                    @for (
+                    comunidad of provinciasService.provinciasAgrupadas();
+                    track comunidad.name
+                    ) {
+                    <optgroup [label]="comunidad.name">
+                        @for (
+                        provincia of comunidad.provinces;
+                        track provincia.id
+                        ) {
+                        <option [value]="provincia.id">
+                            {{ provincia.name }}
+                        </option>
+                        }
+                    </optgroup>
+                    }
+                </select>
+            </mat-form-field>
+        </div>
+
+        <mat-form-field class="client-form__full">
+            <mat-label>Observaciones</mat-label>
+
+            <textarea matInput
+                      rows="4"
+                      [formField]="clienteForm.observaciones">
+            </textarea>
+        </mat-form-field>
+    </section>
+
+    <section class="client-form__section">
+        <mat-checkbox [formField]="clienteForm.factIgual">
+            Mismos datos para la facturación
+        </mat-checkbox>
+
+        @if (!clienteForm.factIgual().value()) {
+        <div class="client-form__billing">
+            <h3>Datos de facturación</h3>
+
+            <div class="client-form__row client-form__row--2">
+                <mat-form-field>
+                    <mat-label>Nombre y apellidos / Razón social</mat-label>
+
+                    <input matInput
+                           [formField]="clienteForm.factNombreApellidos">
+
+                    @if (
+                    clienteForm.factNombreApellidos().touched() &&
+                    clienteForm.factNombreApellidos().invalid()
+                    ) {
+                    <mat-error>
+                        {{
+                            clienteForm.factNombreApellidos()
+                                .errors()[0]?.message
+                        }}
+                    </mat-error>
+                    }
+                </mat-form-field>
+
+                <mat-form-field>
+                    <mat-label>DNI / CIF</mat-label>
+
+                    <input matInput
+                           [formField]="clienteForm.factDniCif">
+
+                    @if (
+                    clienteForm.factDniCif().touched() &&
+                    clienteForm.factDniCif().invalid()
+                    ) {
+                    <mat-error>
+                        {{
+                            clienteForm.factDniCif()
+                                .errors()[0]?.message
+                        }}
+                    </mat-error>
+                    }
+                </mat-form-field>
+            </div>
+
+            <div class="client-form__row client-form__row--2">
+                <mat-form-field>
+                    <mat-label>Teléfono</mat-label>
+
+                    <input matInput
+                           type="tel"
+                           [formField]="clienteForm.factTelefono">
+
+                    @if (
+                    clienteForm.factTelefono().touched() &&
+                    clienteForm.factTelefono().invalid()
+                    ) {
+                    <mat-error>
+                        {{
+                            clienteForm.factTelefono()
+                                .errors()[0]?.message
+                        }}
+                    </mat-error>
+                    }
+                </mat-form-field>
+
+                <mat-form-field>
+                    <mat-label>Email</mat-label>
+
+                    <input matInput
+                           type="email"
+                           [formField]="clienteForm.factEmail">
+
+                    @if (
+                    clienteForm.factEmail().touched() &&
+                    clienteForm.factEmail().invalid()
+                    ) {
+                    <mat-error>
+                        {{
+                            clienteForm.factEmail()
+                                .errors()[0]?.message
+                        }}
+                    </mat-error>
+                    }
+                </mat-form-field>
+            </div>
+
+            <mat-form-field class="client-form__full">
+                <mat-label>Dirección</mat-label>
+
+                <input matInput
+                       [formField]="clienteForm.factDireccion">
+            </mat-form-field>
+
+            <div class="client-form__row client-form__row--3">
+                <mat-form-field>
+                    <mat-label>Código postal</mat-label>
+
+                    <input matInput
+                           [formField]="clienteForm.factCodigoPostal">
+                </mat-form-field>
+
+                <mat-form-field>
+                    <mat-label>Población</mat-label>
+
+                    <input matInput
+                           [formField]="clienteForm.factPoblacion">
+                </mat-form-field>
+
+                <mat-form-field>
+                    <mat-label>Provincia</mat-label>
+
+                    <select matNativeControl
+                            [formField]="clienteForm.factProvincia">
+                        <option value="">
+                            Sin provincia
+                        </option>
+
+                        @for (
+                        comunidad of provinciasService.provinciasAgrupadas();
+                        track comunidad.name
+                        ) {
+                        <optgroup [label]="comunidad.name">
+                            @for (
+                            provincia of comunidad.provinces;
+                            track provincia.id
+                            ) {
+                            <option [value]="provincia.id">
+                                {{ provincia.name }}
+                            </option>
+                            }
+                        </optgroup>
+                        }
+                    </select>
+                </mat-form-field>
+            </div>
+        </div>
+        }
+    </section>
+
+    <div class="client-form__actions">
+        <button mat-stroked-button
+                type="button"
+                [disabled]="saving()"
+                (click)="cancel()">
+            Cancelar
+        </button>
+
+        <button mat-flat-button
+                type="submit"
+                [disabled]="saving()">
+            {{ saving() ? 'Guardando...' : submitLabel() }}
+        </button>
+    </div>
+</form>

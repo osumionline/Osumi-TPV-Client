@@ -1,0 +1,56 @@
+.client-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+
+    .client-form__section {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+
+        h3 {
+            margin: 0;
+        }
+    }
+
+    .client-form__row {
+        display: grid;
+        gap: 12px;
+    }
+
+    .client-form__row--2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .client-form__row--3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .client-form__full {
+        width: 100%;
+    }
+
+    .client-form__billing {
+        display: flex;
+        margin-top: 8px;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .client-form__actions {
+        display: flex;
+        padding-top: 4px;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+}
+
+@media (max-width: 760px) {
+    .client-form {
+
+        .client-form__row--2,
+        .client-form__row--3 {
+            grid-template-columns: 1fr;
+        }
+    }
+}
