@@ -80,9 +80,9 @@
     .tabs__client {
         display: inline-flex;
         max-width: 240px;
-        height: 48px;
         padding: 0 12px;
         border: 0;
+        align-self: stretch;
         align-items: center;
         gap: 6px;
         background-color: transparent;
