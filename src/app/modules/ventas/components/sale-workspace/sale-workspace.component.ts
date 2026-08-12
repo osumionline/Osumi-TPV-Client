@@ -353,14 +353,10 @@ export default class SaleWorkspaceComponent {
     const descuentoBps: number = Math.round(porcentaje * 100);
 
     try {
-      if (descuentoBps === linea.descuentoClienteBps) {
-        if (linea.tieneDescuentoManual) {
-          this.ventasService.quitarDescuentoPorcentajeManual(
-            this.venta().idTemporal,
-            linea.idTemporal,
-          );
-        }
-      } else {
+      const debeCrearDescuentoManual: boolean =
+        linea.tieneDescuentoManual || descuentoBps !== linea.descuentoClienteBps;
+
+      if (debeCrearDescuentoManual) {
         this.ventasService.establecerDescuentoPorcentaje(
           this.venta().idTemporal,
           linea.idTemporal,
@@ -381,7 +377,8 @@ export default class SaleWorkspaceComponent {
   }
 
   /**
-   * Retira el descuento porcentual manual y recupera la capa del cliente.
+   * Retira el descuento porcentual manual y recupera
+   * automáticamente la capa de descuento del cliente.
    */
   clearDescuentoPorcentajeManual(linea: VentaLineaEnCurso, event: MouseEvent): void {
     event.stopPropagation();
