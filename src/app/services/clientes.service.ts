@@ -1,6 +1,7 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { Service, signal } from '@angular/core';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
+import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import Cliente from '@model/clientes/cliente.model';
 
 @Service()
@@ -27,6 +28,38 @@ export default class ClientesService {
 
   reload(): Promise<void> {
     return this.loadData();
+  }
+
+  /**
+   * Crea un cliente, recarga la colección global y devuelve
+   * la instancia canónica incorporada al servicio.
+   */
+  async create(command: CrearClienteCommand): Promise<Cliente> {
+    const createdCliente: ClienteInterface = await window.osumiDesktop.clientes.create(command);
+
+    /*
+     * Si existiese una lectura anterior todavía en curso, esperamos
+     * a que termine antes de forzar nuestra recarga posterior.
+     *
+     * De esta manera evitamos que reload() reutilice una petición
+     * iniciada antes de crear el cliente y que, por tanto, pudiera
+     * no contener todavía el nuevo registro.
+     */
+    if (this.pendingRequest !== null) {
+      await this.pendingRequest;
+    }
+
+    await this.reload();
+
+    const cliente: Cliente | null = this.findByPublicId(createdCliente.publicId);
+
+    if (cliente === null) {
+      throw new Error(
+        'El cliente se ha creado, pero no se ha podido recuperar después de actualizar la lista.',
+      );
+    }
+
+    return cliente;
   }
 
   clear(): void {
