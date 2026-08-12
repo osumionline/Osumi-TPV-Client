@@ -1,0 +1,87 @@
+<div class="overlay">
+    <button class="overlay__backdrop"
+            type="button"
+            aria-label="Cerrar selector de cliente"
+            (click)="cancel()">
+    </button>
+
+    <section class="selector"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="client-selector-title">
+        <h2 id="client-selector-title">
+            Seleccionar cliente
+        </h2>
+
+        <div class="selector__search">
+            <input #searchInput
+                   type="search"
+                   autocomplete="off"
+                   placeholder="Buscar por nombre, DNI/CIF, teléfono o email"
+                   [value]="query()"
+                   (input)="updateQuery($event)">
+        </div>
+
+        <div class="selector__clients">
+            @for (cliente of filteredClientes(); track cliente.publicId) {
+            <button class="selector__client"
+                    type="button"
+                    [class.selector__client--selected]="
+                        selectedPublicId() === cliente.publicId
+                    "
+                    (click)="select(cliente)">
+                <span class="selector__client-name">
+                    {{ cliente.nombreApellidos }}
+                </span>
+
+                <span class="selector__client-data">
+                    @if (cliente.dniCif !== null) {
+                    <span>
+                        {{ cliente.dniCif }}
+                    </span>
+                    }
+
+                    @if (cliente.telefono !== null) {
+                    <span>
+                        {{ cliente.telefono }}
+                    </span>
+                    }
+
+                    @if (cliente.email !== null) {
+                    <span>
+                        {{ cliente.email }}
+                    </span>
+                    }
+                </span>
+
+                @if (cliente.descuento > 0) {
+                <span class="selector__client-discount">
+                    Descuento: {{ cliente.descuento }} %
+                </span>
+                }
+            </button>
+            }
+            @empty {
+            <div class="selector__empty">
+                No se han encontrado clientes.
+            </div>
+            }
+        </div>
+
+        <div class="selector__actions">
+            @if (selectedPublicId() !== null) {
+            <button mat-stroked-button
+                    type="button"
+                    (click)="clear()">
+                Quitar cliente
+            </button>
+            }
+
+            <button mat-stroked-button
+                    type="button"
+                    (click)="cancel()">
+                Cancelar
+            </button>
+        </div>
+    </section>
+</div>

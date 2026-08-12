@@ -29,10 +29,24 @@
     </div>
 
     <div class="tabs__actions">
-        <button matIconButton
-                disabled
-                matTooltip="Se activará en Ventas 6">
+        <button class="tabs__client"
+                type="button"
+                [disabled]="selectedVenta() === null"
+                [matTooltip]="
+                    selectedVenta()?.cliente === null
+                        ? 'Seleccionar cliente'
+                        : 'Cambiar cliente'
+                "
+                (click)="openClient()">
+            @if (selectedVenta()?.cliente; as cliente) {
+            <mat-icon>person</mat-icon>
+            <span>
+                {{ cliente.nombreApellidos }}
+            </span>
+            }
+            @else {
             <mat-icon>person_add</mat-icon>
+            }
         </button>
 
         <button matIconButton

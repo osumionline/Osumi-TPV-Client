@@ -1,4 +1,12 @@
-import { Component, input, output, type InputSignal, type OutputEmitterRef } from '@angular/core';
+import {
+  Component,
+  computed,
+  input,
+  output,
+  type InputSignal,
+  type OutputEmitterRef,
+  type Signal,
+} from '@angular/core';
 import { MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
@@ -20,11 +28,25 @@ export default class SalesTabsComponent {
 
   readonly canCreate: InputSignal<boolean> = input<boolean>(true);
 
+  readonly selectedVenta: Signal<VentaEnCurso | null> = computed((): VentaEnCurso | null => {
+    const selectedId: string | null = this.selectedId();
+
+    if (selectedId === null) {
+      return null;
+    }
+
+    return (
+      this.ventas().find((venta: VentaEnCurso): boolean => venta.idTemporal === selectedId) ?? null
+    );
+  });
+
   readonly selectTabEvent: OutputEmitterRef<string> = output<string>();
 
   readonly closeTabEvent: OutputEmitterRef<string> = output<string>();
 
   readonly newTabEvent: OutputEmitterRef<void> = output<void>();
+
+  readonly clientEvent: OutputEmitterRef<void> = output<void>();
 
   /**
    * Selecciona la pestaña indicada.
@@ -50,5 +72,16 @@ export default class SalesTabsComponent {
     }
 
     this.newTabEvent.emit();
+  }
+
+  /**
+   * Solicita abrir la selección de cliente de la venta activa.
+   */
+  openClient(): void {
+    if (this.selectedVenta() === null) {
+      return;
+    }
+
+    this.clientEvent.emit();
   }
 }

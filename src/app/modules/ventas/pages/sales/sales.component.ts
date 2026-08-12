@@ -10,12 +10,15 @@ import {
 import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import HeaderComponent from '@app/components/header/header.component';
+import type Cliente from '@model/clientes/cliente.model';
 import type Empleado from '@model/empleados/empleado.model';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
+import ClientSelectorComponent from '@modules/ventas/components/client-selector/client-selector.component';
 import EmployeeSelectorComponent from '@modules/ventas/components/employee-selector/employee-selector.component';
 import SaleWorkspaceComponent from '@modules/ventas/components/sale-workspace/sale-workspace.component';
 import SalesTabsComponent from '@modules/ventas/components/sales-tabs/sales-tabs.component';
 import { DialogService } from '@osumi/angular-tools';
+import ClientesService from '@services/clientes.service';
 import EmpleadosService from '@services/empleados.service';
 import VentasContextService from '@services/ventas-context.service';
 import VentasService from '@services/ventas.service';
@@ -34,20 +37,21 @@ import VentasService from '@services/ventas.service';
     MatProgressSpinner,
     SalesTabsComponent,
     SaleWorkspaceComponent,
+    ClientSelectorComponent,
   ],
 })
 export default class SalesComponent implements OnInit {
   private readonly dialog: DialogService = inject(DialogService);
-
   readonly empleadosService: EmpleadosService = inject(EmpleadosService);
-
   readonly ventasContextService: VentasContextService = inject(VentasContextService);
-
   readonly ventasService: VentasService = inject(VentasService);
+  readonly clientesService: ClientesService = inject(ClientesService);
 
   readonly initializing: WritableSignal<boolean> = signal<boolean>(true);
 
   readonly selectingEmployee: WritableSignal<boolean> = signal<boolean>(false);
+
+  readonly selectingClient: WritableSignal<boolean> = signal<boolean>(false);
 
   readonly appName: Signal<string> = computed((): string => {
     const appData = this.ventasContextService.appData();
@@ -124,6 +128,57 @@ export default class SalesComponent implements OnInit {
    */
   cancelEmployeeSelection(): void {
     this.selectingEmployee.set(false);
+  }
+
+  /**
+   * Abre la selección de cliente para la venta activa.
+   */
+  openClientSelection(): void {
+    if (this.ventasService.ventaActiva() === null) {
+      return;
+    }
+
+    this.selectingClient.set(true);
+  }
+
+  /**
+   * Asigna el cliente seleccionado a la venta activa.
+   */
+  selectCliente(cliente: Cliente): void {
+    const venta: VentaEnCurso | null = this.ventasService.ventaActiva();
+
+    if (venta === null) {
+      this.selectingClient.set(false);
+
+      return;
+    }
+
+    this.ventasService.asignarCliente(venta.idTemporal, cliente);
+
+    this.selectingClient.set(false);
+  }
+
+  /**
+   * Quita el cliente asociado a la venta activa.
+   */
+  clearCliente(): void {
+    const venta: VentaEnCurso | null = this.ventasService.ventaActiva();
+
+    if (venta === null) {
+      this.selectingClient.set(false);
+
+      return;
+    }
+
+    this.ventasService.quitarCliente(venta.idTemporal);
+    this.selectingClient.set(false);
+  }
+
+  /**
+   * Cierra la selección de cliente sin modificar la venta.
+   */
+  cancelClientSelection(): void {
+    this.selectingClient.set(false);
   }
 
   /**

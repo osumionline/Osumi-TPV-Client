@@ -57,7 +57,8 @@
                    [canCreate]="ventasContextService.puedeVender()"
                    (selectTabEvent)="selectVenta($event)"
                    (closeTabEvent)="cerrarVenta($event)"
-                   (newTabEvent)="nuevaVenta()" />
+                   (newTabEvent)="nuevaVenta()"
+                   (clientEvent)="openClientSelection()" />
 
   @if (ventasService.ventaActiva(); as venta) {
   <otpv-sale-workspace [venta]="venta"
@@ -82,4 +83,12 @@
 <otpv-employee-selector [empleados]="empleadosService.empleados()"
                         (selectEvent)="selectEmpleado($event)"
                         (cancelEvent)="cancelEmployeeSelection()" />
+}
+
+@if (selectingClient() && ventasService.ventaActiva(); as venta) {
+<otpv-client-selector [clientes]="clientesService.clientes()"
+                      [selectedPublicId]="venta.cliente?.publicId ?? null"
+                      (selectEvent)="selectCliente($event)"
+                      (clearEvent)="clearCliente()"
+                      (cancelEvent)="cancelClientSelection()" />
 }

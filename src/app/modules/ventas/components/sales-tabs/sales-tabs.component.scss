@@ -77,6 +77,34 @@
         }
     }
 
+    .tabs__client {
+        display: inline-flex;
+        max-width: 240px;
+        height: 48px;
+        padding: 0 12px;
+        border: 0;
+        align-items: center;
+        gap: 6px;
+        background-color: transparent;
+        font: inherit;
+        cursor: pointer;
+
+        span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        &:hover:not(:disabled) {
+            background-color: var(--color-medium-light-grey);
+        }
+
+        &:disabled {
+            cursor: default;
+            opacity: 0.4;
+        }
+    }
+
     .tabs__actions {
         display: flex;
         align-items: center;
