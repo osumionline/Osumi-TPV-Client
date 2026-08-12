@@ -154,8 +154,7 @@ export default class SalesComponent implements OnInit {
     }
 
     this.ventasService.asignarCliente(venta.idTemporal, cliente);
-
-    this.selectingClient.set(false);
+    this.closeClientSelectionAndFocusLocalizador(venta.idTemporal);
   }
 
   /**
@@ -171,14 +170,14 @@ export default class SalesComponent implements OnInit {
     }
 
     this.ventasService.quitarCliente(venta.idTemporal);
-    this.selectingClient.set(false);
+    this.closeClientSelectionAndFocusLocalizador(venta.idTemporal);
   }
 
   /**
    * Cierra la selección de cliente sin modificar la venta.
    */
   cancelClientSelection(): void {
-    this.selectingClient.set(false);
+    this.closeClientSelectionAndFocusLocalizador(this.ventasService.ventaActivaId());
   }
 
   /**
@@ -223,6 +222,22 @@ export default class SalesComponent implements OnInit {
     }
 
     this.cerrarVenta(venta.idTemporal);
+  }
+
+  /**
+   * Cierra la selección de cliente y devuelve el foco al localizador
+   * de la venta indicada.
+   */
+  private closeClientSelectionAndFocusLocalizador(ventaIdTemporal: string | null): void {
+    this.selectingClient.set(false);
+
+    if (ventaIdTemporal === null) {
+      return;
+    }
+
+    this.ventasService.setFocusTarget(ventaIdTemporal, {
+      type: 'localizador',
+    });
   }
 
   /**

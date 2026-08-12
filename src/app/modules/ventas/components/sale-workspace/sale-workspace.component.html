@@ -35,7 +35,7 @@
 
     <div class="sale__lines">
         @for (
-        linea of venta().lineas;
+        linea of ventaView().lineas;
         track linea.idTemporal
         ) {
         <div class="sale__line">
@@ -240,10 +240,40 @@
                 <div class="sale__editable-cell">
                     <button class="sale__editable-value"
                             type="button"
-                            matTooltip="Modificar descuento porcentual"
+                            [matTooltip]="
+                                linea.tieneDescuentoManual
+                                    ? 'Descuento porcentual manual'
+                                    : linea.descuentoClienteBps > 0
+                                        ? 'Descuento del cliente'
+                                        : 'Modificar descuento porcentual'
+                            "
                             (click)="editDescuentoPorcentaje(linea)">
                         {{ linea.descuentoBps / 100 }} %
                     </button>
+
+                    @if (linea.tieneDescuentoManual) {
+                    <button class="sale__inline-action"
+                            type="button"
+                            [matTooltip]="
+                                linea.descuentoClienteBps > 0
+                                    ? 'Volver al descuento del cliente'
+                                    : 'Quitar descuento porcentual manual'
+                            "
+                            [attr.aria-label]="
+                                linea.descuentoClienteBps > 0
+                                    ? 'Volver al descuento del cliente'
+                                    : 'Quitar descuento porcentual manual'
+                            "
+                            (click)="clearDescuentoPorcentajeManual(linea, $event)">
+                        <mat-icon>restart_alt</mat-icon>
+                    </button>
+                    }
+                    @else if (linea.descuentoClienteBps > 0) {
+                    <mat-icon class="sale__discount-origin"
+                              matTooltip="Descuento del cliente">
+                        person
+                    </mat-icon>
+                    }
 
                     @if (canModifyAmounts()) {
                     <button class="sale__inline-action"
@@ -301,7 +331,7 @@
            (cdkDragEnded)="onTotalDragEnded($event)">
         <div class="sale__amount">
             {{
-          (venta().totalCents / 100)
+          (ventaView().totalCents / 100)
             | currency:'EUR':'symbol':'1.2-2'
         }}
         </div>
@@ -315,7 +345,7 @@
 
             <button mat-stroked-button
                     type="button"
-                    [disabled]="venta().lineas.length === 0"
+                    [disabled]="ventaView().lineas.length === 0"
                     (click)="cancelVenta()">
                 Cancelar
             </button>

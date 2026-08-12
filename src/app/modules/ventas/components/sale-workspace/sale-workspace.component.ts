@@ -3,6 +3,7 @@ import { CurrencyPipe } from '@angular/common';
 import {
   afterRenderEffect,
   Component,
+  computed,
   ElementRef,
   inject,
   input,
@@ -61,6 +62,25 @@ export default class SaleWorkspaceComponent {
   readonly ventasService: VentasService = inject(VentasService);
 
   readonly venta: InputSignal<VentaEnCurso> = input.required<VentaEnCurso>();
+
+  /**
+   * Expone la venta para la plantilla vinculando su renderizado
+   * a las notificaciones de cambios de VentasService.
+   *
+   * VentaEnCurso es deliberadamente mutable durante la sesión,
+   * por lo que una modificación interna puede conservar la misma
+   * referencia del objeto.
+   */
+  readonly ventaView: Signal<VentaEnCurso> = computed(
+    (): VentaEnCurso => {
+      this.ventasService.ventas();
+
+      return this.venta();
+    },
+    {
+      equal: (): boolean => false,
+    },
+  );
 
   readonly cancelEvent: OutputEmitterRef<void> = output<void>();
 
@@ -333,11 +353,20 @@ export default class SaleWorkspaceComponent {
     const descuentoBps: number = Math.round(porcentaje * 100);
 
     try {
-      this.ventasService.establecerDescuentoPorcentaje(
-        this.venta().idTemporal,
-        linea.idTemporal,
-        descuentoBps,
-      );
+      if (descuentoBps === linea.descuentoClienteBps) {
+        if (linea.tieneDescuentoManual) {
+          this.ventasService.quitarDescuentoPorcentajeManual(
+            this.venta().idTemporal,
+            linea.idTemporal,
+          );
+        }
+      } else {
+        this.ventasService.establecerDescuentoPorcentaje(
+          this.venta().idTemporal,
+          linea.idTemporal,
+          descuentoBps,
+        );
+      }
     } catch (error: unknown) {
       inputElement.value = String(linea.descuentoBps / 100);
 
@@ -349,6 +378,17 @@ export default class SaleWorkspaceComponent {
     if (returnToLocalizador) {
       this.focusLocalizador();
     }
+  }
+
+  /**
+   * Retira el descuento porcentual manual y recupera la capa del cliente.
+   */
+  clearDescuentoPorcentajeManual(linea: VentaLineaEnCurso, event: MouseEvent): void {
+    event.stopPropagation();
+
+    this.ventasService.quitarDescuentoPorcentajeManual(this.venta().idTemporal, linea.idTemporal);
+
+    this.focusLocalizador();
   }
 
   /**
@@ -587,6 +627,7 @@ export default class SaleWorkspaceComponent {
         }
 
         this.ventasService.eliminarLinea(this.venta().idTemporal, linea.idTemporal);
+        this.focusLocalizador();
       });
   }
 

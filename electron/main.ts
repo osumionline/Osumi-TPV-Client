@@ -134,6 +134,27 @@ async function createWindow(): Promise<void> {
     mainWindow = null;
   });
 
+  if (!app.isPackaged) {
+    mainWindow.webContents.on('before-input-event', (event, input): void => {
+      if (input.type !== 'keyDown') {
+        return;
+      }
+
+      const toggleWithShortcut: boolean =
+        input.control && input.shift && input.key.toLowerCase() === 'i';
+
+      const toggleWithF12: boolean = input.key === 'F12';
+
+      if (!toggleWithShortcut && !toggleWithF12) {
+        return;
+      }
+
+      event.preventDefault();
+
+      mainWindow?.webContents.toggleDevTools();
+    });
+  }
+
   if (DEV_SERVER_URL !== undefined && DEV_SERVER_URL.length > 0) {
     await mainWindow.loadURL(DEV_SERVER_URL);
 

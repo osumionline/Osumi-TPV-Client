@@ -127,6 +127,14 @@
         }
     }
 
+    .sale__discount-origin {
+        width: 20px;
+        height: 20px;
+        margin: 0 4px;
+        color: var(--disabled-color);
+        font-size: 20px;
+    }
+
     .sale__gift {
         display: inline-flex;
         width: 28px;
