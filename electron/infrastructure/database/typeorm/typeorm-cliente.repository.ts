@@ -1,3 +1,7 @@
+import type {
+  ClienteTopVentaRecord,
+  ClienteUltimaVentaRecord,
+} from '@backend/contracts/clientes/cliente-estadisticas-record.interface';
 import type ClienteRepository from '@backend/contracts/clientes/cliente.repository.interface';
 import type CrearClienteRecordCommand from '@backend/contracts/clientes/crear-cliente-record-command.interface';
 import type ClienteRecord from '@backend/domain/clientes/cliente-record.interface';
@@ -28,6 +32,22 @@ interface ClienteDatabaseRow {
   readonly observaciones: string | null;
   readonly descuento_bps: number;
   readonly ultima_venta: string | null;
+}
+
+interface ClienteUltimaVentaDatabaseRow {
+  readonly fecha: string;
+  readonly localizador: number | null;
+  readonly nombre: string;
+  readonly unidades: number;
+  readonly pvp_micros: number;
+  readonly importe_micros: number;
+}
+
+interface ClienteTopVentaDatabaseRow {
+  readonly localizador: number | null;
+  readonly nombre: string;
+  readonly unidades: number;
+  readonly importe_micros: number;
 }
 
 export default class TypeOrmClienteRepository implements ClienteRepository {
@@ -237,5 +257,112 @@ export default class TypeOrmClienteRepository implements ClienteRepository {
       descuentoBps: command.descuentoBps,
       ultimaVenta: null,
     };
+  }
+
+  /**
+   * Recupera las últimas líneas compradas por un cliente.
+   */
+  async findUltimasVentas(
+    publicId: string,
+    limit: number,
+  ): Promise<readonly ClienteUltimaVentaRecord[]> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const rows: readonly ClienteUltimaVentaDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT
+          lv.created_at AS fecha,
+          a.localizador,
+          lv.nombre_articulo AS nombre,
+          lv.unidades,
+          lv.pvp_micros,
+          lv.importe_micros
+        FROM cliente c
+        INNER JOIN venta v
+          ON v.id_cliente = c.id
+        INNER JOIN linea_venta lv
+          ON lv.id_venta = v.id
+        LEFT JOIN articulo a
+          ON a.id = lv.id_articulo
+        WHERE
+          c.public_id = ?
+          AND c.deleted_at IS NULL
+          AND v.deleted_at IS NULL
+        ORDER BY
+          v.created_at DESC,
+          lv.id DESC
+        LIMIT ?
+      `,
+      [publicId, limit],
+    )) as readonly ClienteUltimaVentaDatabaseRow[];
+
+    return rows.map((row: ClienteUltimaVentaDatabaseRow): ClienteUltimaVentaRecord => ({
+      fecha: row.fecha,
+      localizador: row.localizador,
+      nombre: row.nombre,
+      unidades: row.unidades,
+      pvpMicros: row.pvp_micros,
+      importeMicros: row.importe_micros,
+    }));
+  }
+
+  /**
+   * Recupera los artículos más comprados por un cliente,
+   * agregando unidades e importe directamente en SQLite.
+   */
+  async findTopVentas(publicId: string, limit: number): Promise<readonly ClienteTopVentaRecord[]> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const rows: readonly ClienteTopVentaDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT
+          a.localizador,
+          COALESCE(
+            a.nombre,
+            lv.nombre_articulo
+          ) AS nombre,
+          CAST(
+            SUM(lv.unidades)
+            AS INTEGER
+          ) AS unidades,
+          CAST(
+            SUM(lv.importe_micros)
+            AS INTEGER
+          ) AS importe_micros
+        FROM cliente c
+        INNER JOIN venta v
+          ON v.id_cliente = c.id
+        INNER JOIN linea_venta lv
+          ON lv.id_venta = v.id
+        LEFT JOIN articulo a
+          ON a.id = lv.id_articulo
+        WHERE
+          c.public_id = ?
+          AND c.deleted_at IS NULL
+          AND v.deleted_at IS NULL
+        GROUP BY
+          lv.id_articulo,
+          a.localizador,
+          a.nombre,
+          CASE
+            WHEN lv.id_articulo IS NULL
+              THEN lv.nombre_articulo
+            ELSE NULL
+          END
+        ORDER BY
+          unidades DESC,
+          importe_micros DESC,
+          nombre COLLATE NOCASE
+        LIMIT ?
+      `,
+      [publicId, limit],
+    )) as readonly ClienteTopVentaDatabaseRow[];
+
+    return rows.map((row: ClienteTopVentaDatabaseRow): ClienteTopVentaRecord => ({
+      localizador: row.localizador,
+      nombre: row.nombre,
+      unidades: row.unidades,
+      importeMicros: row.importe_micros,
+    }));
   }
 }

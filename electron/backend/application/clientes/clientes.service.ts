@@ -1,6 +1,15 @@
+import type {
+  ClienteTopVentaRecord,
+  ClienteUltimaVentaRecord,
+} from '@backend/contracts/clientes/cliente-estadisticas-record.interface';
 import type ClienteRepository from '@backend/contracts/clientes/cliente.repository.interface';
 import type CrearClienteRecordCommand from '@backend/contracts/clientes/crear-cliente-record-command.interface';
 import type ClienteRecord from '@backend/domain/clientes/cliente-record.interface';
+import type {
+  ClienteEstadisticasInterface,
+  ClienteTopVentaInterface,
+  ClienteUltimaVentaInterface,
+} from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 
@@ -9,6 +18,8 @@ const MAX_CLIENT_NAME_LENGTH: number = 150;
 const MAX_DNI_CIF_LENGTH: number = 30;
 const MAX_PHONE_LENGTH: number = 30;
 const MAX_EMAIL_LENGTH: number = 254;
+const ULTIMAS_VENTAS_LIMIT: number = 20;
+const TOP_VENTAS_LIMIT: number = 10;
 
 export default class ClientesService {
   constructor(private readonly clienteRepository: ClienteRepository) {}
@@ -17,6 +28,45 @@ export default class ClientesService {
     const clientes: readonly ClienteRecord[] = await this.clienteRepository.findAll();
 
     return clientes.map((cliente: ClienteRecord): ClienteInterface => this.toInterface(cliente));
+  }
+
+  /**
+   * Recupera las estadísticas rápidas de compra de un cliente.
+   */
+  async getEstadisticas(publicId: string): Promise<ClienteEstadisticasInterface> {
+    const normalizedPublicId: string = publicId.trim();
+
+    if (normalizedPublicId === '') {
+      throw new Error('El identificador del cliente no es válido.');
+    }
+
+    const [ultimasVentas, topVentas]: [
+      readonly ClienteUltimaVentaRecord[],
+      readonly ClienteTopVentaRecord[],
+    ] = await Promise.all([
+      this.clienteRepository.findUltimasVentas(normalizedPublicId, ULTIMAS_VENTAS_LIMIT),
+      this.clienteRepository.findTopVentas(normalizedPublicId, TOP_VENTAS_LIMIT),
+    ]);
+
+    return {
+      ultimasVentas: ultimasVentas.map(
+        (item: ClienteUltimaVentaRecord): ClienteUltimaVentaInterface => ({
+          fecha: item.fecha,
+          localizador: item.localizador,
+          nombre: item.nombre,
+          unidades: item.unidades,
+          pvpMicros: item.pvpMicros,
+          importeMicros: item.importeMicros,
+        }),
+      ),
+
+      topVentas: topVentas.map((item: ClienteTopVentaRecord): ClienteTopVentaInterface => ({
+        localizador: item.localizador,
+        nombre: item.nombre,
+        unidades: item.unidades,
+        importeMicros: item.importeMicros,
+      })),
+    };
   }
 
   /**

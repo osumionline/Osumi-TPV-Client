@@ -19,6 +19,7 @@ const IPC_CHANNELS = {
 
   clientesGetAll: 'clientes:get-all',
   clientesCreate: 'clientes:create',
+  clientesGetEstadisticas: 'clientes:get-estadisticas',
 
   categoriasGetAll: 'categorias:get-all',
 

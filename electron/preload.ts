@@ -2,6 +2,7 @@ import type ApplicationStateResult from '@desktop-contracts/application/applicat
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
 import type CategoriaInterface from '@desktop-contracts/categorias/categoria.interface';
+import type { ClienteEstadisticasInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
@@ -122,6 +123,12 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
 
     create: (command: CrearClienteCommand): Promise<ClienteInterface> =>
       ipcRenderer.invoke(IPC_CHANNELS.clientesCreate, command) as Promise<ClienteInterface>,
+
+    getEstadisticas: (publicId: string): Promise<ClienteEstadisticasInterface> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.clientesGetEstadisticas,
+        publicId,
+      ) as Promise<ClienteEstadisticasInterface>,
   }),
 
   caja: Object.freeze({
