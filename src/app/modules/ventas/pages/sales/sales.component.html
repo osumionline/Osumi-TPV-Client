@@ -89,6 +89,7 @@
 <otpv-client-selector [clientes]="clientesService.clientes()"
                       [selectedPublicId]="venta.cliente?.publicId ?? null"
                       (selectEvent)="selectCliente($event)"
+                      (createdEvent)="createdCliente($event)"
                       (clearEvent)="clearCliente()"
                       (cancelEvent)="cancelClientSelection()" />
 }

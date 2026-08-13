@@ -37,6 +37,8 @@ export default class ClientSelectorComponent {
 
   readonly selectEvent: OutputEmitterRef<Cliente> = output<Cliente>();
 
+  readonly createdEvent: OutputEmitterRef<Cliente> = output<Cliente>();
+
   readonly clearEvent: OutputEmitterRef<void> = output<void>();
 
   readonly cancelEvent: OutputEmitterRef<void> = output<void>();
@@ -140,7 +142,7 @@ export default class ClientSelectorComponent {
     }
 
     if (cliente !== null) {
-      this.selectEvent.emit(cliente);
+      this.createdEvent.emit(cliente);
     }
   }
 

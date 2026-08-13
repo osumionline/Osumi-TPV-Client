@@ -18,6 +18,7 @@ import EmployeeSelectorComponent from '@modules/ventas/components/employee-selec
 import SaleWorkspaceComponent from '@modules/ventas/components/sale-workspace/sale-workspace.component';
 import SalesTabsComponent from '@modules/ventas/components/sales-tabs/sales-tabs.component';
 import { DialogService } from '@osumi/angular-tools';
+import ClienteProteccionDatosPrintService from '@services/cliente-proteccion-datos-print.service';
 import ClientesService from '@services/clientes.service';
 import EmpleadosService from '@services/empleados.service';
 import VentasContextService from '@services/ventas-context.service';
@@ -46,6 +47,9 @@ export default class SalesComponent implements OnInit {
   readonly ventasContextService: VentasContextService = inject(VentasContextService);
   readonly ventasService: VentasService = inject(VentasService);
   readonly clientesService: ClientesService = inject(ClientesService);
+  private readonly clienteProteccionDatosPrintService: ClienteProteccionDatosPrintService = inject(
+    ClienteProteccionDatosPrintService,
+  );
 
   readonly initializing: WritableSignal<boolean> = signal<boolean>(true);
 
@@ -155,6 +159,44 @@ export default class SalesComponent implements OnInit {
 
     this.ventasService.asignarCliente(venta.idTemporal, cliente);
     this.closeClientSelectionAndFocusLocalizador(venta.idTemporal);
+  }
+
+  /**
+   * Asigna un cliente recién creado e inicia inmediatamente
+   * la impresión de su documento de protección de datos.
+   */
+  createdCliente(cliente: Cliente): void {
+    const appData = this.ventasContextService.appData();
+
+    /*
+     * La creación y selección del cliente no debe quedar condicionada
+     * por que la impresión pueda abrirse correctamente.
+     */
+    this.selectCliente(cliente);
+
+    if (appData === null) {
+      this.dialog.alert({
+        title: 'Aviso',
+        content:
+          'El cliente se ha creado correctamente, pero no se han podido obtener los datos de la empresa para imprimir el documento de protección de datos.',
+      });
+
+      return;
+    }
+
+    try {
+      this.clienteProteccionDatosPrintService.print(appData, cliente);
+    } catch (error: unknown) {
+      const message: string =
+        error instanceof Error
+          ? error.message
+          : 'No se ha podido imprimir el documento de protección de datos.';
+
+      this.dialog.alert({
+        title: 'Aviso',
+        content: `El cliente se ha creado correctamente, pero ${message}`,
+      });
+    }
   }
 
   /**
