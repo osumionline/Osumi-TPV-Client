@@ -16,6 +16,7 @@ import ProveedoresService from '@backend/application/proveedores/proveedores.ser
 import { SystemService } from '@backend/application/system/system.service';
 import VentasArticulosService from '@backend/application/ventas/ventas-articulos.service';
 import VentasContextService from '@backend/application/ventas/ventas-context.service';
+import VentasDevolucionesService from '@backend/application/ventas/ventas-devoluciones.service';
 
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';
@@ -34,6 +35,7 @@ import type ApplicationPaths from '@backend/contracts/system/application-paths.i
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
 import type VentasArticulosRepository from '@backend/contracts/ventas/ventas-articulos.repository.interface';
 import type VentasContextRepository from '@backend/contracts/ventas/ventas-context.repository.interface';
+import type VentasDevolucionesRepository from '@backend/contracts/ventas/ventas-devoluciones.repository.interface';
 
 import NewInstallationDataService from '@infrastructure/database/initial-data/new-installation-data.service';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
@@ -50,6 +52,7 @@ import TypeOrmMarcaRepository from '@infrastructure/database/typeorm/typeorm-mar
 import TypeOrmProveedorRepository from '@infrastructure/database/typeorm/typeorm-proveedor.repository';
 import TypeOrmVentasArticulosRepository from '@infrastructure/database/typeorm/typeorm-ventas-articulos.repository';
 import TypeOrmVentasContextRepository from '@infrastructure/database/typeorm/typeorm-ventas-context.repository';
+import TypeOrmVentasDevolucionesRepository from '@infrastructure/database/typeorm/typeorm-ventas-devoluciones.repository';
 
 import ElectronApplicationPathsProvider from '@infrastructure/electron/electron-application-paths.provider';
 import ElectronAssetUrlBuilder from '@infrastructure/electron/electron-asset-url.builder';
@@ -313,6 +316,13 @@ app
       ventasArticulosRepository,
     );
 
+    const ventasDevolucionesRepository: VentasDevolucionesRepository =
+      new TypeOrmVentasDevolucionesRepository(operationalDatabase);
+
+    const ventasDevolucionesService: VentasDevolucionesService = new VentasDevolucionesService(
+      ventasDevolucionesRepository,
+    );
+
     const ventasContextRepository: VentasContextRepository = new TypeOrmVentasContextRepository(
       operationalDatabase,
     );
@@ -414,6 +424,7 @@ app
       (): BrowserWindow | null => mainWindow,
       ventasContextService,
       ventasArticulosService,
+      ventasDevolucionesService,
     );
 
     registerLegacyImportIpc(legacyImportService);

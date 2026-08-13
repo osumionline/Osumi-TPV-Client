@@ -20,6 +20,7 @@ import type { ProveedorInterface } from '@desktop-contracts/proveedores/proveedo
 import AppInfo from '@desktop-contracts/system/app-info.interface';
 import type AccesoDirectoVentaInterface from '@desktop-contracts/ventas/acceso-directo-venta.interface';
 import type ArticuloVentaInterface from '@desktop-contracts/ventas/articulo-venta.interface';
+import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devolucion.interface';
 import type VentasContextInterface from '@desktop-contracts/ventas/ventas-context.interface';
 import IPC_CHANNELS from '@ipc/channels';
 import type { IpcRendererEvent } from 'electron';
@@ -155,6 +156,12 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
       ipcRenderer.invoke(IPC_CHANNELS.ventasGetAccesosDirectos) as Promise<
         readonly AccesoDirectoVentaInterface[]
       >,
+
+    getDevolucion: (idVenta: number): Promise<VentaDevolucionInterface | null> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.ventasGetDevolucion,
+        idVenta,
+      ) as Promise<VentaDevolucionInterface | null>,
   }),
 });
 
