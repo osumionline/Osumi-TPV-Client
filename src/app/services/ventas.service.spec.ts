@@ -154,6 +154,20 @@ describe('VentasService', (): void => {
     });
   });
 
+  it('mantiene por separado el estado del panel de estadísticas de cada venta', (): void => {
+    const service: VentasService = new VentasService();
+
+    const primeraVenta: VentaEnCurso = service.crearVenta();
+
+    const segundaVenta: VentaEnCurso = service.crearVenta();
+
+    service.setClienteEstadisticasExpanded(primeraVenta.idTemporal, false);
+
+    expect(service.getWorkspace(primeraVenta.idTemporal)?.clienteEstadisticasExpanded).toBe(false);
+
+    expect(service.getWorkspace(segundaVenta.idTemporal)?.clienteEstadisticasExpanded).toBe(true);
+  });
+
   it('aplica el descuento del cliente a las líneas existentes y a las nuevas', (): void => {
     const service: VentasService = new VentasService();
     const venta: VentaEnCurso = service.crearVenta();

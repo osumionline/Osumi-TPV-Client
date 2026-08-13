@@ -31,6 +31,7 @@ import type {
 } from '@model/ventas/venta-workspace.interface';
 import { MICROS_PER_CENT } from '@model/ventas/ventas-money.constants';
 import ArticleSearchComponent from '@modules/ventas/components/article-search/article-search.component';
+import ClientStatisticsComponent from '@modules/ventas/components/client-statistics/client-statistics.component';
 import DirectAccessSelectorComponent from '@modules/ventas/components/direct-access-selector/direct-access-selector.component';
 import { DialogService } from '@osumi/angular-tools';
 import VentasArticulosService from '@services/ventas-articulos.service';
@@ -44,14 +45,15 @@ import VentasService from '@services/ventas.service';
   templateUrl: './sale-workspace.component.html',
   styleUrl: './sale-workspace.component.scss',
   imports: [
-    ArticleSearchComponent,
     CdkDrag,
     CdkDragHandle,
     CurrencyPipe,
-    DirectAccessSelectorComponent,
     MatButton,
     MatIcon,
     MatTooltip,
+    ArticleSearchComponent,
+    DirectAccessSelectorComponent,
+    ClientStatisticsComponent,
   ],
 })
 export default class SaleWorkspaceComponent {
@@ -635,6 +637,27 @@ export default class SaleWorkspaceComponent {
     const position: { x: number; y: number } = event.source.getFreeDragPosition();
 
     this.ventasService.setTotalPosition(this.venta().idTemporal, position.x, position.y);
+  }
+
+  /**
+   * Alterna la visibilidad de las estadísticas del cliente
+   * conservando el estado en el workspace de la venta.
+   */
+  toggleClienteEstadisticas(): void {
+    const workspace: VentaWorkspaceState | null = this.ventasService.getWorkspace(
+      this.venta().idTemporal,
+    );
+
+    if (workspace === null) {
+      return;
+    }
+
+    this.ventasService.setClienteEstadisticasExpanded(
+      this.venta().idTemporal,
+      !workspace.clienteEstadisticasExpanded,
+    );
+
+    this.focusLocalizador();
   }
 
   /**

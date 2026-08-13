@@ -83,6 +83,7 @@ export default class VentasService {
         x: 0,
         y: 0,
       },
+      clienteEstadisticasExpanded: true,
     });
 
     this.workspacesSignal.set(workspaces);
@@ -380,6 +381,31 @@ export default class VentasService {
         x,
         y,
       },
+    });
+
+    this.workspacesSignal.set(workspaces);
+  }
+
+  /**
+   * Guarda si el panel de estadísticas del cliente está
+   * desplegado para una venta concreta.
+   */
+  setClienteEstadisticasExpanded(ventaIdTemporal: string, expanded: boolean): void {
+    this.requireVenta(ventaIdTemporal);
+
+    const workspace: VentaWorkspaceState | null = this.getWorkspace(ventaIdTemporal);
+
+    if (workspace === null) {
+      throw new Error('La venta indicada no dispone de workspace.');
+    }
+
+    const workspaces: Map<string, VentaWorkspaceState> = new Map<string, VentaWorkspaceState>(
+      this.workspacesSignal(),
+    );
+
+    workspaces.set(ventaIdTemporal, {
+      ...workspace,
+      clienteEstadisticasExpanded: expanded,
     });
 
     this.workspacesSignal.set(workspaces);

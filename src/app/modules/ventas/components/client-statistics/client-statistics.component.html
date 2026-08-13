@@ -1,0 +1,180 @@
+<section class="client-statistics"
+         [class.client-statistics--collapsed]="!expanded()">
+    <header class="client-statistics__header">
+        <strong>
+            Estadísticas de {{ cliente().nombreApellidos }}
+        </strong>
+
+        @if (estadisticasState().loading) {
+        <span class="client-statistics__status">
+            Actualizando...
+        </span>
+        }
+
+        <button class="client-statistics__toggle"
+                type="button"
+                [attr.aria-label]="
+                    expanded()
+                        ? 'Ocultar estadísticas del cliente'
+                        : 'Mostrar estadísticas del cliente'
+                "
+                (click)="toggleEvent.emit()">
+            <mat-icon [class.client-statistics__toggle-icon--collapsed]="
+                          !expanded()
+                      ">
+                expand_more
+            </mat-icon>
+        </button>
+    </header>
+
+    @if (expanded()) {
+    <div class="client-statistics__content">
+        @if (estadisticasState(); as state) {
+        @if (state.data; as data) {
+        @if (state.error !== null) {
+        <div class="client-statistics__warning">
+            <span>
+                {{ state.error }}
+            </span>
+
+            <button mat-button
+                    type="button"
+                    (click)="retry()">
+                Reintentar
+            </button>
+        </div>
+        }
+
+        <section class="client-statistics__column">
+            <h3>Últimas ventas</h3>
+
+            @if (data.ultimasVentas.length > 0) {
+            <div class="statistics-table statistics-table--recent">
+                <div class="statistics-table__row statistics-table__row--header">
+                    <span>Fecha</span>
+                    <span>Loc.</span>
+                    <span>Nombre</span>
+                    <span>Unid.</span>
+                    <span>PVP</span>
+                    <span>Imp.</span>
+                </div>
+
+                <div class="statistics-table__body">
+                    @for (
+                    item of data.ultimasVentas;
+                    track $index
+                    ) {
+                    <div class="statistics-table__row">
+                        <span>
+                            {{ formatFecha(item.fecha) }}
+                        </span>
+
+                        <span>
+                            {{ item.localizador ?? '—' }}
+                        </span>
+
+                        <span class="statistics-table__name"
+                              [title]="item.nombre">
+                            {{ item.nombre }}
+                        </span>
+
+                        <span>
+                            {{ item.unidades }}
+                        </span>
+
+                        <span>
+                            {{
+                                        (item.pvpMicros / 1_000_000)
+                                            | currency:'EUR':'symbol':'1.2-2'
+                                    }}
+                        </span>
+
+                        <span>
+                            {{
+                                        (item.importeMicros / 1_000_000)
+                                            | currency:'EUR':'symbol':'1.2-2'
+                                    }}
+                        </span>
+                    </div>
+                    }
+                </div>
+            </div>
+            }
+            @else {
+            <div class="client-statistics__empty">
+                El cliente no ha realizado ninguna compra todavía.
+            </div>
+            }
+        </section>
+
+        <section class="client-statistics__column">
+            <h3>Top ventas</h3>
+
+            @if (data.topVentas.length > 0) {
+            <div class="statistics-table statistics-table--top">
+                <div class="statistics-table__row statistics-table__row--header">
+                    <span>Loc.</span>
+                    <span>Nombre</span>
+                    <span>Imp.</span>
+                    <span>Ud.</span>
+                </div>
+
+                <div class="statistics-table__body">
+                    @for (
+                    item of data.topVentas;
+                    track $index
+                    ) {
+                    <div class="statistics-table__row">
+                        <span>
+                            {{ item.localizador ?? '—' }}
+                        </span>
+
+                        <span class="statistics-table__name"
+                              [title]="item.nombre">
+                            {{ item.nombre }}
+                        </span>
+
+                        <span>
+                            {{
+                                        (item.importeMicros / 1_000_000)
+                                            | currency:'EUR':'symbol':'1.2-2'
+                                    }}
+                        </span>
+
+                        <span>
+                            {{ item.unidades }}
+                        </span>
+                    </div>
+                    }
+                </div>
+            </div>
+            }
+            @else {
+            <div class="client-statistics__empty">
+                El cliente no ha realizado ninguna compra todavía.
+            </div>
+            }
+        </section>
+        }
+        @else if (state.error !== null) {
+        <div class="client-statistics__load-state">
+            <span>
+                {{ state.error }}
+            </span>
+
+            <button mat-button
+                    type="button"
+                    (click)="retry()">
+                Reintentar
+            </button>
+        </div>
+        }
+        @else {
+        <div class="client-statistics__load-state">
+            Cargando estadísticas del cliente...
+        </div>
+        }
+        }
+    </div>
+    }
+</section>

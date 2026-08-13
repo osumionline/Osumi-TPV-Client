@@ -326,6 +326,12 @@
     </div>
 
     @if (ventasService.workspaceActivo(); as workspace) {
+    @if (ventaView().cliente; as cliente) {
+    <otpv-client-statistics [cliente]="cliente"
+                            [expanded]="workspace.clienteEstadisticasExpanded"
+                            (toggleEvent)="toggleClienteEstadisticas()" />
+    }
+
     <aside class="sale__total"
            cdkDrag
            [cdkDragFreeDragPosition]="workspace.totalPosition"

@@ -1,0 +1,177 @@
+:host {
+    display: contents;
+}
+
+.client-statistics {
+    position: fixed;
+    bottom: 12px;
+    left: 12px;
+    z-index: 10;
+    display: flex;
+    width: min(920px, calc(100vw - 380px));
+    min-width: 520px;
+    max-height: 230px;
+    flex-direction: column;
+    border: 1px solid var(--color-dark-grey);
+    box-sizing: border-box;
+    border-radius: 8px;
+    background-color: var(--color-white);
+    box-shadow: 0 4px 16px rgb(0 0 0 / 20%);
+    overflow: hidden;
+
+    &.client-statistics--collapsed {
+        width: min(420px, calc(100vw - 380px));
+        min-width: 320px;
+    }
+
+    .client-statistics__header {
+        display: flex;
+        min-height: 34px;
+        padding: 0 6px 0 10px;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 1px solid var(--table-border);
+        background-color: var(--table-header-bg);
+
+        strong {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    }
+
+    &.client-statistics--collapsed {
+        .client-statistics__header {
+            border-bottom: 0;
+        }
+    }
+
+    .client-statistics__status {
+        margin-left: auto;
+        color: var(--disabled-color);
+        font-size: 0.8rem;
+    }
+
+    .client-statistics__toggle {
+        display: inline-flex;
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        border: 0;
+        align-items: center;
+        justify-content: center;
+        background-color: transparent;
+        cursor: pointer;
+
+        mat-icon {
+            transition: transform 0.2s ease-in-out;
+        }
+
+        .client-statistics__toggle-icon--collapsed {
+            transform: rotate(180deg);
+        }
+    }
+
+    .client-statistics__content {
+        display: grid;
+        min-height: 0;
+        grid-template-columns:
+            minmax(0, 5fr) minmax(0, 4fr);
+    }
+
+    .client-statistics__column {
+        min-width: 0;
+
+        &+.client-statistics__column {
+            border-left: 1px solid var(--table-border);
+        }
+
+        h3 {
+            height: 28px;
+            margin: 0;
+            padding: 6px 8px;
+            box-sizing: border-box;
+            font-size: 0.85rem;
+        }
+    }
+
+    .client-statistics__empty,
+    .client-statistics__load-state {
+        padding: 14px 10px;
+        color: var(--disabled-color);
+        font-size: 0.8rem;
+    }
+
+    .client-statistics__load-state {
+        grid-column: 1 / -1;
+
+        button {
+            margin-left: 8px;
+        }
+    }
+
+    .client-statistics__warning {
+        grid-column: 1 / -1;
+        display: flex;
+        padding: 4px 8px;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1px solid var(--table-border);
+        font-size: 0.75rem;
+
+        button {
+            margin-left: auto;
+        }
+    }
+
+    .statistics-table {
+        font-size: 0.72rem;
+
+        .statistics-table__body {
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .statistics-table__row {
+            display: grid;
+            min-height: 28px;
+            align-items: center;
+            border-top: 1px solid var(--table-border);
+
+            >span {
+                min-width: 0;
+                padding: 4px 5px;
+                text-align: center;
+            }
+        }
+
+        .statistics-table__row--header {
+            min-height: 26px;
+            border-top: 0;
+            background-color: var(--color-very-light-grey);
+            font-weight: 500;
+        }
+
+        .statistics-table__name {
+            overflow: hidden;
+            text-align: left;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    }
+
+    .statistics-table--recent {
+        .statistics-table__row {
+            grid-template-columns:
+                76px 44px minmax(100px, 1fr) 42px 70px 70px;
+        }
+    }
+
+    .statistics-table--top {
+        .statistics-table__row {
+            grid-template-columns:
+                44px minmax(100px, 1fr) 76px 42px;
+        }
+    }
+}

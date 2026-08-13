@@ -19,4 +19,5 @@ export interface VentaWorkspacePosition {
 export interface VentaWorkspaceState {
   readonly focusTarget: VentaFocusTarget;
   readonly totalPosition: VentaWorkspacePosition;
+  readonly clienteEstadisticasExpanded: boolean;
 }
