@@ -300,4 +300,60 @@ describe('VentasService', (): void => {
 
     expect(linea.ivaBps).toBe(1_000);
   });
+
+  it('recalcula la venta al modificar el PVP de un Varios', (): void => {
+    const service: VentasService = new VentasService();
+
+    const venta: VentaEnCurso = service.crearVenta();
+
+    service.asignarCliente(venta.idTemporal, createCliente('cliente-1', 10));
+
+    const linea: VentaLineaEnCurso = service.agregarVarios(venta.idTemporal, {
+      descripcion: 'Varios',
+      pvpMicros: 10_000_000,
+      ivaBps: 2_100,
+    });
+
+    service.cambiarCantidad(venta.idTemporal, linea.idTemporal, 2);
+
+    expect(venta.totalMicros).toBe(18_000_000);
+
+    service.actualizarVarios(venta.idTemporal, linea.idTemporal, {
+      descripcion: 'Varios modificado',
+      pvpMicros: 15_000_000,
+      ivaBps: 1_000,
+    });
+
+    expect(venta.totalMicros).toBe(27_000_000);
+
+    expect(linea.descuentoClienteBps).toBe(1_000);
+
+    expect(linea.cantidad).toBe(2);
+  });
+
+  it('impide utilizar actualizarVarios sobre una línea de artículo', (): void => {
+    const service: VentasService = new VentasService();
+
+    const venta: VentaEnCurso = service.crearVenta();
+
+    service.agregarArticulos(venta.idTemporal, [createArticulo('articulo-1', 1_000)]);
+
+    const linea: VentaLineaEnCurso = venta.lineas[0]!;
+
+    const descripcionOriginal: string = linea.descripcion;
+
+    const pvpOriginalMicros: number = linea.pvpMicros;
+
+    expect((): void =>
+      service.actualizarVarios(venta.idTemporal, linea.idTemporal, {
+        descripcion: 'No debería cambiar',
+        pvpMicros: 20_000_000,
+        ivaBps: 2_100,
+      }),
+    ).toThrow('Solo se pueden modificar como Varios las líneas de tipo Varios.');
+
+    expect(linea.descripcion).toBe(descripcionOriginal);
+
+    expect(linea.pvpMicros).toBe(pvpOriginalMicros);
+  });
 });

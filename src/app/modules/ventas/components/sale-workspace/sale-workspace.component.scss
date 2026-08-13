@@ -52,6 +52,23 @@
         }
     }
 
+    .sale__varios-description {
+        display: flex;
+        width: 100%;
+        min-height: 34px;
+        padding: 0 8px;
+        border: 0;
+        align-items: center;
+        background-color: transparent;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+
+        &:hover {
+            background-color: var(--color-very-light-grey);
+        }
+    }
+
     .sale__editable-value {
         width: 100%;
         min-height: 34px;

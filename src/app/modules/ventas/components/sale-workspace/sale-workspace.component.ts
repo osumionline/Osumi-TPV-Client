@@ -26,6 +26,7 @@ import type ArticuloVenta from '@model/ventas/articulo-venta.model';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
 import type VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
 import type VentaVariosData from '@model/ventas/venta-varios-data.interface';
+import type VentaVariosEditorState from '@model/ventas/venta-varios-editor-state.interface';
 import {
   getDefaultVariosIvaBps,
   getVariosIvaOptionsBps,
@@ -104,8 +105,8 @@ export default class SaleWorkspaceComponent {
 
   readonly directAccessOpen: WritableSignal<boolean> = signal<boolean>(false);
 
-  readonly variosEditorData: WritableSignal<VentaVariosData | null> =
-    signal<VentaVariosData | null>(null);
+  readonly variosEditorState: WritableSignal<VentaVariosEditorState | null> =
+    signal<VentaVariosEditorState | null>(null);
 
   readonly variosIvaOptionsBps: Signal<readonly number[]> = computed((): readonly number[] => {
     const appData: AppData | null = this.ventasContextService.appData();
@@ -132,7 +133,7 @@ export default class SaleWorkspaceComponent {
         workspace === null ||
         this.searchOpen() ||
         this.directAccessOpen() ||
-        this.variosEditorData() !== null
+        this.variosEditorState() !== null
       ) {
         return;
       }
@@ -659,24 +660,65 @@ export default class SaleWorkspaceComponent {
       return;
     }
 
-    this.variosEditorData.set({
-      descripcion: 'Varios',
-      pvpMicros: 0,
-      ivaBps,
+    this.variosEditorState.set({
+      lineaIdTemporal: null,
+      data: {
+        descripcion: 'Varios',
+        pvpMicros: 0,
+        ivaBps,
+      },
     });
   }
 
   /**
-   * Confirma la creación del Varios.
+   * Abre el editor con los datos actuales de una línea Varios.
+   */
+  openEditVarios(linea: VentaLineaEnCurso): void {
+    if (!linea.esVarios) {
+      return;
+    }
+
+    this.localizador.set('');
+
+    this.variosEditorState.set({
+      lineaIdTemporal: linea.idTemporal,
+      data: {
+        descripcion: linea.descripcion,
+        pvpMicros: linea.pvpMicros,
+        ivaBps: linea.ivaBps,
+      },
+    });
+  }
+
+  /**
+   * Confirma la creación o edición del Varios activo.
    */
   onVariosSave(data: VentaVariosData): void {
-    try {
-      this.ventasService.agregarVarios(this.venta().idTemporal, data);
+    const editorState: VentaVariosEditorState | null = this.variosEditorState();
 
-      this.variosEditorData.set(null);
+    if (editorState === null) {
+      return;
+    }
+
+    try {
+      if (editorState.lineaIdTemporal === null) {
+        this.ventasService.agregarVarios(this.venta().idTemporal, data);
+      } else {
+        this.ventasService.actualizarVarios(
+          this.venta().idTemporal,
+          editorState.lineaIdTemporal,
+          data,
+        );
+      }
+
+      this.variosEditorState.set(null);
     } catch (error: unknown) {
       const message: string =
-        error instanceof Error ? error.message : 'No se ha podido añadir el Varios.';
+        error instanceof Error
+          ? error.message
+          : editorState.lineaIdTemporal === null
+            ? 'No se ha podido añadir el Varios.'
+            : 'No se ha podido modificar el Varios.';
 
       this.dialog
         .alert({
@@ -691,7 +733,7 @@ export default class SaleWorkspaceComponent {
    * Cancela la introducción del Varios sin crear ninguna línea.
    */
   closeVariosEditor(): void {
-    this.variosEditorData.set(null);
+    this.variosEditorState.set(null);
     this.localizador.set('');
 
     this.focusLocalizador();

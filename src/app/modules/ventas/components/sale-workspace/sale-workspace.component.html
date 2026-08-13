@@ -53,6 +53,15 @@
             </div>
 
             <div class="col-descripcion">
+                @if (linea.esVarios) {
+                <button class="sale__varios-description"
+                        type="button"
+                        matTooltip="Editar Varios"
+                        (click)="openEditVarios(linea)">
+                    {{ linea.descripcion }}
+                </button>
+                }
+                @else {
                 <span>
                     {{ linea.descripcion }}
 
@@ -62,6 +71,7 @@
                     </mat-icon>
                     }
                 </span>
+                }
             </div>
 
             <div class="col-marca">
@@ -377,9 +387,14 @@
                                  (closeEvent)="closeDirectAccess()" />
     }
 
-    @if (variosEditorData(); as initialData) {
-    <otpv-varios-editor [initialData]="initialData"
+    @if (variosEditorState(); as editorState) {
+    <otpv-varios-editor [initialData]="editorState.data"
                         [ivaOptionsBps]="variosIvaOptionsBps()"
+                        [title]="
+            editorState.lineaIdTemporal === null
+                ? 'Introducir Varios'
+                : 'Editar Varios'
+        "
                         (saveEvent)="onVariosSave($event)"
                         (cancelEvent)="closeVariosEditor()" />
     }
