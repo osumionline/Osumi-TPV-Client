@@ -223,4 +223,111 @@ describe('VentaLineaEnCurso', (): void => {
 
     expect((): void => linea.setImporteManualMicros(7_000_000)).toThrow();
   });
+
+  it('crea una línea Varios con sus datos específicos', (): void => {
+    const linea: VentaLineaEnCurso = new VentaLineaEnCurso().fromVarios({
+      descripcion: 'Servicio especial',
+      pvpMicros: 12_500_000,
+      ivaBps: 2_100,
+    });
+
+    expect(linea.esVarios).toBe(true);
+    expect(linea.idArticulo).toBeNull();
+    expect(linea.articuloPublicId).toBeNull();
+    expect(linea.localizador).toBe(0);
+    expect(linea.descripcion).toBe('Servicio especial');
+    expect(linea.marca).toBe('Varios');
+    expect(linea.stock).toBeNull();
+    expect(linea.cantidad).toBe(1);
+    expect(linea.pucMicros).toBe(0);
+    expect(linea.pvpMicros).toBe(12_500_000);
+    expect(linea.ivaBps).toBe(2_100);
+    expect(linea.importeFinalMicros).toBe(12_500_000);
+  });
+
+  it('permite crear un Varios con PVP cero', (): void => {
+    const linea: VentaLineaEnCurso = new VentaLineaEnCurso().fromVarios({
+      descripcion: 'Varios',
+      pvpMicros: 0,
+      ivaBps: 2_100,
+    });
+
+    expect(linea.pvpMicros).toBe(0);
+    expect(linea.importeFinalMicros).toBe(0);
+  });
+
+  it('valida los datos propios de una línea Varios', (): void => {
+    expect((): VentaLineaEnCurso =>
+      new VentaLineaEnCurso().fromVarios({
+        descripcion: '   ',
+        pvpMicros: 1_000_000,
+        ivaBps: 2_100,
+      }),
+    ).toThrow(RangeError);
+
+    expect((): VentaLineaEnCurso =>
+      new VentaLineaEnCurso().fromVarios({
+        descripcion: 'Varios',
+        pvpMicros: -1,
+        ivaBps: 2_100,
+      }),
+    ).toThrow(RangeError);
+
+    expect((): VentaLineaEnCurso =>
+      new VentaLineaEnCurso().fromVarios({
+        descripcion: 'Varios',
+        pvpMicros: 1_000_000,
+        ivaBps: 10_001,
+      }),
+    ).toThrow(RangeError);
+  });
+
+  it('edita un Varios sin destruir cantidad, regalo ni descuentos', (): void => {
+    const linea: VentaLineaEnCurso = new VentaLineaEnCurso().fromVarios({
+      descripcion: 'Varios',
+      pvpMicros: 10_000_000,
+      ivaBps: 2_100,
+    });
+
+    linea.setCantidad(2);
+    linea.setDescuentoClienteBps(1_000);
+    linea.setDescuentoManualBps(2_000);
+    linea.setRegalo(true);
+
+    linea.setDatosVarios({
+      descripcion: 'Servicio modificado',
+      pvpMicros: 15_000_000,
+      ivaBps: 1_000,
+    });
+
+    expect(linea.descripcion).toBe('Servicio modificado');
+    expect(linea.pvpMicros).toBe(15_000_000);
+    expect(linea.ivaBps).toBe(1_000);
+
+    expect(linea.cantidad).toBe(2);
+    expect(linea.descuentoClienteBps).toBe(1_000);
+    expect(linea.descuentoManualBps).toBe(2_000);
+    expect(linea.regalo).toBe(true);
+  });
+
+  it('impide reducir el PVP de un Varios por debajo de su descuento directo', (): void => {
+    const linea: VentaLineaEnCurso = new VentaLineaEnCurso().fromVarios({
+      descripcion: 'Varios',
+      pvpMicros: 10_000_000,
+      ivaBps: 2_100,
+    });
+
+    linea.setDescuentoDirectoMicros(5_000_000);
+
+    expect((): void =>
+      linea.setDatosVarios({
+        descripcion: 'Varios modificado',
+        pvpMicros: 4_000_000,
+        ivaBps: 2_100,
+      }),
+    ).toThrow(RangeError);
+
+    expect(linea.descripcion).toBe('Varios');
+    expect(linea.pvpMicros).toBe(10_000_000);
+  });
 });

@@ -227,4 +227,77 @@ describe('VentasService', (): void => {
     expect(linea.descuentoBps).toBe(0);
     expect(linea.importeFinalMicros).toBe(10_000_000);
   });
+
+  it('añade cada Varios como una línea independiente', (): void => {
+    const service: VentasService = new VentasService();
+
+    const venta: VentaEnCurso = service.crearVenta();
+
+    const primeraLinea: VentaLineaEnCurso = service.agregarVarios(venta.idTemporal, {
+      descripcion: 'Varios',
+      pvpMicros: 5_000_000,
+      ivaBps: 2_100,
+    });
+
+    const segundaLinea: VentaLineaEnCurso = service.agregarVarios(venta.idTemporal, {
+      descripcion: 'Otro varios',
+      pvpMicros: 7_500_000,
+      ivaBps: 2_100,
+    });
+
+    expect(venta.lineas).toHaveLength(2);
+
+    expect(primeraLinea.idTemporal).not.toBe(segundaLinea.idTemporal);
+
+    expect(venta.totalMicros).toBe(12_500_000);
+  });
+
+  it('aplica el descuento del cliente a un Varios nuevo', (): void => {
+    const service: VentasService = new VentasService();
+
+    const venta: VentaEnCurso = service.crearVenta();
+
+    service.asignarCliente(venta.idTemporal, createCliente('cliente-1', 10));
+
+    const linea: VentaLineaEnCurso = service.agregarVarios(venta.idTemporal, {
+      descripcion: 'Varios',
+      pvpMicros: 10_000_000,
+      ivaBps: 2_100,
+    });
+
+    expect(linea.descuentoClienteBps).toBe(1_000);
+
+    expect(linea.importeFinalMicros).toBe(9_000_000);
+  });
+
+  it('actualiza los datos de un Varios sin sustituir la línea', (): void => {
+    const service: VentasService = new VentasService();
+
+    const venta: VentaEnCurso = service.crearVenta();
+
+    const linea: VentaLineaEnCurso = service.agregarVarios(venta.idTemporal, {
+      descripcion: 'Varios',
+      pvpMicros: 10_000_000,
+      ivaBps: 2_100,
+    });
+
+    const idTemporal: string = linea.idTemporal;
+
+    service.actualizarVarios(venta.idTemporal, linea.idTemporal, {
+      descripcion: 'Trabajo especial',
+      pvpMicros: 20_000_000,
+      ivaBps: 1_000,
+    });
+
+    expect(venta.lineas).toHaveLength(1);
+    expect(venta.lineas[0]).toBe(linea);
+
+    expect(linea.idTemporal).toBe(idTemporal);
+
+    expect(linea.descripcion).toBe('Trabajo especial');
+
+    expect(linea.pvpMicros).toBe(20_000_000);
+
+    expect(linea.ivaBps).toBe(1_000);
+  });
 });

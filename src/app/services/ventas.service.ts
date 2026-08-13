@@ -5,6 +5,7 @@ import type Empleado from '@model/empleados/empleado.model';
 import type ArticuloVenta from '@model/ventas/articulo-venta.model';
 import VentaEnCurso from '@model/ventas/venta-en-curso.model';
 import VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
+import type VentaVariosData from '@model/ventas/venta-varios-data.interface';
 import type {
   VentaFocusTarget,
   VentaWorkspaceState,
@@ -203,6 +204,42 @@ export default class VentasService {
 
       venta.addLinea(new VentaLineaEnCurso().fromArticulo(articulo));
     }
+
+    this.notifyVentasChanged();
+
+    this.setFocusTarget(ventaIdTemporal, {
+      type: 'localizador',
+    });
+  }
+
+  /**
+   * Añade una nueva línea Varios a una venta.
+   *
+   * Cada llamada crea siempre una línea independiente.
+   */
+  agregarVarios(ventaIdTemporal: string, data: VentaVariosData): VentaLineaEnCurso {
+    const venta: VentaEnCurso = this.requireVenta(ventaIdTemporal);
+
+    const linea: VentaLineaEnCurso = new VentaLineaEnCurso().fromVarios(data);
+
+    venta.addLinea(linea);
+
+    this.notifyVentasChanged();
+
+    this.setFocusTarget(ventaIdTemporal, {
+      type: 'localizador',
+    });
+
+    return linea;
+  }
+
+  /**
+   * Modifica los datos propios de una línea Varios.
+   */
+  actualizarVarios(ventaIdTemporal: string, lineaIdTemporal: string, data: VentaVariosData): void {
+    const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
+
+    linea.setDatosVarios(data);
 
     this.notifyVentasChanged();
 
