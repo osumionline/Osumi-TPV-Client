@@ -19,11 +19,17 @@ import {
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
+import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import permissionIds from '@desktop-contracts/permissions/permission-ids.constants';
 import type AccesoDirectoVenta from '@model/ventas/acceso-directo-venta.model';
 import type ArticuloVenta from '@model/ventas/articulo-venta.model';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
 import type VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
+import type VentaVariosData from '@model/ventas/venta-varios-data.interface';
+import {
+  getDefaultVariosIvaBps,
+  getVariosIvaOptionsBps,
+} from '@model/ventas/venta-varios-iva.utils';
 import type {
   VentaEditableField,
   VentaFocusTarget,
@@ -33,8 +39,10 @@ import { MICROS_PER_CENT } from '@model/ventas/ventas-money.constants';
 import ArticleSearchComponent from '@modules/ventas/components/article-search/article-search.component';
 import ClientStatisticsComponent from '@modules/ventas/components/client-statistics/client-statistics.component';
 import DirectAccessSelectorComponent from '@modules/ventas/components/direct-access-selector/direct-access-selector.component';
+import VariosEditorComponent from '@modules/ventas/components/varios-editor/varios-editor.component';
 import { DialogService } from '@osumi/angular-tools';
 import VentasArticulosService from '@services/ventas-articulos.service';
+import VentasContextService from '@services/ventas-context.service';
 import VentasService from '@services/ventas.service';
 
 /**
@@ -54,14 +62,14 @@ import VentasService from '@services/ventas.service';
     ArticleSearchComponent,
     DirectAccessSelectorComponent,
     ClientStatisticsComponent,
+    VariosEditorComponent,
   ],
 })
 export default class SaleWorkspaceComponent {
   private readonly dialog: DialogService = inject(DialogService);
-
   private readonly ventasArticulosService: VentasArticulosService = inject(VentasArticulosService);
-
   readonly ventasService: VentasService = inject(VentasService);
+  private readonly ventasContextService: VentasContextService = inject(VentasContextService);
 
   readonly venta: InputSignal<VentaEnCurso> = input.required<VentaEnCurso>();
 
@@ -96,6 +104,19 @@ export default class SaleWorkspaceComponent {
 
   readonly directAccessOpen: WritableSignal<boolean> = signal<boolean>(false);
 
+  readonly variosEditorData: WritableSignal<VentaVariosData | null> =
+    signal<VentaVariosData | null>(null);
+
+  readonly variosIvaOptionsBps: Signal<readonly number[]> = computed((): readonly number[] => {
+    const appData: AppData | null = this.ventasContextService.appData();
+
+    if (appData === null) {
+      return [];
+    }
+
+    return getVariosIvaOptionsBps(appData.ivaList);
+  });
+
   readonly localizadorInput: Signal<ElementRef<HTMLInputElement> | undefined> =
     viewChild<ElementRef<HTMLInputElement>>('localizadorInput');
   readonly editableInputs: Signal<readonly ElementRef<HTMLInputElement>[]> =
@@ -110,7 +131,8 @@ export default class SaleWorkspaceComponent {
         this.ventasService.ventaActivaId() !== venta.idTemporal ||
         workspace === null ||
         this.searchOpen() ||
-        this.directAccessOpen()
+        this.directAccessOpen() ||
+        this.variosEditorData() !== null
       ) {
         return;
       }
@@ -612,6 +634,70 @@ export default class SaleWorkspaceComponent {
   }
 
   /**
+   * Abre el editor para introducir una nueva línea Varios.
+   */
+  openNewVarios(): void {
+    this.localizador.set('');
+
+    const appData: AppData | null = this.ventasContextService.appData();
+
+    if (appData === null) {
+      this.showVariosConfigurationError('No se ha podido obtener la configuración del negocio.');
+
+      return;
+    }
+
+    let ivaBps: number;
+
+    try {
+      ivaBps = getDefaultVariosIvaBps(appData.ivaList);
+    } catch (error: unknown) {
+      this.showVariosConfigurationError(
+        error instanceof Error ? error.message : 'No se ha podido determinar el IVA del Varios.',
+      );
+
+      return;
+    }
+
+    this.variosEditorData.set({
+      descripcion: 'Varios',
+      pvpMicros: 0,
+      ivaBps,
+    });
+  }
+
+  /**
+   * Confirma la creación del Varios.
+   */
+  onVariosSave(data: VentaVariosData): void {
+    try {
+      this.ventasService.agregarVarios(this.venta().idTemporal, data);
+
+      this.variosEditorData.set(null);
+    } catch (error: unknown) {
+      const message: string =
+        error instanceof Error ? error.message : 'No se ha podido añadir el Varios.';
+
+      this.dialog
+        .alert({
+          title: 'Atención',
+          content: message,
+        })
+        .subscribe();
+    }
+  }
+
+  /**
+   * Cancela la introducción del Varios sin crear ninguna línea.
+   */
+  closeVariosEditor(): void {
+    this.variosEditorData.set(null);
+    this.localizador.set('');
+
+    this.focusLocalizador();
+  }
+
+  /**
    * Solicita la eliminación de una línea de la venta.
    */
   deleteLinea(linea: VentaLineaEnCurso): void {
@@ -686,7 +772,7 @@ export default class SaleWorkspaceComponent {
     }
 
     if (codigo === '0') {
-      this.showPendingFeature('La venta de artículos "Varios" se implementará en Ventas 7.');
+      this.openNewVarios();
 
       return;
     }
@@ -750,6 +836,21 @@ export default class SaleWorkspaceComponent {
         this.ventasService.setFocusTarget(this.venta().idTemporal, {
           type: 'localizador',
         });
+      });
+  }
+
+  /**
+   * Informa de un problema con la configuración necesaria
+   * para introducir un Varios.
+   */
+  private showVariosConfigurationError(message: string): void {
+    this.dialog
+      .alert({
+        title: 'Atención',
+        content: message,
+      })
+      .subscribe((): void => {
+        this.focusLocalizador();
       });
   }
 

@@ -376,4 +376,11 @@
     <otpv-direct-access-selector (selectEvent)="onDirectAccessSelected($event)"
                                  (closeEvent)="closeDirectAccess()" />
     }
+
+    @if (variosEditorData(); as initialData) {
+    <otpv-varios-editor [initialData]="initialData"
+                        [ivaOptionsBps]="variosIvaOptionsBps()"
+                        (saveEvent)="onVariosSave($event)"
+                        (cancelEvent)="closeVariosEditor()" />
+    }
 </section>

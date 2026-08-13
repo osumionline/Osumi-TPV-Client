@@ -1,0 +1,94 @@
+<div class="overlay">
+    <button class="overlay__backdrop"
+            type="button"
+            aria-label="Cancelar Varios"
+            (click)="cancel()">
+    </button>
+
+    <section class="varios-editor"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="varios-editor-title">
+        <h2 id="varios-editor-title">
+            {{ title() }}
+        </h2>
+
+        <form novalidate
+              (submit)="save($event)">
+            <mat-form-field>
+                <mat-label>
+                    Nombre
+                </mat-label>
+
+                <input #descripcionInput
+                       matInput
+                       type="text"
+                       maxlength="200"
+                       autocomplete="off"
+                       [value]="descripcion()"
+                       (input)="updateDescripcion($event)">
+            </mat-form-field>
+
+            <div class="varios-editor__row">
+                <mat-form-field>
+                    <mat-label>
+                        PVP
+                    </mat-label>
+
+                    <input #pvpInput
+                           matInput
+                           type="number"
+                           inputmode="decimal"
+                           min="0"
+                           step="0.01"
+                           autocomplete="off"
+                           [value]="pvpEuros() ?? ''"
+                           (input)="updatePvp($event)">
+
+                    <span matTextSuffix>
+                        €
+                    </span>
+                </mat-form-field>
+
+                <mat-form-field>
+                    <mat-label>
+                        IVA
+                    </mat-label>
+
+                    <select matNativeControl
+                            (change)="updateIva($event)">
+                        @for (
+                        optionIvaBps of ivaOptionsBps();
+                        track optionIvaBps
+                        ) {
+                        <option [value]="optionIvaBps"
+                                [selected]="optionIvaBps === ivaBps()">
+                            {{ optionIvaBps / 100 }} %
+                        </option>
+                        }
+                    </select>
+                </mat-form-field>
+            </div>
+
+            @if (error() !== null) {
+            <div class="varios-editor__error"
+                 role="alert">
+                {{ error() }}
+            </div>
+            }
+
+            <div class="varios-editor__actions">
+                <button mat-stroked-button
+                        type="button"
+                        (click)="cancel()">
+                    Cancelar
+                </button>
+
+                <button mat-flat-button
+                        type="submit">
+                    Guardar
+                </button>
+            </div>
+        </form>
+    </section>
+</div>
