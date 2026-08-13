@@ -1,8 +1,16 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { Service, signal } from '@angular/core';
+import type { ClienteEstadisticasInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
+import type ClienteEstadisticasState from '@model/clientes/cliente-estadisticas-state.interface';
 import Cliente from '@model/clientes/cliente.model';
+
+const EMPTY_ESTADISTICAS_STATE: ClienteEstadisticasState = {
+  data: null,
+  loading: false,
+  error: null,
+};
 
 @Service()
 export default class ClientesService {
@@ -12,7 +20,24 @@ export default class ClientesService {
 
   private readonly loadedSignal: WritableSignal<boolean> = signal<boolean>(false);
 
+  private readonly estadisticasSignal: WritableSignal<
+    ReadonlyMap<string, ClienteEstadisticasState>
+  > = signal<ReadonlyMap<string, ClienteEstadisticasState>>(
+    new Map<string, ClienteEstadisticasState>(),
+  );
+
   private pendingRequest: Promise<void> | null = null;
+
+  private readonly pendingEstadisticasRequests: Map<string, Promise<void>> = new Map<
+    string,
+    Promise<void>
+  >();
+
+  /*
+   * Permite invalidar de golpe cualquier petición de estadísticas
+   * anterior cuando se limpia completamente el servicio.
+   */
+  private estadisticasGeneration: number = 0;
 
   readonly clientes: Signal<readonly Cliente[]> = this.clientesSignal.asReadonly();
 
@@ -62,10 +87,53 @@ export default class ClientesService {
     return cliente;
   }
 
+  /**
+   * Devuelve el estado reactivo cacheado de las estadísticas
+   * de un cliente.
+   */
+  getEstadisticasState(publicId: string | null): ClienteEstadisticasState {
+    if (publicId === null) {
+      return EMPTY_ESTADISTICAS_STATE;
+    }
+
+    const normalizedPublicId: string = publicId.trim();
+
+    if (normalizedPublicId === '') {
+      return EMPTY_ESTADISTICAS_STATE;
+    }
+
+    return this.estadisticasSignal().get(normalizedPublicId) ?? EMPTY_ESTADISTICAS_STATE;
+  }
+
+  /**
+   * Carga las estadísticas de un cliente únicamente cuando
+   * todavía no están disponibles en caché.
+   */
+  loadEstadisticas(publicId: string): Promise<void> {
+    return this.loadEstadisticasData(publicId, false);
+  }
+
+  /**
+   * Fuerza la actualización de unas estadísticas ya cacheadas.
+   */
+  reloadEstadisticas(publicId: string): Promise<void> {
+    return this.loadEstadisticasData(publicId, true);
+  }
+
   clear(): void {
     this.clientesSignal.set([]);
 
     this.loadedSignal.set(false);
+
+    this.estadisticasSignal.set(new Map<string, ClienteEstadisticasState>());
+
+    /*
+     * Una petición antigua puede seguir físicamente en curso,
+     * pero su respuesta ya no podrá modificar el nuevo estado.
+     */
+    this.estadisticasGeneration += 1;
+
+    this.pendingEstadisticasRequests.clear();
   }
 
   findById(id: number): Cliente | null {
@@ -102,5 +170,96 @@ export default class ClientesService {
     } finally {
       this.pendingRequest = null;
     }
+  }
+
+  private loadEstadisticasData(publicId: string, force: boolean): Promise<void> {
+    const normalizedPublicId: string = publicId.trim();
+
+    if (normalizedPublicId === '') {
+      throw new Error('El identificador del cliente no es válido.');
+    }
+
+    const cachedState: ClienteEstadisticasState | undefined =
+      this.estadisticasSignal().get(normalizedPublicId);
+
+    if (!force && cachedState?.data !== null && cachedState?.data !== undefined) {
+      return Promise.resolve();
+    }
+
+    const pendingRequest: Promise<void> | undefined =
+      this.pendingEstadisticasRequests.get(normalizedPublicId);
+
+    if (pendingRequest !== undefined) {
+      return pendingRequest;
+    }
+
+    const generation: number = this.estadisticasGeneration;
+
+    const request: Promise<void> = this.requestEstadisticas(normalizedPublicId, generation);
+
+    this.pendingEstadisticasRequests.set(normalizedPublicId, request);
+
+    /*
+     * La comparación de la Promise es importante: si clear()
+     * invalida esta petición y posteriormente se inicia otra para
+     * el mismo cliente, la petición antigua no debe borrar la nueva
+     * del mapa cuando termine.
+     */
+    void request.finally((): void => {
+      if (this.pendingEstadisticasRequests.get(normalizedPublicId) === request) {
+        this.pendingEstadisticasRequests.delete(normalizedPublicId);
+      }
+    });
+
+    return request;
+  }
+
+  private async requestEstadisticas(publicId: string, generation: number): Promise<void> {
+    const currentState: ClienteEstadisticasState = this.getEstadisticasState(publicId);
+
+    this.setEstadisticasState(publicId, {
+      data: currentState.data,
+      loading: true,
+      error: null,
+    });
+
+    try {
+      const result: ClienteEstadisticasInterface =
+        await window.osumiDesktop.clientes.getEstadisticas(publicId);
+
+      if (generation !== this.estadisticasGeneration) {
+        return;
+      }
+
+      this.setEstadisticasState(publicId, {
+        data: result,
+        loading: false,
+        error: null,
+      });
+    } catch (error: unknown) {
+      if (generation !== this.estadisticasGeneration) {
+        return;
+      }
+
+      this.setEstadisticasState(publicId, {
+        data: currentState.data,
+        loading: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'No se han podido cargar las estadísticas del cliente.',
+      });
+    }
+  }
+
+  private setEstadisticasState(publicId: string, state: ClienteEstadisticasState): void {
+    const estadisticas: Map<string, ClienteEstadisticasState> = new Map<
+      string,
+      ClienteEstadisticasState
+    >(this.estadisticasSignal());
+
+    estadisticas.set(publicId, state);
+
+    this.estadisticasSignal.set(estadisticas);
   }
 }
