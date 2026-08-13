@@ -1,8 +1,9 @@
 import {
-  afterNextRender,
+  afterRenderEffect,
   Component,
   computed,
   ElementRef,
+  inject,
   input,
   output,
   signal,
@@ -13,24 +14,40 @@ import {
   type WritableSignal,
 } from '@angular/core';
 import { MatButton } from '@angular/material/button';
+import createClienteCommand from '@model/clientes/cliente-form-command.mapper';
+import type ClienteFormModel from '@model/clientes/cliente-form.model';
 import type Cliente from '@model/clientes/cliente.model';
+import ClientFormComponent from '@modules/clientes/components/client-form/client-form.component';
+import ClientesService from '@services/clientes.service';
+
+type ClientSelectorMode = 'search' | 'create';
 
 @Component({
   selector: 'otpv-client-selector',
   templateUrl: './client-selector.component.html',
   styleUrl: './client-selector.component.scss',
-  imports: [MatButton],
+  imports: [ClientFormComponent, MatButton],
 })
 export default class ClientSelectorComponent {
+  private readonly clientesService: ClientesService = inject(ClientesService);
+
   readonly clientes: InputSignal<readonly Cliente[]> = input.required<readonly Cliente[]>();
 
   readonly selectedPublicId: InputSignal<string | null> = input<string | null>(null);
 
   readonly selectEvent: OutputEmitterRef<Cliente> = output<Cliente>();
+
   readonly clearEvent: OutputEmitterRef<void> = output<void>();
+
   readonly cancelEvent: OutputEmitterRef<void> = output<void>();
 
+  readonly mode: WritableSignal<ClientSelectorMode> = signal<ClientSelectorMode>('search');
+
   readonly query: WritableSignal<string> = signal<string>('');
+
+  readonly saving: WritableSignal<boolean> = signal<boolean>(false);
+
+  readonly creationError: WritableSignal<string | null> = signal<string | null>(null);
 
   readonly filteredClientes: Signal<readonly Cliente[]> = computed((): readonly Cliente[] => {
     const query: string = this.normalizeSearchValue(this.query());
@@ -46,13 +63,18 @@ export default class ClientSelectorComponent {
     );
   });
 
-  private readonly searchInput = viewChild.required<ElementRef<HTMLInputElement>>('searchInput');
+  private readonly searchInput: Signal<ElementRef<HTMLInputElement> | undefined> =
+    viewChild<ElementRef<HTMLInputElement>>('searchInput');
 
-  constructor() {
-    afterNextRender((): void => {
-      this.searchInput().nativeElement.focus();
-    });
-  }
+  private readonly focusSearchRef = afterRenderEffect({
+    write: (): void => {
+      if (this.mode() !== 'search') {
+        return;
+      }
+
+      this.searchInput()?.nativeElement.focus();
+    },
+  });
 
   /**
    * Actualiza el texto utilizado para filtrar los clientes disponibles.
@@ -71,6 +93,58 @@ export default class ClientSelectorComponent {
   }
 
   /**
+   * Muestra el formulario para crear un cliente.
+   */
+  openCreate(): void {
+    if (this.saving()) {
+      return;
+    }
+
+    this.creationError.set(null);
+    this.mode.set('create');
+  }
+
+  /**
+   * Vuelve a la búsqueda de clientes sin cerrar el selector.
+   */
+  openSearch(): void {
+    if (this.saving()) {
+      return;
+    }
+
+    this.creationError.set(null);
+    this.mode.set('search');
+  }
+
+  /**
+   * Crea un cliente y lo devuelve como cliente seleccionado.
+   */
+  async createCliente(model: ClienteFormModel): Promise<void> {
+    if (this.saving()) {
+      return;
+    }
+
+    this.saving.set(true);
+    this.creationError.set(null);
+
+    let cliente: Cliente | null = null;
+
+    try {
+      cliente = await this.clientesService.create(createClienteCommand(model));
+    } catch (error: unknown) {
+      this.creationError.set(
+        error instanceof Error ? error.message : 'No se ha podido crear el cliente.',
+      );
+    } finally {
+      this.saving.set(false);
+    }
+
+    if (cliente !== null) {
+      this.selectEvent.emit(cliente);
+    }
+  }
+
+  /**
    * Elimina el cliente actualmente asociado a la venta.
    */
   clear(): void {
@@ -81,6 +155,10 @@ export default class ClientSelectorComponent {
    * Cierra el selector sin modificar la venta.
    */
   cancel(): void {
+    if (this.saving()) {
+      return;
+    }
+
     this.cancelEvent.emit();
   }
 

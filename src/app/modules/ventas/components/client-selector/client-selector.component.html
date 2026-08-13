@@ -2,17 +2,24 @@
     <button class="overlay__backdrop"
             type="button"
             aria-label="Cerrar selector de cliente"
+            [disabled]="saving()"
             (click)="cancel()">
     </button>
 
     <section class="selector"
              role="dialog"
              aria-modal="true"
-             aria-labelledby="client-selector-title">
+             aria-labelledby="client-selector-title"
+             [class.selector--create]="mode() === 'create'">
         <h2 id="client-selector-title">
-            Seleccionar cliente
+            {{
+                mode() === 'search'
+                    ? 'Seleccionar cliente'
+                    : 'Nuevo cliente'
+            }}
         </h2>
 
+        @if (mode() === 'search') {
         <div class="selector__search">
             <input #searchInput
                    type="search"
@@ -23,7 +30,10 @@
         </div>
 
         <div class="selector__clients">
-            @for (cliente of filteredClientes(); track cliente.publicId) {
+            @for (
+            cliente of filteredClientes();
+            track cliente.publicId
+            ) {
             <button class="selector__client"
                     type="button"
                     [class.selector__client--selected]="
@@ -69,6 +79,13 @@
         </div>
 
         <div class="selector__actions">
+            <button class="selector__new-client"
+                    mat-flat-button
+                    type="button"
+                    (click)="openCreate()">
+                Nuevo cliente
+            </button>
+
             @if (selectedPublicId() !== null) {
             <button mat-stroked-button
                     type="button"
@@ -83,5 +100,21 @@
                 Cancelar
             </button>
         </div>
+        }
+        @else {
+        <div class="selector__form">
+            @if (creationError() !== null) {
+            <div class="selector__error"
+                 role="alert">
+                {{ creationError() }}
+            </div>
+            }
+
+            <otpv-client-form [saving]="saving()"
+                              submitLabel="Guardar y seleccionar"
+                              (saveEvent)="createCliente($event)"
+                              (cancelEvent)="openSearch()" />
+        </div>
+        }
     </section>
 </div>
