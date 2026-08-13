@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 1.2  
+**Versión:** 1.3  
 **Fecha:** 13 de agosto de 2026  
-**Estado:** Installation, importación legacy y Startup completados y probados. En el módulo **Ventas** están completados los bloques 1 a 6. El siguiente bloque es **Ventas 7 — Varios**.
+**Estado:** Installation, importación legacy y Startup completados y probados. En el módulo **Ventas** están completados los bloques 1 a 7. El siguiente bloque es **Ventas 8 — Devoluciones**.
 
 ## 1. Propósito del documento
 
@@ -22,6 +22,7 @@ Los grandes hitos completados hasta ahora son:
 - **Ventas 4 — Estructura visual del módulo**.
 - **Ventas 5 — Operaciones sobre líneas**.
 - **Ventas 6 — Clientes y estadísticas rápidas**.
+- **Ventas 7 — Varios**.
 
 Todos ellos han sido probados por el usuario con la aplicación real y los cambios están subidos al repositorio.
 
@@ -40,9 +41,9 @@ Todos ellos han sido probados por el usuario con la aplicación real y los cambi
 - Precarga global en memoria de marcas, proveedores, empleados, clientes, categorías y provincias: completada.
 - Conexión SQLite operativa persistente durante la ejecución: implementada.
 - Protocolo interno `osumi://assets/...` para recursos de la instalación: implementado y probado.
-- Módulo Ventas operativo hasta el final del bloque 6.
+- Módulo Ventas operativo hasta el final del bloque 7.
 - Las ventas abiertas viven en memoria en `VentasService` y sobreviven a la navegación entre módulos.
-- El siguiente bloque funcional es **Ventas 7 — Varios**.
+- El siguiente bloque funcional es **Ventas 8 — Devoluciones**.
 
 ## 3. Repositorios y entorno
 
@@ -249,14 +250,17 @@ Esta recapitulación debe aparecer al comenzar cada nuevo bloque de desarrollo y
    - ✅ 6B — Selector y asociación de cliente.
    - ✅ 6C — Alta rápida + documento de protección de datos.
    - ✅ 6D — Estadísticas rápidas.
-7. 🟨 **Varios — siguiente bloque**.
-8. ⬜ **Devoluciones**.
+7. ✅ **Varios**.
+   - ✅ 7A — Modelo funcional y operaciones de dominio.
+   - ✅ 7B — Editor de Varios + integración con `0 + Intro`.
+   - ✅ 7C — Edición desde la línea + pruebas de integración.
+8. 🟨 **Devoluciones — siguiente bloque**.
 9. ⬜ **Reservas**.
 10. ⬜ **Finalización y pagos**.
 11. ⬜ **Persistencia transaccional**.
 12. ⬜ **Postventa**.
 
-> **Estado exacto al cerrar esta versión:** Ventas 1–6 están implementados, probados y subidos. El próximo desarrollo debe comenzar por **Ventas 7 — Varios**.
+> **Estado exacto al cerrar esta versión:** Ventas 1–7 están implementados, probados y subidos. El próximo desarrollo debe comenzar por **Ventas 8 — Devoluciones**.
 
 ## 11. Ventas 1 — Contexto operativo ✅
 
@@ -624,9 +628,194 @@ Después de Ventas 11, cuando se persista una venta, se podrá forzar la recarga
 
 `Cliente.publicId` es `string | null`, por lo que el componente comprueba explícitamente `null` antes de cargar o recargar estadísticas; no se usa non-null assertion.
 
-## 17. Ajustes transversales realizados durante Ventas
+## 17. Ventas 7 — Varios ✅
 
-### 17.1 Menú de Electron
+### 17.1 Entrada desde el localizador
+
+El código especial `0 + Intro` abre el editor de una línea libre **Varios**.
+
+A diferencia del TPV antiguo, la línea **no se crea antes de confirmar el editor**:
+
+```text
+0 + Intro
+  ↓
+Editor Varios
+  ├─ Cancelar → la venta no cambia
+  └─ Guardar  → se crea la línea
+```
+
+Con ello se corrigió el fallo legacy por el que cancelar podía dejar una línea `Varios` de 0 € dentro de la venta.
+
+Los localizadores negativos siguen reservados para **Ventas 8 — Devoluciones**.
+
+### 17.2 Modelo de dominio
+
+Se añadió `VentaVariosData` con:
+
+- `descripcion`;
+- `pvpMicros`;
+- `ivaBps`.
+
+`VentaLineaEnCurso` dispone de:
+
+- `fromVarios(data)`;
+- getter `esVarios`;
+- `setDatosVarios(data)`.
+
+Una línea Varios se representa realmente como línea libre y **no como un artículo ficticio con ID 0**:
+
+```text
+idArticulo       = null
+articuloPublicId = null
+localizador      = 0
+marca            = "Varios"
+stock            = null
+cantidad         = 1
+pucMicros        = 0
+```
+
+Esto encaja con el esquema SQLite nuevo, donde `linea_venta.id_articulo` puede ser `NULL`.
+
+Cada ejecución de `0 + Intro` crea siempre una línea independiente. Los Varios nunca se agrupan automáticamente entre sí.
+
+### 17.3 Reglas económicas
+
+Decisiones funcionales fijadas:
+
+- cualquier empleado que pueda vender puede introducir un Varios;
+- no se exige el permiso `ventas.modificarImportes` para indicar su PVP;
+- el PVP puede ser `0 €`;
+- el nombre es obligatorio y debe tener entre 1 y 200 caracteres;
+- cantidad inicial `1`;
+- el Varios puede utilizar después las operaciones normales de línea: cantidad, regalo y descuentos;
+- al crearse mediante `VentaEnCurso.addLinea()`, recibe automáticamente la capa de descuento del cliente activo;
+- editar nombre/PVP/IVA no destruye cantidad, regalo ni las capas de descuento existentes;
+- si existe un descuento directo fijo, no se permite reducir el PVP hasta dejar el descuento por encima del importe base de la línea.
+
+### 17.4 IVA por defecto
+
+La regla acordada para un nuevo Varios es deliberadamente conservadora:
+
+1. si `21 %` está configurado en `appData.ivaList`, se selecciona `21 %`;
+2. si no existe `21 %`, se selecciona **el IVA más alto configurado**.
+
+La razón funcional es evitar que un despiste seleccione por defecto un tipo inferior al que finalmente corresponda.
+
+La regla está encapsulada y probada mediante:
+
+- `getVariosIvaOptionsBps()`;
+- `getDefaultVariosIvaBps()`.
+
+Se detectó además un problema visual con el `<select matNativeControl>`: aunque el signal contenía correctamente `2100` bps, el navegador dejaba seleccionada la primera opción creada por el `@for`. Se corrigió haciendo que cada `<option>` declare explícitamente:
+
+```html
+[selected]="optionIvaBps === ivaBps()"
+```
+
+Los tests del helper ya demostraban que el cálculo era correcto; el fallo estaba únicamente en la representación del `<select>`.
+
+### 17.5 Editor reutilizable
+
+`VariosEditorComponent` permite crear y editar una línea Varios usando el mismo formulario:
+
+- nombre;
+- PVP;
+- IVA.
+
+En creación:
+
+- título `Introducir Varios`;
+- nombre inicial `Varios`;
+- PVP inicial `0`;
+- IVA según la regla anterior;
+- foco inicial en PVP con el contenido seleccionado.
+
+En edición:
+
+- título `Editar Varios`;
+- se cargan nombre, PVP e IVA actuales;
+- no se recalcula ningún IVA por defecto.
+
+El estado se modela con `VentaVariosEditorState`:
+
+```text
+lineaIdTemporal = null   → creación
+lineaIdTemporal = string → edición
+```
+
+El `SaleWorkspaceComponent` impide la restauración automática del foco al localizador mientras el editor está abierto.
+
+### 17.6 Edición desde la línea
+
+La descripción de un Varios se representa como acción interactiva.
+
+Al hacer clic:
+
+```text
+línea Varios
+  ↓
+clic en descripción
+  ↓
+Editar Varios
+  ↓
+Guardar
+  ↓
+misma instancia de VentaLineaEnCurso actualizada
+```
+
+Los artículos normales conservan la descripción puramente informativa y no abren este editor.
+
+Cancelar una edición no modifica ningún dato.
+
+Guardar o cancelar termina devolviendo al usuario al flujo normal del TPV y al localizador.
+
+### 17.7 Servicio y reactividad
+
+`VentasService` expone:
+
+- `agregarVarios(...)`;
+- `actualizarVarios(...)`.
+
+`agregarVarios()` no busca líneas previas equivalentes y crea siempre una nueva.
+
+`actualizarVarios()` exige que la línea sea realmente `esVarios`, por lo que no puede utilizarse como vía para modificar artículos normales.
+
+Las operaciones notifican mediante el mismo mecanismo reactivo de Ventas ya corregido en bloques anteriores, por lo que los cambios se reflejan inmediatamente sin depender de clics o renders secundarios.
+
+### 17.8 Persistencia
+
+Ventas 7 no introduce todavía escritura en backend/IPC/SQLite.
+
+Las líneas Varios viven dentro de la venta en curso igual que las demás líneas. Su persistencia real se realizará en **Ventas 11 — Persistencia transaccional**.
+
+El esquema ya está preparado:
+
+- `linea_venta.id_articulo` puede ser `NULL`;
+- `nombre_articulo` conserva la descripción;
+- PVP e importe se almacenan en microeuros;
+- IVA se almacena en puntos básicos.
+
+### 17.9 Pruebas y validación
+
+Se añadieron pruebas para:
+
+- creación de línea Varios;
+- PVP `0`;
+- validación de descripción/PVP/IVA;
+- conservación de cantidad, regalo y descuentos durante edición;
+- protección del descuento directo frente a una reducción incompatible de PVP;
+- líneas Varios independientes;
+- aplicación del descuento de cliente;
+- actualización sin sustituir la instancia;
+- recálculo del total;
+- rechazo de `actualizarVarios()` sobre un artículo normal;
+- regla de IVA por defecto.
+
+El usuario realizó además pruebas manuales completas de creación, cancelación, edición, varios independientes, descuentos, regalo, borrado y selección de IVA. La batería completa (`test`, `typecheck:electron`, `build`, `lint`) pasa y los cambios están subidos al repositorio.
+
+## 18. Ajustes transversales realizados durante Ventas
+
+### 18.1 Menú de Electron
 
 Se eliminó el menú superior de Electron mediante `Menu.setApplicationMenu(null)` para que Alt no vuelva a mostrar File/Edit/etc.
 
@@ -637,17 +826,17 @@ Como efecto secundario desapareció el acceso a DevTools que dependía del menú
 
 Solo está activo cuando `!app.isPackaged`.
 
-### 17.2 Foco del selector de cliente
+### 18.2 Foco del selector de cliente
 
 Cerrar el selector por selección, eliminación o cancelación fuerza un nuevo `focusTarget` al localizador. Esto evita depender de que el valor anterior del workspace ya fuese `localizador`.
 
-### 17.3 Accesibilidad
+### 18.3 Accesibilidad
 
 Se evita `autofocus` en HTML; el foco inicial se resuelve mediante `viewChild` + `afterNextRender`/efectos post-render.
 
 Los overlays interactivos usan controles accesibles reales en vez de `<div (click)>` no focusables.
 
-## 18. Método de trabajo por bloque
+## 19. Método de trabajo por bloque
 
 Para cada bloque se seguirá el ciclo:
 
@@ -665,7 +854,7 @@ Para cada bloque se seguirá el ciclo:
 
 > **Importante:** no asumir que la implementación antigua es el diseño correcto. Debe utilizarse como fuente funcional y rediseñarse cuando la arquitectura o UX lo justifiquen.
 
-## 19. Fuentes de información
+## 20. Fuentes de información
 
 La fuente principal es el código actual de los repositorios GitHub:
 
@@ -677,7 +866,7 @@ Además pueden utilizarse capturas, explicación funcional del usuario, datos re
 
 No pedir de nuevo archivos ya disponibles y actualizados salvo necesidad concreta.
 
-## 20. Protocolo para cambios de código
+## 21. Protocolo para cambios de código
 
 - Cambios en orden de compilación y en pasos pequeños verificables.
 - Archivo nuevo: entregarlo completo.
@@ -697,20 +886,21 @@ npm run lint
 - No avanzar al bloque siguiente hasta que el actual funcione o sus limitaciones estén documentadas.
 - El usuario suele probar manualmente, ejecutar la batería completa y subir los cambios antes de continuar.
 
-## 21. Prompt de arranque para una conversación nueva
+## 22. Prompt de arranque para una conversación nueva
 
 ```text
 Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” como contexto principal.
 
-Installation + importación legacy y Startup están completados y probados. En el módulo Ventas están completados y subidos los bloques 1 a 6:
+Installation + importación legacy y Startup están completados y probados. En el módulo Ventas están completados y subidos los bloques 1 a 7:
 1. Contexto operativo.
 2. Modelo de venta en curso + workspace persistente.
 3. Consulta/búsqueda de artículos y accesos directos.
 4. Estructura visual.
 5. Operaciones sobre líneas.
 6. Clientes y estadísticas rápidas.
+7. Varios.
 
-El siguiente bloque es Ventas 7 — Varios. Después quedan Devoluciones, Reservas, Finalización y pagos, Persistencia transaccional y Postventa.
+El siguiente bloque es Ventas 8 — Devoluciones. Después quedan Reservas, Finalización y pagos, Persistencia transaccional y Postventa.
 
 Los repositorios de referencia son:
 - Frontend antiguo: https://github.com/osumionline/Osumi-TPV
@@ -721,23 +911,40 @@ Antes de empezar un bloque, dame la recapitulación completa del plan, indicando
 
 Al terminar cada bloque principal, después de que confirme que funciona y que está subido, entrégame una versión actualizada de este documento de continuidad.
 
-Ahora debemos continuar por: Ventas 7 — Varios.
+Ahora debemos continuar por: Ventas 8 — Devoluciones.
 ```
 
-## 22. Próximo paso
+## 23. Próximo paso
 
 El siguiente desarrollo es:
 
-# Ventas 7 — Varios
+# Ventas 8 — Devoluciones
 
-Antes de implementar se debe revisar el comportamiento de **Varios** en el frontend y backend antiguos y concretar exactamente qué operaciones agrupaba, qué permisos/reglas aplicaba y qué parte debe conservarse o rediseñarse.
+El cliente nuevo ya reserva los localizadores negativos para este bloque.
 
-No empezar Ventas 8 hasta que Ventas 7 esté implementado, probado, subido y este documento haya sido actualizado de nuevo.
+La implementación antigua utilizaba un localizador negativo para identificar una venta anterior y abrir un selector de devolución. El modal cargaba la venta histórica, permitía seleccionar una o varias líneas y elegir cuántas unidades devolver de cada una. Las líneas seleccionadas se incorporaban a la venta actual con cantidades negativas y conservaban una referencia a la venta de origen.
 
-## 23. Registro de hitos
+Antes de implementar se debe confirmar expresamente:
+
+- qué identificador del ticket debe introducir o escanear el usuario en el Client (`numero`, serie+número u otro formato);
+- si se mantiene la regla legacy de una única venta de origen en proceso de devolución dentro de una venta actual;
+- cómo se calcula el máximo todavía devolvible cuando una línea ya tuvo devoluciones anteriores;
+- si una venta actual puede mezclar artículos nuevos y líneas de devolución, como permitía implícitamente el TPV antiguo.
+
+El esquema SQLite nuevo ya anticipa devoluciones:
+
+- `venta.total_cents` puede ser negativo;
+- `venta_pago.importe_cents` puede ser negativo;
+- `linea_venta.unidades` puede ser negativo;
+- `linea_venta.unidades_devueltas` registra unidades devueltas de una línea histórica.
+
+No empezar Ventas 9 hasta que Ventas 8 esté implementado, probado, subido y este documento haya sido actualizado de nuevo.
+
+## 24. Registro de hitos
 
 | Versión | Fecha | Hito |
 | --- | --- | --- |
 | 1.0 | 6 de agosto de 2026 | Installation e importación legacy completadas. Inicio del traspaso modular. |
 | 1.1 | 9 de agosto de 2026 | Startup completado: arranque, conexión SQLite operativa, assets internos y precarga global. |
 | 1.2 | 13 de agosto de 2026 | Ventas 1–6 completados: contexto operativo, workspace persistente, búsqueda, estructura visual, operaciones de línea, clientes, alta rápida, protección de datos y estadísticas. Próximo bloque: Ventas 7 — Varios. |
+| 1.3 | 13 de agosto de 2026 | Ventas 7 — Varios completado: línea libre real, creación/cancelación, editor reutilizable, IVA por defecto conservador, edición desde línea y pruebas. Próximo bloque: Ventas 8 — Devoluciones. |
