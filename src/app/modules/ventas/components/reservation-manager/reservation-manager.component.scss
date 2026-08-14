@@ -1,0 +1,187 @@
+.overlay {
+    position: fixed;
+    z-index: 140;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+
+    .overlay__backdrop {
+        position: absolute;
+        inset: 0;
+        padding: 0;
+        border: 0;
+        background-color: var(--modal-bg-color);
+        cursor: default;
+    }
+
+    .reservation-manager {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        width: min(1280px, 100%);
+        height: min(780px, calc(100vh - 48px));
+        min-height: 0;
+        padding: 24px;
+        box-sizing: border-box;
+        border-radius: 8px;
+        flex-direction: column;
+        gap: 16px;
+        background-color: var(--color-white);
+        box-shadow: 0 8px 32px rgb(0 0 0 / 35%);
+    }
+
+    .reservation-manager__header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+
+        h2 {
+            margin-bottom: 4px;
+        }
+
+        p {
+            color: var(--disabled-color);
+        }
+    }
+
+    .reservation-manager__loading,
+    .reservation-manager__empty {
+        display: grid;
+        min-height: 180px;
+        place-items: center;
+        color: var(--disabled-color);
+    }
+
+    .reservation-manager__error,
+    .reservation-manager__loaded-notice {
+        padding: 10px 12px;
+        border-radius: 4px;
+    }
+
+    .reservation-manager__error {
+        border: 1px solid var(--color-red);
+        background-color: rgb(255 51 51 / 8%);
+    }
+
+    .reservation-manager__loaded-notice {
+        background-color: var(--table-row-mark);
+    }
+
+    .reservation-manager__content {
+        display: grid;
+        min-height: 0;
+        flex: 1;
+        grid-template-columns:
+            minmax(360px, 42%) minmax(0, 58%);
+        gap: 16px;
+    }
+
+    .reservation-manager__list,
+    .reservation-manager__detail {
+        display: flex;
+        min-width: 0;
+        min-height: 0;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .reservation-manager__table-wrapper {
+        min-height: 0;
+        flex: 1;
+        overflow: auto;
+        border: 1px solid var(--table-border);
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+
+        th,
+        td {
+            padding: 8px;
+            border-bottom:
+                1px solid var(--table-data-border);
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        th {
+            position: sticky;
+            z-index: 1;
+            top: 0;
+            background-color:
+                var(--table-header-bg);
+            font-weight: 500;
+        }
+
+        .number,
+        .money {
+            text-align: right;
+        }
+
+        .check,
+        .status,
+        .options {
+            width: 44px;
+            text-align: center;
+        }
+    }
+
+    .reservation-manager__reservation {
+        cursor: pointer;
+
+        &:hover {
+            td {
+                background-color:
+                    var(--color-very-light-grey);
+            }
+        }
+    }
+
+    .reservation-manager__reservation--detail {
+        td {
+            background-color:
+                var(--table-row-selected);
+        }
+    }
+
+    .reservation-manager__reservation--loaded {
+        td {
+            background-color:
+                var(--table-row-mark);
+        }
+    }
+
+    .reservation-manager__list-actions {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .reservation-manager__detail-header {
+        display: flex;
+        min-height: 40px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+
+        >div:first-child {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+    }
+
+    .reservation-manager__detail-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    tfoot {
+        td {
+            background-color:
+                var(--color-very-light-grey);
+        }
+    }
+}

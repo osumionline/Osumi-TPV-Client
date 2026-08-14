@@ -42,6 +42,13 @@
         }
     }
 
+    .sale__line--reserva {
+        >div {
+            background-color:
+                var(--table-row-mark);
+        }
+    }
+
     .sale__line--input {
         .sale__locator-input {
             width: 100%;
@@ -92,6 +99,30 @@
             height: 18px;
             margin-left: auto;
             font-size: 18px;
+        }
+    }
+
+    .sale__reserva-description {
+        display: flex;
+        width: 100%;
+        min-width: 0;
+        padding: 0 8px;
+        box-sizing: border-box;
+        align-items: center;
+        gap: 6px;
+
+        mat-icon {
+            width: 18px;
+            height: 18px;
+            flex: 0 0 auto;
+            color: var(--main-color);
+            font-size: 18px;
+        }
+
+        span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
     }
 

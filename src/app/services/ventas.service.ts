@@ -40,6 +40,24 @@ export default class VentasService {
 
   readonly hasVentas: Signal<boolean> = computed((): boolean => this.ventas().length > 0);
 
+  /**
+   * Identificadores de las reservas que ya están cargadas
+   * en alguna de las ventas abiertas.
+   */
+  readonly reservasCargadasPublicIds: Signal<ReadonlySet<string>> = computed(
+    (): ReadonlySet<string> => {
+      const publicIds: Set<string> = new Set<string>();
+
+      for (const venta of this.ventas()) {
+        for (const reserva of venta.reservasOrigen) {
+          publicIds.add(reserva.publicId);
+        }
+      }
+
+      return publicIds;
+    },
+  );
+
   readonly ventaActiva: Signal<VentaEnCurso | null> = computed((): VentaEnCurso | null => {
     const ventaActivaId: string | null = this.ventaActivaId();
 
@@ -119,11 +137,17 @@ export default class VentasService {
 
     const reservaPublicIds: Set<string> = new Set<string>();
 
+    const reservasCargadas: ReadonlySet<string> = this.reservasCargadasPublicIds();
+
     const reservasOrigen: VentaReservaOrigen[] = [];
 
     const lineas: VentaLineaEnCurso[] = [];
 
     for (const reserva of reservas) {
+      if (reservasCargadas.has(reserva.publicId)) {
+        throw new Error('Una de las reservas seleccionadas ya está cargada en otra venta abierta.');
+      }
+
       if (reserva.idCliente !== cliente.id || reserva.clientePublicId !== cliente.publicId) {
         throw new Error('Todas las reservas seleccionadas deben pertenecer al mismo cliente.');
       }

@@ -39,7 +39,8 @@
         track linea.idTemporal
         ) {
         <div class="sale__line"
-             [class.sale__line--devolucion]="linea.esDevolucion">
+             [class.sale__line--devolucion]="linea.esDevolucion"
+             [class.sale__line--reserva]="linea.esReserva">
             <div class="col-localizador">
                 <button class="sale__delete"
                         type="button"
@@ -67,6 +68,18 @@
                         edit
                     </mat-icon>
                 </button>
+                }
+                @else if (linea.esReserva) {
+                <span class="sale__reserva-description">
+                    <mat-icon matTooltip="Línea procedente de una reserva"
+                              aria-hidden="true">
+                        bookmark
+                    </mat-icon>
+
+                    <span>
+                        {{ linea.descripcion }}
+                    </span>
+                </span>
                 }
                 @else if (linea.esVarios) {
                 <button class="sale__varios-description"
@@ -111,7 +124,13 @@
                 @else {
                 <button class="sale__editable-value"
                         type="button"
-                        [matTooltip]="linea.esDevolucion ? 'Cantidad de devolución' : 'Modificar cantidad'"
+                        [matTooltip]="
+    linea.esDevolucion
+        ? 'Cantidad de devolución'
+        : linea.esReserva
+            ? 'Modificar cantidad de la reserva'
+            : 'Modificar cantidad'
+"
                         [disabled]="linea.esDevolucion"
                         (click)="editLinea(linea.idTemporal, 'cantidad')">
                     {{ linea.cantidad }}
@@ -131,7 +150,7 @@
                         type="button"
                         [class.sale__gift--active]="linea.regalo"
                         [attr.aria-pressed]="linea.regalo"
-                        [disabled]="linea.esDevolucion"
+                        [disabled]="linea.esDevolucion || linea.esReserva"
                         [matTooltip]="linea.regalo ? 'Quitar regalo' : 'Marcar como regalo'"
                         (click)="alternarRegalo(linea)">
                     <mat-icon>loyalty</mat-icon>
@@ -157,7 +176,7 @@
                 <div class="sale__editable-cell">
                     <button class="sale__editable-value"
                             type="button"
-                            [disabled]="linea.esDevolucion || !canModifyAmounts()"
+                            [disabled]="linea.esDevolucion || linea.esReserva || !canModifyAmounts()"
                             (click)="editImporte(linea)">
                         {{
                             (linea.importeFinalMicros / 1_000_000)
@@ -197,6 +216,24 @@
                     }
                     @else {
                     {{ origen.descuentoBps / 100 }} %
+                    }
+                </span>
+                }
+                @else if (
+                linea.esReserva &&
+                linea.reservaOrigen;
+                as origenReserva
+                ) {
+                <span class="sale__discount-value"
+                      matTooltip="Descuento histórico de la reserva">
+                    @if (linea.importeDescuentoReservaMicros > 0) {
+                    {{
+                        (linea.importeDescuentoReservaMicros / 1_000_000)
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
+                    }
+                    @else {
+                    {{ origenReserva.descuentoBps / 100 }} %
                     }
                 </span>
                 }
@@ -340,7 +377,11 @@
             </div>
 
             <div class="col-stock">
-                {{ linea.esDevolucion ? '-' : linea.stock }}
+                {{
+                    linea.esDevolucion || linea.esReserva
+                        ? '-'
+                        : linea.stock
+                }}
             </div>
         </div>
         }

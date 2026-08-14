@@ -870,4 +870,32 @@ describe('VentasService', (): void => {
 
     expect(service.ventas()).toHaveLength(0);
   });
+
+  it('impide cargar una reserva en dos ventas abiertas y la libera al cerrar la primera', (): void => {
+    const service: VentasService = new VentasService();
+
+    const cliente: Cliente = createCliente('cliente-1', 0);
+
+    const reserva: ReservaInterface = createReserva('reserva-1', 'linea-101');
+
+    const primeraVenta: VentaEnCurso = service.crearVentaDesdeReservas(null, cliente, [reserva]);
+
+    expect(service.reservasCargadasPublicIds().has('reserva-1')).toBe(true);
+
+    expect((): VentaEnCurso => service.crearVentaDesdeReservas(null, cliente, [reserva])).toThrow(
+      'Una de las reservas seleccionadas ya está cargada en otra venta abierta.',
+    );
+
+    expect(service.ventas()).toHaveLength(1);
+
+    service.cerrarVenta(primeraVenta.idTemporal);
+
+    expect(service.reservasCargadasPublicIds().has('reserva-1')).toBe(false);
+
+    const segundaVenta: VentaEnCurso = service.crearVentaDesdeReservas(null, cliente, [reserva]);
+
+    expect(segundaVenta.tieneReservas).toBe(true);
+
+    expect(service.ventas()).toHaveLength(1);
+  });
 });

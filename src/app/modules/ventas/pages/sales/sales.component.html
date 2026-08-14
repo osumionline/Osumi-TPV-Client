@@ -58,7 +58,8 @@
                    (selectTabEvent)="selectVenta($event)"
                    (closeTabEvent)="cerrarVenta($event)"
                    (newTabEvent)="nuevaVenta()"
-                   (clientEvent)="openClientSelection()" />
+                   (clientEvent)="openClientSelection()"
+                   (reservationsEvent)="openReservas()" />
 
   @if (ventasService.ventaActiva(); as venta) {
   <otpv-sale-workspace [venta]="venta"
@@ -92,4 +93,10 @@
                       (createdEvent)="createdCliente($event)"
                       (clearEvent)="clearCliente()"
                       (cancelEvent)="cancelClientSelection()" />
+}
+
+@if (managingReservas()) {
+<otpv-reservation-manager [loadedPublicIds]="ventasService.reservasCargadasPublicIds()"
+                          (loadEvent)="loadReservas($event)"
+                          (closeEvent)="closeReservas()" />
 }

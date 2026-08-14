@@ -1,0 +1,299 @@
+<div class="overlay">
+    <button class="overlay__backdrop"
+            type="button"
+            aria-label="Cerrar reservas"
+            (click)="close()">
+    </button>
+
+    <section class="reservation-manager"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="reservation-manager-title">
+
+        <header class="reservation-manager__header">
+            <div>
+                <h2 id="reservation-manager-title">
+                    Reservas
+                </h2>
+
+                <p>
+                    Selecciona una reserva para ver su contenido
+                    o marca varias del mismo cliente para cargarlas juntas.
+                </p>
+            </div>
+
+            <button matIconButton
+                    type="button"
+                    aria-label="Cerrar"
+                    matTooltip="Cerrar"
+                    (click)="close()">
+                <mat-icon>close</mat-icon>
+            </button>
+        </header>
+
+        @if (reservasService.error() !== null) {
+        <div class="reservation-manager__error"
+             role="alert">
+            {{ reservasService.error() }}
+        </div>
+        }
+
+        @if (operationError() !== null) {
+        <div class="reservation-manager__error"
+             role="alert">
+            {{ operationError() }}
+        </div>
+        }
+
+        @if (
+        reservasService.loading() &&
+        !reservasService.loaded()
+        ) {
+        <div class="reservation-manager__loading">
+            <mat-spinner diameter="40" />
+        </div>
+        }
+        @else {
+        <div class="reservation-manager__content">
+
+            <section class="reservation-manager__list">
+                @if (reservasService.reservas().length === 0) {
+                <div class="reservation-manager__empty">
+                    No hay reservas activas.
+                </div>
+                }
+                @else {
+                <div class="reservation-manager__table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="check"></th>
+                                <th>Fecha</th>
+                                <th>Cliente</th>
+                                <th class="money">Importe</th>
+                                <th class="status"></th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @for (
+                            reserva of reservasService.reservas();
+                            track reserva.publicId
+                            ) {
+                            <tr class="reservation-manager__reservation"
+                                [class.reservation-manager__reservation--detail]="
+                                    selectedReserva()?.publicId === reserva.publicId
+                                "
+                                [class.reservation-manager__reservation--loaded]="
+                                    isLoaded(reserva)
+                                "
+                                (click)="selectReserva(reserva)">
+
+                                <td class="check">
+                                    <mat-checkbox [checked]="isSelected(reserva)"
+                                                  [disabled]="isLoaded(reserva) || mutating()"
+                                                  [attr.aria-label]="
+                                            'Seleccionar reserva de ' +
+                                            reserva.clienteNombre
+                                        "
+                                                  (click)="$event.stopPropagation()"
+                                                  (change)="toggleReserva(reserva, $event.checked)" />
+                                </td>
+
+                                <td>
+                                    {{ formatFecha(reserva.fecha) }}
+                                </td>
+
+                                <td>
+                                    {{ reserva.clienteNombre }}
+                                </td>
+
+                                <td class="money">
+                                    {{
+                                        (reserva.totalMicros / 1_000_000)
+                                            | currency:'EUR':'symbol':'1.2-2'
+                                    }}
+                                </td>
+
+                                <td class="status">
+                                    @if (isLoaded(reserva)) {
+                                    <mat-icon matTooltip="Cargada en una venta abierta">
+                                        lock
+                                    </mat-icon>
+                                    }
+                                </td>
+                            </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <footer class="reservation-manager__list-actions">
+                    <button mat-flat-button
+                            type="button"
+                            [disabled]="selectedCount() === 0 || mutating()"
+                            (click)="loadSelected()">
+                        Cargar seleccionadas
+                        @if (selectedCount() > 0) {
+                        ({{ selectedCount() }})
+                        }
+                    </button>
+                </footer>
+                }
+            </section>
+
+            <section class="reservation-manager__detail">
+                @if (selectedReserva(); as reserva) {
+                <header class="reservation-manager__detail-header">
+                    <div>
+                        <strong>
+                            {{ reserva.clienteNombre }}
+                        </strong>
+
+                        <span>
+                            {{ formatFecha(reserva.fecha) }}
+                        </span>
+                    </div>
+
+                    <div class="reservation-manager__detail-actions">
+                        <button mat-stroked-button
+                                type="button"
+                                [disabled]="isLoaded(reserva) || mutating()"
+                                (click)="deleteReserva(reserva)">
+                            Eliminar reserva
+                        </button>
+
+                        <button mat-flat-button
+                                type="button"
+                                [disabled]="isLoaded(reserva) || mutating()"
+                                (click)="loadReserva(reserva)">
+                            Cargar reserva
+                        </button>
+                    </div>
+                </header>
+
+                @if (isLoaded(reserva)) {
+                <div class="reservation-manager__loaded-notice">
+                    Esta reserva está cargada en una venta abierta.
+                    Puedes consultarla, pero no modificarla ni volver a cargarla.
+                </div>
+                }
+
+                <div class="reservation-manager__table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Loc.</th>
+                                <th>Marca</th>
+                                <th>Descripción</th>
+                                <th class="number">Cant.</th>
+                                <th class="money">PVP</th>
+                                <th class="money">Descuento</th>
+                                <th class="money">Importe</th>
+                                <th class="options"></th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @for (
+                            linea of reserva.lineas;
+                            track linea.publicId
+                            ) {
+                            <tr>
+                                <td>
+                                    {{
+                                        linea.idArticulo === null
+                                            ? '-'
+                                            : linea.localizador
+                                    }}
+                                </td>
+
+                                <td>
+                                    {{
+                                        linea.idArticulo === null
+                                            ? '-'
+                                            : (linea.marca ?? '-')
+                                    }}
+                                </td>
+
+                                <td>
+                                    {{ linea.nombre }}
+                                </td>
+
+                                <td class="number">
+                                    {{ linea.unidades }}
+                                </td>
+
+                                <td class="money">
+                                    {{
+                                        (linea.pvpMicros / 1_000_000)
+                                            | currency:'EUR':'symbol':'1.2-2'
+                                    }}
+                                </td>
+
+                                <td class="money">
+                                    @if (linea.importeDescuentoMicros > 0) {
+                                    {{
+                                        (linea.importeDescuentoMicros / 1_000_000)
+                                            | currency:'EUR':'symbol':'1.2-2'
+                                    }}
+                                    }
+                                    @else {
+                                    {{ linea.descuentoBps / 100 }} %
+                                    }
+                                </td>
+
+                                <td class="money">
+                                    {{
+                                        (linea.importeMicros / 1_000_000)
+                                            | currency:'EUR':'symbol':'1.2-2'
+                                    }}
+                                </td>
+
+                                <td class="options">
+                                    <button matIconButton
+                                            type="button"
+                                            [disabled]="isLoaded(reserva) || mutating()"
+                                            matTooltip="Eliminar línea"
+                                            [attr.aria-label]="
+                                                'Eliminar ' + linea.nombre
+                                            "
+                                            (click)="deleteLinea(linea)">
+                                        <mat-icon>delete</mat-icon>
+                                    </button>
+                                </td>
+                            </tr>
+                            }
+                        </tbody>
+
+                        <tfoot>
+                            <tr>
+                                <td colspan="6">
+                                    <strong>Total</strong>
+                                </td>
+
+                                <td class="money">
+                                    <strong>
+                                        {{
+                                            (reserva.totalMicros / 1_000_000)
+                                                | currency:'EUR':'symbol':'1.2-2'
+                                        }}
+                                    </strong>
+                                </td>
+
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                }
+                @else {
+                <div class="reservation-manager__empty">
+                    Selecciona una reserva de la lista para ver sus líneas.
+                </div>
+                }
+            </section>
+        </div>
+        }
+    </section>
+</div>

@@ -31,11 +31,18 @@
     <div class="tabs__actions">
         <button class="tabs__client"
                 type="button"
-                [disabled]="selectedVenta() === null"
+                [disabled]="
+                    selectedVenta() === null ||
+                    selectedVenta()?.tieneReservas === true
+                "
                 [matTooltip]="
-                    selectedVenta()?.cliente === null
-                        ? 'Seleccionar cliente'
-                        : 'Cambiar cliente'
+                    selectedVenta() === null
+                        ? 'No hay venta activa'
+                        : selectedVenta()?.tieneReservas
+                            ? 'Cliente fijado por las reservas'
+                            : selectedVenta()?.cliente === null
+                                ? 'Seleccionar cliente'
+                                : 'Cambiar cliente'
                 "
                 (click)="openClient()">
             @if (selectedVenta()?.cliente; as cliente) {
@@ -50,8 +57,10 @@
         </button>
 
         <button matIconButton
-                disabled
-                matTooltip="Se activará en Ventas 9">
+                type="button"
+                [disabled]="!canCreate()"
+                matTooltip="Reservas"
+                (click)="openReservations()">
             <mat-icon>grading</mat-icon>
         </button>
     </div>

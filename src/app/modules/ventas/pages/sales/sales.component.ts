@@ -10,11 +10,14 @@ import {
 import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import HeaderComponent from '@app/components/header/header.component';
+import type AppData from '@desktop-contracts/configuration/app-data.interface';
+import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
 import type Cliente from '@model/clientes/cliente.model';
 import type Empleado from '@model/empleados/empleado.model';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
 import ClientSelectorComponent from '@modules/ventas/components/client-selector/client-selector.component';
 import EmployeeSelectorComponent from '@modules/ventas/components/employee-selector/employee-selector.component';
+import ReservationManagerComponent from '@modules/ventas/components/reservation-manager/reservation-manager.component';
 import SaleWorkspaceComponent from '@modules/ventas/components/sale-workspace/sale-workspace.component';
 import SalesTabsComponent from '@modules/ventas/components/sales-tabs/sales-tabs.component';
 import { DialogService } from '@osumi/angular-tools';
@@ -23,6 +26,11 @@ import ClientesService from '@services/clientes.service';
 import EmpleadosService from '@services/empleados.service';
 import VentasContextService from '@services/ventas-context.service';
 import VentasService from '@services/ventas.service';
+
+interface PendingReservasLoad {
+  readonly cliente: Cliente;
+  readonly reservas: readonly ReservaInterface[];
+}
 
 /**
  * Página principal del módulo de ventas.
@@ -39,6 +47,7 @@ import VentasService from '@services/ventas.service';
     SalesTabsComponent,
     SaleWorkspaceComponent,
     ClientSelectorComponent,
+    ReservationManagerComponent,
   ],
 })
 export default class SalesComponent implements OnInit {
@@ -56,6 +65,11 @@ export default class SalesComponent implements OnInit {
   readonly selectingEmployee: WritableSignal<boolean> = signal<boolean>(false);
 
   readonly selectingClient: WritableSignal<boolean> = signal<boolean>(false);
+
+  readonly managingReservas: WritableSignal<boolean> = signal<boolean>(false);
+
+  private readonly pendingReservasLoad: WritableSignal<PendingReservasLoad | null> =
+    signal<PendingReservasLoad | null>(null);
 
   readonly appName: Signal<string> = computed((): string => {
     const appData = this.ventasContextService.appData();
@@ -122,8 +136,22 @@ export default class SalesComponent implements OnInit {
   /**
    * Crea una nueva venta con el empleado seleccionado.
    */
+  /**
+   * Crea la venta correspondiente con el empleado seleccionado.
+   */
   selectEmpleado(empleado: Empleado): void {
     this.selectingEmployee.set(false);
+
+    const pendingReservas: PendingReservasLoad | null = this.pendingReservasLoad();
+
+    if (pendingReservas !== null) {
+      this.pendingReservasLoad.set(null);
+
+      this.createVentaDesdeReservas(empleado, pendingReservas);
+
+      return;
+    }
+
     this.ventasService.crearVenta(empleado);
   }
 
@@ -132,13 +160,142 @@ export default class SalesComponent implements OnInit {
    */
   cancelEmployeeSelection(): void {
     this.selectingEmployee.set(false);
+    this.pendingReservasLoad.set(null);
+
+    const ventaIdTemporal: string | null = this.ventasService.ventaActivaId();
+
+    if (ventaIdTemporal !== null) {
+      this.ventasService.setFocusTarget(ventaIdTemporal, {
+        type: 'localizador',
+      });
+    }
+  }
+
+  /**
+   * Abre el gestor global de reservas.
+   */
+  openReservas(): void {
+    if (!this.ventasContextService.puedeVender()) {
+      return;
+    }
+
+    this.managingReservas.set(true);
+  }
+
+  /**
+   * Cierra el gestor y restaura el foco
+   * de la venta que estuviera activa.
+   */
+  closeReservas(): void {
+    this.managingReservas.set(false);
+
+    const ventaIdTemporal: string | null = this.ventasService.ventaActivaId();
+
+    if (ventaIdTemporal === null) {
+      return;
+    }
+
+    this.ventasService.setFocusTarget(ventaIdTemporal, {
+      type: 'localizador',
+    });
+  }
+
+  /**
+   * Prepara una nueva venta a partir de las
+   * reservas elegidas en el gestor.
+   */
+  async loadReservas(reservas: readonly ReservaInterface[]): Promise<void> {
+    if (reservas.length === 0) {
+      return;
+    }
+
+    const primeraReserva: ReservaInterface = reservas[0]!;
+
+    if (
+      reservas.some(
+        (reserva: ReservaInterface): boolean =>
+          reserva.clientePublicId !== primeraReserva.clientePublicId ||
+          reserva.idCliente !== primeraReserva.idCliente,
+      )
+    ) {
+      this.dialog.alert({
+        title: 'Error',
+        content: 'Las reservas seleccionadas pertenecen a distintos clientes.',
+      });
+
+      return;
+    }
+
+    try {
+      await this.clientesService.load();
+    } catch {
+      this.dialog.alert({
+        title: 'Error',
+        content: 'No se ha podido recuperar el cliente asociado a las reservas.',
+      });
+
+      return;
+    }
+
+    const cliente: Cliente | null = this.clientesService.findByPublicId(
+      primeraReserva.clientePublicId,
+    );
+
+    if (cliente === null) {
+      this.dialog.alert({
+        title: 'Error',
+        content: 'El cliente asociado a la reserva ya no está disponible.',
+      });
+
+      return;
+    }
+
+    const empleados: readonly Empleado[] = this.empleadosService.empleados();
+
+    if (empleados.length === 0) {
+      this.dialog.alert({
+        title: 'Error',
+        content: 'No existe ningún empleado disponible para cargar la reserva.',
+      });
+
+      return;
+    }
+
+    const appData: AppData | null = this.ventasContextService.appData();
+
+    if (appData === null) {
+      return;
+    }
+
+    const pending: PendingReservasLoad = {
+      cliente,
+      reservas,
+    };
+
+    /*
+     * Cerramos el gestor antes de abrir una
+     * nueva pestaña o el selector de empleado.
+     */
+    this.managingReservas.set(false);
+
+    if (!appData.empleados || empleados.length === 1) {
+      this.createVentaDesdeReservas(empleados[0]!, pending);
+
+      return;
+    }
+
+    this.pendingReservasLoad.set(pending);
+
+    this.selectingEmployee.set(true);
   }
 
   /**
    * Abre la selección de cliente para la venta activa.
    */
   openClientSelection(): void {
-    if (this.ventasService.ventaActiva() === null) {
+    const venta: VentaEnCurso | null = this.ventasService.ventaActiva();
+
+    if (venta === null || venta.tieneReservas) {
       return;
     }
 
@@ -280,6 +437,21 @@ export default class SalesComponent implements OnInit {
     this.ventasService.setFocusTarget(ventaIdTemporal, {
       type: 'localizador',
     });
+  }
+
+  /**
+   * Crea materialmente una pestaña nueva a
+   * partir de las reservas seleccionadas.
+   */
+  private createVentaDesdeReservas(empleado: Empleado, pending: PendingReservasLoad): void {
+    try {
+      this.ventasService.crearVentaDesdeReservas(empleado, pending.cliente, pending.reservas);
+    } catch (error: unknown) {
+      this.dialog.alert({
+        title: 'Error',
+        content: error instanceof Error ? error.message : 'No se han podido cargar las reservas.',
+      });
+    }
   }
 
   /**

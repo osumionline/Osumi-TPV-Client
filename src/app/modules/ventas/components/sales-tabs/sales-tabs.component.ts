@@ -48,6 +48,8 @@ export default class SalesTabsComponent {
 
   readonly clientEvent: OutputEmitterRef<void> = output<void>();
 
+  readonly reservationsEvent: OutputEmitterRef<void> = output<void>();
+
   /**
    * Selecciona la pestaña indicada.
    */
@@ -78,10 +80,23 @@ export default class SalesTabsComponent {
    * Solicita abrir la selección de cliente de la venta activa.
    */
   openClient(): void {
-    if (this.selectedVenta() === null) {
+    const venta: VentaEnCurso | null = this.selectedVenta();
+
+    if (venta === null || venta.tieneReservas) {
       return;
     }
 
     this.clientEvent.emit();
+  }
+
+  /**
+   * Solicita abrir el gestor de reservas.
+   */
+  openReservations(): void {
+    if (!this.canCreate()) {
+      return;
+    }
+
+    this.reservationsEvent.emit();
   }
 }
