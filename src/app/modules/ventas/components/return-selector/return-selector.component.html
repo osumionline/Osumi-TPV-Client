@@ -13,7 +13,11 @@
         <header class="return-selector__header">
             <div>
                 <h2 id="return-selector-title">
-                    Devolución
+                    {{
+                        initialSelection().length === 0
+                            ? 'Devolución'
+                            : 'Editar devolución'
+                    }}
                 </h2>
 
                 <div class="return-selector__ticket">

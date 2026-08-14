@@ -58,7 +58,8 @@
         }
     }
 
-    .sale__varios-description {
+    .sale__varios-description,
+    .sale__devolucion-description {
         display: flex;
         width: 100%;
         min-height: 34px;
@@ -69,9 +70,28 @@
         font: inherit;
         text-align: left;
         cursor: pointer;
+    }
+
+    .sale__varios-description {
+        &:hover {
+            background-color:
+                var(--color-very-light-grey);
+        }
+    }
+
+    .sale__devolucion-description {
+        gap: 6px;
 
         &:hover {
-            background-color: var(--color-very-light-grey);
+            background-color:
+                var(--color-light-grey);
+        }
+
+        mat-icon {
+            width: 18px;
+            height: 18px;
+            margin-left: auto;
+            font-size: 18px;
         }
     }
 

@@ -460,4 +460,230 @@ describe('VentasService', (): void => {
 
     expect(linea.importeFinalMicros).toBe(-9_000_000);
   });
+
+  it('sustituye la selección de una devolución conservando las líneas normales', (): void => {
+    const service: VentasService = new VentasService();
+
+    const venta: VentaEnCurso = service.crearVenta();
+
+    service.agregarArticulos(venta.idTemporal, [createArticulo('articulo-99', 3_000)]);
+
+    const devolucion = {
+      id: 50,
+      publicId: 'venta-original',
+      serie: '',
+      numero: 100,
+      fecha: '2026-08-01',
+      cliente: null,
+      totalCents: 4_000,
+      pagos: [],
+      lineas: [],
+    };
+
+    service.aplicarDevolucion(venta.idTemporal, devolucion, [
+      {
+        linea: {
+          id: 100,
+          publicId: 'linea-100',
+          idArticulo: 1,
+          articuloPublicId: 'articulo-1',
+          localizador: 10,
+          nombre: 'Artículo 1',
+          pucMicros: 0,
+          pvpMicros: 10_000_000,
+          ivaBps: 2_100,
+          importeMicros: 20_000_000,
+          descuentoBps: 0,
+          importeDescuentoMicros: 0,
+          unidades: 2,
+          unidadesDevueltas: 0,
+          unidadesDisponibles: 2,
+          regalo: false,
+        },
+        unidades: 1,
+      },
+    ]);
+
+    service.aplicarDevolucion(venta.idTemporal, devolucion, [
+      {
+        linea: {
+          id: 200,
+          publicId: 'linea-200',
+          idArticulo: 2,
+          articuloPublicId: 'articulo-2',
+          localizador: 20,
+          nombre: 'Artículo 2',
+          pucMicros: 0,
+          pvpMicros: 5_000_000,
+          ivaBps: 2_100,
+          importeMicros: 10_000_000,
+          descuentoBps: 0,
+          importeDescuentoMicros: 0,
+          unidades: 2,
+          unidadesDevueltas: 0,
+          unidadesDisponibles: 2,
+          regalo: false,
+        },
+        unidades: 2,
+      },
+    ]);
+
+    expect(venta.lineas).toHaveLength(2);
+
+    const lineaNormal = venta.lineas.find((linea): boolean => !linea.esDevolucion);
+
+    const lineaDevolucion = venta.lineas.find((linea): boolean => linea.esDevolucion);
+
+    expect(lineaNormal?.articuloPublicId).toBe('articulo-99');
+
+    expect(lineaDevolucion?.devolucionOrigen?.id).toBe(200);
+
+    expect(lineaDevolucion?.cantidad).toBe(-2);
+
+    expect(venta.devolucionOrigen?.id).toBe(50);
+  });
+
+  it('impide sustituir una devolución por otra perteneciente a otro ticket', (): void => {
+    const service: VentasService = new VentasService();
+
+    const venta: VentaEnCurso = service.crearVenta();
+
+    service.aplicarDevolucion(
+      venta.idTemporal,
+      {
+        id: 50,
+        publicId: 'venta-50',
+        serie: '',
+        numero: 50,
+        fecha: '2026-08-01',
+        cliente: null,
+        totalCents: 1_000,
+        pagos: [],
+        lineas: [],
+      },
+      [
+        {
+          linea: {
+            id: 100,
+            publicId: 'linea-100',
+            idArticulo: 1,
+            articuloPublicId: 'articulo-1',
+            localizador: 10,
+            nombre: 'Artículo',
+            pucMicros: 0,
+            pvpMicros: 10_000_000,
+            ivaBps: 2_100,
+            importeMicros: 10_000_000,
+            descuentoBps: 0,
+            importeDescuentoMicros: 0,
+            unidades: 1,
+            unidadesDevueltas: 0,
+            unidadesDisponibles: 1,
+            regalo: false,
+          },
+          unidades: 1,
+        },
+      ],
+    );
+
+    expect((): void =>
+      service.aplicarDevolucion(
+        venta.idTemporal,
+        {
+          id: 51,
+          publicId: 'venta-51',
+          serie: '',
+          numero: 51,
+          fecha: '2026-08-02',
+          cliente: null,
+          totalCents: 1_000,
+          pagos: [],
+          lineas: [],
+        },
+        [
+          {
+            linea: {
+              id: 200,
+              publicId: 'linea-200',
+              idArticulo: 2,
+              articuloPublicId: 'articulo-2',
+              localizador: 20,
+              nombre: 'Otro',
+              pucMicros: 0,
+              pvpMicros: 10_000_000,
+              ivaBps: 2_100,
+              importeMicros: 10_000_000,
+              descuentoBps: 0,
+              importeDescuentoMicros: 0,
+              unidades: 1,
+              unidadesDevueltas: 0,
+              unidadesDisponibles: 1,
+              regalo: false,
+            },
+            unidades: 1,
+          },
+        ],
+      ),
+    ).toThrow(
+      'No se puede iniciar una devolución de otro ticket mientras exista una devolución en curso.',
+    );
+
+    expect(venta.devolucionOrigen?.id).toBe(50);
+
+    expect(venta.lineas).toHaveLength(1);
+
+    expect(venta.lineas[0]?.devolucionOrigen?.id).toBe(100);
+  });
+
+  it('libera el ticket de devolución al eliminar su última línea', (): void => {
+    const service: VentasService = new VentasService();
+
+    const venta: VentaEnCurso = service.crearVenta();
+
+    service.aplicarDevolucion(
+      venta.idTemporal,
+      {
+        id: 50,
+        publicId: 'venta-original',
+        serie: '',
+        numero: 100,
+        fecha: '2026-08-01',
+        cliente: null,
+        totalCents: 1_000,
+        pagos: [],
+        lineas: [],
+      },
+      [
+        {
+          linea: {
+            id: 100,
+            publicId: 'linea-original',
+            idArticulo: 1,
+            articuloPublicId: 'articulo-1',
+            localizador: 10,
+            nombre: 'Artículo',
+            pucMicros: 0,
+            pvpMicros: 10_000_000,
+            ivaBps: 2_100,
+            importeMicros: 10_000_000,
+            descuentoBps: 0,
+            importeDescuentoMicros: 0,
+            unidades: 1,
+            unidadesDevueltas: 0,
+            unidadesDisponibles: 1,
+            regalo: false,
+          },
+          unidades: 1,
+        },
+      ],
+    );
+
+    const linea: VentaLineaEnCurso = venta.lineas[0]!;
+
+    service.eliminarLinea(venta.idTemporal, linea.idTemporal);
+
+    expect(venta.devolucionOrigen).toBeNull();
+
+    expect(venta.lineas).toHaveLength(0);
+  });
 });

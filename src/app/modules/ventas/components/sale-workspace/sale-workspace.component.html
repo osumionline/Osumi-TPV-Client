@@ -54,7 +54,21 @@
             </div>
 
             <div class="col-descripcion">
-                @if (linea.esVarios) {
+                @if (linea.esDevolucion) {
+                <button class="sale__devolucion-description"
+                        type="button"
+                        matTooltip="Editar devolución"
+                        (click)="openEditDevolucion()">
+                    <span>
+                        {{ linea.descripcion }}
+                    </span>
+
+                    <mat-icon aria-hidden="true">
+                        edit
+                    </mat-icon>
+                </button>
+                }
+                @else if (linea.esVarios) {
                 <button class="sale__varios-description"
                         type="button"
                         matTooltip="Editar Varios"
@@ -425,8 +439,12 @@
                         (cancelEvent)="closeVariosEditor()" />
     }
 
-    @if (devolucionSelectorData(); as devolucion) {
-    <otpv-return-selector [devolucion]="devolucion"
+    @if (
+    devolucionSelectorState();
+    as selectorState
+    ) {
+    <otpv-return-selector [devolucion]="selectorState.devolucion"
+                          [initialSelection]="selectorState.seleccionInicial"
                           (selectEvent)="onDevolucionSelected($event)"
                           (cancelEvent)="closeDevolucionSelector()" />
     }

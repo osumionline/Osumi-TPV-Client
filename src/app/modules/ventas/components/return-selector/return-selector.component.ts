@@ -6,6 +6,7 @@ import {
   output,
   signal,
   type InputSignal,
+  type OnInit,
   type OutputEmitterRef,
   type Signal,
   type WritableSignal,
@@ -22,9 +23,13 @@ import type VentaDevolucionSeleccion from '@model/ventas/venta-devolucion-selecc
   styleUrl: './return-selector.component.scss',
   imports: [CurrencyPipe, MatButton, MatCheckbox],
 })
-export default class ReturnSelectorComponent {
+export default class ReturnSelectorComponent implements OnInit {
   readonly devolucion: InputSignal<VentaDevolucionInterface> =
     input.required<VentaDevolucionInterface>();
+
+  readonly initialSelection: InputSignal<readonly VentaDevolucionSeleccion[]> = input<
+    readonly VentaDevolucionSeleccion[]
+  >([]);
 
   readonly selectEvent: OutputEmitterRef<readonly VentaDevolucionSeleccion[]> =
     output<readonly VentaDevolucionSeleccion[]>();
@@ -74,6 +79,20 @@ export default class ReturnSelectorComponent {
       return this.isValidUnidades(linea, seleccion.get(linea.id) ?? null);
     });
   });
+
+  /**
+   * Restaura la selección de una devolución que ya estaba
+   * incorporada a la venta.
+   */
+  ngOnInit(): void {
+    const seleccion: Map<number, number | null> = new Map<number, number | null>();
+
+    for (const item of this.initialSelection()) {
+      seleccion.set(item.linea.id, item.unidades);
+    }
+
+    this.seleccion.set(seleccion);
+  }
 
   /**
    * Indica si una línea está seleccionada.

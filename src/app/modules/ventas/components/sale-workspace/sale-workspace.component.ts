@@ -25,6 +25,7 @@ import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devol
 import type AccesoDirectoVenta from '@model/ventas/acceso-directo-venta.model';
 import type ArticuloVenta from '@model/ventas/articulo-venta.model';
 import type VentaDevolucionSeleccion from '@model/ventas/venta-devolucion-seleccion.interface';
+import type VentaDevolucionSelectorState from '@model/ventas/venta-devolucion-selector-state.interface';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
 import type VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
 import type VentaVariosData from '@model/ventas/venta-varios-data.interface';
@@ -115,8 +116,8 @@ export default class SaleWorkspaceComponent {
   readonly variosEditorState: WritableSignal<VentaVariosEditorState | null> =
     signal<VentaVariosEditorState | null>(null);
 
-  readonly devolucionSelectorData: WritableSignal<VentaDevolucionInterface | null> =
-    signal<VentaDevolucionInterface | null>(null);
+  readonly devolucionSelectorState: WritableSignal<VentaDevolucionSelectorState | null> =
+    signal<VentaDevolucionSelectorState | null>(null);
 
   readonly variosIvaOptionsBps: Signal<readonly number[]> = computed((): readonly number[] => {
     const appData: AppData | null = this.ventasContextService.appData();
@@ -144,7 +145,7 @@ export default class SaleWorkspaceComponent {
         this.searchOpen() ||
         this.directAccessOpen() ||
         this.variosEditorState() !== null ||
-        this.devolucionSelectorData() !== null
+        this.devolucionSelectorState() !== null
       ) {
         return;
       }
@@ -872,7 +873,10 @@ export default class SaleWorkspaceComponent {
         return;
       }
 
-      this.devolucionSelectorData.set(devolucion);
+      this.devolucionSelectorState.set({
+        devolucion,
+        seleccionInicial: [],
+      });
     } catch (error: unknown) {
       this.showDevolucionError(
         error instanceof Error ? error.message : 'No se ha podido recuperar el ticket.',
@@ -883,19 +887,111 @@ export default class SaleWorkspaceComponent {
   }
 
   /**
-   * Incorpora las líneas seleccionadas como devolución.
+   * Vuelve a abrir la devolución que ya está incorporada
+   * a la venta actual.
+   */
+  async openEditDevolucion(): Promise<void> {
+    const origen = this.venta().devolucionOrigen;
+
+    if (origen === null) {
+      return;
+    }
+
+    this.localizador.set('');
+    this.searching.set(true);
+
+    try {
+      const devolucion: VentaDevolucionInterface | null =
+        await this.ventasDevolucionesService.getDevolucion(origen.id);
+
+      if (devolucion === null) {
+        this.showDevolucionError('No se ha podido recuperar el ticket original de la devolución.');
+
+        return;
+      }
+
+      if (devolucion.publicId !== origen.publicId) {
+        this.showDevolucionError('El ticket recuperado no coincide con la devolución en curso.');
+
+        return;
+      }
+
+      const seleccionInicial: readonly VentaDevolucionSeleccion[] =
+        this.buildDevolucionInitialSelection(devolucion);
+
+      this.devolucionSelectorState.set({
+        devolucion,
+        seleccionInicial,
+      });
+    } catch (error: unknown) {
+      this.showDevolucionError(
+        error instanceof Error ? error.message : 'No se ha podido recuperar la devolución.',
+      );
+    } finally {
+      this.searching.set(false);
+    }
+  }
+
+  /**
+   * Reconstruye la selección actual de devolución utilizando
+   * las líneas recién recuperadas del ticket histórico.
+   */
+  private buildDevolucionInitialSelection(
+    devolucion: VentaDevolucionInterface,
+  ): readonly VentaDevolucionSeleccion[] {
+    const seleccion: VentaDevolucionSeleccion[] = [];
+
+    for (const lineaVenta of this.venta().lineas) {
+      if (!lineaVenta.esDevolucion) {
+        continue;
+      }
+
+      const origen = lineaVenta.devolucionOrigen;
+
+      if (origen === null) {
+        throw new Error('Una línea de devolución no dispone de su referencia histórica.');
+      }
+
+      const lineaHistorica = devolucion.lineas.find((linea): boolean => linea.id === origen.id);
+
+      if (lineaHistorica === undefined) {
+        throw new Error('Una de las líneas de la devolución ya no existe en el ticket original.');
+      }
+
+      const unidades: number = lineaVenta.unidadesDevolucion;
+
+      if (unidades > lineaHistorica.unidadesDisponibles) {
+        throw new Error('La disponibilidad del ticket ha cambiado y la devolución debe revisarse.');
+      }
+
+      seleccion.push({
+        linea: lineaHistorica,
+        unidades,
+      });
+    }
+
+    return seleccion;
+  }
+
+  /**
+   * Incorpora o actualiza las líneas seleccionadas
+   * de la devolución.
    */
   onDevolucionSelected(seleccion: readonly VentaDevolucionSeleccion[]): void {
-    const devolucion: VentaDevolucionInterface | null = this.devolucionSelectorData();
+    const selectorState: VentaDevolucionSelectorState | null = this.devolucionSelectorState();
 
-    if (devolucion === null) {
+    if (selectorState === null) {
       return;
     }
 
     try {
-      this.ventasService.aplicarDevolucion(this.venta().idTemporal, devolucion, seleccion);
+      this.ventasService.aplicarDevolucion(
+        this.venta().idTemporal,
+        selectorState.devolucion,
+        seleccion,
+      );
 
-      this.devolucionSelectorData.set(null);
+      this.devolucionSelectorState.set(null);
     } catch (error: unknown) {
       this.dialog
         .alert({
@@ -911,7 +1007,7 @@ export default class SaleWorkspaceComponent {
    * Cierra el selector sin modificar la venta.
    */
   closeDevolucionSelector(): void {
-    this.devolucionSelectorData.set(null);
+    this.devolucionSelectorState.set(null);
 
     this.localizador.set('');
 
