@@ -13,6 +13,7 @@ import InstallationService from '@backend/application/configuration/installation
 import EmpleadosService from '@backend/application/empleados/empleados.service';
 import MarcasService from '@backend/application/marcas/marcas.service';
 import ProveedoresService from '@backend/application/proveedores/proveedores.service';
+import ReservasService from '@backend/application/reservas/reservas.service';
 import { SystemService } from '@backend/application/system/system.service';
 import VentasArticulosService from '@backend/application/ventas/ventas-articulos.service';
 import VentasContextService from '@backend/application/ventas/ventas-context.service';
@@ -30,6 +31,7 @@ import type SecretStorage from '@backend/contracts/configuration/secret-storage.
 import type EmpleadoRepository from '@backend/contracts/empleados/empleado.repository.interface';
 import type MarcaRepository from '@backend/contracts/marcas/marca.repository.interface';
 import type ProveedorRepository from '@backend/contracts/proveedores/proveedor.repository.interface';
+import type ReservasRepository from '@backend/contracts/reservas/reservas.repository.interface';
 import type PasswordHasher from '@backend/contracts/security/password-hasher.interface';
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
@@ -50,6 +52,7 @@ import TypeOrmEmpleadoRepository from '@infrastructure/database/typeorm/typeorm-
 import TypeOrmInstallationDatabase from '@infrastructure/database/typeorm/typeorm-installation-database';
 import TypeOrmMarcaRepository from '@infrastructure/database/typeorm/typeorm-marca.repository';
 import TypeOrmProveedorRepository from '@infrastructure/database/typeorm/typeorm-proveedor.repository';
+import TypeOrmReservasRepository from '@infrastructure/database/typeorm/typeorm-reservas.repository';
 import TypeOrmVentasArticulosRepository from '@infrastructure/database/typeorm/typeorm-ventas-articulos.repository';
 import TypeOrmVentasContextRepository from '@infrastructure/database/typeorm/typeorm-ventas-context.repository';
 import TypeOrmVentasDevolucionesRepository from '@infrastructure/database/typeorm/typeorm-ventas-devoluciones.repository';
@@ -76,6 +79,7 @@ import registerConfigurationIpc from '@ipc/register-configuration-ipc';
 import registerEmpleadosIpc from '@ipc/register-empleados-ipc';
 import registerMarcasIpc from '@ipc/register-marcas-ipc';
 import registerProveedoresIpc from '@ipc/register-proveedores-ipc';
+import registerReservasIpc from '@ipc/register-reservas-ipc';
 import { registerSystemIpc } from '@ipc/register-system-ipc';
 import registerVentasIpc from '@ipc/register-ventas-ipc';
 
@@ -299,6 +303,12 @@ app
 
     const clientesService: ClientesService = new ClientesService(clienteRepository);
 
+    const reservasRepository: ReservasRepository = new TypeOrmReservasRepository(
+      operationalDatabase,
+    );
+
+    const reservasService: ReservasService = new ReservasService(reservasRepository);
+
     const categoriaRepository: CategoriaRepository = new TypeOrmCategoriaRepository(
       operationalDatabase,
     );
@@ -419,6 +429,8 @@ app
     registerCategoriasIpc((): BrowserWindow | null => mainWindow, categoriasService);
 
     registerCajaIpc((): BrowserWindow | null => mainWindow, cajaService);
+
+    registerReservasIpc((): BrowserWindow | null => mainWindow, reservasService);
 
     registerVentasIpc(
       (): BrowserWindow | null => mainWindow,

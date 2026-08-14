@@ -17,6 +17,7 @@ import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-impor
 import type LegacyImportStartResult from '@desktop-contracts/legacy-import/legacy-import-start-result.interface';
 import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
 import type { ProveedorInterface } from '@desktop-contracts/proveedores/proveedor.interface';
+import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
 import AppInfo from '@desktop-contracts/system/app-info.interface';
 import type AccesoDirectoVentaInterface from '@desktop-contracts/ventas/acceso-directo-venta.interface';
 import type ArticuloVentaInterface from '@desktop-contracts/ventas/articulo-venta.interface';
@@ -135,6 +136,17 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
   caja: Object.freeze({
     open: (command: AbrirCajaCommand): Promise<CajaAbiertaInterface> =>
       ipcRenderer.invoke(IPC_CHANNELS.cajaOpen, command) as Promise<CajaAbiertaInterface>,
+  }),
+
+  reservas: Object.freeze({
+    getAll: (): Promise<readonly ReservaInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.reservasGetAll) as Promise<readonly ReservaInterface[]>,
+
+    deleteLinea: (publicId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.reservasDeleteLinea, publicId) as Promise<void>,
+
+    deleteReserva: (publicId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.reservasDelete, publicId) as Promise<void>,
   }),
 
   ventas: Object.freeze({

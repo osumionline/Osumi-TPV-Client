@@ -7,6 +7,7 @@ import type EmpleadosApi from '@desktop-contracts/empleados/empleados-api.interf
 import type LegacyImportApi from '@desktop-contracts/legacy-import/legacy-import-api.interface';
 import type MarcasApi from '@desktop-contracts/marcas/marcas-api.interface';
 import type ProveedoresApi from '@desktop-contracts/proveedores/proveedores-api.interface';
+import type ReservasApi from '@desktop-contracts/reservas/reservas-api.interface';
 import type SystemApi from '@desktop-contracts/system/system-api.interface';
 import type VentasApi from '@desktop-contracts/ventas/ventas-api.interface';
 
@@ -22,5 +23,6 @@ export default interface OsumiDesktopApi {
   readonly categorias: CategoriasApi;
   readonly clientes: ClientesApi;
   readonly caja: CajaApi;
+  readonly reservas: ReservasApi;
   readonly ventas: VentasApi;
 }

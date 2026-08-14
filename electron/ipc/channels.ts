@@ -25,6 +25,10 @@ const IPC_CHANNELS = {
 
   cajaOpen: 'caja:open',
 
+  reservasGetAll: 'reservas:get-all',
+  reservasDeleteLinea: 'reservas:delete-linea',
+  reservasDelete: 'reservas:delete',
+
   ventasGetContext: 'ventas:get-context',
   ventasResolveArticulo: 'ventas:resolve-articulo',
   ventasSearchArticulos: 'ventas:search-articulos',
