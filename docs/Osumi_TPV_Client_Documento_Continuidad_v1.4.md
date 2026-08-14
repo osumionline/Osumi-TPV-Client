@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 1.3  
-**Fecha:** 13 de agosto de 2026  
-**Estado:** Installation, importación legacy y Startup completados y probados. En el módulo **Ventas** están completados los bloques 1 a 7. El siguiente bloque es **Ventas 8 — Devoluciones**.
+**Versión:** 1.4  
+**Fecha:** 14 de agosto de 2026  
+**Estado:** Installation, importación legacy y Startup completados y probados. En el módulo **Ventas** están completados los bloques 1 a 8. El siguiente bloque es **Ventas 9 — Reservas**.
 
 ## 1. Propósito del documento
 
@@ -23,6 +23,7 @@ Los grandes hitos completados hasta ahora son:
 - **Ventas 5 — Operaciones sobre líneas**.
 - **Ventas 6 — Clientes y estadísticas rápidas**.
 - **Ventas 7 — Varios**.
+- **Ventas 8 — Devoluciones**.
 
 Todos ellos han sido probados por el usuario con la aplicación real y los cambios están subidos al repositorio.
 
@@ -41,9 +42,9 @@ Todos ellos han sido probados por el usuario con la aplicación real y los cambi
 - Precarga global en memoria de marcas, proveedores, empleados, clientes, categorías y provincias: completada.
 - Conexión SQLite operativa persistente durante la ejecución: implementada.
 - Protocolo interno `osumi://assets/...` para recursos de la instalación: implementado y probado.
-- Módulo Ventas operativo hasta el final del bloque 7.
+- Módulo Ventas operativo hasta el final del bloque 8.
 - Las ventas abiertas viven en memoria en `VentasService` y sobreviven a la navegación entre módulos.
-- El siguiente bloque funcional es **Ventas 8 — Devoluciones**.
+- El siguiente bloque funcional es **Ventas 9 — Reservas**.
 
 ## 3. Repositorios y entorno
 
@@ -254,13 +255,17 @@ Esta recapitulación debe aparecer al comenzar cada nuevo bloque de desarrollo y
    - ✅ 7A — Modelo funcional y operaciones de dominio.
    - ✅ 7B — Editor de Varios + integración con `0 + Intro`.
    - ✅ 7C — Edición desde la línea + pruebas de integración.
-8. 🟨 **Devoluciones — siguiente bloque**.
-9. ⬜ **Reservas**.
+8. ✅ **Devoluciones**.
+   - ✅ 8A — Consulta de la venta original y modelo de lectura.
+   - ✅ 8B — Modelo de devolución dentro de la venta en curso.
+   - ✅ 8C — Selector de líneas/unidades + integración con localizador.
+   - ✅ 8D — Reapertura/edición + pruebas finales.
+9. 🟨 **Reservas — siguiente bloque**.
 10. ⬜ **Finalización y pagos**.
 11. ⬜ **Persistencia transaccional**.
 12. ⬜ **Postventa**.
 
-> **Estado exacto al cerrar esta versión:** Ventas 1–7 están implementados, probados y subidos. El próximo desarrollo debe comenzar por **Ventas 8 — Devoluciones**.
+> **Estado exacto al cerrar esta versión:** Ventas 1–8 están implementados, probados y subidos. El próximo desarrollo debe comenzar por **Ventas 9 — Reservas**.
 
 ## 11. Ventas 1 — Contexto operativo ✅
 
@@ -813,9 +818,328 @@ Se añadieron pruebas para:
 
 El usuario realizó además pruebas manuales completas de creación, cancelación, edición, varios independientes, descuentos, regalo, borrado y selección de IVA. La batería completa (`test`, `typecheck:electron`, `build`, `lint`) pasa y los cambios están subidos al repositorio.
 
-## 18. Ajustes transversales realizados durante Ventas
+## 18. Ventas 8 — Devoluciones ✅
 
-### 18.1 Menú de Electron
+### 18.1 Compatibilidad con tickets y QR legacy
+
+Los tickets existentes codifican en su QR el `id` interno de la venta como número negativo:
+
+```text
+venta.id = 123
+QR       = -123
+```
+
+Esta nomenclatura debe mantenerse porque existen tickets antiguos todavía en circulación.
+
+La importación legacy conserva explícitamente los identificadores originales de `venta` y `linea_venta`, por lo que una venta histórica importada mantiene el mismo `id` y los QR existentes siguen siendo válidos.
+
+En el renderer:
+
+```text
+-123
+  ↓
+se reconoce como devolución
+  ↓
+se elimina el signo
+  ↓
+getDevolucion(123)
+```
+
+El signo negativo es una convención de entrada del TPV; el backend trabaja siempre con el identificador positivo.
+
+### 18.2 Read model histórico y consulta vertical
+
+Se creó una consulta específica para recuperar únicamente la información necesaria para una devolución.
+
+El contrato `VentaDevolucionInterface` incluye:
+
+- cabecera de la venta original;
+- `id` y `publicId`;
+- serie y número;
+- fecha;
+- cliente;
+- total original;
+- pagos originales;
+- líneas históricas con datos económicos;
+- unidades compradas;
+- unidades ya devueltas;
+- unidades todavía disponibles.
+
+La vertical está separada en:
+
+- contrato público de Electron;
+- record interno de backend;
+- `VentasDevolucionesRepository`;
+- implementación TypeORM;
+- `VentasDevolucionesService`;
+- IPC `ventas:get-devolucion`;
+- preload `window.osumiDesktop.ventas.getDevolucion(idVenta)`;
+- servicio Angular de consulta.
+
+No se cargan históricos completos para realizar una devolución.
+
+### 18.3 Control de unidades ya devueltas
+
+El nuevo flujo corrige una limitación del TPV antiguo.
+
+Para cada línea positiva original se calcula:
+
+```text
+unidadesDisponibles =
+    max(unidades - unidadesDevueltas, 0)
+```
+
+Ejemplo:
+
+```text
+compradas             3
+devueltas previamente 1
+disponibles            2
+```
+
+No se permite devolver más de esas 2 unidades.
+
+Las líneas completamente devueltas no desaparecen del selector. Se muestran como información histórica con:
+
+```text
+unidadesDisponibles = 0
+```
+
+y quedan deshabilitadas.
+
+Las líneas históricas con cantidad no positiva tampoco pueden volver a devolverse.
+
+### 18.4 Modelo de devolución dentro de `VentaEnCurso`
+
+Se añadieron:
+
+- `VentaDevolucionOrigen`;
+- `VentaLineaDevolucionOrigen`;
+- `VentaDevolucionSeleccion`.
+
+`VentaEnCurso` mantiene como máximo un `devolucionOrigen` activo.
+
+Cada `VentaLineaEnCurso` de devolución mantiene una referencia exacta a su `linea_venta` histórica mediante ID/publicId y conserva además:
+
+- unidades originales;
+- unidades devueltas previamente;
+- unidades disponibles;
+- importe histórico final;
+- información histórica de descuento;
+- estado histórico de regalo.
+
+La cantidad real dentro de la venta en curso es negativa:
+
+```text
+1 unidad devuelta → cantidad = -1
+2 unidades        → cantidad = -2
+```
+
+La UI de selección trabaja con cantidades positivas y utiliza `setUnidadesDevolucion()` como única vía válida de modificación.
+
+El getter `esDevolucion` distingue estas líneas de las ordinarias.
+
+`esVarios` excluye expresamente las devoluciones, ya que una devolución de un antiguo Varios puede tener artículo nulo y localizador `0` sin ser un Varios editable.
+
+### 18.5 Economía histórica exacta
+
+Una devolución no utiliza:
+
+- precio actual del artículo;
+- descuento actual del cliente;
+- descuento manual actual;
+- promociones actuales.
+
+El importe a devolver parte del **importe histórico final realmente cobrado** en `linea_venta.importe_micros`.
+
+Las devoluciones parciales utilizan un reparto proporcional acumulativo. En lugar de redondear cada unidad de forma independiente, se calcula la diferencia entre dos acumulados proporcionales.
+
+Esto garantiza que, si finalmente se devuelven todas las unidades mediante varias operaciones parciales, la suma de las devoluciones reproduce exactamente el importe histórico de la línea, sin perder ni duplicar microeuros por redondeo.
+
+`importeFinalMicros` de una devolución es siempre el negativo del importe histórico que corresponda devolver.
+
+### 18.6 Protección del dominio
+
+Las líneas de devolución quedan blindadas frente a operaciones ordinarias.
+
+No se permite utilizar sobre ellas:
+
+- `setCantidad()`;
+- `setRegalo()`;
+- importe manual;
+- descuento de cliente;
+- descuento porcentual manual;
+- descuento directo;
+- eliminación de descuento promocional.
+
+Estas restricciones viven en el propio modelo mediante `requireNotDevolucion(...)`, no solamente en la interfaz.
+
+Una devolución sí puede cambiar sus unidades, pero únicamente mediante:
+
+```text
+setUnidadesDevolucion(unidades)
+```
+
+que valida el máximo disponible.
+
+El cliente actual de la venta tampoco altera económicamente las líneas de devolución.
+
+### 18.7 Una venta de origen por pestaña, otras ventas libres
+
+Regla funcional acordada:
+
+- una misma `VentaEnCurso` solo puede tener una venta histórica de origen en devolución a la vez;
+- mientras exista esa devolución no se puede cargar otro ticket distinto en la misma pestaña;
+- otras pestañas de venta pueden abrirse y utilizarse normalmente.
+
+Eliminar la última línea de devolución libera `devolucionOrigen`, por lo que esa pestaña vuelve a poder iniciar una devolución de otro ticket.
+
+### 18.8 Devolución y compra en la misma operación
+
+Se mantiene el flujo habitual de cambio:
+
+```text
+Artículo devuelto   -20 €
+Artículo nuevo      +35 €
+-------------------------
+TOTAL                15 €
+```
+
+`VentaEnCurso.totalMicros` suma naturalmente importes positivos y negativos.
+
+`VentasService.agregarArticulos()` excluye las líneas de devolución al buscar un artículo existente. Por ello, devolver un artículo y escanear después ese mismo artículo como compra genera dos líneas independientes:
+
+```text
+-1 Camiseta
++1 Camiseta
+```
+
+y nunca incrementa accidentalmente la línea negativa.
+
+### 18.9 Selector de devolución
+
+`ReturnSelectorComponent` muestra:
+
+- ticket;
+- fecha;
+- cliente;
+- total histórico;
+- uno o varios medios de pago;
+- todas las líneas originales;
+- unidades compradas;
+- unidades ya devueltas;
+- unidades disponibles;
+- cantidad que se desea devolver;
+- PVP;
+- descuento histórico;
+- importe histórico.
+
+Seleccionar una línea propone por defecto todas las unidades todavía disponibles, aunque el usuario puede reducir la cantidad.
+
+El selector permite seleccionar todas las líneas devolvibles.
+
+No permite continuar sin al menos una línea válida.
+
+Cancelar no modifica la venta.
+
+Las líneas de devolución se diferencian visualmente en el workspace y sus controles económicos ordinarios están deshabilitados u ocultos.
+
+### 18.10 Integración con el localizador
+
+Los códigos negativos quedan reservados a devoluciones:
+
+```text
+-123 + Intro / QR
+      ↓
+consulta venta.id = 123
+      ↓
+selector de devolución
+      ↓
+selección de líneas/unidades
+      ↓
+líneas negativas en VentaEnCurso
+```
+
+Si el ticket no existe, el código no es válido o esa pestaña ya contiene una devolución de otro ticket, se muestra un error controlado y el foco regresa al localizador.
+
+### 18.11 Reapertura y edición
+
+Una devolución cargada puede volver a abrirse haciendo clic en la descripción de cualquiera de sus líneas.
+
+La edición no conserva una copia histórica arbitrariamente vieja. Se vuelve a consultar el ticket por su `id`, se comprueba su `publicId` y se reconstruye la selección actual mediante los identificadores exactos de las líneas de origen.
+
+`ReturnSelectorComponent` admite `initialSelection` y muestra las líneas/cantidades actuales ya marcadas.
+
+Al confirmar:
+
+- las líneas de devolución anteriores se sustituyen por la nueva selección;
+- las líneas normales de compra permanecen intactas.
+
+Cancelar la edición no modifica nada.
+
+Si la disponibilidad histórica hubiera cambiado y la selección actual superase el máximo recién consultado, se obliga a revisar la devolución.
+
+### 18.12 Eliminación de líneas
+
+Eliminar una línea individual de devolución funciona como en cualquier otra línea del workspace.
+
+Si quedan otras líneas de la misma devolución, `devolucionOrigen` continúa activo.
+
+Si se elimina la última:
+
+```text
+devolucionOrigen = null
+```
+
+y la venta queda liberada para iniciar otra devolución.
+
+### 18.13 Persistencia pendiente
+
+Ventas 8 no persiste todavía la nueva operación.
+
+El esquema SQLite ya anticipa el flujo:
+
+- `venta.total_cents` puede ser negativo;
+- `venta_pago.importe_cents` puede ser negativo;
+- `linea_venta.unidades` puede ser negativo;
+- `linea_venta.unidades_devueltas` acumula las unidades que ya se han devuelto.
+
+La escritura transaccional de la nueva venta y la actualización de `unidades_devueltas` de las líneas históricas se realizará en **Ventas 11 — Persistencia transaccional**.
+
+La finalización económica y los pagos/refundos corresponden a **Ventas 10 — Finalización y pagos**.
+
+### 18.14 Pruebas y validación
+
+Se añadieron pruebas para, entre otros casos:
+
+- creación de una línea de devolución;
+- cantidad e importe negativos;
+- devoluciones parciales;
+- reparto acumulativo del importe histórico;
+- rechazo de modificaciones económicas normales;
+- exclusión del descuento del cliente;
+- compra del mismo artículo que se está devolviendo;
+- sustitución de una selección conservando compras normales;
+- rechazo de un segundo ticket origen en la misma venta;
+- liberación al eliminar la última línea.
+
+El usuario probó además el método de consulta directamente desde DevTools con datos reales y realizó el flujo completo en la aplicación:
+
+- lectura de QR/localizador negativo;
+- selector;
+- unidades disponibles;
+- combinación con compras;
+- reapertura;
+- modificación;
+- cancelación;
+- eliminación;
+- trabajo simultáneo con otras ventas.
+
+Toda la batería de pruebas (`test`, `typecheck:electron`, `build`, `lint`) y las pruebas manuales han sido validadas. Los cambios están subidos al repositorio.
+
+## 19. Ajustes transversales realizados durante Ventas
+
+### 19.1 Menú de Electron
 
 Se eliminó el menú superior de Electron mediante `Menu.setApplicationMenu(null)` para que Alt no vuelva a mostrar File/Edit/etc.
 
@@ -826,17 +1150,17 @@ Como efecto secundario desapareció el acceso a DevTools que dependía del menú
 
 Solo está activo cuando `!app.isPackaged`.
 
-### 18.2 Foco del selector de cliente
+### 19.2 Foco del selector de cliente
 
 Cerrar el selector por selección, eliminación o cancelación fuerza un nuevo `focusTarget` al localizador. Esto evita depender de que el valor anterior del workspace ya fuese `localizador`.
 
-### 18.3 Accesibilidad
+### 19.3 Accesibilidad
 
 Se evita `autofocus` en HTML; el foco inicial se resuelve mediante `viewChild` + `afterNextRender`/efectos post-render.
 
 Los overlays interactivos usan controles accesibles reales en vez de `<div (click)>` no focusables.
 
-## 19. Método de trabajo por bloque
+## 20. Método de trabajo por bloque
 
 Para cada bloque se seguirá el ciclo:
 
@@ -854,7 +1178,7 @@ Para cada bloque se seguirá el ciclo:
 
 > **Importante:** no asumir que la implementación antigua es el diseño correcto. Debe utilizarse como fuente funcional y rediseñarse cuando la arquitectura o UX lo justifiquen.
 
-## 20. Fuentes de información
+## 21. Fuentes de información
 
 La fuente principal es el código actual de los repositorios GitHub:
 
@@ -866,7 +1190,7 @@ Además pueden utilizarse capturas, explicación funcional del usuario, datos re
 
 No pedir de nuevo archivos ya disponibles y actualizados salvo necesidad concreta.
 
-## 21. Protocolo para cambios de código
+## 22. Protocolo para cambios de código
 
 - Cambios en orden de compilación y en pasos pequeños verificables.
 - Archivo nuevo: entregarlo completo.
@@ -886,12 +1210,12 @@ npm run lint
 - No avanzar al bloque siguiente hasta que el actual funcione o sus limitaciones estén documentadas.
 - El usuario suele probar manualmente, ejecutar la batería completa y subir los cambios antes de continuar.
 
-## 22. Prompt de arranque para una conversación nueva
+## 23. Prompt de arranque para una conversación nueva
 
 ```text
 Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” como contexto principal.
 
-Installation + importación legacy y Startup están completados y probados. En el módulo Ventas están completados y subidos los bloques 1 a 7:
+Installation + importación legacy y Startup están completados y probados. En el módulo Ventas están completados y subidos los bloques 1 a 8:
 1. Contexto operativo.
 2. Modelo de venta en curso + workspace persistente.
 3. Consulta/búsqueda de artículos y accesos directos.
@@ -899,8 +1223,9 @@ Installation + importación legacy y Startup están completados y probados. En e
 5. Operaciones sobre líneas.
 6. Clientes y estadísticas rápidas.
 7. Varios.
+8. Devoluciones.
 
-El siguiente bloque es Ventas 8 — Devoluciones. Después quedan Reservas, Finalización y pagos, Persistencia transaccional y Postventa.
+El siguiente bloque es Ventas 9 — Reservas. Después quedan Finalización y pagos, Persistencia transaccional y Postventa.
 
 Los repositorios de referencia son:
 - Frontend antiguo: https://github.com/osumionline/Osumi-TPV
@@ -911,36 +1236,56 @@ Antes de empezar un bloque, dame la recapitulación completa del plan, indicando
 
 Al terminar cada bloque principal, después de que confirme que funciona y que está subido, entrégame una versión actualizada de este documento de continuidad.
 
-Ahora debemos continuar por: Ventas 8 — Devoluciones.
+Ahora debemos continuar por: Ventas 9 — Reservas.
 ```
 
-## 23. Próximo paso
+## 24. Próximo paso
 
 El siguiente desarrollo es:
 
-# Ventas 8 — Devoluciones
+# Ventas 9 — Reservas
 
-El cliente nuevo ya reserva los localizadores negativos para este bloque.
+En el TPV antiguo las reservas tienen un ciclo de vida propio:
 
-La implementación antigua utilizaba un localizador negativo para identificar una venta anterior y abrir un selector de devolución. El modal cargaba la venta histórica, permitía seleccionar una o varias líneas y elegir cuántas unidades devolver de cada una. Las líneas seleccionadas se incorporaban a la venta actual con cantidades negativas y conservaban una referencia a la venta de origen.
+1. una venta en curso puede guardarse como reserva desde el flujo de finalización;
+2. la reserva pertenece obligatoriamente a un cliente;
+3. al guardarla se persisten sus líneas y se descuenta inmediatamente el stock físico reservado;
+4. existe un selector/listado de reservas activas;
+5. puede abrirse una reserva, eliminar líneas o eliminarla entera, devolviendo al stock lo que corresponda;
+6. una o varias reservas del mismo cliente pueden cargarse como una nueva venta;
+7. al vender finalmente una reserva se reconcilia el stock reservado con las unidades realmente vendidas y se consume la reserva.
 
-Antes de implementar se debe confirmar expresamente:
+La implementación antigua también presenta comportamientos que deben revisarse antes de reproducirlos:
 
-- qué identificador del ticket debe introducir o escanear el usuario en el Client (`numero`, serie+número u otro formato);
-- si se mantiene la regla legacy de una única venta de origen en proceso de devolución dentro de una venta actual;
-- cómo se calcula el máximo todavía devolvible cuando una línea ya tuvo devoluciones anteriores;
-- si una venta actual puede mezclar artículos nuevos y líneas de devolución, como permitía implícitamente el TPV antiguo.
+- al cargar varias reservas, líneas del mismo artículo podían quedar deduplicadas de forma incorrecta en vez de conservar todas las unidades/orígenes;
+- al cargar una reserva se reaplicaba el descuento actual del cliente, con riesgo de alterar el precio económico acordado al reservar;
+- la eliminación de una línea cargada de reserva utilizaba cantidad `0` para que la persistencia posterior restaurase el stock;
+- la creación de la reserva estaba integrada en el modal de finalización mediante las opciones `Reserva` y `Reserva (sin ticket)`.
 
-El esquema SQLite nuevo ya anticipa devoluciones:
+El esquema SQLite nuevo ya contiene:
 
-- `venta.total_cents` puede ser negativo;
-- `venta_pago.importe_cents` puede ser negativo;
-- `linea_venta.unidades` puede ser negativo;
-- `linea_venta.unidades_devueltas` registra unidades devueltas de una línea histórica.
+- `reserva`;
+- `linea_reserva`;
+- relación obligatoria con cliente;
+- datos históricos de nombre, PUC, PVP, IVA, descuentos, importe y unidades;
+- soporte para artículos nulos, necesario para Varios.
 
-No empezar Ventas 9 hasta que Ventas 8 esté implementado, probado, subido y este documento haya sido actualizado de nuevo.
+Antes de implementar Ventas 9 deben confirmarse expresamente las decisiones funcionales sobre:
 
-## 24. Registro de hitos
+- si se mantiene la carga múltiple de reservas únicamente cuando pertenecen al mismo cliente;
+- si las líneas procedentes de reservas diferentes se mantienen separadas aunque correspondan al mismo artículo;
+- si al cargar una reserva debe conservarse exactamente su precio/descuento histórico;
+- qué cambios de cantidad se permiten sobre una línea reservada al convertirla finalmente en venta;
+- si la venta que carga una reserva puede añadir artículos nuevos;
+- si el cliente de una venta cargada desde una reserva puede cambiarse o eliminarse;
+- si cargar una reserva debe seguir abriendo siempre una nueva pestaña de venta;
+- si se mantiene la eliminación de líneas/reservas con restitución inmediata del stock;
+- cómo dividir la creación de reservas entre Ventas 9 y Ventas 10, dado que en el TPV antiguo se inicia desde el flujo de finalización;
+- si se mantienen las dos variantes de creación: con ticket de reserva y sin ticket.
+
+No empezar Ventas 10 hasta que Ventas 9 esté implementado, probado, subido y este documento haya sido actualizado de nuevo.
+
+## 25. Registro de hitos
 
 | Versión | Fecha | Hito |
 | --- | --- | --- |
@@ -948,3 +1293,4 @@ No empezar Ventas 9 hasta que Ventas 8 esté implementado, probado, subido y est
 | 1.1 | 9 de agosto de 2026 | Startup completado: arranque, conexión SQLite operativa, assets internos y precarga global. |
 | 1.2 | 13 de agosto de 2026 | Ventas 1–6 completados: contexto operativo, workspace persistente, búsqueda, estructura visual, operaciones de línea, clientes, alta rápida, protección de datos y estadísticas. Próximo bloque: Ventas 7 — Varios. |
 | 1.3 | 13 de agosto de 2026 | Ventas 7 — Varios completado: línea libre real, creación/cancelación, editor reutilizable, IVA por defecto conservador, edición desde línea y pruebas. Próximo bloque: Ventas 8 — Devoluciones. |
+| 1.4 | 14 de agosto de 2026 | Ventas 8 — Devoluciones completado: compatibilidad QR legacy, read model histórico, control de unidades disponibles, economía histórica exacta, selector, mezcla con compras y reapertura/edición. Próximo bloque: Ventas 9 — Reservas. |
