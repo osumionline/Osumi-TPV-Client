@@ -36,6 +36,12 @@
         }
     }
 
+    .sale__line--devolucion {
+        >div {
+            background-color: var(--color-very-light-grey);
+        }
+    }
+
     .sale__line--input {
         .sale__locator-input {
             width: 100%;
@@ -82,6 +88,15 @@
         &:hover {
             background-color: var(--color-very-light-grey);
             cursor: pointer;
+        }
+
+        &:disabled {
+            cursor: default;
+
+            &:hover {
+                background-color: transparent;
+                cursor: default;
+            }
         }
     }
 
@@ -175,6 +190,10 @@
             mat-icon {
                 color: var(--main-color);
             }
+        }
+
+        &:disabled {
+            cursor: default;
         }
     }
 

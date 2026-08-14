@@ -1,0 +1,240 @@
+<div class="overlay">
+    <button class="overlay__backdrop"
+            type="button"
+            aria-label="Cancelar devolución"
+            (click)="cancel()">
+    </button>
+
+    <section class="return-selector"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="return-selector-title">
+
+        <header class="return-selector__header">
+            <div>
+                <h2 id="return-selector-title">
+                    Devolución
+                </h2>
+
+                <div class="return-selector__ticket">
+                    Ticket {{ getTicketLabel() }}
+                </div>
+            </div>
+
+            <div class="return-selector__summary">
+                <span>
+                    Fecha:
+                    <strong>
+                        {{ formatFecha(devolucion().fecha) }}
+                    </strong>
+                </span>
+
+                <span>
+                    Total:
+                    <strong>
+                        {{
+                            (devolucion().totalCents / 100)
+                                | currency:'EUR':'symbol':'1.2-2'
+                        }}
+                    </strong>
+                </span>
+
+                @if (devolucion().cliente !== null) {
+                <span>
+                    Cliente:
+                    <strong>
+                        {{ devolucion().cliente }}
+                    </strong>
+                </span>
+                }
+            </div>
+        </header>
+
+        @if (devolucion().pagos.length > 0) {
+        <div class="return-selector__payments">
+            <strong>
+                Forma de pago:
+            </strong>
+
+            @for (
+            pago of devolucion().pagos;
+            track $index
+            ) {
+            <span>
+                {{ pago.nombre }}
+                ({{
+                (pago.importeCents / 100)
+                | currency:'EUR':'symbol':'1.2-2'
+                }})
+            </span>
+            }
+        </div>
+        }
+
+        <div class="return-selector__table-wrapper">
+            <table class="return-selector__table">
+                <thead>
+                    <tr>
+                        <th class="return-selector__check">
+                            <mat-checkbox aria-label="Seleccionar todas las líneas"
+                                          [checked]="allSelected()"
+                                          [indeterminate]="someSelected()"
+                                          [disabled]="lineasSeleccionables().length === 0"
+                                          (change)="toggleAll($event.checked)" />
+                        </th>
+
+                        <th>
+                            Descripción
+                        </th>
+
+                        <th class="number">
+                            Compradas
+                        </th>
+
+                        <th class="number">
+                            Devueltas
+                        </th>
+
+                        <th class="number">
+                            Disponibles
+                        </th>
+
+                        <th class="number">
+                            Devolver
+                        </th>
+
+                        <th class="money">
+                            PVP
+                        </th>
+
+                        <th class="money">
+                            Descuento
+                        </th>
+
+                        <th class="money">
+                            Importe
+                        </th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @for (
+                    linea of devolucion().lineas;
+                    track linea.publicId
+                    ) {
+                    <tr [class.return-selector__row--unavailable]="
+                            linea.unidadesDisponibles === 0
+                        "
+                        [class.return-selector__row--selected]="
+                            isSelected(linea)
+                        ">
+
+                        <td class="return-selector__check">
+                            <mat-checkbox [attr.aria-label]="
+                                    'Devolver ' + linea.nombre
+                                "
+                                          [checked]="isSelected(linea)"
+                                          [disabled]="linea.unidadesDisponibles === 0"
+                                          (change)="toggleLinea(linea, $event.checked)" />
+                        </td>
+
+                        <td>
+                            {{ linea.nombre }}
+
+                            @if (linea.regalo) {
+                            <span class="return-selector__gift">
+                                Regalo
+                            </span>
+                            }
+                        </td>
+
+                        <td class="number">
+                            {{ linea.unidades }}
+                        </td>
+
+                        <td class="number">
+                            {{ linea.unidadesDevueltas }}
+                        </td>
+
+                        <td class="number">
+                            {{ linea.unidadesDisponibles }}
+                        </td>
+
+                        <td class="number">
+                            <input class="return-selector__units"
+                                   type="number"
+                                   inputmode="numeric"
+                                   min="1"
+                                   step="1"
+                                   [max]="linea.unidadesDisponibles"
+                                   [disabled]="!isSelected(linea)"
+                                   [value]="getUnidadesValue(linea)"
+                                   [attr.aria-label]="
+                                       'Unidades a devolver de ' + linea.nombre
+                                   "
+                                   (input)="updateUnidades(linea, $event)">
+                        </td>
+
+                        <td class="money">
+                            {{
+                                (linea.pvpMicros / 1_000_000)
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </td>
+
+                        <td class="money">
+                            @if (linea.regalo) {
+                            Regalo
+                            }
+                            @else if (linea.importeDescuentoMicros > 0) {
+                            {{
+                                (linea.importeDescuentoMicros / 1_000_000)
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                            }
+                            @else {
+                            {{ linea.descuentoBps / 100 }} %
+                            }
+                        </td>
+
+                        <td class="money">
+                            {{
+                                (linea.importeMicros / 1_000_000)
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (lineasSeleccionables().length === 0) {
+        <div class="return-selector__notice">
+            Este ticket no tiene ninguna unidad pendiente de devolución.
+        </div>
+        }
+
+        @if (error() !== null) {
+        <div class="return-selector__error"
+             role="alert">
+            {{ error() }}
+        </div>
+        }
+
+        <footer class="return-selector__actions">
+            <button mat-stroked-button
+                    type="button"
+                    (click)="cancel()">
+                Cancelar
+            </button>
+
+            <button mat-flat-button
+                    type="button"
+                    [disabled]="!canContinue()"
+                    (click)="continue()">
+                Continuar
+            </button>
+        </footer>
+    </section>
+</div>

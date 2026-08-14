@@ -38,7 +38,8 @@
         linea of ventaView().lineas;
         track linea.idTemporal
         ) {
-        <div class="sale__line">
+        <div class="sale__line"
+             [class.sale__line--devolucion]="linea.esDevolucion">
             <div class="col-localizador">
                 <button class="sale__delete"
                         type="button"
@@ -75,7 +76,7 @@
             </div>
 
             <div class="col-marca">
-                {{ linea.marca }}
+                {{ linea.esDevolucion ? 'Devolución' : linea.marca }}
             </div>
 
             <div class="col-cantidad">
@@ -96,7 +97,8 @@
                 @else {
                 <button class="sale__editable-value"
                         type="button"
-                        matTooltip="Modificar cantidad"
+                        [matTooltip]="linea.esDevolucion ? 'Cantidad de devolución' : 'Modificar cantidad'"
+                        [disabled]="linea.esDevolucion"
                         (click)="editLinea(linea.idTemporal, 'cantidad')">
                     {{ linea.cantidad }}
                 </button>
@@ -115,6 +117,7 @@
                         type="button"
                         [class.sale__gift--active]="linea.regalo"
                         [attr.aria-pressed]="linea.regalo"
+                        [disabled]="linea.esDevolucion"
                         [matTooltip]="linea.regalo ? 'Quitar regalo' : 'Marcar como regalo'"
                         (click)="alternarRegalo(linea)">
                     <mat-icon>loyalty</mat-icon>
@@ -140,7 +143,7 @@
                 <div class="sale__editable-cell">
                     <button class="sale__editable-value"
                             type="button"
-                            [disabled]="!canModifyAmounts()"
+                            [disabled]="linea.esDevolucion || !canModifyAmounts()"
                             (click)="editImporte(linea)">
                         {{
                             (linea.importeFinalMicros / 1_000_000)
@@ -162,6 +165,28 @@
             </div>
 
             <div class="col-descuentos">
+                @if (
+                linea.esDevolucion &&
+                linea.devolucionOrigen;
+                as origen
+                ) {
+                <span class="sale__discount-value"
+                      matTooltip="Descuento de la venta original">
+                    @if (origen.regalo) {
+                    Regalo
+                    }
+                    @else if (origen.importeDescuentoMicros > 0) {
+                    {{
+                        (origen.importeDescuentoMicros / 1_000_000)
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
+                    }
+                    @else {
+                    {{ origen.descuentoBps / 100 }} %
+                    }
+                </span>
+                }
+                @else {
                 @if (linea.tieneDescuentoPromocional) {
                 <div class="sale__editable-cell">
                     <span class="sale__discount-value"
@@ -297,10 +322,11 @@
                     }
                 </div>
                 }
+                }
             </div>
 
             <div class="col-stock">
-                {{ linea.stock }}
+                {{ linea.esDevolucion ? '-' : linea.stock }}
             </div>
         </div>
         }
@@ -397,5 +423,11 @@
         "
                         (saveEvent)="onVariosSave($event)"
                         (cancelEvent)="closeVariosEditor()" />
+    }
+
+    @if (devolucionSelectorData(); as devolucion) {
+    <otpv-return-selector [devolucion]="devolucion"
+                          (selectEvent)="onDevolucionSelected($event)"
+                          (cancelEvent)="closeDevolucionSelector()" />
     }
 </section>

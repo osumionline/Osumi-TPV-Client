@@ -21,8 +21,10 @@ import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import permissionIds from '@desktop-contracts/permissions/permission-ids.constants';
+import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devolucion.interface';
 import type AccesoDirectoVenta from '@model/ventas/acceso-directo-venta.model';
 import type ArticuloVenta from '@model/ventas/articulo-venta.model';
+import type VentaDevolucionSeleccion from '@model/ventas/venta-devolucion-seleccion.interface';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
 import type VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
 import type VentaVariosData from '@model/ventas/venta-varios-data.interface';
@@ -40,10 +42,12 @@ import { MICROS_PER_CENT } from '@model/ventas/ventas-money.constants';
 import ArticleSearchComponent from '@modules/ventas/components/article-search/article-search.component';
 import ClientStatisticsComponent from '@modules/ventas/components/client-statistics/client-statistics.component';
 import DirectAccessSelectorComponent from '@modules/ventas/components/direct-access-selector/direct-access-selector.component';
+import ReturnSelectorComponent from '@modules/ventas/components/return-selector/return-selector.component';
 import VariosEditorComponent from '@modules/ventas/components/varios-editor/varios-editor.component';
 import { DialogService } from '@osumi/angular-tools';
 import VentasArticulosService from '@services/ventas-articulos.service';
 import VentasContextService from '@services/ventas-context.service';
+import VentasDevolucionesService from '@services/ventas-devoluciones.service';
 import VentasService from '@services/ventas.service';
 
 /**
@@ -64,6 +68,7 @@ import VentasService from '@services/ventas.service';
     DirectAccessSelectorComponent,
     ClientStatisticsComponent,
     VariosEditorComponent,
+    ReturnSelectorComponent,
   ],
 })
 export default class SaleWorkspaceComponent {
@@ -71,6 +76,8 @@ export default class SaleWorkspaceComponent {
   private readonly ventasArticulosService: VentasArticulosService = inject(VentasArticulosService);
   readonly ventasService: VentasService = inject(VentasService);
   private readonly ventasContextService: VentasContextService = inject(VentasContextService);
+  private readonly ventasDevolucionesService: VentasDevolucionesService =
+    inject(VentasDevolucionesService);
 
   readonly venta: InputSignal<VentaEnCurso> = input.required<VentaEnCurso>();
 
@@ -108,6 +115,9 @@ export default class SaleWorkspaceComponent {
   readonly variosEditorState: WritableSignal<VentaVariosEditorState | null> =
     signal<VentaVariosEditorState | null>(null);
 
+  readonly devolucionSelectorData: WritableSignal<VentaDevolucionInterface | null> =
+    signal<VentaDevolucionInterface | null>(null);
+
   readonly variosIvaOptionsBps: Signal<readonly number[]> = computed((): readonly number[] => {
     const appData: AppData | null = this.ventasContextService.appData();
 
@@ -133,7 +143,8 @@ export default class SaleWorkspaceComponent {
         workspace === null ||
         this.searchOpen() ||
         this.directAccessOpen() ||
-        this.variosEditorState() !== null
+        this.variosEditorState() !== null ||
+        this.devolucionSelectorData() !== null
       ) {
         return;
       }
@@ -820,12 +831,91 @@ export default class SaleWorkspaceComponent {
     }
 
     if (/^-\d+$/.test(codigo)) {
-      this.showPendingFeature('Las devoluciones se implementarán en Ventas 8.');
+      await this.resolveDevolucion(codigo);
 
       return;
     }
 
     await this.resolveCode(codigo);
+  }
+
+  /**
+   * Recupera el ticket histórico asociado a un QR de devolución
+   * y abre su selector de líneas.
+   */
+  private async resolveDevolucion(codigo: string): Promise<void> {
+    this.localizador.set('');
+
+    const idVenta: number = Number(codigo.substring(1));
+
+    if (!Number.isSafeInteger(idVenta) || idVenta <= 0) {
+      this.showDevolucionError('El código del ticket no es válido.');
+
+      return;
+    }
+
+    if (this.venta().devolucionOrigen !== null) {
+      this.showDevolucionError('Ya existe una devolución en curso en esta venta.');
+
+      return;
+    }
+
+    this.searching.set(true);
+
+    try {
+      const devolucion: VentaDevolucionInterface | null =
+        await this.ventasDevolucionesService.getDevolucion(idVenta);
+
+      if (devolucion === null) {
+        this.showDevolucionError('No se ha encontrado el ticket indicado.');
+
+        return;
+      }
+
+      this.devolucionSelectorData.set(devolucion);
+    } catch (error: unknown) {
+      this.showDevolucionError(
+        error instanceof Error ? error.message : 'No se ha podido recuperar el ticket.',
+      );
+    } finally {
+      this.searching.set(false);
+    }
+  }
+
+  /**
+   * Incorpora las líneas seleccionadas como devolución.
+   */
+  onDevolucionSelected(seleccion: readonly VentaDevolucionSeleccion[]): void {
+    const devolucion: VentaDevolucionInterface | null = this.devolucionSelectorData();
+
+    if (devolucion === null) {
+      return;
+    }
+
+    try {
+      this.ventasService.aplicarDevolucion(this.venta().idTemporal, devolucion, seleccion);
+
+      this.devolucionSelectorData.set(null);
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Atención',
+          content:
+            error instanceof Error ? error.message : 'No se ha podido aplicar la devolución.',
+        })
+        .subscribe();
+    }
+  }
+
+  /**
+   * Cierra el selector sin modificar la venta.
+   */
+  closeDevolucionSelector(): void {
+    this.devolucionSelectorData.set(null);
+
+    this.localizador.set('');
+
+    this.focusLocalizador();
   }
 
   /**
@@ -886,6 +976,20 @@ export default class SaleWorkspaceComponent {
    * para introducir un Varios.
    */
   private showVariosConfigurationError(message: string): void {
+    this.dialog
+      .alert({
+        title: 'Atención',
+        content: message,
+      })
+      .subscribe((): void => {
+        this.focusLocalizador();
+      });
+  }
+
+  /**
+   * Informa de un problema al iniciar una devolución.
+   */
+  private showDevolucionError(message: string): void {
     this.dialog
       .alert({
         title: 'Atención',
