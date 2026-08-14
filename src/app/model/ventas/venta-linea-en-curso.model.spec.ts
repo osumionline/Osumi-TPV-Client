@@ -426,4 +426,187 @@ describe('VentaLineaEnCurso', (): void => {
 
     expect((): void => linea.setImporteManualMicros(5_000_000)).toThrow();
   });
+
+  it('crea una línea de reserva conservando su economía histórica', (): void => {
+    const linea: VentaLineaEnCurso = new VentaLineaEnCurso().fromReserva(
+      {
+        id: 10,
+        publicId: 'reserva-10',
+        idCliente: 1,
+        clientePublicId: 'cliente-1',
+        clienteNombre: 'Cliente 1',
+        totalMicros: 18_000_000,
+        fecha: '2026-08-14',
+        lineas: [],
+      },
+      {
+        id: 20,
+        publicId: 'linea-reserva-20',
+
+        idArticulo: 1,
+        articuloPublicId: 'articulo-1',
+
+        localizador: 1,
+        marca: 'Marca',
+
+        nombre: 'Artículo',
+
+        pucMicros: 5_000_000,
+
+        pvpMicros: 10_000_000,
+
+        ivaBps: 2_100,
+
+        importeMicros: 18_000_000,
+
+        descuentoBps: 1_000,
+
+        importeDescuentoMicros: 2_000_000,
+
+        unidades: 2,
+      },
+    );
+
+    expect(linea.esReserva).toBe(true);
+
+    expect(linea.esDevolucion).toBe(false);
+
+    expect(linea.esVarios).toBe(false);
+
+    expect(linea.cantidad).toBe(2);
+
+    expect(linea.importeFinalMicros).toBe(18_000_000);
+
+    expect(linea.reservaOrigen?.reservaPublicId).toBe('reserva-10');
+
+    expect(linea.reservaOrigen?.lineaPublicId).toBe('linea-reserva-20');
+  });
+
+  it('escala el importe histórico al modificar la cantidad final de una reserva', (): void => {
+    const linea: VentaLineaEnCurso = new VentaLineaEnCurso().fromReserva(
+      {
+        id: 10,
+        publicId: 'reserva-10',
+        idCliente: 1,
+        clientePublicId: 'cliente-1',
+        clienteNombre: 'Cliente 1',
+        totalMicros: 18_000_000,
+        fecha: '2026-08-14',
+        lineas: [],
+      },
+      {
+        id: 20,
+        publicId: 'linea-reserva-20',
+        idArticulo: 1,
+        articuloPublicId: 'articulo-1',
+        localizador: 1,
+        marca: 'Marca',
+        nombre: 'Artículo',
+        pucMicros: 5_000_000,
+        pvpMicros: 10_000_000,
+        ivaBps: 2_100,
+        importeMicros: 18_000_000,
+        descuentoBps: 1_000,
+        importeDescuentoMicros: 2_000_000,
+        unidades: 2,
+      },
+    );
+
+    linea.setCantidadReserva(1);
+
+    expect(linea.importeFinalMicros).toBe(9_000_000);
+
+    linea.setCantidadReserva(3);
+
+    expect(linea.importeFinalMicros).toBe(27_000_000);
+
+    expect(linea.importeDescuentoReservaMicros).toBe(3_000_000);
+  });
+
+  it('impide modificar económicamente una línea procedente de reserva', (): void => {
+    const linea: VentaLineaEnCurso = new VentaLineaEnCurso().fromReserva(
+      {
+        id: 10,
+        publicId: 'reserva-10',
+        idCliente: 1,
+        clientePublicId: 'cliente-1',
+        clienteNombre: 'Cliente 1',
+        totalMicros: 9_000_000,
+        fecha: '2026-08-14',
+        lineas: [],
+      },
+      {
+        id: 20,
+        publicId: 'linea-reserva-20',
+        idArticulo: 1,
+        articuloPublicId: 'articulo-1',
+        localizador: 1,
+        marca: 'Marca',
+        nombre: 'Artículo',
+        pucMicros: 5_000_000,
+        pvpMicros: 10_000_000,
+        ivaBps: 2_100,
+        importeMicros: 9_000_000,
+        descuentoBps: 1_000,
+        importeDescuentoMicros: 1_000_000,
+        unidades: 1,
+      },
+    );
+
+    expect((): void => linea.setCantidad(2)).toThrow();
+
+    expect((): void => linea.setRegalo(true)).toThrow();
+
+    expect((): void => linea.setImporteManualMicros(5_000_000)).toThrow();
+
+    expect((): void => linea.setDescuentoManualBps(2_000)).toThrow();
+
+    expect((): void => linea.setDescuentoClienteBps(2_000)).toThrow();
+
+    linea.setCantidadReserva(2);
+
+    expect(linea.cantidad).toBe(2);
+  });
+
+  it('no confunde una línea libre reservada con un Varios editable', (): void => {
+    const linea: VentaLineaEnCurso = new VentaLineaEnCurso().fromReserva(
+      {
+        id: 10,
+        publicId: 'reserva-10',
+        idCliente: 1,
+        clientePublicId: 'cliente-1',
+        clienteNombre: 'Cliente 1',
+        totalMicros: 5_000_000,
+        fecha: '2026-08-14',
+        lineas: [],
+      },
+      {
+        id: 20,
+        publicId: 'linea-reserva-20',
+
+        idArticulo: null,
+        articuloPublicId: null,
+
+        localizador: null,
+        marca: null,
+
+        nombre: 'Trabajo especial',
+
+        pucMicros: 0,
+        pvpMicros: 5_000_000,
+        ivaBps: 2_100,
+
+        importeMicros: 5_000_000,
+
+        descuentoBps: 0,
+        importeDescuentoMicros: 0,
+
+        unidades: 1,
+      },
+    );
+
+    expect(linea.esReserva).toBe(true);
+
+    expect(linea.esVarios).toBe(false);
+  });
 });

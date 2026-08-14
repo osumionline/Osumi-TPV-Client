@@ -2,6 +2,7 @@ import type Cliente from '@model/clientes/cliente.model';
 import type Empleado from '@model/empleados/empleado.model';
 import type VentaDevolucionOrigen from '@model/ventas/venta-devolucion-origen.interface';
 import VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
+import type VentaReservaOrigen from '@model/ventas/venta-reserva-origen.interface';
 import { MICROS_PER_CENT } from '@model/ventas/ventas-money.constants';
 
 /**
@@ -13,6 +14,7 @@ export default class VentaEnCurso {
   empleado: Empleado | null = null;
   cliente: Cliente | null = null;
   devolucionOrigen: VentaDevolucionOrigen | null = null;
+  reservasOrigen: readonly VentaReservaOrigen[] = [];
   lineas: VentaLineaEnCurso[] = [];
 
   constructor(readonly numero: number) {}
@@ -37,6 +39,13 @@ export default class VentaEnCurso {
   }
 
   /**
+   * Indica si esta venta procede de una o varias reservas.
+   */
+  get tieneReservas(): boolean {
+    return this.reservasOrigen.length > 0;
+  }
+
+  /**
    * Asigna el empleado responsable de la venta.
    */
   setEmpleado(empleado: Empleado): void {
@@ -47,12 +56,17 @@ export default class VentaEnCurso {
    * Asigna un cliente a la venta y actualiza su descuento en todas las líneas.
    */
   setCliente(cliente: Cliente): void {
+    if (this.tieneReservas) {
+      throw new Error(
+        'No se puede cambiar el cliente mientras haya reservas cargadas en la venta.',
+      );
+    }
     const descuentoClienteBps: number = this.getDescuentoClienteBps(cliente);
 
     this.cliente = cliente;
 
     for (const linea of this.lineas) {
-      if (!linea.esDevolucion) {
+      if (!linea.esDevolucion && !linea.esReserva) {
         linea.setDescuentoClienteBps(descuentoClienteBps);
       }
     }
@@ -62,10 +76,15 @@ export default class VentaEnCurso {
    * Elimina el cliente de la venta y su capa de descuento.
    */
   clearCliente(): void {
+    if (this.tieneReservas) {
+      throw new Error(
+        'No se puede eliminar el cliente mientras haya reservas cargadas en la venta.',
+      );
+    }
     this.cliente = null;
 
     for (const linea of this.lineas) {
-      if (!linea.esDevolucion) {
+      if (!linea.esDevolucion && !linea.esReserva) {
         linea.setDescuentoClienteBps(0);
       }
     }
@@ -75,11 +94,96 @@ export default class VentaEnCurso {
    * Añade una línea real a la venta.
    */
   addLinea(linea: VentaLineaEnCurso): void {
+    if (linea.esReserva) {
+      throw new Error('Las líneas procedentes de reserva deben cargarse mediante setReservas().');
+    }
+
     if (this.cliente !== null && !linea.esDevolucion) {
       linea.setDescuentoClienteBps(this.getDescuentoClienteBps(this.cliente));
     }
 
     this.lineas.push(linea);
+  }
+
+  /**
+   * Inicializa esta venta a partir de una o varias reservas
+   * pertenecientes al mismo cliente.
+   */
+  setReservas(
+    cliente: Cliente,
+    reservasOrigen: readonly VentaReservaOrigen[],
+    lineas: readonly VentaLineaEnCurso[],
+  ): void {
+    if (reservasOrigen.length === 0) {
+      throw new Error('Debe indicarse al menos una reserva.');
+    }
+
+    if (this.lineas.length > 0 || this.tieneReservas) {
+      throw new Error('Las reservas solo pueden cargarse sobre una venta nueva.');
+    }
+
+    if (cliente.id === null || cliente.publicId === null) {
+      throw new Error('Las reservas requieren un cliente persistido.');
+    }
+
+    const clientePublicId: string = cliente.publicId;
+
+    const reservaPublicIds: Set<string> = new Set<string>();
+
+    for (const reserva of reservasOrigen) {
+      if (reserva.idCliente !== cliente.id || reserva.clientePublicId !== clientePublicId) {
+        throw new Error('Todas las reservas deben pertenecer al mismo cliente de la venta.');
+      }
+
+      if (reservaPublicIds.has(reserva.publicId)) {
+        throw new Error('No se puede cargar dos veces la misma reserva.');
+      }
+
+      reservaPublicIds.add(reserva.publicId);
+    }
+
+    if (lineas.length === 0) {
+      throw new Error('Las reservas seleccionadas no contienen líneas.');
+    }
+
+    for (const linea of lineas) {
+      const lineaOrigen = linea.reservaOrigen;
+
+      if (lineaOrigen === null) {
+        throw new Error('Todas las líneas deben proceder de una reserva.');
+      }
+
+      const reservaOrigen: VentaReservaOrigen | undefined = reservasOrigen.find(
+        (reserva: VentaReservaOrigen): boolean =>
+          reserva.id === lineaOrigen.reservaId && reserva.publicId === lineaOrigen.reservaPublicId,
+      );
+
+      if (reservaOrigen === undefined) {
+        throw new Error('Una línea no pertenece a ninguna de las reservas indicadas.');
+      }
+
+      const lineaExiste: boolean = reservaOrigen.lineas.some(
+        (origen): boolean =>
+          origen.lineaId === lineaOrigen.lineaId &&
+          origen.lineaPublicId === lineaOrigen.lineaPublicId,
+      );
+
+      if (!lineaExiste) {
+        throw new Error('Una línea de reserva no coincide con su origen histórico.');
+      }
+    }
+
+    /*
+     * Asignación directa intencionada:
+     *
+     * no utilizamos setCliente(), porque eso aplicaría
+     * el descuento actual del cliente a las líneas.
+     */
+    this.cliente = cliente;
+
+    this.reservasOrigen = [...reservasOrigen];
+
+    this.lineas = [...lineas];
   }
 
   /**
@@ -117,6 +221,14 @@ export default class VentaEnCurso {
     if (!this.lineas.some((linea: VentaLineaEnCurso): boolean => linea.esDevolucion)) {
       this.devolucionOrigen = null;
     }
+
+    /*
+     * reservasOrigen NO se modifica.
+     *
+     * Ventas 11 necesitará conocer las líneas
+     * originalmente reservadas aunque el usuario
+     * haya eliminado alguna de la venta final.
+     */
   }
 
   /**

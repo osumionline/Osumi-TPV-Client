@@ -1,3 +1,4 @@
+import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
 import Cliente from '@model/clientes/cliente.model';
 import ArticuloVenta from '@model/ventas/articulo-venta.model';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
@@ -20,6 +21,49 @@ const createArticulo = (publicId: string, pvpCents: number = 1_000): ArticuloVen
   articulo.stock = 10;
 
   return articulo;
+};
+
+const createReserva = (
+  reservaPublicId: string,
+  lineaPublicId: string,
+  clientePublicId: string = 'cliente-1',
+  articuloPublicId: string = 'articulo-1',
+  unidades: number = 2,
+  importeMicros: number = 18_000_000,
+): ReservaInterface => {
+  const reservaId: number = Number(reservaPublicId.replace(/\D/g, '')) || 1;
+  const lineaId: number = Number(lineaPublicId.replace(/\D/g, '')) || 1;
+  const clienteId: number = Number(clientePublicId.replace(/\D/g, '')) || 1;
+  const articuloId: number = Number(articuloPublicId.replace(/\D/g, '')) || 1;
+  const pvpMicros: number = 10_000_000;
+
+  return {
+    id: reservaId,
+    publicId: reservaPublicId,
+    idCliente: clienteId,
+    clientePublicId,
+    clienteNombre: `Cliente ${clientePublicId}`,
+    totalMicros: importeMicros,
+    fecha: '2026-08-14',
+    lineas: [
+      {
+        id: lineaId,
+        publicId: lineaPublicId,
+        idArticulo: articuloId,
+        articuloPublicId,
+        localizador: articuloId,
+        marca: 'Marca',
+        nombre: `Artículo ${articuloPublicId}`,
+        pucMicros: 5_000_000,
+        pvpMicros,
+        ivaBps: 2_100,
+        importeMicros,
+        descuentoBps: 1_000,
+        importeDescuentoMicros: Math.max(unidades * pvpMicros - importeMicros, 0),
+        unidades,
+      },
+    ],
+  };
 };
 
 const createCliente = (publicId: string, descuento: number): Cliente => {
@@ -685,5 +729,145 @@ describe('VentasService', (): void => {
     expect(venta.devolucionOrigen).toBeNull();
 
     expect(venta.lineas).toHaveLength(0);
+  });
+
+  it('mantiene separadas las líneas del mismo artículo procedentes de reservas distintas', (): void => {
+    const service: VentasService = new VentasService();
+
+    const cliente: Cliente = createCliente('cliente-1', 20);
+
+    const venta: VentaEnCurso = service.crearVentaDesdeReservas(null, cliente, [
+      createReserva('reserva-1', 'linea-101', 'cliente-1', 'articulo-1', 1, 9_000_000),
+      createReserva('reserva-2', 'linea-102', 'cliente-1', 'articulo-1', 2, 18_000_000),
+    ]);
+
+    expect(venta.lineas).toHaveLength(2);
+
+    expect(venta.lineas[0]?.reservaOrigen?.reservaPublicId).toBe('reserva-1');
+
+    expect(venta.lineas[1]?.reservaOrigen?.reservaPublicId).toBe('reserva-2');
+
+    expect(venta.lineas[0]?.cantidad).toBe(1);
+
+    expect(venta.lineas[1]?.cantidad).toBe(2);
+
+    expect(venta.totalMicros).toBe(27_000_000);
+  });
+
+  it('conserva la economía histórica de la reserva y aplica el descuento actual solo a compras nuevas', (): void => {
+    const service: VentasService = new VentasService();
+
+    const cliente: Cliente = createCliente('cliente-1', 20);
+
+    const venta: VentaEnCurso = service.crearVentaDesdeReservas(null, cliente, [
+      createReserva('reserva-1', 'linea-101', 'cliente-1', 'articulo-1', 1, 9_000_000),
+    ]);
+
+    const reservada: VentaLineaEnCurso = venta.lineas[0]!;
+
+    expect(reservada.descuentoClienteBps).toBe(0);
+
+    expect(reservada.importeFinalMicros).toBe(9_000_000);
+
+    service.agregarArticulos(venta.idTemporal, [createArticulo('articulo-2', 1_000)]);
+
+    const nueva: VentaLineaEnCurso = venta.lineas[1]!;
+
+    expect(nueva.descuentoClienteBps).toBe(2_000);
+
+    expect(nueva.importeFinalMicros).toBe(8_000_000);
+
+    expect(venta.totalMicros).toBe(17_000_000);
+  });
+
+  it('mantiene separada una nueva compra del mismo artículo reservado', (): void => {
+    const service: VentasService = new VentasService();
+
+    const cliente: Cliente = createCliente('cliente-1', 0);
+
+    const venta: VentaEnCurso = service.crearVentaDesdeReservas(null, cliente, [
+      createReserva('reserva-1', 'linea-101'),
+    ]);
+
+    service.agregarArticulos(venta.idTemporal, [createArticulo('articulo-1')]);
+
+    expect(venta.lineas).toHaveLength(2);
+
+    expect(venta.lineas[0]?.esReserva).toBe(true);
+
+    expect(venta.lineas[0]?.cantidad).toBe(2);
+
+    expect(venta.lineas[1]?.esReserva).toBe(false);
+
+    expect(venta.lineas[1]?.cantidad).toBe(1);
+
+    service.agregarArticulos(venta.idTemporal, [createArticulo('articulo-1')]);
+
+    expect(venta.lineas).toHaveLength(2);
+
+    expect(venta.lineas[0]?.cantidad).toBe(2);
+
+    expect(venta.lineas[1]?.cantidad).toBe(2);
+  });
+
+  it('impide cambiar o eliminar el cliente mientras haya reservas cargadas', (): void => {
+    const service: VentasService = new VentasService();
+
+    const cliente: Cliente = createCliente('cliente-1', 10);
+
+    const venta: VentaEnCurso = service.crearVentaDesdeReservas(null, cliente, [
+      createReserva('reserva-1', 'linea-101'),
+    ]);
+
+    expect((): void =>
+      service.asignarCliente(venta.idTemporal, createCliente('cliente-2', 5)),
+    ).toThrow('No se puede cambiar el cliente mientras haya reservas cargadas en la venta.');
+
+    expect((): void => service.quitarCliente(venta.idTemporal)).toThrow(
+      'No se puede eliminar el cliente mientras haya reservas cargadas en la venta.',
+    );
+
+    expect(venta.cliente).toBe(cliente);
+  });
+
+  it('conserva el origen de la reserva aunque se elimine su línea visible', (): void => {
+    const service: VentasService = new VentasService();
+
+    const cliente: Cliente = createCliente('cliente-1', 0);
+
+    const venta: VentaEnCurso = service.crearVentaDesdeReservas(null, cliente, [
+      createReserva('reserva-1', 'linea-101'),
+    ]);
+
+    const linea: VentaLineaEnCurso = venta.lineas[0]!;
+
+    service.eliminarLinea(venta.idTemporal, linea.idTemporal);
+
+    expect(venta.lineas).toHaveLength(0);
+
+    expect(venta.tieneReservas).toBe(true);
+
+    expect(venta.reservasOrigen).toHaveLength(1);
+
+    expect(venta.reservasOrigen[0]?.lineas).toHaveLength(1);
+
+    expect(venta.reservasOrigen[0]?.lineas[0]?.lineaPublicId).toBe('linea-101');
+
+    expect((): void => service.quitarCliente(venta.idTemporal)).toThrow();
+  });
+
+  it('rechaza cargar conjuntamente reservas de clientes distintos sin abrir una venta', (): void => {
+    const service: VentasService = new VentasService();
+
+    const cliente: Cliente = createCliente('cliente-1', 0);
+
+    expect((): VentaEnCurso =>
+      service.crearVentaDesdeReservas(null, cliente, [
+        createReserva('reserva-1', 'linea-101', 'cliente-1'),
+        createReserva('reserva-2', 'linea-102', 'cliente-2'),
+      ]),
+    ).toThrow('Todas las reservas seleccionadas deben pertenecer al mismo cliente.');
+
+    expect(service.ventas()).toHaveLength(0);
   });
 });

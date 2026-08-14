@@ -1,6 +1,9 @@
+import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
+import type { ReservaLineaInterface } from '@desktop-contracts/reservas/reserva.interface';
 import type { VentaDevolucionLineaInterface } from '@desktop-contracts/ventas/venta-devolucion.interface';
 import type ArticuloVenta from '@model/ventas/articulo-venta.model';
 import type VentaLineaDevolucionOrigen from '@model/ventas/venta-linea-devolucion-origen.interface';
+import type VentaLineaReservaOrigen from '@model/ventas/venta-linea-reserva-origen.interface';
 import type VentaVariosData from '@model/ventas/venta-varios-data.interface';
 import { BASIS_POINTS_TOTAL, MICROS_PER_CENT } from '@model/ventas/ventas-money.constants';
 
@@ -30,6 +33,7 @@ export default class VentaLineaEnCurso {
   observaciones: string | null = null;
   regalo: boolean = false;
   devolucionOrigen: VentaLineaDevolucionOrigen | null = null;
+  reservaOrigen: VentaLineaReservaOrigen | null = null;
 
   /**
    * Inicializa la línea a partir de un artículo seleccionado para la venta.
@@ -157,11 +161,109 @@ export default class VentaLineaEnCurso {
   }
 
   /**
+   * Inicializa una línea a partir de una línea histórica
+   * perteneciente a una reserva.
+   */
+  fromReserva(reserva: ReservaInterface, linea: ReservaLineaInterface): VentaLineaEnCurso {
+    if (reserva.publicId.trim() === '') {
+      throw new Error('La reserva no dispone de un identificador válido.');
+    }
+
+    if (linea.publicId.trim() === '') {
+      throw new Error('La línea de reserva no dispone de un identificador válido.');
+    }
+
+    if (!Number.isSafeInteger(linea.unidades) || linea.unidades <= 0) {
+      throw new RangeError('Las unidades reservadas deben ser un entero mayor que cero.');
+    }
+
+    this.requireNonNegativeMicros(linea.pucMicros, 'PUC de la línea reservada');
+
+    this.requireNonNegativeMicros(linea.pvpMicros, 'PVP de la línea reservada');
+
+    this.requireNonNegativeMicros(linea.importeMicros, 'importe histórico de la reserva');
+
+    this.requireNonNegativeMicros(
+      linea.importeDescuentoMicros,
+      'descuento histórico de la reserva',
+    );
+
+    this.requireValidIvaBps(linea.ivaBps);
+
+    this.requireValidDescuentoBps(linea.descuentoBps, 'descuento histórico de la reserva');
+
+    this.idArticulo = linea.idArticulo;
+
+    this.articuloPublicId = linea.articuloPublicId;
+
+    this.localizador = linea.localizador;
+
+    this.descripcion = linea.nombre;
+
+    this.marca = linea.marca ?? '';
+
+    /*
+     * No mostramos un stock concreto para la línea
+     * reservada porque su stock ya fue inmovilizado
+     * al crear la reserva.
+     */
+    this.stock = null;
+
+    this.pucMicros = linea.pucMicros;
+
+    this.pvpMicros = linea.pvpMicros;
+
+    this.ivaBps = linea.ivaBps;
+
+    /*
+     * Las capas económicas ordinarias quedan vacías.
+     * El importe final procederá exclusivamente
+     * del histórico de la reserva.
+     */
+    this.pvpDescuentoMicros = null;
+    this.importeManualMicros = null;
+
+    this.descuentoClienteBps = 0;
+    this.descuentoManualBps = null;
+    this.descuentoDirectoMicros = null;
+
+    this.observaciones = null;
+    this.regalo = false;
+
+    this.devolucionOrigen = null;
+
+    this.reservaOrigen = {
+      reservaId: reserva.id,
+      reservaPublicId: reserva.publicId,
+
+      lineaId: linea.id,
+      lineaPublicId: linea.publicId,
+
+      idArticulo: linea.idArticulo,
+
+      articuloPublicId: linea.articuloPublicId,
+
+      unidadesReservadas: linea.unidades,
+
+      importeReservadoMicros: linea.importeMicros,
+
+      descuentoBps: linea.descuentoBps,
+
+      importeDescuentoReservadoMicros: linea.importeDescuentoMicros,
+    };
+
+    this.setCantidadReserva(linea.unidades);
+
+    return this;
+  }
+
+  /**
    * Indica si la línea representa una entrada libre Varios.
    */
   get esVarios(): boolean {
     return (
       !this.esDevolucion &&
+      !this.esReserva &&
       this.idArticulo === null &&
       this.articuloPublicId === null &&
       this.localizador === 0
@@ -173,6 +275,13 @@ export default class VentaLineaEnCurso {
    */
   get esDevolucion(): boolean {
     return this.devolucionOrigen !== null;
+  }
+
+  /**
+   * Indica si la línea procede de una reserva.
+   */
+  get esReserva(): boolean {
+    return this.reservaOrigen !== null;
   }
 
   /**
@@ -270,10 +379,50 @@ export default class VentaLineaEnCurso {
   }
 
   /**
+   * Modifica la cantidad finalmente adquirida
+   * de una línea procedente de reserva.
+   *
+   * Puede ser menor, igual o mayor que la cantidad
+   * originalmente reservada.
+   */
+  setCantidadReserva(cantidad: number): void {
+    const origen: VentaLineaReservaOrigen | null = this.reservaOrigen;
+
+    if (origen === null) {
+      throw new Error('La línea indicada no procede de una reserva.');
+    }
+
+    if (!Number.isSafeInteger(cantidad) || cantidad <= 0) {
+      throw new RangeError('La cantidad de una línea reservada debe ser un entero mayor que cero.');
+    }
+
+    /*
+     * Validamos también que los cálculos económicos
+     * sigan dentro del rango seguro antes de modificar
+     * realmente la cantidad.
+     */
+    this.getImporteProporcionalMicros(
+      origen.importeReservadoMicros,
+      cantidad,
+      origen.unidadesReservadas,
+    );
+
+    this.getImporteProporcionalMicros(
+      origen.importeDescuentoReservadoMicros,
+      cantidad,
+      origen.unidadesReservadas,
+    );
+
+    this.cantidad = cantidad;
+  }
+
+  /**
    * Establece la cantidad de unidades de la línea.
    */
   setCantidad(cantidad: number): void {
     this.requireNotDevolucion('modificar directamente la cantidad');
+
+    this.requireNotReserva('modificar directamente la cantidad');
 
     if (!Number.isSafeInteger(cantidad) || cantidad <= 0) {
       throw new RangeError('La cantidad de una línea de venta debe ser un entero mayor que cero.');
@@ -304,6 +453,7 @@ export default class VentaLineaEnCurso {
    */
   setRegalo(regalo: boolean): void {
     this.requireNotDevolucion('cambiar el estado de regalo');
+    this.requireNotReserva('cambiar el estado de regalo');
 
     this.regalo = regalo;
   }
@@ -313,6 +463,7 @@ export default class VentaLineaEnCurso {
    */
   setImporteManualMicros(importeManualMicros: number): void {
     this.requireNotDevolucion('modificar el importe');
+    this.requireNotReserva('modificar el importe');
     this.requireNonNegativeMicros(importeManualMicros, 'importe manual');
 
     if (this.regalo) {
@@ -337,6 +488,7 @@ export default class VentaLineaEnCurso {
    */
   clearImporteManual(): void {
     this.requireNotDevolucion('eliminar el importe manual');
+    this.requireNotReserva('eliminar el importe manual');
     this.importeManualMicros = null;
   }
 
@@ -348,6 +500,7 @@ export default class VentaLineaEnCurso {
    */
   setDescuentoClienteBps(descuentoClienteBps: number): void {
     this.requireNotDevolucion('aplicar el descuento del cliente');
+    this.requireNotReserva('aplicar el descuento del cliente');
     this.requireValidDescuentoBps(descuentoClienteBps, 'descuento del cliente');
 
     this.descuentoClienteBps = descuentoClienteBps;
@@ -358,6 +511,7 @@ export default class VentaLineaEnCurso {
    */
   setDescuentoManualBps(descuentoManualBps: number): void {
     this.requireNotDevolucion('modificar el descuento');
+    this.requireNotReserva('modificar el descuento');
     this.requireValidDescuentoBps(descuentoManualBps, 'descuento porcentual');
 
     if (this.regalo) {
@@ -385,6 +539,7 @@ export default class VentaLineaEnCurso {
    */
   clearDescuentoManual(): void {
     this.requireNotDevolucion('eliminar el descuento manual');
+    this.requireNotReserva('eliminar el descuento manual');
     this.descuentoManualBps = null;
   }
 
@@ -393,6 +548,7 @@ export default class VentaLineaEnCurso {
    */
   setDescuentoDirectoMicros(descuentoDirectoMicros: number): void {
     this.requireNotDevolucion('modificar el descuento');
+    this.requireNotReserva('modificar el descuento');
     this.requireNonNegativeMicros(descuentoDirectoMicros, 'descuento directo');
 
     if (descuentoDirectoMicros === 0) {
@@ -424,6 +580,7 @@ export default class VentaLineaEnCurso {
    */
   clearDescuentoDirecto(): void {
     this.requireNotDevolucion('eliminar el descuento directo');
+    this.requireNotReserva('eliminar el descuento directo');
     this.descuentoDirectoMicros = null;
   }
 
@@ -432,6 +589,7 @@ export default class VentaLineaEnCurso {
    */
   clearDescuentoPromocional(): void {
     this.requireNotDevolucion('eliminar el descuento promocional');
+    this.requireNotReserva('eliminar el descuento promocional');
     this.pvpDescuentoMicros = null;
   }
 
@@ -461,6 +619,42 @@ export default class VentaLineaEnCurso {
     const descuentoMicros: number = this.importeBaseMicros * this.descuentoBps;
 
     return this.roundDivision(descuentoMicros, BASIS_POINTS_TOTAL);
+  }
+
+  /**
+   * Obtiene el importe final correspondiente a la cantidad
+   * que finalmente se comprará de una línea reservada.
+   */
+  get importeReservaMicros(): number {
+    const origen: VentaLineaReservaOrigen | null = this.reservaOrigen;
+
+    if (origen === null) {
+      return 0;
+    }
+
+    return this.getImporteProporcionalMicros(
+      origen.importeReservadoMicros,
+      this.cantidad,
+      origen.unidadesReservadas,
+    );
+  }
+
+  /**
+   * Obtiene el descuento histórico escalado a la
+   * cantidad finalmente comprada.
+   */
+  get importeDescuentoReservaMicros(): number {
+    const origen: VentaLineaReservaOrigen | null = this.reservaOrigen;
+
+    if (origen === null) {
+      return 0;
+    }
+
+    return this.getImporteProporcionalMicros(
+      origen.importeDescuentoReservadoMicros,
+      this.cantidad,
+      origen.unidadesReservadas,
+    );
   }
 
   /**
@@ -501,6 +695,10 @@ export default class VentaLineaEnCurso {
   get importeFinalMicros(): number {
     if (this.esDevolucion) {
       return -this.importeDevolucionMicros;
+    }
+
+    if (this.esReserva) {
+      return this.importeReservaMicros;
     }
 
     if (this.regalo) {
@@ -588,6 +786,16 @@ export default class VentaLineaEnCurso {
   private requireNotDevolucion(operation: string): void {
     if (this.esDevolucion) {
       throw new Error(`No se puede ${operation} en una línea de devolución.`);
+    }
+  }
+
+  /**
+   * Impide aplicar operaciones económicas ordinarias
+   * a una línea cuyo precio procede de una reserva.
+   */
+  private requireNotReserva(operation: string): void {
+    if (this.esReserva) {
+      throw new Error(`No se puede ${operation} en una línea procedente de reserva.`);
     }
   }
 }

@@ -1,5 +1,6 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { computed, Service, signal } from '@angular/core';
+import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
 import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devolucion.interface';
 import type Cliente from '@model/clientes/cliente.model';
 import type Empleado from '@model/empleados/empleado.model';
@@ -13,6 +14,9 @@ import type {
   VentaFocusTarget,
   VentaWorkspaceState,
 } from '@model/ventas/venta-workspace.interface';
+
+import type VentaLineaReservaOrigen from '@model/ventas/venta-linea-reserva-origen.interface';
+import type VentaReservaOrigen from '@model/ventas/venta-reserva-origen.interface';
 
 /**
  * Mantiene las ventas abiertas y su workspace durante toda la sesión de la aplicación.
@@ -92,6 +96,94 @@ export default class VentasService {
 
     this.workspacesSignal.set(workspaces);
     this.ventaActivaIdSignal.set(venta.idTemporal);
+
+    return venta;
+  }
+
+  /**
+   * Crea una nueva venta a partir de una o varias reservas
+   * pertenecientes al mismo cliente.
+   */
+  crearVentaDesdeReservas(
+    empleado: Empleado | null,
+    cliente: Cliente,
+    reservas: readonly ReservaInterface[],
+  ): VentaEnCurso {
+    if (cliente.id === null || cliente.publicId === null) {
+      throw new Error('Las reservas requieren un cliente persistido.');
+    }
+
+    if (reservas.length === 0) {
+      throw new Error('Debe seleccionarse al menos una reserva.');
+    }
+
+    const reservaPublicIds: Set<string> = new Set<string>();
+
+    const reservasOrigen: VentaReservaOrigen[] = [];
+
+    const lineas: VentaLineaEnCurso[] = [];
+
+    for (const reserva of reservas) {
+      if (reserva.idCliente !== cliente.id || reserva.clientePublicId !== cliente.publicId) {
+        throw new Error('Todas las reservas seleccionadas deben pertenecer al mismo cliente.');
+      }
+
+      if (reservaPublicIds.has(reserva.publicId)) {
+        throw new Error('No se puede cargar dos veces la misma reserva.');
+      }
+
+      reservaPublicIds.add(reserva.publicId);
+
+      if (reserva.lineas.length === 0) {
+        throw new Error('No se puede cargar una reserva sin líneas.');
+      }
+
+      const lineasOrigen: VentaLineaReservaOrigen[] = [];
+
+      for (const lineaReserva of reserva.lineas) {
+        const linea: VentaLineaEnCurso = new VentaLineaEnCurso().fromReserva(reserva, lineaReserva);
+
+        const lineaOrigen: VentaLineaReservaOrigen | null = linea.reservaOrigen;
+
+        if (lineaOrigen === null) {
+          throw new Error('No se ha podido reconstruir el origen de una línea de reserva.');
+        }
+
+        lineasOrigen.push(lineaOrigen);
+
+        /*
+         * No hay ninguna deduplicación por artículo.
+         */
+        lineas.push(linea);
+      }
+
+      reservasOrigen.push({
+        id: reserva.id,
+        publicId: reserva.publicId,
+
+        idCliente: reserva.idCliente,
+
+        clientePublicId: reserva.clientePublicId,
+
+        lineas: lineasOrigen,
+      });
+    }
+
+    /*
+     * Toda la validación y construcción se ha realizado
+     * antes de abrir la nueva pestaña.
+     */
+    const venta: VentaEnCurso = this.crearVenta(empleado);
+
+    venta.setReservas(cliente, reservasOrigen, lineas);
+
+    /*
+     * crearVenta() notificó antes de que el modelo fuese
+     * rellenado con las reservas. Forzamos una nueva
+     * referencia para que la UI vea inmediatamente
+     * cliente y líneas.
+     */
+    this.notifyVentasChanged();
 
     return venta;
   }
@@ -198,7 +290,7 @@ export default class VentasService {
     for (const articulo of articulos) {
       const lineaExistente: VentaLineaEnCurso | undefined = venta.lineas.find(
         (linea: VentaLineaEnCurso): boolean =>
-          !linea.esDevolucion && linea.articuloPublicId === articulo.publicId,
+          !linea.esDevolucion && !linea.esReserva && linea.articuloPublicId === articulo.publicId,
       );
 
       if (lineaExistente !== undefined) {
@@ -309,7 +401,12 @@ export default class VentasService {
   cambiarCantidad(ventaIdTemporal: string, lineaIdTemporal: string, cantidad: number): void {
     const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
 
-    linea.setCantidad(cantidad);
+    if (linea.esReserva) {
+      linea.setCantidadReserva(cantidad);
+    } else {
+      linea.setCantidad(cantidad);
+    }
+
     this.notifyVentasChanged();
   }
 
