@@ -356,4 +356,108 @@ describe('VentasService', (): void => {
 
     expect(linea.pvpMicros).toBe(pvpOriginalMicros);
   });
+
+  it('mantiene separadas la devolución y una nueva compra del mismo artículo', (): void => {
+    const service: VentasService = new VentasService();
+
+    const venta: VentaEnCurso = service.crearVenta();
+
+    service.aplicarDevolucion(
+      venta.idTemporal,
+      {
+        id: 50,
+        publicId: 'venta-original',
+        serie: '',
+        numero: 100,
+        fecha: '2026-08-01',
+        cliente: null,
+        totalCents: 1000,
+        pagos: [],
+        lineas: [],
+      },
+      [
+        {
+          linea: {
+            id: 100,
+            publicId: 'linea-original',
+            idArticulo: 1,
+            articuloPublicId: 'articulo-1',
+            localizador: 10,
+            nombre: 'Artículo',
+            pucMicros: 0,
+            pvpMicros: 10_000_000,
+            ivaBps: 2_100,
+            importeMicros: 10_000_000,
+            descuentoBps: 0,
+            importeDescuentoMicros: 0,
+            unidades: 1,
+            unidadesDevueltas: 0,
+            unidadesDisponibles: 1,
+            regalo: false,
+          },
+          unidades: 1,
+        },
+      ],
+    );
+
+    service.agregarArticulos(venta.idTemporal, [createArticulo('articulo-1', 1_000)]);
+
+    expect(venta.lineas).toHaveLength(2);
+
+    expect(venta.lineas[0]?.cantidad).toBe(-1);
+
+    expect(venta.lineas[1]?.cantidad).toBe(1);
+  });
+
+  it('no aplica el descuento del cliente a las líneas de devolución', (): void => {
+    const service: VentasService = new VentasService();
+
+    const venta: VentaEnCurso = service.crearVenta();
+
+    service.asignarCliente(venta.idTemporal, createCliente('cliente-1', 20));
+
+    service.aplicarDevolucion(
+      venta.idTemporal,
+      {
+        id: 50,
+        publicId: 'venta-original',
+        serie: '',
+        numero: 100,
+        fecha: '2026-08-01',
+        cliente: null,
+        totalCents: 1000,
+        pagos: [],
+        lineas: [],
+      },
+      [
+        {
+          linea: {
+            id: 100,
+            publicId: 'linea-original',
+            idArticulo: 1,
+            articuloPublicId: 'articulo-1',
+            localizador: 10,
+            nombre: 'Artículo',
+            pucMicros: 0,
+            pvpMicros: 10_000_000,
+            ivaBps: 2_100,
+            importeMicros: 9_000_000,
+            descuentoBps: 1_000,
+            importeDescuentoMicros: 1_000_000,
+            unidades: 1,
+            unidadesDevueltas: 0,
+            unidadesDisponibles: 1,
+            regalo: false,
+          },
+          unidades: 1,
+        },
+      ],
+    );
+
+    const linea: VentaLineaEnCurso = venta.lineas[0]!;
+
+    expect(linea.descuentoClienteBps).toBe(0);
+
+    expect(linea.importeFinalMicros).toBe(-9_000_000);
+  });
 });

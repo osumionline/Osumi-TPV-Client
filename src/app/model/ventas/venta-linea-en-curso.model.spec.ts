@@ -330,4 +330,100 @@ describe('VentaLineaEnCurso', (): void => {
     expect(linea.descripcion).toBe('Varios');
     expect(linea.pvpMicros).toBe(10_000_000);
   });
+
+  it('crea una devolución con cantidad e importe negativos', (): void => {
+    const linea: VentaLineaEnCurso = new VentaLineaEnCurso().fromDevolucion(
+      {
+        id: 100,
+        publicId: 'linea-original',
+        idArticulo: 10,
+        articuloPublicId: 'articulo-10',
+        localizador: 25,
+        nombre: 'Artículo devuelto',
+        pucMicros: 5_000_000,
+        pvpMicros: 10_000_000,
+        ivaBps: 2_100,
+        importeMicros: 18_000_000,
+        descuentoBps: 1_000,
+        importeDescuentoMicros: 2_000_000,
+        unidades: 2,
+        unidadesDevueltas: 0,
+        unidadesDisponibles: 2,
+        regalo: false,
+      },
+      1,
+    );
+
+    expect(linea.esDevolucion).toBe(true);
+    expect(linea.esVarios).toBe(false);
+
+    expect(linea.cantidad).toBe(-1);
+    expect(linea.unidadesDevolucion).toBe(1);
+
+    expect(linea.importeDevolucionMicros).toBe(9_000_000);
+
+    expect(linea.importeFinalMicros).toBe(-9_000_000);
+  });
+
+  it('reparte el importe histórico de forma acumulativa entre devoluciones parciales', (): void => {
+    const linea: VentaLineaEnCurso = new VentaLineaEnCurso().fromDevolucion(
+      {
+        id: 100,
+        publicId: 'linea-original',
+        idArticulo: 10,
+        articuloPublicId: 'articulo-10',
+        localizador: 25,
+        nombre: 'Artículo',
+        pucMicros: 0,
+        pvpMicros: 10_000_000,
+        ivaBps: 2_100,
+
+        importeMicros: 25_000_000,
+
+        descuentoBps: 0,
+        importeDescuentoMicros: 5_000_000,
+
+        unidades: 3,
+        unidadesDevueltas: 1,
+        unidadesDisponibles: 2,
+
+        regalo: false,
+      },
+      1,
+    );
+
+    expect(linea.importeDevolucionMicros).toBe(8_333_334);
+  });
+
+  it('impide modificar económicamente una línea de devolución', (): void => {
+    const linea: VentaLineaEnCurso = new VentaLineaEnCurso().fromDevolucion(
+      {
+        id: 100,
+        publicId: 'linea-original',
+        idArticulo: 10,
+        articuloPublicId: 'articulo-10',
+        localizador: 25,
+        nombre: 'Artículo',
+        pucMicros: 0,
+        pvpMicros: 10_000_000,
+        ivaBps: 2_100,
+        importeMicros: 10_000_000,
+        descuentoBps: 0,
+        importeDescuentoMicros: 0,
+        unidades: 1,
+        unidadesDevueltas: 0,
+        unidadesDisponibles: 1,
+        regalo: false,
+      },
+      1,
+    );
+
+    expect((): void => linea.setCantidad(2)).toThrow();
+
+    expect((): void => linea.setRegalo(true)).toThrow();
+
+    expect((): void => linea.setDescuentoManualBps(1_000)).toThrow();
+
+    expect((): void => linea.setImporteManualMicros(5_000_000)).toThrow();
+  });
 });

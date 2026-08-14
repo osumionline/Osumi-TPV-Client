@@ -1,8 +1,11 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { computed, Service, signal } from '@angular/core';
+import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devolucion.interface';
 import type Cliente from '@model/clientes/cliente.model';
 import type Empleado from '@model/empleados/empleado.model';
 import type ArticuloVenta from '@model/ventas/articulo-venta.model';
+import type VentaDevolucionOrigen from '@model/ventas/venta-devolucion-origen.interface';
+import type VentaDevolucionSeleccion from '@model/ventas/venta-devolucion-seleccion.interface';
 import VentaEnCurso from '@model/ventas/venta-en-curso.model';
 import VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
 import type VentaVariosData from '@model/ventas/venta-varios-data.interface';
@@ -194,7 +197,8 @@ export default class VentasService {
 
     for (const articulo of articulos) {
       const lineaExistente: VentaLineaEnCurso | undefined = venta.lineas.find(
-        (linea: VentaLineaEnCurso): boolean => linea.articuloPublicId === articulo.publicId,
+        (linea: VentaLineaEnCurso): boolean =>
+          !linea.esDevolucion && linea.articuloPublicId === articulo.publicId,
       );
 
       if (lineaExistente !== undefined) {
@@ -240,6 +244,57 @@ export default class VentasService {
     const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
 
     linea.setDatosVarios(data);
+
+    this.notifyVentasChanged();
+
+    this.setFocusTarget(ventaIdTemporal, {
+      type: 'localizador',
+    });
+  }
+
+  /**
+   * Incorpora a una venta las líneas seleccionadas
+   * de un ticket histórico.
+   */
+  aplicarDevolucion(
+    ventaIdTemporal: string,
+    devolucion: VentaDevolucionInterface,
+    seleccion: readonly VentaDevolucionSeleccion[],
+  ): void {
+    const venta: VentaEnCurso = this.requireVenta(ventaIdTemporal);
+
+    const origen: VentaDevolucionOrigen = {
+      id: devolucion.id,
+      publicId: devolucion.publicId,
+      serie: devolucion.serie,
+      numero: devolucion.numero,
+    };
+
+    const lineas: readonly VentaLineaEnCurso[] = seleccion.map(
+      (item: VentaDevolucionSeleccion): VentaLineaEnCurso =>
+        new VentaLineaEnCurso().fromDevolucion(item.linea, item.unidades),
+    );
+
+    venta.setDevolucion(origen, lineas);
+
+    this.notifyVentasChanged();
+
+    this.setFocusTarget(ventaIdTemporal, {
+      type: 'localizador',
+    });
+  }
+
+  /**
+   * Retira todas las líneas pertenecientes a la devolución activa.
+   */
+  quitarDevolucion(ventaIdTemporal: string): void {
+    const venta: VentaEnCurso = this.requireVenta(ventaIdTemporal);
+
+    if (venta.devolucionOrigen === null) {
+      return;
+    }
+
+    venta.setDevolucion(venta.devolucionOrigen, []);
 
     this.notifyVentasChanged();
 

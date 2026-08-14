@@ -1,5 +1,6 @@
 import type Cliente from '@model/clientes/cliente.model';
 import type Empleado from '@model/empleados/empleado.model';
+import type VentaDevolucionOrigen from '@model/ventas/venta-devolucion-origen.interface';
 import VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
 import { MICROS_PER_CENT } from '@model/ventas/ventas-money.constants';
 
@@ -11,6 +12,7 @@ export default class VentaEnCurso {
 
   empleado: Empleado | null = null;
   cliente: Cliente | null = null;
+  devolucionOrigen: VentaDevolucionOrigen | null = null;
   lineas: VentaLineaEnCurso[] = [];
 
   constructor(readonly numero: number) {}
@@ -50,7 +52,9 @@ export default class VentaEnCurso {
     this.cliente = cliente;
 
     for (const linea of this.lineas) {
-      linea.setDescuentoClienteBps(descuentoClienteBps);
+      if (!linea.esDevolucion) {
+        linea.setDescuentoClienteBps(descuentoClienteBps);
+      }
     }
   }
 
@@ -61,7 +65,9 @@ export default class VentaEnCurso {
     this.cliente = null;
 
     for (const linea of this.lineas) {
-      linea.setDescuentoClienteBps(0);
+      if (!linea.esDevolucion) {
+        linea.setDescuentoClienteBps(0);
+      }
     }
   }
 
@@ -69,11 +75,35 @@ export default class VentaEnCurso {
    * Añade una línea real a la venta.
    */
   addLinea(linea: VentaLineaEnCurso): void {
-    if (this.cliente !== null) {
+    if (this.cliente !== null && !linea.esDevolucion) {
       linea.setDescuentoClienteBps(this.getDescuentoClienteBps(this.cliente));
     }
 
     this.lineas.push(linea);
+  }
+
+  /**
+   * Sustituye las líneas de devolución actuales por una nueva
+   * selección perteneciente al mismo ticket de origen.
+   */
+  setDevolucion(origen: VentaDevolucionOrigen, lineas: readonly VentaLineaEnCurso[]): void {
+    if (this.devolucionOrigen !== null && this.devolucionOrigen.id !== origen.id) {
+      throw new Error(
+        'No se puede iniciar una devolución de otro ticket mientras exista una devolución en curso.',
+      );
+    }
+
+    if (lineas.some((linea: VentaLineaEnCurso): boolean => !linea.esDevolucion)) {
+      throw new Error('Todas las líneas indicadas deben ser líneas de devolución.');
+    }
+
+    const lineasNormales: readonly VentaLineaEnCurso[] = this.lineas.filter(
+      (linea: VentaLineaEnCurso): boolean => !linea.esDevolucion,
+    );
+
+    this.lineas = [...lineasNormales, ...lineas];
+
+    this.devolucionOrigen = lineas.length === 0 ? null : origen;
   }
 
   /**
@@ -83,6 +113,10 @@ export default class VentaEnCurso {
     this.lineas = this.lineas.filter(
       (linea: VentaLineaEnCurso): boolean => linea.idTemporal !== lineaIdTemporal,
     );
+
+    if (!this.lineas.some((linea: VentaLineaEnCurso): boolean => linea.esDevolucion)) {
+      this.devolucionOrigen = null;
+    }
   }
 
   /**

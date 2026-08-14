@@ -1,4 +1,6 @@
+import type { VentaDevolucionLineaInterface } from '@desktop-contracts/ventas/venta-devolucion.interface';
 import type ArticuloVenta from '@model/ventas/articulo-venta.model';
+import type VentaLineaDevolucionOrigen from '@model/ventas/venta-linea-devolucion-origen.interface';
 import type VentaVariosData from '@model/ventas/venta-varios-data.interface';
 import { BASIS_POINTS_TOTAL, MICROS_PER_CENT } from '@model/ventas/ventas-money.constants';
 
@@ -27,6 +29,7 @@ export default class VentaLineaEnCurso {
   ivaBps: number = 0;
   observaciones: string | null = null;
   regalo: boolean = false;
+  devolucionOrigen: VentaLineaDevolucionOrigen | null = null;
 
   /**
    * Inicializa la línea a partir de un artículo seleccionado para la venta.
@@ -75,10 +78,101 @@ export default class VentaLineaEnCurso {
   }
 
   /**
+   * Inicializa la línea como devolución de una línea histórica.
+   */
+  fromDevolucion(linea: VentaDevolucionLineaInterface, unidades: number): VentaLineaEnCurso {
+    if (!Number.isSafeInteger(linea.unidades) || linea.unidades <= 0) {
+      throw new RangeError('La línea original no contiene una cantidad válida para devolver.');
+    }
+
+    if (
+      !Number.isSafeInteger(linea.unidadesDevueltas) ||
+      linea.unidadesDevueltas < 0 ||
+      linea.unidadesDevueltas > linea.unidades
+    ) {
+      throw new RangeError('Las unidades ya devueltas de la línea original no son válidas.');
+    }
+
+    if (
+      !Number.isSafeInteger(linea.unidadesDisponibles) ||
+      linea.unidadesDisponibles < 0 ||
+      linea.unidadesDisponibles > linea.unidades - linea.unidadesDevueltas
+    ) {
+      throw new RangeError('Las unidades disponibles para devolución no son válidas.');
+    }
+
+    if (!Number.isSafeInteger(linea.importeMicros) || linea.importeMicros < 0) {
+      throw new RangeError('El importe histórico de la línea no es válido para una devolución.');
+    }
+
+    this.idArticulo = linea.idArticulo;
+    this.articuloPublicId = linea.articuloPublicId;
+
+    this.localizador = linea.localizador;
+    this.descripcion = linea.nombre;
+
+    /*
+     * La consulta histórica no necesita recuperar la marca.
+     * La devolución se identificará visualmente como tal en 8C.
+     */
+    this.marca = '';
+    this.stock = null;
+
+    this.pucMicros = linea.pucMicros;
+    this.pvpMicros = linea.pvpMicros;
+    this.ivaBps = linea.ivaBps;
+
+    /*
+     * Las capas económicas normales quedan deliberadamente vacías.
+     * Una devolución utiliza exclusivamente su importe histórico.
+     */
+    this.pvpDescuentoMicros = null;
+    this.importeManualMicros = null;
+    this.descuentoClienteBps = 0;
+    this.descuentoManualBps = null;
+    this.descuentoDirectoMicros = null;
+
+    this.observaciones = null;
+    this.regalo = linea.regalo;
+
+    this.devolucionOrigen = {
+      id: linea.id,
+      publicId: linea.publicId,
+
+      unidadesOriginales: linea.unidades,
+      unidadesDevueltasPrevias: linea.unidadesDevueltas,
+      unidadesDisponibles: linea.unidadesDisponibles,
+
+      importeOriginalMicros: linea.importeMicros,
+
+      descuentoBps: linea.descuentoBps,
+      importeDescuentoMicros: linea.importeDescuentoMicros,
+
+      regalo: linea.regalo,
+    };
+
+    this.setUnidadesDevolucion(unidades);
+
+    return this;
+  }
+
+  /**
    * Indica si la línea representa una entrada libre Varios.
    */
   get esVarios(): boolean {
-    return this.idArticulo === null && this.articuloPublicId === null && this.localizador === 0;
+    return (
+      !this.esDevolucion &&
+      this.idArticulo === null &&
+      this.articuloPublicId === null &&
+      this.localizador === 0
+    );
+  }
+
+  /**
+   * Indica si la línea procede de una venta histórica.
+   */
+  get esDevolucion(): boolean {
+    return this.devolucionOrigen !== null;
   }
 
   /**
@@ -150,9 +244,37 @@ export default class VentaLineaEnCurso {
   }
 
   /**
+   * Obtiene el número positivo de unidades que se están devolviendo.
+   */
+  get unidadesDevolucion(): number {
+    return this.esDevolucion ? -this.cantidad : 0;
+  }
+
+  /**
+   * Cambia las unidades de una línea de devolución.
+   */
+  setUnidadesDevolucion(unidades: number): void {
+    const origen: VentaLineaDevolucionOrigen | null = this.devolucionOrigen;
+
+    if (origen === null) {
+      throw new Error('La línea indicada no es una devolución.');
+    }
+
+    if (!Number.isSafeInteger(unidades) || unidades <= 0 || unidades > origen.unidadesDisponibles) {
+      throw new RangeError(
+        `Solo se pueden devolver entre 1 y ${origen.unidadesDisponibles} unidades.`,
+      );
+    }
+
+    this.cantidad = -unidades;
+  }
+
+  /**
    * Establece la cantidad de unidades de la línea.
    */
   setCantidad(cantidad: number): void {
+    this.requireNotDevolucion('modificar directamente la cantidad');
+
     if (!Number.isSafeInteger(cantidad) || cantidad <= 0) {
       throw new RangeError('La cantidad de una línea de venta debe ser un entero mayor que cero.');
     }
@@ -181,6 +303,8 @@ export default class VentaLineaEnCurso {
    * recuperarlas si posteriormente se desmarca el regalo.
    */
   setRegalo(regalo: boolean): void {
+    this.requireNotDevolucion('cambiar el estado de regalo');
+
     this.regalo = regalo;
   }
 
@@ -188,6 +312,7 @@ export default class VentaLineaEnCurso {
    * Sustituye el importe calculado de la línea por un importe manual.
    */
   setImporteManualMicros(importeManualMicros: number): void {
+    this.requireNotDevolucion('modificar el importe');
     this.requireNonNegativeMicros(importeManualMicros, 'importe manual');
 
     if (this.regalo) {
@@ -211,6 +336,7 @@ export default class VentaLineaEnCurso {
    * Elimina el importe manual y recupera el cálculo normal de la línea.
    */
   clearImporteManual(): void {
+    this.requireNotDevolucion('eliminar el importe manual');
     this.importeManualMicros = null;
   }
 
@@ -221,6 +347,7 @@ export default class VentaLineaEnCurso {
    * económicas porque queda oculta mientras exista una capa con mayor prioridad.
    */
   setDescuentoClienteBps(descuentoClienteBps: number): void {
+    this.requireNotDevolucion('aplicar el descuento del cliente');
     this.requireValidDescuentoBps(descuentoClienteBps, 'descuento del cliente');
 
     this.descuentoClienteBps = descuentoClienteBps;
@@ -230,6 +357,7 @@ export default class VentaLineaEnCurso {
    * Establece un descuento porcentual manual sobre la línea.
    */
   setDescuentoManualBps(descuentoManualBps: number): void {
+    this.requireNotDevolucion('modificar el descuento');
     this.requireValidDescuentoBps(descuentoManualBps, 'descuento porcentual');
 
     if (this.regalo) {
@@ -256,6 +384,7 @@ export default class VentaLineaEnCurso {
    * Elimina el descuento porcentual manual y recupera el descuento del cliente.
    */
   clearDescuentoManual(): void {
+    this.requireNotDevolucion('eliminar el descuento manual');
     this.descuentoManualBps = null;
   }
 
@@ -263,6 +392,7 @@ export default class VentaLineaEnCurso {
    * Establece un importe fijo de descuento sobre la línea.
    */
   setDescuentoDirectoMicros(descuentoDirectoMicros: number): void {
+    this.requireNotDevolucion('modificar el descuento');
     this.requireNonNegativeMicros(descuentoDirectoMicros, 'descuento directo');
 
     if (descuentoDirectoMicros === 0) {
@@ -293,6 +423,7 @@ export default class VentaLineaEnCurso {
    * Elimina el descuento directo aplicado a la línea.
    */
   clearDescuentoDirecto(): void {
+    this.requireNotDevolucion('eliminar el descuento directo');
     this.descuentoDirectoMicros = null;
   }
 
@@ -300,6 +431,7 @@ export default class VentaLineaEnCurso {
    * Elimina el precio promocional con el que el artículo entró en la venta.
    */
   clearDescuentoPromocional(): void {
+    this.requireNotDevolucion('eliminar el descuento promocional');
     this.pvpDescuentoMicros = null;
   }
 
@@ -332,9 +464,45 @@ export default class VentaLineaEnCurso {
   }
 
   /**
+   * Obtiene el importe positivo que corresponde devolver
+   * por las unidades seleccionadas.
+   */
+  get importeDevolucionMicros(): number {
+    const origen: VentaLineaDevolucionOrigen | null = this.devolucionOrigen;
+
+    if (origen === null) {
+      return 0;
+    }
+
+    const unidadesSeleccionadas: number = this.unidadesDevolucion;
+
+    const unidadesAntes: number = origen.unidadesDevueltasPrevias;
+
+    const unidadesDespues: number = unidadesAntes + unidadesSeleccionadas;
+
+    const importeAntes: number = this.getImporteProporcionalMicros(
+      origen.importeOriginalMicros,
+      unidadesAntes,
+      origen.unidadesOriginales,
+    );
+
+    const importeDespues: number = this.getImporteProporcionalMicros(
+      origen.importeOriginalMicros,
+      unidadesDespues,
+      origen.unidadesOriginales,
+    );
+
+    return importeDespues - importeAntes;
+  }
+
+  /**
    * Obtiene el importe final de la línea en microeuros.
    */
   get importeFinalMicros(): number {
+    if (this.esDevolucion) {
+      return -this.importeDevolucionMicros;
+    }
+
     if (this.regalo) {
       return 0;
     }
@@ -386,5 +554,40 @@ export default class VentaLineaEnCurso {
     const sign: number = value < 0 ? -1 : 1;
 
     return sign * Math.round(Math.abs(value) / divisor);
+  }
+
+  /**
+   * Calcula de manera acumulativa la parte proporcional
+   * de un importe correspondiente a unas unidades concretas.
+   *
+   * El cálculo acumulativo garantiza que devolver finalmente
+   * todas las unidades reproduce exactamente el importe histórico.
+   */
+  private getImporteProporcionalMicros(
+    importeMicros: number,
+    unidades: number,
+    unidadesTotales: number,
+  ): number {
+    if (unidades === 0) {
+      return 0;
+    }
+
+    const product: number = importeMicros * unidades;
+
+    if (!Number.isSafeInteger(product)) {
+      throw new RangeError('El importe de devolución supera el rango numérico seguro.');
+    }
+
+    return this.roundDivision(product, unidadesTotales);
+  }
+
+  /**
+   * Impide utilizar sobre una devolución operaciones económicas
+   * pertenecientes a una venta ordinaria.
+   */
+  private requireNotDevolucion(operation: string): void {
+    if (this.esDevolucion) {
+      throw new Error(`No se puede ${operation} en una línea de devolución.`);
+    }
   }
 }
