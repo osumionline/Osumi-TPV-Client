@@ -1,17 +1,18 @@
+import { PERCENT_TOTAL } from '@constants/percentage.constants';
+import { percentToBps } from '@utils/percentage.utils';
+
 const DEFAULT_IVA_BPS: number = 2_100;
-const BASIS_POINTS_PER_PERCENT: number = 100;
-const MAX_IVA_PERCENT: number = 100;
 
 /**
  * Convierte la configuración porcentual de IVA a puntos básicos.
  */
 export function getVariosIvaOptionsBps(ivaList: readonly number[]): readonly number[] {
   return ivaList.map((iva: number): number => {
-    if (!Number.isFinite(iva) || iva < 0 || iva > MAX_IVA_PERCENT) {
+    if (!Number.isFinite(iva) || iva < 0 || iva > PERCENT_TOTAL) {
       throw new RangeError('La configuración de IVA contiene un valor no válido.');
     }
 
-    return Math.round(iva * BASIS_POINTS_PER_PERCENT);
+    return percentToBps(iva);
   });
 }
 

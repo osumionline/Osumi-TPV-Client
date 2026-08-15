@@ -1,3 +1,4 @@
+import { BASIS_POINTS_TOTAL } from '@constants/percentage.constants';
 import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
 import type { ReservaLineaInterface } from '@desktop-contracts/reservas/reserva.interface';
 import type { VentaDevolucionLineaInterface } from '@desktop-contracts/ventas/venta-devolucion.interface';
@@ -5,7 +6,11 @@ import type ArticuloVenta from '@model/ventas/articulo-venta.model';
 import type VentaLineaDevolucionOrigen from '@model/ventas/venta-linea-devolucion-origen.interface';
 import type VentaLineaReservaOrigen from '@model/ventas/venta-linea-reserva-origen.interface';
 import type VentaVariosData from '@model/ventas/venta-varios-data.interface';
-import { BASIS_POINTS_TOTAL, MICROS_PER_CENT } from '@model/ventas/ventas-money.constants';
+import {
+  calculateBpsAmountMicros,
+  calculateProportionalMicros,
+  centsToMicros,
+} from '@utils/money.utils';
 
 /**
  * Representa una línea real de una venta que todavía no ha sido finalizada.
@@ -47,9 +52,9 @@ export default class VentaLineaEnCurso {
     this.stock = articulo.stock;
     this.cantidad = 1;
     this.pucMicros = articulo.pucMicros;
-    this.pvpMicros = articulo.pvpCents * MICROS_PER_CENT;
+    this.pvpMicros = centsToMicros(articulo.pvpCents);
     this.pvpDescuentoMicros =
-      articulo.pvpDescuentoCents === null ? null : articulo.pvpDescuentoCents * MICROS_PER_CENT;
+      articulo.pvpDescuentoCents === null ? null : centsToMicros(articulo.pvpDescuentoCents);
     this.ivaBps = articulo.ivaBps;
     this.observaciones = articulo.mostrarObservacionesVentas ? articulo.observaciones : null;
 
@@ -401,13 +406,9 @@ export default class VentaLineaEnCurso {
      * sigan dentro del rango seguro antes de modificar
      * realmente la cantidad.
      */
-    this.getImporteProporcionalMicros(
-      origen.importeReservadoMicros,
-      cantidad,
-      origen.unidadesReservadas,
-    );
+    calculateProportionalMicros(origen.importeReservadoMicros, cantidad, origen.unidadesReservadas);
 
-    this.getImporteProporcionalMicros(
+    calculateProportionalMicros(
       origen.importeDescuentoReservadoMicros,
       cantidad,
       origen.unidadesReservadas,
@@ -616,9 +617,7 @@ export default class VentaLineaEnCurso {
       return this.descuentoDirectoMicros;
     }
 
-    const descuentoMicros: number = this.importeBaseMicros * this.descuentoBps;
-
-    return this.roundDivision(descuentoMicros, BASIS_POINTS_TOTAL);
+    return calculateBpsAmountMicros(this.importeBaseMicros, this.descuentoBps);
   }
 
   /**
@@ -632,7 +631,7 @@ export default class VentaLineaEnCurso {
       return 0;
     }
 
-    return this.getImporteProporcionalMicros(
+    return calculateProportionalMicros(
       origen.importeReservadoMicros,
       this.cantidad,
       origen.unidadesReservadas,
@@ -650,7 +649,7 @@ export default class VentaLineaEnCurso {
       return 0;
     }
 
-    return this.getImporteProporcionalMicros(
+    return calculateProportionalMicros(
       origen.importeDescuentoReservadoMicros,
       this.cantidad,
       origen.unidadesReservadas,
@@ -674,13 +673,13 @@ export default class VentaLineaEnCurso {
 
     const unidadesDespues: number = unidadesAntes + unidadesSeleccionadas;
 
-    const importeAntes: number = this.getImporteProporcionalMicros(
+    const importeAntes: number = calculateProportionalMicros(
       origen.importeOriginalMicros,
       unidadesAntes,
       origen.unidadesOriginales,
     );
 
-    const importeDespues: number = this.getImporteProporcionalMicros(
+    const importeDespues: number = calculateProportionalMicros(
       origen.importeOriginalMicros,
       unidadesDespues,
       origen.unidadesOriginales,
@@ -743,40 +742,6 @@ export default class VentaLineaEnCurso {
         `El ${field} debe ser un número entero de microeuros mayor o igual a cero.`,
       );
     }
-  }
-
-  /**
-   * Redondea una división de enteros de forma simétrica para valores positivos y negativos.
-   */
-  private roundDivision(value: number, divisor: number): number {
-    const sign: number = value < 0 ? -1 : 1;
-
-    return sign * Math.round(Math.abs(value) / divisor);
-  }
-
-  /**
-   * Calcula de manera acumulativa la parte proporcional
-   * de un importe correspondiente a unas unidades concretas.
-   *
-   * El cálculo acumulativo garantiza que devolver finalmente
-   * todas las unidades reproduce exactamente el importe histórico.
-   */
-  private getImporteProporcionalMicros(
-    importeMicros: number,
-    unidades: number,
-    unidadesTotales: number,
-  ): number {
-    if (unidades === 0) {
-      return 0;
-    }
-
-    const product: number = importeMicros * unidades;
-
-    if (!Number.isSafeInteger(product)) {
-      throw new RangeError('El importe de devolución supera el rango numérico seguro.');
-    }
-
-    return this.roundDivision(product, unidadesTotales);
   }
 
   /**

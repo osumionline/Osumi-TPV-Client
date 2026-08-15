@@ -1,9 +1,11 @@
+import { PERCENT_TOTAL } from '@constants/percentage.constants';
 import type Cliente from '@model/clientes/cliente.model';
 import type Empleado from '@model/empleados/empleado.model';
 import type VentaDevolucionOrigen from '@model/ventas/venta-devolucion-origen.interface';
 import VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
 import type VentaReservaOrigen from '@model/ventas/venta-reserva-origen.interface';
-import { MICROS_PER_CENT } from '@model/ventas/ventas-money.constants';
+import { microsToCents } from '@utils/money.utils';
+import { percentToBps } from '@utils/percentage.utils';
 
 /**
  * Representa una venta temporal que existe únicamente durante la sesión de trabajo.
@@ -33,9 +35,7 @@ export default class VentaEnCurso {
    * Obtiene el total final de la venta redondeado a céntimos.
    */
   get totalCents(): number {
-    const sign: number = this.totalMicros < 0 ? -1 : 1;
-
-    return sign * Math.round(Math.abs(this.totalMicros) / MICROS_PER_CENT);
+    return microsToCents(this.totalMicros);
   }
 
   /**
@@ -235,10 +235,14 @@ export default class VentaEnCurso {
    * Convierte el descuento porcentual de un cliente a puntos básicos.
    */
   private getDescuentoClienteBps(cliente: Cliente): number {
-    if (!Number.isFinite(cliente.descuento) || cliente.descuento < 0 || cliente.descuento > 100) {
+    if (
+      !Number.isFinite(cliente.descuento) ||
+      cliente.descuento < 0 ||
+      cliente.descuento > PERCENT_TOTAL
+    ) {
       throw new RangeError('El descuento del cliente debe estar comprendido entre 0 y 100 %.');
     }
 
-    return Math.round(cliente.descuento * 100);
+    return percentToBps(cliente.descuento);
   }
 }

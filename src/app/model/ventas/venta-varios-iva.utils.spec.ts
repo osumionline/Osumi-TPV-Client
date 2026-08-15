@@ -20,6 +20,10 @@ describe('venta-varios-iva.utils', (): void => {
     expect(getVariosIvaOptionsBps([4, 10, 21])).toEqual([400, 1_000, 2_100]);
   });
 
+  it('conserva los IVA configurados con decimales al convertirlos a puntos básicos', (): void => {
+    expect(getVariosIvaOptionsBps([4, 10.5, 21])).toEqual([400, 1_050, 2_100]);
+  });
+
   it('rechaza una configuración sin tipos de IVA', (): void => {
     expect((): number => getDefaultVariosIvaBps([])).toThrow(
       'No hay ningún tipo de IVA configurado.',
