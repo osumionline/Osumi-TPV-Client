@@ -1,6 +1,8 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { Service, signal } from '@angular/core';
 import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
+import mapVentaToCrearReservaCommand from '@model/reservas/crear-reserva-command.mapper';
+import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
 
 @Service()
 export default class ReservasService {
@@ -23,6 +25,36 @@ export default class ReservasService {
   readonly loading: Signal<boolean> = this.loadingSignal.asReadonly();
 
   readonly error: Signal<string | null> = this.errorSignal.asReadonly();
+
+  /**
+   * Persiste una venta como nueva reserva y devuelve
+   * la instancia canónica obtenida después de recargar.
+   */
+  async createFromVenta(venta: VentaEnCurso): Promise<ReservaInterface> {
+    const command = mapVentaToCrearReservaCommand(venta);
+
+    /*
+     * Evitamos que una carga anterior a la creación
+     * pueda dejar después el cache con datos obsoletos.
+     */
+    if (this.pendingRequest !== null) {
+      await this.pendingRequest;
+    }
+
+    const publicId: string = await window.osumiDesktop.reservas.create(command);
+
+    await this.reload();
+
+    const reserva: ReservaInterface | undefined = this.reservas().find(
+      (item: ReservaInterface): boolean => item.publicId === publicId,
+    );
+
+    if (reserva === undefined) {
+      throw new Error('La reserva se ha creado pero no ha podido recuperarse después.');
+    }
+
+    return reserva;
+  }
 
   /**
    * Carga las reservas si todavía no se han

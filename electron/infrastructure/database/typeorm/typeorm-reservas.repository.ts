@@ -1,7 +1,10 @@
+import type CrearReservaRecordCommand from '@backend/contracts/reservas/crear-reserva-record-command.interface';
+import type { CrearReservaLineaRecordCommand } from '@backend/contracts/reservas/crear-reserva-record-command.interface';
 import type ReservasRepository from '@backend/contracts/reservas/reservas.repository.interface';
 import type ReservaRecord from '@backend/domain/reservas/reserva-record.interface';
 import type { ReservaLineaRecord } from '@backend/domain/reservas/reserva-record.interface';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
+import { randomUUID } from 'node:crypto';
 import type { DataSource, QueryRunner } from 'typeorm';
 
 interface ReservaDatabaseRow {
@@ -65,8 +68,97 @@ interface ReservaStockDatabaseRow {
   readonly unidades: number;
 }
 
+interface DatabaseIdRow {
+  readonly id: number;
+}
+
 export default class TypeOrmReservasRepository implements ReservasRepository {
   constructor(private readonly applicationDatabase: TypeOrmApplicationDatabase) {}
+
+  /**
+   * Persiste una nueva reserva y descuenta en la misma
+   * transacción el stock que queda inmovilizado.
+   */
+  async create(command: CrearReservaRecordCommand): Promise<string> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const queryRunner: QueryRunner = dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const idCliente: number = await this.resolveClienteId(queryRunner, command.clientePublicId);
+
+      const reservaPublicId: string = randomUUID();
+
+      const timestamp: string = new Date().toISOString();
+
+      await queryRunner.query(
+        `
+        INSERT INTO reserva (
+          public_id,
+          id_cliente,
+          total_cents,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          ?, ?, ?, ?, ?
+        )
+      `,
+        [reservaPublicId, idCliente, command.totalCents, timestamp, timestamp],
+      );
+
+      const reservaRows: readonly DatabaseIdRow[] = (await queryRunner.query(
+        `
+            SELECT
+              id
+            FROM reserva
+            WHERE public_id = ?
+            LIMIT 1
+          `,
+        [reservaPublicId],
+      )) as readonly DatabaseIdRow[];
+
+      const idReserva: number | undefined = reservaRows[0]?.id;
+
+      if (idReserva === undefined || !Number.isSafeInteger(idReserva) || idReserva <= 0) {
+        throw new Error('No se ha podido obtener el identificador de la reserva creada.');
+      }
+
+      for (const linea of command.lineas) {
+        let idArticulo: number | null = null;
+
+        if (linea.articuloPublicId !== null) {
+          idArticulo = await this.resolveArticuloId(queryRunner, linea.articuloPublicId);
+        }
+
+        await this.insertLinea(queryRunner, idReserva, idArticulo, linea, timestamp);
+
+        if (idArticulo !== null) {
+          await this.reserveStock(queryRunner, idArticulo, linea.unidades, timestamp);
+        }
+      }
+
+      await queryRunner.commitTransaction();
+
+      return reservaPublicId;
+    } catch (error: unknown) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+
+      throw new Error(
+        error instanceof Error ? error.message : 'No se ha podido crear la reserva.',
+        {
+          cause: error,
+        },
+      );
+    } finally {
+      await queryRunner.release();
+    }
+  }
 
   /**
    * Recupera todas las reservas activas junto
@@ -431,6 +523,122 @@ export default class TypeOrmReservasRepository implements ReservasRepository {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  private async resolveClienteId(queryRunner: QueryRunner, publicId: string): Promise<number> {
+    const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+          SELECT
+            id
+          FROM cliente
+          WHERE
+            public_id = ?
+            AND deleted_at IS NULL
+          LIMIT 1
+        `,
+      [publicId],
+    )) as readonly DatabaseIdRow[];
+
+    const id: number | undefined = rows[0]?.id;
+
+    if (id === undefined || !Number.isSafeInteger(id) || id <= 0) {
+      throw new Error('El cliente asociado a la reserva ya no está disponible.');
+    }
+
+    return id;
+  }
+
+  /**
+   * Resuelve el artículo activo mediante su identificador público.
+   */
+  private async resolveArticuloId(queryRunner: QueryRunner, publicId: string): Promise<number> {
+    const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+          SELECT
+            id
+          FROM articulo
+          WHERE
+            public_id = ?
+            AND deleted_at IS NULL
+          LIMIT 1
+        `,
+      [publicId],
+    )) as readonly DatabaseIdRow[];
+
+    const id: number | undefined = rows[0]?.id;
+
+    if (id === undefined || !Number.isSafeInteger(id) || id <= 0) {
+      throw new Error('Uno de los artículos de la reserva ya no está disponible.');
+    }
+
+    return id;
+  }
+
+  private async insertLinea(
+    queryRunner: QueryRunner,
+    idReserva: number,
+    idArticulo: number | null,
+    linea: CrearReservaLineaRecordCommand,
+    timestamp: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+      INSERT INTO linea_reserva (
+        public_id,
+        id_reserva,
+        id_articulo,
+        nombre_articulo,
+        puc_micros,
+        pvp_cents,
+        iva_bps,
+        importe_cents,
+        descuento_bps,
+        importe_descuento_cents,
+        unidades,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      )
+    `,
+      [
+        randomUUID(),
+        idReserva,
+        idArticulo,
+        linea.nombre,
+        linea.pucMicros,
+        linea.pvpCents,
+        linea.ivaBps,
+        linea.importeCents,
+        linea.descuentoBps,
+        linea.importeDescuentoCents,
+        linea.unidades,
+        timestamp,
+        timestamp,
+      ],
+    );
+  }
+
+  /**
+   * Inmoviliza el stock correspondiente a una línea reservada.
+   */
+  private async reserveStock(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    unidades: number,
+    timestamp: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+      UPDATE articulo
+      SET
+        stock = stock - ?,
+        updated_at = ?
+      WHERE id = ?
+    `,
+      [unidades, timestamp, idArticulo],
+    );
   }
 
   /**

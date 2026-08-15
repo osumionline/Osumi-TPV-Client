@@ -25,6 +25,7 @@ const IPC_CHANNELS = {
 
   cajaOpen: 'caja:open',
 
+  reservasCreate: 'reservas:create',
   reservasGetAll: 'reservas:get-all',
   reservasDeleteLinea: 'reservas:delete-linea',
   reservasDelete: 'reservas:delete',

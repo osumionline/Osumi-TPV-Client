@@ -17,6 +17,7 @@ import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-impor
 import type LegacyImportStartResult from '@desktop-contracts/legacy-import/legacy-import-start-result.interface';
 import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
 import type { ProveedorInterface } from '@desktop-contracts/proveedores/proveedor.interface';
+import type CrearReservaCommand from '@desktop-contracts/reservas/crear-reserva-command.interface';
 import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
 import AppInfo from '@desktop-contracts/system/app-info.interface';
 import type AccesoDirectoVentaInterface from '@desktop-contracts/ventas/acceso-directo-venta.interface';
@@ -139,6 +140,9 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
   }),
 
   reservas: Object.freeze({
+    create: (command: CrearReservaCommand): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.reservasCreate, command) as Promise<string>,
+
     getAll: (): Promise<readonly ReservaInterface[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.reservasGetAll) as Promise<readonly ReservaInterface[]>,
 

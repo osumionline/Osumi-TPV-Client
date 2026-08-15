@@ -1,4 +1,5 @@
 import type ReservasService from '@backend/application/reservas/reservas.service';
+import type CrearReservaCommand from '@desktop-contracts/reservas/crear-reserva-command.interface';
 import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
 import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
 import { assertTrustedSender } from '@ipc/assert-trusted-sender';
@@ -12,6 +13,15 @@ export default function registerReservasIpc(
   getMainWindow: MainWindowProvider,
   reservasService: ReservasService,
 ): void {
+  ipcMain.handle(
+    IPC_CHANNELS.reservasCreate,
+    async (event, command: CrearReservaCommand): Promise<string> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return reservasService.create(command);
+    },
+  );
+
   ipcMain.handle(
     IPC_CHANNELS.reservasGetAll,
     async (event): Promise<readonly ReservaInterface[]> => {
