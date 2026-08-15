@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 1.5  
+**Versión:** 1.6  
 **Fecha:** 15 de agosto de 2026  
-**Estado:** Installation, importación legacy y Startup completados y probados. En el módulo **Ventas** están completados los bloques 1 a 9. El siguiente bloque planificado es **Ventas 10 — Finalización y pagos**, aunque antes de iniciarlo el usuario quiere revisar otro asunto.
+**Estado:** Installation, importación legacy y Startup completados y probados. En el módulo **Ventas** están completados, probados y subidos los bloques 1 a 9. Se ha completado una **auditoría transversal de arquitectura** y, antes de Ventas 10, se realizará un refactor técnico en cinco fases (A–E) sin cambios funcionales.
 
 ## 1. Propósito del documento
 
@@ -25,8 +25,9 @@ Los grandes hitos completados hasta ahora son:
 - **Ventas 7 — Varios**.
 - **Ventas 8 — Devoluciones**.
 - **Ventas 9 — Reservas**.
+- **Auditoría transversal de arquitectura tras Ventas 9**.
 
-Todos ellos han sido probados por el usuario con la aplicación real. Los bloques anteriores están subidos al repositorio; Ventas 9 ha quedado funcionalmente validado y debe subirse junto con esta actualización documental si todavía no se ha hecho.
+Todos los bloques Ventas 1–9 han sido probados por el usuario con la aplicación real y están subidos al repositorio. Tras cerrar Ventas 9 se ha realizado una auditoría transversal del estado actual de `main`; sus conclusiones y el plan de refactor quedan documentados en esta versión.
 
 ## 2. Estado actual del proyecto
 
@@ -45,7 +46,7 @@ Todos ellos han sido probados por el usuario con la aplicación real. Los bloque
 - Protocolo interno `osumi://assets/...` para recursos de la instalación: implementado y probado.
 - Módulo Ventas operativo hasta el final del bloque 9.
 - Las ventas abiertas viven en memoria en `VentasService` y sobreviven a la navegación entre módulos.
-- El siguiente bloque funcional planificado es **Ventas 10 — Finalización y pagos**.
+- Antes de Ventas 10 se ejecutará el **refactor transversal A–E** derivado de la auditoría arquitectónica.
 
 ## 3. Repositorios y entorno
 
@@ -266,11 +267,13 @@ Esta recapitulación debe aparecer al comenzar cada nuevo bloque de desarrollo y
    - ✅ 9B — Reserva cargada dentro de `VentaEnCurso`.
    - ✅ 9C — Gestor de reservas + carga en una nueva venta.
    - ✅ 9D — Creación/persistencia de reservas + stock.
-10. ⬜ **Finalización y pagos — siguiente bloque planificado**.
+10. ⬜ **Finalización y pagos — siguiente bloque funcional planificado**.
 11. ⬜ **Persistencia transaccional**.
 12. ⬜ **Postventa**.
 
-> **Estado exacto al cerrar esta versión:** Ventas 1–9 están implementados y probados. El siguiente bloque planificado es **Ventas 10 — Finalización y pagos**, pero antes de iniciarlo el usuario quiere revisar otro asunto.
+> **Hito transversal antes de Ventas 10:** auditoría de arquitectura completada. Debe ejecutarse primero el refactor técnico A–E descrito en la sección 20. No cambia funcionalidad de negocio ni altera el orden de los bloques 10–12.
+
+> **Estado exacto al cerrar esta versión:** Ventas 1–9 están implementados, probados y subidos. La auditoría transversal de arquitectura está completada. Antes de iniciar **Ventas 10 — Finalización y pagos** debe ejecutarse el refactor técnico A–E.
 
 ## 11. Ventas 1 — Contexto operativo ✅
 
@@ -1679,9 +1682,813 @@ Después de esa corrección:
 
 Ventas 9 queda funcionalmente cerrado.
 
-## 20. Ajustes transversales realizados durante Ventas
+## 20. Auditoría transversal de arquitectura tras Ventas 9
 
-### 20.1 Menú de Electron
+### 20.1 Motivo y alcance
+
+Tras completar nueve bloques verticales del módulo Ventas se detectó el riesgo de que algunas decisiones técnicas hubieran quedado demasiado ligadas al bloque concreto en el que nacieron.
+
+La auditoría se realizó sobre el estado actual de `main` después de Ventas 9, sin modificar código, con estos objetivos:
+
+- localizar constantes y valores mágicos que ya tengan alcance transversal;
+- detectar helpers repetidos o que hayan dejado de pertenecer al dominio en el que nacieron;
+- revisar conversiones monetarias, porcentajes y redondeos antes de Ventas 10–11;
+- revisar fechas, strings, errores y validaciones repetidas;
+- detectar duplicación de infraestructura en SQLite/TypeORM;
+- revisar responsabilidades de archivos que hayan crecido durante los bloques;
+- comprobar la ubicación de models, interfaces, constants y utils;
+- revisar la frontera Angular / Electron backend / infrastructure;
+- decidir también qué **no** conviene abstraer.
+
+La conclusión general es positiva:
+
+> **No existe un problema de arquitectura de base ni es necesario rehacer las capas actuales.**
+
+La arquitectura vertical utilizada hasta ahora sigue siendo válida. Lo que se necesita es una consolidación transversal de varias abstracciones que solo han revelado su verdadero alcance después de acumular suficiente funcionalidad.
+
+### 20.2 Principio para extraer constantes y helpers
+
+No se moverá código simplemente porque sea una constante o una función privada.
+
+Una extracción debe cumplir al menos una de estas condiciones:
+
+- existe duplicación real;
+- expresa un concepto transversal;
+- se reutiliza o es claramente reutilizable;
+- mejora de forma significativa la legibilidad;
+- evita que una regla técnica se implemente de varias maneras.
+
+En cambio, debe permanecer local cuando:
+
+- solo tiene sentido dentro de una clase/servicio;
+- representa estado interno de una implementación;
+- es una regla específica de negocio;
+- moverlo obligaría a saltar de archivo sin aportar reutilización ni claridad.
+
+Ejemplo de constante que debe quedarse local:
+
+```text
+EMPTY_ESTADISTICAS_STATE
+```
+
+si solo describe el estado vacío de la caché de estadísticas de `ClientesService`.
+
+Ejemplo de concepto transversal:
+
+```text
+MICROS_PER_CENT = 10_000
+BASIS_POINTS_TOTAL = 10_000
+```
+
+porque representan unidades fundamentales de toda la aplicación.
+
+### 20.3 Separación de utils Angular / backend
+
+Decisión explícita del proyecto:
+
+```text
+src/app/
+    utils/
+    constants/
+    pipes/
+
+electron/
+    backend/
+        utils/
+        constants/
+
+electron/
+    infrastructure/
+        ...
+```
+
+No se creará por ahora una carpeta ejecutable `shared/` común a Angular y Electron.
+
+Solo se compartirá entre ambos runtimes aquello que pertenezca realmente a la **definición contractual del dato**, utilizando `electron/contracts`, por ejemplo límites máximos de campos de Cliente.
+
+Si en el futuro aparecen suficientes utilidades puras realmente comunes, se podrá reevaluar esta decisión.
+
+### 20.4 `@osumi/tools`
+
+Aunque el usuario es autor de `@osumi/tools`, la librería **no debe condicionar esta auditoría ni el refactor**.
+
+Situación acordada:
+
+- actualmente el Client declara `@osumi/tools`, pero no se está utilizando para este trabajo;
+- se valorará eliminar la dependencia del Client durante la fase de limpieza;
+- los nuevos helpers se diseñarán primero según las necesidades reales de Osumi TPV Client;
+- después, de manera independiente, se podrá decidir si alguno es suficientemente genérico como para incorporarlo a `@osumi/tools`.
+
+La dirección correcta es:
+
+```text
+Osumi TPV Client
+    ↓
+descubre un helper realmente genérico
+    ↓
+se consolida localmente
+    ↓
+posible candidato futuro para @osumi/tools
+```
+
+y no al revés.
+
+### 20.5 Hallazgo A — Dinero y porcentajes 🔴 Alta prioridad
+
+Es el hallazgo más importante antes de Ventas 10 y 11.
+
+Actualmente existen conceptos monetarios repartidos en varias zonas:
+
+```text
+MICROS_PER_CENT
+BASIS_POINTS_TOTAL
+BASIS_POINTS_PER_PERCENT
+conversión cents ↔ micros
+conversión euros ↔ micros
+conversión bps ↔ porcentaje
+redondeos
+reparto proporcional de importes
+```
+
+Ya existen ejemplos de duplicación y crecimiento histórico:
+
+- `ventas-money.constants.ts` contiene constantes que ya no son exclusivas de Ventas;
+- Reservas backend vuelve a declarar `MICROS_PER_CENT`;
+- Clientes y Varios tienen constantes propias relacionadas con basis points;
+- templates realizan expresiones como `micros / 1_000_000` y `bps / 100`;
+- `VentaEnCurso.totalCents` tiene lógica propia de redondeo;
+- `VentaLineaEnCurso` contiene `roundDivision()` y cálculo proporcional;
+- `SaleWorkspaceComponent` convierte entradas de euros a micros;
+- `ReservasService` backend contiene otra implementación `microsToCents()/centsToMicros()`.
+
+Además existe una señal clara de que un helper ha superado su dominio original:
+
+```text
+getImporteProporcionalMicros(...)
+```
+
+se usa tanto para devoluciones como para reservas, pero todavía puede producir un mensaje de error que habla específicamente de “devolución”.
+
+#### Propuesta
+
+Angular:
+
+```text
+src/app/constants/
+    money.constants.ts
+    percentage.constants.ts
+
+src/app/utils/
+    money.utils.ts
+    percentage.utils.ts
+
+src/app/pipes/
+    micros-to-euros.pipe.ts
+    bps-to-percent.pipe.ts
+```
+
+Backend:
+
+```text
+electron/backend/constants/
+    money.constants.ts
+    percentage.constants.ts
+
+electron/backend/utils/
+    money.utils.ts
+    percentage.utils.ts
+```
+
+Objetivos:
+
+- una única semántica de conversión;
+- una única política de redondeo;
+- helpers proporcionales reutilizables;
+- eliminar números mágicos monetarios de componentes/templates;
+- preparar Ventas 10–11 sobre una base consistente.
+
+No se moverán al util genérico reglas económicas de negocio como precedencias de descuento, regalo, devolución o reserva.
+
+### 20.6 Hallazgo B — Fechas Angular 🟠 Prioridad media
+
+Se detectó el mismo `formatFecha()` en al menos:
+
+- `ReturnSelectorComponent`;
+- `ReservationManagerComponent`.
+
+La función transforma:
+
+```text
+YYYY-MM-DD...
+→
+DD/MM/YYYY
+```
+
+sin realizar conversiones de zona horaria.
+
+#### Propuesta
+
+```text
+src/app/utils/date.utils.ts
+```
+
+con una función semántica equivalente a:
+
+```text
+formatIsoDateToSpanishDate(...)
+```
+
+No se sustituirá automáticamente por `DatePipe`, porque el comportamiento actual evita deliberadamente cambios de fecha por timezone.
+
+### 20.7 Hallazgo C — Strings Angular 🟠 Prioridad media
+
+Se identificaron patrones reutilizables como:
+
+- normalización para búsqueda ignorando mayúsculas/minúsculas y diacríticos;
+- `trim()` + conversión de string vacío a `null`.
+
+#### Propuesta
+
+```text
+src/app/utils/string.utils.ts
+```
+
+con helpers pequeños y puramente técnicos, por ejemplo:
+
+```text
+normalizeTextForSearch(...)
+trimToNull(...)
+```
+
+#### No generalizar
+
+`VentasArticulosService.getSearchPattern()` debe permanecer en su dominio.
+
+Aunque trate strings, además transforma puntuación/espacios para generar un patrón SQL compatible con los slugs del catálogo. Es lógica específica de búsqueda de artículos, no una utilidad genérica.
+
+### 20.8 Hallazgo D — Errores Angular 🟠 Prioridad media
+
+Se repite el patrón:
+
+```text
+error instanceof Error
+    ? error.message
+    : fallback
+```
+
+en varios componentes y operaciones.
+
+#### Propuesta
+
+```text
+src/app/utils/error.utils.ts
+```
+
+con un helper pequeño equivalente a:
+
+```text
+getErrorMessage(error: unknown, fallback: string): string
+```
+
+No se creará un sistema global de errores ni se abstraerán los diálogos; solo se eliminará la transformación técnica repetida.
+
+### 20.9 Hallazgo E — Límites de validación de Cliente 🟠 Prioridad media
+
+Los límites de campos aparecen tanto en Angular como en backend, por ejemplo:
+
+```text
+nombre       150
+DNI/CIF       30
+teléfono      30
+email        254
+descuento   0–100
+```
+
+La duplicación puede provocar drift entre frontend y backend.
+
+#### Propuesta
+
+Como estos valores forman parte del contrato del dato, no de una implementación ejecutable compartida:
+
+```text
+electron/contracts/clientes/
+    cliente-validation.constants.ts
+```
+
+Angular y backend podrán importar estas constantes desde `@desktop-contracts/*`.
+
+Las implementaciones de validación seguirán separadas:
+
+- Angular conserva sus validadores de formulario;
+- backend conserva su validación de aplicación.
+
+Solo se comparte la definición contractual de límites.
+
+### 20.10 Hallazgo F — Transacciones TypeORM 🔴 Alta prioridad
+
+Se detectó repetición del ciclo completo:
+
+```text
+connect()
+createQueryRunner()
+queryRunner.connect()
+startTransaction()
+
+try
+    operation
+    commit
+catch
+    rollback
+finally
+    release
+```
+
+en varios repositories, especialmente Reservas y Caja.
+
+Ventas 11 será el bloque con mayor densidad de transacciones, por lo que conviene consolidar esta infraestructura antes.
+
+#### Propuesta
+
+```text
+electron/infrastructure/database/typeorm/
+    typeorm-transaction.utils.ts
+```
+
+con una operación conceptual:
+
+```text
+runInTransaction<T>(
+    dataSource,
+    operation(queryRunner)
+)
+```
+
+Responsabilidad del util:
+
+- crear QueryRunner;
+- conectar;
+- iniciar transacción;
+- commit;
+- rollback;
+- release.
+
+Responsabilidad del repository:
+
+- SQL de negocio;
+- validaciones del caso de uso;
+- mensaje/error específico de la operación.
+
+No se ocultará la lógica SQL del repository.
+
+### 20.11 Hallazgo G — Recuperación del ID tras INSERT 🟡 Prioridad baja/media
+
+Actualmente existen al menos dos estrategias:
+
+- Caja utiliza `last_insert_rowid()`;
+- Reservas genera UUID, inserta y después recupera el `id` mediante `SELECT ... WHERE public_id = ?`.
+
+Ambas funcionan, pero Ventas 11 necesitará insertar una cabecera y muchas entidades dependientes.
+
+#### Propuesta
+
+Elegir una convención única y extraer, probablemente:
+
+```text
+electron/infrastructure/database/typeorm/
+    sqlite.utils.ts
+```
+
+con un helper como:
+
+```text
+getLastInsertId(queryRunner)
+```
+
+No crear helpers SQL dinámicos del tipo:
+
+```text
+resolveIdByPublicId(tableName, ...)
+```
+
+porque ocultarían SQL explícito, introducirían nombres de tabla dinámicos y aportarían poca ganancia.
+
+### 20.12 Hallazgo H — Overlays y modales Angular 🟠 Prioridad media
+
+Los componentes de:
+
+- cliente;
+- Varios;
+- devolución;
+- reservas;
+- búsquedas;
+- accesos directos;
+- selector de empleado;
+
+repiten buena parte de:
+
+```text
+overlay fixed
+backdrop
+centrado
+padding
+panel
+border-radius
+box-shadow
+tablas modales
+cajas de error
+```
+
+También se observa crecimiento incremental de `z-index` a medida que nacieron nuevos overlays.
+
+#### Propuesta
+
+No crear un `ModalComponent` genérico.
+
+Extraer solo primitivas SCSS reutilizables, probablemente:
+
+```text
+src/styles/
+    mixins/
+        _overlay.scss
+        _modal.scss
+        _table.scss
+```
+
+Los componentes conservan su HTML y comportamiento propios.
+
+Es conveniente hacerlo antes de Ventas 10 porque Finalización añadirá otra interfaz modal/overlay.
+
+### 20.13 Hallazgo I — `electron/main.ts` 🟠 Prioridad media
+
+`electron/main.ts` ha crecido hasta mezclar:
+
+- lifecycle de Electron;
+- creación de `BrowserWindow`;
+- paths/directorios;
+- recovery de instalación;
+- bases de datos;
+- creación de repositories;
+- creación de services;
+- legacy import;
+- installation;
+- registro de IPC;
+- shutdown.
+
+La explicitud actual es buena y no se introducirá framework de DI, contenedor ni arquitectura innecesaria.
+
+#### Propuesta
+
+Separar únicamente el **composition root/bootstrap**, manteniendo `main.ts` como entry point legible.
+
+Dirección aproximada:
+
+```text
+electron/bootstrap/
+    create-operational-services.ts
+    create-installation-services.ts
+    create-legacy-import-services.ts
+    register-operational-ipc.ts
+```
+
+Los nombres exactos se decidirán durante la fase D después de inspeccionar nuevamente el archivo.
+
+Objetivo:
+
+```text
+Electron ready
+    ↓
+obtener paths
+    ↓
+preparar infraestructura
+    ↓
+crear servicios
+    ↓
+registrar IPC
+    ↓
+crear ventana
+```
+
+sin introducir abstracciones opacas.
+
+### 20.14 Hallazgo J — Servicios `load/reload/pendingRequest` ⚪ Posponer
+
+Varios servicios Angular repiten patrones de:
+
+```text
+loadedSignal
+pendingRequest
+load()
+reload()
+clear()
+```
+
+La duplicación es real, pero actualmente existen diferencias suficientes entre servicios:
+
+- Categorías genera árbol/plain;
+- Clientes incorpora estadísticas y control de generaciones;
+- Reservas tiene loading/error y mutaciones;
+- otros catálogos son más simples.
+
+#### Decisión
+
+**No abstraer ahora.**
+
+No crear todavía:
+
+```text
+CollectionStore<T>
+CachedResource<T>
+LoadableSignal<T>
+```
+
+La repetición actual es más fácil de entender que una abstracción genérica prematura.
+
+Se puede reevaluar cuando el patrón sea estable y las diferencias estén claras.
+
+### 20.15 Hallazgo K — `VentaLineaEnCurso` grande, pero cohesivo ⚪ Posponer
+
+`VentaLineaEnCurso` ha crecido mucho y contiene:
+
+- economía normal;
+- regalo;
+- importe manual;
+- promoción;
+- descuento de cliente;
+- descuento manual;
+- descuento directo;
+- Varios;
+- devolución;
+- reserva;
+- precedencias;
+- validaciones.
+
+#### Decisión
+
+**No dividir el dominio en strategies/clases ahora.**
+
+La mayoría de estas reglas forman una unidad de negocio real.
+
+Sí se extraerán de la clase durante el refactor A:
+
+- redondeos puramente técnicos;
+- proporcionalidad matemática;
+- validaciones puramente técnicas de money/bps cuando proceda.
+
+Permanecen en el dominio:
+
+- precedencias;
+- guards de devolución/reserva;
+- reglas de regalo;
+- decisiones económicas.
+
+Se volverá a auditar después de completar Ventas 12.
+
+### 20.16 Hallazgo L — `SaleWorkspaceComponent` grande ⚪ Posponer
+
+`SaleWorkspaceComponent` ha crecido de forma notable con los bloques Ventas.
+
+#### Decisión
+
+**No dividirlo todavía.**
+
+Aún faltan:
+
+- Finalización;
+- pagos;
+- persistencia;
+- Postventa.
+
+Separarlo ahora podría fijar una arquitectura alrededor de un dominio todavía incompleto.
+
+Primero se extraerán utilidades transversales obvias, lo que ya reducirá ruido.
+
+Después de Ventas 12 se revisará de nuevo si existen responsabilidades estables que merezcan subcomponentes o servicios de UI.
+
+### 20.17 Elementos revisados que NO deben moverse 🟢
+
+La auditoría también confirma decisiones ya correctas.
+
+#### `venta-varios-iva.utils.ts`
+
+Debe permanecer en el dominio Ventas.
+
+La regla:
+
+```text
+21 % si existe
+si no → IVA configurado más alto
+```
+
+es específica de Varios.
+
+Puede utilizar helpers generales de porcentaje, pero su algoritmo sigue perteneciendo a Ventas/Varios.
+
+#### `EMPTY_ESTADISTICAS_STATE`
+
+Debe permanecer en `ClientesService`.
+
+Describe estado interno de esa caché y no es una constante transversal.
+
+#### `VentasArticulosService.getSearchPattern()`
+
+Debe permanecer junto a búsqueda de artículos.
+
+No es normalización genérica de strings.
+
+#### IPC y preload
+
+`preload.ts` y `ipc/channels.ts` son explícitos y auditables.
+
+Aunque tengan repetición, esa explicitud es una ventaja de seguridad y comprensión.
+
+No se generalizarán.
+
+#### Resolvers de IDs de repositories
+
+Helpers como:
+
+```text
+resolveClienteId()
+resolveArticuloId()
+getTerminalId()
+```
+
+pueden parecer similares, pero contienen predicados, errores y reglas específicas de cada caso.
+
+No se crearán resolvers SQL genéricos.
+
+### 20.18 Arquitectura destino aproximada
+
+Después del refactor transversal, la estructura prevista es aproximadamente:
+
+```text
+src/app/
+├── constants/
+│   ├── money.constants.ts
+│   └── percentage.constants.ts
+│
+├── utils/
+│   ├── date.utils.ts
+│   ├── error.utils.ts
+│   ├── money.utils.ts
+│   ├── percentage.utils.ts
+│   └── string.utils.ts
+│
+├── pipes/
+│   ├── micros-to-euros.pipe.ts
+│   └── bps-to-percent.pipe.ts
+│
+└── ...
+
+electron/
+├── backend/
+│   ├── constants/
+│   │   ├── money.constants.ts
+│   │   └── percentage.constants.ts
+│   └── utils/
+│       └── money.utils.ts
+│
+├── contracts/
+│   └── clientes/
+│       └── cliente-validation.constants.ts
+│
+├── infrastructure/
+│   └── database/
+│       └── typeorm/
+│           ├── typeorm-transaction.utils.ts
+│           └── sqlite.utils.ts
+│
+└── bootstrap/
+    └── ...
+```
+
+En Angular se prevé añadir aliases equivalentes a:
+
+```text
+@constants/*
+@utils/*
+@pipes/*
+```
+
+si siguen siendo útiles al implementar la fase correspondiente.
+
+Electron ya dispone de `@backend/*`, `@infrastructure/*` y `@desktop-contracts/*`, por lo que no necesita nuevos aliases para estas zonas.
+
+### 20.19 Plan de refactor antes de Ventas 10
+
+El refactor se divide en cinco fases pequeñas, sin cambio funcional.
+
+#### Refactor A — Dinero y porcentajes
+
+Prioridad máxima.
+
+Incluye:
+
+- constantes money/percentage;
+- conversiones;
+- redondeos;
+- proporcionalidad;
+- posibles pipes Angular;
+- sustitución de números mágicos;
+- limpieza de helpers técnicos de `VentaLineaEnCurso` y servicios.
+
+Debe quedar completamente probado antes de continuar.
+
+#### Refactor B — Utilidades Angular y contratos
+
+Incluye:
+
+- `date.utils.ts`;
+- `string.utils.ts`;
+- `error.utils.ts`;
+- límites contractuales de Cliente;
+- sustitución de duplicaciones existentes.
+
+No crear abstracciones genéricas de carga/caché.
+
+#### Refactor C — Infraestructura SQLite
+
+Incluye:
+
+- helper transaccional TypeORM;
+- convención de recuperación de ID tras `INSERT`;
+- adaptación de repositories existentes sin cambiar comportamiento.
+
+Es especialmente importante antes de Ventas 11.
+
+#### Refactor D — UI y Bootstrap
+
+Incluye:
+
+- primitivas SCSS para overlays/modales/tablas cuando aporten reutilización real;
+- separación del composition root de `electron/main.ts`;
+- mantener explícitos IPC, preload y wiring.
+
+No introducir frameworks de DI.
+
+#### Refactor E — Limpieza final
+
+Incluye:
+
+- eliminar `@osumi/tools` del Client si continúa sin uso;
+- regenerar lockfile;
+- eliminar imports/código muerto;
+- revisar aliases;
+- ejecutar suite completa;
+- actualizar este documento.
+
+### 20.20 Método de trabajo durante el refactor
+
+Cada fase A–E debe tratarse como un bloque verificable independiente.
+
+Después de cada una:
+
+```bash
+npm test
+npm run typecheck:electron
+npm run build
+npm run lint
+```
+
+Cuando afecte a Electron/infrastructure también es recomendable:
+
+```bash
+npm run build:desktop
+```
+
+No se mezclarán en un mismo paso grandes cambios de A+B+C.
+
+Si aparece una regresión, debe corregirse dentro de la fase que la produjo antes de continuar.
+
+No se aprovechará el refactor para cambiar reglas funcionales de negocio.
+
+### 20.21 Estado al cerrar la auditoría
+
+La auditoría está **completada**.
+
+No es necesario volver a realizarla desde cero si cambia la conversación.
+
+Próxima secuencia acordada:
+
+```text
+Refactor A — Dinero y porcentajes
+        ↓
+Refactor B — Utils Angular + contratos
+        ↓
+Refactor C — Infraestructura SQLite
+        ↓
+Refactor D — UI + Bootstrap
+        ↓
+Refactor E — Limpieza final
+        ↓
+Ventas 10 — Finalización y pagos
+```
+
+Antes de empezar cada fase se debe volver a inspeccionar el estado actual de los archivos implicados en `main`, proponer el diseño exacto y después realizar cambios incrementales.
+
+## 21. Ajustes transversales realizados durante Ventas
+
+### 21.1 Menú de Electron
 
 Se eliminó el menú superior de Electron mediante `Menu.setApplicationMenu(null)` para que Alt no vuelva a mostrar File/Edit/etc.
 
@@ -1692,17 +2499,17 @@ Como efecto secundario desapareció el acceso a DevTools que dependía del menú
 
 Solo está activo cuando `!app.isPackaged`.
 
-### 20.2 Foco del selector de cliente
+### 21.2 Foco del selector de cliente
 
 Cerrar el selector por selección, eliminación o cancelación fuerza un nuevo `focusTarget` al localizador. Esto evita depender de que el valor anterior del workspace ya fuese `localizador`.
 
-### 20.3 Accesibilidad
+### 21.3 Accesibilidad
 
 Se evita `autofocus` en HTML; el foco inicial se resuelve mediante `viewChild` + `afterNextRender`/efectos post-render.
 
 Los overlays interactivos usan controles accesibles reales en vez de `<div (click)>` no focusables.
 
-## 21. Método de trabajo por bloque
+## 22. Método de trabajo por bloque
 
 Para cada bloque se seguirá el ciclo:
 
@@ -1720,7 +2527,7 @@ Para cada bloque se seguirá el ciclo:
 
 > **Importante:** no asumir que la implementación antigua es el diseño correcto. Debe utilizarse como fuente funcional y rediseñarse cuando la arquitectura o UX lo justifiquen.
 
-## 22. Fuentes de información
+## 23. Fuentes de información
 
 La fuente principal es el código actual de los repositorios GitHub:
 
@@ -1732,7 +2539,7 @@ Además pueden utilizarse capturas, explicación funcional del usuario, datos re
 
 No pedir de nuevo archivos ya disponibles y actualizados salvo necesidad concreta.
 
-## 23. Protocolo para cambios de código
+## 24. Protocolo para cambios de código
 
 - Cambios en orden de compilación y en pasos pequeños verificables.
 - Archivo nuevo: entregarlo completo.
@@ -1752,7 +2559,7 @@ npm run lint
 - No avanzar al bloque siguiente hasta que el actual funcione o sus limitaciones estén documentadas.
 - El usuario suele probar manualmente, ejecutar la batería completa y subir los cambios antes de continuar.
 
-## 24. Prompt de arranque para una conversación nueva
+## 25. Prompt de arranque para una conversación nueva
 
 ```text
 Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” como contexto principal.
@@ -1768,7 +2575,7 @@ Installation + importación legacy y Startup están completados y probados. En e
 8. Devoluciones.
 9. Reservas.
 
-El siguiente bloque planificado es Ventas 10 — Finalización y pagos. Después quedan Persistencia transaccional y Postventa. Antes de iniciar Ventas 10, el usuario quiere revisar otro asunto.
+Después de Ventas 9 se completó una auditoría transversal de arquitectura. Antes de Ventas 10 deben ejecutarse los refactors A–E: A dinero/porcentajes, B utils Angular/contratos, C infraestructura SQLite, D UI/bootstrap y E limpieza final. Después quedan Ventas 10 — Finalización y pagos, Ventas 11 — Persistencia transaccional y Ventas 12 — Postventa.
 
 Los repositorios de referencia son:
 - Frontend antiguo: https://github.com/osumionline/Osumi-TPV
@@ -1779,47 +2586,56 @@ Antes de empezar un bloque, dame la recapitulación completa del plan, indicando
 
 Al terminar cada bloque principal, después de que confirme que funciona y que está subido, entrégame una versión actualizada de este documento de continuidad.
 
-Cuando el usuario indique que quiere retomar el plan principal, debemos continuar por: Ventas 10 — Finalización y pagos.
+Debemos continuar por: **Refactor A — Dinero y porcentajes**. No iniciar Ventas 10 hasta completar y validar las fases A–E.
 ```
 
-## 25. Próximo paso
+## 26. Próximo paso
 
-El siguiente bloque planificado del traspaso de Ventas es:
+El siguiente desarrollo es un hito transversal, no un nuevo bloque funcional de Ventas:
 
-# Ventas 10 — Finalización y pagos
+# Refactor A — Dinero y porcentajes
 
-**No iniciarlo todavía automáticamente.** Al cerrar Ventas 9, el usuario ha indicado expresamente que antes quiere revisar otro asunto.
+Debe comenzar inspeccionando de nuevo el estado actual de los archivos implicados en `main` y diseñando exactamente:
 
-Cuando se retome el plan principal, Ventas 10 debe partir de todo lo ya construido:
+- constantes monetarias Angular;
+- constantes de porcentajes/basis points Angular;
+- utils monetarios Angular;
+- utils de porcentajes Angular;
+- pipes que realmente merezca la pena introducir;
+- constantes equivalentes backend;
+- utils monetarios/porcentajes backend;
+- helpers técnicos de redondeo y proporcionalidad que deben salir de `VentaLineaEnCurso`;
+- todos los lugares actuales donde se utilizan números mágicos o conversiones manuales.
 
-- venta ordinaria;
-- Varios;
-- cliente;
-- devoluciones;
-- reservas cargadas;
-- creación de reservas mediante `ReservasService.createFromVenta()`.
+Reglas del refactor:
 
-Este bloque tendrá que analizar primero el flujo completo de finalización del TPV antiguo y después diseñar el nuevo flujo para, como mínimo:
+- no cambiar funcionalidad;
+- no modificar precedencias económicas;
+- no cambiar la resolución interna en microeuros;
+- no cambiar las reglas de redondeo existentes sin detectar antes una inconsistencia real;
+- mantener Angular y backend separados;
+- no usar `@osumi/tools`;
+- no crear una capa `shared` ejecutable;
+- mantener las reglas específicas de negocio dentro de su dominio.
 
-- calcular y presentar el total final;
-- decidir entre venta normal y reserva;
-- mantener las opciones `Reserva` y `Reserva sin ticket`;
-- impedir reservar ventas con devoluciones o procedentes de reservas;
-- seleccionar uno o varios tipos de pago;
-- manejar efectivo y cambio;
-- soportar total positivo, cero o negativo;
-- resolver cómo se devuelve dinero en una devolución neta;
-- permitir cambios donde convivan líneas negativas y positivas;
-- determinar reglas de impresión de ticket;
-- cerrar la pestaña únicamente después de una operación válida;
-- conectar la creación de reservas ya implementada en Ventas 9;
-- dejar preparado el command que Ventas 11 persistirá transaccionalmente.
+Después de Refactor A se ejecutará la batería completa antes de pasar a Refactor B.
 
-Ventas 10 no debe asumir todavía que la venta normal ya se persiste: **Ventas 11 — Persistencia transaccional** sigue siendo responsable de la escritura definitiva de venta, líneas, pagos, stock, reservas consumidas y unidades devueltas.
+Secuencia pendiente:
 
-Antes de proponer implementación de Ventas 10 se debe volver a revisar el frontend antiguo, TPV-API y el estado actual del repositorio Client, y fijar con el usuario cualquier comportamiento ambiguo.
+```text
+A — Dinero y porcentajes
+B — Utils Angular + contratos
+C — Infraestructura SQLite
+D — UI + Bootstrap
+E — Limpieza final
+Ventas 10 — Finalización y pagos
+Ventas 11 — Persistencia transaccional
+Ventas 12 — Postventa
+```
 
-## 26. Registro de hitos
+No iniciar Ventas 10 hasta cerrar A–E.
+
+## 27. Registro de hitos
 
 | Versión | Fecha | Hito |
 | --- | --- | --- |
@@ -1829,3 +2645,4 @@ Antes de proponer implementación de Ventas 10 se debe volver a revisar el front
 | 1.3 | 13 de agosto de 2026 | Ventas 7 — Varios completado: línea libre real, creación/cancelación, editor reutilizable, IVA por defecto conservador, edición desde línea y pruebas. Próximo bloque: Ventas 8 — Devoluciones. |
 | 1.4 | 14 de agosto de 2026 | Ventas 8 — Devoluciones completado: compatibilidad QR legacy, read model histórico, control de unidades disponibles, economía histórica exacta, selector, mezcla con compras y reapertura/edición. Próximo bloque: Ventas 9 — Reservas. |
 | 1.5 | 15 de agosto de 2026 | Ventas 9 — Reservas completado: consulta y gestión transaccional, carga múltiple sin deduplicación, economía histórica, cliente bloqueado, gestor visual, creación de reservas y ciclo simétrico de stock. Próximo bloque planificado: Ventas 10 — Finalización y pagos; antes se revisará otro asunto con el usuario. |
+| 1.6 | 15 de agosto de 2026 | Auditoría transversal de arquitectura completada tras Ventas 9. No requiere rehacer la arquitectura base. Se acuerda refactor técnico A–E antes de Ventas 10: dinero/porcentajes, utils Angular/contratos, infraestructura SQLite, UI/bootstrap y limpieza final. |
