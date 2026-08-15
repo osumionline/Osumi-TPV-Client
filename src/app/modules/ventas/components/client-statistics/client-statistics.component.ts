@@ -15,13 +15,14 @@ import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import type ClienteEstadisticasState from '@model/clientes/cliente-estadisticas-state.interface';
 import type Cliente from '@model/clientes/cliente.model';
+import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
 import ClientesService from '@services/clientes.service';
 
 @Component({
   selector: 'otpv-client-statistics',
   templateUrl: './client-statistics.component.html',
   styleUrl: './client-statistics.component.scss',
-  imports: [CurrencyPipe, MatButton, MatIcon],
+  imports: [CurrencyPipe, MicrosToEurosPipe, MatButton, MatIcon],
 })
 export default class ClientStatisticsComponent {
   private readonly clientesService: ClientesService = inject(ClientesService);

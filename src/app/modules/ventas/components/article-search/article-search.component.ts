@@ -18,6 +18,7 @@ import {
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import type ArticuloVenta from '@model/ventas/articulo-venta.model';
+import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import VentasArticulosService from '@services/ventas-articulos.service';
 
 /**
@@ -27,7 +28,7 @@ import VentasArticulosService from '@services/ventas-articulos.service';
   selector: 'otpv-article-search',
   templateUrl: './article-search.component.html',
   styleUrl: './article-search.component.scss',
-  imports: [CurrencyPipe, MatButton, MatIcon],
+  imports: [CurrencyPipe, CentsToEurosPipe, MatButton, MatIcon],
 })
 export default class ArticleSearchComponent implements OnInit, OnDestroy {
   private readonly ventasArticulosService: VentasArticulosService = inject(VentasArticulosService);

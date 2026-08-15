@@ -19,6 +19,7 @@ import {
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
+import { PERCENT_TOTAL } from '@constants/percentage.constants';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import permissionIds from '@desktop-contracts/permissions/permission-ids.constants';
 import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devolucion.interface';
@@ -39,17 +40,21 @@ import type {
   VentaFocusTarget,
   VentaWorkspaceState,
 } from '@model/ventas/venta-workspace.interface';
-import { MICROS_PER_CENT } from '@model/ventas/ventas-money.constants';
 import ArticleSearchComponent from '@modules/ventas/components/article-search/article-search.component';
 import ClientStatisticsComponent from '@modules/ventas/components/client-statistics/client-statistics.component';
 import DirectAccessSelectorComponent from '@modules/ventas/components/direct-access-selector/direct-access-selector.component';
 import ReturnSelectorComponent from '@modules/ventas/components/return-selector/return-selector.component';
 import VariosEditorComponent from '@modules/ventas/components/varios-editor/varios-editor.component';
 import { DialogService } from '@osumi/angular-tools';
+import BpsToPercentPipe from '@pipes/bps-to-percent.pipe';
+import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
+import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
 import VentasArticulosService from '@services/ventas-articulos.service';
 import VentasContextService from '@services/ventas-context.service';
 import VentasDevolucionesService from '@services/ventas-devoluciones.service';
 import VentasService from '@services/ventas.service';
+import { eurosToMicros, microsToEuros } from '@utils/money.utils';
+import { bpsToPercent, percentToBps } from '@utils/percentage.utils';
 
 /**
  * Muestra y gestiona la estructura visual de una venta abierta.
@@ -70,6 +75,9 @@ import VentasService from '@services/ventas.service';
     ClientStatisticsComponent,
     VariosEditorComponent,
     ReturnSelectorComponent,
+    BpsToPercentPipe,
+    CentsToEurosPipe,
+    MicrosToEurosPipe,
   ],
 })
 export default class SaleWorkspaceComponent {
@@ -270,10 +278,11 @@ export default class SaleWorkspaceComponent {
     }
 
     const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
     const inputValue: number = inputElement.valueAsNumber;
 
     if (Number.isNaN(inputValue) || inputValue < 0) {
-      inputElement.value = String(linea.importeFinalMicros / (100 * MICROS_PER_CENT));
+      inputElement.value = String(microsToEuros(linea.importeFinalMicros));
 
       this.showLineOperationError(
         new RangeError('El importe debe ser mayor o igual que cero.'),
@@ -284,16 +293,16 @@ export default class SaleWorkspaceComponent {
       return;
     }
 
-    const importeManualMicros: number = Math.round(inputValue * 100) * MICROS_PER_CENT;
-
     try {
+      const importeManualMicros: number = eurosToMicros(inputValue);
+
       this.ventasService.establecerImporteManual(
         this.venta().idTemporal,
         linea.idTemporal,
         importeManualMicros,
       );
     } catch (error: unknown) {
-      inputElement.value = String(linea.importeFinalMicros / (100 * MICROS_PER_CENT));
+      inputElement.value = String(microsToEuros(linea.importeFinalMicros));
 
       this.showLineOperationError(error, linea.idTemporal, 'importe');
 
@@ -372,11 +381,13 @@ export default class SaleWorkspaceComponent {
     }
 
     const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
     const inputValue: number = inputElement.valueAsNumber;
+
     const porcentaje: number = Number.isNaN(inputValue) ? 0 : inputValue;
 
-    if (porcentaje < 0 || porcentaje > 100) {
-      inputElement.value = String(linea.descuentoBps / 100);
+    if (porcentaje < 0 || porcentaje > PERCENT_TOTAL) {
+      inputElement.value = String(bpsToPercent(linea.descuentoBps));
 
       this.showLineOperationError(
         new RangeError('El descuento debe estar comprendido entre 0 y 100 %.'),
@@ -387,7 +398,7 @@ export default class SaleWorkspaceComponent {
       return;
     }
 
-    const descuentoBps: number = Math.round(porcentaje * 100);
+    const descuentoBps: number = percentToBps(porcentaje);
 
     try {
       const debeCrearDescuentoManual: boolean =
@@ -401,7 +412,7 @@ export default class SaleWorkspaceComponent {
         );
       }
     } catch (error: unknown) {
-      inputElement.value = String(linea.descuentoBps / 100);
+      inputElement.value = String(bpsToPercent(linea.descuentoBps));
 
       this.showLineOperationError(error, linea.idTemporal, 'descuento-porcentaje');
 
@@ -473,6 +484,7 @@ export default class SaleWorkspaceComponent {
     }
 
     const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
     const inputValue: number = inputElement.valueAsNumber;
 
     if (Number.isNaN(inputValue) || inputValue <= 0) {
@@ -481,9 +493,9 @@ export default class SaleWorkspaceComponent {
       return;
     }
 
-    const descuentoDirectoMicros: number = Math.round(inputValue * 100) * MICROS_PER_CENT;
-
     try {
+      const descuentoDirectoMicros: number = eurosToMicros(inputValue);
+
       this.ventasService.establecerDescuentoDirecto(
         this.venta().idTemporal,
         linea.idTemporal,
@@ -493,7 +505,7 @@ export default class SaleWorkspaceComponent {
       inputElement.value =
         linea.descuentoDirectoMicros === null
           ? ''
-          : String(linea.descuentoDirectoMicros / (100 * MICROS_PER_CENT));
+          : String(microsToEuros(linea.descuentoDirectoMicros));
 
       this.showLineOperationError(error, linea.idTemporal, 'descuento-importe');
 

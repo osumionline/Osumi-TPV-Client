@@ -84,16 +84,18 @@
 
                         <span>
                             {{
-                                        (item.pvpMicros / 1_000_000)
-                                            | currency:'EUR':'symbol':'1.2-2'
-                                    }}
+                                item.pvpMicros
+                                    | microsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
                         </span>
 
                         <span>
                             {{
-                                        (item.importeMicros / 1_000_000)
-                                            | currency:'EUR':'symbol':'1.2-2'
-                                    }}
+                                item.importeMicros
+                                    | microsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
                         </span>
                     </div>
                     }
@@ -136,9 +138,10 @@
 
                         <span>
                             {{
-                                        (item.importeMicros / 1_000_000)
-                                            | currency:'EUR':'symbol':'1.2-2'
-                                    }}
+                                item.importeMicros
+                                    | microsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
                         </span>
 
                         <span>

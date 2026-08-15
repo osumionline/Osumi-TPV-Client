@@ -141,7 +141,8 @@
             <div class="col-pvp">
                 <span>
                     {{
-                        (linea.pvpMicros / 1_000_000)
+                        linea.pvpMicros
+                            | microsToEuros
                             | currency:'EUR':'symbol':'1.2-2'
                     }}
                 </span>
@@ -168,7 +169,7 @@
                        aria-label="Importe"
                        [attr.data-linea-id-temporal]="linea.idTemporal"
                        data-field="importe"
-                       [value]="linea.importeFinalMicros / 1_000_000"
+                       [value]="linea.importeFinalMicros | microsToEuros"
                        (keydown.enter)="commitImporte(linea, $event, true)"
                        (blur)="commitImporte(linea, $event, false)">
                 }
@@ -179,7 +180,8 @@
                             [disabled]="linea.esDevolucion || linea.esReserva || !canModifyAmounts()"
                             (click)="editImporte(linea)">
                         {{
-                            (linea.importeFinalMicros / 1_000_000)
+                            linea.importeFinalMicros
+                                | microsToEuros
                                 | currency:'EUR':'symbol':'1.2-2'
                         }}
                     </button>
@@ -210,12 +212,13 @@
                     }
                     @else if (origen.importeDescuentoMicros > 0) {
                     {{
-                        (origen.importeDescuentoMicros / 1_000_000)
+                        origen.importeDescuentoMicros
+                            | microsToEuros
                             | currency:'EUR':'symbol':'1.2-2'
                     }}
                     }
                     @else {
-                    {{ origen.descuentoBps / 100 }} %
+                    {{ origen.descuentoBps | bpsToPercent }} %
                     }
                 </span>
                 }
@@ -228,12 +231,13 @@
                       matTooltip="Descuento histórico de la reserva">
                     @if (linea.importeDescuentoReservaMicros > 0) {
                     {{
-                        (linea.importeDescuentoReservaMicros / 1_000_000)
+                        linea.importeDescuentoReservaMicros
+                            | microsToEuros
                             | currency:'EUR':'symbol':'1.2-2'
                     }}
                     }
                     @else {
-                    {{ origenReserva.descuentoBps / 100 }} %
+                    {{ origenReserva.descuentoBps | bpsToPercent }} %
                     }
                 </span>
                 }
@@ -243,7 +247,8 @@
                     <span class="sale__discount-value"
                           matTooltip="Descuento promocional del artículo">
                         {{
-                            (linea.importeDescuentoPromocionalMicros / 1_000_000)
+                            linea.importeDescuentoPromocionalMicros
+                                | microsToEuros
                                 | currency:'EUR':'symbol':'1.2-2'
                         }}
                     </span>
@@ -271,10 +276,10 @@
                            [attr.data-linea-id-temporal]="linea.idTemporal"
                            data-field="descuento-importe"
                            [value]="
-                               linea.descuentoDirectoMicros === null
-                                   ? ''
-                                   : linea.descuentoDirectoMicros / 1_000_000
-                           "
+                                linea.descuentoDirectoMicros === null
+                                    ? ''
+                                    : (linea.descuentoDirectoMicros | microsToEuros)
+                            "
                            (keydown.enter)="commitDescuentoDirecto(linea, $event, true)"
                            (blur)="commitDescuentoDirecto(linea, $event, false)">
                     <span>€</span>
@@ -288,7 +293,8 @@
                             matTooltip="Modificar descuento directo"
                             (click)="editDescuentoDirecto(linea)">
                         {{
-                            (linea.descuentoDirectoMicros / 1_000_000)
+                            linea.descuentoDirectoMicros
+                                | microsToEuros
                                 | currency:'EUR':'symbol':'1.2-2'
                         }}
                     </button>
@@ -316,7 +322,7 @@
                            aria-label="Descuento porcentual"
                            [attr.data-linea-id-temporal]="linea.idTemporal"
                            data-field="descuento-porcentaje"
-                           [value]="linea.descuentoBps / 100"
+                           [value]="linea.descuentoBps | bpsToPercent"
                            (keydown.enter)="commitDescuentoPorcentaje(linea, $event, true)"
                            (blur)="commitDescuentoPorcentaje(linea, $event, false)">
                     <span>%</span>
@@ -334,7 +340,7 @@
                                         : 'Modificar descuento porcentual'
                             "
                             (click)="editDescuentoPorcentaje(linea)">
-                        {{ linea.descuentoBps / 100 }} %
+                        {{ linea.descuentoBps | bpsToPercent }} %
                     </button>
 
                     @if (linea.tieneDescuentoManual) {
@@ -429,9 +435,10 @@
            (cdkDragEnded)="onTotalDragEnded($event)">
         <div class="sale__amount">
             {{
-          (ventaView().totalCents / 100)
-            | currency:'EUR':'symbol':'1.2-2'
-        }}
+                ventaView().totalCents
+                    | centsToEuros
+                    | currency:'EUR':'symbol':'1.2-2'
+            }}
         </div>
 
         <div class="sale__controls">

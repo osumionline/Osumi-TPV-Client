@@ -20,6 +20,18 @@ export function centsToMicros(cents: number): number {
 }
 
 /**
+ * Convierte céntimos a euros.
+ *
+ * No realiza ningún redondeo adicional:
+ * se utiliza principalmente para presentación.
+ */
+export function centsToEuros(cents: number): number {
+  requireSafeInteger(cents, 'La cantidad de céntimos no es válida.');
+
+  return cents / CENTS_PER_EURO;
+}
+
+/**
  * Convierte microeuros a céntimos utilizando
  * redondeo simétrico para valores positivos
  * y negativos.

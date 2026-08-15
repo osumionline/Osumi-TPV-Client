@@ -63,7 +63,7 @@
                         ) {
                         <option [value]="optionIvaBps"
                                 [selected]="optionIvaBps === ivaBps()">
-                            {{ optionIvaBps / 100 }} %
+                            {{ optionIvaBps | bpsToPercent }} %
                         </option>
                         }
                     </select>

@@ -15,7 +15,8 @@
             </button>
         </header>
 
-        <input #searchInput class="search__input"
+        <input #searchInput
+               class="search__input"
                type="search"
                autocomplete="off"
                placeholder="Buscar por nombre"
@@ -68,14 +69,13 @@
 
                 <span class="search__price">
                     {{
-                (
-                  (
-                    articulo.pvpDescuentoCents
-                    ?? articulo.pvpCents
-                  ) / 100
-                )
-                  | currency:'EUR':'symbol':'1.2-2'
-              }}
+                        (
+                            articulo.pvpDescuentoCents
+                            ?? articulo.pvpCents
+                        )
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
                 </span>
 
                 <span class="search__stock">

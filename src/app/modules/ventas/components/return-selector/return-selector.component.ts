@@ -16,12 +16,22 @@ import { MatCheckbox } from '@angular/material/checkbox';
 import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devolucion.interface';
 import type { VentaDevolucionLineaInterface } from '@desktop-contracts/ventas/venta-devolucion.interface';
 import type VentaDevolucionSeleccion from '@model/ventas/venta-devolucion-seleccion.interface';
+import BpsToPercentPipe from '@pipes/bps-to-percent.pipe';
+import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
+import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
 
 @Component({
   selector: 'otpv-return-selector',
   templateUrl: './return-selector.component.html',
   styleUrl: './return-selector.component.scss',
-  imports: [CurrencyPipe, MatButton, MatCheckbox],
+  imports: [
+    CurrencyPipe,
+    BpsToPercentPipe,
+    CentsToEurosPipe,
+    MicrosToEurosPipe,
+    MatButton,
+    MatCheckbox,
+  ],
 })
 export default class ReturnSelectorComponent implements OnInit {
   readonly devolucion: InputSignal<VentaDevolucionInterface> =

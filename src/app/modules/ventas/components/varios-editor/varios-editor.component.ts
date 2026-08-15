@@ -16,13 +16,14 @@ import { MatButton } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
 import type VentaVariosData from '@model/ventas/venta-varios-data.interface';
-import { MICROS_PER_CENT } from '@model/ventas/ventas-money.constants';
+import BpsToPercentPipe from '@pipes/bps-to-percent.pipe';
+import { eurosToMicros, microsToEuros } from '@utils/money.utils';
 
 @Component({
   selector: 'otpv-varios-editor',
   templateUrl: './varios-editor.component.html',
   styleUrl: './varios-editor.component.scss',
-  imports: [MatButton, MatFormFieldModule, MatInput],
+  imports: [BpsToPercentPipe, MatButton, MatFormFieldModule, MatInput],
 })
 export default class VariosEditorComponent implements OnInit {
   readonly initialData: InputSignal<VentaVariosData> = input.required<VentaVariosData>();
@@ -63,7 +64,7 @@ export default class VariosEditorComponent implements OnInit {
 
     this.descripcion.set(initialData.descripcion);
 
-    this.pvpEuros.set(initialData.pvpMicros / 1_000_000);
+    this.pvpEuros.set(microsToEuros(initialData.pvpMicros));
 
     this.ivaBps.set(initialData.ivaBps);
   }
@@ -123,9 +124,11 @@ export default class VariosEditorComponent implements OnInit {
       return;
     }
 
-    const pvpMicros: number = Math.round(pvpEuros * 100) * MICROS_PER_CENT;
+    let pvpMicros: number;
 
-    if (!Number.isSafeInteger(pvpMicros)) {
+    try {
+      pvpMicros = eurosToMicros(pvpEuros);
+    } catch {
       this.error.set('El PVP indicado es demasiado grande.');
 
       this.pvpInput().nativeElement.focus();

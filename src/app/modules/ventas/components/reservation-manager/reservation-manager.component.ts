@@ -20,6 +20,8 @@ import { MatTooltip } from '@angular/material/tooltip';
 import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
 import type { ReservaLineaInterface } from '@desktop-contracts/reservas/reserva.interface';
 import { DialogService } from '@osumi/angular-tools';
+import BpsToPercentPipe from '@pipes/bps-to-percent.pipe';
+import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
 import ReservasService from '@services/reservas.service';
 
 @Component({
@@ -28,6 +30,8 @@ import ReservasService from '@services/reservas.service';
   styleUrl: './reservation-manager.component.scss',
   imports: [
     CurrencyPipe,
+    BpsToPercentPipe,
+    MicrosToEurosPipe,
     MatButton,
     MatCheckbox,
     MatIcon,

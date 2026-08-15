@@ -1,6 +1,7 @@
 import {
   calculateBpsAmountMicros,
   calculateProportionalMicros,
+  centsToEuros,
   centsToMicros,
   eurosToMicros,
   microsToCents,
@@ -12,6 +13,12 @@ describe('money.utils', (): void => {
     expect(centsToMicros(1_234)).toBe(12_340_000);
 
     expect(centsToMicros(-1_234)).toBe(-12_340_000);
+  });
+
+  it('convierte céntimos a euros sin redondeo adicional', (): void => {
+    expect(centsToEuros(1_234)).toBe(12.34);
+
+    expect(centsToEuros(-1_234)).toBe(-12.34);
   });
 
   it('convierte microeuros a céntimos con redondeo simétrico', (): void => {

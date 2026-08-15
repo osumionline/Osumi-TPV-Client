@@ -110,7 +110,8 @@
 
                                 <td class="money">
                                     {{
-                                        (reserva.totalMicros / 1_000_000)
+                                        reserva.totalMicros
+                                            | microsToEuros
                                             | currency:'EUR':'symbol':'1.2-2'
                                     }}
                                 </td>
@@ -226,7 +227,8 @@
 
                                 <td class="money">
                                     {{
-                                        (linea.pvpMicros / 1_000_000)
+                                        linea.pvpMicros
+                                            | microsToEuros
                                             | currency:'EUR':'symbol':'1.2-2'
                                     }}
                                 </td>
@@ -234,18 +236,20 @@
                                 <td class="money">
                                     @if (linea.importeDescuentoMicros > 0) {
                                     {{
-                                        (linea.importeDescuentoMicros / 1_000_000)
+                                        linea.importeDescuentoMicros
+                                            | microsToEuros
                                             | currency:'EUR':'symbol':'1.2-2'
                                     }}
                                     }
                                     @else {
-                                    {{ linea.descuentoBps / 100 }} %
+                                    {{ linea.descuentoBps | bpsToPercent }} %
                                     }
                                 </td>
 
                                 <td class="money">
                                     {{
-                                        (linea.importeMicros / 1_000_000)
+                                        linea.importeMicros
+                                            | microsToEuros
                                             | currency:'EUR':'symbol':'1.2-2'
                                     }}
                                 </td>
@@ -275,7 +279,8 @@
                                 <td class="money">
                                     <strong>
                                         {{
-                                            (reserva.totalMicros / 1_000_000)
+                                            reserva.totalMicros
+                                                | microsToEuros
                                                 | currency:'EUR':'symbol':'1.2-2'
                                         }}
                                     </strong>

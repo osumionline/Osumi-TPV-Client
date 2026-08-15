@@ -37,7 +37,8 @@
                     Total:
                     <strong>
                         {{
-                            (devolucion().totalCents / 100)
+                            devolucion().totalCents
+                                | centsToEuros
                                 | currency:'EUR':'symbol':'1.2-2'
                         }}
                     </strong>
@@ -67,7 +68,8 @@
             <span>
                 {{ pago.nombre }}
                 ({{
-                (pago.importeCents / 100)
+                pago.importeCents
+                | centsToEuros
                 | currency:'EUR':'symbol':'1.2-2'
                 }})
             </span>
@@ -181,7 +183,8 @@
 
                         <td class="money">
                             {{
-                                (linea.pvpMicros / 1_000_000)
+                                linea.pvpMicros
+                                    | microsToEuros
                                     | currency:'EUR':'symbol':'1.2-2'
                             }}
                         </td>
@@ -192,18 +195,20 @@
                             }
                             @else if (linea.importeDescuentoMicros > 0) {
                             {{
-                                (linea.importeDescuentoMicros / 1_000_000)
+                                linea.importeDescuentoMicros
+                                    | microsToEuros
                                     | currency:'EUR':'symbol':'1.2-2'
                             }}
                             }
                             @else {
-                            {{ linea.descuentoBps / 100 }} %
+                            {{ linea.descuentoBps | bpsToPercent }} %
                             }
                         </td>
 
                         <td class="money">
                             {{
-                                (linea.importeMicros / 1_000_000)
+                                linea.importeMicros
+                                    | microsToEuros
                                     | currency:'EUR':'symbol':'1.2-2'
                             }}
                         </td>
