@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 1.4  
-**Fecha:** 14 de agosto de 2026  
-**Estado:** Installation, importación legacy y Startup completados y probados. En el módulo **Ventas** están completados los bloques 1 a 8. El siguiente bloque es **Ventas 9 — Reservas**.
+**Versión:** 1.5  
+**Fecha:** 15 de agosto de 2026  
+**Estado:** Installation, importación legacy y Startup completados y probados. En el módulo **Ventas** están completados los bloques 1 a 9. El siguiente bloque planificado es **Ventas 10 — Finalización y pagos**, aunque antes de iniciarlo el usuario quiere revisar otro asunto.
 
 ## 1. Propósito del documento
 
@@ -24,8 +24,9 @@ Los grandes hitos completados hasta ahora son:
 - **Ventas 6 — Clientes y estadísticas rápidas**.
 - **Ventas 7 — Varios**.
 - **Ventas 8 — Devoluciones**.
+- **Ventas 9 — Reservas**.
 
-Todos ellos han sido probados por el usuario con la aplicación real y los cambios están subidos al repositorio.
+Todos ellos han sido probados por el usuario con la aplicación real. Los bloques anteriores están subidos al repositorio; Ventas 9 ha quedado funcionalmente validado y debe subirse junto con esta actualización documental si todavía no se ha hecho.
 
 ## 2. Estado actual del proyecto
 
@@ -42,9 +43,9 @@ Todos ellos han sido probados por el usuario con la aplicación real y los cambi
 - Precarga global en memoria de marcas, proveedores, empleados, clientes, categorías y provincias: completada.
 - Conexión SQLite operativa persistente durante la ejecución: implementada.
 - Protocolo interno `osumi://assets/...` para recursos de la instalación: implementado y probado.
-- Módulo Ventas operativo hasta el final del bloque 8.
+- Módulo Ventas operativo hasta el final del bloque 9.
 - Las ventas abiertas viven en memoria en `VentasService` y sobreviven a la navegación entre módulos.
-- El siguiente bloque funcional es **Ventas 9 — Reservas**.
+- El siguiente bloque funcional planificado es **Ventas 10 — Finalización y pagos**.
 
 ## 3. Repositorios y entorno
 
@@ -260,12 +261,16 @@ Esta recapitulación debe aparecer al comenzar cada nuevo bloque de desarrollo y
    - ✅ 8B — Modelo de devolución dentro de la venta en curso.
    - ✅ 8C — Selector de líneas/unidades + integración con localizador.
    - ✅ 8D — Reapertura/edición + pruebas finales.
-9. 🟨 **Reservas — siguiente bloque**.
-10. ⬜ **Finalización y pagos**.
+9. ✅ **Reservas**.
+   - ✅ 9A — Consulta y gestión de reservas.
+   - ✅ 9B — Reserva cargada dentro de `VentaEnCurso`.
+   - ✅ 9C — Gestor de reservas + carga en una nueva venta.
+   - ✅ 9D — Creación/persistencia de reservas + stock.
+10. ⬜ **Finalización y pagos — siguiente bloque planificado**.
 11. ⬜ **Persistencia transaccional**.
 12. ⬜ **Postventa**.
 
-> **Estado exacto al cerrar esta versión:** Ventas 1–8 están implementados, probados y subidos. El próximo desarrollo debe comenzar por **Ventas 9 — Reservas**.
+> **Estado exacto al cerrar esta versión:** Ventas 1–9 están implementados y probados. El siguiente bloque planificado es **Ventas 10 — Finalización y pagos**, pero antes de iniciarlo el usuario quiere revisar otro asunto.
 
 ## 11. Ventas 1 — Contexto operativo ✅
 
@@ -1137,9 +1142,546 @@ El usuario probó además el método de consulta directamente desde DevTools con
 
 Toda la batería de pruebas (`test`, `typecheck:electron`, `build`, `lint`) y las pruebas manuales han sido validadas. Los cambios están subidos al repositorio.
 
-## 19. Ajustes transversales realizados durante Ventas
+## 19. Ventas 9 — Reservas ✅
 
-### 19.1 Menú de Electron
+### 19.1 Reglas funcionales acordadas
+
+Antes de implementar el bloque se revisó el comportamiento completo del TPV antiguo y se fijaron expresamente estas reglas para el Client:
+
+- se pueden cargar varias reservas a la vez únicamente si pertenecen al mismo cliente;
+- líneas de reservas distintas no se agrupan aunque correspondan al mismo artículo;
+- una línea cargada desde reserva conserva exactamente su economía histórica;
+- la cantidad final de una línea reservada puede ser menor, igual o mayor que la reservada;
+- una venta cargada desde reserva puede añadir artículos nuevos;
+- el cliente queda bloqueado mientras existan reservas cargadas;
+- cargar reservas crea siempre una nueva pestaña;
+- eliminar una línea o una reserva activa devuelve inmediatamente su stock;
+- una venta que contiene devoluciones no puede convertirse en reserva;
+- una venta que ya procede de reservas tampoco puede volver a reservarse;
+- se mantienen conceptualmente las variantes `Reserva` y `Reserva sin ticket`, pero la elección visual y la impresión pertenecen a Ventas 10.
+
+También se corrigieron dos fallos del TPV antiguo:
+
+1. no se deduplican líneas de distintas reservas por `idArticulo`;
+2. no se reaplica el descuento actual del cliente a una línea reservada.
+
+### 19.2 API y read model independiente de Reservas
+
+Reservas se implementó como dominio propio de Electron, separado de `VentasApi`.
+
+Se añadieron contratos públicos para:
+
+- `ReservaInterface`;
+- `ReservaLineaInterface`;
+- `ReservasApi`.
+
+El read model de una reserva contiene:
+
+- `id` y `publicId`;
+- cliente;
+- fecha;
+- total;
+- todas sus líneas;
+- artículo/publicId cuando existe;
+- localizador y marca;
+- nombre histórico;
+- PUC;
+- PVP;
+- IVA;
+- importe final;
+- descuento porcentual;
+- descuento fijo histórico;
+- unidades.
+
+Hacia Angular los importes se expresan en microeuros. Internamente, el backend refleja la resolución real del esquema SQLite y transforma céntimos ↔ microeuros en la frontera correspondiente.
+
+### 19.3 Consulta de reservas activas
+
+Se creó la vertical completa:
+
+```text
+Angular ReservasService
+        ↓
+window.osumiDesktop.reservas
+        ↓
+IPC reservas:*
+        ↓
+ReservasService backend
+        ↓
+ReservasRepository
+        ↓
+SQLite
+```
+
+`findAllActive()` recupera únicamente reservas cuyo `deleted_at` es `NULL`, con sus líneas y datos del cliente/artículo.
+
+Reservas no se precargan durante Startup. Son una función ocasional y el gestor fuerza una recarga al abrirse para trabajar con información actual.
+
+### 19.4 Eliminación transaccional de líneas
+
+Eliminar una línea activa de reserva:
+
+1. inicia una transacción;
+2. localiza la línea y su reserva;
+3. devuelve al stock sus unidades si tiene artículo;
+4. elimina la línea cuando quedan otras;
+5. recalcula `reserva.total_cents` a partir de las líneas restantes;
+6. confirma la transacción.
+
+Si era la última línea, la operación equivale a cancelar la reserva completa y se aplica borrado lógico a la cabecera.
+
+Esto corrige un fallo legacy: el backend antiguo devolvía stock y eliminaba la línea pero no recalculaba el total persistido de la reserva.
+
+Una línea con `id_articulo = NULL` no modifica stock.
+
+### 19.5 Cancelación transaccional de una reserva
+
+Eliminar una reserva completa:
+
+1. inicia una transacción;
+2. recupera todas sus líneas;
+3. restaura el stock de cada artículo;
+4. aplica `deleted_at` y `updated_at` sobre la cabecera;
+5. conserva `linea_reserva` como histórico;
+6. confirma la transacción.
+
+Ante cualquier error se ejecuta rollback.
+
+Se usa soft-delete porque el esquema nuevo dispone expresamente de `reserva.deleted_at`.
+
+### 19.6 Modelo de origen dentro de la venta
+
+Se añadieron:
+
+- `VentaLineaReservaOrigen`;
+- `VentaReservaOrigen`.
+
+Cada línea reservada conserva la identidad exacta de:
+
+```text
+reserva
+linea_reserva
+```
+
+y el snapshot histórico necesario:
+
+- unidades reservadas;
+- importe histórico;
+- descuento porcentual;
+- descuento histórico fijo;
+- artículo/publicId.
+
+`VentaEnCurso.reservasOrigen` mantiene el snapshot completo de todas las reservas cargadas.
+
+Este snapshot **no se elimina** aunque el usuario borre visualmente una línea reservada de la venta. Ventas 11 lo necesitará para reconciliar:
+
+```text
+unidades reservadas
+vs.
+unidades finalmente vendidas
+```
+
+sin recurrir al truco legacy de conservar líneas visibles con cantidad `0`.
+
+### 19.7 `VentaLineaEnCurso.fromReserva()`
+
+Una línea cargada desde reserva tiene:
+
+```text
+esReserva = true
+esDevolucion = false
+esVarios = false
+```
+
+La exclusión de `esVarios` es importante porque `linea_reserva.id_articulo` puede ser `NULL`.
+
+La línea conserva:
+
+- descripción histórica;
+- PUC;
+- PVP;
+- IVA;
+- importe histórico;
+- descuento histórico;
+- cantidad reservada;
+- identidad exacta de reserva/línea.
+
+No muestra stock ordinario porque esas unidades ya fueron inmovilizadas al crear la reserva.
+
+### 19.8 Cantidad final de una línea reservada
+
+Las líneas reservadas no usan `setCantidad()` directamente.
+
+Su única vía válida es:
+
+```text
+setCantidadReserva(cantidad)
+```
+
+La cantidad debe ser un entero positivo pero puede ser:
+
+- menor que la reservada;
+- igual;
+- mayor.
+
+Ejemplo:
+
+```text
+reservadas 2
+venta final 1 → Ventas 11 devolverá 1 al stock
+
+reservadas 2
+venta final 2 → sin ajuste adicional
+
+reservadas 2
+venta final 3 → Ventas 11 descontará 1 adicional
+```
+
+### 19.9 Economía histórica bloqueada
+
+Una línea de reserva no recibe:
+
+- descuento actual del cliente;
+- importe manual nuevo;
+- descuento manual nuevo;
+- descuento directo nuevo;
+- promociones nuevas;
+- estado de regalo nuevo.
+
+El dominio lo impide mediante `requireNotReserva(...)`.
+
+`importeFinalMicros` utiliza `importeReservaMicros`, calculado proporcionalmente a partir del importe histórico reservado.
+
+Si:
+
+```text
+2 unidades → 18 €
+```
+
+entonces:
+
+```text
+1 → 9 €
+2 → 18 €
+3 → 27 €
+```
+
+El descuento histórico fijo dispone también de un getter proporcional.
+
+Esto evita reinterpretar a posteriori cómo se formó el precio reservado.
+
+### 19.10 Cliente bloqueado y compras nuevas
+
+`VentaEnCurso.setCliente()` y `clearCliente()` rechazan cambios mientras `tieneReservas` sea `true`.
+
+Al cargar reservas se asigna el cliente directamente, sin ejecutar `setCliente()`, para evitar reaplicar su descuento actual a las líneas históricas.
+
+Sin embargo, los artículos nuevos añadidos después siguen siendo líneas ordinarias y sí reciben el descuento actual del cliente.
+
+Ejemplo:
+
+```text
+Camiseta reservada → conserva 18 € históricos
+Pantalón nuevo     → usa descuento actual del cliente
+```
+
+### 19.11 Carga múltiple sin deduplicación
+
+`crearVentaDesdeReservas()` valida antes de abrir ninguna pestaña que:
+
+- existe al menos una reserva;
+- todas pertenecen al mismo cliente persistido;
+- no se repite una reserva;
+- ninguna reserva está ya cargada en otra venta abierta;
+- todas tienen líneas válidas.
+
+Después crea una nueva venta y llama a `setReservas(...)`.
+
+No existe deduplicación por artículo.
+
+Dos reservas:
+
+```text
+Reserva A: Camiseta x1
+Reserva B: Camiseta x2
+```
+
+producen:
+
+```text
+Camiseta x1 [A]
+Camiseta x2 [B]
+```
+
+Si después se escanea otra Camiseta:
+
+```text
+Camiseta x1 [A]
+Camiseta x2 [B]
+Camiseta x1 [compra nueva]
+```
+
+y sucesivos escaneos incrementan únicamente la línea ordinaria.
+
+### 19.12 Reserva cargada en una sola venta abierta
+
+`VentasService.reservasCargadasPublicIds` expone los `publicId` de reservas que ya viven en alguna pestaña abierta.
+
+Una reserva cargada:
+
+- sigue visible en el gestor;
+- puede inspeccionarse;
+- aparece bloqueada;
+- no puede volver a cargarse;
+- no puede eliminarse ni modificarse desde el gestor.
+
+Al cerrar la venta abierta, vuelve a quedar disponible.
+
+La protección existe tanto en UI como en `VentasService`.
+
+### 19.13 Gestor de reservas
+
+Se creó `ReservationManagerComponent`.
+
+Permite:
+
+- listar reservas activas;
+- seleccionar una para ver detalle;
+- seleccionar varias del mismo cliente;
+- cargar una sola reserva;
+- cargar varias;
+- eliminar líneas con confirmación;
+- cancelar reservas completas con confirmación;
+- identificar reservas ya cargadas mediante candado.
+
+La incompatibilidad entre clientes se detecta al marcar la reserva, no únicamente al confirmar.
+
+El detalle muestra:
+
+- fecha;
+- cliente;
+- total;
+- localizador;
+- marca;
+- descripción;
+- unidades;
+- PVP;
+- descuento histórico;
+- importe;
+- acciones.
+
+Las operaciones destructivas recargan después la colección canónica de `ReservasService`.
+
+### 19.14 Apertura de nueva pestaña y empleado
+
+El botón Reservas (`grading`) quedó activado en las pestañas de Ventas.
+
+Cargar reservas no reutiliza la venta activa: crea siempre una nueva pestaña.
+
+Se mantiene la misma política de empleado que en una venta ordinaria:
+
+- si la configuración no exige selección, se utiliza directamente el empleado disponible;
+- si hay que elegirlo, aparece el selector antes de crear la venta reservada.
+
+La venta que estuviera activa antes permanece intacta.
+
+### 19.15 Representación visual en el workspace
+
+Las líneas procedentes de reserva:
+
+- usan un fondo diferenciado;
+- muestran icono `bookmark`;
+- identifican visualmente su procedencia;
+- permiten editar cantidad;
+- deshabilitan regalo e importe;
+- muestran descuento histórico de solo lectura;
+- muestran `-` como stock.
+
+El cliente queda visualmente bloqueado en la pestaña.
+
+El usuario confirmó que el resultado visual es correcto y agradable.
+
+### 19.16 Creación de una reserva desde una venta
+
+Se añadió `CrearReservaCommand` como contrato público y `CrearReservaRecordCommand` como command interno.
+
+El renderer no envía IDs SQLite ni un total redundante.
+
+El command público contiene:
+
+```text
+clientePublicId
+lineas[]
+```
+
+y cada línea incluye:
+
+- artículo `publicId` o `null`;
+- nombre;
+- PUC;
+- PVP;
+- IVA;
+- importe final;
+- descuento porcentual;
+- descuento fijo histórico;
+- unidades.
+
+El backend valida y normaliza toda la estructura y calcula `totalCents` a partir de sus líneas.
+
+### 19.17 Snapshot económico al reservar
+
+`mapVentaToCrearReservaCommand()` transforma una `VentaEnCurso` ordinaria en el snapshot persistible.
+
+Reglas:
+
+- descuento porcentual → conserva `descuentoBps`;
+- descuento directo → conserva importe fijo;
+- promoción → conserva importe fijo equivalente;
+- importe manual → conserva la diferencia económica frente al importe base cuando corresponda;
+- regalo → se representa como importe final `0` y descuento fijo equivalente al importe base.
+
+Esto permite conservar el resultado económico aunque `linea_reserva` no tenga un flag específico `regalo`.
+
+El mapper exige:
+
+- cliente persistido;
+- al menos una línea;
+- cantidades positivas;
+- ausencia de devoluciones;
+- ausencia de reservas de origen.
+
+Por tanto una venta con devolución o ya cargada desde reserva no puede generar otra reserva.
+
+### 19.18 Persistencia transaccional de una reserva
+
+`TypeOrmReservasRepository.create()` realiza en una única transacción:
+
+```text
+resolver cliente
+    ↓
+INSERT reserva
+    ↓
+por cada línea:
+    resolver artículo si existe
+    INSERT linea_reserva
+    stock = stock - unidades
+    ↓
+COMMIT
+```
+
+Si cualquier paso falla:
+
+```text
+ROLLBACK
+```
+
+Los identificadores públicos de reserva y líneas se generan con UUID.
+
+El repository devuelve el `publicId` de la nueva reserva.
+
+Para Varios:
+
+```text
+articuloPublicId = null
+id_articulo      = null
+```
+
+por lo que se crea la línea sin modificar stock.
+
+No se impone stock mínimo: el modelo actual permite stock negativo.
+
+### 19.19 Simetría del stock
+
+El ciclo queda preparado de forma simétrica:
+
+```text
+CREAR RESERVA
+stock = stock - unidades
+
+ELIMINAR LÍNEA / CANCELAR RESERVA
+stock = stock + unidades
+```
+
+Ambos extremos se realizan transaccionalmente.
+
+La reconciliación entre unidades originalmente reservadas y unidades finalmente vendidas se mantiene pendiente para **Ventas 11 — Persistencia transaccional**.
+
+### 19.20 Angular `ReservasService.createFromVenta()`
+
+Angular dispone de:
+
+```text
+createFromVenta(venta)
+```
+
+que:
+
+1. ejecuta el mapper;
+2. espera cualquier carga pendiente;
+3. llama a `window.osumiDesktop.reservas.create(...)`;
+4. recarga la colección;
+5. devuelve la instancia canónica recién creada.
+
+Este método **no**:
+
+- cierra la venta;
+- imprime ticket;
+- decide entre `Reserva` y `Reserva sin ticket`.
+
+Ese orchestration pertenece a **Ventas 10 — Finalización y pagos**.
+
+### 19.21 Pruebas y validación
+
+Se añadieron pruebas para:
+
+- snapshot de descuento porcentual;
+- descuento directo;
+- regalo;
+- obligatoriedad de cliente;
+- bloqueo de una venta procedente de reservas;
+- economía histórica de `fromReserva()`;
+- escalado de cantidad;
+- bloqueo de operaciones económicas;
+- Varios reservado no editable como Varios;
+- líneas iguales de distintas reservas separadas;
+- descuento actual solo para compras nuevas;
+- compra nueva del mismo artículo separada;
+- cliente bloqueado;
+- conservación de `reservasOrigen` tras borrar líneas visibles;
+- rechazo de reservas de clientes distintos;
+- una reserva cargada en una sola venta abierta y liberación al cerrar.
+
+Durante las pruebas apareció un único fallo en el test:
+
+```text
+impide crear otra reserva desde una venta procedente de reservas
+```
+
+El mapper validaba correctamente primero la obligatoriedad del cliente. El test no había preparado esa precondición y esperaba llegar directamente a la validación de `tieneReservas`.
+
+La corrección fue añadir:
+
+```text
+venta.setCliente(createCliente())
+```
+
+al propio test. No se cambió el mapper ni el orden de sus validaciones.
+
+Después de esa corrección:
+
+- toda la batería de tests pasó;
+- `typecheck:electron` pasó;
+- build pasó;
+- lint pasó;
+- la creación real desde DevTools funcionó;
+- el stock disminuyó al crear la reserva;
+- al eliminarla volvió exactamente a su valor inicial.
+
+Ventas 9 queda funcionalmente cerrado.
+
+## 20. Ajustes transversales realizados durante Ventas
+
+### 20.1 Menú de Electron
 
 Se eliminó el menú superior de Electron mediante `Menu.setApplicationMenu(null)` para que Alt no vuelva a mostrar File/Edit/etc.
 
@@ -1150,17 +1692,17 @@ Como efecto secundario desapareció el acceso a DevTools que dependía del menú
 
 Solo está activo cuando `!app.isPackaged`.
 
-### 19.2 Foco del selector de cliente
+### 20.2 Foco del selector de cliente
 
 Cerrar el selector por selección, eliminación o cancelación fuerza un nuevo `focusTarget` al localizador. Esto evita depender de que el valor anterior del workspace ya fuese `localizador`.
 
-### 19.3 Accesibilidad
+### 20.3 Accesibilidad
 
 Se evita `autofocus` en HTML; el foco inicial se resuelve mediante `viewChild` + `afterNextRender`/efectos post-render.
 
 Los overlays interactivos usan controles accesibles reales en vez de `<div (click)>` no focusables.
 
-## 20. Método de trabajo por bloque
+## 21. Método de trabajo por bloque
 
 Para cada bloque se seguirá el ciclo:
 
@@ -1178,7 +1720,7 @@ Para cada bloque se seguirá el ciclo:
 
 > **Importante:** no asumir que la implementación antigua es el diseño correcto. Debe utilizarse como fuente funcional y rediseñarse cuando la arquitectura o UX lo justifiquen.
 
-## 21. Fuentes de información
+## 22. Fuentes de información
 
 La fuente principal es el código actual de los repositorios GitHub:
 
@@ -1190,7 +1732,7 @@ Además pueden utilizarse capturas, explicación funcional del usuario, datos re
 
 No pedir de nuevo archivos ya disponibles y actualizados salvo necesidad concreta.
 
-## 22. Protocolo para cambios de código
+## 23. Protocolo para cambios de código
 
 - Cambios en orden de compilación y en pasos pequeños verificables.
 - Archivo nuevo: entregarlo completo.
@@ -1210,12 +1752,12 @@ npm run lint
 - No avanzar al bloque siguiente hasta que el actual funcione o sus limitaciones estén documentadas.
 - El usuario suele probar manualmente, ejecutar la batería completa y subir los cambios antes de continuar.
 
-## 23. Prompt de arranque para una conversación nueva
+## 24. Prompt de arranque para una conversación nueva
 
 ```text
 Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” como contexto principal.
 
-Installation + importación legacy y Startup están completados y probados. En el módulo Ventas están completados y subidos los bloques 1 a 8:
+Installation + importación legacy y Startup están completados y probados. En el módulo Ventas están completados y probados los bloques 1 a 9:
 1. Contexto operativo.
 2. Modelo de venta en curso + workspace persistente.
 3. Consulta/búsqueda de artículos y accesos directos.
@@ -1224,8 +1766,9 @@ Installation + importación legacy y Startup están completados y probados. En e
 6. Clientes y estadísticas rápidas.
 7. Varios.
 8. Devoluciones.
+9. Reservas.
 
-El siguiente bloque es Ventas 9 — Reservas. Después quedan Finalización y pagos, Persistencia transaccional y Postventa.
+El siguiente bloque planificado es Ventas 10 — Finalización y pagos. Después quedan Persistencia transaccional y Postventa. Antes de iniciar Ventas 10, el usuario quiere revisar otro asunto.
 
 Los repositorios de referencia son:
 - Frontend antiguo: https://github.com/osumionline/Osumi-TPV
@@ -1236,56 +1779,47 @@ Antes de empezar un bloque, dame la recapitulación completa del plan, indicando
 
 Al terminar cada bloque principal, después de que confirme que funciona y que está subido, entrégame una versión actualizada de este documento de continuidad.
 
-Ahora debemos continuar por: Ventas 9 — Reservas.
+Cuando el usuario indique que quiere retomar el plan principal, debemos continuar por: Ventas 10 — Finalización y pagos.
 ```
 
-## 24. Próximo paso
+## 25. Próximo paso
 
-El siguiente desarrollo es:
+El siguiente bloque planificado del traspaso de Ventas es:
 
-# Ventas 9 — Reservas
+# Ventas 10 — Finalización y pagos
 
-En el TPV antiguo las reservas tienen un ciclo de vida propio:
+**No iniciarlo todavía automáticamente.** Al cerrar Ventas 9, el usuario ha indicado expresamente que antes quiere revisar otro asunto.
 
-1. una venta en curso puede guardarse como reserva desde el flujo de finalización;
-2. la reserva pertenece obligatoriamente a un cliente;
-3. al guardarla se persisten sus líneas y se descuenta inmediatamente el stock físico reservado;
-4. existe un selector/listado de reservas activas;
-5. puede abrirse una reserva, eliminar líneas o eliminarla entera, devolviendo al stock lo que corresponda;
-6. una o varias reservas del mismo cliente pueden cargarse como una nueva venta;
-7. al vender finalmente una reserva se reconcilia el stock reservado con las unidades realmente vendidas y se consume la reserva.
+Cuando se retome el plan principal, Ventas 10 debe partir de todo lo ya construido:
 
-La implementación antigua también presenta comportamientos que deben revisarse antes de reproducirlos:
+- venta ordinaria;
+- Varios;
+- cliente;
+- devoluciones;
+- reservas cargadas;
+- creación de reservas mediante `ReservasService.createFromVenta()`.
 
-- al cargar varias reservas, líneas del mismo artículo podían quedar deduplicadas de forma incorrecta en vez de conservar todas las unidades/orígenes;
-- al cargar una reserva se reaplicaba el descuento actual del cliente, con riesgo de alterar el precio económico acordado al reservar;
-- la eliminación de una línea cargada de reserva utilizaba cantidad `0` para que la persistencia posterior restaurase el stock;
-- la creación de la reserva estaba integrada en el modal de finalización mediante las opciones `Reserva` y `Reserva (sin ticket)`.
+Este bloque tendrá que analizar primero el flujo completo de finalización del TPV antiguo y después diseñar el nuevo flujo para, como mínimo:
 
-El esquema SQLite nuevo ya contiene:
+- calcular y presentar el total final;
+- decidir entre venta normal y reserva;
+- mantener las opciones `Reserva` y `Reserva sin ticket`;
+- impedir reservar ventas con devoluciones o procedentes de reservas;
+- seleccionar uno o varios tipos de pago;
+- manejar efectivo y cambio;
+- soportar total positivo, cero o negativo;
+- resolver cómo se devuelve dinero en una devolución neta;
+- permitir cambios donde convivan líneas negativas y positivas;
+- determinar reglas de impresión de ticket;
+- cerrar la pestaña únicamente después de una operación válida;
+- conectar la creación de reservas ya implementada en Ventas 9;
+- dejar preparado el command que Ventas 11 persistirá transaccionalmente.
 
-- `reserva`;
-- `linea_reserva`;
-- relación obligatoria con cliente;
-- datos históricos de nombre, PUC, PVP, IVA, descuentos, importe y unidades;
-- soporte para artículos nulos, necesario para Varios.
+Ventas 10 no debe asumir todavía que la venta normal ya se persiste: **Ventas 11 — Persistencia transaccional** sigue siendo responsable de la escritura definitiva de venta, líneas, pagos, stock, reservas consumidas y unidades devueltas.
 
-Antes de implementar Ventas 9 deben confirmarse expresamente las decisiones funcionales sobre:
+Antes de proponer implementación de Ventas 10 se debe volver a revisar el frontend antiguo, TPV-API y el estado actual del repositorio Client, y fijar con el usuario cualquier comportamiento ambiguo.
 
-- si se mantiene la carga múltiple de reservas únicamente cuando pertenecen al mismo cliente;
-- si las líneas procedentes de reservas diferentes se mantienen separadas aunque correspondan al mismo artículo;
-- si al cargar una reserva debe conservarse exactamente su precio/descuento histórico;
-- qué cambios de cantidad se permiten sobre una línea reservada al convertirla finalmente en venta;
-- si la venta que carga una reserva puede añadir artículos nuevos;
-- si el cliente de una venta cargada desde una reserva puede cambiarse o eliminarse;
-- si cargar una reserva debe seguir abriendo siempre una nueva pestaña de venta;
-- si se mantiene la eliminación de líneas/reservas con restitución inmediata del stock;
-- cómo dividir la creación de reservas entre Ventas 9 y Ventas 10, dado que en el TPV antiguo se inicia desde el flujo de finalización;
-- si se mantienen las dos variantes de creación: con ticket de reserva y sin ticket.
-
-No empezar Ventas 10 hasta que Ventas 9 esté implementado, probado, subido y este documento haya sido actualizado de nuevo.
-
-## 25. Registro de hitos
+## 26. Registro de hitos
 
 | Versión | Fecha | Hito |
 | --- | --- | --- |
@@ -1294,3 +1828,4 @@ No empezar Ventas 10 hasta que Ventas 9 esté implementado, probado, subido y es
 | 1.2 | 13 de agosto de 2026 | Ventas 1–6 completados: contexto operativo, workspace persistente, búsqueda, estructura visual, operaciones de línea, clientes, alta rápida, protección de datos y estadísticas. Próximo bloque: Ventas 7 — Varios. |
 | 1.3 | 13 de agosto de 2026 | Ventas 7 — Varios completado: línea libre real, creación/cancelación, editor reutilizable, IVA por defecto conservador, edición desde línea y pruebas. Próximo bloque: Ventas 8 — Devoluciones. |
 | 1.4 | 14 de agosto de 2026 | Ventas 8 — Devoluciones completado: compatibilidad QR legacy, read model histórico, control de unidades disponibles, economía histórica exacta, selector, mezcla con compras y reapertura/edición. Próximo bloque: Ventas 9 — Reservas. |
+| 1.5 | 15 de agosto de 2026 | Ventas 9 — Reservas completado: consulta y gestión transaccional, carga múltiple sin deduplicación, economía histórica, cliente bloqueado, gestor visual, creación de reservas y ciclo simétrico de stock. Próximo bloque planificado: Ventas 10 — Finalización y pagos; antes se revisará otro asunto con el usuario. |
