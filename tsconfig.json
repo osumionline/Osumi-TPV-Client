@@ -18,11 +18,14 @@
     "paths": {
       "@env/*": ["./src/environments/*"],
       "@app/*": ["./src/app/*"],
+      "@constants/*": ["./src/app/constants/*"],
       "@guards/*": ["./src/app/guards/*"],
       "@interfaces/*": ["./src/app/interfaces/*"],
       "@model/*": ["./src/app/model/*"],
       "@modules/*": ["./src/app/modules/*"],
+      "@pipes/*": ["./src/app/pipes/*"],
       "@services/*": ["./src/app/services/*"],
+      "@utils/*": ["./src/app/utils/*"],
       "@desktop-contracts/*": ["./electron/contracts/*"]
     }
   },
