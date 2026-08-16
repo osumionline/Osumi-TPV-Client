@@ -1,4 +1,4 @@
-import { BASIS_POINTS_TOTAL } from '@constants/percentage.constants';
+import { BASIS_POINTS_TOTAL, PERCENT_TOTAL } from '@constants/percentage.constants';
 import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
 import type { ReservaLineaInterface } from '@desktop-contracts/reservas/reserva.interface';
 import type { VentaDevolucionLineaInterface } from '@desktop-contracts/ventas/venta-devolucion.interface';
@@ -720,7 +720,7 @@ export default class VentaLineaEnCurso {
       descuentoBps < 0 ||
       descuentoBps > BASIS_POINTS_TOTAL
     ) {
-      throw new RangeError(`El ${field} debe estar comprendido entre 0 y 100 %.`);
+      throw new RangeError(`El ${field} debe estar comprendido entre 0 y ${PERCENT_TOTAL} %.`);
     }
   }
 
@@ -729,7 +729,7 @@ export default class VentaLineaEnCurso {
    */
   private requireValidIvaBps(ivaBps: number): void {
     if (!Number.isSafeInteger(ivaBps) || ivaBps < 0 || ivaBps > BASIS_POINTS_TOTAL) {
-      throw new RangeError('El IVA debe estar comprendido entre 0 y 100 %.');
+      throw new RangeError(`El IVA debe estar comprendido entre 0 y ${PERCENT_TOTAL} %.`);
     }
   }
 

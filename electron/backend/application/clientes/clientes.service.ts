@@ -251,7 +251,7 @@ export default class ClientesService {
 
   private normalizeDiscount(descuento: number): number {
     if (!Number.isFinite(descuento) || descuento < 0 || descuento > PERCENT_TOTAL) {
-      throw new Error('El descuento debe estar comprendido entre 0 y 100 %.');
+      throw new Error(`El descuento debe estar comprendido entre 0 y ${PERCENT_TOTAL} %.`);
     }
 
     return percentToBps(descuento);

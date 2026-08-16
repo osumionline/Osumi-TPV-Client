@@ -391,7 +391,7 @@ export default class SaleWorkspaceComponent {
       inputElement.value = String(bpsToPercent(linea.descuentoBps));
 
       this.showLineOperationError(
-        new RangeError('El descuento debe estar comprendido entre 0 y 100 %.'),
+        new RangeError(`El descuento debe estar comprendido entre 0 y ${PERCENT_TOTAL} %.`),
         linea.idTemporal,
         'descuento-porcentaje',
       );

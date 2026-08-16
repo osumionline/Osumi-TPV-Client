@@ -240,7 +240,9 @@ export default class VentaEnCurso {
       cliente.descuento < 0 ||
       cliente.descuento > PERCENT_TOTAL
     ) {
-      throw new RangeError('El descuento del cliente debe estar comprendido entre 0 y 100 %.');
+      throw new RangeError(
+        `El descuento del cliente debe estar comprendido entre 0 y ${PERCENT_TOTAL} %.`,
+      );
     }
 
     return percentToBps(cliente.descuento);
