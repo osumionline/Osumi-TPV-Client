@@ -3,6 +3,7 @@ import { Service, signal } from '@angular/core';
 import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
 import mapVentaToCrearReservaCommand from '@model/reservas/crear-reserva-command.mapper';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
+import { getErrorMessage } from '@utils/error.utils';
 
 @Service()
 export default class ReservasService {
@@ -123,9 +124,7 @@ export default class ReservasService {
 
       this.loadedSignal.set(true);
     } catch (error: unknown) {
-      this.errorSignal.set(
-        error instanceof Error ? error.message : 'No se han podido cargar las reservas.',
-      );
+      this.errorSignal.set(getErrorMessage(error, 'No se han podido cargar las reservas.'));
     } finally {
       this.loadingSignal.set(false);
       this.pendingRequest = null;

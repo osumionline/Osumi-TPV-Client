@@ -2,6 +2,7 @@ import type { Signal, WritableSignal } from '@angular/core';
 import { computed, Service, signal } from '@angular/core';
 import type ApplicationStateResult from '@desktop-contracts/application/application-state-result.interface';
 import type { ApplicationState } from '@desktop-contracts/application/application-state.type';
+import { getErrorMessage } from '@utils/error.utils';
 
 @Service()
 export default class ApplicationStateService {
@@ -80,7 +81,7 @@ export default class ApplicationStateService {
 
       return result;
     } catch (error: unknown) {
-      const message: string = error instanceof Error ? error.message : String(error);
+      const message: string = getErrorMessage(error);
 
       this.errorSignal.set(message);
 

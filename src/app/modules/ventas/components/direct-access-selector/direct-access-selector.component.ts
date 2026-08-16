@@ -11,6 +11,7 @@ import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import type AccesoDirectoVenta from '@model/ventas/acceso-directo-venta.model';
 import VentasArticulosService from '@services/ventas-articulos.service';
+import { getErrorMessage } from '@utils/error.utils';
 
 /**
  * Muestra los accesos directos configurados para seleccionar rápidamente un artículo.
@@ -67,7 +68,7 @@ export default class DirectAccessSelectorComponent implements OnInit {
     try {
       this.accesos.set(await this.ventasArticulosService.getAccesosDirectos());
     } catch (error: unknown) {
-      this.error.set(error instanceof Error ? error.message : String(error));
+      this.error.set(getErrorMessage(error));
     } finally {
       this.loading.set(false);
     }

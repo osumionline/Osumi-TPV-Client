@@ -19,6 +19,7 @@ import type ClienteFormModel from '@model/clientes/cliente-form.model';
 import type Cliente from '@model/clientes/cliente.model';
 import ClientFormComponent from '@modules/clientes/components/client-form/client-form.component';
 import ClientesService from '@services/clientes.service';
+import { getErrorMessage } from '@utils/error.utils';
 import { normalizeTextForSearch } from '@utils/string.utils';
 
 type ClientSelectorMode = 'search' | 'create';
@@ -135,9 +136,7 @@ export default class ClientSelectorComponent {
     try {
       cliente = await this.clientesService.create(createClienteCommand(model));
     } catch (error: unknown) {
-      this.creationError.set(
-        error instanceof Error ? error.message : 'No se ha podido crear el cliente.',
-      );
+      this.creationError.set(getErrorMessage(error, 'No se ha podido crear el cliente.'));
     } finally {
       this.saving.set(false);
     }

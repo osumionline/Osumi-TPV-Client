@@ -6,6 +6,7 @@ import type TerminalInterface from '@desktop-contracts/terminales/terminal.inter
 import type TipoPagoInterface from '@desktop-contracts/tipos-pago/tipo-pago.interface';
 import type VentasContextInterface from '@desktop-contracts/ventas/ventas-context.interface';
 import TipoPago from '@model/tipos-pago/tipo-pago.model';
+import { getErrorMessage } from '@utils/error.utils';
 
 /**
  * Mantiene el contexto operativo actual necesario para trabajar en el módulo de ventas.
@@ -142,7 +143,7 @@ export default class VentasContextService {
     } catch (error: unknown) {
       this.resetData();
 
-      const message: string = error instanceof Error ? error.message : String(error);
+      const message: string = getErrorMessage(error);
 
       this.errorSignal.set(message);
 
@@ -166,7 +167,7 @@ export default class VentasContextService {
 
       this.cajaAbiertaSignal.set(cajaAbierta);
     } catch (error: unknown) {
-      const message: string = error instanceof Error ? error.message : String(error);
+      const message: string = getErrorMessage(error);
 
       this.errorSignal.set(message);
 

@@ -26,6 +26,7 @@ import ClientesService from '@services/clientes.service';
 import EmpleadosService from '@services/empleados.service';
 import VentasContextService from '@services/ventas-context.service';
 import VentasService from '@services/ventas.service';
+import { getErrorMessage } from '@utils/error.utils';
 
 interface PendingReservasLoad {
   readonly cliente: Cliente;
@@ -344,10 +345,10 @@ export default class SalesComponent implements OnInit {
     try {
       this.clienteProteccionDatosPrintService.print(appData, cliente);
     } catch (error: unknown) {
-      const message: string =
-        error instanceof Error
-          ? error.message
-          : 'No se ha podido imprimir el documento de protección de datos.';
+      const message: string = getErrorMessage(
+        error,
+        'No se ha podido imprimir el documento de protección de datos.',
+      );
 
       this.dialog.alert({
         title: 'Aviso',
@@ -449,7 +450,7 @@ export default class SalesComponent implements OnInit {
     } catch (error: unknown) {
       this.dialog.alert({
         title: 'Error',
-        content: error instanceof Error ? error.message : 'No se han podido cargar las reservas.',
+        content: getErrorMessage(error, 'No se han podido cargar las reservas.'),
       });
     }
   }

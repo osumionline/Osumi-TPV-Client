@@ -5,6 +5,7 @@ import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import type ClienteEstadisticasState from '@model/clientes/cliente-estadisticas-state.interface';
 import Cliente from '@model/clientes/cliente.model';
+import { getErrorMessage } from '@utils/error.utils';
 
 const EMPTY_ESTADISTICAS_STATE: ClienteEstadisticasState = {
   data: null,
@@ -244,10 +245,7 @@ export default class ClientesService {
       this.setEstadisticasState(publicId, {
         data: currentState.data,
         loading: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : 'No se han podido cargar las estadísticas del cliente.',
+        error: getErrorMessage(error, 'No se han podido cargar las estadísticas del cliente.'),
       });
     }
   }

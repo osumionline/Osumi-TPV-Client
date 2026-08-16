@@ -53,6 +53,7 @@ import VentasArticulosService from '@services/ventas-articulos.service';
 import VentasContextService from '@services/ventas-context.service';
 import VentasDevolucionesService from '@services/ventas-devoluciones.service';
 import VentasService from '@services/ventas.service';
+import { getErrorMessage } from '@utils/error.utils';
 import { eurosToMicros, microsToEuros } from '@utils/money.utils';
 import { bpsToPercent, percentToBps } from '@utils/percentage.utils';
 
@@ -678,7 +679,7 @@ export default class SaleWorkspaceComponent {
       ivaBps = getDefaultVariosIvaBps(appData.ivaList);
     } catch (error: unknown) {
       this.showVariosConfigurationError(
-        error instanceof Error ? error.message : 'No se ha podido determinar el IVA del Varios.',
+        getErrorMessage(error, 'No se ha podido determinar el IVA del Varios.'),
       );
 
       return;
@@ -737,12 +738,12 @@ export default class SaleWorkspaceComponent {
 
       this.variosEditorState.set(null);
     } catch (error: unknown) {
-      const message: string =
-        error instanceof Error
-          ? error.message
-          : editorState.lineaIdTemporal === null
-            ? 'No se ha podido añadir el Varios.'
-            : 'No se ha podido modificar el Varios.';
+      const message: string = getErrorMessage(
+        error,
+        editorState.lineaIdTemporal === null
+          ? 'No se ha podido añadir el Varios.'
+          : 'No se ha podido modificar el Varios.',
+      );
 
       this.dialog
         .alert({
@@ -890,9 +891,7 @@ export default class SaleWorkspaceComponent {
         seleccionInicial: [],
       });
     } catch (error: unknown) {
-      this.showDevolucionError(
-        error instanceof Error ? error.message : 'No se ha podido recuperar el ticket.',
-      );
+      this.showDevolucionError(getErrorMessage(error, 'No se ha podido recuperar el ticket.'));
     } finally {
       this.searching.set(false);
     }
@@ -936,9 +935,7 @@ export default class SaleWorkspaceComponent {
         seleccionInicial,
       });
     } catch (error: unknown) {
-      this.showDevolucionError(
-        error instanceof Error ? error.message : 'No se ha podido recuperar la devolución.',
-      );
+      this.showDevolucionError(getErrorMessage(error, 'No se ha podido recuperar la devolución.'));
     } finally {
       this.searching.set(false);
     }
@@ -1008,8 +1005,7 @@ export default class SaleWorkspaceComponent {
       this.dialog
         .alert({
           title: 'Atención',
-          content:
-            error instanceof Error ? error.message : 'No se ha podido aplicar la devolución.',
+          content: getErrorMessage(error, 'No se ha podido aplicar la devolución.'),
         })
         .subscribe();
     }
@@ -1125,8 +1121,7 @@ export default class SaleWorkspaceComponent {
     lineaIdTemporal: string,
     field: VentaEditableField,
   ): void {
-    const message: string =
-      error instanceof Error ? error.message : 'No se ha podido modificar la línea de venta.';
+    const message: string = getErrorMessage(error, 'No se ha podido modificar la línea de venta.');
 
     this.dialog
       .alert({

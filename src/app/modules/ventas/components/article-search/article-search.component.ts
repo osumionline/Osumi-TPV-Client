@@ -20,6 +20,7 @@ import { MatIcon } from '@angular/material/icon';
 import type ArticuloVenta from '@model/ventas/articulo-venta.model';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import VentasArticulosService from '@services/ventas-articulos.service';
+import { getErrorMessage } from '@utils/error.utils';
 
 /**
  * Busca artículos para añadir uno o varios a una venta.
@@ -162,7 +163,7 @@ export default class ArticleSearchComponent implements OnInit, OnDestroy {
       }
 
       this.results.set([]);
-      this.error.set(error instanceof Error ? error.message : String(error));
+      this.error.set(getErrorMessage(error));
     } finally {
       if (currentVersion === this.searchVersion) {
         this.loading.set(false);

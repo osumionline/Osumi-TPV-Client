@@ -7,6 +7,7 @@ import EmpleadosService from '@services/empleados.service';
 import MarcasService from '@services/marcas.service';
 import ProveedoresService from '@services/proveedores.service';
 import ProvinciasService from '@services/provincias.service';
+import { getErrorMessage } from '@utils/error.utils';
 
 @Service()
 export default class ApplicationStartupService {
@@ -90,7 +91,7 @@ export default class ApplicationStartupService {
 
       this.statusSignal.set('ready');
     } catch (error: unknown) {
-      const message: string = error instanceof Error ? error.message : String(error);
+      const message: string = getErrorMessage(error);
 
       this.errorSignal.set(message);
 

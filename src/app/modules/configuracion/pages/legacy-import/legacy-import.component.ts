@@ -31,6 +31,7 @@ import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-impor
 import LegacyImportStartResult from '@desktop-contracts/legacy-import/legacy-import-start-result.interface';
 import LegacyImportConflictResolutionComponent from '@modules/configuracion/components/legacy-import-conflict-resolution/legacy-import-conflict-resolution.component';
 import DesktopLegacyImportService from '@services/desktop-legacy-import.service';
+import { getErrorMessage } from '@utils/error.utils';
 
 @Component({
   selector: 'otpv-legacy-import',
@@ -175,7 +176,7 @@ export default class LegacyImportComponent {
 
       this.analysisReport.set(null);
 
-      this.selectionError.set(this.getErrorMessage(error));
+      this.selectionError.set(getErrorMessage(error));
     } finally {
       this.selecting.set(false);
     }
@@ -206,7 +207,7 @@ export default class LegacyImportComponent {
     } catch (error: unknown) {
       this.analysisReport.set(null);
 
-      this.analysisError.set(this.getErrorMessage(error));
+      this.analysisError.set(getErrorMessage(error));
     } finally {
       this.analyzing.set(false);
     }
@@ -300,14 +301,6 @@ export default class LegacyImportComponent {
     );
   }
 
-  private getErrorMessage(error: unknown): string {
-    if (error instanceof Error) {
-      return error.message;
-    }
-
-    return String(error);
-  }
-
   openConflictResolution(): void {
     this.reviewSubmissionError.set(null);
     const report: LegacyImportAnalysisReport | null = this.analysisReport();
@@ -345,7 +338,7 @@ export default class LegacyImportComponent {
       this.resolvingConflicts.set(false);
       this.scrollToSection(this.validatedDecisions, 'end');
     } catch (error: unknown) {
-      this.reviewSubmissionError.set(this.getErrorMessage(error));
+      this.reviewSubmissionError.set(getErrorMessage(error));
     } finally {
       this.savingReviewDecisions.set(false);
     }
@@ -384,7 +377,7 @@ export default class LegacyImportComponent {
       this.importResult.set(result);
       this.scrollToSection(this.importResultSection, 'end');
     } catch (error: unknown) {
-      this.importError.set(this.getErrorMessage(error));
+      this.importError.set(getErrorMessage(error));
     } finally {
       this.importing.set(false);
     }
