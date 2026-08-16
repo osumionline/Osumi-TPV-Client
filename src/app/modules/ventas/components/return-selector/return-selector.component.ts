@@ -18,6 +18,7 @@ import type { VentaDevolucionLineaInterface } from '@desktop-contracts/ventas/ve
 import type VentaDevolucionSeleccion from '@model/ventas/venta-devolucion-seleccion.interface';
 import BpsToPercentPipe from '@pipes/bps-to-percent.pipe';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
+import IsoDateToSpanishPipe from '@pipes/iso-date-to-spanish.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
 
 @Component({
@@ -28,6 +29,7 @@ import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
     CurrencyPipe,
     BpsToPercentPipe,
     CentsToEurosPipe,
+    IsoDateToSpanishPipe,
     MicrosToEurosPipe,
     MatButton,
     MatCheckbox,
@@ -245,19 +247,6 @@ export default class ReturnSelectorComponent implements OnInit {
     const serie: string = devolucion.serie.trim();
 
     return serie === '' ? String(devolucion.numero) : `${serie}-${devolucion.numero}`;
-  }
-
-  /**
-   * Formatea la fecha sin conversiones de zona horaria.
-   */
-  formatFecha(fecha: string): string {
-    const match: RegExpExecArray | null = /^(\d{4})-(\d{2})-(\d{2})/.exec(fecha);
-
-    if (match === null) {
-      return fecha;
-    }
-
-    return `${match[3]}/${match[2]}/${match[1]}`;
   }
 
   /**

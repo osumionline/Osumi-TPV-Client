@@ -21,6 +21,7 @@ import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface
 import type { ReservaLineaInterface } from '@desktop-contracts/reservas/reserva.interface';
 import { DialogService } from '@osumi/angular-tools';
 import BpsToPercentPipe from '@pipes/bps-to-percent.pipe';
+import IsoDateToSpanishPipe from '@pipes/iso-date-to-spanish.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
 import ReservasService from '@services/reservas.service';
 
@@ -31,6 +32,7 @@ import ReservasService from '@services/reservas.service';
   imports: [
     CurrencyPipe,
     BpsToPercentPipe,
+    IsoDateToSpanishPipe,
     MicrosToEurosPipe,
     MatButton,
     MatCheckbox,
@@ -265,16 +267,6 @@ export default class ReservationManagerComponent implements OnInit {
 
   close(): void {
     this.closeEvent.emit();
-  }
-
-  formatFecha(fecha: string): string {
-    const match: RegExpExecArray | null = /^(\d{4})-(\d{2})-(\d{2})/.exec(fecha);
-
-    if (match === null) {
-      return fecha;
-    }
-
-    return `${match[3]}/${match[2]}/${match[1]}`;
   }
 
   private async confirmDeleteLinea(linea: ReservaLineaInterface): Promise<void> {

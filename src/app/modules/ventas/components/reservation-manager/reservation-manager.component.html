@@ -101,7 +101,7 @@
                                 </td>
 
                                 <td>
-                                    {{ formatFecha(reserva.fecha) }}
+                                    {{ reserva.fecha | isoDateToSpanish }}
                                 </td>
 
                                 <td>
@@ -152,7 +152,7 @@
                         </strong>
 
                         <span>
-                            {{ formatFecha(reserva.fecha) }}
+                            {{ reserva.fecha | isoDateToSpanish }}
                         </span>
                     </div>
 

@@ -15,6 +15,7 @@ import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import type ClienteEstadisticasState from '@model/clientes/cliente-estadisticas-state.interface';
 import type Cliente from '@model/clientes/cliente.model';
+import IsoDateToSpanishPipe from '@pipes/iso-date-to-spanish.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
 import ClientesService from '@services/clientes.service';
 
@@ -22,7 +23,7 @@ import ClientesService from '@services/clientes.service';
   selector: 'otpv-client-statistics',
   templateUrl: './client-statistics.component.html',
   styleUrl: './client-statistics.component.scss',
-  imports: [CurrencyPipe, MicrosToEurosPipe, MatButton, MatIcon],
+  imports: [CurrencyPipe, IsoDateToSpanishPipe, MicrosToEurosPipe, MatButton, MatIcon],
 })
 export default class ClientStatisticsComponent {
   private readonly clientesService: ClientesService = inject(ClientesService);
@@ -68,19 +69,5 @@ export default class ClientStatisticsComponent {
     }
 
     void this.clientesService.reloadEstadisticas(publicId);
-  }
-
-  /**
-   * Formatea una fecha almacenada por SQLite sin aplicar
-   * conversiones de zona horaria.
-   */
-  formatFecha(fecha: string): string {
-    const match: RegExpExecArray | null = /^(\d{4})-(\d{2})-(\d{2})/.exec(fecha.trim());
-
-    if (match === null) {
-      return fecha;
-    }
-
-    return `${match[3]}/${match[2]}/${match[1]}`;
   }
 }
