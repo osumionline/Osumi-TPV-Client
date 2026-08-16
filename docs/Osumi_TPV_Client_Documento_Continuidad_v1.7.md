@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 1.6  
-**Fecha:** 15 de agosto de 2026  
-**Estado:** Installation, importación legacy y Startup completados y probados. En el módulo **Ventas** están completados, probados y subidos los bloques 1 a 9. Se ha completado una **auditoría transversal de arquitectura** y, antes de Ventas 10, se realizará un refactor técnico en cinco fases (A–E) sin cambios funcionales.
+**Versión:** 1.7  
+**Fecha:** 16 de agosto de 2026  
+**Estado:** Installation, importación legacy y Startup completados y probados. En el módulo **Ventas** están completados, probados y subidos los bloques 1 a 9. La **auditoría transversal de arquitectura** está completada y los refactors **A — Dinero y porcentajes** y **B — Utils Angular + contratos** están terminados, probados y subidos. El siguiente paso es **Refactor C — Infraestructura SQLite**.
 
 ## 1. Propósito del documento
 
@@ -26,8 +26,10 @@ Los grandes hitos completados hasta ahora son:
 - **Ventas 8 — Devoluciones**.
 - **Ventas 9 — Reservas**.
 - **Auditoría transversal de arquitectura tras Ventas 9**.
+- **Refactor A — Dinero y porcentajes**.
+- **Refactor B — Utils Angular + contratos**.
 
-Todos los bloques Ventas 1–9 han sido probados por el usuario con la aplicación real y están subidos al repositorio. Tras cerrar Ventas 9 se ha realizado una auditoría transversal del estado actual de `main`; sus conclusiones y el plan de refactor quedan documentados en esta versión.
+Todos los bloques Ventas 1–9 han sido probados por el usuario con la aplicación real y están subidos al repositorio. Tras cerrar Ventas 9 se realizó una auditoría transversal del estado de `main`. Los refactors **A** y **B** derivados de esa auditoría están completados, probados y subidos; quedan **C, D y E** antes de iniciar Ventas 10.
 
 ## 2. Estado actual del proyecto
 
@@ -46,7 +48,9 @@ Todos los bloques Ventas 1–9 han sido probados por el usuario con la aplicaci�
 - Protocolo interno `osumi://assets/...` para recursos de la instalación: implementado y probado.
 - Módulo Ventas operativo hasta el final del bloque 9.
 - Las ventas abiertas viven en memoria en `VentasService` y sobreviven a la navegación entre módulos.
-- Antes de Ventas 10 se ejecutará el **refactor transversal A–E** derivado de la auditoría arquitectónica.
+- Refactor A — Dinero y porcentajes: completado, probado y subido.
+- Refactor B — Utils Angular + contratos: completado, probado y subido.
+- Antes de Ventas 10 quedan los refactors **C — Infraestructura SQLite**, **D — UI + Bootstrap** y **E — Limpieza final**.
 
 ## 3. Repositorios y entorno
 
@@ -273,7 +277,7 @@ Esta recapitulación debe aparecer al comenzar cada nuevo bloque de desarrollo y
 
 > **Hito transversal antes de Ventas 10:** auditoría de arquitectura completada. Debe ejecutarse primero el refactor técnico A–E descrito en la sección 20. No cambia funcionalidad de negocio ni altera el orden de los bloques 10–12.
 
-> **Estado exacto al cerrar esta versión:** Ventas 1–9 están implementados, probados y subidos. La auditoría transversal de arquitectura está completada. Antes de iniciar **Ventas 10 — Finalización y pagos** debe ejecutarse el refactor técnico A–E.
+> **Estado exacto al cerrar esta versión:** Ventas 1–9 están implementados, probados y subidos. La auditoría transversal está completada. **Refactor A** y **Refactor B** están completados, probados y subidos. El siguiente paso es **Refactor C — Infraestructura SQLite**; después quedan D y E antes de Ventas 10.
 
 ## 11. Ventas 1 — Contexto operativo ✅
 
@@ -2317,9 +2321,9 @@ pueden parecer similares, pero contienen predicados, errores y reglas específic
 
 No se crearán resolvers SQL genéricos.
 
-### 20.18 Arquitectura destino aproximada
+### 20.18 Arquitectura transversal: estado actual y destino
 
-Después del refactor transversal, la estructura prevista es aproximadamente:
+Tras completar A y B, una parte importante de la estructura prevista ya está implementada. La estructura actual/destino es aproximadamente:
 
 ```text
 src/app/
@@ -2335,8 +2339,10 @@ src/app/
 │   └── string.utils.ts
 │
 ├── pipes/
-│   ├── micros-to-euros.pipe.ts
-│   └── bps-to-percent.pipe.ts
+│   ├── bps-to-percent.pipe.ts
+│   ├── cents-to-euros.pipe.ts
+│   ├── iso-date-to-spanish.pipe.ts
+│   └── micros-to-euros.pipe.ts
 │
 └── ...
 
@@ -2346,7 +2352,8 @@ electron/
 │   │   ├── money.constants.ts
 │   │   └── percentage.constants.ts
 │   └── utils/
-│       └── money.utils.ts
+│       ├── money.utils.ts
+│       └── percentage.utils.ts
 │
 ├── contracts/
 │   └── clientes/
@@ -2362,7 +2369,7 @@ electron/
     └── ...
 ```
 
-En Angular se prevé añadir aliases equivalentes a:
+En Angular ya están activos y utilizados los aliases:
 
 ```text
 @constants/*
@@ -2370,7 +2377,7 @@ En Angular se prevé añadir aliases equivalentes a:
 @pipes/*
 ```
 
-si siguen siendo útiles al implementar la fase correspondiente.
+Se mantienen separados de las utilidades ejecutables del backend.
 
 Electron ya dispone de `@backend/*`, `@infrastructure/*` y `@desktop-contracts/*`, por lo que no necesita nuevos aliases para estas zonas.
 
@@ -2378,9 +2385,9 @@ Electron ya dispone de `@backend/*`, `@infrastructure/*` y `@desktop-contracts/*
 
 El refactor se divide en cinco fases pequeñas, sin cambio funcional.
 
-#### Refactor A — Dinero y porcentajes
+#### ✅ Refactor A — Dinero y porcentajes
 
-Prioridad máxima.
+**Completado, probado y subido.**
 
 Incluye:
 
@@ -2394,7 +2401,9 @@ Incluye:
 
 Debe quedar completamente probado antes de continuar.
 
-#### Refactor B — Utilidades Angular y contratos
+#### ✅ Refactor B — Utilidades Angular y contratos
+
+**Completado, probado y subido.**
 
 Incluye:
 
@@ -2406,7 +2415,7 @@ Incluye:
 
 No crear abstracciones genéricas de carga/caché.
 
-#### Refactor C — Infraestructura SQLite
+#### ⬜ Refactor C — Infraestructura SQLite — siguiente paso
 
 Incluye:
 
@@ -2462,29 +2471,567 @@ Si aparece una regresión, debe corregirse dentro de la fase que la produjo ante
 
 No se aprovechará el refactor para cambiar reglas funcionales de negocio.
 
-### 20.21 Estado al cerrar la auditoría
+### 20.21 Estado actual del refactor transversal
 
-La auditoría está **completada**.
+La auditoría está **completada** y no debe repetirse desde cero si cambia la conversación.
 
-No es necesario volver a realizarla desde cero si cambia la conversación.
-
-Próxima secuencia acordada:
+Estado actual:
 
 ```text
-Refactor A — Dinero y porcentajes
-        ↓
-Refactor B — Utils Angular + contratos
-        ↓
-Refactor C — Infraestructura SQLite
-        ↓
-Refactor D — UI + Bootstrap
-        ↓
-Refactor E — Limpieza final
-        ↓
-Ventas 10 — Finalización y pagos
+✅ Refactor A — Dinero y porcentajes
+✅ Refactor B — Utils Angular + contratos
+⬜ Refactor C — Infraestructura SQLite
+⬜ Refactor D — UI + Bootstrap
+⬜ Refactor E — Limpieza final
+⬜ Ventas 10 — Finalización y pagos
 ```
 
 Antes de empezar cada fase se debe volver a inspeccionar el estado actual de los archivos implicados en `main`, proponer el diseño exacto y después realizar cambios incrementales.
+
+### 20.22 Refactor A — Dinero y porcentajes ✅
+
+Refactor A está **completado, probado y subido al repositorio**.
+
+Objetivo: eliminar conversiones monetarias/porcentuales duplicadas, números mágicos y helpers técnicos incrustados en el dominio o la UI, manteniendo exactamente las reglas económicas existentes.
+
+#### 20.22.1 Base común Angular
+
+Se añadieron aliases Angular para:
+
+```text
+@constants/*
+@utils/*
+@pipes/*
+```
+
+Se crearon:
+
+```text
+src/app/constants/
+├── money.constants.ts
+└── percentage.constants.ts
+
+src/app/utils/
+├── money.utils.ts
+└── percentage.utils.ts
+```
+
+Constantes monetarias Angular:
+
+```text
+CENTS_PER_EURO = 100
+MICROS_PER_CENT = 10_000
+MICROS_PER_EURO = 1_000_000
+```
+
+Constantes porcentuales Angular:
+
+```text
+BASIS_POINTS_PER_PERCENT = 100
+PERCENT_TOTAL = 100
+BASIS_POINTS_TOTAL = 10_000
+```
+
+Utils monetarios principales:
+
+```text
+centsToMicros()
+centsToEuros()
+microsToCents()
+microsToEuros()
+eurosToMicros()
+calculateBpsAmountMicros()
+calculateProportionalMicros()
+```
+
+Decisiones importantes:
+
+- entradas monetarias del usuario en euros se redondean primero a céntimos y después se convierten a micros;
+- `microsToCents()` utiliza redondeo simétrico para positivos y negativos;
+- la proporcionalidad admite `unidades > unidadesTotales`, necesario para reservas cuya cantidad final supera la reservada;
+- los utils técnicos no imponen reglas funcionales de rango que pertenecen al dominio.
+
+Utils porcentuales:
+
+```text
+percentToBps()
+bpsToPercent()
+```
+
+Estas funciones convierten unidades, pero no deciden si un dominio permite 0–100 %, negativos u otro rango.
+
+#### 20.22.2 Migración del dominio Angular
+
+`VentaLineaEnCurso` dejó de implementar localmente:
+
+```text
+roundDivision()
+getImporteProporcionalMicros()
+```
+
+La proporcionalidad utilizada por Reservas y Devoluciones se centralizó en `calculateProportionalMicros()`.
+
+Esto eliminó además un problema semántico de crecimiento histórico: un helper ya utilizado por Reservas todavía podía emitir un error específico de “devolución”.
+
+Se migraron:
+
+- cents → micros al construir líneas desde artículos;
+- cálculo de descuento BPS;
+- proporcionalidad económica de reservas;
+- proporcionalidad acumulativa de devoluciones.
+
+Las precedencias económicas y los guards de negocio permanecen en `VentaLineaEnCurso`.
+
+`VentaEnCurso` delega:
+
+- total micros → cents en `microsToCents()`;
+- porcentaje de descuento de cliente → BPS en `percentToBps()`.
+
+La validación funcional 0–100 % continúa en el dominio.
+
+`venta-varios-iva.utils.ts` mantiene local la regla:
+
+```text
+21 % si está configurado
+si no → IVA configurado más alto
+```
+
+pero delega la conversión `% → bps` en `percentage.utils`.
+
+#### 20.22.3 Migración de UI Angular
+
+Se crearon pipes puros:
+
+```text
+src/app/pipes/
+├── bps-to-percent.pipe.ts
+├── cents-to-euros.pipe.ts
+└── micros-to-euros.pipe.ts
+```
+
+Los templates dejan de expresar directamente conversiones como:
+
+```text
+micros / 1_000_000
+cents / 100
+bps / 100
+```
+
+La UI utiliza ahora pipes que hacen explícita la unidad de entrada.
+
+Se migraron, entre otros:
+
+- `SaleWorkspaceComponent`;
+- `VariosEditorComponent`;
+- `ReturnSelectorComponent`;
+- `ReservationManagerComponent`;
+- `ClientStatisticsComponent`;
+- `ArticleSearchComponent`.
+
+Los inputs monetarios continúan convirtiéndose en TypeScript mediante `eurosToMicros()`, no mediante pipes inversos.
+
+#### 20.22.4 Backend Electron
+
+Se crearon:
+
+```text
+electron/backend/constants/
+├── money.constants.ts
+└── percentage.constants.ts
+
+electron/backend/utils/
+├── money.utils.ts
+└── percentage.utils.ts
+```
+
+El backend mantiene su propia implementación ejecutable y no comparte utils con Angular.
+
+`ReservasService` dejó de:
+
+- declarar `MICROS_PER_CENT` localmente;
+- implementar sus propios `microsToCents()` / `centsToMicros()`;
+- utilizar `10_000` como literal para el total BPS.
+
+Las reglas de Reservas que exigen importes no negativos continúan en el servicio mediante validación de dominio/aplicación.
+
+`ClientesService` dejó de realizar manualmente:
+
+```text
+descuentoBps / 100
+descuento * 100
+```
+
+y utiliza `bpsToPercent()` / `percentToBps()`.
+
+#### 20.22.5 Limpieza final A
+
+Se eliminó:
+
+```text
+src/app/model/ventas/ventas-money.constants.ts
+```
+
+porque sus conceptos ya pertenecen a las constantes transversales.
+
+Se realizaron barridos sobre:
+
+```text
+MICROS_PER_CENT
+BASIS_POINTS_PER_PERCENT
+1_000_000
+Math.round
+/ 100
+* 100
+```
+
+Los usos restantes de `Math.round` fuera de las utils monetarias fueron revisados y considerados legítimos:
+
+- cálculo de brillo RGB en `Empleado`;
+- porcentaje visual de progreso en `ApplicationStartupService`.
+
+No se sustituyeron números locales evidentes solo por eliminar literales.
+
+#### 20.22.6 Validación A
+
+Tras cada subfase se ejecutaron correctamente:
+
+```bash
+npm test
+npm run typecheck:electron
+npm run build
+npm run lint
+```
+
+y cuando se tocó Electron:
+
+```bash
+npm run build:desktop
+```
+
+También se realizaron pruebas manuales de:
+
+- venta normal;
+- descuento cliente/manual/directo;
+- importe manual;
+- regalo/promoción;
+- Varios;
+- devoluciones;
+- reservas;
+- creación/eliminación de reserva y simetría de stock;
+- presentación monetaria en buscadores, estadísticas y gestores.
+
+No se detectaron cambios funcionales.
+
+### 20.23 Refactor B — Utils Angular + contratos ✅
+
+Refactor B está **completado, probado y subido al repositorio**.
+
+Objetivo: centralizar pequeñas utilidades técnicas realmente repetidas en Angular y convertir límites duplicados de Cliente en una definición contractual compartida, sin crear una capa ejecutable común entre Angular y Electron.
+
+#### 20.23.1 Fechas Angular
+
+Se creó:
+
+```text
+src/app/utils/date.utils.ts
+```
+
+con:
+
+```text
+formatIsoDateToSpanishDate()
+```
+
+Semántica:
+
+```text
+YYYY-MM-DD...
+→ DD/MM/YYYY
+```
+
+sin construir un `Date` y sin aplicar conversiones de zona horaria.
+
+Se creó además:
+
+```text
+src/app/pipes/iso-date-to-spanish.pipe.ts
+```
+
+El util es la fuente de verdad y el pipe es el adaptador de template.
+
+Se eliminaron implementaciones `formatFecha()` duplicadas de:
+
+- selector de devoluciones;
+- gestor de reservas;
+- estadísticas de cliente.
+
+#### 20.23.2 Strings Angular
+
+Se creó:
+
+```text
+src/app/utils/string.utils.ts
+```
+
+con:
+
+```text
+normalizeTextForSearch()
+trimToNull()
+```
+
+`normalizeTextForSearch()`:
+
+- tolera `null` / `undefined`;
+- normaliza NFD;
+- elimina diacríticos;
+- convierte a minúsculas con locale `es-ES`;
+- aplica `trim()`.
+
+Se utiliza para la búsqueda humana del selector de clientes.
+
+`trimToNull()`:
+
+- admite `string | null | undefined`;
+- elimina espacios exteriores;
+- devuelve `null` si no queda contenido.
+
+Se utiliza en:
+
+- mapper del formulario de Cliente;
+- builder del documento de protección de datos.
+
+Durante el barrido se detectó una implementación `normalizeOptionalText()` adicional dentro de `cliente-proteccion-datos-document.builder.ts`; se migró también y se eliminó la duplicación.
+
+No se generalizó:
+
+```text
+VentasArticulosService.getSearchPattern()
+```
+
+porque representa una transformación SQL/específica de catálogo, no una normalización genérica de strings.
+
+Tampoco se generalizó la conversión de provincia del formulario.
+
+#### 20.23.3 Errores Angular
+
+Se creó:
+
+```text
+src/app/utils/error.utils.ts
+```
+
+con:
+
+```text
+getErrorMessage(error, fallback?)
+```
+
+Semántica preservada:
+
+```text
+Error
+→ error.message
+
+no Error + fallback
+→ fallback
+
+no Error + sin fallback
+→ String(error)
+```
+
+No se interpretan objetos arbitrarios con propiedad `message` como `Error`.
+
+Se migraron consumidores en:
+
+- selector de clientes;
+- gestor de reservas;
+- buscador de artículos;
+- selector de accesos directos;
+- workspace de Ventas;
+- `ApplicationStartupService`;
+- `ApplicationStateService`;
+- `ClientesService`;
+- `ReservasService`;
+- `VentasContextService`;
+- Legacy Import;
+- `SalesComponent`.
+
+Durante el barrido se detectaron dos consumidores adicionales en `SalesComponent`; se migraron antes de cerrar B3.
+
+No se creó `ErrorService`, interceptor ni sistema global de errores.
+
+Los `catch` que deliberadamente transforman cualquier excepción en un mensaje funcional específico permanecen locales.
+
+#### 20.23.4 Contrato de validación de Cliente
+
+Se creó:
+
+```text
+electron/contracts/clientes/
+└── cliente-validation.constants.ts
+```
+
+con:
+
+```text
+CLIENT_NAME_MAX_LENGTH = 150
+CLIENT_DNI_CIF_MAX_LENGTH = 30
+CLIENT_PHONE_MAX_LENGTH = 30
+CLIENT_EMAIL_MAX_LENGTH = 254
+```
+
+Estos valores se consideran parte del contrato del dato Cliente y son consumidos por ambos runtimes mediante `@desktop-contracts/*`.
+
+No se comparte implementación de validación.
+
+Angular conserva:
+
+- Signal Forms;
+- `required`;
+- `maxLength`;
+- `email`;
+- validadores y mensajes propios.
+
+Backend conserva:
+
+- `requireText()`;
+- `normalizeOptionalText()`;
+- `normalizeOptionalEmail()`;
+- `isValidEmail()`;
+- mensajes y reglas de aplicación propios.
+
+Los mismos límites se reutilizan también para los campos equivalentes de facturación.
+
+No se inventaron límites para dirección, código postal, población u observaciones porque no existían reglas duplicadas previas.
+
+#### 20.23.5 Migración del contrato
+
+`cliente-form.schema.ts` utiliza las constantes contractuales para:
+
+- nombre/apellidos;
+- DNI/CIF;
+- teléfono;
+- email;
+- campos equivalentes de facturación.
+
+Los mensajes del formulario interpolan las mismas constantes para impedir drift entre límite y texto.
+
+El descuento utiliza:
+
+```text
+PERCENT_TOTAL
+```
+
+y no una constante específica de Cliente redundante.
+
+`ClientesService` backend eliminó sus constantes locales:
+
+```text
+MAX_CLIENT_NAME_LENGTH
+MAX_DNI_CIF_LENGTH
+MAX_PHONE_LENGTH
+MAX_EMAIL_LENGTH
+```
+
+y utiliza el mismo contrato.
+
+Las constantes locales de estadísticas:
+
+```text
+ULTIMAS_VENTAS_LIMIT
+TOP_VENTAS_LIMIT
+```
+
+permanecen en el servicio porque son reglas propias del caso de uso.
+
+#### 20.23.6 Limpieza final B
+
+Se revisaron:
+
+- `formatFecha`;
+- regex de fecha;
+- `normalizeOptionalText`;
+- normalización NFD;
+- `instanceof Error`;
+- `String(error)`;
+- nombres antiguos de límites de Cliente;
+- literales contractuales 150/254;
+- mensajes porcentuales que validaban con constantes pero todavía mostraban `100 %` literal.
+
+Como ajuste final se hicieron dependientes de `PERCENT_TOTAL` los mensajes correspondientes en:
+
+- `VentaEnCurso`;
+- `VentaLineaEnCurso`;
+- `SaleWorkspaceComponent`;
+- `ClientesService` backend.
+
+No se modificó la funcionalidad: el valor sigue siendo 100, pero ahora regla y mensaje no pueden divergir.
+
+#### 20.23.7 Validación B
+
+Tras los subpasos se ejecutaron correctamente:
+
+```bash
+npm test
+npm run typecheck:electron
+npm run build
+npm run lint
+```
+
+y, cuando B5/B6 tocaron backend:
+
+```bash
+npm run build:desktop
+```
+
+También se verificaron manualmente:
+
+- búsqueda de clientes con/sin acentos;
+- alta rápida;
+- campos opcionales;
+- facturación distinta;
+- documento de protección de datos;
+- fechas de devoluciones, reservas y estadísticas;
+- límites de nombre/DNI/email;
+- descuento superior al 100 %.
+
+Todos los cambios están subidos al repositorio y el local del usuario quedó limpio tras cada cierre.
+
+### 20.24 Próximo hito transversal — Refactor C
+
+El siguiente paso es:
+
+# Refactor C — Infraestructura SQLite
+
+Objetivos ya fijados por la auditoría:
+
+1. centralizar el ciclo repetido de transacción TypeORM:
+
+```text
+createQueryRunner
+connect
+startTransaction
+operation
+commit / rollback
+release
+```
+
+2. decidir y aplicar una convención coherente para recuperar IDs después de un `INSERT`;
+
+3. adaptar repositories existentes sin cambiar reglas de negocio ni ocultar el SQL;
+
+4. preparar una infraestructura segura y explícita antes de Ventas 11 — Persistencia transaccional.
+
+Dirección prevista:
+
+```text
+electron/infrastructure/database/typeorm/
+├── typeorm-transaction.utils.ts
+└── sqlite.utils.ts
+```
+
+Antes de implementar C debe volver a inspeccionarse el estado actual de los repositories y los patrones reales existentes. No se debe crear una abstracción más amplia de la necesaria.
 
 ## 21. Ajustes transversales realizados durante Ventas
 
@@ -2575,7 +3122,7 @@ Installation + importación legacy y Startup están completados y probados. En e
 8. Devoluciones.
 9. Reservas.
 
-Después de Ventas 9 se completó una auditoría transversal de arquitectura. Antes de Ventas 10 deben ejecutarse los refactors A–E: A dinero/porcentajes, B utils Angular/contratos, C infraestructura SQLite, D UI/bootstrap y E limpieza final. Después quedan Ventas 10 — Finalización y pagos, Ventas 11 — Persistencia transaccional y Ventas 12 — Postventa.
+Después de Ventas 9 se completó una auditoría transversal de arquitectura. **Refactor A — Dinero/porcentajes** y **Refactor B — Utils Angular/contratos** ya están completados, probados y subidos. Antes de Ventas 10 quedan **Refactor C — Infraestructura SQLite**, **Refactor D — UI/bootstrap** y **Refactor E — Limpieza final**. Después quedan Ventas 10 — Finalización y pagos, Ventas 11 — Persistencia transaccional y Ventas 12 — Postventa.
 
 Los repositorios de referencia son:
 - Frontend antiguo: https://github.com/osumionline/Osumi-TPV
@@ -2586,46 +3133,65 @@ Antes de empezar un bloque, dame la recapitulación completa del plan, indicando
 
 Al terminar cada bloque principal, después de que confirme que funciona y que está subido, entrégame una versión actualizada de este documento de continuidad.
 
-Debemos continuar por: **Refactor A — Dinero y porcentajes**. No iniciar Ventas 10 hasta completar y validar las fases A–E.
+Debemos continuar por: **Refactor C — Infraestructura SQLite**. A y B están cerrados; no repetirlos ni rehacer la auditoría. No iniciar Ventas 10 hasta completar y validar C, D y E.
 ```
 
 ## 26. Próximo paso
 
-El siguiente desarrollo es un hito transversal, no un nuevo bloque funcional de Ventas:
+El siguiente desarrollo es:
 
-# Refactor A — Dinero y porcentajes
+# Refactor C — Infraestructura SQLite
 
-Debe comenzar inspeccionando de nuevo el estado actual de los archivos implicados en `main` y diseñando exactamente:
-
-- constantes monetarias Angular;
-- constantes de porcentajes/basis points Angular;
-- utils monetarios Angular;
-- utils de porcentajes Angular;
-- pipes que realmente merezca la pena introducir;
-- constantes equivalentes backend;
-- utils monetarios/porcentajes backend;
-- helpers técnicos de redondeo y proporcionalidad que deben salir de `VentaLineaEnCurso`;
-- todos los lugares actuales donde se utilizan números mágicos o conversiones manuales.
-
-Reglas del refactor:
-
-- no cambiar funcionalidad;
-- no modificar precedencias económicas;
-- no cambiar la resolución interna en microeuros;
-- no cambiar las reglas de redondeo existentes sin detectar antes una inconsistencia real;
-- mantener Angular y backend separados;
-- no usar `@osumi/tools`;
-- no crear una capa `shared` ejecutable;
-- mantener las reglas específicas de negocio dentro de su dominio.
-
-Después de Refactor A se ejecutará la batería completa antes de pasar a Refactor B.
-
-Secuencia pendiente:
+Estado del refactor transversal:
 
 ```text
-A — Dinero y porcentajes
-B — Utils Angular + contratos
-C — Infraestructura SQLite
+✅ A — Dinero y porcentajes
+✅ B — Utils Angular + contratos
+⬜ C — Infraestructura SQLite
+⬜ D — UI + Bootstrap
+⬜ E — Limpieza final
+```
+
+C debe comenzar con una nueva inspección del código actual de `main`, especialmente:
+
+- `TypeOrmReservasRepository`;
+- `TypeOrmCajaRepository`;
+- otros repositories que creen `QueryRunner` o transacciones manuales;
+- patrones actuales de `last_insert_rowid()`;
+- consultas posteriores por `public_id` utilizadas para recuperar IDs;
+- cualquier otro `INSERT` que necesite el ID generado.
+
+Objetivos:
+
+1. diseñar un helper TypeORM mínimo para ejecutar una operación dentro de una transacción;
+2. mantener en cada repository sus mensajes y reglas específicas;
+3. garantizar `commit`, `rollback` y `release` en todas las ramas;
+4. elegir una convención coherente para recuperar el ID SQLite generado;
+5. evitar helpers SQL dinámicos del tipo `resolveIdByPublicId(tableName, ...)`;
+6. no crear RepositoryBase, ServiceBase ni framework de infraestructura;
+7. no cambiar comportamiento funcional.
+
+Dirección prevista:
+
+```text
+electron/infrastructure/database/typeorm/
+├── typeorm-transaction.utils.ts
+└── sqlite.utils.ts
+```
+
+Después de cada subfase:
+
+```bash
+npm test
+npm run typecheck:electron
+npm run build
+npm run lint
+npm run build:desktop
+```
+
+Tras C quedarán:
+
+```text
 D — UI + Bootstrap
 E — Limpieza final
 Ventas 10 — Finalización y pagos
@@ -2633,7 +3199,7 @@ Ventas 11 — Persistencia transaccional
 Ventas 12 — Postventa
 ```
 
-No iniciar Ventas 10 hasta cerrar A–E.
+No iniciar Ventas 10 hasta cerrar C–E.
 
 ## 27. Registro de hitos
 
@@ -2646,3 +3212,4 @@ No iniciar Ventas 10 hasta cerrar A–E.
 | 1.4 | 14 de agosto de 2026 | Ventas 8 — Devoluciones completado: compatibilidad QR legacy, read model histórico, control de unidades disponibles, economía histórica exacta, selector, mezcla con compras y reapertura/edición. Próximo bloque: Ventas 9 — Reservas. |
 | 1.5 | 15 de agosto de 2026 | Ventas 9 — Reservas completado: consulta y gestión transaccional, carga múltiple sin deduplicación, economía histórica, cliente bloqueado, gestor visual, creación de reservas y ciclo simétrico de stock. Próximo bloque planificado: Ventas 10 — Finalización y pagos; antes se revisará otro asunto con el usuario. |
 | 1.6 | 15 de agosto de 2026 | Auditoría transversal de arquitectura completada tras Ventas 9. No requiere rehacer la arquitectura base. Se acuerda refactor técnico A–E antes de Ventas 10: dinero/porcentajes, utils Angular/contratos, infraestructura SQLite, UI/bootstrap y limpieza final. |
+| 1.7 | 16 de agosto de 2026 | Refactors A y B completados, probados y subidos. A centraliza dinero/porcentajes en Angular y backend, elimina conversiones y magic numbers duplicados y añade pipes de presentación. B centraliza fechas, strings y errores Angular y comparte contractualmente los límites de Cliente sin compartir implementación. Siguiente paso: Refactor C — Infraestructura SQLite. |
