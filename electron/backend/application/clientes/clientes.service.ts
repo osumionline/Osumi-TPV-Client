@@ -1,3 +1,4 @@
+import { PERCENT_TOTAL } from '@backend/constants/percentage.constants';
 import type {
   ClienteTopVentaRecord,
   ClienteUltimaVentaRecord,
@@ -5,6 +6,7 @@ import type {
 import type ClienteRepository from '@backend/contracts/clientes/cliente.repository.interface';
 import type CrearClienteRecordCommand from '@backend/contracts/clientes/crear-cliente-record-command.interface';
 import type ClienteRecord from '@backend/domain/clientes/cliente-record.interface';
+import { bpsToPercent, percentToBps } from '@backend/utils/percentage.utils';
 import type {
   ClienteEstadisticasInterface,
   ClienteTopVentaInterface,
@@ -13,7 +15,6 @@ import type {
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 
-const BASIS_POINTS_PER_PERCENT: number = 100;
 const MAX_CLIENT_NAME_LENGTH: number = 150;
 const MAX_DNI_CIF_LENGTH: number = 30;
 const MAX_PHONE_LENGTH: number = 30;
@@ -59,7 +60,6 @@ export default class ClientesService {
           importeMicros: item.importeMicros,
         }),
       ),
-
       topVentas: topVentas.map((item: ClienteTopVentaRecord): ClienteTopVentaInterface => ({
         localizador: item.localizador,
         nombre: item.nombre,
@@ -180,7 +180,7 @@ export default class ClientesService {
       factPoblacion: cliente.factPoblacion,
       factProvincia: cliente.factProvincia,
       observaciones: cliente.observaciones,
-      descuento: cliente.descuentoBps / BASIS_POINTS_PER_PERCENT,
+      descuento: bpsToPercent(cliente.descuentoBps),
       ultimaVenta: cliente.ultimaVenta,
     };
   }
@@ -248,11 +248,11 @@ export default class ClientesService {
   }
 
   private normalizeDiscount(descuento: number): number {
-    if (!Number.isFinite(descuento) || descuento < 0 || descuento > 100) {
+    if (!Number.isFinite(descuento) || descuento < 0 || descuento > PERCENT_TOTAL) {
       throw new Error('El descuento debe estar comprendido entre 0 y 100 %.');
     }
 
-    return Math.round(descuento * BASIS_POINTS_PER_PERCENT);
+    return percentToBps(descuento);
   }
 
   private isValidEmail(email: string): boolean {

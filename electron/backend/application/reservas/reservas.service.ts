@@ -1,14 +1,14 @@
+import { BASIS_POINTS_TOTAL } from '@backend/constants/percentage.constants';
 import type CrearReservaRecordCommand from '@backend/contracts/reservas/crear-reserva-record-command.interface';
 import type { CrearReservaLineaRecordCommand } from '@backend/contracts/reservas/crear-reserva-record-command.interface';
 import type ReservasRepository from '@backend/contracts/reservas/reservas.repository.interface';
 import type ReservaRecord from '@backend/domain/reservas/reserva-record.interface';
 import type { ReservaLineaRecord } from '@backend/domain/reservas/reserva-record.interface';
+import { centsToMicros, microsToCents } from '@backend/utils/money.utils';
 import type CrearReservaCommand from '@desktop-contracts/reservas/crear-reserva-command.interface';
 import type { CrearReservaLineaCommand } from '@desktop-contracts/reservas/crear-reserva-command.interface';
 import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
 import type { ReservaLineaInterface } from '@desktop-contracts/reservas/reserva.interface';
-
-const MICROS_PER_CENT: number = 10_000;
 
 export default class ReservasService {
   constructor(private readonly reservasRepository: ReservasRepository) {}
@@ -59,46 +59,36 @@ export default class ReservasService {
     return reservas.map((reserva: ReservaRecord): ReservaInterface => ({
       id: reserva.id,
       publicId: reserva.publicId,
-
       idCliente: reserva.idCliente,
-
       clientePublicId: reserva.clientePublicId,
-
       clienteNombre: reserva.clienteNombre,
-
-      totalMicros: this.centsToMicros(reserva.totalCents, 'total de la reserva'),
-
+      totalMicros: centsToMicros(
+        this.requireNonNegativeInteger(reserva.totalCents, 'total de la reserva'),
+      ),
       fecha: reserva.fecha,
-
       lineas: reserva.lineas.map((linea: ReservaLineaRecord): ReservaLineaInterface => ({
         id: linea.id,
         publicId: linea.publicId,
-
         idArticulo: linea.idArticulo,
-
         articuloPublicId: linea.articuloPublicId,
-
         localizador: linea.localizador,
-
         marca: linea.marca,
-
         nombre: linea.nombre,
-
         pucMicros: linea.pucMicros,
-
-        pvpMicros: this.centsToMicros(linea.pvpCents, 'PVP de la línea de reserva'),
-
-        ivaBps: linea.ivaBps,
-
-        importeMicros: this.centsToMicros(linea.importeCents, 'importe de la línea de reserva'),
-
-        descuentoBps: linea.descuentoBps,
-
-        importeDescuentoMicros: this.centsToMicros(
-          linea.importeDescuentoCents,
-          'descuento de la línea de reserva',
+        pvpMicros: centsToMicros(
+          this.requireNonNegativeInteger(linea.pvpCents, 'PVP de la línea de reserva'),
         ),
-
+        ivaBps: linea.ivaBps,
+        importeMicros: centsToMicros(
+          this.requireNonNegativeInteger(linea.importeCents, 'importe de la línea de reserva'),
+        ),
+        descuentoBps: linea.descuentoBps,
+        importeDescuentoMicros: centsToMicros(
+          this.requireNonNegativeInteger(
+            linea.importeDescuentoCents,
+            'descuento de la línea de reserva',
+          ),
+        ),
         unidades: linea.unidades,
       })),
     }));
@@ -143,10 +133,7 @@ export default class ReservasService {
       );
     }
 
-    this.requireNonNegativeMicros(linea.pucMicros, 'PUC de la línea de reserva');
-
     this.requireValidBps(linea.ivaBps, 'IVA');
-
     this.requireValidBps(linea.descuentoBps, 'descuento');
 
     let articuloPublicId: string | null = null;
@@ -157,50 +144,45 @@ export default class ReservasService {
 
     return {
       articuloPublicId,
-
       nombre,
-
-      pucMicros: linea.pucMicros,
-
-      pvpCents: this.microsToCents(linea.pvpMicros, 'PVP de la línea de reserva'),
-
-      ivaBps: linea.ivaBps,
-
-      importeCents: this.microsToCents(linea.importeMicros, 'importe de la línea de reserva'),
-
-      descuentoBps: linea.descuentoBps,
-
-      importeDescuentoCents: this.microsToCents(
-        linea.importeDescuentoMicros,
-        'descuento de la línea de reserva',
+      pucMicros: this.requireNonNegativeInteger(linea.pucMicros, 'PUC de la línea de reserva'),
+      pvpCents: microsToCents(
+        this.requireNonNegativeInteger(linea.pvpMicros, 'PVP de la línea de reserva'),
       ),
-
+      ivaBps: linea.ivaBps,
+      importeCents: microsToCents(
+        this.requireNonNegativeInteger(linea.importeMicros, 'importe de la línea de reserva'),
+      ),
+      descuentoBps: linea.descuentoBps,
+      importeDescuentoCents: microsToCents(
+        this.requireNonNegativeInteger(
+          linea.importeDescuentoMicros,
+          'descuento de la línea de reserva',
+        ),
+      ),
       unidades: linea.unidades,
     };
   }
 
-  private requireNonNegativeMicros(value: number, fieldName: string): void {
+  /**
+   * Valida los enteros monetarios que por contrato
+   * deben ser mayores o iguales que cero.
+   *
+   * La unidad concreta —cents o micros— no modifica
+   * esta invariante.
+   */
+  private requireNonNegativeInteger(value: number, fieldName: string): number {
     if (!Number.isSafeInteger(value) || value < 0) {
       throw new RangeError(`El ${fieldName} no es válido.`);
     }
+
+    return value;
   }
 
   private requireValidBps(value: number, fieldName: string): void {
-    if (!Number.isSafeInteger(value) || value < 0 || value > 10_000) {
+    if (!Number.isSafeInteger(value) || value < 0 || value > BASIS_POINTS_TOTAL) {
       throw new RangeError(`El ${fieldName} no es válido.`);
     }
-  }
-
-  private microsToCents(micros: number, fieldName: string): number {
-    this.requireNonNegativeMicros(micros, fieldName);
-
-    const cents: number = Math.round(micros / MICROS_PER_CENT);
-
-    if (!Number.isSafeInteger(cents)) {
-      throw new RangeError(`El ${fieldName} supera el rango numérico seguro.`);
-    }
-
-    return cents;
   }
 
   private requirePublicId(publicId: string): string {
@@ -211,19 +193,5 @@ export default class ReservasService {
     }
 
     return normalizedPublicId;
-  }
-
-  private centsToMicros(cents: number, fieldName: string): number {
-    if (!Number.isSafeInteger(cents) || cents < 0) {
-      throw new RangeError(`El ${fieldName} no es válido.`);
-    }
-
-    const micros: number = cents * MICROS_PER_CENT;
-
-    if (!Number.isSafeInteger(micros)) {
-      throw new RangeError(`El ${fieldName} supera el rango numérico seguro.`);
-    }
-
-    return micros;
   }
 }
