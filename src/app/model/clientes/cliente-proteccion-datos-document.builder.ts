@@ -1,5 +1,6 @@
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type Cliente from '@model/clientes/cliente.model';
+import { trimToNull } from '@utils/string.utils';
 
 export default function buildClienteProteccionDatosDocument(
   appData: AppData,
@@ -16,8 +17,7 @@ export default function buildClienteProteccionDatosDocument(
     year: 'numeric',
   }).format(new Date());
 
-  const lugarFirma: string =
-    normalizeOptionalText(appData.poblacion) ?? '____________________________';
+  const lugarFirma: string = trimToNull(appData.poblacion) ?? '____________________________';
 
   const datosFacturacion: string = cliente.factIgual
     ? ''
@@ -47,7 +47,7 @@ export default function buildClienteProteccionDatosDocument(
 
   const responsableHtml: string = escapeHtml(responsable);
 
-  const cifResponsable: string | null = normalizeOptionalText(appData.cif);
+  const cifResponsable: string | null = trimToNull(appData.cif);
 
   const domicilioResponsable: string | null = joinNotEmpty(appData.direccion, appData.poblacion);
 
@@ -512,7 +512,7 @@ export default function buildClienteProteccionDatosDocument(
 }
 
 function renderField(label: string, value: string | null, fullWidth: boolean = false): string {
-  const normalizedValue: string | null = normalizeOptionalText(value);
+  const normalizedValue: string | null = trimToNull(value);
 
   return `
     <div class="field${fullWidth ? ' field--full' : ''}">
@@ -528,24 +528,14 @@ function renderField(label: string, value: string | null, fullWidth: boolean = f
 }
 
 function renderInlineValue(value: string | null): string {
-  const normalizedValue: string | null = normalizeOptionalText(value);
+  const normalizedValue: string | null = trimToNull(value);
 
   return normalizedValue === null ? '&nbsp;' : escapeHtml(normalizedValue);
 }
 
-function normalizeOptionalText(value: string | null): string | null {
-  if (value === null) {
-    return null;
-  }
-
-  const normalizedValue: string = value.trim();
-
-  return normalizedValue === '' ? null : normalizedValue;
-}
-
 function firstNotEmpty(...values: readonly string[]): string | null {
   for (const value of values) {
-    const normalizedValue: string | null = normalizeOptionalText(value);
+    const normalizedValue: string | null = trimToNull(value);
 
     if (normalizedValue !== null) {
       return normalizedValue;
@@ -557,7 +547,7 @@ function firstNotEmpty(...values: readonly string[]): string | null {
 
 function joinNotEmpty(...values: readonly string[]): string | null {
   const normalizedValues: readonly string[] = values
-    .map((value: string): string | null => normalizeOptionalText(value))
+    .map((value: string): string | null => trimToNull(value))
     .filter((value: string | null): value is string => value !== null);
 
   return normalizedValues.length === 0 ? null : normalizedValues.join(', ');

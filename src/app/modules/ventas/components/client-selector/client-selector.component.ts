@@ -19,6 +19,7 @@ import type ClienteFormModel from '@model/clientes/cliente-form.model';
 import type Cliente from '@model/clientes/cliente.model';
 import ClientFormComponent from '@modules/clientes/components/client-form/client-form.component';
 import ClientesService from '@services/clientes.service';
+import { normalizeTextForSearch } from '@utils/string.utils';
 
 type ClientSelectorMode = 'search' | 'create';
 
@@ -52,7 +53,7 @@ export default class ClientSelectorComponent {
   readonly creationError: WritableSignal<string | null> = signal<string | null>(null);
 
   readonly filteredClientes: Signal<readonly Cliente[]> = computed((): readonly Cliente[] => {
-    const query: string = this.normalizeSearchValue(this.query());
+    const query: string = normalizeTextForSearch(this.query());
 
     if (query === '') {
       return this.clientes();
@@ -60,7 +61,7 @@ export default class ClientSelectorComponent {
 
     return this.clientes().filter((cliente: Cliente): boolean =>
       [cliente.nombreApellidos, cliente.dniCif, cliente.telefono, cliente.email].some(
-        (value: string | null): boolean => this.normalizeSearchValue(value).includes(query),
+        (value: string | null): boolean => normalizeTextForSearch(value).includes(query),
       ),
     );
   });
@@ -162,17 +163,5 @@ export default class ClientSelectorComponent {
     }
 
     this.cancelEvent.emit();
-  }
-
-  /**
-   * Normaliza un valor para realizar búsquedas sin distinguir
-   * mayúsculas, minúsculas ni acentos.
-   */
-  private normalizeSearchValue(value: string | null): string {
-    return (value ?? '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLocaleLowerCase('es-ES')
-      .trim();
   }
 }
