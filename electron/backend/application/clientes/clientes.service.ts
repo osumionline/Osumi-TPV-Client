@@ -12,13 +12,15 @@ import type {
   ClienteTopVentaInterface,
   ClienteUltimaVentaInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import {
+  CLIENT_DNI_CIF_MAX_LENGTH,
+  CLIENT_EMAIL_MAX_LENGTH,
+  CLIENT_NAME_MAX_LENGTH,
+  CLIENT_PHONE_MAX_LENGTH,
+} from '@desktop-contracts/clientes/cliente-validation.constants';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 
-const MAX_CLIENT_NAME_LENGTH: number = 150;
-const MAX_DNI_CIF_LENGTH: number = 30;
-const MAX_PHONE_LENGTH: number = 30;
-const MAX_EMAIL_LENGTH: number = 254;
 const ULTIMAS_VENTAS_LIMIT: number = 20;
 const TOP_VENTAS_LIMIT: number = 10;
 
@@ -76,25 +78,25 @@ export default class ClientesService {
     const nombreApellidos: string = this.requireText(
       command.nombreApellidos,
       'nombre y apellidos',
-      MAX_CLIENT_NAME_LENGTH,
+      CLIENT_NAME_MAX_LENGTH,
     );
 
     const dniCif: string | null = this.normalizeOptionalText(
       command.dniCif,
       'DNI/CIF',
-      MAX_DNI_CIF_LENGTH,
+      CLIENT_DNI_CIF_MAX_LENGTH,
     );
 
     const telefono: string | null = this.normalizeOptionalText(
       command.telefono,
       'teléfono',
-      MAX_PHONE_LENGTH,
+      CLIENT_PHONE_MAX_LENGTH,
     );
 
     const email: string | null = this.normalizeOptionalText(
       command.email,
       'email',
-      MAX_EMAIL_LENGTH,
+      CLIENT_EMAIL_MAX_LENGTH,
     );
 
     if (email !== null && !this.isValidEmail(email)) {
@@ -127,21 +129,21 @@ export default class ClientesService {
         : this.normalizeOptionalText(
             command.factNombreApellidos,
             'nombre de facturación',
-            MAX_CLIENT_NAME_LENGTH,
+            CLIENT_NAME_MAX_LENGTH,
           ),
       factDniCif: factIgual
         ? null
         : this.normalizeOptionalText(
             command.factDniCif,
             'DNI/CIF de facturación',
-            MAX_DNI_CIF_LENGTH,
+            CLIENT_DNI_CIF_MAX_LENGTH,
           ),
       factTelefono: factIgual
         ? null
         : this.normalizeOptionalText(
             command.factTelefono,
             'teléfono de facturación',
-            MAX_PHONE_LENGTH,
+            CLIENT_PHONE_MAX_LENGTH,
           ),
       factEmail: factIgual ? null : this.normalizeOptionalEmail(command.factEmail),
       factDireccion: factIgual ? null : this.normalizeOptionalText(command.factDireccion),
@@ -225,7 +227,7 @@ export default class ClientesService {
     const email: string | null = this.normalizeOptionalText(
       value,
       'email de facturación',
-      MAX_EMAIL_LENGTH,
+      CLIENT_EMAIL_MAX_LENGTH,
     );
 
     if (email !== null && !this.isValidEmail(email)) {
