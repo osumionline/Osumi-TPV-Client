@@ -4,6 +4,7 @@ import type ReservasRepository from '@backend/contracts/reservas/reservas.reposi
 import type ReservaRecord from '@backend/domain/reservas/reserva-record.interface';
 import type { ReservaLineaRecord } from '@backend/domain/reservas/reserva-record.interface';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
+import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
 import { randomUUID } from 'node:crypto';
 import type { DataSource, QueryRunner } from 'typeorm';
 
@@ -82,81 +83,75 @@ export default class TypeOrmReservasRepository implements ReservasRepository {
   async create(command: CrearReservaRecordCommand): Promise<string> {
     const dataSource: DataSource = await this.applicationDatabase.connect();
 
-    const queryRunner: QueryRunner = dataSource.createQueryRunner();
-
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
     try {
-      const idCliente: number = await this.resolveClienteId(queryRunner, command.clientePublicId);
+      return await runDataSourceTransaction(
+        dataSource,
+        async (queryRunner: QueryRunner): Promise<string> => {
+          const idCliente: number = await this.resolveClienteId(
+            queryRunner,
+            command.clientePublicId,
+          );
 
-      const reservaPublicId: string = randomUUID();
+          const reservaPublicId: string = randomUUID();
+          const timestamp: string = new Date().toISOString();
 
-      const timestamp: string = new Date().toISOString();
+          await queryRunner.query(
+            `
+            INSERT INTO reserva (
+              public_id,
+              id_cliente,
+              total_cents,
+              created_at,
+              updated_at
+            )
+            VALUES (
+              ?, ?, ?, ?, ?
+            )
+          `,
+            [reservaPublicId, idCliente, command.totalCents, timestamp, timestamp],
+          );
 
-      await queryRunner.query(
-        `
-        INSERT INTO reserva (
-          public_id,
-          id_cliente,
-          total_cents,
-          created_at,
-          updated_at
-        )
-        VALUES (
-          ?, ?, ?, ?, ?
-        )
-      `,
-        [reservaPublicId, idCliente, command.totalCents, timestamp, timestamp],
-      );
-
-      const reservaRows: readonly DatabaseIdRow[] = (await queryRunner.query(
-        `
+          const reservaRows: readonly DatabaseIdRow[] = (await queryRunner.query(
+            `
             SELECT
               id
             FROM reserva
             WHERE public_id = ?
             LIMIT 1
           `,
-        [reservaPublicId],
-      )) as readonly DatabaseIdRow[];
+            [reservaPublicId],
+          )) as readonly DatabaseIdRow[];
 
-      const idReserva: number | undefined = reservaRows[0]?.id;
+          const idReserva: number | undefined = reservaRows[0]?.id;
 
-      if (idReserva === undefined || !Number.isSafeInteger(idReserva) || idReserva <= 0) {
-        throw new Error('No se ha podido obtener el identificador de la reserva creada.');
-      }
+          if (idReserva === undefined || !Number.isSafeInteger(idReserva) || idReserva <= 0) {
+            throw new Error('No se ha podido obtener el identificador de la reserva creada.');
+          }
 
-      for (const linea of command.lineas) {
-        let idArticulo: number | null = null;
+          for (const linea of command.lineas) {
+            let idArticulo: number | null = null;
 
-        if (linea.articuloPublicId !== null) {
-          idArticulo = await this.resolveArticuloId(queryRunner, linea.articuloPublicId);
-        }
+            if (linea.articuloPublicId !== null) {
+              idArticulo = await this.resolveArticuloId(queryRunner, linea.articuloPublicId);
+            }
 
-        await this.insertLinea(queryRunner, idReserva, idArticulo, linea, timestamp);
+            await this.insertLinea(queryRunner, idReserva, idArticulo, linea, timestamp);
 
-        if (idArticulo !== null) {
-          await this.reserveStock(queryRunner, idArticulo, linea.unidades, timestamp);
-        }
-      }
+            if (idArticulo !== null) {
+              await this.reserveStock(queryRunner, idArticulo, linea.unidades, timestamp);
+            }
+          }
 
-      await queryRunner.commitTransaction();
-
-      return reservaPublicId;
+          return reservaPublicId;
+        },
+      );
     } catch (error: unknown) {
-      if (queryRunner.isTransactionActive) {
-        await queryRunner.rollbackTransaction();
-      }
-
       throw new Error(
         error instanceof Error ? error.message : 'No se ha podido crear la reserva.',
         {
           cause: error,
         },
       );
-    } finally {
-      await queryRunner.release();
     }
   }
 
@@ -313,128 +308,116 @@ export default class TypeOrmReservasRepository implements ReservasRepository {
   async deleteLinea(publicId: string): Promise<boolean> {
     const dataSource: DataSource = await this.applicationDatabase.connect();
 
-    const queryRunner: QueryRunner = dataSource.createQueryRunner();
-
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
     try {
-      const rows: readonly ReservaLineaDeleteDatabaseRow[] = (await queryRunner.query(
-        `
-              SELECT
-                lr.id,
-                lr.id_reserva,
-                lr.id_articulo,
-                lr.unidades
+      return await runDataSourceTransaction(
+        dataSource,
+        async (queryRunner: QueryRunner): Promise<boolean> => {
+          const rows: readonly ReservaLineaDeleteDatabaseRow[] = (await queryRunner.query(
+            `
+            SELECT
+              lr.id,
+              lr.id_reserva,
+              lr.id_articulo,
+              lr.unidades
 
-              FROM linea_reserva lr
+            FROM linea_reserva lr
 
-              INNER JOIN reserva r
-                ON r.id = lr.id_reserva
+            INNER JOIN reserva r
+              ON r.id = lr.id_reserva
 
+            WHERE
+              lr.public_id = ?
+              AND r.deleted_at IS NULL
+            LIMIT 1
+          `,
+            [publicId],
+          )) as readonly ReservaLineaDeleteDatabaseRow[];
+
+          const linea: ReservaLineaDeleteDatabaseRow | undefined = rows[0];
+
+          if (linea === undefined) {
+            return false;
+          }
+
+          const countRows: readonly CountDatabaseRow[] = (await queryRunner.query(
+            `
+            SELECT
+              COUNT(*) AS total
+            FROM linea_reserva
+            WHERE id_reserva = ?
+          `,
+            [linea.id_reserva],
+          )) as readonly CountDatabaseRow[];
+
+          const totalLineas: number = countRows[0]?.total ?? 0;
+          const timestamp: string = new Date().toISOString();
+
+          await this.restoreStock(queryRunner, linea.id_articulo, linea.unidades, timestamp);
+
+          /*
+           * Si era la última línea, la operación equivale
+           * a cancelar la reserva completa.
+           *
+           * Conservamos la línea histórica y marcamos
+           * únicamente la reserva como eliminada.
+           */
+          if (totalLineas <= 1) {
+            await queryRunner.query(
+              `
+              UPDATE reserva
+              SET
+                deleted_at = ?,
+                updated_at = ?
               WHERE
-                lr.public_id = ?
-                AND r.deleted_at IS NULL
-
-              LIMIT 1
+                id = ?
+                AND deleted_at IS NULL
             `,
-        [publicId],
-      )) as readonly ReservaLineaDeleteDatabaseRow[];
-
-      const linea: ReservaLineaDeleteDatabaseRow | undefined = rows[0];
-
-      if (linea === undefined) {
-        await queryRunner.commitTransaction();
-
-        return false;
-      }
-
-      const countRows: readonly CountDatabaseRow[] = (await queryRunner.query(
-        `
-              SELECT
-                COUNT(*) AS total
-              FROM linea_reserva
-              WHERE id_reserva = ?
+              [timestamp, timestamp, linea.id_reserva],
+            );
+          } else {
+            await queryRunner.query(
+              `
+              DELETE FROM linea_reserva
+              WHERE id = ?
             `,
-        [linea.id_reserva],
-      )) as readonly CountDatabaseRow[];
+              [linea.id],
+            );
 
-      const totalLineas: number = countRows[0]?.total ?? 0;
+            /*
+             * Recalculamos desde las líneas que realmente
+             * permanecen en SQLite en vez de confiar en
+             * el total anterior.
+             */
+            await queryRunner.query(
+              `
+              UPDATE reserva
+              SET
+                total_cents = (
+                  SELECT
+                    COALESCE(
+                      SUM(importe_cents),
+                      0
+                    )
+                  FROM linea_reserva
+                  WHERE
+                    id_reserva = ?
+                ),
+                updated_at = ?
+              WHERE
+                id = ?
+                AND deleted_at IS NULL
+            `,
+              [linea.id_reserva, timestamp, linea.id_reserva],
+            );
+          }
 
-      const timestamp: string = new Date().toISOString();
-
-      await this.restoreStock(queryRunner, linea.id_articulo, linea.unidades, timestamp);
-
-      /*
-       * Si era la última línea, la operación equivale
-       * a cancelar la reserva completa.
-       *
-       * Conservamos la línea histórica y marcamos
-       * únicamente la reserva como eliminada.
-       */
-      if (totalLineas <= 1) {
-        await queryRunner.query(
-          `
-            UPDATE reserva
-            SET
-              deleted_at = ?,
-              updated_at = ?
-            WHERE
-              id = ?
-              AND deleted_at IS NULL
-          `,
-          [timestamp, timestamp, linea.id_reserva],
-        );
-      } else {
-        await queryRunner.query(
-          `
-            DELETE FROM linea_reserva
-            WHERE id = ?
-          `,
-          [linea.id],
-        );
-
-        /*
-         * Recalculamos desde las líneas que realmente
-         * permanecen en SQLite en vez de confiar en
-         * el total anterior.
-         */
-        await queryRunner.query(
-          `
-            UPDATE reserva
-            SET
-              total_cents = (
-                SELECT
-                  COALESCE(
-                    SUM(importe_cents),
-                    0
-                  )
-                FROM linea_reserva
-                WHERE
-                  id_reserva = ?
-              ),
-              updated_at = ?
-            WHERE
-              id = ?
-              AND deleted_at IS NULL
-          `,
-          [linea.id_reserva, timestamp, linea.id_reserva],
-        );
-      }
-
-      await queryRunner.commitTransaction();
-
-      return true;
+          return true;
+        },
+      );
     } catch (error: unknown) {
-      if (queryRunner.isTransactionActive) {
-        await queryRunner.rollbackTransaction();
-      }
-
       throw new Error('No se ha podido eliminar la línea de reserva.', {
         cause: error,
       });
-    } finally {
-      await queryRunner.release();
     }
   }
 
@@ -445,83 +428,73 @@ export default class TypeOrmReservasRepository implements ReservasRepository {
   async deleteReserva(publicId: string): Promise<boolean> {
     const dataSource: DataSource = await this.applicationDatabase.connect();
 
-    const queryRunner: QueryRunner = dataSource.createQueryRunner();
-
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
     try {
-      const reservaRows: readonly ReservaDeleteDatabaseRow[] = (await queryRunner.query(
-        `
-              SELECT
-                id
-              FROM reserva
-              WHERE
-                public_id = ?
-                AND deleted_at IS NULL
-              LIMIT 1
-            `,
-        [publicId],
-      )) as readonly ReservaDeleteDatabaseRow[];
+      return await runDataSourceTransaction(
+        dataSource,
+        async (queryRunner: QueryRunner): Promise<boolean> => {
+          const reservaRows: readonly ReservaDeleteDatabaseRow[] = (await queryRunner.query(
+            `
+            SELECT
+              id
+            FROM reserva
+            WHERE
+              public_id = ?
+              AND deleted_at IS NULL
+            LIMIT 1
+          `,
+            [publicId],
+          )) as readonly ReservaDeleteDatabaseRow[];
 
-      const reserva: ReservaDeleteDatabaseRow | undefined = reservaRows[0];
+          const reserva: ReservaDeleteDatabaseRow | undefined = reservaRows[0];
 
-      if (reserva === undefined) {
-        await queryRunner.commitTransaction();
+          if (reserva === undefined) {
+            return false;
+          }
 
-        return false;
-      }
+          const lineas: readonly ReservaStockDatabaseRow[] = (await queryRunner.query(
+            `
+            SELECT
+              id_articulo,
+              unidades
+            FROM linea_reserva
+            WHERE id_reserva = ?
+            ORDER BY id
+          `,
+            [reserva.id],
+          )) as readonly ReservaStockDatabaseRow[];
 
-      const lineas: readonly ReservaStockDatabaseRow[] = (await queryRunner.query(
-        `
-              SELECT
-                id_articulo,
-                unidades
-              FROM linea_reserva
-              WHERE id_reserva = ?
-              ORDER BY id
-            `,
-        [reserva.id],
-      )) as readonly ReservaStockDatabaseRow[];
+          const timestamp: string = new Date().toISOString();
 
-      const timestamp: string = new Date().toISOString();
+          for (const linea of lineas) {
+            await this.restoreStock(queryRunner, linea.id_articulo, linea.unidades, timestamp);
+          }
 
-      for (const linea of lineas) {
-        await this.restoreStock(queryRunner, linea.id_articulo, linea.unidades, timestamp);
-      }
+          /*
+           * Se realiza borrado lógico.
+           *
+           * linea_reserva se conserva como histórico
+           * asociado a una reserva cancelada.
+           */
+          await queryRunner.query(
+            `
+            UPDATE reserva
+            SET
+              deleted_at = ?,
+              updated_at = ?
+            WHERE
+              id = ?
+              AND deleted_at IS NULL
+          `,
+            [timestamp, timestamp, reserva.id],
+          );
 
-      /*
-       * Se realiza borrado lógico.
-       *
-       * linea_reserva se conserva como histórico
-       * asociado a una reserva cancelada.
-       */
-      await queryRunner.query(
-        `
-          UPDATE reserva
-          SET
-            deleted_at = ?,
-            updated_at = ?
-          WHERE
-            id = ?
-            AND deleted_at IS NULL
-        `,
-        [timestamp, timestamp, reserva.id],
+          return true;
+        },
       );
-
-      await queryRunner.commitTransaction();
-
-      return true;
     } catch (error: unknown) {
-      if (queryRunner.isTransactionActive) {
-        await queryRunner.rollbackTransaction();
-      }
-
       throw new Error('No se ha podido eliminar la reserva.', {
         cause: error,
       });
-    } finally {
-      await queryRunner.release();
     }
   }
 

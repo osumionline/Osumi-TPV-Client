@@ -2,6 +2,7 @@ import type CajaRepository from '@backend/contracts/caja/caja.repository.interfa
 import type CajaAbiertaRecord from '@backend/domain/caja/caja-abierta-record.interface';
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
+import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
 import { randomUUID } from 'node:crypto';
 import type { DataSource, QueryRunner } from 'typeorm';
 
@@ -37,104 +38,96 @@ export default class TypeOrmCajaRepository implements CajaRepository {
    */
   async open(command: AbrirCajaCommand): Promise<CajaAbiertaRecord> {
     const dataSource: DataSource = await this.applicationDatabase.connect();
-    const queryRunner: QueryRunner = dataSource.createQueryRunner();
-
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
 
     try {
-      const terminalId: number = await this.getTerminalId(queryRunner, command.terminalPublicId);
+      return await runDataSourceTransaction(
+        dataSource,
+        async (queryRunner: QueryRunner): Promise<CajaAbiertaRecord> => {
+          const terminalId: number = await this.getTerminalId(
+            queryRunner,
+            command.terminalPublicId,
+          );
 
-      const cajaAbierta: CajaAbiertaRecord | null = await this.getCajaAbierta(
-        queryRunner,
-        terminalId,
-      );
+          const cajaAbierta: CajaAbiertaRecord | null = await this.getCajaAbierta(
+            queryRunner,
+            terminalId,
+          );
 
-      if (cajaAbierta !== null) {
-        await queryRunner.commitTransaction();
+          if (cajaAbierta !== null) {
+            return cajaAbierta;
+          }
 
-        return cajaAbierta;
-      }
+          const importeAperturaCents: number = await this.getImporteAperturaCents(
+            queryRunner,
+            terminalId,
+          );
 
-      const importeAperturaCents: number = await this.getImporteAperturaCents(
-        queryRunner,
-        terminalId,
-      );
+          const apertura: string = new Date().toISOString();
+          const publicId: string = randomUUID();
 
-      const apertura: string = new Date().toISOString();
-      const publicId: string = randomUUID();
+          await queryRunner.query(
+            `
+            INSERT INTO caja (
+              public_id,
+              id_terminal,
+              id_empleado_apertura,
+              id_empleado_cierre,
+              apertura,
+              cierre,
+              ventas_cents,
+              beneficios_cents,
+              descuentos_cents,
+              movimientos_entrada_cents,
+              movimientos_salida_cents,
+              importe_apertura_cents,
+              importe_cierre_teorico_cents,
+              importe_cierre_real_cents,
+              importe_retirado_cents,
+              observaciones,
+              created_at,
+              updated_at
+            )
+            VALUES (
+              ?,
+              ?,
+              NULL,
+              NULL,
+              ?,
+              NULL,
+              0,
+              0,
+              0,
+              0,
+              0,
+              ?,
+              0,
+              0,
+              0,
+              NULL,
+              ?,
+              ?
+            )
+          `,
+            [publicId, terminalId, apertura, importeAperturaCents, apertura, apertura],
+          );
 
-      await queryRunner.query(
-        `
-          INSERT INTO caja (
-            public_id,
-            id_terminal,
-            id_empleado_apertura,
-            id_empleado_cierre,
+          const id: number = await this.getLastInsertId(queryRunner);
+
+          await this.createPaymentTypeRows(queryRunner, id, apertura);
+
+          return {
+            id,
+            publicId,
+            idTerminal: terminalId,
             apertura,
-            cierre,
-            ventas_cents,
-            beneficios_cents,
-            descuentos_cents,
-            movimientos_entrada_cents,
-            movimientos_salida_cents,
-            importe_apertura_cents,
-            importe_cierre_teorico_cents,
-            importe_cierre_real_cents,
-            importe_retirado_cents,
-            observaciones,
-            created_at,
-            updated_at
-          )
-          VALUES (
-            ?,
-            ?,
-            NULL,
-            NULL,
-            ?,
-            NULL,
-            0,
-            0,
-            0,
-            0,
-            0,
-            ?,
-            0,
-            0,
-            0,
-            NULL,
-            ?,
-            ?
-          )
-        `,
-        [publicId, terminalId, apertura, importeAperturaCents, apertura, apertura],
+            importeAperturaCents,
+          };
+        },
       );
-
-      const id: number = await this.getLastInsertId(queryRunner);
-
-      await this.createPaymentTypeRows(queryRunner, id, apertura);
-
-      const result: CajaAbiertaRecord = {
-        id,
-        publicId,
-        idTerminal: terminalId,
-        apertura,
-        importeAperturaCents,
-      };
-
-      await queryRunner.commitTransaction();
-
-      return result;
     } catch (error: unknown) {
-      if (queryRunner.isTransactionActive) {
-        await queryRunner.rollbackTransaction();
-      }
-
       throw new Error('No se ha podido abrir la caja.', {
         cause: error,
       });
-    } finally {
-      await queryRunner.release();
     }
   }
 
