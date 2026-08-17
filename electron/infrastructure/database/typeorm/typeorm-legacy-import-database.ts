@@ -6,6 +6,7 @@ import type LegacyImportExecutionSummary from '@backend/domain/legacy-import/leg
 import type LegacyImportPhaseResult from '@backend/domain/legacy-import/legacy-import-phase-result.interface';
 import DatabaseSchemaService from '@infrastructure/database/schema/database-schema.service';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
+import { runQueryRunnerTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
 import { rm } from 'node:fs/promises';
 import type { DataSource, QueryRunner } from 'typeorm';
 
@@ -185,11 +186,11 @@ export default class TypeOrmLegacyImportDatabase {
     queryRunner: QueryRunner,
     command: LegacyImportExecutionCommand,
   ): Promise<void> {
-    await queryRunner.startTransaction();
-
-    try {
-      await queryRunner.query(
-        `
+    await runQueryRunnerTransaction(
+      queryRunner,
+      async (transactionQueryRunner: QueryRunner): Promise<void> => {
+        await transactionQueryRunner.query(
+          `
           INSERT INTO legacy_import (
             source_application,
             source_version,
@@ -215,24 +216,17 @@ export default class TypeOrmLegacyImportDatabase {
             NULL
           )
         `,
-        [
-          command.sourceApplication,
-          command.sourceVersion,
-          command.sourceSchemaVersion,
-          command.sourceHash.toLowerCase(),
-          command.startedAt,
-          command.warningCount,
-        ],
-      );
-
-      await queryRunner.commitTransaction();
-    } catch (error: unknown) {
-      if (queryRunner.isTransactionActive) {
-        await queryRunner.rollbackTransaction();
-      }
-
-      throw error;
-    }
+          [
+            command.sourceApplication,
+            command.sourceVersion,
+            command.sourceSchemaVersion,
+            command.sourceHash.toLowerCase(),
+            command.startedAt,
+            command.warningCount,
+          ],
+        );
+      },
+    );
   }
 
   private async updateImportWarningCount(
@@ -254,9 +248,7 @@ export default class TypeOrmLegacyImportDatabase {
 
   private async prepareDocumentSequences(
     queryRunner: QueryRunner,
-
     command: LegacyImportExecutionCommand,
-
     completedAt: string,
   ): Promise<void> {
     this.assertInitialDocumentNumber(command.initialSaleNumber, 'ticket');
@@ -277,21 +269,24 @@ export default class TypeOrmLegacyImportDatabase {
       command.initialInvoiceNumber - 1,
     );
 
-    await queryRunner.startTransaction();
+    await runQueryRunnerTransaction(
+      queryRunner,
+      async (transactionQueryRunner: QueryRunner): Promise<void> => {
+        await this.upsertDocumentSequence(
+          transactionQueryRunner,
+          'venta',
+          lastSaleNumber,
+          completedAt,
+        );
 
-    try {
-      await this.upsertDocumentSequence(queryRunner, 'venta', lastSaleNumber, completedAt);
-
-      await this.upsertDocumentSequence(queryRunner, 'factura', lastInvoiceNumber, completedAt);
-
-      await queryRunner.commitTransaction();
-    } catch (error: unknown) {
-      if (queryRunner.isTransactionActive) {
-        await queryRunner.rollbackTransaction();
-      }
-
-      throw error;
-    }
+        await this.upsertDocumentSequence(
+          transactionQueryRunner,
+          'factura',
+          lastInvoiceNumber,
+          completedAt,
+        );
+      },
+    );
   }
 
   private async readMaximumDocumentNumber(
@@ -368,52 +363,42 @@ export default class TypeOrmLegacyImportDatabase {
 
   private async completeImportRecord(
     queryRunner: QueryRunner,
-
     sourceHash: string,
-
     warningCount: number,
-
     completedAt: string,
   ): Promise<void> {
     const status: 'success' | 'success_with_warnings' =
       warningCount > 0 ? 'success_with_warnings' : 'success';
 
-    await queryRunner.startTransaction();
+    await runQueryRunnerTransaction(
+      queryRunner,
+      async (transactionQueryRunner: QueryRunner): Promise<void> => {
+        await transactionQueryRunner.query(
+          `
+          UPDATE legacy_import
+          SET
+            status = ?,
+            completed_at = ?,
+            warning_count = ?,
+            error_count = 0
+          WHERE
+            source_hash = ?
+        `,
+          [status, completedAt, warningCount, sourceHash.toLowerCase()],
+        );
 
-    try {
-      await queryRunner.query(
-        `
-        UPDATE legacy_import
-        SET
-          status = ?,
-          completed_at = ?,
-          warning_count = ?,
-          error_count = 0
-        WHERE
-          source_hash = ?
-      `,
-        [status, completedAt, warningCount, sourceHash.toLowerCase()],
-      );
-
-      await queryRunner.query(
-        `
-        UPDATE application_metadata
-        SET
-          imported_at = ?
-        WHERE
-          id = 1
-      `,
-        [completedAt],
-      );
-
-      await queryRunner.commitTransaction();
-    } catch (error: unknown) {
-      if (queryRunner.isTransactionActive) {
-        await queryRunner.rollbackTransaction();
-      }
-
-      throw error;
-    }
+        await transactionQueryRunner.query(
+          `
+          UPDATE application_metadata
+          SET
+            imported_at = ?
+          WHERE
+            id = 1
+        `,
+          [completedAt],
+        );
+      },
+    );
   }
 
   private assertInitialDocumentNumber(
