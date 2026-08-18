@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 1.7  
-**Fecha:** 16 de agosto de 2026  
-**Estado:** Installation, importación legacy y Startup completados y probados. En el módulo **Ventas** están completados, probados y subidos los bloques 1 a 9. La **auditoría transversal de arquitectura** está completada y los refactors **A — Dinero y porcentajes** y **B — Utils Angular + contratos** están terminados, probados y subidos. El siguiente paso es **Refactor C — Infraestructura SQLite**.
+**Versión:** 1.8  
+**Fecha:** 18 de agosto de 2026  
+**Estado:** Installation, importación legacy y Startup completados y probados. En el módulo **Ventas** están completados, probados y subidos los bloques 1 a 9. La **auditoría transversal de arquitectura** está completada y los refactors **A — Dinero y porcentajes**, **B — Utils Angular + contratos** y **C — Infraestructura SQLite** están terminados, probados y subidos. El siguiente paso es **Refactor D — UI + Bootstrap**.
 
 ## 1. Propósito del documento
 
@@ -28,8 +28,9 @@ Los grandes hitos completados hasta ahora son:
 - **Auditoría transversal de arquitectura tras Ventas 9**.
 - **Refactor A — Dinero y porcentajes**.
 - **Refactor B — Utils Angular + contratos**.
+- **Refactor C — Infraestructura SQLite**.
 
-Todos los bloques Ventas 1–9 han sido probados por el usuario con la aplicación real y están subidos al repositorio. Tras cerrar Ventas 9 se realizó una auditoría transversal del estado de `main`. Los refactors **A** y **B** derivados de esa auditoría están completados, probados y subidos; quedan **C, D y E** antes de iniciar Ventas 10.
+Todos los bloques Ventas 1–9 han sido probados por el usuario con la aplicación real y están subidos al repositorio. Tras cerrar Ventas 9 se realizó una auditoría transversal del estado de `main`. Los refactors **A**, **B** y **C** derivados de esa auditoría están completados, probados y subidos; quedan **D y E** antes de iniciar Ventas 10.
 
 ## 2. Estado actual del proyecto
 
@@ -50,7 +51,8 @@ Todos los bloques Ventas 1–9 han sido probados por el usuario con la aplicaci�
 - Las ventas abiertas viven en memoria en `VentasService` y sobreviven a la navegación entre módulos.
 - Refactor A — Dinero y porcentajes: completado, probado y subido.
 - Refactor B — Utils Angular + contratos: completado, probado y subido.
-- Antes de Ventas 10 quedan los refactors **C — Infraestructura SQLite**, **D — UI + Bootstrap** y **E — Limpieza final**.
+- Refactor C — Infraestructura SQLite: completado, probado y subido.
+- Antes de Ventas 10 quedan los refactors **D — UI + Bootstrap** y **E — Limpieza final**.
 
 ## 3. Repositorios y entorno
 
@@ -277,7 +279,7 @@ Esta recapitulación debe aparecer al comenzar cada nuevo bloque de desarrollo y
 
 > **Hito transversal antes de Ventas 10:** auditoría de arquitectura completada. Debe ejecutarse primero el refactor técnico A–E descrito en la sección 20. No cambia funcionalidad de negocio ni altera el orden de los bloques 10–12.
 
-> **Estado exacto al cerrar esta versión:** Ventas 1–9 están implementados, probados y subidos. La auditoría transversal está completada. **Refactor A** y **Refactor B** están completados, probados y subidos. El siguiente paso es **Refactor C — Infraestructura SQLite**; después quedan D y E antes de Ventas 10.
+> **Estado exacto al cerrar esta versión:** Ventas 1–9 están implementados, probados y subidos. La auditoría transversal está completada. **Refactor A**, **Refactor B** y **Refactor C** están completados, probados y subidos. El siguiente paso es **Refactor D — UI + Bootstrap**; después queda E antes de Ventas 10.
 
 ## 11. Ventas 1 — Contexto operativo ✅
 
@@ -2415,7 +2417,9 @@ Incluye:
 
 No crear abstracciones genéricas de carga/caché.
 
-#### ⬜ Refactor C — Infraestructura SQLite — siguiente paso
+#### ✅ Refactor C — Infraestructura SQLite
+
+**Completado, probado y subido.**
 
 Incluye:
 
@@ -2425,7 +2429,7 @@ Incluye:
 
 Es especialmente importante antes de Ventas 11.
 
-#### Refactor D — UI y Bootstrap
+#### ⬜ Refactor D — UI y Bootstrap — siguiente paso
 
 Incluye:
 
@@ -2480,7 +2484,7 @@ Estado actual:
 ```text
 ✅ Refactor A — Dinero y porcentajes
 ✅ Refactor B — Utils Angular + contratos
-⬜ Refactor C — Infraestructura SQLite
+✅ Refactor C — Infraestructura SQLite
 ⬜ Refactor D — UI + Bootstrap
 ⬜ Refactor E — Limpieza final
 ⬜ Ventas 10 — Finalización y pagos
@@ -2998,40 +3002,574 @@ También se verificaron manualmente:
 
 Todos los cambios están subidos al repositorio y el local del usuario quedó limpio tras cada cierre.
 
-### 20.24 Próximo hito transversal — Refactor C
+### 20.24 Refactor C — Infraestructura SQLite ✅
 
-El siguiente paso es:
+Refactor C está **completado, probado y subido al repositorio**.
 
-# Refactor C — Infraestructura SQLite
+Objetivo: centralizar la mecánica transaccional repetida de TypeORM/SQLite y fijar una convención única para recuperar el ID autogenerado de una fila recién insertada, sin esconder el SQL, sin introducir repositorios base y sin alterar reglas de negocio.
 
-Objetivos ya fijados por la auditoría:
+La fase se dividió en:
 
-1. centralizar el ciclo repetido de transacción TypeORM:
+```text
+✅ C1 — Base transaccional TypeORM
+✅ C2 — Caja + Reservas
+✅ C3 — Legacy Import
+✅ C4 — IDs SQLite tras INSERT
+✅ C5 — Limpieza y regresión
+```
+
+#### 20.24.1 C1 — Base transaccional TypeORM
+
+Se creó:
+
+```text
+electron/infrastructure/database/typeorm/
+└── typeorm-transaction.utils.ts
+```
+
+con dos primitivas complementarias:
+
+```text
+runQueryRunnerTransaction<T>()
+runDataSourceTransaction<T>()
+```
+
+`runQueryRunnerTransaction()` recibe un `QueryRunner` cuyo ciclo de vida pertenece al consumidor y se responsabiliza únicamente de:
+
+```text
+startTransaction
+        ↓
+operation
+        ↓
+commit
+        │
+        └─ error → rollback
+```
+
+Decisiones importantes:
+
+- no conecta el `QueryRunner`;
+- no lo libera;
+- comprueba `isTransactionActive` antes del rollback;
+- vuelve a lanzar el error original;
+- no añade mensajes funcionales ni conocimiento de dominio.
+
+`runDataSourceTransaction()` recibe un `DataSource` y una operación, crea un runner específico para esa transacción y se responsabiliza de:
+
+```text
+createQueryRunner
+connect
+runQueryRunnerTransaction
+release
+```
+
+Comprueba `isReleased` antes de liberar.
+
+La razón para mantener dos niveles fue descubierta al revisar el código real:
+
+- Caja y Reservas crean un runner exclusivo para una operación;
+- Legacy Import mantiene un único runner de larga duración para todo el pipeline y abre varias transacciones independientes sobre él.
+
+No se utilizó `DataSource.transaction()` porque la infraestructura existente trabaja explícitamente con `QueryRunner`, y Legacy Import necesita conservar la propiedad de un runner largo.
+
+No se añadieron:
+
+```text
+RepositoryBase
+TransactionalRepository
+ServiceBase
+runReadQuery
+framework de DI
+```
+
+#### 20.24.2 C2 — Migración de Caja y Reservas
+
+Se migraron las operaciones transaccionales operativas a `runDataSourceTransaction()`.
+
+En Caja:
+
+```text
+TypeOrmCajaRepository.open()
+```
+
+dejó de implementar manualmente:
 
 ```text
 createQueryRunner
 connect
 startTransaction
-operation
-commit / rollback
+commitTransaction
+rollbackTransaction
 release
 ```
 
-2. decidir y aplicar una convención coherente para recuperar IDs después de un `INSERT`;
+La rama que detecta una caja ya abierta conserva exactamente su comportamiento, pero ahora un `return` dentro del callback provoca primero el commit gestionado por el helper y después retorna al repository.
 
-3. adaptar repositories existentes sin cambiar reglas de negocio ni ocultar el SQL;
+Las queries, reglas funcionales y mensajes de error de Caja permanecen en el repository.
 
-4. preparar una infraestructura segura y explícita antes de Ventas 11 — Persistencia transaccional.
+En Reservas se migraron:
 
-Dirección prevista:
+```text
+create()
+deleteLinea()
+deleteReserva()
+```
+
+También desaparecieron sus commits manuales en ramas tempranas como:
+
+```text
+línea inexistente → false
+reserva inexistente → false
+```
+
+El helper garantiza igualmente commit y release.
+
+Se mantuvieron intactas las reglas ya establecidas:
+
+- alta de reserva y decremento de stock en la misma transacción;
+- eliminación de línea y restitución de stock;
+- cancelación de última línea mediante borrado lógico de reserva;
+- recalcular el total desde SQLite;
+- cancelar reserva restaurando stock de todas las líneas.
+
+Los `catch` de cada repository siguen añadiendo el contexto propio del caso de uso. La infraestructura no transforma errores funcionales.
+
+#### 20.24.3 C3 — Legacy Import
+
+Se migraron tres bloques transaccionales internos de:
+
+```text
+TypeOrmLegacyImportDatabase
+```
+
+a:
+
+```text
+runQueryRunnerTransaction()
+```
+
+Los bloques son:
+
+```text
+insertImportRecord()
+prepareDocumentSequences()
+completeImportRecord()
+```
+
+Legacy Import **sigue siendo propietario de un único `QueryRunner` de larga duración**:
+
+```text
+prepare()
+    ↓
+createQueryRunner
+connect
+    ↓
+schema / importadores / validaciones
+    ↓
+varias transacciones independientes
+    ↓
+checkpoint
+release
+destroy
+```
+
+El helper solo posee begin/commit/rollback de cada tramo.
+
+No se amplió el alcance de ninguna transacción.
+
+En particular, `prepareDocumentSequences()` conserva esta frontera:
+
+```text
+leer máximos de ticket/factura
+calcular últimos números
+        ↓
+BEGIN
+actualizar secuencia venta
+actualizar secuencia factura
+COMMIT
+```
+
+Las lecturas no fueron desplazadas dentro de la transacción.
+
+`completeImportRecord()` conserva atómicos:
+
+```text
+legacy_import.status / completed_at
++
+application_metadata.imported_at
+```
+
+`updateImportWarningCount()` permanece fuera de esas transacciones porque así estaba diseñado el flujo previo.
+
+No se tocaron:
+
+- importadores de fases;
+- creación del schema;
+- validación final;
+- checkpoint WAL;
+- cierre/eliminación de la SQLite temporal.
+
+Se realizó una importación `.otpv` real después del cambio y terminó correctamente.
+
+#### 20.24.4 Tooling de tests durante C3
+
+Durante esta fase se corrigió una molestia del flujo de trabajo.
+
+Antes:
+
+```json
+"test": "ng test"
+```
+
+dejaba Vitest/Angular en modo:
+
+```text
+Waiting for file changes...
+```
+
+después de ejecutar la suite.
+
+Se cambió la convención para que:
+
+```bash
+npm test
+```
+
+sea un comando finito mediante:
+
+```json
+"test": "ng test --watch=false"
+```
+
+y se conserva el modo interactivo mediante:
+
+```json
+"test:watch": "ng test"
+```
+
+Por tanto:
+
+```text
+npm test
+→ ejecuta una vez y termina
+
+npm run test:watch
+→ permanece escuchando cambios
+```
+
+Esta es la convención que debe utilizarse en los siguientes bloques y en CI.
+
+#### 20.24.5 C4 — Convención SQLite para IDs recién insertados
+
+Se creó:
 
 ```text
 electron/infrastructure/database/typeorm/
-├── typeorm-transaction.utils.ts
 └── sqlite.utils.ts
 ```
 
-Antes de implementar C debe volver a inspeccionarse el estado actual de los repositories y los patrones reales existentes. No se debe crear una abstracción más amplia de la necesaria.
+con:
+
+```text
+getLastInsertId(queryRunner, errorMessage)
+```
+
+La implementación centraliza:
+
+```sql
+SELECT
+  last_insert_rowid() AS id
+```
+
+y valida que el resultado sea:
+
+- existente;
+- entero seguro;
+- mayor que cero.
+
+Regla crítica:
+
+> `last_insert_rowid()` debe ejecutarse con el mismo `QueryRunner` que realizó el `INSERT`, porque el valor pertenece a la conexión SQLite.
+
+La utilidad recibe el mensaje de error desde el repository para no conocer dominios como Caja, Reserva o Cliente.
+
+#### 20.24.6 Migración de Caja al helper SQLite
+
+Caja ya utilizaba `last_insert_rowid()`, pero mediante:
+
+```text
+LastInsertIdDatabaseRow
+private getLastInsertId()
+```
+
+locales en `TypeOrmCajaRepository`.
+
+Se eliminaron ambos y Caja utiliza ahora:
+
+```text
+getLastInsertId(queryRunner, ...)
+```
+
+La consulta y la semántica son las mismas, pero existe una única implementación.
+
+#### 20.24.7 Migración de Reservas al helper SQLite
+
+Antes, después de:
+
+```sql
+INSERT INTO reserva ...
+```
+
+el repository hacía:
+
+```sql
+SELECT id
+FROM reserva
+WHERE public_id = ?
+```
+
+solo para descubrir el ID que SQLite acababa de generar.
+
+Ese patrón se sustituyó por:
+
+```text
+INSERT reserva
+        ↓
+getLastInsertId(queryRunner)
+        ↓
+INSERT linea_reserva
+```
+
+Todo sigue dentro de la misma transacción y del mismo `QueryRunner`.
+
+`DatabaseIdRow` no se eliminó porque continúa siendo necesario para resoluciones legítimas de entidades existentes como:
+
+```text
+resolveClienteId()
+resolveArticuloId()
+```
+
+#### 20.24.8 Migración de Cliente
+
+`TypeOrmClienteRepository.create()` también hacía:
+
+```text
+INSERT cliente
+        ↓
+SELECT id FROM cliente WHERE public_id = ?
+```
+
+El alta de Cliente se migró a:
+
+```text
+runDataSourceTransaction()
+```
+
+para garantizar:
+
+```text
+mismo QueryRunner
+        ↓
+INSERT cliente
+        ↓
+getLastInsertId()
+        ↓
+ClienteRecord
+```
+
+Esto introduce además una mejora de coherencia:
+
+antes, si el `INSERT` tenía éxito pero fallaba la consulta posterior del ID, el cliente podía quedar persistido aunque `create()` fallase.
+
+Ahora:
+
+```text
+BEGIN
+INSERT
+getLastInsertId
+error → ROLLBACK
+```
+
+El camino correcto y las reglas funcionales del alta no cambian.
+
+#### 20.24.9 Regla final para IDs
+
+La convención queda expresamente fijada:
+
+```text
+fila recién insertada
+→ getLastInsertId(queryRunner)
+
+entidad existente recibida por publicId
+→ SELECT id WHERE public_id = ?
+```
+
+Por tanto, buscar por `public_id` sigue siendo totalmente válido para resolver entidades ya existentes.
+
+No se creó ningún helper como:
+
+```text
+resolveIdByPublicId(tableName, ...)
+insertAndReturnId(tableName, ...)
+```
+
+porque introduciría SQL dinámico y escondería conocimiento que debe permanecer en el repository.
+
+Esta regla es especialmente importante para **Ventas 11 — Persistencia transaccional**:
+
+```text
+INSERT venta
+        ↓
+getLastInsertId(queryRunner)
+        ↓
+INSERT líneas / pagos / relaciones
+```
+
+#### 20.24.10 C5 — Limpieza y regresión
+
+C5 no necesitó cambios de código adicionales.
+
+Los barridos finales confirmaron:
+
+```text
+startTransaction
+commitTransaction
+rollbackTransaction
+```
+
+solo aparecen en:
+
+```text
+typeorm-transaction.utils.ts
+```
+
+`createQueryRunner()` y `release()` siguen apareciendo deliberadamente en:
+
+```text
+typeorm-transaction.utils.ts
+typeorm-legacy-import-database.ts
+typeorm-installation-database.ts
+```
+
+porque representan tres propietarios legítimos del ciclo de vida:
+
+```text
+runner corto de una transacción
+runner largo del Legacy Import
+runner largo de Installation
+```
+
+`last_insert_rowid()` aparece únicamente en:
+
+```text
+sqlite.utils.ts
+```
+
+y `getLastInsertId()` es consumido por:
+
+```text
+TypeOrmCajaRepository
+TypeOrmReservasRepository
+TypeOrmClienteRepository
+```
+
+Los consumidores de `runDataSourceTransaction()` son:
+
+```text
+Caja
+Reservas
+Cliente
+```
+
+y `runQueryRunnerTransaction()` es utilizado productivamente por Legacy Import.
+
+#### 20.24.11 Casos deliberadamente no abstraídos
+
+Se revisaron y se mantienen explícitos:
+
+```text
+TypeOrmInstallationDatabase
+```
+
+usa un `QueryRunner` para todo el proceso de instalación pero no abre una transacción explícita. No se hizo transaccional solo por uniformidad.
+
+```text
+TypeOrmLegacyImportDatabase
+```
+
+mantiene su runner largo; no se convirtió todo el proceso de importación en una única gran transacción.
+
+Los repositories siguen recibiendo/pasando `QueryRunner` entre helpers privados para que la frontera transaccional sea visible.
+
+No se introdujeron:
+
+```text
+RepositoryBase
+TransactionalRepository
+ServiceBase
+generic table helpers
+framework de infraestructura
+```
+
+#### 20.24.12 Validación de Refactor C
+
+En las subfases se ejecutaron correctamente:
+
+```bash
+npm test
+npm run typecheck:electron
+npm run build
+npm run lint
+npm run build:desktop
+```
+
+También pasaron los greps previstos de:
+
+- lifecycle transaccional;
+- creación/liberación de `QueryRunner`;
+- `last_insert_rowid()`;
+- `getLastInsertId()`;
+- consumidores de helpers;
+- búsquedas legítimas por `public_id`.
+
+Pruebas manuales realizadas:
+
+- Caja: recuperación correcta de una caja ya abierta y estabilidad del contexto operativo;
+- Reservas: alta, decremento de stock, eliminación de línea/reserva y restitución simétrica de stock;
+- Legacy Import: importación `.otpv` real completa;
+- Cliente: creación real, selección posterior y documento de protección de datos;
+- Ventas: smoke test normal después de los cambios.
+
+Todos los cambios de C1–C4 están subidos al repositorio. C5 cerró sin necesidad de un commit adicional.
+
+### 20.25 Próximo hito transversal — Refactor D
+
+El siguiente paso es:
+
+# Refactor D — UI + Bootstrap
+
+Objetivos fijados por la auditoría:
+
+1. revisar la duplicación SCSS real en overlays, modales, contenedores y tablas;
+2. extraer únicamente primitivas visuales que tengan reutilización demostrada;
+3. no crear un `ModalComponent` genérico ni una jerarquía abstracta de UI sin necesidad;
+4. revisar `electron/main.ts`, que actualmente acumula lifecycle de Electron, creación/configuración de ventana, wiring de dependencias y registro IPC;
+5. separar el composition root/bootstrap en piezas pequeñas sin introducir un framework de DI;
+6. mantener explícitos IPC, preload y wiring para que el arranque siga siendo fácil de seguir.
+
+Antes de implementar D debe inspeccionarse de nuevo el estado actual de `main`, tanto los SCSS implicados como `electron/main.ts` y los módulos de registro IPC existentes.
+
+La prioridad de D no es reducir líneas por sí misma. Debe mejorar:
+
+```text
+coherencia visual
++
+legibilidad del bootstrap
++
+mantenibilidad
+```
+
+sin ocultar comportamiento.
 
 ## 21. Ajustes transversales realizados durante Ventas
 
@@ -3102,6 +3640,8 @@ npm run lint
 ```
 
 - `npm run build:desktop` es útil cuando se toca Electron/backend o empaquetado.
+- `npm test` ejecuta `ng test --watch=false`, por lo que la suite termina automáticamente al finalizar.
+- Para desarrollo interactivo existe `npm run test:watch`, que ejecuta `ng test` en modo watch.
 - No existe un script `npm run typecheck`; el correcto es `npm run typecheck:electron`.
 - No avanzar al bloque siguiente hasta que el actual funcione o sus limitaciones estén documentadas.
 - El usuario suele probar manualmente, ejecutar la batería completa y subir los cambios antes de continuar.
@@ -3122,7 +3662,7 @@ Installation + importación legacy y Startup están completados y probados. En e
 8. Devoluciones.
 9. Reservas.
 
-Después de Ventas 9 se completó una auditoría transversal de arquitectura. **Refactor A — Dinero/porcentajes** y **Refactor B — Utils Angular/contratos** ya están completados, probados y subidos. Antes de Ventas 10 quedan **Refactor C — Infraestructura SQLite**, **Refactor D — UI/bootstrap** y **Refactor E — Limpieza final**. Después quedan Ventas 10 — Finalización y pagos, Ventas 11 — Persistencia transaccional y Ventas 12 — Postventa.
+Después de Ventas 9 se completó una auditoría transversal de arquitectura. **Refactor A — Dinero/porcentajes**, **Refactor B — Utils Angular/contratos** y **Refactor C — Infraestructura SQLite** ya están completados, probados y subidos. Antes de Ventas 10 quedan **Refactor D — UI/bootstrap** y **Refactor E — Limpieza final**. Después quedan Ventas 10 — Finalización y pagos, Ventas 11 — Persistencia transaccional y Ventas 12 — Postventa.
 
 Los repositorios de referencia son:
 - Frontend antiguo: https://github.com/osumionline/Osumi-TPV
@@ -3133,53 +3673,108 @@ Antes de empezar un bloque, dame la recapitulación completa del plan, indicando
 
 Al terminar cada bloque principal, después de que confirme que funciona y que está subido, entrégame una versión actualizada de este documento de continuidad.
 
-Debemos continuar por: **Refactor C — Infraestructura SQLite**. A y B están cerrados; no repetirlos ni rehacer la auditoría. No iniciar Ventas 10 hasta completar y validar C, D y E.
+Debemos continuar por: **Refactor D — UI + Bootstrap**. A, B y C están cerrados; no repetirlos ni rehacer la auditoría. No iniciar Ventas 10 hasta completar y validar D y E.
 ```
 
 ## 26. Próximo paso
 
 El siguiente desarrollo es:
 
-# Refactor C — Infraestructura SQLite
+# Refactor D — UI + Bootstrap
 
 Estado del refactor transversal:
 
 ```text
 ✅ A — Dinero y porcentajes
 ✅ B — Utils Angular + contratos
-⬜ C — Infraestructura SQLite
+✅ C — Infraestructura SQLite
 ⬜ D — UI + Bootstrap
 ⬜ E — Limpieza final
 ```
 
-C debe comenzar con una nueva inspección del código actual de `main`, especialmente:
+D debe comenzar con una inspección actualizada de `main`.
 
-- `TypeOrmReservasRepository`;
-- `TypeOrmCajaRepository`;
-- otros repositories que creen `QueryRunner` o transacciones manuales;
-- patrones actuales de `last_insert_rowid()`;
-- consultas posteriores por `public_id` utilizadas para recuperar IDs;
-- cualquier otro `INSERT` que necesite el ID generado.
+## Área D1 — UI / SCSS
 
-Objetivos:
+Revisar especialmente componentes con:
 
-1. diseñar un helper TypeORM mínimo para ejecutar una operación dentro de una transacción;
-2. mantener en cada repository sus mensajes y reglas específicas;
-3. garantizar `commit`, `rollback` y `release` en todas las ramas;
-4. elegir una convención coherente para recuperar el ID SQLite generado;
-5. evitar helpers SQL dinámicos del tipo `resolveIdByPublicId(tableName, ...)`;
-6. no crear RepositoryBase, ServiceBase ni framework de infraestructura;
-7. no cambiar comportamiento funcional.
+- overlays de pantalla completa;
+- paneles/modales;
+- cabeceras y pies de diálogo;
+- backdrop;
+- `z-index`;
+- tablas/listados dentro de overlays;
+- botones/cierres/foco asociados.
 
-Dirección prevista:
+Objetivo:
 
 ```text
-electron/infrastructure/database/typeorm/
-├── typeorm-transaction.utils.ts
-└── sqlite.utils.ts
+detectar repetición real
+        ↓
+extraer primitivas SCSS pequeñas
+        ↓
+migrar consumidores verificables
 ```
 
-Después de cada subfase:
+No crear por adelantado:
+
+```text
+ModalComponent genérico
+OverlayService genérico
+framework visual propio
+```
+
+si la duplicación no lo justifica.
+
+Debe mantenerse el comportamiento actual de foco, accesibilidad y cierre de overlays.
+
+## Área D2 — Bootstrap Electron
+
+Revisar especialmente:
+
+```text
+electron/main.ts
+```
+
+y los módulos actuales de:
+
+- creación/configuración de `BrowserWindow`;
+- lifecycle `app.whenReady`, `activate`, `window-all-closed`;
+- menú y atajos de DevTools;
+- construcción de servicios/repositories;
+- registro de handlers IPC;
+- preload y contratos.
+
+Objetivo:
+
+```text
+main.ts
+→ contar claramente el lifecycle de la aplicación
+
+composition/bootstrap
+→ construir dependencias y registrar infraestructura
+```
+
+sin introducir:
+
+```text
+contenedor DI
+decoradores
+auto-discovery
+registro IPC implícito
+```
+
+El wiring debe seguir siendo explícito y fácil de rastrear.
+
+## Método
+
+Antes de proponer cambios sobre archivos existentes:
+
+1. inspeccionar el contenido actual;
+2. inventariar repetición real;
+3. separar D en subbloques pequeños verificables;
+4. cambiar una sola zona por vez;
+5. ejecutar tras cada subfase:
 
 ```bash
 npm test
@@ -3189,17 +3784,16 @@ npm run lint
 npm run build:desktop
 ```
 
-Tras C quedarán:
+Tras D quedarán:
 
 ```text
-D — UI + Bootstrap
 E — Limpieza final
 Ventas 10 — Finalización y pagos
 Ventas 11 — Persistencia transaccional
 Ventas 12 — Postventa
 ```
 
-No iniciar Ventas 10 hasta cerrar C–E.
+No iniciar Ventas 10 hasta cerrar D y E.
 
 ## 27. Registro de hitos
 
@@ -3213,3 +3807,4 @@ No iniciar Ventas 10 hasta cerrar C–E.
 | 1.5 | 15 de agosto de 2026 | Ventas 9 — Reservas completado: consulta y gestión transaccional, carga múltiple sin deduplicación, economía histórica, cliente bloqueado, gestor visual, creación de reservas y ciclo simétrico de stock. Próximo bloque planificado: Ventas 10 — Finalización y pagos; antes se revisará otro asunto con el usuario. |
 | 1.6 | 15 de agosto de 2026 | Auditoría transversal de arquitectura completada tras Ventas 9. No requiere rehacer la arquitectura base. Se acuerda refactor técnico A–E antes de Ventas 10: dinero/porcentajes, utils Angular/contratos, infraestructura SQLite, UI/bootstrap y limpieza final. |
 | 1.7 | 16 de agosto de 2026 | Refactors A y B completados, probados y subidos. A centraliza dinero/porcentajes en Angular y backend, elimina conversiones y magic numbers duplicados y añade pipes de presentación. B centraliza fechas, strings y errores Angular y comparte contractualmente los límites de Cliente sin compartir implementación. Siguiente paso: Refactor C — Infraestructura SQLite. |
+| 1.8 | 18 de agosto de 2026 | Refactor C — Infraestructura SQLite completado, probado y subido. Se centraliza la mecánica transaccional TypeORM con helpers para runners propios y ajenos, se migran Caja, Reservas y Legacy Import, se fija `getLastInsertId()` como convención para filas recién insertadas y se migra también Cliente. `npm test` pasa a ser finito mediante `--watch=false`, conservando `test:watch`. Siguiente paso: Refactor D — UI + Bootstrap. |
