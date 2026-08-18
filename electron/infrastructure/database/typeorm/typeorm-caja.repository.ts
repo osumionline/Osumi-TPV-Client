@@ -1,14 +1,11 @@
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CajaAbiertaRecord from '@backend/domain/caja/caja-abierta-record.interface';
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
+import { getLastInsertId } from '@infrastructure/database/typeorm/sqlite.utils';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
 import { randomUUID } from 'node:crypto';
 import type { DataSource, QueryRunner } from 'typeorm';
-
-interface TerminalIdDatabaseRow {
-  readonly id: number;
-}
 
 interface CajaAbiertaDatabaseRow {
   readonly id: number;
@@ -23,7 +20,7 @@ interface CajaAnteriorDatabaseRow {
   readonly movimientos_entrada_cents: number;
 }
 
-interface LastInsertIdDatabaseRow {
+interface TerminalIdDatabaseRow {
   readonly id: number;
 }
 
@@ -111,7 +108,10 @@ export default class TypeOrmCajaRepository implements CajaRepository {
             [publicId, terminalId, apertura, importeAperturaCents, apertura, apertura],
           );
 
-          const id: number = await this.getLastInsertId(queryRunner);
+          const id: number = await getLastInsertId(
+            queryRunner,
+            'No se ha podido obtener el identificador de la caja creada.',
+          );
 
           await this.createPaymentTypeRows(queryRunner, id, apertura);
 
@@ -270,24 +270,6 @@ export default class TypeOrmCajaRepository implements CajaRepository {
       `,
       [cajaId, createdAt, createdAt],
     );
-  }
-
-  /**
-   * Obtiene el identificador generado por el último INSERT del QueryRunner.
-   */
-  private async getLastInsertId(queryRunner: QueryRunner): Promise<number> {
-    const rows: readonly LastInsertIdDatabaseRow[] = (await queryRunner.query(`
-      SELECT
-        last_insert_rowid() AS id
-    `)) as readonly LastInsertIdDatabaseRow[];
-
-    const id: number | undefined = rows[0]?.id;
-
-    if (id === undefined || !Number.isSafeInteger(id) || id <= 0) {
-      throw new Error('No se ha podido obtener el identificador de la caja creada.');
-    }
-
-    return id;
   }
 
   /**

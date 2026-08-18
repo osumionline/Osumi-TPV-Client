@@ -3,6 +3,7 @@ import type { CrearReservaLineaRecordCommand } from '@backend/contracts/reservas
 import type ReservasRepository from '@backend/contracts/reservas/reservas.repository.interface';
 import type ReservaRecord from '@backend/domain/reservas/reserva-record.interface';
 import type { ReservaLineaRecord } from '@backend/domain/reservas/reserva-record.interface';
+import { getLastInsertId } from '@infrastructure/database/typeorm/sqlite.utils';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
 import { randomUUID } from 'node:crypto';
@@ -111,22 +112,10 @@ export default class TypeOrmReservasRepository implements ReservasRepository {
             [reservaPublicId, idCliente, command.totalCents, timestamp, timestamp],
           );
 
-          const reservaRows: readonly DatabaseIdRow[] = (await queryRunner.query(
-            `
-            SELECT
-              id
-            FROM reserva
-            WHERE public_id = ?
-            LIMIT 1
-          `,
-            [reservaPublicId],
-          )) as readonly DatabaseIdRow[];
-
-          const idReserva: number | undefined = reservaRows[0]?.id;
-
-          if (idReserva === undefined || !Number.isSafeInteger(idReserva) || idReserva <= 0) {
-            throw new Error('No se ha podido obtener el identificador de la reserva creada.');
-          }
+          const idReserva: number = await getLastInsertId(
+            queryRunner,
+            'No se ha podido obtener el identificador de la reserva creada.',
+          );
 
           for (const linea of command.lineas) {
             let idArticulo: number | null = null;

@@ -5,9 +5,11 @@ import type {
 import type ClienteRepository from '@backend/contracts/clientes/cliente.repository.interface';
 import type CrearClienteRecordCommand from '@backend/contracts/clientes/crear-cliente-record-command.interface';
 import type ClienteRecord from '@backend/domain/clientes/cliente-record.interface';
+import { getLastInsertId } from '@infrastructure/database/typeorm/sqlite.utils';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
+import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
 import { randomUUID } from 'node:crypto';
-import type { DataSource } from 'typeorm';
+import type { DataSource, QueryRunner } from 'typeorm';
 
 interface ClienteDatabaseRow {
   readonly id: number;
@@ -156,107 +158,101 @@ export default class TypeOrmClienteRepository implements ClienteRepository {
     const dataSource: DataSource = await this.applicationDatabase.connect();
 
     const publicId: string = randomUUID();
+
     const timestamp: string = new Date().toISOString();
 
-    await dataSource.query(
-      `
-      INSERT INTO cliente (
-        public_id,
-        nombre_apellidos,
-        dni_cif,
-        telefono,
-        email,
-        direccion,
-        codigo_postal,
-        poblacion,
-        id_provincia,
-        datos_facturacion_iguales,
-        fact_nombre_apellidos,
-        fact_dni_cif,
-        fact_telefono,
-        fact_email,
-        fact_direccion,
-        fact_codigo_postal,
-        fact_poblacion,
-        fact_id_provincia,
-        observaciones,
-        descuento_bps,
-        created_at,
-        updated_at
-      )
-      VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?
-      )
-    `,
-      [
-        publicId,
-        command.nombreApellidos,
-        command.dniCif,
-        command.telefono,
-        command.email,
-        command.direccion,
-        command.codigoPostal,
-        command.poblacion,
-        command.provincia,
-        command.factIgual ? 1 : 0,
-        command.factNombreApellidos,
-        command.factDniCif,
-        command.factTelefono,
-        command.factEmail,
-        command.factDireccion,
-        command.factCodigoPostal,
-        command.factPoblacion,
-        command.factProvincia,
-        command.observaciones,
-        command.descuentoBps,
-        timestamp,
-        timestamp,
-      ],
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<ClienteRecord> => {
+        await queryRunner.query(
+          `
+          INSERT INTO cliente (
+            public_id,
+            nombre_apellidos,
+            dni_cif,
+            telefono,
+            email,
+            direccion,
+            codigo_postal,
+            poblacion,
+            id_provincia,
+            datos_facturacion_iguales,
+            fact_nombre_apellidos,
+            fact_dni_cif,
+            fact_telefono,
+            fact_email,
+            fact_direccion,
+            fact_codigo_postal,
+            fact_poblacion,
+            fact_id_provincia,
+            observaciones,
+            descuento_bps,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?
+          )
+        `,
+          [
+            publicId,
+            command.nombreApellidos,
+            command.dniCif,
+            command.telefono,
+            command.email,
+            command.direccion,
+            command.codigoPostal,
+            command.poblacion,
+            command.provincia,
+            command.factIgual ? 1 : 0,
+            command.factNombreApellidos,
+            command.factDniCif,
+            command.factTelefono,
+            command.factEmail,
+            command.factDireccion,
+            command.factCodigoPostal,
+            command.factPoblacion,
+            command.factProvincia,
+            command.observaciones,
+            command.descuentoBps,
+            timestamp,
+            timestamp,
+          ],
+        );
+
+        const id: number = await getLastInsertId(
+          queryRunner,
+          'No se ha podido obtener el identificador del cliente creado.',
+        );
+
+        return {
+          id,
+          publicId,
+          nombreApellidos: command.nombreApellidos,
+          dniCif: command.dniCif,
+          telefono: command.telefono,
+          email: command.email,
+          direccion: command.direccion,
+          codigoPostal: command.codigoPostal,
+          poblacion: command.poblacion,
+          provincia: command.provincia,
+          factIgual: command.factIgual,
+          factNombreApellidos: command.factNombreApellidos,
+          factDniCif: command.factDniCif,
+          factTelefono: command.factTelefono,
+          factEmail: command.factEmail,
+          factDireccion: command.factDireccion,
+          factCodigoPostal: command.factCodigoPostal,
+          factPoblacion: command.factPoblacion,
+          factProvincia: command.factProvincia,
+          observaciones: command.observaciones,
+          descuentoBps: command.descuentoBps,
+          ultimaVenta: null,
+        };
+      },
     );
-
-    const rows: readonly { readonly id: number }[] = (await dataSource.query(
-      `
-        SELECT
-          id
-        FROM cliente
-        WHERE public_id = ?
-        LIMIT 1
-      `,
-      [publicId],
-    )) as readonly { readonly id: number }[];
-
-    const id: number | undefined = rows[0]?.id;
-
-    if (id === undefined || !Number.isSafeInteger(id) || id <= 0) {
-      throw new Error('No se ha podido obtener el identificador del cliente creado.');
-    }
-
-    return {
-      id,
-      publicId,
-      nombreApellidos: command.nombreApellidos,
-      dniCif: command.dniCif,
-      telefono: command.telefono,
-      email: command.email,
-      direccion: command.direccion,
-      codigoPostal: command.codigoPostal,
-      poblacion: command.poblacion,
-      provincia: command.provincia,
-      factIgual: command.factIgual,
-      factNombreApellidos: command.factNombreApellidos,
-      factDniCif: command.factDniCif,
-      factTelefono: command.factTelefono,
-      factEmail: command.factEmail,
-      factDireccion: command.factDireccion,
-      factCodigoPostal: command.factCodigoPostal,
-      factPoblacion: command.factPoblacion,
-      factProvincia: command.factProvincia,
-      observaciones: command.observaciones,
-      descuentoBps: command.descuentoBps,
-      ultimaVenta: null,
-    };
   }
 
   /**
