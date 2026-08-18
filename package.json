@@ -13,6 +13,7 @@
     "build:desktop": "npm run build -- --base-href ./ && npm run build:electron",
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false",
+    "test:watch": "ng test",
     "lint": "ng lint",
     "rebuild:native": "electron-rebuild -f -w better-sqlite3",
     "postinstall": "npm run rebuild:native"
@@ -29,7 +30,6 @@
     "@angular/platform-browser": "^22.1.2",
     "@angular/router": "^22.1.2",
     "@osumi/angular-tools": "^1.5.2",
-    "@osumi/tools": "^1.7.1",
     "better-sqlite3": "^12.11.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "~7.8.2",
