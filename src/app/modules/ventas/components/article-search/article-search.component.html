@@ -39,29 +39,40 @@
             articulo of results();
             track articulo.publicId
             ) {
-            <button type="button"
-                    class="search__result"
-                    [class.search__result--selected]="
-              selectedPublicIds().has(articulo.publicId)
-            "
-                    (click)="toggleArticulo(articulo)">
-                <span class="search__check">
+            <div class="search__result"
+                 [class.search__result--selected]="
+                   selectedPublicIds().has(articulo.publicId)
+                 ">
+                <button type="button"
+                        class="search__check"
+                        [attr.aria-pressed]="
+                        selectedPublicIds().has(articulo.publicId)
+                      "
+                        [attr.aria-label]="
+                        'Marcar o desmarcar ' + articulo.nombre
+                      "
+                        (click)="toggleArticulo(articulo)">
                     <mat-icon>
                         {{
-                  selectedPublicIds().has(articulo.publicId)
-                    ? 'check_box'
-                    : 'check_box_outline_blank'
-                }}
+                    selectedPublicIds().has(articulo.publicId)
+                      ? 'check_box'
+                      : 'check_box_outline_blank'
+                  }}
                     </mat-icon>
-                </span>
+                </button>
 
                 <span class="search__locator">
                     {{ articulo.localizador }}
                 </span>
 
-                <span class="search__name">
+                <button type="button"
+                        class="search__name"
+                        [attr.aria-label]="
+                        'Añadir ' + articulo.nombre + ' directamente a la venta'
+                      "
+                        (click)="selectArticulo(articulo)">
                     {{ articulo.nombre }}
-                </span>
+                </button>
 
                 <span class="search__brand">
                     {{ articulo.marca }}
@@ -69,19 +80,19 @@
 
                 <span class="search__price">
                     {{
-                        (
-                            articulo.pvpDescuentoCents
-                            ?? articulo.pvpCents
-                        )
-                            | centsToEuros
-                            | currency:'EUR':'symbol':'1.2-2'
-                    }}
+                  (
+                    articulo.pvpDescuentoCents
+                    ?? articulo.pvpCents
+                  )
+                    | centsToEuros
+                    | currency:'EUR':'symbol':'1.2-2'
+                }}
                 </span>
 
                 <span class="search__stock">
                     {{ articulo.stock }}
                 </span>
-            </button>
+            </div>
             } @empty {
             <div class="search__empty">
                 No se han encontrado artículos.

@@ -68,16 +68,40 @@
         align-items: center;
         gap: 8px;
         padding: 10px 16px;
-        border: 0;
         border-bottom: 1px solid var(--table-data-border);
         background-color: var(--color-white);
         font: inherit;
         text-align: left;
-        cursor: pointer;
 
         &:hover,
         &.search__result--selected {
             background-color: var(--table-row-selected);
+        }
+    }
+
+    .search__check,
+    .search__name {
+        border: 0;
+        background-color: transparent;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+    }
+
+    .search__check {
+        display: grid;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        place-items: center;
+    }
+
+    .search__name {
+        padding: 4px 0;
+        text-align: left;
+
+        &:hover {
+            text-decoration: underline;
         }
     }
 

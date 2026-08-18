@@ -115,6 +115,13 @@ export default class ArticleSearchComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Selecciona inmediatamente un único artículo.
+   */
+  selectArticulo(articulo: ArticuloVenta): void {
+    this.selectEvent.emit([articulo]);
+  }
+
+  /**
    * Devuelve al módulo de ventas los artículos seleccionados.
    */
   confirm(): void {
