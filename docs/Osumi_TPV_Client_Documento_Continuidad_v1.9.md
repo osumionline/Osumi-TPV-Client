@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 1.8  
-**Fecha:** 18 de agosto de 2026  
-**Estado:** Installation, importación legacy y Startup completados y probados. En el módulo **Ventas** están completados, probados y subidos los bloques 1 a 9. La **auditoría transversal de arquitectura** está completada y los refactors **A — Dinero y porcentajes**, **B — Utils Angular + contratos** y **C — Infraestructura SQLite** están terminados, probados y subidos. El siguiente paso es **Refactor D — UI + Bootstrap**.
+**Versión:** 1.9  
+**Fecha:** 19 de agosto de 2026  
+**Estado:** Installation, importación legacy y Startup completados y probados. En el módulo **Ventas** están completados, probados y subidos los bloques 1 a 9. La **auditoría transversal de arquitectura** y el **refactor técnico A–E completo** están terminados, probados y subidos. También está completado y validado el ajuste funcional del **buscador de artículos** para permitir selección individual inmediata mediante clic en el nombre, manteniendo la selección múltiple mediante checks. El siguiente paso es **Ventas 10 — Finalización y pagos**.
 
 ## 1. Propósito del documento
 
@@ -29,8 +29,11 @@ Los grandes hitos completados hasta ahora son:
 - **Refactor A — Dinero y porcentajes**.
 - **Refactor B — Utils Angular + contratos**.
 - **Refactor C — Infraestructura SQLite**.
+- **Refactor D — UI + Bootstrap**.
+- **Refactor E — Limpieza final**.
+- **Ajuste UX del buscador de artículos**: clic en nombre para añadir un artículo inmediatamente, manteniendo checks para selección múltiple.
 
-Todos los bloques Ventas 1–9 han sido probados por el usuario con la aplicación real y están subidos al repositorio. Tras cerrar Ventas 9 se realizó una auditoría transversal del estado de `main`. Los refactors **A**, **B** y **C** derivados de esa auditoría están completados, probados y subidos; quedan **D y E** antes de iniciar Ventas 10.
+Todos los bloques Ventas 1–9 han sido probados por el usuario con la aplicación real y están subidos al repositorio. Tras cerrar Ventas 9 se realizó una auditoría transversal del estado de `main`. El refactor técnico completo **A–E** derivado de esa auditoría está completado, probado y subido. Después se realizó y validó el ajuste funcional del buscador de artículos. El proyecto queda preparado para iniciar **Ventas 10 — Finalización y pagos**.
 
 ## 2. Estado actual del proyecto
 
@@ -52,7 +55,11 @@ Todos los bloques Ventas 1–9 han sido probados por el usuario con la aplicaci�
 - Refactor A — Dinero y porcentajes: completado, probado y subido.
 - Refactor B — Utils Angular + contratos: completado, probado y subido.
 - Refactor C — Infraestructura SQLite: completado, probado y subido.
-- Antes de Ventas 10 quedan los refactors **D — UI + Bootstrap** y **E — Limpieza final**.
+- Refactor D — UI + Bootstrap: completado, probado y subido.
+- Refactor E — Limpieza final: completado, probado y subido.
+- Refactor transversal A–E: cerrado y validado mediante greps, suite de tests y pruebas manuales.
+- Buscador de artículos de Ventas: ajuste UX completado para selección individual inmediata por nombre, conservando selección múltiple por checks.
+- Siguiente bloque funcional: **Ventas 10 — Finalización y pagos**.
 
 ## 3. Repositorios y entorno
 
@@ -277,9 +284,9 @@ Esta recapitulación debe aparecer al comenzar cada nuevo bloque de desarrollo y
 11. ⬜ **Persistencia transaccional**.
 12. ⬜ **Postventa**.
 
-> **Hito transversal antes de Ventas 10:** auditoría de arquitectura completada. Debe ejecutarse primero el refactor técnico A–E descrito en la sección 20. No cambia funcionalidad de negocio ni altera el orden de los bloques 10–12.
+> **Hito transversal antes de Ventas 10:** auditoría de arquitectura y refactor técnico A–E completados. No cambia funcionalidad de negocio ni altera el orden de los bloques 10–12.
 
-> **Estado exacto al cerrar esta versión:** Ventas 1–9 están implementados, probados y subidos. La auditoría transversal está completada. **Refactor A**, **Refactor B** y **Refactor C** están completados, probados y subidos. El siguiente paso es **Refactor D — UI + Bootstrap**; después queda E antes de Ventas 10.
+> **Estado exacto al cerrar esta versión:** Ventas 1–9 están implementados, probados y subidos. La auditoría transversal y los refactors **A, B, C, D y E** están completados, probados y subidos. También está cerrado el ajuste UX del buscador de artículos. El siguiente paso es **Ventas 10 — Finalización y pagos**.
 
 ## 11. Ventas 1 — Contexto operativo ✅
 
@@ -2429,7 +2436,7 @@ Incluye:
 
 Es especialmente importante antes de Ventas 11.
 
-#### ⬜ Refactor D — UI y Bootstrap — siguiente paso
+#### ✅ Refactor D — UI y Bootstrap
 
 Incluye:
 
@@ -2439,7 +2446,7 @@ Incluye:
 
 No introducir frameworks de DI.
 
-#### Refactor E — Limpieza final
+#### ✅ Refactor E — Limpieza final
 
 Incluye:
 
@@ -2485,8 +2492,9 @@ Estado actual:
 ✅ Refactor A — Dinero y porcentajes
 ✅ Refactor B — Utils Angular + contratos
 ✅ Refactor C — Infraestructura SQLite
-⬜ Refactor D — UI + Bootstrap
-⬜ Refactor E — Limpieza final
+✅ Refactor D — UI + Bootstrap
+✅ Refactor E — Limpieza final
+✅ Ajuste UX — Buscador de artículos
 ⬜ Ventas 10 — Finalización y pagos
 ```
 
@@ -3542,34 +3550,118 @@ Pruebas manuales realizadas:
 
 Todos los cambios de C1–C4 están subidos al repositorio. C5 cerró sin necesidad de un commit adicional.
 
-### 20.25 Próximo hito transversal — Refactor D
+### 20.25 Refactor D — UI + Bootstrap ✅
 
-El siguiente paso es:
+Refactor D está **completado, probado y subido al repositorio**.
 
-# Refactor D — UI + Bootstrap
+Objetivos cerrados:
 
-Objetivos fijados por la auditoría:
+- consolidación de primitivas visuales reutilizables únicamente donde existía duplicación real en overlays/modales/tablas;
+- mantenimiento del comportamiento ya validado de foco, accesibilidad y cierre de overlays;
+- revisión y reorganización del bootstrap/composition root de Electron para que `electron/main.ts` mantenga un lifecycle legible;
+- separación del wiring en piezas pequeñas y explícitas sin introducir contenedor DI, decoradores, auto-discovery ni registro IPC implícito;
+- conservación de preload, IPC y composición de dependencias como elementos auditables y fáciles de rastrear.
 
-1. revisar la duplicación SCSS real en overlays, modales, contenedores y tablas;
-2. extraer únicamente primitivas visuales que tengan reutilización demostrada;
-3. no crear un `ModalComponent` genérico ni una jerarquía abstracta de UI sin necesidad;
-4. revisar `electron/main.ts`, que actualmente acumula lifecycle de Electron, creación/configuración de ventana, wiring de dependencias y registro IPC;
-5. separar el composition root/bootstrap en piezas pequeñas sin introducir un framework de DI;
-6. mantener explícitos IPC, preload y wiring para que el arranque siga siendo fácil de seguir.
+No se creó un `ModalComponent` genérico ni un framework visual propio. El objetivo fue reducir repetición demostrada sin ocultar comportamiento.
 
-Antes de implementar D debe inspeccionarse de nuevo el estado actual de `main`, tanto los SCSS implicados como `electron/main.ts` y los módulos de registro IPC existentes.
+La fase fue validada junto al resto del refactor mediante greps, suite completa de tests y pruebas manuales del usuario.
 
-La prioridad de D no es reducir líneas por sí misma. Debe mejorar:
+### 20.26 Refactor E — Limpieza final ✅
 
-```text
-coherencia visual
-+
-legibilidad del bootstrap
-+
-mantenibilidad
+Refactor E está **completado, probado y subido al repositorio**.
+
+Esta fase cerró el refactor transversal con limpieza de dependencias/imports/código muerto y revisión final de aliases y estructura, manteniendo las decisiones arquitectónicas fijadas durante la auditoría.
+
+El cierre completo A–E fue validado mediante:
+
+```bash
+npm test
+npm run typecheck:electron
+npm run build
+npm run lint
+npm run build:desktop
 ```
 
-sin ocultar comportamiento.
+Además se realizaron los greps finales previstos y pruebas manuales de regresión sobre las áreas afectadas. El usuario dio por bueno el conjunto completo del refactor.
+
+### 20.27 Cierre del refactor transversal
+
+El refactor técnico derivado de la auditoría tras Ventas 9 queda cerrado:
+
+```text
+✅ A — Dinero y porcentajes
+✅ B — Utils Angular + contratos
+✅ C — Infraestructura SQLite
+✅ D — UI + Bootstrap
+✅ E — Limpieza final
+```
+
+No quedan tareas técnicas bloqueantes de esta auditoría antes de continuar con Ventas. Las abstracciones expresamente pospuestas —por ejemplo store genérico de colecciones, división prematura de `VentaLineaEnCurso` o de `SaleWorkspaceComponent`— siguen pospuestas y deberán reevaluarse después de Ventas 12, no durante Ventas 10.
+
+### 20.28 Ajuste UX posterior — Buscador de artículos ✅
+
+Antes de retomar Ventas 10 se realizó un pequeño ajuste funcional independiente del refactor en el buscador de artículos que aparece al escribir en el campo de localizador.
+
+El comportamiento anterior era:
+
+```text
+resultado
+  ↓
+clic en fila / check
+  ↓
+marcar selección
+  ↓
+Añadir
+```
+
+El comportamiento actual distingue dos vías:
+
+```text
+clic en NOMBRE del artículo
+        ↓
+selección individual inmediata
+        ↓
+cerrar buscador
+        ↓
+añadir ese artículo a la venta
+```
+
+y:
+
+```text
+clic en CHECK
+        ↓
+marcar/desmarcar
+        ↓
+el buscador permanece abierto
+        ↓
+seleccionar N artículos
+        ↓
+Añadir
+        ↓
+añadir todos simultáneamente
+```
+
+Decisiones de implementación:
+
+- se conserva el `selectEvent` existente con `readonly ArticuloVenta[]`;
+- el clic directo en el nombre emite un array de un solo elemento;
+- el padre reutiliza el flujo existente `onSearchSelected()`;
+- la inserción sigue pasando por `VentasService.agregarArticulos()`, por lo que no se duplica ninguna regla de negocio;
+- si el artículo ya está presente, se mantiene el comportamiento existente de agrupación/incremento cuando corresponda;
+- los checks continúan permitiendo selección múltiple;
+- nombre y check usan controles interactivos separados, evitando propagaciones ambiguas y manteniendo accesibilidad por teclado;
+- cerrar el buscador continúa limpiando el localizador y devolviendo al flujo normal de introducción de líneas.
+
+El usuario validó manualmente:
+
+- selección inmediata mediante clic en nombre;
+- selección y deselección mediante checks;
+- selección múltiple y botón `Añadir`;
+- comportamiento con artículos ya existentes;
+- continuidad normal del localizador después de cerrar.
+
+También pasaron tests y comprobaciones finales. El ajuste queda cerrado.
 
 ## 21. Ajustes transversales realizados durante Ventas
 
@@ -3662,7 +3754,7 @@ Installation + importación legacy y Startup están completados y probados. En e
 8. Devoluciones.
 9. Reservas.
 
-Después de Ventas 9 se completó una auditoría transversal de arquitectura. **Refactor A — Dinero/porcentajes**, **Refactor B — Utils Angular/contratos** y **Refactor C — Infraestructura SQLite** ya están completados, probados y subidos. Antes de Ventas 10 quedan **Refactor D — UI/bootstrap** y **Refactor E — Limpieza final**. Después quedan Ventas 10 — Finalización y pagos, Ventas 11 — Persistencia transaccional y Ventas 12 — Postventa.
+Después de Ventas 9 se completó una auditoría transversal de arquitectura y el refactor técnico completo **A–E**. Todos los refactors están completados, probados y subidos. Después se cerró también un ajuste UX del buscador de artículos: clic en nombre añade inmediatamente un único artículo y cierra el buscador, mientras los checks mantienen la selección múltiple. Quedan Ventas 10 — Finalización y pagos, Ventas 11 — Persistencia transaccional y Ventas 12 — Postventa.
 
 Los repositorios de referencia son:
 - Frontend antiguo: https://github.com/osumionline/Osumi-TPV
@@ -3673,127 +3765,32 @@ Antes de empezar un bloque, dame la recapitulación completa del plan, indicando
 
 Al terminar cada bloque principal, después de que confirme que funciona y que está subido, entrégame una versión actualizada de este documento de continuidad.
 
-Debemos continuar por: **Refactor D — UI + Bootstrap**. A, B y C están cerrados; no repetirlos ni rehacer la auditoría. No iniciar Ventas 10 hasta completar y validar D y E.
+Debemos continuar por: **Ventas 10 — Finalización y pagos**. La auditoría, el refactor transversal A–E y el ajuste UX del buscador están cerrados; no repetirlos ni rehacerlos.
 ```
 
 ## 26. Próximo paso
 
 El siguiente desarrollo es:
 
-# Refactor D — UI + Bootstrap
+# Ventas 10 — Finalización y pagos
 
-Estado del refactor transversal:
-
-```text
-✅ A — Dinero y porcentajes
-✅ B — Utils Angular + contratos
-✅ C — Infraestructura SQLite
-⬜ D — UI + Bootstrap
-⬜ E — Limpieza final
-```
-
-D debe comenzar con una inspección actualizada de `main`.
-
-## Área D1 — UI / SCSS
-
-Revisar especialmente componentes con:
-
-- overlays de pantalla completa;
-- paneles/modales;
-- cabeceras y pies de diálogo;
-- backdrop;
-- `z-index`;
-- tablas/listados dentro de overlays;
-- botones/cierres/foco asociados.
-
-Objetivo:
+Estado general:
 
 ```text
-detectar repetición real
-        ↓
-extraer primitivas SCSS pequeñas
-        ↓
-migrar consumidores verificables
+✅ Ventas 1–9
+✅ Auditoría transversal
+✅ Refactor A–E completo
+✅ Ajuste UX del buscador de artículos
+⬜ Ventas 10 — Finalización y pagos
+⬜ Ventas 11 — Persistencia transaccional
+⬜ Ventas 12 — Postventa
 ```
 
-No crear por adelantado:
+Antes de implementar Ventas 10 debe realizarse el repaso obligatorio del plan maestro y revisar el comportamiento funcional equivalente en el TPV antiguo junto con el estado actual de `main`.
 
-```text
-ModalComponent genérico
-OverlayService genérico
-framework visual propio
-```
+Ventas 10 resolverá la **finalización económica de una venta** y la interacción de pagos/refundos/reservas necesaria antes de que Ventas 11 persista transaccionalmente la operación. Debe diseñarse sobre las reglas ya cerradas de ventas normales, Varios, devoluciones y reservas, sin reinterpretar su economía histórica.
 
-si la duplicación no lo justifica.
-
-Debe mantenerse el comportamiento actual de foco, accesibilidad y cierre de overlays.
-
-## Área D2 — Bootstrap Electron
-
-Revisar especialmente:
-
-```text
-electron/main.ts
-```
-
-y los módulos actuales de:
-
-- creación/configuración de `BrowserWindow`;
-- lifecycle `app.whenReady`, `activate`, `window-all-closed`;
-- menú y atajos de DevTools;
-- construcción de servicios/repositories;
-- registro de handlers IPC;
-- preload y contratos.
-
-Objetivo:
-
-```text
-main.ts
-→ contar claramente el lifecycle de la aplicación
-
-composition/bootstrap
-→ construir dependencias y registrar infraestructura
-```
-
-sin introducir:
-
-```text
-contenedor DI
-decoradores
-auto-discovery
-registro IPC implícito
-```
-
-El wiring debe seguir siendo explícito y fácil de rastrear.
-
-## Método
-
-Antes de proponer cambios sobre archivos existentes:
-
-1. inspeccionar el contenido actual;
-2. inventariar repetición real;
-3. separar D en subbloques pequeños verificables;
-4. cambiar una sola zona por vez;
-5. ejecutar tras cada subfase:
-
-```bash
-npm test
-npm run typecheck:electron
-npm run build
-npm run lint
-npm run build:desktop
-```
-
-Tras D quedarán:
-
-```text
-E — Limpieza final
-Ventas 10 — Finalización y pagos
-Ventas 11 — Persistencia transaccional
-Ventas 12 — Postventa
-```
-
-No iniciar Ventas 10 hasta cerrar D y E.
+No deben reabrirse los refactors A–E salvo que Ventas 10 descubra una regresión concreta o una necesidad nueva demostrada.
 
 ## 27. Registro de hitos
 
@@ -3808,3 +3805,4 @@ No iniciar Ventas 10 hasta cerrar D y E.
 | 1.6 | 15 de agosto de 2026 | Auditoría transversal de arquitectura completada tras Ventas 9. No requiere rehacer la arquitectura base. Se acuerda refactor técnico A–E antes de Ventas 10: dinero/porcentajes, utils Angular/contratos, infraestructura SQLite, UI/bootstrap y limpieza final. |
 | 1.7 | 16 de agosto de 2026 | Refactors A y B completados, probados y subidos. A centraliza dinero/porcentajes en Angular y backend, elimina conversiones y magic numbers duplicados y añade pipes de presentación. B centraliza fechas, strings y errores Angular y comparte contractualmente los límites de Cliente sin compartir implementación. Siguiente paso: Refactor C — Infraestructura SQLite. |
 | 1.8 | 18 de agosto de 2026 | Refactor C — Infraestructura SQLite completado, probado y subido. Se centraliza la mecánica transaccional TypeORM con helpers para runners propios y ajenos, se migran Caja, Reservas y Legacy Import, se fija `getLastInsertId()` como convención para filas recién insertadas y se migra también Cliente. `npm test` pasa a ser finito mediante `--watch=false`, conservando `test:watch`. Siguiente paso: Refactor D — UI + Bootstrap. |
+| 1.9 | 19 de agosto de 2026 | Refactors D — UI + Bootstrap y E — Limpieza final completados, probados y subidos. Queda cerrado el refactor transversal A–E con greps, tests y pruebas manuales validadas. Después se completa el ajuste UX del buscador de artículos: clic en nombre añade inmediatamente un artículo y cierra el buscador; los checks mantienen la selección múltiple y el botón Añadir. Siguiente paso: Ventas 10 — Finalización y pagos. |
