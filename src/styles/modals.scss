@@ -1,4 +1,26 @@
 /* Estilos para ventanas modales */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.overlay--dimmed {
+  background-color: var(--modal-bg-color);
+}
+
+.overlay__panel {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background-color: var(--color-white);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 35%);
+}
+
 .modal-wide {
   width: 95%;
   height: 95%;
