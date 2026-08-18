@@ -1,8 +1,8 @@
 import 'reflect-metadata';
 
 import { app, BrowserWindow, Menu, protocol } from 'electron';
-
 import { join } from 'node:path';
+import { createMainWindow, getMainWindow } from '@infrastructure/electron/main-window';
 
 import ApplicationStateService from '@backend/application/application/application-state.service';
 import CajaService from '@backend/application/caja/caja.service';
@@ -105,10 +105,6 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
-const DEV_SERVER_URL: string | undefined = process.env['OSUMI_TPV_RENDERER_URL'];
-
-let mainWindow: BrowserWindow | null = null;
-
 let applicationDatabase: TypeOrmApplicationDatabase | null = null;
 
 let applicationQuitPrepared: boolean = false;
@@ -116,62 +112,6 @@ let applicationQuitPrepared: boolean = false;
 const runtimeInfoProvider: ElectronRuntimeInfoProvider = new ElectronRuntimeInfoProvider();
 
 const systemService: SystemService = new SystemService(runtimeInfoProvider);
-
-async function createWindow(): Promise<void> {
-  mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 1024,
-    minHeight: 700,
-    show: false,
-    webPreferences: {
-      preload: join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
-  });
-
-  mainWindow.once('ready-to-show', (): void => {
-    mainWindow?.maximize();
-    mainWindow?.show();
-  });
-
-  mainWindow.once('closed', (): void => {
-    mainWindow = null;
-  });
-
-  if (!app.isPackaged) {
-    mainWindow.webContents.on('before-input-event', (event, input): void => {
-      if (input.type !== 'keyDown') {
-        return;
-      }
-
-      const toggleWithShortcut: boolean =
-        input.control && input.shift && input.key.toLowerCase() === 'i';
-
-      const toggleWithF12: boolean = input.key === 'F12';
-
-      if (!toggleWithShortcut && !toggleWithF12) {
-        return;
-      }
-
-      event.preventDefault();
-
-      mainWindow?.webContents.toggleDevTools();
-    });
-  }
-
-  if (DEV_SERVER_URL !== undefined && DEV_SERVER_URL.length > 0) {
-    await mainWindow.loadURL(DEV_SERVER_URL);
-
-    return;
-  }
-
-  await mainWindow.loadFile(
-    join(__dirname, '..', 'dist', 'osumi-tpv-client', 'browser', 'index.html'),
-  );
-}
 
 app.enableSandbox();
 
@@ -344,7 +284,7 @@ app
     );
 
     const legacyImportDialog: ElectronLegacyImportDialog = new ElectronLegacyImportDialog(
-      (): BrowserWindow | null => mainWindow,
+      getMainWindow,
     );
 
     const legacyImportPackageInspector: YauzlLegacyImportPackageInspector =
@@ -410,30 +350,22 @@ app
      */
     registerApplicationIpc(applicationStateService);
 
-    registerMarcasIpc(
-      (): BrowserWindow | null => mainWindow,
+    registerMarcasIpc(getMainWindow, marcasService);
 
-      marcasService,
-    );
+    registerProveedoresIpc(getMainWindow, proveedoresService);
 
-    registerProveedoresIpc(
-      (): BrowserWindow | null => mainWindow,
+    registerEmpleadosIpc(getMainWindow, empleadosService);
 
-      proveedoresService,
-    );
+    registerClientesIpc(getMainWindow, clientesService);
 
-    registerEmpleadosIpc((): BrowserWindow | null => mainWindow, empleadosService);
+    registerCategoriasIpc(getMainWindow, categoriasService);
 
-    registerClientesIpc((): BrowserWindow | null => mainWindow, clientesService);
+    registerCajaIpc(getMainWindow, cajaService);
 
-    registerCategoriasIpc((): BrowserWindow | null => mainWindow, categoriasService);
-
-    registerCajaIpc((): BrowserWindow | null => mainWindow, cajaService);
-
-    registerReservasIpc((): BrowserWindow | null => mainWindow, reservasService);
+    registerReservasIpc(getMainWindow, reservasService);
 
     registerVentasIpc(
-      (): BrowserWindow | null => mainWindow,
+      getMainWindow,
       ventasContextService,
       ventasArticulosService,
       ventasDevolucionesService,
@@ -441,27 +373,18 @@ app
 
     registerLegacyImportIpc(legacyImportService);
 
-    registerSystemIpc(
-      (): BrowserWindow | null => mainWindow,
+    registerSystemIpc(getMainWindow, systemService);
 
-      systemService,
-    );
-
-    registerConfigurationIpc(
-      (): BrowserWindow | null => mainWindow,
-
-      configurationService,
-      installationService,
-    );
+    registerConfigurationIpc(getMainWindow, configurationService, installationService);
 
     /*
      * Ventana principal.
      */
-    await createWindow();
+    await createMainWindow();
 
     app.on('activate', (): void => {
       if (BrowserWindow.getAllWindows().length === 0) {
-        void createWindow();
+        void createMainWindow();
       }
     });
   })
