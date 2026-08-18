@@ -1,34 +1,14 @@
 .overlay {
-    position: fixed;
     z-index: 140;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    padding: 24px;
-
-    .overlay__backdrop {
-        position: absolute;
-        inset: 0;
-        padding: 0;
-        border: 0;
-        background-color: var(--modal-bg-color);
-        cursor: default;
-    }
 
     .reservation-manager {
-        position: relative;
-        z-index: 1;
         display: flex;
         width: min(1280px, 100%);
         height: min(780px, calc(100vh - 48px));
         min-height: 0;
         padding: 24px;
-        box-sizing: border-box;
-        border-radius: 8px;
         flex-direction: column;
         gap: 16px;
-        background-color: var(--color-white);
-        box-shadow: 0 8px 32px rgb(0 0 0 / 35%);
     }
 
     .reservation-manager__header {

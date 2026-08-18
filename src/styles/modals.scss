@@ -12,6 +12,15 @@
   background-color: var(--modal-bg-color);
 }
 
+.overlay__backdrop {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background-color: var(--modal-bg-color);
+  cursor: default;
+}
+
 .overlay__panel {
   position: relative;
   z-index: 1;
