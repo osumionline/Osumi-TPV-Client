@@ -11,19 +11,30 @@ import {
   type Signal,
   type WritableSignal,
 } from '@angular/core';
-import { MatButton } from '@angular/material/button';
+import { MatButton, MatIconButton } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
+import { MatInput } from '@angular/material/input';
 import type TipoPago from '@model/tipos-pago/tipo-pago.model';
 import VentaFinalizacionEnCurso from '@model/ventas/venta-finalizacion-en-curso.model';
 import type VentaPagoEnCurso from '@model/ventas/venta-pago-en-curso.model';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import { getErrorMessage } from '@utils/error.utils';
+import { centsToEuros, eurosToCents } from '@utils/money.utils';
 
 @Component({
   selector: 'otpv-sale-finalization',
   templateUrl: './sale-finalization.component.html',
   styleUrl: './sale-finalization.component.scss',
-  imports: [CurrencyPipe, MatButton, MatIcon, CentsToEurosPipe],
+  imports: [
+    CurrencyPipe,
+    MatButton,
+    MatFormFieldModule,
+    MatIcon,
+    MatIconButton,
+    MatInput,
+    CentsToEurosPipe,
+  ],
 })
 export default class SaleFinalizationComponent implements OnInit {
   readonly totalCents: InputSignal<number> = input.required<number>();
@@ -90,6 +101,125 @@ export default class SaleFinalizationComponent implements OnInit {
     } catch (error: unknown) {
       this.error.set(getErrorMessage(error, 'No se ha podido añadir el medio de pago.'));
     }
+  }
+
+  /**
+   * Devuelve el importe del pago como cantidad positiva
+   * expresada en euros para su edición.
+   *
+   * En una devolución el signo negativo pertenece al dominio,
+   * no a la interacción del usuario.
+   */
+  getPagoImporteEuros(pago: VentaPagoEnCurso): number {
+    return Math.abs(centsToEuros(pago.importeCents));
+  }
+
+  /**
+   * Calcula el máximo que puede asignarse actualmente
+   * a un pago sin superar el total de la operación.
+   *
+   * Incluye el importe que ya tiene ese mismo pago
+   * más lo que todavía queda pendiente.
+   */
+  getPagoMaxEuros(pago: VentaPagoEnCurso): number {
+    const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
+
+    if (finalizacion === null) {
+      return this.getPagoImporteEuros(pago);
+    }
+
+    return Math.abs(centsToEuros(pago.importeCents + finalizacion.pendienteCents));
+  }
+
+  /**
+   * Selecciona el contenido completo de un input monetario
+   * para facilitar la sustitución directa del importe.
+   */
+  selectInputContent(event: FocusEvent): void {
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
+    inputElement.select();
+  }
+
+  /**
+   * Actualiza el importe aplicado por un medio de pago.
+   */
+  updatePagoImporte(pago: VentaPagoEnCurso, event: Event): void {
+    const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
+
+    if (finalizacion === null) {
+      return;
+    }
+
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
+    const euros: number = inputElement.valueAsNumber;
+
+    if (Number.isNaN(euros) || !Number.isFinite(euros) || euros <= 0) {
+      this.error.set('El importe debe ser mayor que 0,00 €.');
+
+      inputElement.value = String(this.getPagoImporteEuros(pago));
+
+      return;
+    }
+
+    try {
+      const importeAbsCents: number = eurosToCents(euros);
+
+      if (importeAbsCents <= 0) {
+        throw new RangeError('El importe debe ser mayor que 0,00 €.');
+      }
+
+      const maxImporteCents: number = Math.abs(pago.importeCents + finalizacion.pendienteCents);
+
+      if (importeAbsCents > maxImporteCents) {
+        throw new RangeError(
+          `El importe no puede superar ${centsToEuros(maxImporteCents).toFixed(2)} €.`,
+        );
+      }
+
+      const importeCents: number = finalizacion.totalCents < 0 ? -importeAbsCents : importeAbsCents;
+
+      const pagoActualizado: VentaPagoEnCurso = finalizacion.updatePago(
+        pago.tipoPagoPublicId,
+        importeCents,
+      );
+
+      this.error.set(null);
+
+      this.finalizacion.set(finalizacion);
+
+      /*
+       * Normalizamos también el valor visible por si el
+       * usuario introdujo más de dos decimales.
+       */
+      inputElement.value = String(this.getPagoImporteEuros(pagoActualizado));
+    } catch (error: unknown) {
+      this.error.set(getErrorMessage(error, 'No se ha podido modificar el importe del pago.'));
+
+      /*
+       * updatePago() es atómico respecto al estado del modelo:
+       * si falla, el pago original continúa intacto.
+       */
+      inputElement.value = String(this.getPagoImporteEuros(pago));
+    }
+  }
+
+  /**
+   * Elimina un medio de pago de la finalización.
+   */
+  removePago(tipoPagoPublicId: string): void {
+    const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
+
+    if (finalizacion === null) {
+      return;
+    }
+
+    finalizacion.removePago(tipoPagoPublicId);
+
+    this.error.set(null);
+
+    this.finalizacion.set(finalizacion);
   }
 
   /**

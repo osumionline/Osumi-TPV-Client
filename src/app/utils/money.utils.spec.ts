@@ -3,6 +3,7 @@ import {
   calculateProportionalMicros,
   centsToEuros,
   centsToMicros,
+  eurosToCents,
   eurosToMicros,
   microsToCents,
   microsToEuros,
@@ -35,6 +36,14 @@ describe('money.utils', (): void => {
     expect(microsToEuros(12_340_000)).toBe(12.34);
 
     expect(microsToEuros(-12_340_000)).toBe(-12.34);
+  });
+
+  it('convierte euros a céntimos con redondeo simétrico', (): void => {
+    expect(eurosToCents(12.346)).toBe(1_235);
+    expect(eurosToCents(12.344)).toBe(1_234);
+
+    expect(eurosToCents(-12.346)).toBe(-1_235);
+    expect(eurosToCents(-12.344)).toBe(-1_234);
   });
 
   it('convierte euros a microeuros redondeando primero a céntimos', (): void => {

@@ -32,6 +32,28 @@ export function centsToEuros(cents: number): number {
 }
 
 /**
+ * Convierte una cantidad expresada en euros a
+ * céntimos utilizando redondeo simétrico.
+ *
+ * Es la convención utilizada para cantidades
+ * monetarias introducidas por el usuario cuyo
+ * dominio trabaja directamente en céntimos.
+ */
+export function eurosToCents(euros: number): number {
+  if (!Number.isFinite(euros)) {
+    throw new RangeError('La cantidad de euros no es válida.');
+  }
+
+  const sign: number = euros < 0 ? -1 : 1;
+
+  const cents: number = sign * Math.round(Math.abs(euros) * CENTS_PER_EURO);
+
+  requireSafeInteger(cents, 'La conversión de euros a céntimos supera el rango numérico seguro.');
+
+  return cents;
+}
+
+/**
  * Convierte microeuros a céntimos utilizando
  * redondeo simétrico para valores positivos
  * y negativos.
@@ -62,17 +84,7 @@ export function microsToEuros(micros: number): number {
  * cantidad monetaria introducida por el usuario.
  */
 export function eurosToMicros(euros: number): number {
-  if (!Number.isFinite(euros)) {
-    throw new RangeError('La cantidad de euros no es válida.');
-  }
-
-  const sign: number = euros < 0 ? -1 : 1;
-
-  const cents: number = sign * Math.round(Math.abs(euros) * CENTS_PER_EURO);
-
-  requireSafeInteger(cents, 'La conversión de euros a céntimos supera el rango numérico seguro.');
-
-  return centsToMicros(cents);
+  return centsToMicros(eurosToCents(euros));
 }
 
 /**
