@@ -7,7 +7,7 @@
 
     .finalization {
         display: flex;
-        width: min(840px, 100%);
+        width: min(920px, 100%);
         max-height: min(760px, calc(100vh - 48px));
         padding: 24px;
         flex-direction: column;
@@ -49,7 +49,8 @@
 
     .finalization__summary {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(auto-fit,
+                minmax(150px, 1fr));
         gap: 12px;
 
         >div {
@@ -78,6 +79,15 @@
         &.finalization__pending--complete {
             border-color: var(--main-color);
             background-color: var(--table-row-selected);
+        }
+    }
+
+    .finalization__change-summary {
+        border-color: var(--main-color) !important;
+        background-color: var(--table-row-selected);
+
+        strong {
+            color: var(--main-color);
         }
     }
 
@@ -146,10 +156,10 @@
 
     .finalization__payment {
         display: grid;
-        min-height: 64px;
-        padding: 8px 12px;
+        min-height: 72px;
+        padding: 10px 12px;
         grid-template-columns:
-            minmax(0, 1fr) 180px 40px;
+            minmax(180px, 1fr) minmax(160px, 200px) 40px;
         align-items: center;
         gap: 12px;
         border-bottom: 1px solid var(--separator-color);
@@ -157,22 +167,58 @@
         &:last-child {
             border-bottom: 0;
         }
+
+        &.finalization__payment--cash {
+            grid-template-columns:
+                minmax(180px, 1fr) minmax(150px, 180px) minmax(150px, 180px) 110px 40px;
+        }
     }
 
     .finalization__payment-name {
         display: flex;
         min-width: 0;
-        flex: 1;
         align-items: center;
         gap: 8px;
 
         mat-icon {
+            flex: 0 0 auto;
             color: var(--main-color);
+        }
+
+        strong {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
     }
 
     .finalization__payment-field {
         width: 100%;
+        min-width: 0;
+    }
+
+    .finalization__payment-change {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        align-items: flex-end;
+
+        span {
+            color: var(--disabled-color);
+            font-size: .8rem;
+        }
+
+        strong {
+            font-size: 1.1rem;
+            white-space: nowrap;
+        }
+
+        &.finalization__payment-change--active {
+            strong {
+                color: var(--main-color);
+            }
+        }
     }
 
     .finalization__payment-delete {
@@ -200,6 +246,33 @@
         gap: 12px;
     }
 
+    @media (max-width: 850px) {
+        .finalization__payment {
+            grid-template-columns:
+                minmax(0, 1fr) minmax(140px, 180px) 40px;
+
+            &.finalization__payment--cash {
+                grid-template-columns:
+                    minmax(0, 1fr) minmax(140px, 180px) minmax(140px, 180px) 40px;
+
+                .finalization__payment-name {
+                    grid-column: 1 / -1;
+                }
+
+                .finalization__payment-change {
+                    grid-column: 1 / 4;
+                    grid-row: 3;
+                    align-items: flex-end;
+                }
+
+                .finalization__payment-delete {
+                    grid-column: 4;
+                    grid-row: 3;
+                }
+            }
+        }
+    }
+
     @media (max-width: 700px) {
         .finalization__header {
             flex-direction: column;
@@ -223,6 +296,34 @@
 
             .finalization__payment-field {
                 grid-column: 1;
+            }
+
+            &.finalization__payment--cash {
+                grid-template-columns:
+                    minmax(0, 1fr) 40px;
+
+                .finalization__payment-name {
+                    grid-column: 1 / -1;
+                }
+
+                .finalization__payment-field {
+                    grid-column: 1;
+
+                    &:nth-of-type(2) {
+                        grid-row: 3;
+                    }
+                }
+
+                .finalization__payment-change {
+                    grid-column: 1;
+                    grid-row: auto;
+                    align-items: flex-start;
+                }
+
+                .finalization__payment-delete {
+                    grid-column: 2;
+                    grid-row: auto;
+                }
             }
         }
     }

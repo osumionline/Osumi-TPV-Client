@@ -54,6 +54,19 @@ export default class SaleFinalizationComponent implements OnInit {
       equal: (): boolean => false,
     });
 
+  readonly cambioTotalCents: Signal<number> = computed((): number => {
+    const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
+
+    if (finalizacion === null) {
+      return 0;
+    }
+
+    return finalizacion.pagos.reduce(
+      (total: number, pago: VentaPagoEnCurso): number => total + pago.cambioCents,
+      0,
+    );
+  });
+
   readonly error: WritableSignal<string | null> = signal<string | null>(null);
 
   readonly tiposPagoFisicos: Signal<readonly TipoPago[]> = computed((): readonly TipoPago[] =>
@@ -112,6 +125,18 @@ export default class SaleFinalizationComponent implements OnInit {
    */
   getPagoImporteEuros(pago: VentaPagoEnCurso): number {
     return Math.abs(centsToEuros(pago.importeCents));
+  }
+
+  /**
+   * Devuelve el efectivo entregado por el cliente
+   * como cantidad positiva expresada en euros.
+   */
+  getPagoEntregadoEuros(pago: VentaPagoEnCurso): number {
+    if (!pago.esEfectivo || pago.entregadoCents === null) {
+      return 0;
+    }
+
+    return centsToEuros(pago.entregadoCents);
   }
 
   /**
@@ -202,6 +227,59 @@ export default class SaleFinalizationComponent implements OnInit {
        * si falla, el pago original continúa intacto.
        */
       inputElement.value = String(this.getPagoImporteEuros(pago));
+    }
+  }
+
+  /**
+   * Actualiza la cantidad físicamente entregada
+   * por el cliente para un pago en efectivo.
+   *
+   * No modifica el importe aplicado a la venta.
+   */
+  updatePagoEntregado(pago: VentaPagoEnCurso, event: Event): void {
+    const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
+
+    if (finalizacion === null || !pago.esEfectivo || pago.importeCents < 0) {
+      return;
+    }
+
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
+    const euros: number = inputElement.valueAsNumber;
+
+    if (Number.isNaN(euros) || !Number.isFinite(euros) || euros <= 0) {
+      this.error.set('La cantidad entregada debe ser mayor que 0,00 €.');
+
+      inputElement.value = String(this.getPagoEntregadoEuros(pago));
+
+      return;
+    }
+
+    try {
+      const entregadoCents: number = eurosToCents(euros);
+
+      if (entregadoCents < pago.importeCents) {
+        throw new RangeError(
+          `La cantidad entregada no puede ser inferior a ${centsToEuros(pago.importeCents).toFixed(
+            2,
+          )} €.`,
+        );
+      }
+
+      const pagoActualizado: VentaPagoEnCurso = finalizacion.updatePago(
+        pago.tipoPagoPublicId,
+        pago.importeCents,
+        entregadoCents,
+      );
+
+      this.error.set(null);
+      this.finalizacion.set(finalizacion);
+
+      inputElement.value = String(this.getPagoEntregadoEuros(pagoActualizado));
+    } catch (error: unknown) {
+      this.error.set(getErrorMessage(error, 'No se ha podido modificar la cantidad entregada.'));
+
+      inputElement.value = String(this.getPagoEntregadoEuros(pago));
     }
   }
 
