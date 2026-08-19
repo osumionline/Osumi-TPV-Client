@@ -1,0 +1,211 @@
+.overlay {
+    /*
+     * Finalización se abre directamente desde el workspace.
+     * No es un overlay anidado sobre Varios o Devoluciones.
+     */
+    z-index: 110;
+
+    .finalization {
+        display: flex;
+        width: min(840px, 100%);
+        max-height: min(760px, calc(100vh - 48px));
+        padding: 24px;
+        flex-direction: column;
+        gap: 20px;
+        overflow-y: auto;
+    }
+
+    .finalization__header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+
+        h2 {
+            margin: 0 0 4px;
+        }
+
+        p {
+            margin: 0;
+            color: var(--disabled-color);
+        }
+    }
+
+    .finalization__total {
+        display: flex;
+        min-width: 180px;
+        flex-direction: column;
+        align-items: flex-end;
+
+        span {
+            color: var(--disabled-color);
+        }
+
+        strong {
+            font-size: 2rem;
+            font-weight: 500;
+        }
+    }
+
+    .finalization__summary {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+
+        >div {
+            display: flex;
+            min-width: 0;
+            padding: 12px 16px;
+            border: 1px solid var(--separator-color);
+            border-radius: 6px;
+            flex-direction: column;
+
+            span {
+                color: var(--disabled-color);
+                font-size: .9rem;
+            }
+
+            strong {
+                margin-top: 4px;
+                font-size: 1.25rem;
+            }
+        }
+    }
+
+    .finalization__pending {
+        background-color: var(--color-very-light-grey);
+
+        &.finalization__pending--complete {
+            border-color: var(--main-color);
+            background-color: var(--table-row-selected);
+        }
+    }
+
+    .finalization__section {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+
+        h3 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+    }
+
+    .finalization__payment-types {
+        display: grid;
+        grid-template-columns: repeat(auto-fill,
+                minmax(160px, 1fr));
+        gap: 10px;
+    }
+
+    .finalization__payment-type {
+        position: relative;
+        display: flex;
+        min-height: 72px;
+        padding: 12px;
+        border: 1px solid var(--separator-color);
+        border-radius: 6px;
+        align-items: center;
+        gap: 10px;
+        background-color: var(--color-white);
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+
+        &:hover:not(:disabled) {
+            background-color: var(--color-very-light-grey);
+        }
+
+        &:disabled {
+            cursor: default;
+        }
+
+        &.finalization__payment-type--added {
+            border-color: var(--main-color);
+            background-color: var(--table-row-selected);
+        }
+
+        >mat-icon:first-child {
+            color: var(--main-color);
+        }
+    }
+
+    .finalization__payment-added {
+        margin-left: auto;
+        color: var(--main-color);
+    }
+
+    .finalization__payments {
+        overflow: hidden;
+        border: 1px solid var(--separator-color);
+        border-radius: 6px;
+    }
+
+    .finalization__payment {
+        display: flex;
+        min-height: 48px;
+        padding: 8px 12px;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid var(--separator-color);
+
+        &:last-child {
+            border-bottom: 0;
+        }
+    }
+
+    .finalization__payment-name {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        align-items: center;
+        gap: 8px;
+
+        mat-icon {
+            color: var(--main-color);
+        }
+    }
+
+    .finalization__payment-amount {
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    .finalization__notice,
+    .finalization__error {
+        padding: 10px 12px;
+        border-radius: 4px;
+    }
+
+    .finalization__notice {
+        background-color: var(--color-very-light-grey);
+    }
+
+    .finalization__error {
+        border: 1px solid var(--color-red);
+        background-color: rgb(255 51 51 / 8%);
+    }
+
+    .finalization__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+
+    @media (max-width: 700px) {
+        .finalization__header {
+            flex-direction: column;
+        }
+
+        .finalization__total {
+            align-items: flex-start;
+        }
+
+        .finalization__summary {
+            grid-template-columns: 1fr;
+        }
+    }
+}

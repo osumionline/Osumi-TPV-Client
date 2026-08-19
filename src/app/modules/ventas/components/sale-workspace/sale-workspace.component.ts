@@ -23,6 +23,7 @@ import { PERCENT_TOTAL } from '@constants/percentage.constants';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import permissionIds from '@desktop-contracts/permissions/permission-ids.constants';
 import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devolucion.interface';
+import type TipoPago from '@model/tipos-pago/tipo-pago.model';
 import type AccesoDirectoVenta from '@model/ventas/acceso-directo-venta.model';
 import type ArticuloVenta from '@model/ventas/articulo-venta.model';
 import type VentaDevolucionSeleccion from '@model/ventas/venta-devolucion-seleccion.interface';
@@ -44,6 +45,7 @@ import ArticleSearchComponent from '@modules/ventas/components/article-search/ar
 import ClientStatisticsComponent from '@modules/ventas/components/client-statistics/client-statistics.component';
 import DirectAccessSelectorComponent from '@modules/ventas/components/direct-access-selector/direct-access-selector.component';
 import ReturnSelectorComponent from '@modules/ventas/components/return-selector/return-selector.component';
+import SaleFinalizationComponent from '@modules/ventas/components/sale-finalization/sale-finalization.component';
 import VariosEditorComponent from '@modules/ventas/components/varios-editor/varios-editor.component';
 import { DialogService } from '@osumi/angular-tools';
 import BpsToPercentPipe from '@pipes/bps-to-percent.pipe';
@@ -76,6 +78,7 @@ import { bpsToPercent, percentToBps } from '@utils/percentage.utils';
     ClientStatisticsComponent,
     VariosEditorComponent,
     ReturnSelectorComponent,
+    SaleFinalizationComponent,
     BpsToPercentPipe,
     CentsToEurosPipe,
     MicrosToEurosPipe,
@@ -128,6 +131,10 @@ export default class SaleWorkspaceComponent {
   readonly devolucionSelectorState: WritableSignal<VentaDevolucionSelectorState | null> =
     signal<VentaDevolucionSelectorState | null>(null);
 
+  readonly finalizationOpen: WritableSignal<boolean> = signal<boolean>(false);
+
+  readonly tiposPago: Signal<readonly TipoPago[]> = this.ventasContextService.tiposPago;
+
   readonly variosIvaOptionsBps: Signal<readonly number[]> = computed((): readonly number[] => {
     const appData: AppData | null = this.ventasContextService.appData();
 
@@ -154,7 +161,8 @@ export default class SaleWorkspaceComponent {
         this.searchOpen() ||
         this.directAccessOpen() ||
         this.variosEditorState() !== null ||
-        this.devolucionSelectorState() !== null
+        this.devolucionSelectorState() !== null ||
+        this.finalizationOpen()
       ) {
         return;
       }
@@ -818,6 +826,29 @@ export default class SaleWorkspaceComponent {
    */
   cancelVenta(): void {
     this.cancelEvent.emit();
+  }
+
+  /**
+   * Abre una nueva finalización temporal para la venta actual.
+   */
+  openFinalization(): void {
+    if (this.venta().lineas.length === 0) {
+      return;
+    }
+
+    this.localizador.set('');
+    this.finalizationOpen.set(true);
+  }
+
+  /**
+   * Descarta la finalización temporal y devuelve
+   * al usuario al flujo normal de venta.
+   */
+  closeFinalization(): void {
+    this.finalizationOpen.set(false);
+    this.localizador.set('');
+
+    this.focusLocalizador();
   }
 
   /**

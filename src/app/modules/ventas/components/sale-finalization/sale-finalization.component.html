@@ -1,0 +1,235 @@
+<div class="overlay">
+    <button class="overlay__backdrop"
+            type="button"
+            aria-label="Cancelar finalización de la venta"
+            (click)="cancel()">
+    </button>
+
+    <section class="finalization overlay__panel"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="sale-finalization-title">
+
+        @if (finalizacion(); as state) {
+        <header class="finalization__header">
+            <div>
+                <h2 id="sale-finalization-title">
+                    @if (state.totalCents > 0) {
+                    Finalizar venta
+                    }
+                    @else if (state.totalCents < 0)
+                      {
+                      Finalizar
+                      devolución
+                      }
+                      @else
+                      {
+                      Finalizar
+                      operación
+                      }
+                      </h2>
+
+                        <p>
+                            @if (state.totalCents > 0) {
+                            Selecciona cómo se realizará el cobro.
+                            }
+                            @else if (state.totalCents < 0)
+                              {
+                              Selecciona
+                              cómo
+                              se
+                              realizará
+                              el
+                              reembolso.
+                              }
+                              @else
+                              {
+                              La
+                              operación
+                              no
+                              requiere
+                              ningún
+                              movimiento
+                              económico.
+                              }
+                              </p>
+            </div>
+
+            <div class="finalization__total">
+                <span>Total</span>
+
+                <strong>
+                    {{
+                        state.totalCents
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
+                </strong>
+            </div>
+        </header>
+
+        <div class="finalization__summary">
+            <div>
+                <span>
+                    Total
+                </span>
+
+                <strong>
+                    {{
+                        state.totalCents
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
+                </strong>
+            </div>
+
+            <div>
+                <span>
+                    {{
+                        state.totalCents < 0
+                            ? 'Reembolsado'
+                            : 'Pagado'
+                    }}
+                </span>
+
+                <strong>
+                    {{
+                        state.totalPagadoCents
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
+                </strong>
+            </div>
+
+            <div class="finalization__pending"
+                 [class.finalization__pending--complete]="state.completa">
+                <span>
+                    Pendiente
+                </span>
+
+                <strong>
+                    {{
+                        state.pendienteCents
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
+                </strong>
+            </div>
+        </div>
+
+        @if (state.totalCents !== 0) {
+        <section class="finalization__section">
+            <h3>
+                Medios de pago
+            </h3>
+
+            @if (tiposPagoFisicos().length > 0) {
+            <div class="finalization__payment-types">
+                @for (
+                tipoPago of tiposPagoFisicos();
+                track tipoPago.publicId
+                ) {
+                <button class="finalization__payment-type"
+                        type="button"
+                        [class.finalization__payment-type--added]="
+                            isTipoPagoAdded(tipoPago)
+                        "
+                        [disabled]="!canAddTipoPago(tipoPago)"
+                        (click)="addTipoPago(tipoPago)">
+                    <mat-icon aria-hidden="true">
+                        {{
+                            tipoPago.slug === 'efectivo'
+                                ? 'payments'
+                                : 'account_balance_wallet'
+                        }}
+                    </mat-icon>
+
+                    <span>
+                        {{ tipoPago.nombre }}
+                    </span>
+
+                    @if (isTipoPagoAdded(tipoPago)) {
+                    <mat-icon class="finalization__payment-added"
+                              aria-hidden="true">
+                        check_circle
+                    </mat-icon>
+                    }
+                </button>
+                }
+            </div>
+            }
+            @else {
+            <div class="finalization__notice">
+                No hay medios de pago físicos disponibles.
+            </div>
+            }
+        </section>
+        }
+
+        @if (state.pagos.length > 0) {
+        <section class="finalization__section">
+            <h3>
+                {{
+                    state.totalCents < 0
+                        ? 'Reembolsos'
+                        : 'Pagos aplicados'
+                }}
+            </h3>
+
+            <div class="finalization__payments">
+                @for (
+                pago of state.pagos;
+                track pago.tipoPagoPublicId
+                ) {
+                <div class="finalization__payment">
+                    <div class="finalization__payment-name">
+                        <mat-icon aria-hidden="true">
+                            {{
+                                pago.esEfectivo
+                                    ? 'payments'
+                                    : 'account_balance_wallet'
+                            }}
+                        </mat-icon>
+
+                        <strong>
+                            {{ pago.tipoPago.nombre }}
+                        </strong>
+                    </div>
+
+                    <strong class="finalization__payment-amount">
+                        {{
+                            pago.importeCents
+                                | centsToEuros
+                                | currency:'EUR':'symbol':'1.2-2'
+                        }}
+                    </strong>
+                </div>
+                }
+            </div>
+        </section>
+        }
+
+        @if (state.totalCents === 0) {
+        <div class="finalization__notice">
+            El total de la operación es 0,00 €. No es necesario
+            seleccionar ningún medio de pago.
+        </div>
+        }
+
+        @if (error() !== null) {
+        <div class="finalization__error"
+             role="alert">
+            {{ error() }}
+        </div>
+        }
+
+        <footer class="finalization__actions">
+            <button mat-stroked-button
+                    type="button"
+                    (click)="cancel()">
+                Cancelar
+            </button>
+        </footer>
+        }
+    </section>
+</div>

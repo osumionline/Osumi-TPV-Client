@@ -457,7 +457,8 @@
 
             <button mat-flat-button
                     type="button"
-                    disabled>
+                    [disabled]="ventaView().lineas.length === 0"
+                    (click)="openFinalization()">
                 Terminar
             </button>
         </div>
@@ -495,5 +496,11 @@
                           [initialSelection]="selectorState.seleccionInicial"
                           (selectEvent)="onDevolucionSelected($event)"
                           (cancelEvent)="closeDevolucionSelector()" />
+    }
+
+    @if (finalizationOpen()) {
+    <otpv-sale-finalization [totalCents]="ventaView().totalCents"
+                            [tiposPago]="tiposPago()"
+                            (cancelEvent)="closeFinalization()" />
     }
 </section>
