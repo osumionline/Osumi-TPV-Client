@@ -244,6 +244,8 @@
     .finalization__reservation-actions {
         display: flex;
         justify-content: flex-start;
+        gap: 12px;
+        flex-wrap: wrap;
 
         button {
             mat-icon {

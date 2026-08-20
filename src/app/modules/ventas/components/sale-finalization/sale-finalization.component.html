@@ -340,6 +340,24 @@
                             reservaSaving() ||
                             reservaBlockedReason() !== null
                         "
+                        (click)="createReservaConTicket()">
+                    <mat-icon>
+                        print
+                    </mat-icon>
+
+                    {{
+                        reservaSaving()
+                            ? 'Guardando reserva...'
+                            : 'Reserva'
+                    }}
+                </button>
+
+                <button mat-stroked-button
+                        type="button"
+                        [disabled]="
+                            reservaSaving() ||
+                            reservaBlockedReason() !== null
+                        "
                         (click)="createReservaSinTicket()">
                     <mat-icon>
                         bookmark_add

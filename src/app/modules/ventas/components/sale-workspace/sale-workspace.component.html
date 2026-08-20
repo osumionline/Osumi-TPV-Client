@@ -503,6 +503,7 @@
                             [tiposPago]="tiposPago()"
                             [reservaBlockedReason]="reservaBlockedReason()"
                             [reservaSaving]="reservaSaving()"
+                            (reservaConTicketEvent)="createReservaConTicket()"
                             (reservaSinTicketEvent)="createReservaSinTicket()"
                             (cancelEvent)="closeFinalization()" />
     }

@@ -22,6 +22,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { PERCENT_TOTAL } from '@constants/percentage.constants';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import permissionIds from '@desktop-contracts/permissions/permission-ids.constants';
+import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
 import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devolucion.interface';
 import type TipoPago from '@model/tipos-pago/tipo-pago.model';
 import type AccesoDirectoVenta from '@model/ventas/acceso-directo-venta.model';
@@ -51,6 +52,7 @@ import { DialogService } from '@osumi/angular-tools';
 import BpsToPercentPipe from '@pipes/bps-to-percent.pipe';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
+import ReservaTicketPrintService from '@services/reserva-ticket-print.service';
 import ReservasService from '@services/reservas.service';
 import VentasArticulosService from '@services/ventas-articulos.service';
 import VentasContextService from '@services/ventas-context.service';
@@ -93,6 +95,8 @@ export default class SaleWorkspaceComponent {
   private readonly ventasDevolucionesService: VentasDevolucionesService =
     inject(VentasDevolucionesService);
   private readonly reservasService: ReservasService = inject(ReservasService);
+  private readonly reservaTicketPrintService: ReservaTicketPrintService =
+    inject(ReservaTicketPrintService);
 
   readonly venta: InputSignal<VentaEnCurso> = input.required<VentaEnCurso>();
 
@@ -902,10 +906,28 @@ export default class SaleWorkspaceComponent {
   }
 
   /**
-   * Persiste la venta actual como reserva sin imprimir
-   * ningún comprobante y cierra después su pestaña.
+   * Persiste la venta como reserva e imprime
+   * después su comprobante.
+   */
+  async createReservaConTicket(): Promise<void> {
+    await this.createReserva(true);
+  }
+
+  /**
+   * Persiste la venta como reserva sin imprimir
+   * ningún comprobante.
    */
   async createReservaSinTicket(): Promise<void> {
+    await this.createReserva(false);
+  }
+
+  /**
+   * Orquesta la creación de una reserva y, opcionalmente,
+   * su comprobante.
+   *
+   * La persistencia siempre ocurre antes de imprimir.
+   */
+  private async createReserva(imprimirTicket: boolean): Promise<void> {
     if (this.reservaSaving()) {
       return;
     }
@@ -927,8 +949,10 @@ export default class SaleWorkspaceComponent {
 
     this.reservaSaving.set(true);
 
+    let reserva: ReservaInterface;
+
     try {
-      await this.reservasService.createFromVenta(venta);
+      reserva = await this.reservasService.createFromVenta(venta);
     } catch (error: unknown) {
       this.reservaSaving.set(false);
 
@@ -942,17 +966,46 @@ export default class SaleWorkspaceComponent {
       return;
     }
 
+    let printError: string | null = null;
+
+    if (imprimirTicket) {
+      const appData: AppData | null = this.ventasContextService.appData();
+
+      if (appData === null) {
+        printError = 'No se han podido obtener los datos del negocio para imprimir el comprobante.';
+      } else {
+        try {
+          this.reservaTicketPrintService.print(appData, reserva);
+        } catch (error: unknown) {
+          printError = getErrorMessage(
+            error,
+            'No se ha podido imprimir el comprobante de reserva.',
+          );
+        }
+      }
+    }
+
     /*
-     * La reserva ya está persistida y el stock inmovilizado.
+     * A estas alturas la reserva ya existe y el stock
+     * ya se encuentra inmovilizado.
      *
-     * No llamamos a closeFinalization(), porque intentaría
-     * devolver el foco al localizador de una venta que vamos
-     * a cerrar inmediatamente.
+     * Un problema posterior de impresión nunca debe
+     * permitir repetir accidentalmente la reserva.
      */
     this.reservaSaving.set(false);
+
     this.finalizationOpen.set(false);
 
     this.ventasService.cerrarVenta(venta.idTemporal);
+
+    if (printError !== null) {
+      this.dialog
+        .alert({
+          title: 'Aviso',
+          content: `La reserva se ha creado correctamente, pero ha ocurrido un problema con la impresión: ${printError}`,
+        })
+        .subscribe();
+    }
   }
 
   /**

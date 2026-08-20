@@ -1,5 +1,6 @@
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type Cliente from '@model/clientes/cliente.model';
+import { escapeHtml } from '@utils/html.utils';
 import { trimToNull } from '@utils/string.utils';
 
 export default function buildClienteProteccionDatosDocument(
@@ -551,18 +552,4 @@ function joinNotEmpty(...values: readonly string[]): string | null {
     .filter((value: string | null): value is string => value !== null);
 
   return normalizedValues.length === 0 ? null : normalizedValues.join(', ');
-}
-
-/**
- * Todos los datos de empresa y cliente proceden de almacenamiento
- * editable por el usuario. Nunca deben insertarse directamente en
- * el documento HTML sin escapar.
- */
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
 }

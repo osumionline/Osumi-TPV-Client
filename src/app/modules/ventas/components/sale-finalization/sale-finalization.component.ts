@@ -49,6 +49,8 @@ export default class SaleFinalizationComponent implements OnInit {
 
   readonly reservaSinTicketEvent: OutputEmitterRef<void> = output<void>();
 
+  readonly reservaConTicketEvent: OutputEmitterRef<void> = output<void>();
+
   /**
    * El modelo es mutable durante la interacción.
    *
@@ -331,6 +333,18 @@ export default class SaleFinalizationComponent implements OnInit {
     const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
 
     return finalizacion !== null && !finalizacion.completa && !this.isTipoPagoAdded(tipoPago);
+  }
+
+  /**
+   * Solicita guardar la venta como reserva
+   * e imprimir su comprobante.
+   */
+  createReservaConTicket(): void {
+    if (this.reservaSaving() || this.reservaBlockedReason() !== null) {
+      return;
+    }
+
+    this.reservaConTicketEvent.emit();
   }
 
   /**
