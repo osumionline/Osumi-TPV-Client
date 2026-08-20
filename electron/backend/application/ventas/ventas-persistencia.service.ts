@@ -128,6 +128,12 @@ export default class VentasPersistenciaService {
       'El descuento fijo de una línea no es válido.',
     );
 
+    if (descuentoBps !== 0 && importeDescuentoMicros !== 0) {
+      throw new Error(
+        'Una línea no puede contener simultáneamente descuento porcentual y descuento fijo.',
+      );
+    }
+
     const unidades: number = this.requireSafeInteger(
       linea.unidades,
       'Las unidades de una línea no son válidas.',

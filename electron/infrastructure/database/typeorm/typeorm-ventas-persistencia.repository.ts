@@ -34,6 +34,7 @@ interface ExistingVentaDatabaseRow {
 interface TipoPagoDatabaseRow {
   readonly id: number;
   readonly slug: string;
+  readonly afecta_caja: number;
   readonly fisico: number;
 }
 
@@ -74,6 +75,25 @@ interface LineaReservaStockDatabaseRow {
 
 interface ArticuloStockDatabaseRow {
   readonly stock: number;
+}
+
+interface CajaAcumuladosDatabaseRow {
+  readonly ventas_cents: number;
+  readonly beneficios_cents: number;
+  readonly descuentos_cents: number;
+  readonly importe_cierre_teorico_cents: number;
+}
+
+interface CajaTipoAcumuladosDatabaseRow {
+  readonly operaciones: number;
+  readonly importe_total_cents: number;
+  readonly importe_descuento_cents: number;
+}
+
+interface VentaCajaSummary {
+  readonly beneficioCents: number;
+  readonly descuentoCents: number;
+  readonly cierreTeoricoImpactCents: number;
 }
 
 interface SecuenciaDatabaseRow {
@@ -184,6 +204,8 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
             command,
             timestamp,
           );
+
+          await this.updateCajaAcumulados(queryRunner, idCaja, command, tiposPago, timestamp);
 
           return {
             id: idVenta,
@@ -408,6 +430,7 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
             SELECT
               id,
               slug,
+              afecta_caja,
               fisico
             FROM tipo_pago
             WHERE
@@ -1158,6 +1181,398 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
         timestamp,
       ],
     );
+  }
+
+  private async updateCajaAcumulados(
+    queryRunner: QueryRunner,
+    idCaja: number,
+    command: GuardarVentaRecordCommand,
+    tiposPago: ReadonlyMap<string, TipoPagoDatabaseRow>,
+    timestamp: string,
+  ): Promise<void> {
+    const summary: VentaCajaSummary = this.calculateVentaCajaSummary(command, tiposPago);
+
+    const rows: readonly CajaAcumuladosDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT
+          ventas_cents,
+          beneficios_cents,
+          descuentos_cents,
+          importe_cierre_teorico_cents
+        FROM caja
+        WHERE
+          id = ?
+          AND cierre IS NULL
+        LIMIT 1
+      `,
+      [idCaja],
+    )) as readonly CajaAcumuladosDatabaseRow[];
+
+    const caja: CajaAcumuladosDatabaseRow | undefined = rows[0];
+
+    if (caja === undefined) {
+      throw new Error('La caja asociada a la venta ya no está abierta.');
+    }
+
+    const ventasCents: number = this.safeAdd(
+      caja.ventas_cents,
+      command.totalCents,
+      'El acumulado de ventas de la caja supera el rango numérico seguro.',
+    );
+
+    const beneficiosCents: number = this.safeAdd(
+      caja.beneficios_cents,
+      summary.beneficioCents,
+      'El acumulado de beneficios de la caja supera el rango numérico seguro.',
+    );
+
+    const descuentosCents: number = this.safeAdd(
+      caja.descuentos_cents,
+      summary.descuentoCents,
+      'El acumulado de descuentos de la caja supera el rango numérico seguro.',
+    );
+
+    const cierreTeoricoCents: number = this.safeAdd(
+      caja.importe_cierre_teorico_cents,
+      summary.cierreTeoricoImpactCents,
+      'El importe teórico de la caja supera el rango numérico seguro.',
+    );
+
+    await queryRunner.query(
+      `
+      UPDATE caja
+      SET
+        ventas_cents = ?,
+        beneficios_cents = ?,
+        descuentos_cents = ?,
+        importe_cierre_teorico_cents = ?,
+        updated_at = ?
+      WHERE
+        id = ?
+        AND cierre IS NULL
+    `,
+      [ventasCents, beneficiosCents, descuentosCents, cierreTeoricoCents, timestamp, idCaja],
+    );
+
+    const descuentoPagosCents: readonly number[] = this.allocateDiscountByPayments(
+      summary.descuentoCents,
+      command.pagos,
+    );
+
+    for (let index: number = 0; index < command.pagos.length; index += 1) {
+      const pago: GuardarVentaPagoRecordCommand | undefined = command.pagos[index];
+
+      const descuentoCents: number | undefined = descuentoPagosCents[index];
+
+      if (pago === undefined || descuentoCents === undefined) {
+        throw new Error('No se ha podido actualizar uno de los acumulados de pago de la caja.');
+      }
+
+      const tipoPago: TipoPagoDatabaseRow | undefined = tiposPago.get(pago.tipoPagoPublicId);
+
+      if (tipoPago === undefined) {
+        throw new Error('No se ha podido resolver uno de los tipos de pago de la caja.');
+      }
+
+      await this.updateCajaTipo(
+        queryRunner,
+        idCaja,
+        tipoPago.id,
+        pago.importeCents,
+        descuentoCents,
+        timestamp,
+      );
+    }
+  }
+
+  private calculateVentaCajaSummary(
+    command: GuardarVentaRecordCommand,
+    tiposPago: ReadonlyMap<string, TipoPagoDatabaseRow>,
+  ): VentaCajaSummary {
+    let beneficioMicros: number = 0;
+    let descuentoMicros: number = 0;
+
+    for (const linea of command.lineas) {
+      const costeMicros: number = this.safeMultiply(
+        linea.pucMicros,
+        linea.unidades,
+        'El coste de una línea supera el rango numérico seguro.',
+      );
+
+      const beneficioLineaMicros: number = this.safeSubtract(
+        linea.importeMicros,
+        costeMicros,
+        'El beneficio de una línea supera el rango numérico seguro.',
+      );
+
+      beneficioMicros = this.safeAdd(
+        beneficioMicros,
+        beneficioLineaMicros,
+        'El beneficio total de la venta supera el rango numérico seguro.',
+      );
+
+      descuentoMicros = this.safeAdd(
+        descuentoMicros,
+        this.calculateLineaDescuentoMicros(linea),
+        'El descuento total de la venta supera el rango numérico seguro.',
+      );
+    }
+
+    let cierreTeoricoImpactCents: number = 0;
+
+    for (const pago of command.pagos) {
+      const tipoPago: TipoPagoDatabaseRow | undefined = tiposPago.get(pago.tipoPagoPublicId);
+
+      if (tipoPago === undefined) {
+        throw new Error('No se ha podido resolver uno de los tipos de pago de la venta.');
+      }
+
+      if (tipoPago.afecta_caja === 1) {
+        cierreTeoricoImpactCents = this.safeAdd(
+          cierreTeoricoImpactCents,
+          pago.importeCents,
+          'El impacto de los pagos sobre la caja supera el rango numérico seguro.',
+        );
+      }
+    }
+
+    return {
+      beneficioCents: this.microsToCents(beneficioMicros),
+      descuentoCents: this.microsToCents(descuentoMicros),
+      cierreTeoricoImpactCents,
+    };
+  }
+
+  private calculateLineaDescuentoMicros(linea: GuardarVentaLineaRecordCommand): number {
+    if (linea.importeDescuentoMicros !== 0) {
+      return linea.unidades < 0 ? -linea.importeDescuentoMicros : linea.importeDescuentoMicros;
+    }
+
+    if (linea.descuentoBps === 0) {
+      return 0;
+    }
+
+    const importeBaseMicros: number = this.safeMultiply(
+      linea.pvpMicros,
+      linea.unidades,
+      'El importe base de una línea supera el rango numérico seguro.',
+    );
+
+    const descuentoMicros: number = this.safeSubtract(
+      importeBaseMicros,
+      linea.importeMicros,
+      'El descuento porcentual de una línea supera el rango numérico seguro.',
+    );
+
+    if (linea.unidades > 0 && descuentoMicros < 0) {
+      throw new Error(
+        'El descuento porcentual de una línea positiva no puede aumentar su importe.',
+      );
+    }
+
+    if (linea.unidades < 0 && descuentoMicros > 0) {
+      throw new Error('El descuento porcentual de una devolución no tiene un signo válido.');
+    }
+
+    return descuentoMicros;
+  }
+
+  private async updateCajaTipo(
+    queryRunner: QueryRunner,
+    idCaja: number,
+    idTipoPago: number,
+    importeCents: number,
+    descuentoCents: number,
+    timestamp: string,
+  ): Promise<void> {
+    const rows: readonly CajaTipoAcumuladosDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT
+          operaciones,
+          importe_total_cents,
+          importe_descuento_cents
+        FROM caja_tipo
+        WHERE
+          id_caja = ?
+          AND id_tipo_pago = ?
+        LIMIT 1
+      `,
+      [idCaja, idTipoPago],
+    )) as readonly CajaTipoAcumuladosDatabaseRow[];
+
+    const cajaTipo: CajaTipoAcumuladosDatabaseRow | undefined = rows[0];
+
+    if (cajaTipo === undefined) {
+      await queryRunner.query(
+        `
+        INSERT INTO caja_tipo (
+          id_caja,
+          id_tipo_pago,
+          operaciones,
+          importe_total_cents,
+          importe_real_cents,
+          importe_descuento_cents,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          ?, ?, 1, ?, NULL, ?, ?, ?
+        )
+      `,
+        [idCaja, idTipoPago, importeCents, descuentoCents, timestamp, timestamp],
+      );
+
+      return;
+    }
+
+    const operaciones: number = this.safeAdd(
+      cajaTipo.operaciones,
+      1,
+      'El número de operaciones del tipo de pago supera el rango numérico seguro.',
+    );
+
+    const importeTotalCents: number = this.safeAdd(
+      cajaTipo.importe_total_cents,
+      importeCents,
+      'El acumulado del tipo de pago supera el rango numérico seguro.',
+    );
+
+    const importeDescuentoCents: number = this.safeAdd(
+      cajaTipo.importe_descuento_cents,
+      descuentoCents,
+      'El descuento acumulado del tipo de pago supera el rango numérico seguro.',
+    );
+
+    await queryRunner.query(
+      `
+      UPDATE caja_tipo
+      SET
+        operaciones = ?,
+        importe_total_cents = ?,
+        importe_descuento_cents = ?,
+        updated_at = ?
+      WHERE
+        id_caja = ?
+        AND id_tipo_pago = ?
+    `,
+      [operaciones, importeTotalCents, importeDescuentoCents, timestamp, idCaja, idTipoPago],
+    );
+  }
+
+  private allocateDiscountByPayments(
+    descuentoTotalCents: number,
+    pagos: readonly GuardarVentaPagoRecordCommand[],
+  ): readonly number[] {
+    if (pagos.length === 0) {
+      return [];
+    }
+
+    if (descuentoTotalCents === 0) {
+      return pagos.map((): number => 0);
+    }
+
+    let totalWeight: number = 0;
+
+    for (const pago of pagos) {
+      totalWeight = this.safeAdd(
+        totalWeight,
+        Math.abs(pago.importeCents),
+        'El total utilizado para repartir el descuento supera el rango numérico seguro.',
+      );
+    }
+
+    if (totalWeight === 0) {
+      throw new Error('No se puede repartir el descuento entre pagos sin importe.');
+    }
+
+    const descuentoSign: number = descuentoTotalCents < 0 ? -1 : 1;
+
+    const descuentoAbsCents: number = Math.abs(descuentoTotalCents);
+
+    let allocatedCents: number = 0;
+
+    return pagos.map((pago: GuardarVentaPagoRecordCommand, index: number): number => {
+      if (index === pagos.length - 1) {
+        return this.safeSubtract(
+          descuentoTotalCents,
+          allocatedCents,
+          'El reparto final del descuento supera el rango numérico seguro.',
+        );
+      }
+
+      const allocationAbsCents: number = this.roundProportionalInteger(
+        descuentoAbsCents,
+        Math.abs(pago.importeCents),
+        totalWeight,
+      );
+
+      const allocationCents: number = descuentoSign * allocationAbsCents;
+
+      allocatedCents = this.safeAdd(
+        allocatedCents,
+        allocationCents,
+        'El reparto del descuento supera el rango numérico seguro.',
+      );
+
+      return allocationCents;
+    });
+  }
+
+  private roundProportionalInteger(total: number, part: number, whole: number): number {
+    if (
+      !Number.isSafeInteger(total) ||
+      !Number.isSafeInteger(part) ||
+      !Number.isSafeInteger(whole) ||
+      total < 0 ||
+      part < 0 ||
+      whole <= 0
+    ) {
+      throw new Error('No se puede calcular un reparto proporcional con valores no válidos.');
+    }
+
+    const totalBigInt: bigint = BigInt(total);
+
+    const partBigInt: bigint = BigInt(part);
+
+    const wholeBigInt: bigint = BigInt(whole);
+
+    const numerator: bigint = totalBigInt * partBigInt;
+
+    const rounded: bigint = (numerator + wholeBigInt / 2n) / wholeBigInt;
+
+    const result: number = Number(rounded);
+
+    if (!Number.isSafeInteger(result)) {
+      throw new Error('El reparto proporcional supera el rango numérico seguro.');
+    }
+
+    return result;
+  }
+
+  private microsToCents(micros: number): number {
+    if (!Number.isSafeInteger(micros)) {
+      throw new Error('Un importe en microeuros no es válido.');
+    }
+
+    const sign: number = micros < 0 ? -1 : 1;
+
+    const cents: number = sign * Math.round(Math.abs(micros) / MICROS_PER_CENT);
+
+    if (!Number.isSafeInteger(cents)) {
+      throw new Error('Un importe convertido a céntimos supera el rango numérico seguro.');
+    }
+
+    return cents;
+  }
+
+  private safeMultiply(left: number, right: number, message: string): number {
+    const result: number = left * right;
+
+    if (!Number.isSafeInteger(result)) {
+      throw new Error(message);
+    }
+
+    return result;
   }
 
   private centsToMicros(cents: number): number {
