@@ -51,6 +51,7 @@ import { DialogService } from '@osumi/angular-tools';
 import BpsToPercentPipe from '@pipes/bps-to-percent.pipe';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
+import ReservasService from '@services/reservas.service';
 import VentasArticulosService from '@services/ventas-articulos.service';
 import VentasContextService from '@services/ventas-context.service';
 import VentasDevolucionesService from '@services/ventas-devoluciones.service';
@@ -91,6 +92,7 @@ export default class SaleWorkspaceComponent {
   private readonly ventasContextService: VentasContextService = inject(VentasContextService);
   private readonly ventasDevolucionesService: VentasDevolucionesService =
     inject(VentasDevolucionesService);
+  private readonly reservasService: ReservasService = inject(ReservasService);
 
   readonly venta: InputSignal<VentaEnCurso> = input.required<VentaEnCurso>();
 
@@ -134,6 +136,54 @@ export default class SaleWorkspaceComponent {
   readonly finalizationOpen: WritableSignal<boolean> = signal<boolean>(false);
 
   readonly tiposPago: Signal<readonly TipoPago[]> = this.ventasContextService.tiposPago;
+
+  readonly reservaSaving: WritableSignal<boolean> = signal<boolean>(false);
+
+  /**
+   * Explica por qué la venta actual no puede convertirse
+   * en una nueva reserva.
+   *
+   * Esta validación mejora la UX del modal. El mapper de
+   * Reservas continúa siendo la autoridad y vuelve a validar
+   * las mismas precondiciones antes de persistir.
+   */
+  readonly reservaBlockedReason: Signal<string | null> = computed((): string | null => {
+    const venta: VentaEnCurso = this.ventaView();
+    const clientePublicId: string | null = venta.cliente?.publicId ?? null;
+
+    if (clientePublicId === null) {
+      return 'Para crear una reserva es obligatorio seleccionar un cliente.';
+    }
+
+    if (
+      venta.devolucionOrigen !== null ||
+      venta.lineas.some((linea: VentaLineaEnCurso): boolean => linea.esDevolucion)
+    ) {
+      return 'No se puede crear una reserva desde una venta que contiene devoluciones.';
+    }
+
+    if (
+      venta.tieneReservas ||
+      venta.lineas.some((linea: VentaLineaEnCurso): boolean => linea.esReserva)
+    ) {
+      return 'No se puede crear una nueva reserva desde una venta que ya procede de reservas.';
+    }
+
+    if (venta.lineas.length === 0) {
+      return 'No se puede crear una reserva sin líneas.';
+    }
+
+    if (
+      venta.lineas.some(
+        (linea: VentaLineaEnCurso): boolean =>
+          !Number.isSafeInteger(linea.cantidad) || linea.cantidad <= 0,
+      )
+    ) {
+      return 'Las líneas de una reserva deben tener una cantidad positiva.';
+    }
+
+    return null;
+  });
 
   readonly variosIvaOptionsBps: Signal<readonly number[]> = computed((): readonly number[] => {
     const appData: AppData | null = this.ventasContextService.appData();
@@ -849,6 +899,60 @@ export default class SaleWorkspaceComponent {
     this.localizador.set('');
 
     this.focusLocalizador();
+  }
+
+  /**
+   * Persiste la venta actual como reserva sin imprimir
+   * ningún comprobante y cierra después su pestaña.
+   */
+  async createReservaSinTicket(): Promise<void> {
+    if (this.reservaSaving()) {
+      return;
+    }
+
+    const blockedReason: string | null = this.reservaBlockedReason();
+
+    if (blockedReason !== null) {
+      this.dialog
+        .alert({
+          title: 'Reserva',
+          content: blockedReason,
+        })
+        .subscribe();
+
+      return;
+    }
+
+    const venta: VentaEnCurso = this.venta();
+
+    this.reservaSaving.set(true);
+
+    try {
+      await this.reservasService.createFromVenta(venta);
+    } catch (error: unknown) {
+      this.reservaSaving.set(false);
+
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido crear la reserva.'),
+        })
+        .subscribe();
+
+      return;
+    }
+
+    /*
+     * La reserva ya está persistida y el stock inmovilizado.
+     *
+     * No llamamos a closeFinalization(), porque intentaría
+     * devolver el foco al localizador de una venta que vamos
+     * a cerrar inmediatamente.
+     */
+    this.reservaSaving.set(false);
+    this.finalizationOpen.set(false);
+
+    this.ventasService.cerrarVenta(venta.idTemporal);
   }
 
   /**

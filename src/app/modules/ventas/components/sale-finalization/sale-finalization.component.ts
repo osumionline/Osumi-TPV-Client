@@ -41,7 +41,13 @@ export default class SaleFinalizationComponent implements OnInit {
 
   readonly tiposPago: InputSignal<readonly TipoPago[]> = input.required<readonly TipoPago[]>();
 
+  readonly reservaBlockedReason: InputSignal<string | null> = input<string | null>(null);
+
+  readonly reservaSaving: InputSignal<boolean> = input<boolean>(false);
+
   readonly cancelEvent: OutputEmitterRef<void> = output<void>();
+
+  readonly reservaSinTicketEvent: OutputEmitterRef<void> = output<void>();
 
   /**
    * El modelo es mutable durante la interacción.
@@ -328,9 +334,25 @@ export default class SaleFinalizationComponent implements OnInit {
   }
 
   /**
+   * Solicita guardar la venta actual como reserva
+   * sin imprimir comprobante.
+   */
+  createReservaSinTicket(): void {
+    if (this.reservaSaving() || this.reservaBlockedReason() !== null) {
+      return;
+    }
+
+    this.reservaSinTicketEvent.emit();
+  }
+
+  /**
    * Cancela la finalización sin modificar VentaEnCurso.
    */
   cancel(): void {
+    if (this.reservaSaving()) {
+      return;
+    }
+
     this.cancelEvent.emit();
   }
 }

@@ -225,6 +225,33 @@
         color: var(--color-red);
     }
 
+    .finalization__reservation {
+        padding-top: 16px;
+        border-top: 1px solid var(--separator-color);
+    }
+
+    .finalization__reservation-info {
+        h3 {
+            margin: 0;
+        }
+
+        p {
+            margin: 4px 0 0;
+            color: var(--disabled-color);
+        }
+    }
+
+    .finalization__reservation-actions {
+        display: flex;
+        justify-content: flex-start;
+
+        button {
+            mat-icon {
+                margin-right: 6px;
+            }
+        }
+    }
+
     .finalization__notice,
     .finalization__error {
         padding: 10px 12px;

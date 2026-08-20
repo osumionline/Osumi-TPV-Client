@@ -501,6 +501,9 @@
     @if (finalizationOpen()) {
     <otpv-sale-finalization [totalCents]="ventaView().totalCents"
                             [tiposPago]="tiposPago()"
+                            [reservaBlockedReason]="reservaBlockedReason()"
+                            [reservaSaving]="reservaSaving()"
+                            (reservaSinTicketEvent)="createReservaSinTicket()"
                             (cancelEvent)="closeFinalization()" />
     }
 </section>
