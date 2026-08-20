@@ -50,21 +50,51 @@ export default class PrintingService {
   }
 
   /**
-   * Genera un PDF a partir de un documento HTML utilizando
-   * el renderer Chromium oculto del proceso principal.
+   * Genera un PDF utilizando el renderer Chromium
+   * oculto del proceso principal.
    */
   async renderPdf(value: unknown): Promise<Uint8Array> {
     const documentHtml: string = this.normalizeDocumentHtml(value);
 
     const pdfBuffer: Buffer = await this.documentRenderer.renderPdf(documentHtml);
 
-    /*
-     * IPC transporta explícitamente un Uint8Array.
-     *
-     * No exponemos Buffer como parte de los contratos
-     * públicos porque Buffer pertenece al runtime Node.
-     */
     return new Uint8Array(pdfBuffer);
+  }
+
+  /**
+   * Imprime el documento en la impresora de tickets
+   * configurada para este equipo.
+   */
+  async printTicket(value: unknown): Promise<void> {
+    const documentHtml: string = this.normalizeDocumentHtml(value);
+
+    const settings: PrintingSettings = await this.settingsRepository.load();
+
+    const deviceName: string | null = settings.ticketPrinterDeviceName;
+
+    if (deviceName === null) {
+      throw new Error('No hay una impresora de tickets configurada.');
+    }
+
+    /*
+     * Comprobamos antes que la impresora siga
+     * existiendo en este equipo.
+     *
+     * No modificamos la configuración si ha
+     * desaparecido: puede ser una desconexión
+     * temporal.
+     */
+    const printers: readonly PrinterInterface[] = await this.printerProvider.getPrinters();
+
+    const printerExists: boolean = printers.some(
+      (printer: PrinterInterface): boolean => printer.deviceName === deviceName,
+    );
+
+    if (!printerExists) {
+      throw new Error('La impresora de tickets configurada no está disponible en este equipo.');
+    }
+
+    await this.documentRenderer.print(documentHtml, deviceName);
   }
 
   private normalizeDocumentHtml(value: unknown): string {

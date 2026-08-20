@@ -41,4 +41,13 @@ export default function registerPrintingIpc(
       return printingService.renderPdf(documentHtml);
     },
   );
+
+  ipcMain.handle(
+    IPC_CHANNELS.printingPrintTicket,
+    async (event, documentHtml: unknown): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await printingService.printTicket(documentHtml);
+    },
+  );
 }

@@ -9,4 +9,6 @@ export default interface PrintingApi {
   setTicketPrinterDeviceName(deviceName: string | null): Promise<PrintingSettings>;
 
   renderPdf(documentHtml: string): Promise<Uint8Array>;
+
+  printTicket(documentHtml: string): Promise<void>;
 }

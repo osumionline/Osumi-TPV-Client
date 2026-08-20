@@ -3,32 +3,29 @@ import { BrowserWindow, type WebContents } from 'electron';
 import type { Buffer } from 'node:buffer';
 
 const MILLIMETERS_PER_INCH: number = 25.4;
+const MICRONS_PER_MILLIMETER: number = 1_000;
 const CSS_PIXELS_PER_INCH: number = 96;
 
 /*
- * Los tickets actuales están diseñados para papel
- * térmico de 80 mm.
- *
- * Si en el futuro hacemos configurable el ancho del papel,
- * esta decisión saldrá de este renderer y pasará a formar
- * parte de las opciones del documento.
+ * Los tickets actuales están diseñados para
+ * papel térmico de 80 mm.
  */
 const TICKET_WIDTH_MILLIMETERS: number = 80;
+
 const TICKET_WIDTH_INCHES: number = TICKET_WIDTH_MILLIMETERS / MILLIMETERS_PER_INCH;
 
+const TICKET_WIDTH_MICRONS: number = TICKET_WIDTH_MILLIMETERS * MICRONS_PER_MILLIMETER;
+
 /*
- * Añadimos unos pocos píxeles al alto medido para evitar
- * que los errores de redondeo de Chromium provoquen una
- * segunda página prácticamente vacía.
+ * Añadimos unos pocos píxeles al alto medido
+ * para evitar errores de redondeo de Chromium.
  */
 const DOCUMENT_HEIGHT_SAFETY_PIXELS: number = 4;
 
 const MIN_DOCUMENT_HEIGHT_INCHES: number = 1;
 
 /*
- * Dos metros de ticket son un límite defensivo muy amplio.
- * Si alguna vez llegásemos aquí probablemente habría un
- * documento anómalo que convendría revisar.
+ * Límite defensivo: dos metros de ticket.
  */
 const MAX_DOCUMENT_HEIGHT_INCHES: number = 2_000 / MILLIMETERS_PER_INCH;
 
@@ -59,8 +56,58 @@ export default class ElectronHtmlDocumentRenderer implements HtmlDocumentRendere
   }
 
   /**
-   * Crea un renderer Chromium invisible durante el tiempo
-   * estrictamente necesario para procesar el documento.
+   * Imprime silenciosamente el documento utilizando
+   * directamente la impresora indicada.
+   */
+  async print(documentHtml: string, deviceName: string): Promise<void> {
+    return this.withDocumentWindow(
+      documentHtml,
+      async (webContents: WebContents): Promise<void> => {
+        const documentHeightMicrons: number = await this.getDocumentHeightMicrons(webContents);
+
+        await new Promise<void>((resolve, reject): void => {
+          webContents.print(
+            {
+              silent: true,
+              printBackground: true,
+              deviceName,
+              landscape: false,
+              margins: {
+                marginType: 'none',
+              },
+              pageSize: {
+                width: TICKET_WIDTH_MICRONS,
+                height: documentHeightMicrons,
+              },
+              copies: 1,
+              duplexMode: 'simplex',
+            },
+            (success: boolean, failureReason: string): void => {
+              if (success) {
+                resolve();
+
+                return;
+              }
+
+              const reason: string = failureReason.trim();
+
+              reject(
+                new Error(
+                  reason.length === 0
+                    ? 'No se ha podido imprimir el documento.'
+                    : `No se ha podido imprimir el documento: ${reason}`,
+                ),
+              );
+            },
+          );
+        });
+      },
+    );
+  }
+
+  /**
+   * Crea un renderer Chromium invisible durante
+   * el tiempo estrictamente necesario.
    */
   private async withDocumentWindow<T>(
     documentHtml: string,
@@ -70,9 +117,8 @@ export default class ElectronHtmlDocumentRenderer implements HtmlDocumentRendere
       show: false,
 
       /*
-       * Una altura pequeña evita que reglas CSS basadas
-       * en 100vh inflen artificialmente la medición de
-       * tickets cortos.
+       * Una altura pequeña evita que reglas CSS
+       * basadas en 100vh inflen tickets cortos.
        */
       width: 360,
       height: 100,
@@ -115,12 +161,36 @@ export default class ElectronHtmlDocumentRenderer implements HtmlDocumentRendere
   }
 
   /**
-   * Calcula la altura real del documento renderizado.
-   *
-   * printToPDF espera las dimensiones personalizadas
-   * expresadas en pulgadas.
+   * Calcula la altura del documento en pulgadas,
+   * que es la unidad que utiliza printToPDF().
    */
   private async getDocumentHeightInches(webContents: WebContents): Promise<number> {
+    const heightPixels: number = await this.getDocumentHeightPixels(webContents);
+
+    const heightInches: number = Math.max(
+      heightPixels / CSS_PIXELS_PER_INCH,
+      MIN_DOCUMENT_HEIGHT_INCHES,
+    );
+
+    if (heightInches > MAX_DOCUMENT_HEIGHT_INCHES) {
+      throw new RangeError('El documento es demasiado largo para imprimir.');
+    }
+
+    return heightInches;
+  }
+
+  /**
+   * Calcula la misma altura en micras, que es la
+   * unidad utilizada por el pageSize personalizado
+   * de webContents.print().
+   */
+  private async getDocumentHeightMicrons(webContents: WebContents): Promise<number> {
+    const heightInches: number = await this.getDocumentHeightInches(webContents);
+
+    return Math.ceil(heightInches * MILLIMETERS_PER_INCH * MICRONS_PER_MILLIMETER);
+  }
+
+  private async getDocumentHeightPixels(webContents: WebContents): Promise<number> {
     const result: unknown = await webContents.executeJavaScript(
       `
           Math.ceil(
@@ -137,17 +207,6 @@ export default class ElectronHtmlDocumentRenderer implements HtmlDocumentRendere
       throw new Error('No se ha podido calcular la altura del documento.');
     }
 
-    const heightPixels: number = result + DOCUMENT_HEIGHT_SAFETY_PIXELS;
-
-    const heightInches: number = Math.max(
-      heightPixels / CSS_PIXELS_PER_INCH,
-      MIN_DOCUMENT_HEIGHT_INCHES,
-    );
-
-    if (heightInches > MAX_DOCUMENT_HEIGHT_INCHES) {
-      throw new RangeError('El documento es demasiado largo para generar el PDF.');
-    }
-
-    return heightInches;
+    return result + DOCUMENT_HEIGHT_SAFETY_PIXELS;
   }
 }

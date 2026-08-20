@@ -117,6 +117,9 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
 
     renderPdf: (documentHtml: string): Promise<Uint8Array> =>
       ipcRenderer.invoke(IPC_CHANNELS.printingRenderPdf, documentHtml) as Promise<Uint8Array>,
+
+    printTicket: (documentHtml: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.printingPrintTicket, documentHtml) as Promise<void>,
   }),
 
   marcas: Object.freeze({
