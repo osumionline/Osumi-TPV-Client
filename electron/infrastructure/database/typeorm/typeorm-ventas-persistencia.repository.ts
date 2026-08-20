@@ -15,6 +15,9 @@ const VENTA_DOCUMENT_TYPE: string = 'venta';
 const VENTA_SERIE: string = '';
 const EFECTIVO_SLUG: string = 'efectivo';
 
+const HISTORICO_ARTICULO_TIPO_VENTA: number = 1;
+const MICROS_PER_CENT: number = 10_000;
+
 interface DatabaseIdRow {
   readonly id: number;
 }
@@ -48,6 +51,29 @@ interface LineaReservaOrigenDatabaseRow {
   readonly id: number;
   readonly id_reserva: number;
   readonly id_articulo: number | null;
+}
+
+interface LineaVentaDevolucionStockDatabaseRow {
+  readonly id: number;
+  readonly id_articulo: number | null;
+  readonly unidades: number;
+  readonly unidades_devueltas: number;
+  readonly puc_micros: number;
+  readonly pvp_micros: number;
+}
+
+interface LineaReservaStockDatabaseRow {
+  readonly id: number;
+  readonly public_id: string;
+  readonly id_reserva: number;
+  readonly id_articulo: number | null;
+  readonly puc_micros: number;
+  readonly pvp_cents: number;
+  readonly unidades: number;
+}
+
+interface ArticuloStockDatabaseRow {
+  readonly stock: number;
 }
 
 interface SecuenciaDatabaseRow {
@@ -149,6 +175,15 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
 
             await this.insertPago(queryRunner, idVenta, tipoPago.id, index, pago, timestamp);
           }
+
+          await this.reconcileStockAndOrigins(
+            queryRunner,
+            idVenta,
+            idVentaOrigenDevolucion,
+            reservas,
+            command,
+            timestamp,
+          );
 
           return {
             id: idVenta,
@@ -749,6 +784,414 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
       rows[0]?.id,
       'Uno de los artículos de la venta ya no está disponible.',
     );
+  }
+
+  private async reconcileStockAndOrigins(
+    queryRunner: QueryRunner,
+    idVenta: number,
+    idVentaOrigenDevolucion: number | null,
+    reservas: ReadonlyMap<string, ReservaDatabaseRow>,
+    command: GuardarVentaRecordCommand,
+    timestamp: string,
+  ): Promise<void> {
+    for (const linea of command.lineas) {
+      /*
+       * Las líneas procedentes de reserva se procesan
+       * conjuntamente después, porque necesitamos comparar
+       * toda la reserva original con su resultado final.
+       */
+      if (linea.reservaLineaOrigenPublicId !== null) {
+        continue;
+      }
+
+      if (linea.devolucionLineaOrigenPublicId !== null) {
+        await this.processDevolucionStock(
+          queryRunner,
+          idVenta,
+          idVentaOrigenDevolucion,
+          linea,
+          timestamp,
+        );
+
+        continue;
+      }
+
+      const idArticulo: number | null = await this.resolveArticuloId(
+        queryRunner,
+        linea.articuloPublicId,
+      );
+
+      if (idArticulo === null) {
+        continue;
+      }
+
+      await this.applyStockMovement(
+        queryRunner,
+        idArticulo,
+        linea.unidades,
+        idVenta,
+        linea.pucMicros,
+        linea.pvpMicros,
+        timestamp,
+      );
+    }
+
+    await this.consumeReservas(queryRunner, idVenta, reservas, command.lineas, timestamp);
+  }
+
+  /**
+   * Aplica una devolución sobre la línea histórica exacta.
+   *
+   * unidades_devueltas se acumula, nunca se sustituye.
+   */
+  private async processDevolucionStock(
+    queryRunner: QueryRunner,
+    idVenta: number,
+    idVentaOrigenDevolucion: number | null,
+    linea: GuardarVentaLineaRecordCommand,
+    timestamp: string,
+  ): Promise<void> {
+    if (idVentaOrigenDevolucion === null || linea.devolucionLineaOrigenPublicId === null) {
+      throw new Error('Una línea de devolución no tiene un origen válido.');
+    }
+
+    const rows: readonly LineaVentaDevolucionStockDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT
+          id,
+          id_articulo,
+          unidades,
+          unidades_devueltas,
+          puc_micros,
+          pvp_micros
+        FROM linea_venta
+        WHERE
+          public_id = ?
+          AND id_venta = ?
+          AND unidades > 0
+        LIMIT 1
+      `,
+      [linea.devolucionLineaOrigenPublicId, idVentaOrigenDevolucion],
+    )) as readonly LineaVentaDevolucionStockDatabaseRow[];
+
+    const origen: LineaVentaDevolucionStockDatabaseRow | undefined = rows[0];
+
+    if (origen === undefined) {
+      throw new Error('Una de las líneas origen de devolución ya no está disponible.');
+    }
+
+    if (
+      !Number.isSafeInteger(origen.unidades) ||
+      origen.unidades <= 0 ||
+      !Number.isSafeInteger(origen.unidades_devueltas) ||
+      origen.unidades_devueltas < 0
+    ) {
+      throw new Error('La línea origen de devolución contiene unas unidades no válidas.');
+    }
+
+    const unidadesDevueltasAhora: number = -linea.unidades;
+
+    const unidadesDevueltasTotal: number = this.safeAdd(
+      origen.unidades_devueltas,
+      unidadesDevueltasAhora,
+      'El total de unidades devueltas supera el rango numérico seguro.',
+    );
+
+    if (unidadesDevueltasTotal > origen.unidades) {
+      throw new Error('La devolución supera las unidades disponibles de la línea original.');
+    }
+
+    await queryRunner.query(
+      `
+      UPDATE linea_venta
+      SET
+        unidades_devueltas = ?,
+        updated_at = ?
+      WHERE id = ?
+    `,
+      [unidadesDevueltasTotal, timestamp, origen.id],
+    );
+
+    if (origen.id_articulo === null) {
+      return;
+    }
+
+    /*
+     * linea.unidades es negativa:
+     *
+     * diferencia = -2
+     * stockFinal = stockPrevio - (-2)
+     *            = stockPrevio + 2
+     */
+    await this.applyStockMovement(
+      queryRunner,
+      origen.id_articulo,
+      linea.unidades,
+      idVenta,
+      origen.puc_micros,
+      origen.pvp_micros,
+      timestamp,
+    );
+  }
+
+  /**
+   * Resuelve conjuntamente todas las reservas originales.
+   *
+   * Una línea reservada que ya no aparezca en la venta
+   * equivale a cero unidades finalmente vendidas.
+   */
+  private async consumeReservas(
+    queryRunner: QueryRunner,
+    idVenta: number,
+    reservas: ReadonlyMap<string, ReservaDatabaseRow>,
+    lineasVenta: readonly GuardarVentaLineaRecordCommand[],
+    timestamp: string,
+  ): Promise<void> {
+    if (reservas.size === 0) {
+      return;
+    }
+
+    const lineasFinales: Map<string, GuardarVentaLineaRecordCommand> = new Map<
+      string,
+      GuardarVentaLineaRecordCommand
+    >();
+
+    for (const linea of lineasVenta) {
+      if (linea.reservaLineaOrigenPublicId === null) {
+        continue;
+      }
+
+      lineasFinales.set(linea.reservaLineaOrigenPublicId, linea);
+    }
+
+    for (const reserva of reservas.values()) {
+      const lineasReserva: readonly LineaReservaStockDatabaseRow[] = (await queryRunner.query(
+        `
+          SELECT
+            id,
+            public_id,
+            id_reserva,
+            id_articulo,
+            puc_micros,
+            pvp_cents,
+            unidades
+          FROM linea_reserva
+          WHERE id_reserva = ?
+          ORDER BY id
+        `,
+        [reserva.id],
+      )) as readonly LineaReservaStockDatabaseRow[];
+
+      if (lineasReserva.length === 0) {
+        throw new Error('Una de las reservas asociadas a la venta no contiene líneas.');
+      }
+
+      for (const lineaReserva of lineasReserva) {
+        if (!Number.isSafeInteger(lineaReserva.unidades) || lineaReserva.unidades <= 0) {
+          throw new Error('Una línea de reserva contiene unas unidades no válidas.');
+        }
+
+        const lineaFinal: GuardarVentaLineaRecordCommand | undefined = lineasFinales.get(
+          lineaReserva.public_id,
+        );
+
+        const unidadesFinales: number = lineaFinal?.unidades ?? 0;
+
+        const diferencia: number = this.safeSubtract(
+          unidadesFinales,
+          lineaReserva.unidades,
+          'La reconciliación de una reserva supera el rango numérico seguro.',
+        );
+
+        if (lineaReserva.id_articulo !== null) {
+          await this.applyStockMovement(
+            queryRunner,
+            lineaReserva.id_articulo,
+            diferencia,
+            idVenta,
+            lineaReserva.puc_micros,
+            this.centsToMicros(lineaReserva.pvp_cents),
+            timestamp,
+          );
+        }
+
+        if (lineaFinal !== undefined) {
+          lineasFinales.delete(lineaReserva.public_id);
+        }
+      }
+
+      /*
+       * La reserva queda resuelta por esta venta.
+       *
+       * Conservamos sus líneas como histórico y realizamos
+       * únicamente borrado lógico de la cabecera.
+       */
+      await queryRunner.query(
+        `
+        UPDATE reserva
+        SET
+          deleted_at = ?,
+          updated_at = ?
+        WHERE
+          id = ?
+          AND deleted_at IS NULL
+      `,
+        [timestamp, timestamp, reserva.id],
+      );
+    }
+
+    if (lineasFinales.size !== 0) {
+      throw new Error(
+        'Una línea de reserva no pertenece a ninguna de las reservas asociadas a la venta.',
+      );
+    }
+  }
+
+  /**
+   * Aplica un movimiento utilizando siempre la convención:
+   *
+   * stockFinal = stockPrevio - diferencia
+   */
+  private async applyStockMovement(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    diferencia: number,
+    idVenta: number,
+    pucMicros: number,
+    pvpMicros: number,
+    timestamp: string,
+  ): Promise<void> {
+    const rows: readonly ArticuloStockDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT
+          stock
+        FROM articulo
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [idArticulo],
+    )) as readonly ArticuloStockDatabaseRow[];
+
+    const stockPrevio: number | undefined = rows[0]?.stock;
+
+    if (stockPrevio === undefined || !Number.isSafeInteger(stockPrevio)) {
+      throw new Error('No se ha podido obtener el stock actual de uno de los artículos.');
+    }
+
+    if (!Number.isSafeInteger(diferencia)) {
+      throw new Error('El movimiento de stock de una línea no es válido.');
+    }
+
+    const stockFinal: number = this.safeSubtract(
+      stockPrevio,
+      diferencia,
+      'El nuevo stock del artículo supera el rango numérico seguro.',
+    );
+
+    await queryRunner.query(
+      `
+      UPDATE articulo
+      SET
+        stock = ?,
+        updated_at = ?
+      WHERE id = ?
+    `,
+      [stockFinal, timestamp, idArticulo],
+    );
+
+    await this.insertHistoricoArticulo(
+      queryRunner,
+      idArticulo,
+      diferencia,
+      stockPrevio,
+      stockFinal,
+      idVenta,
+      pucMicros,
+      pvpMicros,
+      timestamp,
+    );
+  }
+
+  private async insertHistoricoArticulo(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    diferencia: number,
+    stockPrevio: number,
+    stockFinal: number,
+    idVenta: number,
+    pucMicros: number,
+    pvpMicros: number,
+    timestamp: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+      INSERT INTO historico_articulo (
+        public_id,
+        id_articulo,
+        tipo,
+        stock_previo,
+        diferencia,
+        stock_final,
+        id_venta,
+        id_pedido,
+        id_merma_caducidad,
+        puc_micros,
+        pvp_micros,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?
+      )
+    `,
+      [
+        randomUUID(),
+        idArticulo,
+        HISTORICO_ARTICULO_TIPO_VENTA,
+        stockPrevio,
+        diferencia,
+        stockFinal,
+        idVenta,
+        pucMicros,
+        pvpMicros,
+        timestamp,
+        timestamp,
+      ],
+    );
+  }
+
+  private centsToMicros(cents: number): number {
+    if (!Number.isSafeInteger(cents)) {
+      throw new Error('Un precio histórico de reserva no es válido.');
+    }
+
+    const micros: number = cents * MICROS_PER_CENT;
+
+    if (!Number.isSafeInteger(micros)) {
+      throw new Error('Un precio histórico de reserva supera el rango numérico seguro.');
+    }
+
+    return micros;
+  }
+
+  private safeAdd(left: number, right: number, message: string): number {
+    const result: number = left + right;
+
+    if (!Number.isSafeInteger(result)) {
+      throw new Error(message);
+    }
+
+    return result;
+  }
+
+  private safeSubtract(left: number, right: number, message: string): number {
+    const result: number = left - right;
+
+    if (!Number.isSafeInteger(result)) {
+      throw new Error(message);
+    }
+
+    return result;
   }
 
   private async insertPago(
