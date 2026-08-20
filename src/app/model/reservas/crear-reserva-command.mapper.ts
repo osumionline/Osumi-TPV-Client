@@ -1,12 +1,11 @@
 import type CrearReservaCommand from '@desktop-contracts/reservas/crear-reserva-command.interface';
 import type { CrearReservaLineaCommand } from '@desktop-contracts/reservas/crear-reserva-command.interface';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
+import {
+  getVentaLineaDescuentoSnapshot,
+  type VentaLineaDescuentoSnapshot,
+} from '@model/ventas/venta-linea-descuento-snapshot';
 import type VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
-
-interface ReservaDiscountSnapshot {
-  readonly descuentoBps: number;
-  readonly importeDescuentoMicros: number;
-}
 
 /**
  * Convierte una venta ordinaria en el snapshot económico
@@ -45,7 +44,7 @@ export default function mapVentaToCrearReservaCommand(venta: VentaEnCurso): Crea
         throw new RangeError('Las líneas de una reserva deben tener una cantidad positiva.');
       }
 
-      const discount: ReservaDiscountSnapshot = getDiscountSnapshot(linea);
+      const discount: VentaLineaDescuentoSnapshot = getVentaLineaDescuentoSnapshot(linea);
 
       return {
         articuloPublicId: linea.articuloPublicId,
@@ -64,46 +63,5 @@ export default function mapVentaToCrearReservaCommand(venta: VentaEnCurso): Crea
   return {
     clientePublicId,
     lineas,
-  };
-}
-
-/**
- * Conserva la forma histórica del descuento:
- *
- * - porcentaje → descuento_bps
- * - promocional/directo/manual/regalo → importe fijo
- */
-function getDiscountSnapshot(linea: VentaLineaEnCurso): ReservaDiscountSnapshot {
-  if (linea.regalo) {
-    return {
-      descuentoBps: 0,
-      importeDescuentoMicros: linea.importeBaseMicros,
-    };
-  }
-
-  if (linea.importeManualMicros !== null) {
-    return {
-      descuentoBps: 0,
-      importeDescuentoMicros: Math.max(linea.importeBaseMicros - linea.importeFinalMicros, 0),
-    };
-  }
-
-  if (linea.tieneDescuentoPromocional) {
-    return {
-      descuentoBps: 0,
-      importeDescuentoMicros: linea.importeDescuentoPromocionalMicros,
-    };
-  }
-
-  if (linea.descuentoDirectoMicros !== null) {
-    return {
-      descuentoBps: 0,
-      importeDescuentoMicros: linea.descuentoDirectoMicros,
-    };
-  }
-
-  return {
-    descuentoBps: linea.descuentoBps,
-    importeDescuentoMicros: 0,
   };
 }
