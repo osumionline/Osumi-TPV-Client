@@ -65,40 +65,10 @@ export default function buildReservaTicketDocument(
       min-height: 100vh;
     }
 
-    .toolbar {
-      position: sticky;
-      z-index: 10;
-      top: 0;
-      display: flex;
-      padding: 10px;
-      justify-content: center;
-      gap: 8px;
-      background: #fff;
-      border-bottom: 1px solid #ccc;
-    }
-
-    .toolbar button {
-      min-width: 100px;
-      padding: 8px 14px;
-      border: 1px solid #555;
-      border-radius: 4px;
-      color: #111;
-      background: #fff;
-      font: inherit;
-      cursor: pointer;
-    }
-
-    .toolbar button:first-child {
-      color: #fff;
-      background: #222;
-    }
-
     .ticket {
       width: 80mm;
-      margin: 16px auto;
       padding: 4mm;
       background: #fff;
-      box-shadow: 0 2px 12px rgb(0 0 0 / 18%);
       font-size: 9pt;
       line-height: 1.3;
     }
@@ -238,39 +208,15 @@ export default function buildReservaTicketDocument(
 
     @media print {
       html,
-      body {
-        width: 80mm;
-        min-height: auto;
-        background: #fff;
-      }
-
-      .toolbar {
-        display: none;
-      }
-
+      body,
       .ticket {
         width: 80mm;
-        margin: 0;
-        padding: 4mm;
-        box-shadow: none;
       }
     }
   </style>
 </head>
 
 <body>
-  <div class="toolbar">
-    <button id="print-button"
-            type="button">
-      Imprimir
-    </button>
-
-    <button id="close-button"
-            type="button">
-      Cerrar
-    </button>
-  </div>
-
   <main class="ticket">
     <header class="business">
       <div class="business__name">

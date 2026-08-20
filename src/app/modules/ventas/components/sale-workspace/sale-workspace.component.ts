@@ -982,7 +982,7 @@ export default class SaleWorkspaceComponent {
         printError = 'No se han podido obtener los datos del negocio para imprimir el comprobante.';
       } else {
         try {
-          this.reservaTicketPrintService.print(appData, reserva);
+          await this.reservaTicketPrintService.print(appData, reserva);
         } catch (error: unknown) {
           printError = getErrorMessage(
             error,
