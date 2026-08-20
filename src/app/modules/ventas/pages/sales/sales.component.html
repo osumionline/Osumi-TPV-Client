@@ -63,6 +63,7 @@
 
   @if (ventasService.ventaActiva(); as venta) {
   <otpv-sale-workspace [venta]="venta"
+                       (completedEvent)="completeVenta($event)"
                        (cancelEvent)="cancelarVentaActiva()" />
   } @else {
   <section class="sales__state">

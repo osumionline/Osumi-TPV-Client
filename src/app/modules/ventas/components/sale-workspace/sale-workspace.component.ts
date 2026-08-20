@@ -121,6 +121,13 @@ export default class SaleWorkspaceComponent {
 
   readonly cancelEvent: OutputEmitterRef<void> = output<void>();
 
+  /**
+   * Informa al componente padre de que la operación actual
+   * ha terminado correctamente y puede ser sustituida por
+   * una nueva venta.
+   */
+  readonly completedEvent: OutputEmitterRef<string> = output<string>();
+
   readonly localizador: WritableSignal<string> = signal<string>('');
 
   readonly searching: WritableSignal<boolean> = signal<boolean>(false);
@@ -996,8 +1003,6 @@ export default class SaleWorkspaceComponent {
 
     this.finalizationOpen.set(false);
 
-    this.ventasService.cerrarVenta(venta.idTemporal);
-
     if (printError !== null) {
       this.dialog
         .alert({
@@ -1006,6 +1011,8 @@ export default class SaleWorkspaceComponent {
         })
         .subscribe();
     }
+
+    this.completedEvent.emit(venta.idTemporal);
   }
 
   /**

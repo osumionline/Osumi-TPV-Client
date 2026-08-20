@@ -425,6 +425,21 @@ export default class SalesComponent implements OnInit {
   }
 
   /**
+   * Cierra una operación que ha terminado correctamente
+   * y prepara inmediatamente una nueva venta para el
+   * siguiente cliente.
+   */
+  completeVenta(ventaIdTemporal: string): void {
+    if (this.ventasService.findById(ventaIdTemporal) === null) {
+      return;
+    }
+
+    this.ventasService.cerrarVenta(ventaIdTemporal);
+
+    this.nuevaVenta();
+  }
+
+  /**
    * Cierra la selección de cliente y devuelve el foco al localizador
    * de la venta indicada.
    */
