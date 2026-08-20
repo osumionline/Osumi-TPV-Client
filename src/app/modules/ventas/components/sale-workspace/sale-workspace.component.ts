@@ -984,10 +984,7 @@ export default class SaleWorkspaceComponent {
         try {
           await this.reservaTicketPrintService.print(appData, reserva);
         } catch (error: unknown) {
-          printError = getErrorMessage(
-            error,
-            'No se ha podido imprimir el comprobante de reserva.',
-          );
+          printError = getErrorMessage(error, 'No se ha podido completar la impresión.');
         }
       }
     }
@@ -1006,10 +1003,14 @@ export default class SaleWorkspaceComponent {
     if (printError !== null) {
       this.dialog
         .alert({
-          title: 'Aviso',
-          content: `La reserva se ha creado correctamente, pero ha ocurrido un problema con la impresión: ${printError}`,
+          title: 'Reserva creada',
+          content: `La reserva se ha creado correctamente, pero no se ha podido imprimir el comprobante. ${printError}`,
         })
-        .subscribe();
+        .subscribe((): void => {
+          this.completedEvent.emit(venta.idTemporal);
+        });
+
+      return;
     }
 
     this.completedEvent.emit(venta.idTemporal);

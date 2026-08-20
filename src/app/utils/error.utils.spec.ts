@@ -30,4 +30,24 @@ describe('error.utils', (): void => {
   it('no sustituye un mensaje vacío de Error por el fallback', (): void => {
     expect(getErrorMessage(new Error(''), 'Error alternativo.')).toBe('');
   });
+
+  it('elimina el envoltorio técnico de un error IPC de Electron', (): void => {
+    expect(
+      getErrorMessage(
+        new Error(
+          "Error invoking remote method 'printing:print-ticket': Error: No hay una impresora de tickets configurada.",
+        ),
+      ),
+    ).toBe('No hay una impresora de tickets configurada.');
+  });
+
+  it('elimina el envoltorio IPC aunque el mensaje no incluya un segundo Error', (): void => {
+    expect(
+      getErrorMessage(
+        new Error(
+          "Error invoking remote method 'printing:print-ticket': La impresora no está disponible.",
+        ),
+      ),
+    ).toBe('La impresora no está disponible.');
+  });
 });
