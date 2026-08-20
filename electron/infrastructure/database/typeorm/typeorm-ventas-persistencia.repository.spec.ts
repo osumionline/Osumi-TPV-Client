@@ -45,6 +45,31 @@ interface SecuenciaRow {
   readonly ultimo_numero: number;
 }
 
+interface DevolucionOrigenRow {
+  readonly unidades_devueltas: number;
+}
+
+interface DevolucionTrazabilidadRow {
+  readonly venta_origen_public_id: string;
+  readonly linea_origen_public_id: string;
+}
+
+interface ReservaConsumidaRow {
+  readonly public_id: string;
+  readonly deleted_at: string | null;
+}
+
+interface HistoricoReservaRow {
+  readonly articulo_public_id: string;
+  readonly stock_previo: number;
+  readonly diferencia: number;
+  readonly stock_final: number;
+}
+
+interface LineaReservaTrazabilidadRow {
+  readonly linea_origen_public_id: string;
+}
+
 let tempDirectory: string | null = null;
 let applicationDatabase: TypeOrmApplicationDatabase | null = null;
 let ventasPersistenciaService: VentasPersistenciaService | null = null;
@@ -411,6 +436,389 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
 
     expect(await countRows(dataSource, 'secuencia_documento')).toBe(0);
   });
+
+  it('acumula una devolución parcial y rechaza devolver más unidades de las disponibles', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await seedReturnOrigin(dataSource);
+
+    const service: VentasPersistenciaService = requireService();
+
+    const result: VentaPersistidaRecord = await service.save(
+      createPartialReturnCommand('venta-devolucion-1'),
+    );
+
+    expect(result.numero).toBe(41);
+
+    expect(result.totalCents).toBe(-1_800);
+
+    const origen: DevolucionOrigenRow = await queryOne<DevolucionOrigenRow>(
+      dataSource,
+      `
+      SELECT
+        unidades_devueltas
+      FROM linea_venta
+      WHERE public_id = ?
+    `,
+      ['linea-venta-origen-1'],
+    );
+
+    expect(origen.unidades_devueltas).toBe(3);
+
+    const trazabilidad: DevolucionTrazabilidadRow = await queryOne<DevolucionTrazabilidadRow>(
+      dataSource,
+      `
+        SELECT
+          vo.public_id AS venta_origen_public_id,
+          lvo.public_id AS linea_origen_public_id
+        FROM venta v
+
+        INNER JOIN venta vo
+          ON vo.id = v.id_venta_origen_devolucion
+
+        INNER JOIN linea_venta lv
+          ON lv.id_venta = v.id
+
+        INNER JOIN linea_venta lvo
+          ON lvo.id = lv.id_linea_venta_origen_devolucion
+
+        WHERE v.public_id = ?
+      `,
+      ['venta-devolucion-1'],
+    );
+
+    expect(trazabilidad).toEqual({
+      venta_origen_public_id: 'venta-origen-devolucion-1',
+      linea_origen_public_id: 'linea-venta-origen-1',
+    });
+
+    const stock: StockRow = await queryOne<StockRow>(
+      dataSource,
+      `
+      SELECT
+        stock
+      FROM articulo
+      WHERE public_id = ?
+    `,
+      ['articulo-1'],
+    );
+
+    expect(stock.stock).toBe(22);
+
+    const historico: HistoricoRow = await queryOne<HistoricoRow>(
+      dataSource,
+      `
+      SELECT
+        stock_previo,
+        diferencia,
+        stock_final,
+        puc_micros,
+        pvp_micros
+      FROM historico_articulo
+      WHERE id_venta = ?
+    `,
+      [result.id],
+    );
+
+    expect(historico).toEqual({
+      stock_previo: 20,
+      diferencia: -2,
+      stock_final: 22,
+      puc_micros: 4_000_000,
+      pvp_micros: 10_000_000,
+    });
+
+    const caja: CajaRow = await queryOne<CajaRow>(
+      dataSource,
+      `
+      SELECT
+        ventas_cents,
+        beneficios_cents,
+        descuentos_cents,
+        importe_cierre_teorico_cents
+      FROM caja
+      WHERE public_id = ?
+    `,
+      ['caja-1'],
+    );
+
+    expect(caja).toEqual({
+      ventas_cents: -1_800,
+      beneficios_cents: -1_000,
+      descuentos_cents: -200,
+      importe_cierre_teorico_cents: -1_800,
+    });
+
+    await expect(
+      service.save(createPartialReturnCommand('venta-devolucion-excesiva-1')),
+    ).rejects.toThrow('La devolución supera las unidades disponibles de la línea original.');
+
+    const origenTrasError: DevolucionOrigenRow = await queryOne<DevolucionOrigenRow>(
+      dataSource,
+      `
+        SELECT
+          unidades_devueltas
+        FROM linea_venta
+        WHERE public_id = ?
+      `,
+      ['linea-venta-origen-1'],
+    );
+
+    expect(origenTrasError.unidades_devueltas).toBe(3);
+
+    const stockTrasError: StockRow = await queryOne<StockRow>(
+      dataSource,
+      `
+      SELECT
+        stock
+      FROM articulo
+      WHERE public_id = ?
+    `,
+      ['articulo-1'],
+    );
+
+    expect(stockTrasError.stock).toBe(22);
+
+    expect(await countRows(dataSource, 'venta')).toBe(2);
+
+    expect(await countRows(dataSource, 'venta_pago')).toBe(1);
+
+    expect(await countRows(dataSource, 'historico_articulo')).toBe(1);
+
+    const secuencia: SecuenciaRow = await queryOne<SecuenciaRow>(
+      dataSource,
+      `
+      SELECT
+        ultimo_numero
+      FROM secuencia_documento
+      WHERE
+        tipo = 'venta'
+        AND serie = ''
+    `,
+    );
+
+    expect(secuencia.ultimo_numero).toBe(41);
+  });
+
+  it('consume una reserva, reconcilia cantidades y restaura una línea eliminada', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await seedReservation(dataSource);
+
+    const result: VentaPersistidaRecord = await requireService().save(
+      createReservationSaleCommand(),
+    );
+
+    expect(result.totalCents).toBe(3_000);
+
+    const articulo1: StockRow = await queryOne<StockRow>(
+      dataSource,
+      `
+      SELECT
+        stock
+      FROM articulo
+      WHERE public_id = ?
+    `,
+      ['articulo-1'],
+    );
+
+    expect(articulo1.stock).toBe(17);
+
+    const articulo2: StockRow = await queryOne<StockRow>(
+      dataSource,
+      `
+      SELECT
+        stock
+      FROM articulo
+      WHERE public_id = ?
+    `,
+      ['articulo-2'],
+    );
+
+    expect(articulo2.stock).toBe(10);
+
+    const historicos: readonly HistoricoReservaRow[] = await queryRows<HistoricoReservaRow>(
+      dataSource,
+      `
+        SELECT
+          a.public_id AS articulo_public_id,
+          h.stock_previo,
+          h.diferencia,
+          h.stock_final
+        FROM historico_articulo h
+
+        INNER JOIN articulo a
+          ON a.id = h.id_articulo
+
+        WHERE h.id_venta = ?
+
+        ORDER BY a.public_id
+      `,
+      [result.id],
+    );
+
+    expect(historicos).toEqual([
+      {
+        articulo_public_id: 'articulo-1',
+        stock_previo: 15,
+        diferencia: -2,
+        stock_final: 17,
+      },
+      {
+        articulo_public_id: 'articulo-2',
+        stock_previo: 8,
+        diferencia: -2,
+        stock_final: 10,
+      },
+    ]);
+
+    const reserva: ReservaConsumidaRow = await queryOne<ReservaConsumidaRow>(
+      dataSource,
+      `
+        SELECT
+          r.public_id,
+          r.deleted_at
+        FROM venta_reserva vr
+
+        INNER JOIN reserva r
+          ON r.id = vr.id_reserva
+
+        WHERE vr.id_venta = ?
+      `,
+      [result.id],
+    );
+
+    expect(reserva.public_id).toBe('reserva-1');
+
+    expect(reserva.deleted_at).not.toBeNull();
+
+    const lineaOrigen: LineaReservaTrazabilidadRow = await queryOne<LineaReservaTrazabilidadRow>(
+      dataSource,
+      `
+        SELECT
+          lr.public_id AS linea_origen_public_id
+        FROM linea_venta lv
+
+        INNER JOIN linea_reserva lr
+          ON lr.id = lv.id_linea_reserva_origen
+
+        WHERE lv.id_venta = ?
+      `,
+      [result.id],
+    );
+
+    expect(lineaOrigen.linea_origen_public_id).toBe('linea-reserva-1');
+
+    const lineasPersistidas: CountRow = await queryOne<CountRow>(
+      dataSource,
+      `
+      SELECT
+        COUNT(*) AS total
+      FROM linea_venta
+      WHERE id_venta = ?
+    `,
+      [result.id],
+    );
+
+    expect(lineasPersistidas.total).toBe(1);
+
+    const caja: CajaRow = await queryOne<CajaRow>(
+      dataSource,
+      `
+      SELECT
+        ventas_cents,
+        beneficios_cents,
+        descuentos_cents,
+        importe_cierre_teorico_cents
+      FROM caja
+      WHERE public_id = ?
+    `,
+      ['caja-1'],
+    );
+
+    expect(caja).toEqual({
+      ventas_cents: 3_000,
+      beneficios_cents: 1_800,
+      descuentos_cents: 0,
+      importe_cierre_teorico_cents: 0,
+    });
+
+    const foreignKeyErrors: readonly unknown[] = (await dataSource.query(
+      'PRAGMA foreign_key_check',
+    )) as readonly unknown[];
+
+    expect(foreignKeyErrors).toEqual([]);
+  });
+
+  it('persiste una venta de total cero sin pagos', async (): Promise<void> => {
+    const result: VentaPersistidaRecord = await requireService().save(createZeroTotalGiftCommand());
+
+    expect(result.totalCents).toBe(0);
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    expect(await countRows(dataSource, 'venta')).toBe(1);
+
+    expect(await countRows(dataSource, 'linea_venta')).toBe(1);
+
+    expect(await countRows(dataSource, 'venta_pago')).toBe(0);
+
+    expect(await countRows(dataSource, 'historico_articulo')).toBe(1);
+
+    const stock: StockRow = await queryOne<StockRow>(
+      dataSource,
+      `
+      SELECT
+        stock
+      FROM articulo
+      WHERE public_id = ?
+    `,
+      ['articulo-1'],
+    );
+
+    expect(stock.stock).toBe(19);
+
+    const caja: CajaRow = await queryOne<CajaRow>(
+      dataSource,
+      `
+      SELECT
+        ventas_cents,
+        beneficios_cents,
+        descuentos_cents,
+        importe_cierre_teorico_cents
+      FROM caja
+      WHERE public_id = ?
+    `,
+      ['caja-1'],
+    );
+
+    expect(caja).toEqual({
+      ventas_cents: 0,
+      beneficios_cents: -400,
+      descuentos_cents: 1_000,
+      importe_cierre_teorico_cents: 0,
+    });
+
+    const operaciones: CountRow = await queryOne<CountRow>(
+      dataSource,
+      `
+      SELECT
+        COALESCE(
+          SUM(operaciones),
+          0
+        ) AS total
+      FROM caja_tipo
+      WHERE id_caja = (
+        SELECT id
+        FROM caja
+        WHERE public_id = ?
+      )
+    `,
+      ['caja-1'],
+    );
+
+    expect(operaciones.total).toBe(0);
+  });
 });
 
 async function createSchema(dataSource: DataSource): Promise<void> {
@@ -578,6 +986,37 @@ async function seedBaseData(dataSource: DataSource): Promise<void> {
       )
     `,
   );
+
+  await dataSource.query(
+    `
+    INSERT INTO articulo (
+      public_id,
+      localizador,
+      nombre,
+      slug,
+      id_marca,
+      puc_micros,
+      pvp_cents,
+      iva_bps,
+      stock
+    )
+    VALUES (
+      'articulo-2',
+      2,
+      'Artículo reservado eliminado',
+      'articulo-reservado-eliminado',
+      (
+        SELECT id
+        FROM marca
+        WHERE public_id = 'marca-1'
+      ),
+      2000000,
+      500,
+      2100,
+      10
+    )
+  `,
+  );
 }
 
 function createNormalSaleCommand(publicId: string): GuardarVentaCommand {
@@ -633,6 +1072,300 @@ function createNormalSaleCommand(publicId: string): GuardarVentaCommand {
         cambioCents: 0,
       },
     ],
+  };
+}
+
+async function seedReturnOrigin(dataSource: DataSource): Promise<void> {
+  await dataSource.query(
+    `
+      INSERT INTO venta (
+        public_id,
+        id_caja,
+        id_empleado,
+        serie,
+        numero,
+        total_cents,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        'venta-origen-devolucion-1',
+        (
+          SELECT id
+          FROM caja
+          WHERE public_id = 'caja-1'
+        ),
+        (
+          SELECT id
+          FROM empleado
+          WHERE public_id = 'empleado-1'
+        ),
+        '',
+        40,
+        3600,
+        '2026-08-20T10:00:00.000Z',
+        '2026-08-20T10:00:00.000Z'
+      )
+    `,
+  );
+
+  await dataSource.query(
+    `
+      INSERT INTO linea_venta (
+        public_id,
+        id_venta,
+        id_articulo,
+        nombre_articulo,
+        puc_micros,
+        pvp_micros,
+        iva_bps,
+        importe_micros,
+        descuento_bps,
+        importe_descuento_micros,
+        unidades,
+        unidades_devueltas,
+        regalo
+      )
+      VALUES (
+        'linea-venta-origen-1',
+        (
+          SELECT id
+          FROM venta
+          WHERE public_id = 'venta-origen-devolucion-1'
+        ),
+        (
+          SELECT id
+          FROM articulo
+          WHERE public_id = 'articulo-1'
+        ),
+        'Artículo de prueba',
+        4000000,
+        10000000,
+        2100,
+        36000000,
+        1000,
+        0,
+        4,
+        1,
+        0
+      )
+    `,
+  );
+}
+
+function createPartialReturnCommand(publicId: string): GuardarVentaCommand {
+  return {
+    publicId,
+    cajaPublicId: 'caja-1',
+    empleadoPublicId: 'empleado-1',
+    clientePublicId: null,
+    devolucionVentaOrigenPublicId: 'venta-origen-devolucion-1',
+    reservasOrigenPublicIds: [],
+    totalCents: -1_800,
+    lineas: [
+      {
+        articuloPublicId: 'articulo-1',
+        nombre: 'Artículo de prueba',
+        pucMicros: 4_000_000,
+        pvpMicros: 10_000_000,
+        ivaBps: 2_100,
+        importeMicros: -18_000_000,
+        descuentoBps: 0,
+        importeDescuentoMicros: 2_000_000,
+        unidades: -2,
+        regalo: false,
+        devolucionLineaOrigenPublicId: 'linea-venta-origen-1',
+        reservaLineaOrigenPublicId: null,
+      },
+    ],
+    pagos: [
+      {
+        tipoPagoPublicId: 'tipo-pago-efectivo',
+        importeCents: -1_800,
+        entregadoCents: null,
+        cambioCents: 0,
+      },
+    ],
+  };
+}
+
+async function seedReservation(dataSource: DataSource): Promise<void> {
+  await dataSource.query(
+    `
+      INSERT INTO cliente (
+        public_id,
+        nombre_apellidos
+      )
+      VALUES (
+        'cliente-1',
+        'Cliente reserva'
+      )
+    `,
+  );
+
+  await dataSource.query(
+    `
+      INSERT INTO reserva (
+        public_id,
+        id_cliente,
+        total_cents
+      )
+      VALUES (
+        'reserva-1',
+        (
+          SELECT id
+          FROM cliente
+          WHERE public_id = 'cliente-1'
+        ),
+        6000
+      )
+    `,
+  );
+
+  await dataSource.query(
+    `
+      INSERT INTO linea_reserva (
+        public_id,
+        id_reserva,
+        id_articulo,
+        nombre_articulo,
+        puc_micros,
+        pvp_cents,
+        iva_bps,
+        importe_cents,
+        descuento_bps,
+        importe_descuento_cents,
+        unidades
+      )
+      VALUES
+        (
+          'linea-reserva-1',
+          (
+            SELECT id
+            FROM reserva
+            WHERE public_id = 'reserva-1'
+          ),
+          (
+            SELECT id
+            FROM articulo
+            WHERE public_id = 'articulo-1'
+          ),
+          'Artículo de prueba',
+          4000000,
+          1000,
+          2100,
+          5000,
+          0,
+          0,
+          5
+        ),
+        (
+          'linea-reserva-2',
+          (
+            SELECT id
+            FROM reserva
+            WHERE public_id = 'reserva-1'
+          ),
+          (
+            SELECT id
+            FROM articulo
+            WHERE public_id = 'articulo-2'
+          ),
+          'Artículo reservado eliminado',
+          2000000,
+          500,
+          2100,
+          1000,
+          0,
+          0,
+          2
+        )
+    `,
+  );
+
+  /*
+   * Simulamos el efecto que ya produjo la creación
+   * original de la reserva sobre el stock.
+   */
+  await dataSource.query(
+    `
+      UPDATE articulo
+      SET stock = 15
+      WHERE public_id = 'articulo-1'
+    `,
+  );
+
+  await dataSource.query(
+    `
+      UPDATE articulo
+      SET stock = 8
+      WHERE public_id = 'articulo-2'
+    `,
+  );
+}
+
+function createReservationSaleCommand(): GuardarVentaCommand {
+  return {
+    publicId: 'venta-reserva-1',
+    cajaPublicId: 'caja-1',
+    empleadoPublicId: 'empleado-1',
+    clientePublicId: 'cliente-1',
+    devolucionVentaOrigenPublicId: null,
+    reservasOrigenPublicIds: ['reserva-1'],
+    totalCents: 3_000,
+    lineas: [
+      {
+        articuloPublicId: 'articulo-1',
+        nombre: 'Artículo de prueba',
+        pucMicros: 4_000_000,
+        pvpMicros: 10_000_000,
+        ivaBps: 2_100,
+        importeMicros: 30_000_000,
+        descuentoBps: 0,
+        importeDescuentoMicros: 0,
+        unidades: 3,
+        regalo: false,
+        devolucionLineaOrigenPublicId: null,
+        reservaLineaOrigenPublicId: 'linea-reserva-1',
+      },
+    ],
+    pagos: [
+      {
+        tipoPagoPublicId: 'tipo-pago-tarjeta',
+        importeCents: 3_000,
+        entregadoCents: null,
+        cambioCents: 0,
+      },
+    ],
+  };
+}
+
+function createZeroTotalGiftCommand(): GuardarVentaCommand {
+  return {
+    publicId: 'venta-total-cero-1',
+    cajaPublicId: 'caja-1',
+    empleadoPublicId: 'empleado-1',
+    clientePublicId: null,
+    devolucionVentaOrigenPublicId: null,
+    reservasOrigenPublicIds: [],
+    totalCents: 0,
+    lineas: [
+      {
+        articuloPublicId: 'articulo-1',
+        nombre: 'Artículo de prueba',
+        pucMicros: 4_000_000,
+        pvpMicros: 10_000_000,
+        ivaBps: 2_100,
+        importeMicros: 0,
+        descuentoBps: 0,
+        importeDescuentoMicros: 10_000_000,
+        unidades: 1,
+        regalo: true,
+        devolucionLineaOrigenPublicId: null,
+        reservaLineaOrigenPublicId: null,
+      },
+    ],
+    pagos: [],
   };
 }
 
