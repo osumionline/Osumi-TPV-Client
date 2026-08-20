@@ -1,5 +1,6 @@
 import TipoPago from '@model/tipos-pago/tipo-pago.model';
 import VentaFinalizacionEnCurso from '@model/ventas/venta-finalizacion-en-curso.model';
+import type { VentaFinalizacionResultado } from '@model/ventas/venta-finalizacion-resultado.interface';
 import type VentaPagoEnCurso from '@model/ventas/venta-pago-en-curso.model';
 
 const createTipoPago = (id: number, publicId: string, slug: string, nombre: string): TipoPago => {
@@ -225,6 +226,107 @@ describe('VentaFinalizacionEnCurso', (): void => {
     expect((): VentaPagoEnCurso => finalizacion.updatePago('tipo-pago-inexistente', 1_000)).toThrow(
       'El tipo de pago no está incluido en la finalización.',
     );
+  });
+
+  it('genera el resultado definitivo de una venta completamente liquidada', (): void => {
+    const finalizacion: VentaFinalizacionEnCurso = new VentaFinalizacionEnCurso(6_000);
+
+    finalizacion.addPago(createEfectivo(), 2_000, 5_000);
+
+    finalizacion.addPago(createTarjeta(), 4_000);
+
+    const resultado: VentaFinalizacionResultado = finalizacion.toResultado();
+
+    expect(resultado).toEqual({
+      totalCents: 6_000,
+
+      pagos: [
+        {
+          tipoPagoPublicId: 'tipo-pago-efectivo',
+
+          importeCents: 2_000,
+          entregadoCents: 5_000,
+          cambioCents: 3_000,
+        },
+        {
+          tipoPagoPublicId: 'tipo-pago-tarjeta',
+
+          importeCents: 4_000,
+          entregadoCents: null,
+          cambioCents: 0,
+        },
+      ],
+    });
+  });
+
+  it('conserva el signo negativo de los reembolsos en el resultado definitivo', (): void => {
+    const finalizacion: VentaFinalizacionEnCurso = new VentaFinalizacionEnCurso(-2_500);
+
+    finalizacion.addPago(createEfectivo(), -1_000);
+
+    finalizacion.addPago(createTarjeta(), -1_500);
+
+    expect(finalizacion.toResultado()).toEqual({
+      totalCents: -2_500,
+
+      pagos: [
+        {
+          tipoPagoPublicId: 'tipo-pago-efectivo',
+
+          importeCents: -1_000,
+          entregadoCents: null,
+          cambioCents: 0,
+        },
+        {
+          tipoPagoPublicId: 'tipo-pago-tarjeta',
+
+          importeCents: -1_500,
+          entregadoCents: null,
+          cambioCents: 0,
+        },
+      ],
+    });
+  });
+
+  it('genera una finalización sin pagos para una operación con total cero', (): void => {
+    const finalizacion: VentaFinalizacionEnCurso = new VentaFinalizacionEnCurso(0);
+
+    expect(finalizacion.toResultado()).toEqual({
+      totalCents: 0,
+      pagos: [],
+    });
+  });
+
+  it('rechaza obtener el resultado mientras exista importe pendiente', (): void => {
+    const finalizacion: VentaFinalizacionEnCurso = new VentaFinalizacionEnCurso(6_000);
+
+    finalizacion.addPago(createTarjeta(), 5_000);
+
+    expect((): VentaFinalizacionResultado => finalizacion.toResultado()).toThrow(
+      'No se puede finalizar una operación mientras exista un importe pendiente.',
+    );
+  });
+
+  it('el resultado no conserva referencias a los pagos mutables de la finalización', (): void => {
+    const finalizacion: VentaFinalizacionEnCurso = new VentaFinalizacionEnCurso(6_000);
+
+    finalizacion.addPago(createTarjeta(), 6_000);
+
+    const resultado: VentaFinalizacionResultado = finalizacion.toResultado();
+
+    finalizacion.removePago('tipo-pago-tarjeta');
+
+    expect(finalizacion.pagos).toHaveLength(0);
+
+    expect(resultado.pagos).toEqual([
+      {
+        tipoPagoPublicId: 'tipo-pago-tarjeta',
+
+        importeCents: 6_000,
+        entregadoCents: null,
+        cambioCents: 0,
+      },
+    ]);
   });
 
   it('rechaza un total que no sea un entero seguro de céntimos', (): void => {

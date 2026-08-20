@@ -1,4 +1,8 @@
 import type TipoPago from '@model/tipos-pago/tipo-pago.model';
+import type {
+  VentaFinalizacionResultado,
+  VentaPagoFinalizado,
+} from '@model/ventas/venta-finalizacion-resultado.interface';
 import VentaPagoEnCurso from '@model/ventas/venta-pago-en-curso.model';
 
 /**
@@ -49,6 +53,33 @@ export default class VentaFinalizacionEnCurso {
    */
   get completa(): boolean {
     return this.pendienteCents === 0;
+  }
+
+  /**
+   * Produce el snapshot económico que podrá entregarse
+   * al caso de uso encargado de persistir la venta.
+   *
+   * Solo una finalización completamente liquidada puede
+   * convertirse en resultado definitivo.
+   */
+  toResultado(): VentaFinalizacionResultado {
+    if (!this.completa) {
+      throw new Error('No se puede finalizar una operación mientras exista un importe pendiente.');
+    }
+
+    const pagos: readonly VentaPagoFinalizado[] = this.pagosValue.map(
+      (pago: VentaPagoEnCurso): VentaPagoFinalizado => ({
+        tipoPagoPublicId: pago.tipoPagoPublicId,
+        importeCents: pago.importeCents,
+        entregadoCents: pago.entregadoCents,
+        cambioCents: pago.cambioCents,
+      }),
+    );
+
+    return {
+      totalCents: this.totalCents,
+      pagos,
+    };
   }
 
   /**
