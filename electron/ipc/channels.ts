@@ -12,6 +12,7 @@ const IPC_CHANNELS = {
   printingGetPrinters: 'printing:get-printers',
   printingGetSettings: 'printing:get-settings',
   printingSetTicketPrinter: 'printing:set-ticket-printer',
+  printingRenderPdf: 'printing:render-pdf',
 
   applicationGetState: 'application:get-state',
 

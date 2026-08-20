@@ -27,6 +27,7 @@ import type LogoStorage from '@backend/contracts/configuration/logo-storage.inte
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
 import type EmpleadoRepository from '@backend/contracts/empleados/empleado.repository.interface';
 import type MarcaRepository from '@backend/contracts/marcas/marca.repository.interface';
+import type HtmlDocumentRenderer from '@backend/contracts/printing/html-document-renderer.interface';
 import type PrinterProvider from '@backend/contracts/printing/printer.provider.interface';
 import type PrintingSettingsRepository from '@backend/contracts/printing/printing-settings.repository.interface';
 import type ProveedorRepository from '@backend/contracts/proveedores/proveedor.repository.interface';
@@ -56,6 +57,7 @@ import TypeOrmVentasArticulosRepository from '@infrastructure/database/typeorm/t
 import TypeOrmVentasContextRepository from '@infrastructure/database/typeorm/typeorm-ventas-context.repository';
 import TypeOrmVentasDevolucionesRepository from '@infrastructure/database/typeorm/typeorm-ventas-devoluciones.repository';
 import ElectronAssetUrlBuilder from '@infrastructure/electron/electron-asset-url.builder';
+import ElectronHtmlDocumentRenderer from '@infrastructure/electron/electron-html-document.renderer';
 import ElectronLegacyImportDialog from '@infrastructure/electron/electron-legacy-import-dialog';
 import ElectronLogoStorage from '@infrastructure/electron/electron-logo.storage';
 import ElectronPrinterProvider from '@infrastructure/electron/electron-printer.provider';
@@ -294,9 +296,12 @@ export default function createApplicationComposition(
 
   const printerProvider: PrinterProvider = new ElectronPrinterProvider(getMainWindow);
 
+  const htmlDocumentRenderer: HtmlDocumentRenderer = new ElectronHtmlDocumentRenderer();
+
   const printingService: PrintingService = new PrintingService(
     printingSettingsRepository,
     printerProvider,
+    htmlDocumentRenderer,
   );
 
   /*

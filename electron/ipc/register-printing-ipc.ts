@@ -32,4 +32,13 @@ export default function registerPrintingIpc(
       return printingService.setTicketPrinterDeviceName(deviceName);
     },
   );
+
+  ipcMain.handle(
+    IPC_CHANNELS.printingRenderPdf,
+    async (event, documentHtml: unknown): Promise<Uint8Array> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return printingService.renderPdf(documentHtml);
+    },
+  );
 }
