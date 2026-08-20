@@ -28,7 +28,6 @@ const completeDatabaseSchemaTables: readonly string[] = [
   'articulo_etiqueta_web',
   'articulo_archivo',
   'merma_caducidad',
-
   'pedido',
   'linea_pedido',
   'pedido_archivo',
@@ -41,6 +40,7 @@ const completeDatabaseSchemaTables: readonly string[] = [
   'venta',
   'venta_pago',
   'linea_venta',
+  'venta_reserva',
   'venta_ticketbai',
 
   'factura',

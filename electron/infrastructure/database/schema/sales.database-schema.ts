@@ -14,6 +14,14 @@ const statements: readonly string[] = [
       id_cliente INTEGER,
 
       /*
+       * Venta histórica cuyo ticket se cargó como
+       * origen de una devolución.
+       *
+       * Es NULL para operaciones sin devolución.
+       */
+      id_venta_origen_devolucion INTEGER,
+
+      /*
        * La serie permite separar numeraciones en
        * instalaciones futuras con varios terminales.
        */
@@ -74,6 +82,16 @@ const statements: readonly string[] = [
           id
         )
         ON DELETE SET NULL
+        ON UPDATE CASCADE,
+
+      CONSTRAINT fk_venta_devolucion_origen
+        FOREIGN KEY (
+          id_venta_origen_devolucion
+        )
+        REFERENCES venta (
+          id
+        )
+        ON DELETE RESTRICT
         ON UPDATE CASCADE
     ) STRICT
   `,
@@ -101,6 +119,14 @@ const statements: readonly string[] = [
       created_at
     )
     WHERE id_cliente IS NOT NULL
+  `,
+
+  `
+    CREATE INDEX idx_venta_devolucion_origen
+    ON venta (
+      id_venta_origen_devolucion
+    )
+    WHERE id_venta_origen_devolucion IS NOT NULL
   `,
 
   `
@@ -235,6 +261,22 @@ const statements: readonly string[] = [
        */
       id_articulo INTEGER,
 
+      /*
+       * Línea histórica exacta que origina esta
+       * devolución.
+       *
+       * Una misma línea original puede aparecer aquí
+       * varias veces si se realizan devoluciones
+       * parciales sucesivas.
+       */
+      id_linea_venta_origen_devolucion INTEGER,
+
+      /*
+       * Línea concreta de reserva de la que procede
+       * esta línea cuando corresponda.
+       */
+      id_linea_reserva_origen INTEGER,
+
       nombre_articulo TEXT NOT NULL
         COLLATE NOCASE
         CHECK (
@@ -319,6 +361,16 @@ const statements: readonly string[] = [
       updated_at TEXT NOT NULL
         DEFAULT (${SQLITE_TIMESTAMP_DEFAULT}),
 
+      /*
+       * Una línea puede proceder de una devolución
+       * o de una reserva, pero nunca de ambos orígenes
+       * simultáneamente.
+       */
+      CHECK (
+        id_linea_venta_origen_devolucion IS NULL
+        OR id_linea_reserva_origen IS NULL
+      ),
+
       CONSTRAINT fk_linea_venta_venta
         FOREIGN KEY (
           id_venta
@@ -337,6 +389,26 @@ const statements: readonly string[] = [
           id
         )
         ON DELETE SET NULL
+        ON UPDATE CASCADE,
+
+      CONSTRAINT fk_linea_venta_devolucion_origen
+        FOREIGN KEY (
+          id_linea_venta_origen_devolucion
+        )
+        REFERENCES linea_venta (
+          id
+        )
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE,
+
+      CONSTRAINT fk_linea_venta_reserva_origen
+        FOREIGN KEY (
+          id_linea_reserva_origen
+        )
+        REFERENCES linea_reserva (
+          id
+        )
+        ON DELETE RESTRICT
         ON UPDATE CASCADE
     ) STRICT
   `,
@@ -354,6 +426,70 @@ const statements: readonly string[] = [
       id_articulo
     )
     WHERE id_articulo IS NOT NULL
+  `,
+
+  `
+    CREATE INDEX idx_linea_venta_devolucion_origen
+    ON linea_venta (
+      id_linea_venta_origen_devolucion
+    )
+    WHERE id_linea_venta_origen_devolucion IS NOT NULL
+  `,
+
+  `
+    CREATE INDEX idx_linea_venta_reserva_origen
+    ON linea_venta (
+      id_linea_reserva_origen
+    )
+    WHERE id_linea_reserva_origen IS NOT NULL
+  `,
+
+  /*
+   * Relación entre una venta y las reservas que
+   * quedaron definitivamente resueltas por ella.
+   *
+   * Una venta puede consumir varias reservas.
+   *
+   * Una reserva solo puede ser consumida por una
+   * única venta.
+   */
+  `
+    CREATE TABLE venta_reserva (
+      id_venta INTEGER NOT NULL,
+      id_reserva INTEGER NOT NULL,
+
+      created_at TEXT NOT NULL
+        DEFAULT (${SQLITE_TIMESTAMP_DEFAULT}),
+
+      PRIMARY KEY (
+        id_venta,
+        id_reserva
+      ),
+
+      UNIQUE (
+        id_reserva
+      ),
+
+      CONSTRAINT fk_venta_reserva_venta
+        FOREIGN KEY (
+          id_venta
+        )
+        REFERENCES venta (
+          id
+        )
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+
+      CONSTRAINT fk_venta_reserva_reserva
+        FOREIGN KEY (
+          id_reserva
+        )
+        REFERENCES reserva (
+          id
+        )
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
+    ) STRICT
   `,
 
   /*
