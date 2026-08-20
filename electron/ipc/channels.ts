@@ -9,6 +9,10 @@ const IPC_CHANNELS = {
 
   configurationInstall: 'configuration:install',
 
+  printingGetPrinters: 'printing:get-printers',
+  printingGetSettings: 'printing:get-settings',
+  printingSetTicketPrinter: 'printing:set-ticket-printer',
+
   applicationGetState: 'application:get-state',
 
   marcasGetAll: 'marcas:get-all',

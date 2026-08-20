@@ -29,6 +29,7 @@ export default class ElectronApplicationPathsProvider implements ApplicationPath
       stagingFilesDirectory,
 
       appDataFile: join(configDirectory, 'app_data.json'),
+      printingSettingsFile: join(configDirectory, 'printing_settings.json'),
       logoFile: join(assetsDirectory, 'logo.png'),
       databaseFile: join(databaseDirectory, 'osumi-tpv.sqlite'),
       secretsFile: join(secretsDirectory, 'secrets.json'),

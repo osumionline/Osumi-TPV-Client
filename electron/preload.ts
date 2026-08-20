@@ -16,6 +16,8 @@ import type LegacyImportProgress from '@desktop-contracts/legacy-import/legacy-i
 import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-import/legacy-import-review-decision.type';
 import type LegacyImportStartResult from '@desktop-contracts/legacy-import/legacy-import-start-result.interface';
 import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
+import type PrinterInterface from '@desktop-contracts/printing/printer.interface';
+import type PrintingSettings from '@desktop-contracts/printing/printing-settings.interface';
 import type { ProveedorInterface } from '@desktop-contracts/proveedores/proveedor.interface';
 import type CrearReservaCommand from '@desktop-contracts/reservas/crear-reserva-command.interface';
 import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
@@ -98,6 +100,20 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
   configuration: Object.freeze({
     install: (command: InstallationCommand): Promise<InstallationResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.configurationInstall, command) as Promise<InstallationResult>,
+  }),
+
+  printing: Object.freeze({
+    getPrinters: (): Promise<readonly PrinterInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.printingGetPrinters) as Promise<readonly PrinterInterface[]>,
+
+    getSettings: (): Promise<PrintingSettings> =>
+      ipcRenderer.invoke(IPC_CHANNELS.printingGetSettings) as Promise<PrintingSettings>,
+
+    setTicketPrinterDeviceName: (deviceName: string | null): Promise<PrintingSettings> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.printingSetTicketPrinter,
+        deviceName,
+      ) as Promise<PrintingSettings>,
   }),
 
   marcas: Object.freeze({

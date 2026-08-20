@@ -6,6 +6,7 @@ import type ConfigurationApi from '@desktop-contracts/configuration/configuratio
 import type EmpleadosApi from '@desktop-contracts/empleados/empleados-api.interface';
 import type LegacyImportApi from '@desktop-contracts/legacy-import/legacy-import-api.interface';
 import type MarcasApi from '@desktop-contracts/marcas/marcas-api.interface';
+import type PrintingApi from '@desktop-contracts/printing/printing-api.interface';
 import type ProveedoresApi from '@desktop-contracts/proveedores/proveedores-api.interface';
 import type ReservasApi from '@desktop-contracts/reservas/reservas-api.interface';
 import type SystemApi from '@desktop-contracts/system/system-api.interface';
@@ -17,6 +18,7 @@ export default interface OsumiDesktopApi {
   readonly system: SystemApi;
   readonly legacyImport: LegacyImportApi;
   readonly configuration: ConfigurationApi;
+  readonly printing: PrintingApi;
   readonly marcas: MarcasApi;
   readonly proveedores: ProveedoresApi;
   readonly empleados: EmpleadosApi;

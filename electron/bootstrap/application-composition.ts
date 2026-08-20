@@ -9,6 +9,7 @@ import InstallationService from '@backend/application/configuration/installation
 import EmpleadosService from '@backend/application/empleados/empleados.service';
 import LegacyImportService from '@backend/application/legacy-import/legacy-import.service';
 import MarcasService from '@backend/application/marcas/marcas.service';
+import PrintingService from '@backend/application/printing/printing.service';
 import ProveedoresService from '@backend/application/proveedores/proveedores.service';
 import ReservasService from '@backend/application/reservas/reservas.service';
 import { SystemService } from '@backend/application/system/system.service';
@@ -26,6 +27,8 @@ import type LogoStorage from '@backend/contracts/configuration/logo-storage.inte
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
 import type EmpleadoRepository from '@backend/contracts/empleados/empleado.repository.interface';
 import type MarcaRepository from '@backend/contracts/marcas/marca.repository.interface';
+import type PrinterProvider from '@backend/contracts/printing/printer.provider.interface';
+import type PrintingSettingsRepository from '@backend/contracts/printing/printing-settings.repository.interface';
 import type ProveedorRepository from '@backend/contracts/proveedores/proveedor.repository.interface';
 import type ReservasRepository from '@backend/contracts/reservas/reservas.repository.interface';
 import type PasswordHasher from '@backend/contracts/security/password-hasher.interface';
@@ -55,11 +58,13 @@ import TypeOrmVentasDevolucionesRepository from '@infrastructure/database/typeor
 import ElectronAssetUrlBuilder from '@infrastructure/electron/electron-asset-url.builder';
 import ElectronLegacyImportDialog from '@infrastructure/electron/electron-legacy-import-dialog';
 import ElectronLogoStorage from '@infrastructure/electron/electron-logo.storage';
+import ElectronPrinterProvider from '@infrastructure/electron/electron-printer.provider';
 import { ElectronRuntimeInfoProvider } from '@infrastructure/electron/electron-runtime-info.provider';
 import ElectronSafeStorageSecretStorage from '@infrastructure/electron/electron-safe-storage-secret-storage';
 import { getMainWindow } from '@infrastructure/electron/main-window';
 import FileInstallationStaging from '@infrastructure/filesystem/file-installation-staging';
 import JsonAppDataRepository from '@infrastructure/filesystem/json-app-data.repository';
+import JsonPrintingSettingsRepository from '@infrastructure/filesystem/json-printing-settings.repository';
 import InMemoryLegacyImportSelectionStore from '@infrastructure/legacy-import/in-memory-legacy-import-selection.store';
 import MariaDbInsertParser from '@infrastructure/legacy-import/maria-db-insert.parser';
 import NodeLegacyImportRunner from '@infrastructure/legacy-import/node-legacy-import.runner';
@@ -75,6 +80,7 @@ import registerConfigurationIpc from '@ipc/register-configuration-ipc';
 import registerEmpleadosIpc from '@ipc/register-empleados-ipc';
 import registerLegacyImportIpc from '@ipc/register-legacy-import-ipc';
 import registerMarcasIpc from '@ipc/register-marcas-ipc';
+import registerPrintingIpc from '@ipc/register-printing-ipc';
 import registerProveedoresIpc from '@ipc/register-proveedores-ipc';
 import registerReservasIpc from '@ipc/register-reservas-ipc';
 import { registerSystemIpc } from '@ipc/register-system-ipc';
@@ -280,6 +286,20 @@ export default function createApplicationComposition(
   const systemService: SystemService = new SystemService(runtimeInfoProvider);
 
   /*
+   * Impresión y configuración local del terminal.
+   */
+  const printingSettingsRepository: PrintingSettingsRepository = new JsonPrintingSettingsRepository(
+    applicationPaths.printingSettingsFile,
+  );
+
+  const printerProvider: PrinterProvider = new ElectronPrinterProvider(getMainWindow);
+
+  const printingService: PrintingService = new PrintingService(
+    printingSettingsRepository,
+    printerProvider,
+  );
+
+  /*
    * Canales IPC.
    */
   registerApplicationIpc(applicationStateService);
@@ -301,6 +321,7 @@ export default function createApplicationComposition(
 
   registerLegacyImportIpc(legacyImportService);
   registerSystemIpc(getMainWindow, systemService);
+  registerPrintingIpc(getMainWindow, printingService);
 
   registerConfigurationIpc(getMainWindow, configurationService, installationService);
 
