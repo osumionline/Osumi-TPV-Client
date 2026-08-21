@@ -27,6 +27,7 @@ import type ArticuloVentaInterface from '@desktop-contracts/ventas/articulo-vent
 import type { GuardarVentaCommand } from '@desktop-contracts/ventas/guardar-venta-command.interface';
 import type GuardarVentaResult from '@desktop-contracts/ventas/guardar-venta-result.interface';
 import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devolucion.interface';
+import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
 import type VentasContextInterface from '@desktop-contracts/ventas/ventas-context.interface';
 import IPC_CHANNELS from '@ipc/channels';
 import type { IpcRendererEvent } from 'electron';
@@ -202,6 +203,12 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         IPC_CHANNELS.ventasGetDevolucion,
         idVenta,
       ) as Promise<VentaDevolucionInterface | null>,
+
+    getTicket: (idVenta: number): Promise<VentaTicketInterface | null> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.ventasGetTicket,
+        idVenta,
+      ) as Promise<VentaTicketInterface | null>,
 
     save: (command: GuardarVentaCommand): Promise<GuardarVentaResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.ventasSave, command) as Promise<GuardarVentaResult>,

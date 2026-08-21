@@ -2,11 +2,13 @@ import type VentasArticulosService from '@backend/application/ventas/ventas-arti
 import type VentasContextService from '@backend/application/ventas/ventas-context.service';
 import type VentasDevolucionesService from '@backend/application/ventas/ventas-devoluciones.service';
 import type VentasPersistenciaService from '@backend/application/ventas/ventas-persistencia.service';
+import type VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
 import type AccesoDirectoVentaInterface from '@desktop-contracts/ventas/acceso-directo-venta.interface';
 import type ArticuloVentaInterface from '@desktop-contracts/ventas/articulo-venta.interface';
 import type { GuardarVentaCommand } from '@desktop-contracts/ventas/guardar-venta-command.interface';
 import type GuardarVentaResult from '@desktop-contracts/ventas/guardar-venta-result.interface';
 import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devolucion.interface';
+import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
 import type VentasContextInterface from '@desktop-contracts/ventas/ventas-context.interface';
 import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
 import { assertTrustedSender } from '@ipc/assert-trusted-sender';
@@ -22,6 +24,7 @@ export default function registerVentasIpc(
   ventasArticulosService: VentasArticulosService,
   ventasDevolucionesService: VentasDevolucionesService,
   ventasPersistenciaService: VentasPersistenciaService,
+  ventasTicketsService: VentasTicketsService,
 ): void {
   ipcMain.handle(IPC_CHANNELS.ventasGetContext, async (event): Promise<VentasContextInterface> => {
     assertTrustedSender(event, getMainWindow);
@@ -62,6 +65,15 @@ export default function registerVentasIpc(
       assertTrustedSender(event, getMainWindow);
 
       return ventasDevolucionesService.getByVentaId(idVenta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.ventasGetTicket,
+    async (event, idVenta: number): Promise<VentaTicketInterface | null> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return ventasTicketsService.getByVentaId(idVenta);
     },
   );
 
