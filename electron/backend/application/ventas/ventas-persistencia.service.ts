@@ -128,12 +128,6 @@ export default class VentasPersistenciaService {
       'El descuento fijo de una línea no es válido.',
     );
 
-    if (descuentoBps !== 0 && importeDescuentoMicros !== 0) {
-      throw new Error(
-        'Una línea no puede contener simultáneamente descuento porcentual y descuento fijo.',
-      );
-    }
-
     const unidades: number = this.requireSafeInteger(
       linea.unidades,
       'Las unidades de una línea no son válidas.',
@@ -156,6 +150,32 @@ export default class VentasPersistenciaService {
       linea.reservaLineaOrigenPublicId,
       'línea origen de la reserva',
     );
+
+    if (devolucionLineaOrigenPublicId !== null && reservaLineaOrigenPublicId !== null) {
+      throw new Error(
+        'Una línea no puede proceder simultáneamente de una devolución y de una reserva.',
+      );
+    }
+
+    /*
+     * Las líneas ordinarias utilizan una única
+     * representación de descuento.
+     *
+     * Las líneas históricas de devolución o reserva,
+     * en cambio, pueden conservar simultáneamente el
+     * porcentaje original y el importe económico
+     * histórico correspondiente.
+     */
+    if (
+      devolucionLineaOrigenPublicId === null &&
+      reservaLineaOrigenPublicId === null &&
+      descuentoBps !== 0 &&
+      importeDescuentoMicros !== 0
+    ) {
+      throw new Error(
+        'Una línea ordinaria no puede contener simultáneamente descuento porcentual y descuento fijo.',
+      );
+    }
 
     if (devolucionLineaOrigenPublicId !== null && reservaLineaOrigenPublicId !== null) {
       throw new Error(

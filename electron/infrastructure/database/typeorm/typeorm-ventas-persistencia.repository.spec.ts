@@ -609,7 +609,7 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
       createReservationSaleCommand(),
     );
 
-    expect(result.totalCents).toBe(3_000);
+    expect(result.totalCents).toBe(2_700);
 
     const articulo1: StockRow = await queryOne<StockRow>(
       dataSource,
@@ -737,9 +737,9 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
     );
 
     expect(caja).toEqual({
-      ventas_cents: 3_000,
-      beneficios_cents: 1_800,
-      descuentos_cents: 0,
+      ventas_cents: 2_700,
+      beneficios_cents: 1_500,
+      descuentos_cents: 300,
       importe_cierre_teorico_cents: 0,
     });
 
@@ -1217,7 +1217,7 @@ async function seedReservation(dataSource: DataSource): Promise<void> {
           FROM cliente
           WHERE public_id = 'cliente-1'
         ),
-        6000
+        5500
       )
     `,
   );
@@ -1254,9 +1254,9 @@ async function seedReservation(dataSource: DataSource): Promise<void> {
           4000000,
           1000,
           2100,
-          5000,
-          0,
-          0,
+          4500,
+          1000,
+          500,
           5
         ),
         (
@@ -1312,7 +1312,7 @@ function createReservationSaleCommand(): GuardarVentaCommand {
     clientePublicId: 'cliente-1',
     devolucionVentaOrigenPublicId: null,
     reservasOrigenPublicIds: ['reserva-1'],
-    totalCents: 3_000,
+    totalCents: 2_700,
     lineas: [
       {
         articuloPublicId: 'articulo-1',
@@ -1320,9 +1320,9 @@ function createReservationSaleCommand(): GuardarVentaCommand {
         pucMicros: 4_000_000,
         pvpMicros: 10_000_000,
         ivaBps: 2_100,
-        importeMicros: 30_000_000,
-        descuentoBps: 0,
-        importeDescuentoMicros: 0,
+        importeMicros: 27_000_000,
+        descuentoBps: 1_000,
+        importeDescuentoMicros: 3_000_000,
         unidades: 3,
         regalo: false,
         devolucionLineaOrigenPublicId: null,
@@ -1332,7 +1332,7 @@ function createReservationSaleCommand(): GuardarVentaCommand {
     pagos: [
       {
         tipoPagoPublicId: 'tipo-pago-tarjeta',
-        importeCents: 3_000,
+        importeCents: 2_700,
         entregadoCents: null,
         cambioCents: 0,
       },
