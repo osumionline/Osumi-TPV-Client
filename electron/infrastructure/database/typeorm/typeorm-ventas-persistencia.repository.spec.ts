@@ -1,10 +1,13 @@
 import VentasPersistenciaService from '@backend/application/ventas/ventas-persistencia.service';
+import VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
 import type VentaPersistidaRecord from '@backend/domain/ventas/venta-persistida-record.interface';
 import type { GuardarVentaCommand } from '@desktop-contracts/ventas/guardar-venta-command.interface';
+import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import TypeOrmVentasPersistenciaRepository from '@infrastructure/database/typeorm/typeorm-ventas-persistencia.repository';
+import TypeOrmVentasTicketsRepository from '@infrastructure/database/typeorm/typeorm-ventas-tickets.repository';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -249,6 +252,67 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
     )) as readonly unknown[];
 
     expect(foreignKeyErrors).toEqual([]);
+  });
+
+  it('recupera el snapshot persistido necesario para el ticket definitivo', async (): Promise<void> => {
+    const result: VentaPersistidaRecord = await requireService().save(
+      createNormalSaleCommand('venta-ticket-1'),
+    );
+
+    const ticketsService: VentasTicketsService = new VentasTicketsService(
+      new TypeOrmVentasTicketsRepository(requireDatabase()),
+    );
+
+    const ticket: VentaTicketInterface | null = await ticketsService.getByVentaId(result.id);
+
+    expect(ticket).not.toBeNull();
+
+    expect(ticket).toEqual({
+      id: result.id,
+      publicId: 'venta-ticket-1',
+      serie: '',
+      numero: 1,
+      fecha: result.fecha,
+      empleadoNombre: 'Empleado test',
+      clienteNombre: null,
+      totalCents: 2_200,
+      pagos: [
+        {
+          nombre: 'Efectivo',
+          importeCents: 1_200,
+          entregadoCents: 2_000,
+          cambioCents: 800,
+        },
+        {
+          nombre: 'Tarjeta',
+          importeCents: 1_000,
+          entregadoCents: null,
+          cambioCents: 0,
+        },
+      ],
+      lineas: [
+        {
+          nombre: 'Artículo de prueba',
+          pvpMicros: 10_000_000,
+          ivaBps: 2_100,
+          importeMicros: 18_000_000,
+          descuentoBps: 1_000,
+          importeDescuentoMicros: 0,
+          unidades: 2,
+          regalo: false,
+        },
+        {
+          nombre: 'Varios',
+          pvpMicros: 5_000_000,
+          ivaBps: 2_100,
+          importeMicros: 4_000_000,
+          descuentoBps: 0,
+          importeDescuentoMicros: 1_000_000,
+          unidades: 1,
+          regalo: false,
+        },
+      ],
+    });
   });
 
   it('es idempotente y no repite ningún efecto al guardar dos veces la misma venta', async (): Promise<void> => {
