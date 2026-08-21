@@ -23,6 +23,7 @@ import { PERCENT_TOTAL } from '@constants/percentage.constants';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import permissionIds from '@desktop-contracts/permissions/permission-ids.constants';
 import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
+import type GuardarVentaResult from '@desktop-contracts/ventas/guardar-venta-result.interface';
 import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devolucion.interface';
 import type TipoPago from '@model/tipos-pago/tipo-pago.model';
 import type AccesoDirectoVenta from '@model/ventas/acceso-directo-venta.model';
@@ -55,6 +56,7 @@ import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
 import ReservaTicketPrintService from '@services/reserva-ticket-print.service';
 import ReservasService from '@services/reservas.service';
+import VentaPostCommitService from '@services/venta-post-commit.service';
 import VentasArticulosService from '@services/ventas-articulos.service';
 import VentasContextService from '@services/ventas-context.service';
 import VentasDevolucionesService from '@services/ventas-devoluciones.service';
@@ -101,6 +103,7 @@ export default class SaleWorkspaceComponent {
     inject(ReservaTicketPrintService);
   private readonly ventasPersistenciaService: VentasPersistenciaService =
     inject(VentasPersistenciaService);
+  private readonly ventaPostCommitService: VentaPostCommitService = inject(VentaPostCommitService);
 
   readonly venta: InputSignal<VentaEnCurso> = input.required<VentaEnCurso>();
 
@@ -926,8 +929,9 @@ export default class SaleWorkspaceComponent {
    * Persiste definitivamente la venta utilizando el
    * snapshot económico producido por el modal.
    *
-   * La operación permanece abierta en memoria hasta que
-   * SQLite ha confirmado la transacción completa.
+   * Solo un fallo anterior al COMMIT mantiene la operación abierta.
+   * Cualquier incidencia posterior se limita a informar al usuario,
+   * porque la venta ya existe definitivamente en SQLite.
    */
   async finalizeVenta(finalizacion: VentaFinalizacionResultado): Promise<void> {
     if (this.ventaSaving() || this.reservaSaving()) {
@@ -938,8 +942,10 @@ export default class SaleWorkspaceComponent {
 
     this.ventaSaving.set(true);
 
+    let result: GuardarVentaResult;
+
     try {
-      await this.ventasPersistenciaService.save(venta, finalizacion);
+      result = await this.ventasPersistenciaService.save(venta, finalizacion);
     } catch (error: unknown) {
       this.ventaSaving.set(false);
 
@@ -954,31 +960,40 @@ export default class SaleWorkspaceComponent {
     }
 
     /*
-     * La venta ya está confirmada en SQLite.
+     * A partir de este punto la venta está confirmada.
      *
-     * Si procedía de reservas, refrescamos su colección
-     * después del COMMIT para eliminar las ya consumidas.
+     * Ningún fallo de PDF, impresión, reservas o cualquier
+     * otro postproceso puede permitir repetir save().
      */
-    let reservasReloadError: string | null = null;
+    let warnings: readonly string[];
 
-    if (venta.tieneReservas) {
-      await this.reservasService.reload();
-
-      reservasReloadError = this.reservasService.error();
+    try {
+      warnings = await this.ventaPostCommitService.run(result.id, venta.tieneReservas);
+    } catch (error: unknown) {
+      /*
+       * VentaPostCommitService está diseñado para absorber
+       * sus incidencias individualmente. Esta protección
+       * adicional mantiene la frontera del COMMIT incluso
+       * ante un error inesperado de programación.
+       */
+      warnings = [
+        `No se han podido completar todos los procesos posteriores a la venta. ${getErrorMessage(
+          error,
+          'Se ha producido un error inesperado.',
+        )}`,
+      ];
     }
 
-    /*
-     * Desde aquí nunca permitimos repetir la persistencia:
-     * la venta ya existe definitivamente.
-     */
     this.ventaSaving.set(false);
     this.finalizationOpen.set(false);
 
-    if (reservasReloadError !== null) {
+    if (warnings.length > 0) {
       this.dialog
         .alert({
           title: 'Venta finalizada',
-          content: `La venta se ha guardado correctamente, pero no se ha podido actualizar la lista de reservas. ${reservasReloadError}`,
+          content:
+            `La venta se ha guardado correctamente, pero se han producido incidencias posteriores. ` +
+            warnings.join(' '),
         })
         .subscribe((): void => {
           this.completedEvent.emit(venta.idTemporal);
