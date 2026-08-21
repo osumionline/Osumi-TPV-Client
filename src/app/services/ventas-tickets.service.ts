@@ -10,4 +10,12 @@ export default class VentasTicketsService {
   async getByVentaId(idVenta: number): Promise<VentaTicketInterface | null> {
     return window.osumiDesktop.ventas.getTicket(idVenta);
   }
+
+  /**
+   * Conserva en el backend el PDF histórico
+   * correspondiente a una venta persistida.
+   */
+  async savePdf(idVenta: number, pdf: Uint8Array): Promise<void> {
+    await window.osumiDesktop.ventas.saveTicketPdf(idVenta, pdf);
+  }
 }

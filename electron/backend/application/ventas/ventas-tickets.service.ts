@@ -1,3 +1,4 @@
+import type VentaTicketPdfStorage from '@backend/contracts/ventas/venta-ticket-pdf-storage.interface';
 import type VentasTicketsRepository from '@backend/contracts/ventas/ventas-tickets.repository.interface';
 import type {
   VentaTicketLineaRecord,
@@ -11,16 +12,17 @@ import type {
 } from '@desktop-contracts/ventas/venta-ticket.interface';
 
 export default class VentasTicketsService {
-  constructor(private readonly ventasTicketsRepository: VentasTicketsRepository) {}
+  constructor(
+    private readonly ventasTicketsRepository: VentasTicketsRepository,
+    private readonly ventaTicketPdfStorage: VentaTicketPdfStorage,
+  ) {}
 
   /**
    * Recupera el snapshot persistido necesario para generar
    * el ticket definitivo de una venta.
    */
   async getByVentaId(idVenta: number): Promise<VentaTicketInterface | null> {
-    if (!Number.isSafeInteger(idVenta) || idVenta <= 0) {
-      throw new RangeError('El identificador de la venta no es válido.');
-    }
+    this.validateVentaId(idVenta);
 
     const venta: VentaTicketRecord | null =
       await this.ventasTicketsRepository.findByVentaId(idVenta);
@@ -55,5 +57,31 @@ export default class VentasTicketsService {
         regalo: linea.regalo,
       })),
     };
+  }
+
+  /**
+   * Conserva el PDF histórico correspondiente a una venta
+   * que ya existe definitivamente en SQLite.
+   *
+   * La existencia de la venta se verifica antes de entregar
+   * el documento al almacenamiento write-once.
+   */
+  async savePdf(idVenta: number, pdf: Uint8Array): Promise<void> {
+    this.validateVentaId(idVenta);
+
+    const venta: VentaTicketRecord | null =
+      await this.ventasTicketsRepository.findByVentaId(idVenta);
+
+    if (venta === null) {
+      throw new Error('No se ha encontrado la venta asociada al PDF del ticket.');
+    }
+
+    await this.ventaTicketPdfStorage.save(idVenta, pdf);
+  }
+
+  private validateVentaId(idVenta: number): void {
+    if (!Number.isSafeInteger(idVenta) || idVenta <= 0) {
+      throw new RangeError('El identificador de la venta no es válido.');
+    }
   }
 }

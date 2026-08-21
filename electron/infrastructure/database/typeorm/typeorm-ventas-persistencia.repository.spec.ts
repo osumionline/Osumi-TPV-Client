@@ -1,5 +1,6 @@
 import VentasPersistenciaService from '@backend/application/ventas/ventas-persistencia.service';
 import VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
+import type VentaTicketPdfStorage from '@backend/contracts/ventas/venta-ticket-pdf-storage.interface';
 import type VentaPersistidaRecord from '@backend/domain/ventas/venta-persistida-record.interface';
 import type { GuardarVentaCommand } from '@desktop-contracts/ventas/guardar-venta-command.interface';
 import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
@@ -261,6 +262,7 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
 
     const ticketsService: VentasTicketsService = new VentasTicketsService(
       new TypeOrmVentasTicketsRepository(requireDatabase()),
+      new NoopVentaTicketPdfStorage(),
     );
 
     const ticket: VentaTicketInterface | null = await ticketsService.getByVentaId(result.id);
@@ -1492,4 +1494,10 @@ async function queryRows<T>(
   parameters: readonly unknown[] = [],
 ): Promise<readonly T[]> {
   return (await dataSource.query(sql, [...parameters])) as readonly T[];
+}
+
+class NoopVentaTicketPdfStorage implements VentaTicketPdfStorage {
+  save(_idVenta: number, _pdf: Uint8Array): Promise<void> {
+    return Promise.resolve();
+  }
 }

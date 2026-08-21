@@ -19,5 +19,7 @@ export default interface VentasApi {
 
   getTicket(idVenta: number): Promise<VentaTicketInterface | null>;
 
+  saveTicketPdf(idVenta: number, pdf: Uint8Array): Promise<void>;
+
   save(command: GuardarVentaCommand): Promise<GuardarVentaResult>;
 }

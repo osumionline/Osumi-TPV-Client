@@ -37,6 +37,7 @@ import type ReservasRepository from '@backend/contracts/reservas/reservas.reposi
 import type PasswordHasher from '@backend/contracts/security/password-hasher.interface';
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
+import type VentaTicketPdfStorage from '@backend/contracts/ventas/venta-ticket-pdf-storage.interface';
 import type VentasArticulosRepository from '@backend/contracts/ventas/ventas-articulos.repository.interface';
 import type VentasContextRepository from '@backend/contracts/ventas/ventas-context.repository.interface';
 import type VentasDevolucionesRepository from '@backend/contracts/ventas/ventas-devoluciones.repository.interface';
@@ -71,6 +72,7 @@ import { ElectronRuntimeInfoProvider } from '@infrastructure/electron/electron-r
 import ElectronSafeStorageSecretStorage from '@infrastructure/electron/electron-safe-storage-secret-storage';
 import { getMainWindow } from '@infrastructure/electron/main-window';
 import FileInstallationStaging from '@infrastructure/filesystem/file-installation-staging';
+import FileVentaTicketPdfStorage from '@infrastructure/filesystem/file-venta-ticket-pdf.storage';
 import JsonAppDataRepository from '@infrastructure/filesystem/json-app-data.repository';
 import JsonPrintingSettingsRepository from '@infrastructure/filesystem/json-printing-settings.repository';
 import InMemoryLegacyImportSelectionStore from '@infrastructure/legacy-import/in-memory-legacy-import-selection.store';
@@ -233,8 +235,13 @@ export default function createApplicationComposition(
     operationalDatabase,
   );
 
+  const ventaTicketPdfStorage: VentaTicketPdfStorage = new FileVentaTicketPdfStorage(
+    join(applicationPaths.filesDirectory, 'ventas', 'tickets'),
+  );
+
   const ventasTicketsService: VentasTicketsService = new VentasTicketsService(
     ventasTicketsRepository,
+    ventaTicketPdfStorage,
   );
 
   /*
