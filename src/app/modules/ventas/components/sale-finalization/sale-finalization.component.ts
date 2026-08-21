@@ -17,6 +17,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import type TipoPago from '@model/tipos-pago/tipo-pago.model';
 import VentaFinalizacionEnCurso from '@model/ventas/venta-finalizacion-en-curso.model';
+import type { VentaFinalizacionResultado } from '@model/ventas/venta-finalizacion-resultado.interface';
 import type VentaPagoEnCurso from '@model/ventas/venta-pago-en-curso.model';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import { getErrorMessage } from '@utils/error.utils';
@@ -38,18 +39,24 @@ import { centsToEuros, eurosToCents } from '@utils/money.utils';
 })
 export default class SaleFinalizationComponent implements OnInit {
   readonly totalCents: InputSignal<number> = input.required<number>();
-
   readonly tiposPago: InputSignal<readonly TipoPago[]> = input.required<readonly TipoPago[]>();
 
   readonly reservaBlockedReason: InputSignal<string | null> = input<string | null>(null);
 
   readonly reservaSaving: InputSignal<boolean> = input<boolean>(false);
+  readonly ventaSaving: InputSignal<boolean> = input<boolean>(false);
 
   readonly cancelEvent: OutputEmitterRef<void> = output<void>();
 
-  readonly reservaSinTicketEvent: OutputEmitterRef<void> = output<void>();
+  readonly finalizeEvent: OutputEmitterRef<VentaFinalizacionResultado> =
+    output<VentaFinalizacionResultado>();
 
+  readonly reservaSinTicketEvent: OutputEmitterRef<void> = output<void>();
   readonly reservaConTicketEvent: OutputEmitterRef<void> = output<void>();
+
+  readonly saving: Signal<boolean> = computed(
+    (): boolean => this.reservaSaving() || this.ventaSaving(),
+  );
 
   /**
    * El modelo es mutable durante la interacción.
@@ -105,7 +112,12 @@ export default class SaleFinalizationComponent implements OnInit {
   addTipoPago(tipoPago: TipoPago): void {
     const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
 
-    if (finalizacion === null || finalizacion.completa || this.isTipoPagoAdded(tipoPago)) {
+    if (
+      this.saving() ||
+      finalizacion === null ||
+      finalizacion.completa ||
+      this.isTipoPagoAdded(tipoPago)
+    ) {
       return;
     }
 
@@ -180,7 +192,7 @@ export default class SaleFinalizationComponent implements OnInit {
   updatePagoImporte(pago: VentaPagoEnCurso, event: Event): void {
     const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
 
-    if (finalizacion === null) {
+    if (this.saving() || finalizacion === null) {
       return;
     }
 
@@ -247,7 +259,7 @@ export default class SaleFinalizationComponent implements OnInit {
   updatePagoEntregado(pago: VentaPagoEnCurso, event: Event): void {
     const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
 
-    if (finalizacion === null || !pago.esEfectivo || pago.importeCents < 0) {
+    if (this.saving() || finalizacion === null || !pago.esEfectivo || pago.importeCents < 0) {
       return;
     }
 
@@ -297,7 +309,7 @@ export default class SaleFinalizationComponent implements OnInit {
   removePago(tipoPagoPublicId: string): void {
     const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
 
-    if (finalizacion === null) {
+    if (this.saving() || finalizacion === null) {
       return;
     }
 
@@ -332,7 +344,40 @@ export default class SaleFinalizationComponent implements OnInit {
   canAddTipoPago(tipoPago: TipoPago): boolean {
     const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
 
-    return finalizacion !== null && !finalizacion.completa && !this.isTipoPagoAdded(tipoPago);
+    return (
+      !this.saving() &&
+      finalizacion !== null &&
+      !finalizacion.completa &&
+      !this.isTipoPagoAdded(tipoPago)
+    );
+  }
+
+  /**
+   * Produce el snapshot económico definitivo y solicita
+   * al workspace la persistencia de la venta.
+   */
+  finalizeVenta(): void {
+    if (this.saving()) {
+      return;
+    }
+
+    const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
+
+    if (finalizacion === null || !finalizacion.completa) {
+      return;
+    }
+
+    try {
+      const resultado: VentaFinalizacionResultado = finalizacion.toResultado();
+
+      this.error.set(null);
+
+      this.finalizeEvent.emit(resultado);
+    } catch (error: unknown) {
+      this.error.set(
+        getErrorMessage(error, 'No se ha podido preparar la finalización de la venta.'),
+      );
+    }
   }
 
   /**
@@ -340,7 +385,7 @@ export default class SaleFinalizationComponent implements OnInit {
    * e imprimir su comprobante.
    */
   createReservaConTicket(): void {
-    if (this.reservaSaving() || this.reservaBlockedReason() !== null) {
+    if (this.saving() || this.reservaBlockedReason() !== null) {
       return;
     }
 
@@ -352,7 +397,7 @@ export default class SaleFinalizationComponent implements OnInit {
    * sin imprimir comprobante.
    */
   createReservaSinTicket(): void {
-    if (this.reservaSaving() || this.reservaBlockedReason() !== null) {
+    if (this.saving() || this.reservaBlockedReason() !== null) {
       return;
     }
 
@@ -363,7 +408,7 @@ export default class SaleFinalizationComponent implements OnInit {
    * Cancela la finalización sin modificar VentaEnCurso.
    */
   cancel(): void {
-    if (this.reservaSaving()) {
+    if (this.saving()) {
       return;
     }
 

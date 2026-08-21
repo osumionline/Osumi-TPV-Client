@@ -30,6 +30,7 @@ import type ArticuloVenta from '@model/ventas/articulo-venta.model';
 import type VentaDevolucionSeleccion from '@model/ventas/venta-devolucion-seleccion.interface';
 import type VentaDevolucionSelectorState from '@model/ventas/venta-devolucion-selector-state.interface';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
+import type { VentaFinalizacionResultado } from '@model/ventas/venta-finalizacion-resultado.interface';
 import type VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
 import type VentaVariosData from '@model/ventas/venta-varios-data.interface';
 import type VentaVariosEditorState from '@model/ventas/venta-varios-editor-state.interface';
@@ -57,6 +58,7 @@ import ReservasService from '@services/reservas.service';
 import VentasArticulosService from '@services/ventas-articulos.service';
 import VentasContextService from '@services/ventas-context.service';
 import VentasDevolucionesService from '@services/ventas-devoluciones.service';
+import VentasPersistenciaService from '@services/ventas-persistencia.service';
 import VentasService from '@services/ventas.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { eurosToMicros, microsToEuros } from '@utils/money.utils';
@@ -97,6 +99,8 @@ export default class SaleWorkspaceComponent {
   private readonly reservasService: ReservasService = inject(ReservasService);
   private readonly reservaTicketPrintService: ReservaTicketPrintService =
     inject(ReservaTicketPrintService);
+  private readonly ventasPersistenciaService: VentasPersistenciaService =
+    inject(VentasPersistenciaService);
 
   readonly venta: InputSignal<VentaEnCurso> = input.required<VentaEnCurso>();
 
@@ -147,6 +151,8 @@ export default class SaleWorkspaceComponent {
   readonly finalizationOpen: WritableSignal<boolean> = signal<boolean>(false);
 
   readonly tiposPago: Signal<readonly TipoPago[]> = this.ventasContextService.tiposPago;
+
+  readonly ventaSaving: WritableSignal<boolean> = signal<boolean>(false);
 
   readonly reservaSaving: WritableSignal<boolean> = signal<boolean>(false);
 
@@ -906,10 +912,82 @@ export default class SaleWorkspaceComponent {
    * al usuario al flujo normal de venta.
    */
   closeFinalization(): void {
+    if (this.ventaSaving() || this.reservaSaving()) {
+      return;
+    }
+
     this.finalizationOpen.set(false);
     this.localizador.set('');
 
     this.focusLocalizador();
+  }
+
+  /**
+   * Persiste definitivamente la venta utilizando el
+   * snapshot económico producido por el modal.
+   *
+   * La operación permanece abierta en memoria hasta que
+   * SQLite ha confirmado la transacción completa.
+   */
+  async finalizeVenta(finalizacion: VentaFinalizacionResultado): Promise<void> {
+    if (this.ventaSaving() || this.reservaSaving()) {
+      return;
+    }
+
+    const venta: VentaEnCurso = this.venta();
+
+    this.ventaSaving.set(true);
+
+    try {
+      await this.ventasPersistenciaService.save(venta, finalizacion);
+    } catch (error: unknown) {
+      this.ventaSaving.set(false);
+
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido finalizar la venta.'),
+        })
+        .subscribe();
+
+      return;
+    }
+
+    /*
+     * La venta ya está confirmada en SQLite.
+     *
+     * Si procedía de reservas, refrescamos su colección
+     * después del COMMIT para eliminar las ya consumidas.
+     */
+    let reservasReloadError: string | null = null;
+
+    if (venta.tieneReservas) {
+      await this.reservasService.reload();
+
+      reservasReloadError = this.reservasService.error();
+    }
+
+    /*
+     * Desde aquí nunca permitimos repetir la persistencia:
+     * la venta ya existe definitivamente.
+     */
+    this.ventaSaving.set(false);
+    this.finalizationOpen.set(false);
+
+    if (reservasReloadError !== null) {
+      this.dialog
+        .alert({
+          title: 'Venta finalizada',
+          content: `La venta se ha guardado correctamente, pero no se ha podido actualizar la lista de reservas. ${reservasReloadError}`,
+        })
+        .subscribe((): void => {
+          this.completedEvent.emit(venta.idTemporal);
+        });
+
+      return;
+    }
+
+    this.completedEvent.emit(venta.idTemporal);
   }
 
   /**
@@ -935,7 +1013,7 @@ export default class SaleWorkspaceComponent {
    * La persistencia siempre ocurre antes de imprimir.
    */
   private async createReserva(imprimirTicket: boolean): Promise<void> {
-    if (this.reservaSaving()) {
+    if (this.reservaSaving() || this.ventaSaving()) {
       return;
     }
 

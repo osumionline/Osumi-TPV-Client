@@ -2,7 +2,7 @@
     <button class="overlay__backdrop"
             type="button"
             aria-label="Cancelar finalización de la venta"
-            [disabled]="reservaSaving()"
+            [disabled]="saving()"
             (click)="cancel()">
     </button>
 
@@ -151,7 +151,7 @@
                         [class.finalization__payment-type--added]="
                             isTipoPagoAdded(tipoPago)
                         "
-                        [disabled]="!canAddTipoPago(tipoPago)"
+                        [disabled]="saving() || !canAddTipoPago(tipoPago)"
                         (click)="addTipoPago(tipoPago)">
                     <mat-icon aria-hidden="true">
                         {{
@@ -234,6 +234,7 @@
                                min="0.01"
                                step="0.01"
                                autocomplete="off"
+                               [disabled]="saving()"
                                [max]="getPagoMaxEuros(pago)"
                                [value]="getPagoImporteEuros(pago)"
                                (focus)="selectInputContent($event)"
@@ -262,6 +263,7 @@
                                min="0.01"
                                step="0.01"
                                autocomplete="off"
+                               [disabled]="saving()"
                                [min]="getPagoImporteEuros(pago)"
                                [value]="getPagoEntregadoEuros(pago)"
                                (focus)="selectInputContent($event)"
@@ -297,6 +299,7 @@
                             [attr.aria-label]="
                                 'Eliminar ' + pago.tipoPago.nombre
                             "
+                            [disabled]="saving()"
                             (click)="removePago(pago.tipoPagoPublicId)">
                         <mat-icon>
                             delete
@@ -337,7 +340,7 @@
                 <button mat-stroked-button
                         type="button"
                         [disabled]="
-                            reservaSaving() ||
+                            saving() ||
                             reservaBlockedReason() !== null
                         "
                         (click)="createReservaConTicket()">
@@ -355,7 +358,7 @@
                 <button mat-stroked-button
                         type="button"
                         [disabled]="
-                            reservaSaving() ||
+                            saving() ||
                             reservaBlockedReason() !== null
                         "
                         (click)="createReservaSinTicket()">
@@ -382,10 +385,32 @@
         <footer class="finalization__actions">
             <button mat-stroked-button
                     type="button"
-                    [disabled]="reservaSaving()"
+                    [disabled]="saving()"
                     (click)="cancel()">
                 Cancelar
             </button>
+
+            <button mat-flat-button
+                    type="button"
+                    [disabled]="saving() || !state.completa"
+                    (click)="finalizeVenta()">
+                @if (ventaSaving()) {
+                Guardando venta...
+                }
+                @else if (state.totalCents > 0) {
+                Finalizar venta
+                }
+                @else if (state.totalCents < 0)
+                  {
+                  Finalizar
+                  devolución
+                  }
+                  @else
+                  {
+                  Finalizar
+                  operación
+                  }
+                  </button>
         </footer>
         }
     </section>

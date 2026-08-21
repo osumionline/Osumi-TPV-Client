@@ -502,7 +502,9 @@
     <otpv-sale-finalization [totalCents]="ventaView().totalCents"
                             [tiposPago]="tiposPago()"
                             [reservaBlockedReason]="reservaBlockedReason()"
+                            [ventaSaving]="ventaSaving()"
                             [reservaSaving]="reservaSaving()"
+                            (finalizeEvent)="finalizeVenta($event)"
                             (reservaConTicketEvent)="createReservaConTicket()"
                             (reservaSinTicketEvent)="createReservaSinTicket()"
                             (cancelEvent)="closeFinalization()" />

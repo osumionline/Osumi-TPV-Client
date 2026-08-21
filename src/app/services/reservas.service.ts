@@ -71,9 +71,17 @@ export default class ReservasService {
 
   /**
    * Fuerza una nueva lectura de SQLite.
+   *
+   * Si existe una petición anterior en curso, espera primero
+   * a que termine para garantizar que la siguiente lectura
+   * comienza después del momento en el que se solicitó reload().
    */
-  reload(): Promise<void> {
-    return this.loadData();
+  async reload(): Promise<void> {
+    if (this.pendingRequest !== null) {
+      await this.pendingRequest;
+    }
+
+    await this.loadData();
   }
 
   /**
