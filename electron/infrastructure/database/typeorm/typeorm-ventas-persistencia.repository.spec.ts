@@ -1497,7 +1497,7 @@ async function queryRows<T>(
 }
 
 class NoopVentaTicketPdfStorage implements VentaTicketPdfStorage {
-  save(_idVenta: number, _pdf: Uint8Array): Promise<void> {
+  save(): Promise<void> {
     return Promise.resolve();
   }
 }

@@ -1,4 +1,5 @@
 import { inject, Service } from '@angular/core';
+
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
 import buildVentaTicketDocument from '@model/ventas/venta-ticket-document.builder';
@@ -42,5 +43,15 @@ export default class VentaTicketDocumentService {
     const pdf: Uint8Array = await window.osumiDesktop.printing.renderPdf(documentHtml);
 
     await this.ventasTicketsService.savePdf(idVenta, pdf);
+  }
+
+  /**
+   * Imprime silenciosamente el ticket definitivo de una
+   * venta ya persistida utilizando la impresora configurada.
+   */
+  async print(idVenta: number): Promise<void> {
+    const documentHtml: string = await this.buildHtml(idVenta);
+
+    await window.osumiDesktop.printing.printTicket(documentHtml);
   }
 }
