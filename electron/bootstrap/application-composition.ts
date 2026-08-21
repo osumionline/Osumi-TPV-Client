@@ -16,6 +16,7 @@ import { SystemService } from '@backend/application/system/system.service';
 import VentasArticulosService from '@backend/application/ventas/ventas-articulos.service';
 import VentasContextService from '@backend/application/ventas/ventas-context.service';
 import VentasDevolucionesService from '@backend/application/ventas/ventas-devoluciones.service';
+import VentasPersistenciaService from '@backend/application/ventas/ventas-persistencia.service';
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';
 import type ClienteRepository from '@backend/contracts/clientes/cliente.repository.interface';
@@ -38,6 +39,7 @@ import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.in
 import type VentasArticulosRepository from '@backend/contracts/ventas/ventas-articulos.repository.interface';
 import type VentasContextRepository from '@backend/contracts/ventas/ventas-context.repository.interface';
 import type VentasDevolucionesRepository from '@backend/contracts/ventas/ventas-devoluciones.repository.interface';
+import type VentasPersistenciaRepository from '@backend/contracts/ventas/ventas-persistencia.repository.interface';
 import DefaultLegacyImportReviewDecisionValidator from '@backend/domain/legacy-import/default-legacy-import-review-decision.validator';
 import NewInstallationDataService from '@infrastructure/database/initial-data/new-installation-data.service';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
@@ -56,6 +58,7 @@ import TypeOrmReservasRepository from '@infrastructure/database/typeorm/typeorm-
 import TypeOrmVentasArticulosRepository from '@infrastructure/database/typeorm/typeorm-ventas-articulos.repository';
 import TypeOrmVentasContextRepository from '@infrastructure/database/typeorm/typeorm-ventas-context.repository';
 import TypeOrmVentasDevolucionesRepository from '@infrastructure/database/typeorm/typeorm-ventas-devoluciones.repository';
+import TypeOrmVentasPersistenciaRepository from '@infrastructure/database/typeorm/typeorm-ventas-persistencia.repository';
 import ElectronAssetUrlBuilder from '@infrastructure/electron/electron-asset-url.builder';
 import ElectronHtmlDocumentRenderer from '@infrastructure/electron/electron-html-document.renderer';
 import ElectronLegacyImportDialog from '@infrastructure/electron/electron-legacy-import-dialog';
@@ -216,6 +219,13 @@ export default function createApplicationComposition(
     assetUrlBuilder,
   );
 
+  const ventasPersistenciaRepository: VentasPersistenciaRepository =
+    new TypeOrmVentasPersistenciaRepository(operationalDatabase);
+
+  const ventasPersistenciaService: VentasPersistenciaService = new VentasPersistenciaService(
+    ventasPersistenciaRepository,
+  );
+
   /*
    * Importación legacy.
    */
@@ -322,6 +332,7 @@ export default function createApplicationComposition(
     ventasContextService,
     ventasArticulosService,
     ventasDevolucionesService,
+    ventasPersistenciaService,
   );
 
   registerLegacyImportIpc(legacyImportService);

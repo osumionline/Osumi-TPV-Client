@@ -177,12 +177,6 @@ export default class VentasPersistenciaService {
       );
     }
 
-    if (devolucionLineaOrigenPublicId !== null && reservaLineaOrigenPublicId !== null) {
-      throw new Error(
-        'Una línea no puede proceder simultáneamente de una devolución y de una reserva.',
-      );
-    }
-
     if (devolucionLineaOrigenPublicId !== null) {
       if (unidades >= 0) {
         throw new Error('Una línea de devolución debe tener unidades negativas.');

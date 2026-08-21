@@ -41,6 +41,7 @@ const IPC_CHANNELS = {
   ventasSearchArticulos: 'ventas:search-articulos',
   ventasGetAccesosDirectos: 'ventas:get-accesos-directos',
   ventasGetDevolucion: 'ventas:get-devolucion',
+  ventasSave: 'ventas:save',
 } as const;
 
 export default IPC_CHANNELS;

@@ -1,8 +1,11 @@
 import type VentasArticulosService from '@backend/application/ventas/ventas-articulos.service';
 import type VentasContextService from '@backend/application/ventas/ventas-context.service';
 import type VentasDevolucionesService from '@backend/application/ventas/ventas-devoluciones.service';
+import type VentasPersistenciaService from '@backend/application/ventas/ventas-persistencia.service';
 import type AccesoDirectoVentaInterface from '@desktop-contracts/ventas/acceso-directo-venta.interface';
 import type ArticuloVentaInterface from '@desktop-contracts/ventas/articulo-venta.interface';
+import type { GuardarVentaCommand } from '@desktop-contracts/ventas/guardar-venta-command.interface';
+import type GuardarVentaResult from '@desktop-contracts/ventas/guardar-venta-result.interface';
 import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devolucion.interface';
 import type VentasContextInterface from '@desktop-contracts/ventas/ventas-context.interface';
 import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
@@ -18,6 +21,7 @@ export default function registerVentasIpc(
   ventasContextService: VentasContextService,
   ventasArticulosService: VentasArticulosService,
   ventasDevolucionesService: VentasDevolucionesService,
+  ventasPersistenciaService: VentasPersistenciaService,
 ): void {
   ipcMain.handle(IPC_CHANNELS.ventasGetContext, async (event): Promise<VentasContextInterface> => {
     assertTrustedSender(event, getMainWindow);
@@ -58,6 +62,15 @@ export default function registerVentasIpc(
       assertTrustedSender(event, getMainWindow);
 
       return ventasDevolucionesService.getByVentaId(idVenta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.ventasSave,
+    async (event, command: GuardarVentaCommand): Promise<GuardarVentaResult> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return ventasPersistenciaService.save(command);
     },
   );
 }
