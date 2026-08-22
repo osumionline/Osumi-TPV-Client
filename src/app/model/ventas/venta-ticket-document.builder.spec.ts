@@ -161,4 +161,77 @@ describe('buildVentaTicketDocument', (): void => {
 
     expect(documentHtml).toContain('Sin movimientos de pago');
   });
+
+  it('incluye el logo y utiliza el nombre fiscal del negocio', (): void => {
+    const documentHtml: string = buildVentaTicketDocument(appData, ticket);
+
+    expect(documentHtml).toContain('src="osumi://assets/logo"');
+
+    expect(documentHtml).toContain('Empresa &amp; Compañía');
+
+    expect(documentHtml).not.toContain('>Mi comercio<');
+  });
+
+  it('muestra únicamente las redes sociales configuradas', (): void => {
+    const appDataWithSocial: AppData = {
+      ...appData,
+      twitter: '@empresa',
+      facebook: '',
+      instagram: 'empresa_instagram',
+      web: 'https://empresa.example',
+    };
+
+    const documentHtml: string = buildVentaTicketDocument(appDataWithSocial, ticket);
+
+    expect(documentHtml).toContain('osumi://assets/app/icons/twitter.svg');
+
+    expect(documentHtml).toContain('@empresa');
+
+    expect(documentHtml).not.toContain('osumi://assets/app/icons/facebook.svg');
+
+    expect(documentHtml).toContain('osumi://assets/app/icons/instagram.svg');
+
+    expect(documentHtml).toContain('empresa_instagram');
+
+    expect(documentHtml).toContain('osumi://assets/app/icons/web.svg');
+
+    expect(documentHtml).toContain('https://empresa.example');
+  });
+
+  it('no genera el bloque social cuando no hay redes configuradas', (): void => {
+    const documentHtml: string = buildVentaTicketDocument(appData, ticket);
+
+    expect(documentHtml).not.toContain('class="social"');
+  });
+
+  it('incluye las frases personalizadas del ticket', (): void => {
+    const appDataWithPhrases: AppData = {
+      ...appData,
+      frasesTicket: ['Conserve este ticket.', 'Cambios hasta el 31 de enero.'],
+    };
+
+    const documentHtml: string = buildVentaTicketDocument(appDataWithPhrases, ticket);
+
+    expect(documentHtml).toContain('Conserve este ticket.');
+
+    expect(documentHtml).toContain('Cambios hasta el 31 de enero.');
+  });
+
+  it('escapa las redes y frases personalizadas', (): void => {
+    const unsafeAppData: AppData = {
+      ...appData,
+      twitter: '<script>twitter</script>',
+      frasesTicket: ['<strong>Frase</strong>'],
+    };
+
+    const documentHtml: string = buildVentaTicketDocument(unsafeAppData, ticket);
+
+    expect(documentHtml).toContain('&lt;script&gt;twitter&lt;/script&gt;');
+
+    expect(documentHtml).toContain('&lt;strong&gt;Frase&lt;/strong&gt;');
+
+    expect(documentHtml).not.toContain('<script>twitter</script>');
+
+    expect(documentHtml).not.toContain('<strong>Frase</strong>');
+  });
 });

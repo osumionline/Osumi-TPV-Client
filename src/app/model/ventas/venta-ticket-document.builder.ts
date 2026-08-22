@@ -16,6 +16,16 @@ import { escapeHtml } from '@utils/html.utils';
 import { centsToEuros, microsToEuros } from '@utils/money.utils';
 import { trimToNull } from '@utils/string.utils';
 
+const BUSINESS_LOGO_URL: string = 'osumi://assets/logo';
+
+const TWITTER_ICON_URL: string = 'osumi://assets/app/icons/twitter.svg';
+
+const FACEBOOK_ICON_URL: string = 'osumi://assets/app/icons/facebook.svg';
+
+const INSTAGRAM_ICON_URL: string = 'osumi://assets/app/icons/instagram.svg';
+
+const WEB_ICON_URL: string = 'osumi://assets/app/icons/web.svg';
+
 const currencyFormatter: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
   style: 'currency',
   currency: 'EUR',
@@ -38,8 +48,7 @@ export default function buildVentaTicketDocument(
   appData: AppData,
   ticket: VentaTicketInterface,
 ): string {
-  const businessName: string =
-    firstNotEmpty(appData.nombreComercial, appData.nombre) ?? 'Osumi TPV';
+  const businessName: string = trimToNull(appData.nombre) ?? 'Osumi TPV';
 
   const address: string | null = joinNotEmpty(appData.direccion, appData.poblacion);
 
@@ -94,6 +103,16 @@ export default function buildVentaTicketDocument(
       text-align: center;
     }
 
+    .business__logo {
+      display: block;
+      width: auto;
+      height: auto;
+      max-width: 58mm;
+      max-height: 22mm;
+      margin: 0 auto 2.5mm;
+      object-fit: contain;
+    }
+
     .business__name {
       margin: 0 0 1.5mm;
       font-size: 14pt;
@@ -102,6 +121,35 @@ export default function buildVentaTicketDocument(
 
     .business__line {
       margin: .5mm 0;
+    }
+
+    .social {
+      display: flex;
+      margin-top: 2.5mm;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 1.5mm 4mm;
+    }
+
+    .social__item {
+      display: flex;
+      max-width: 100%;
+      align-items: center;
+      gap: 1.5mm;
+      font-size: 8pt;
+    }
+
+    .social__icon {
+      display: block;
+      width: 4mm;
+      height: 4mm;
+      flex: 0 0 4mm;
+      object-fit: contain;
+    }
+
+    .social__value {
+      min-width: 0;
+      overflow-wrap: anywhere;
     }
 
     .ticket__title {
@@ -284,9 +332,14 @@ export default function buildVentaTicketDocument(
     }
 
     .footer {
-      margin-top: 3mm;
+      margin-top: 4mm;
       font-size: 8pt;
       text-align: center;
+    }
+
+    .footer__phrase {
+      margin: .8mm 0;
+      overflow-wrap: anywhere;
     }
 
     @page {
@@ -305,6 +358,12 @@ export default function buildVentaTicketDocument(
 <body>
   <main class="ticket">
     <header class="business">
+      <img
+        class="business__logo"
+        src="${BUSINESS_LOGO_URL}"
+        alt=""
+      >
+
       <div class="business__name">
         ${escapeHtml(businessName)}
       </div>
@@ -328,6 +387,7 @@ export default function buildVentaTicketDocument(
             </div>
           `
       }
+      ${renderSocial(appData)}
     </header>
 
     <div class="ticket__title">
@@ -404,13 +464,79 @@ export default function buildVentaTicketDocument(
       ${qrSvg}
     </div>
 
-    <footer class="footer">
-      Gracias por su visita.
-    </footer>
+    ${renderTicketPhrases(appData.frasesTicket)}
   </main>
 </body>
 </html>
   `.trim();
+}
+
+function renderSocial(appData: AppData): string {
+  const items: string[] = [];
+
+  addSocialItem(items, TWITTER_ICON_URL, 'Twitter', appData.twitter);
+
+  addSocialItem(items, FACEBOOK_ICON_URL, 'Facebook', appData.facebook);
+
+  addSocialItem(items, INSTAGRAM_ICON_URL, 'Instagram', appData.instagram);
+
+  addSocialItem(items, WEB_ICON_URL, 'Web', appData.web);
+
+  if (items.length === 0) {
+    return '';
+  }
+
+  return `
+    <div class="social">
+      ${items.join('')}
+    </div>
+  `;
+}
+
+function addSocialItem(items: string[], iconUrl: string, iconAlt: string, value: string): void {
+  const normalizedValue: string | null = trimToNull(value);
+
+  if (normalizedValue === null) {
+    return;
+  }
+
+  items.push(`
+    <div class="social__item">
+      <img
+        class="social__icon"
+        src="${iconUrl}"
+        alt="${escapeHtml(iconAlt)}"
+      >
+
+      <span class="social__value">
+        ${escapeHtml(normalizedValue)}
+      </span>
+    </div>
+  `);
+}
+
+function renderTicketPhrases(phrases: readonly string[]): string {
+  const normalizedPhrases: readonly string[] = phrases
+    .map((phrase: string): string => phrase.trim())
+    .filter((phrase: string): boolean => phrase !== '');
+
+  if (normalizedPhrases.length === 0) {
+    return '';
+  }
+
+  return `
+    <footer class="footer">
+      ${normalizedPhrases
+        .map(
+          (phrase: string): string => `
+            <div class="footer__phrase">
+              ${escapeHtml(phrase)}
+            </div>
+          `,
+        )
+        .join('')}
+    </footer>
+  `;
 }
 
 function renderLinea(linea: VentaTicketLineaInterface): string {
@@ -637,18 +763,6 @@ function formatMicros(micros: number): string {
 
 function formatPercentage(bps: number): string {
   return `${percentageFormatter.format(bps / 100)} %`;
-}
-
-function firstNotEmpty(...values: readonly string[]): string | null {
-  for (const value of values) {
-    const normalizedValue: string | null = trimToNull(value);
-
-    if (normalizedValue !== null) {
-      return normalizedValue;
-    }
-  }
-
-  return null;
 }
 
 function joinNotEmpty(...values: readonly string[]): string | null {
