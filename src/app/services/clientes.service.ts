@@ -121,6 +121,38 @@ export default class ClientesService {
     return this.loadEstadisticasData(publicId, true);
   }
 
+  /**
+   * Invalida las estadísticas cacheadas de un cliente.
+   *
+   * Si existe una consulta anterior todavía en curso, esperamos
+   * a que termine antes de eliminar su resultado para impedir
+   * que una respuesta iniciada antes del COMMIT repueble la
+   * caché con datos desactualizados.
+   */
+  async invalidateEstadisticas(publicId: string): Promise<void> {
+    const normalizedPublicId: string = publicId.trim();
+
+    if (normalizedPublicId === '') {
+      throw new Error('El identificador del cliente no es válido.');
+    }
+
+    const pendingRequest: Promise<void> | undefined =
+      this.pendingEstadisticasRequests.get(normalizedPublicId);
+
+    if (pendingRequest !== undefined) {
+      await pendingRequest;
+    }
+
+    const estadisticas: Map<string, ClienteEstadisticasState> = new Map<
+      string,
+      ClienteEstadisticasState
+    >(this.estadisticasSignal());
+
+    estadisticas.delete(normalizedPublicId);
+
+    this.estadisticasSignal.set(estadisticas);
+  }
+
   clear(): void {
     this.clientesSignal.set([]);
 

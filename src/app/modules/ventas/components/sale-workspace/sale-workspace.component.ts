@@ -968,7 +968,11 @@ export default class SaleWorkspaceComponent {
     let warnings: readonly string[];
 
     try {
-      warnings = await this.ventaPostCommitService.run(result.id, venta.tieneReservas);
+      warnings = await this.ventaPostCommitService.run(
+        result.id,
+        venta.tieneReservas,
+        venta.cliente?.publicId ?? null,
+      );
     } catch (error: unknown) {
       /*
        * VentaPostCommitService está diseñado para absorber
