@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.1  
-**Fecha:** 21 de agosto de 2026  
-**Estado:** Installation, importación legacy, Startup, auditoría/refactor transversal y los bloques **Ventas 1–10** están completados. En **Ventas 11 — Persistencia transaccional** están completados **11A, 11B, 11C y 11D**. Dentro de **11E — Ticket definitivo + QR + PDF + impresión**, está completado **11E.1 — snapshot persistido del ticket**. El siguiente paso exacto es **11E.2 — exposición IPC + servicio Angular del ticket**. Después quedarán 11E.3–11E.6, 11F y Ventas 12 — Postventa.
+**Versión:** 2.2  
+**Fecha:** 23 de agosto de 2026  
+**Estado:** Installation, importación legacy, Startup, auditoría/refactor transversal y los bloques **Ventas 1–11** están completados, probados y subidos. **Ventas 11 — Persistencia transaccional** queda cerrado de extremo a extremo: transacción SQLite, líneas/pagos/stock/histórico/caja, devoluciones/reservas, ticket definitivo, QR compatible, PDF histórico write-once, impresión silenciosa y postprocesos no bloqueantes. La única validación pendiente es la **prueba física con Star TSP100/TSP143 de 80 mm**, que queda expresamente documentada como no bloqueante. El siguiente bloque es **Ventas 12 — Postventa**.
 
 ---
 
@@ -39,9 +39,10 @@ Hitos principales completados:
 - **Ventas 11B — Contratos + mapper de GuardarVenta + trazabilidad SQLite**.
 - **Ventas 11C — Caso de uso backend + transacción SQLite**, incluida regresión real contra SQLite.
 - **Ventas 11D — IPC + Angular + Finalizar venta**, incluida prueba manual end-to-end.
-- **Ventas 11E.1 — Snapshot persistido del ticket definitivo**.
+- **Ventas 11E — Ticket definitivo + QR + PDF + impresión**, incluida regresión funcional real.
+- **Ventas 11F — Regresión completa + cierre**.
 
-Los hitos cerrados hasta 11D han sido probados con la aplicación real y están subidos al repositorio. 11E.1 está implementado y validado; antes de continuar debe revisarse siempre el `main` actual.
+Todos los bloques **Ventas 1–11** han sido probados con la aplicación real y están subidos al repositorio. La única comprobación pendiente de Ventas 11 es la prueba física con la impresora térmica Star TSP100/TSP143 de 80 mm; no bloquea el avance a Postventa.
 
 ---
 
@@ -57,21 +58,23 @@ Los hitos cerrados hasta 11D han sido probados con la aplicación real y están 
 - Promoción atómica desde staging a la instalación definitiva: completada.
 - `ApplicationStateService`, `/startup` y precarga global: completados.
 - Conexión SQLite operativa persistente durante la sesión: implementada.
-- Protocolo interno `osumi://assets/...`: implementado y probado.
+- Protocolo interno `osumi://assets/...`: implementado; sirve logo instalado, ficheros históricos y assets estáticos permitidos de la aplicación con resolución segura.
 - Las ventas abiertas viven en memoria en `VentasService` y sobreviven a la navegación entre módulos.
 - Refactor transversal A–E: completado, probado y subido.
 - Buscador de artículos: clic en el nombre añade inmediatamente un único artículo y cierra el buscador; los checks mantienen la selección múltiple.
-- Ventas 10: finalización económica, pagos múltiples, efectivo/cambio, reembolsos, reservas e infraestructura de impresión/PDF completados.
-- Ventas 11A–11D: persistencia transaccional real completada, conectada de extremo a extremo y validada manualmente.
-- Ventas 11E.1: snapshot persistido del ticket definitivo completado.
-- Siguiente paso: **Ventas 11E.2 — exposición IPC + servicio Angular del ticket**.
-- Después: **11E.3–11E.6**, **11F — regresión completa y cierre**, y **Ventas 12 — Postventa**.
+- Ventas 10: finalización económica, pagos múltiples, efectivo/cambio, reembolsos, reservas e infraestructura documental/impresión completados.
+- Ventas 11: persistencia transaccional real, ticket definitivo, PDF histórico, postprocesos y regresión completados.
+- Tras persistir una venta con cliente se invalida la caché de sus estadísticas para que la siguiente consulta refleje la nueva operación.
+- `app_data.json` dispone de `frasesTicket: string[]`; instalaciones/configuraciones anteriores se normalizan a `[]` y las importaciones legacy también parten de `[]`.
+- Los tickets de venta históricos se almacenan en `assets/files/ventas/tickets/{idVenta}.pdf` y son **write-once**.
+- Siguiente bloque: **Ventas 12 — Postventa**.
 
 Validación de hardware pendiente y no bloqueante:
 
-- Impresora de pruebas futura: **Star TSP100 Cutter / TSP143**.
-- Papel: **80 mm**.
-- Debe verificarse físicamente longitud del ticket, márgenes y comportamiento del corte cuando haya acceso a la impresora.
+- impresora prevista: **Star TSP100 Cutter / TSP143**;
+- papel: **80 mm**;
+- pendiente comprobar físicamente márgenes, longitud, legibilidad del QR, logo, redes, textos y comportamiento del corte;
+- cuando exista acceso al hardware debe retomarse esta prueba sin reabrir Ventas 11 funcionalmente salvo que aparezca una regresión real.
 
 ---
 
@@ -194,6 +197,37 @@ Pendiente de UX futura:
 - no crear una pantalla independiente solo para la impresora;
 - un `.otpv` importado no debe suponer que la impresora del equipo anterior existe en el nuevo.
 
+### 6.2 Configuración documental del ticket de venta
+
+`app_data.json` contiene además:
+
+```json
+{
+  "frasesTicket": []
+}
+```
+
+Reglas:
+
+- es un array de strings opcional;
+- en instalación se edita mediante un textarea, **una frase por línea**;
+- líneas vacías se eliminan;
+- cada frase se imprime centrada en el pie del ticket;
+- configuraciones existentes anteriores al campo se cargan como `frasesTicket: []`;
+- una importación `.otpv` legacy inicializa `frasesTicket: []`, porque el formato antiguo no contenía este dato;
+- no se incrustan textos comerciales heredados del TPV antiguo como reglas globales: cada tienda decide sus propias frases.
+
+El ticket utiliza como nombre principal `appData.nombre`, no `nombreComercial`.
+
+Las redes opcionales disponibles son:
+
+- Twitter;
+- Facebook;
+- Instagram;
+- Web.
+
+Solo se muestran las configuradas. Los iconos reutilizan los assets SVG de la propia aplicación a través del protocolo seguro `osumi://assets/app/...`.
+
 ---
 
 ## 7. Startup ✅
@@ -232,7 +266,7 @@ Las ventas abiertas se mantienen en `VentasService` y sobreviven a la navegació
 
 ## 8. Plan maestro del módulo Ventas
 
-Esta recapitulación debe aparecer al comenzar cada fase, bloque o subapartado.
+Esta recapitulación debe aparecer al comenzar **cada fase, bloque, subapartado o paso**. Debe mostrarse el listado completo del bloque actual, marcar qué está completado, indicar exactamente el paso en curso y todo lo pendiente. Después deben añadirse uno o dos párrafos explicando qué se va a resolver en el paso actual antes de entrar en implementación.
 
 1. ✅ **Contexto operativo**
    - ✅ 1A — Lectura del contexto operativo.
@@ -251,36 +285,21 @@ Esta recapitulación debe aparecer al comenzar cada fase, bloque o subapartado.
     - ✅ 10C — Efectivo, cambio y reembolsos.
     - ✅ 10D — Reserva desde finalización.
     - ✅ 10E — Contrato definitivo y regresión.
-11. 🟦 **Persistencia transaccional — en curso**.
+11. ✅ **Persistencia transaccional**.
     - ✅ 11A — Análisis y diseño de la transacción.
-    - ✅ 11B — Contratos + mapper de GuardarVenta.
-      - ✅ 11B.1 — `GuardarVentaCommand`.
-      - ✅ 11B.2 — Snapshot persistente del descuento.
-      - ✅ 11B.3 — Mapper `VentaEnCurso + VentaFinalizacionResultado`.
-      - ✅ 11B.4 — Tests completos del mapper.
-      - ✅ 11B.5 — Trazabilidad SQLite de devolución/reserva.
+    - ✅ 11B — Contratos + mapper de GuardarVenta + trazabilidad SQLite.
     - ✅ 11C — Caso de uso backend + transacción SQLite.
-      - ✅ 11C.1 — Contratos internos.
-      - ✅ 11C.2 — Validación/normalización backend.
-      - ✅ 11C.3 — Venta + numeración + líneas + pagos.
-      - ✅ 11C.4 — Stock + histórico + devoluciones + reservas.
-      - ✅ 11C.5 — Acumulados de caja.
-      - ✅ 11C.6 — Regresión transaccional con SQLite real.
     - ✅ 11D — IPC + Angular + Finalizar venta.
-      - ✅ 11D.1 — Composition root + IPC backend.
-      - ✅ 11D.2 — Preload + Desktop API.
-      - ✅ 11D.3 — Servicio Angular de persistencia.
-      - ✅ 11D.4 — Integración con Finalizar venta.
-      - ✅ 11D.5 — Prueba manual end-to-end.
-    - 🟦 11E — Ticket definitivo + QR + PDF + impresión.
+    - ✅ 11E — Ticket definitivo + QR + PDF + impresión.
       - ✅ 11E.1 — Snapshot persistido del ticket.
-      - 🟦 11E.2 — Exposición IPC + servicio Angular.
-      - ⬜ 11E.3 — QR local + documento HTML de 80 mm.
-      - ⬜ 11E.4 — PDF + impresión silenciosa.
-      - ⬜ 11E.5 — Orquestación post-COMMIT y errores no bloqueantes.
-      - ⬜ 11E.6 — Prueba física y regresión.
-    - ⬜ 11F — Regresión completa + cierre.
-12. ⬜ **Postventa**.
+      - ✅ 11E.2 — Exposición IPC + servicio Angular.
+      - ✅ 11E.3 — QR local + documento HTML de 80 mm.
+      - ✅ 11E.4 — PDF histórico + impresión silenciosa + regresión técnica.
+      - ✅ 11E.5 — Orquestación post-COMMIT y errores no bloqueantes.
+      - ✅ 11E.6 — Regresión funcional real.
+      - ⚠️ 11E.6.4 — Prueba física Star TSP100/TSP143 de 80 mm pendiente, **no bloqueante**.
+    - ✅ 11F — Regresión completa + cierre.
+12. 🟦 **Postventa — siguiente bloque**.
 
 Hitos transversales ya cerrados:
 
@@ -872,32 +891,28 @@ No reemplazar el primer modelo por el segundo indiscriminadamente.
 
 ---
 
-## 11.9 PDF histórico — decisión preparada, no completada
+## 11.9 PDF histórico — completado en Ventas 11 ✅
 
-La infraestructura `renderPdf()` existe y está probada.
+Ventas 10 dejó preparada la infraestructura `renderPdf()`. Ventas 11 completó el objetivo: cada venta persistida genera un **artefacto histórico definitivo**.
 
-Sin embargo, una reserva no genera un PDF para descartarlo inmediatamente.
-
-Para ventas ordinarias se quiere que el PDF se convierta en un **artefacto histórico definitivo**:
+Flujo final:
 
 ```text
 venta persistida
 → ID definitivo
+→ snapshot releído desde SQLite
 → ticket definitivo
 → PDF
-→ almacenar
+→ almacenamiento write-once
 ```
 
-Motivos:
+Ubicación:
 
-- email desde finalización;
-- email desde histórico;
-- reimpresión;
-- conservar exactamente el documento original aunque cambien más adelante logo, datos o plantilla.
+```text
+assets/files/ventas/tickets/{idVenta}.pdf
+```
 
-No regenerar años después un ticket histórico usando una plantilla nueva si ya puede conservarse el original.
-
-La integración concreta del PDF histórico se está cerrando en **Ventas 11E**. La reutilización postventa del PDF quedará para Ventas 12.
+El archivo no se regenera ni sobrescribe si ya existe. Esto permite que Postventa pueda reutilizar exactamente el documento original para reimpresión o email aunque en el futuro cambien logo, datos del negocio o plantilla.
 
 ---
 
@@ -1131,9 +1146,9 @@ pasa al cierre del bloque.
 
 ---
 
-# 12. Ventas 11 — Persistencia transaccional 🟦 EN CURSO
+# 12. Ventas 11 — Persistencia transaccional ✅ COMPLETADO
 
-## 12.1 Estado actual del bloque
+## 12.1 Estado final del bloque
 
 ```text
 ✅ 11A — Análisis y diseño de la transacción
@@ -1160,26 +1175,25 @@ pasa al cierre del bloque.
    ✅ 11D.4 — Integración con Finalizar venta
    ✅ 11D.5 — Prueba manual end-to-end
 
-🟦 11E — Ticket definitivo + QR + PDF + impresión
+✅ 11E — Ticket definitivo + QR + PDF + impresión
    ✅ 11E.1 — Snapshot persistido del ticket
-   🟦 11E.2 — Exposición IPC + servicio Angular
-   ⬜ 11E.3 — QR local + documento HTML de 80 mm
-   ⬜ 11E.4 — PDF + impresión silenciosa
-   ⬜ 11E.5 — Orquestación post-COMMIT y errores no bloqueantes
-   ⬜ 11E.6 — Prueba física y regresión
+   ✅ 11E.2 — Exposición IPC + servicio Angular
+   ✅ 11E.3 — QR local + HTML print-native de 80 mm
+   ✅ 11E.4 — PDF histórico + impresión silenciosa
+   ✅ 11E.5 — Orquestación post-COMMIT y errores no bloqueantes
+   ✅ 11E.6 — Regresión funcional real
+   ⚠️ 11E.6.4 — Prueba física de 80 mm pendiente, no bloqueante
 
-⬜ 11F — Regresión completa + cierre
+✅ 11F — Regresión completa + cierre
 ```
 
-El bloque ya ha superado la parte crítica de persistencia y conexión end-to-end. El trabajo actual no debe reabrir la transacción salvo que aparezca una regresión real: ahora el foco está en construir el documento definitivo **a partir de la venta ya persistida** y ejecutar los postprocesos después del COMMIT.
+Ventas 11 está cerrado funcional y técnicamente. La prueba física de impresora queda registrada como validación de hardware futura y no impide comenzar Ventas 12.
 
 ---
 
 ## 12.2 11A — Diseño de la transacción ✅
 
-Se revisaron el esquema actual, repositories y flujo legacy de `SaveVenta`. La implementación nueva no replica la arquitectura antigua; conserva únicamente su comportamiento funcional relevante.
-
-Principio de la operación:
+Principio final:
 
 ```text
 validar comando
@@ -1195,18 +1209,16 @@ validar comando
 → COMMIT
 ```
 
-Cualquier fallo antes del commit implica **ROLLBACK completo**. QR, PDF, impresión y demás salidas documentales ocurren siempre después.
+Cualquier fallo antes del COMMIT implica **ROLLBACK completo**. QR, PDF, impresión, invalidación de cachés y otras salidas son posteriores al COMMIT.
 
 Decisiones principales:
 
 - el backend trata el payload Angular como no confiable y revalida todos los datos autoritativos;
-- `cajaPublicId` representa la caja concreta con la que se inició la operación, y debe seguir abierta;
-- la numeración usa `secuencia_documento`, no `MAX(numero)+1` como mecanismo principal;
-- la secuencia se sincroniza con el máximo histórico importado para convivir con datos legacy;
+- `cajaPublicId` representa la caja concreta con la que se inició la operación y debe seguir abierta;
+- la numeración utiliza `secuencia_documento`, sincronizada con el máximo histórico importado;
 - `VentaEnCurso.idTemporal` se utiliza como `venta.public_id` e idempotency key;
-- un reintento después de un COMMIT ya realizado devuelve la misma venta sin repetir stock, caja, pagos ni histórico;
-- la persistencia de una venta procedente de reserva **no** llama a `ReservasRepository.deleteReserva()`, porque esa operación tiene otra semántica y su propia transacción;
-- TicketBAI queda fuera de la transacción comercial de este bloque.
+- un reintento después de un COMMIT ya realizado devuelve la misma venta sin repetir efectos;
+- TicketBAI queda fuera de esta transacción comercial.
 
 ---
 
@@ -1220,109 +1232,56 @@ Archivo:
 electron/contracts/ventas/guardar-venta-command.interface.ts
 ```
 
-Contiene tres exports nombrados:
-
-- `GuardarVentaPagoCommand`;
-- `GuardarVentaLineaCommand`;
-- `GuardarVentaCommand`.
-
-Transporta `publicId` públicos, nunca IDs internos de SQLite. Incluye caja, empleado, cliente, venta origen de devolución, reservas origen, total, líneas y pagos.
+Transporta `publicId` públicos, nunca IDs internos de SQLite, e incluye caja, empleado, cliente, venta origen de devolución, reservas origen, total, líneas y pagos.
 
 ### Snapshot de descuento
 
-Archivo:
-
-```text
-src/app/model/ventas/venta-linea-descuento-snapshot.ts
-```
-
 Las líneas ordinarias persisten una representación inequívoca del descuento. Las líneas históricas procedentes de reserva/devolución pueden conservar simultáneamente porcentaje e importe económico histórico.
-
-### Mapper
-
-Archivo:
-
-```text
-src/app/model/ventas/guardar-venta-command.mapper.ts
-```
-
-Convierte:
-
-```text
-VentaEnCurso
-+
-VentaFinalizacionResultado
-+
-cajaPublicId
-→
-GuardarVentaCommand
-```
-
-Casos cubiertos por tests:
-
-- artículo normal + Varios + pagos múltiples;
-- total cero sin pagos;
-- reserva histórica con cantidad modificada;
-- línea reservada eliminada visualmente;
-- devoluciones parciales sucesivas;
-- caja vacía;
-- empleado/cliente no persistidos;
-- venta sin líneas;
-- snapshot de finalización desactualizado.
 
 ### Trazabilidad SQLite
 
-El esquema canónico se amplió directamente —sin migraciones— con:
+El esquema canónico incorpora:
 
 ```text
 venta.id_venta_origen_devolucion
-
 linea_venta.id_linea_venta_origen_devolucion
 linea_venta.id_linea_reserva_origen
-
 venta_reserva(id_venta, id_reserva)
 ```
 
-`linea_venta` impide que una línea sea simultáneamente devolución y reserva. `venta_reserva` permite varias reservas por venta y `UNIQUE(id_reserva)` impide consumir una misma reserva desde dos ventas.
+`linea_venta` impide que una línea sea simultáneamente devolución y reserva. `venta_reserva` permite varias reservas por venta y evita consumir una misma reserva desde dos ventas.
 
-### Regla de esquema durante desarrollo pre-release
+### Regla de esquema pre-release
 
-El proyecto todavía no tiene usuarios ni versiones distribuidas. Por decisión explícita del usuario:
+Mientras el producto siga greenfield y sin versiones distribuidas:
 
-- **no crear migraciones de esquema durante esta fase greenfield**;
-- modificar directamente el esquema canónico;
-- recrear la base de desarrollo cuando sea necesario;
-- mantener `DATABASE_SCHEMA_VERSION = 1` mientras esta sea la primera versión no publicada;
-- introducir una estrategia de migraciones cuando exista una versión distribuida que deba actualizarse.
-
-Se borró la carpeta de datos local y se realizó una instalación completa nueva importando el `.otpv` real. La creación del nuevo esquema y la importación legacy terminaron correctamente.
+- no crear migraciones todavía;
+- modificar el esquema canónico;
+- recrear la base de desarrollo cuando cambie el esquema;
+- mantener `DATABASE_SCHEMA_VERSION = 1`;
+- introducir migraciones cuando exista una versión publicada que deba actualizarse.
 
 ---
 
 ## 12.4 11C — Transacción SQLite real ✅
 
-### Frontera de aplicación
-
-Angular construye `GuardarVentaCommand`. El backend lo normaliza en `VentasPersistenciaService` y genera `GuardarVentaRecordCommand`.
-
-El repository:
+La frontera de aplicación queda:
 
 ```text
-electron/infrastructure/database/typeorm/
-typeorm-ventas-persistencia.repository.ts
+Angular
+→ GuardarVentaCommand
+→ VentasPersistenciaService backend
+→ GuardarVentaRecordCommand
+→ TypeOrmVentasPersistenciaRepository
+→ transacción SQLite
 ```
 
-posee la unidad transaccional completa mediante `runDataSourceTransaction()`.
-
-### Resoluciones autoritativas
-
-Dentro de la transacción se resuelven y validan:
+Dentro de la transacción se resuelven y validan autoritativamente:
 
 - caja concreta aún abierta;
 - empleado activo;
-- cliente existente si lo hay;
-- venta origen de devolución;
-- línea exacta origen de devolución;
+- cliente si existe;
+- venta y línea exacta origen de devolución;
 - reservas y cliente propietario;
 - líneas concretas de reserva;
 - artículos;
@@ -1330,21 +1289,15 @@ Dentro de la transacción se resuelven y validan:
 - semántica de efectivo mediante `tipo_pago.slug`;
 - `afecta_caja` desde SQLite.
 
-No se confía en que Angular indique qué pago es efectivo ni qué tipos afectan caja.
+### Numeración e idempotencia
 
-### Numeración
+`secuencia_documento` se sincroniza con `MAX(numero)` histórico antes de incrementar y se actualiza dentro de la transacción.
 
-`secuencia_documento` se inicializa/sincroniza con el `MAX(numero)` histórico de `venta` antes de incrementar. Esto permite continuar correctamente tras importar un `.otpv` antiguo aunque la tabla de secuencia no estuviera inicializada por el legacy.
+Antes de crear efectos se busca `venta.public_id = command.publicId`:
 
-La secuencia se actualiza dentro de la misma transacción: si falla posteriormente stock/caja/reserva, también vuelve atrás.
-
-### Idempotencia
-
-Antes de crear efectos se busca `venta.public_id = command.publicId`.
-
-- si ya existe con el mismo total, se devuelve la venta persistida;
-- no se repiten líneas, pagos, stock, histórico ni caja;
-- si existe el mismo `publicId` con otro total, se rechaza por inconsistencia.
+- mismo `publicId` + mismo total → devolver la venta ya persistida;
+- no repetir líneas, pagos, stock, histórico ni caja;
+- mismo `publicId` + total distinto → rechazar por inconsistencia.
 
 ---
 
@@ -1366,24 +1319,13 @@ reserva 5 → vende 7       diferencia =  2 → stock -2
 reserva 5 → vende 5       diferencia =  0 → stock igual
 ```
 
-Cada movimiento de artículo genera `historico_articulo` con tipo de venta `1`, stock previo/final, diferencia, venta y precios históricos.
+Cada movimiento de artículo genera `historico_articulo` con stock previo/final, diferencia, venta y precios históricos.
 
 ### Devoluciones
 
-La devolución utiliza la **línea histórica exacta**, no `venta + artículo`.
+La devolución referencia la **línea histórica exacta**. `unidades_devueltas` se acumula y nunca puede superar las unidades originales.
 
-`unidades_devueltas` se acumula:
-
-```text
-original 4
-ya devueltas 1
-nueva devolución 2
-→ acumulado 3
-```
-
-Si una nueva devolución supera las unidades originales, falla toda la transacción.
-
-El movimiento de stock usa los precios históricos de la línea original.
+El movimiento de stock conserva precios históricos de la línea de origen.
 
 ### Reservas
 
@@ -1393,9 +1335,9 @@ Las reservas ya descontaron stock al crearse. Al venderlas se reconcilia:
 diferencia = unidadesFinales - unidadesReservadas
 ```
 
-Se recorren **todas las líneas originales de la reserva**, incluso las eliminadas visualmente de la venta. Una línea reservada eliminada equivale a `unidadesFinales = 0` y restaura completamente el stock inmovilizado.
+Se recorren todas las líneas originales, incluso las eliminadas visualmente. Una línea eliminada equivale a `unidadesFinales = 0` y restaura completamente el stock inmovilizado.
 
-La cabecera de reserva queda con borrado lógico después de la reconciliación; sus líneas se conservan como histórico. `venta_reserva` deja constancia de qué venta la consumió.
+La cabecera de reserva queda con borrado lógico, las líneas se conservan como histórico y `venta_reserva` registra qué venta la consumió.
 
 ---
 
@@ -1420,51 +1362,34 @@ Reglas:
 - beneficio = importe final de línea - coste firmado;
 - descuentos se acumulan con signo;
 - solo tipos con `afecta_caja = 1` modifican el cierre teórico;
-- para efectivo se usa el **importe aplicado**, nunca el dinero entregado;
-- `importe_real_cents` no se toca durante ventas: pertenece al recuento/cierre físico;
+- para efectivo se usa el importe aplicado, nunca el dinero entregado;
+- `importe_real_cents` pertenece al recuento/cierre físico y no se toca durante ventas;
 - cada tipo utilizado incrementa una operación;
-- en pago mixto, el descuento se distribuye proporcionalmente según `abs(importeCents)` y el último pago absorbe el residual de redondeo.
+- en pago mixto el descuento se distribuye proporcionalmente por `abs(importeCents)` y el último pago absorbe el residual de redondeo.
 
 ---
 
 ## 12.7 Tests backend y regresión transaccional ✅
 
-Se añadió un runner Vitest específico para Electron/backend:
+Existe un runner Vitest específico para Electron/backend:
 
 ```text
 electron/vitest.config.ts
 scripts/test-electron.mjs
 ```
 
-Scripts:
+Comandos:
 
 ```bash
 npm run test:electron
 npm run test:electron:vitest
 ```
 
-`better-sqlite3` es un addon nativo y Electron/Node utilizan ABIs diferentes. El wrapper público `test:electron` hace:
+`npm run test:electron` es el comando seguro porque recompila `better-sqlite3` para Node, ejecuta la suite y en `finally` lo reconstruye para Electron.
 
-```text
-rebuild better-sqlite3 para Node
-→ ejecutar Vitest
-→ finally
-→ electron-rebuild para Electron
-```
+La regresión usa SQLite real temporal y cubre, entre otros:
 
-En npm 12 fue necesario aprobar explícitamente el script de instalación:
-
-```json
-"allowScripts": {
-  "better-sqlite3@12.11.1": true
-}
-```
-
-No usar `test:electron:vitest` como comando habitual sin saber en qué ABI está compilado `better-sqlite3`; el comando seguro es `npm run test:electron`.
-
-La regresión real usa archivos SQLite temporales, no mocks. Cubre:
-
-- venta normal completa;
+- venta normal;
 - stock/histórico;
 - caja y reparto de descuento;
 - idempotencia;
@@ -1472,40 +1397,28 @@ La regresión real usa archivos SQLite temporales, no mocks. Cubre:
 - devolución parcial acumulativa y exceso rechazado;
 - reserva con cantidad reducida y línea eliminada;
 - total cero/regalo sin pagos;
-- snapshot persistido del ticket añadido en 11E.1.
+- snapshot persistido del ticket.
 
-Tras 11E.1 la suite backend contiene **7 tests** y el usuario confirmó que pasan. Al final del runner aparece `Rebuild Complete` y la aplicación Electron arranca correctamente después.
-
-Batería habitual desde este punto:
-
-```bash
-npm test
-npm run test:electron
-npm run typecheck:electron
-npm run build
-npm run lint
-npm run build:desktop
-```
+Se añadieron además tests específicos para impresión, almacenamiento histórico de PDF y servicios post-COMMIT.
 
 ---
 
 ## 12.8 11D — Wiring completo y prueba end-to-end ✅
 
-Se añadió el resultado público:
+`GuardarVentaResult` expone:
 
 ```text
-GuardarVentaResult
-├── id
-├── publicId
-├── serie
-├── numero
-├── totalCents
-└── fecha
+id
+publicId
+serie
+numero
+totalCents
+fecha
 ```
 
-El `id` numérico se expone deliberadamente porque el QR compatible con devoluciones será `-id`.
+El `id` numérico se expone deliberadamente porque el QR compatible con devoluciones usa `-id`.
 
-Flujo final implementado:
+Flujo:
 
 ```text
 SaleFinalizationComponent
@@ -1518,22 +1431,11 @@ SaleFinalizationComponent
 → VentasPersistenciaService backend
 → TypeOrmVentasPersistenciaRepository
 → COMMIT
-→ completedEvent
-→ SalesComponent.completeVenta()
-→ cerrar venta terminada
-→ crear UNA nueva venta vacía
-→ foco al localizador
 ```
 
-`SaleFinalizationComponent` bloquea mutaciones/cierre mientras se persiste.
+Un fallo anterior al COMMIT mantiene la venta abierta y permite reintento. Después del COMMIT ningún postproceso puede volver a convertir la operación en pendiente.
 
-Un fallo antes del COMMIT mantiene la venta abierta y permite reintento. Un postproceso posterior nunca debe convertir una venta ya confirmada en una venta pendiente.
-
-Si la venta procedía de reservas, `ReservasService.reload()` fuerza una lectura realmente posterior al COMMIT para eliminar del cache las reservas consumidas.
-
-### Pruebas manuales end-to-end completadas
-
-El usuario confirmó correctamente desde la interfaz:
+Pruebas manuales completadas:
 
 - venta normal en efectivo;
 - pago mixto;
@@ -1545,36 +1447,23 @@ El usuario confirmó correctamente desde la interfaz:
 - continuidad de foco;
 - efectos reales sobre SQLite.
 
-Con esto 11D se considera cerrado.
-
 ---
 
-## 12.9 11E — Ticket definitivo + QR + PDF + impresión 🟦
+## 12.9 11E.1–11E.2 — Snapshot documental e IPC ✅
 
-Principio fijado:
+El ticket definitivo **no se construye desde `VentaEnCurso`**.
 
-> El ticket definitivo **no se construye desde `VentaEnCurso`**. Después del COMMIT se utiliza `GuardarVentaResult.id` para volver a leer de SQLite la venta realmente persistida y construir un snapshot documental autoritativo.
-
-Esto evita que el ticket dependa de un modelo mutable que va a desaparecer y garantiza número, fecha, líneas y pagos exactamente persistidos.
-
-### 11E.1 — Snapshot persistido del ticket ✅
-
-Contratos creados:
+Después del COMMIT:
 
 ```text
-electron/contracts/ventas/venta-ticket.interface.ts
-electron/backend/domain/ventas/venta-ticket-record.interface.ts
-electron/backend/contracts/ventas/ventas-tickets.repository.interface.ts
+GuardarVentaResult.id
+→ ventas:get-ticket
+→ TypeOrmVentasTicketsRepository
+→ SQLite
+→ VentaTicketInterface
 ```
 
-Servicio/backend:
-
-```text
-electron/backend/application/ventas/ventas-tickets.service.ts
-electron/infrastructure/database/typeorm/typeorm-ventas-tickets.repository.ts
-```
-
-`VentaTicketInterface` contiene únicamente datos necesarios para el documento:
+`VentaTicketInterface` contiene únicamente datos documentales:
 
 ```text
 id / publicId
@@ -1599,95 +1488,280 @@ lineas[]
   regalo
 ```
 
-No incluye stock, PUC ni trazabilidad de reserva/devolución porque no son datos de impresión.
+No incluye stock, PUC ni trazabilidad interna de reserva/devolución.
 
-`TypeOrmVentasTicketsRepository.findByVentaId()` relee:
+El snapshot se expone de extremo a extremo mediante composition root, IPC `ventas:get-ticket`, preload/`VentasApi` y `VentasTicketsService` Angular.
 
-- cabecera de `venta`;
+---
+
+## 12.10 11E.3 — QR local + ticket HTML de 80 mm ✅
+
+El QR comercial compatible con devoluciones mantiene exactamente:
+
+```text
+venta id 123
+→ contenido QR "-123"
+```
+
+Se utiliza generación local de QR y SVG, sin servicios externos.
+
+El builder del ticket:
+
+```text
+src/app/model/ventas/venta-ticket-document.builder.ts
+```
+
+produce HTML print-native de **80 mm** a partir de `VentaTicketInterface + AppData`.
+
+Contenido final validado:
+
+- logo de la empresa;
+- `appData.nombre` como nombre principal;
+- dirección/población;
+- CIF/NIF y teléfono;
+- redes configuradas: Twitter, Facebook, Instagram y Web, con iconos;
+- título `TICKET` o `DEVOLUCIÓN` según el total;
+- referencia;
+- fecha/hora local del terminal a partir del instante UTC persistido;
 - empleado;
 - cliente opcional;
-- líneas persistidas ordenadas;
-- pagos persistidos ordenados con `entregado` y `cambio`.
+- líneas, cantidades, PVP, descuentos y regalos;
+- total;
+- pagos;
+- entregado y cambio cuando corresponda;
+- desglose de IVA;
+- QR `-id`;
+- frases personalizadas `frasesTicket`, una por línea y centradas.
 
-Se añadió un séptimo test backend que persiste una venta real y comprueba que el snapshot documental recuperado coincide exactamente con lo almacenado.
+Todo texto dinámico se escapa con `escapeHtml()`.
 
-### 11E.2 — Siguiente paso exacto 🟦
+### IVA en devoluciones
 
-Hay que exponer el snapshot de extremo a extremo:
+El desglose se calcula sobre importes **firmados** persistidos. Una devolución compensa base y cuota en lugar de convertirlas artificialmente a positivas como hacía el legacy.
 
-```text
-VentasTicketsService backend
-→ composition root
-→ IPC ventas:get-ticket
-→ preload / VentasApi
-→ servicio Angular de ticket
-```
+Las pruebas manuales confirmaron que los signos negativos en devolución son correctos y aceptables visualmente.
 
-Después de 11E.2, tras `save()` Angular tendrá:
+### Assets documentales
 
-```text
-GuardarVentaResult.id
-→ getTicket(id)
-→ VentaTicketInterface persistido
-```
+El protocolo `osumi://assets/...` sirve:
 
-y se podrá entrar en 11E.3.
+- `osumi://assets/logo` → logo instalado;
+- `osumi://assets/files/...` → ficheros de la instalación;
+- `osumi://assets/app/...` → assets estáticos permitidos de la aplicación.
 
-### 11E.3–11E.6 pendientes
-
-11E.3:
-
-- generar QR local con contenido exacto `-${ticket.id}`;
-- construir HTML print-native de 80 mm;
-- líneas, cantidades, PVP, descuentos, regalos, cliente, empleado, pagos, entregado, cambio y desglose de IVA;
-- escapar todo texto dinámico.
-
-11E.4:
-
-- `renderPdf()` usando la infraestructura Electron oculta ya existente;
-- conservar/decidir almacenamiento del PDF histórico;
-- impresión silenciosa mediante la impresora configurada.
-
-11E.5:
-
-- orquestación estrictamente post-COMMIT;
-- error de PDF/impresión no revierte la venta;
-- aviso funcional y cierre posterior;
-- evitar cualquier posibilidad de repetir la persistencia.
-
-11E.6:
-
-- regresión funcional;
-- cuando haya hardware disponible, validar Star TSP100/TSP143, papel 80 mm, márgenes, longitud y corte.
+La resolución evita traversal y escapes por symlinks mediante comprobación de rutas reales.
 
 ---
 
-## 12.10 PDF histórico y Postventa
+## 12.11 Configuración `frasesTicket` ✅
 
-La infraestructura `printing.renderPdf()` ya existe y funciona. Para ventas, el PDF debe ser un artefacto histórico real, no un buffer generado y descartado.
+`AppData` incluye:
 
-Objetivo conceptual:
-
-```text
-COMMIT venta
-→ snapshot persistido
-→ ticket definitivo
-→ PDF definitivo
-→ almacenar
-→ imprimir / email / reimpresión futura
+```ts
+readonly frasesTicket: readonly string[];
 ```
 
-Motivos:
+Instalación:
 
-- reimpresión exacta;
-- envío por email desde finalización o histórico;
-- no regenerar años después un ticket con logos/datos/plantillas nuevas.
+- textarea opcional;
+- una frase por línea;
+- Angular convierte a array;
+- backend vuelve a normalizar;
+- las líneas vacías se eliminan.
 
-La creación/almacenamiento inicial se resolverá en 11E; la explotación del PDF desde histórico/postventa pertenece a Ventas 12.
+Compatibilidad:
+
+- `app_data.json` anterior sin el campo → se carga como `[]`;
+- importación `.otpv` antigua → `frasesTicket: []`;
+- no requiere reinstalar ni cambiar `DATABASE_SCHEMA_VERSION`.
 
 ---
 
-## 12.11 TicketBAI / TicketBaiWS
+## 12.12 11E.4 — PDF histórico + impresión silenciosa ✅
+
+### Almacenamiento histórico
+
+Contrato:
+
+```text
+VentaTicketPdfStorage
+```
+
+Implementación:
+
+```text
+FileVentaTicketPdfStorage
+```
+
+Ubicación:
+
+```text
+assets/files/ventas/tickets/{idVenta}.pdf
+```
+
+Reglas:
+
+- creación de directorios automática;
+- escritura mediante temporal + `rename`;
+- validación de ID;
+- validación de firma `%PDF-`;
+- límite defensivo de 10 MB;
+- **write-once**: si el PDF existe, no se sobrescribe.
+
+Esto garantiza que una plantilla futura no modifique un ticket histórico ya emitido.
+
+### Generación
+
+```text
+VentaTicketDocumentService.generateAndSavePdf(idVenta)
+→ getTicket(idVenta)
+→ buildVentaTicketDocument()
+→ printing.renderPdf()
+→ Uint8Array
+→ ventas:save-ticket-pdf
+→ validación backend de que la venta existe
+→ FileVentaTicketPdfStorage
+```
+
+### Impresión
+
+```text
+VentaTicketDocumentService.print(idVenta)
+→ getTicket(idVenta)
+→ mismo HTML definitivo
+→ printing.printTicket()
+→ impresión silenciosa
+```
+
+PDF e impresión usan exactamente el mismo builder documental.
+
+---
+
+## 12.13 11E.5 — Post-COMMIT no bloqueante ✅
+
+`VentaPostCommitService` encapsula los trabajos posteriores al COMMIT:
+
+```text
+invalidar estadísticas del cliente si existe
+→ recargar reservas si procede
+→ generar/conservar PDF
+→ intentar imprimir
+```
+
+Cada trabajo es independiente y sus errores se convierten en warnings.
+
+Regla crítica:
+
+```text
+save() falla antes del COMMIT
+→ venta sigue abierta
+→ se puede reintentar
+
+save() devuelve GuardarVentaResult
+→ venta YA terminada
+→ ningún fallo posterior puede repetir save()
+```
+
+Si hay incidencias post-COMMIT:
+
+```text
+venta guardada
+→ mostrar aviso "Venta finalizada"
+→ usuario acepta
+→ completedEvent
+→ cerrar operación
+→ crear UNA nueva venta
+→ foco localizador
+```
+
+El PDF se intenta aunque después falle la impresora, y la impresión se intenta aunque haya fallado la generación/almacenamiento del PDF.
+
+---
+
+## 12.14 Estadísticas del cliente — invalidación final ✅
+
+`ClientesService` cachea estadísticas rápidas por `publicId`.
+
+Tras persistir una venta con cliente:
+
+```text
+COMMIT
+→ ClientesService.invalidateEstadisticas(clientePublicId)
+```
+
+Si existe una petición antigua todavía en curso, se espera a que termine antes de eliminar su resultado. La siguiente selección del cliente fuerza una consulta nueva y refleja la venta recién realizada.
+
+La prueba manual confirmó que no es necesario reiniciar la aplicación ni recargar todos los clientes.
+
+---
+
+## 12.15 Regresión funcional final ✅
+
+Se verificaron durante Ventas 11:
+
+- venta normal;
+- pago en efectivo;
+- pago mixto;
+- efectivo entregado y cambio;
+- total cero/regalo;
+- devolución parcial;
+- devolución netamente negativa;
+- venta procedente de reserva;
+- reconciliación de stock;
+- consumo y recarga de reservas;
+- caja;
+- histórico de artículo;
+- idempotencia;
+- rollback transaccional;
+- snapshot documental releído desde SQLite;
+- QR `-id` y recuperación de devolución mediante ese código;
+- HTML de 80 mm;
+- logo, redes y frases personalizadas;
+- desglose de IVA firmado;
+- PDF histórico write-once;
+- ausencia de impresora como error no bloqueante;
+- nueva venta automática después de completar;
+- recuperación del foco en el localizador;
+- invalidación y recarga real de estadísticas del cliente.
+
+Batería final habitual:
+
+```bash
+npm test
+npm run test:electron
+npm run typecheck:electron
+npm run build
+npm run lint
+npm run build:desktop
+```
+
+El usuario confirmó que pasa al cierre del bloque.
+
+### Pendiente de hardware
+
+No se ha podido validar todavía físicamente la impresión en:
+
+```text
+Star TSP100 Cutter / TSP143
+papel 80 mm
+```
+
+Cuando exista acceso a la impresora, comprobar:
+
+- impresión silenciosa real;
+- ancho/márgenes;
+- longitud del ticket;
+- logo y redes;
+- líneas largas;
+- QR escaneable desde papel;
+- frases personalizadas;
+- corte final.
+
+Esta prueba queda **pendiente y no bloquea Ventas 12**.
+
+---
+
+## 12.16 TicketBAI / TicketBaiWS
 
 Existe la librería propia publicada:
 
@@ -1695,39 +1769,47 @@ Existe la librería propia publicada:
 @osumi/ticketbaiws
 ```
 
-- npm: `@osumi/ticketbaiws`;
-- GitHub: `osumionline/ticketbaiws`.
-
 Reglas:
 
-- reutilizarla cuando llegue la integración fiscal;
-- no crear cliente HTTP ad hoc en el Client;
-- no contaminar 11E con TicketBAI salvo que sea imprescindible para el ticket comercial;
-- revisar la respuesta/documentación de Berein y posibles cambios del SDK al retomar el bloque fiscal.
+- reutilizarla cuando llegue el tramo fiscal/Postventa;
+- no crear un cliente HTTP ad hoc en el Client;
+- el ticket comercial actual no contiene todavía el QR fiscal de TicketBAI;
+- cuando se integre TicketBAI, revisar la respuesta/documentación de Berein y posibles cambios del SDK antes de fijar contratos definitivos;
+- el QR comercial `-id` para devoluciones y el futuro QR fiscal de TicketBAI son conceptos distintos y deben coexistir cuando corresponda.
 
 ---
 
-## 12.12 Estadísticas de cliente — recordatorio
+# 13. Ventas 12 — Postventa 🟦 SIGUIENTE BLOQUE
 
-Tras persistir una venta real debe revisarse antes de cerrar Ventas 11 si la caché de estadísticas del cliente necesita invalidación/recarga. No olvidar este punto en **11F**.
+Pendiente de analizar y descomponer antes de implementar.
 
----
-
-# 13. Ventas 12 — Postventa ⬜
-
-Pendiente.
-
-Debe incluir/revisar:
+Ámbito funcional conocido que debe revisarse:
 
 - histórico de ventas;
-- reimpresión;
-- envío de ticket por email;
-- reutilización del PDF histórico;
+- consulta del detalle de una venta persistida;
+- reimpresión utilizando el **PDF histórico original**, no regenerando el ticket;
+- envío de ticket por email reutilizando ese PDF histórico;
 - facturación;
 - TicketBAI/TicketBaiWS;
-- otras acciones posteriores a una venta ya persistida.
+- acciones posteriores sobre ventas ya persistidas;
+- posibles dependencias con devoluciones y facturas existentes.
 
-En el TPV antiguo, el email adjuntaba el PDF del ticket. Esa capacidad debe recuperarse reutilizando el documento histórico de la venta.
+En el TPV antiguo el email adjuntaba el PDF del ticket. Esa capacidad debe recuperarse reutilizando el artefacto histórico creado en Ventas 11.
+
+### Inicio obligatorio de Ventas 12
+
+Antes de implementar:
+
+1. mostrar el listado completo del bloque con completado / actual / pendiente;
+2. explicar en uno o dos párrafos qué resolverá el primer paso;
+3. revisar `main` actual;
+4. inventariar el comportamiento funcional de Postventa en el frontend y backend antiguos;
+5. revisar el esquema/repositorios y las capacidades actuales del Client;
+6. separar comportamiento que debe conservarse de deuda técnica legacy;
+7. diseñar los subbloques de Ventas 12 y sus responsabilidades;
+8. revisar el estado actual de `@osumi/ticketbaiws` y la documentación de Berein antes del tramo fiscal.
+
+No empezar directamente por TicketBAI sin haber hecho primero el análisis funcional completo de Postventa.
 
 ---
 
@@ -1776,6 +1858,28 @@ sin impresora
 ```
 
 ---
+
+
+### PDF histórico de venta
+
+Ventas 11 añadió:
+
+```text
+assets/files/ventas/tickets/{idVenta}.pdf
+```
+
+Es write-once y debe ser la fuente documental preferente de Postventa para:
+
+- reimpresión exacta;
+- envío por email;
+- conservación histórica.
+
+No regenerar un ticket histórico si su PDF definitivo ya existe.
+
+### Assets del ticket
+
+El protocolo `osumi://assets/...` permite al renderer documental acceder de forma controlada al logo instalado y a iconos estáticos de la aplicación. El ticket de venta utiliza esta infraestructura para logo y redes sociales.
+
 
 # 15. Decisiones de UX pendientes
 
@@ -1843,21 +1947,25 @@ para mostrar al usuario únicamente el mensaje funcional.
 
 # 17. Método de trabajo obligatorio por bloque
 
-Para cada fase, bloque o subapartado:
+Para **cada fase, bloque, subapartado o paso**:
 
-1. mostrar el **listado completo** del bloque actual;
-2. marcar qué está completado;
-3. indicar exactamente dónde estamos;
-4. indicar todo lo que queda;
-5. explicar en uno o dos párrafos qué resuelve el apartado actual;
-6. revisar el código actual antes de proponer cambios;
+1. mostrar primero el **listado completo del bloque actual**;
+2. marcar explícitamente qué pasos están ✅ completados;
+3. marcar exactamente cuál está 🟦 en curso;
+4. mostrar todos los pasos ⬜ pendientes;
+5. después del listado, explicar en **uno o dos párrafos** qué vamos a hacer en el paso actual y qué objetivo tiene;
+6. revisar el código actual de `main` antes de proponer cambios sobre archivos existentes;
 7. inventariar el comportamiento legacy cuando sea relevante;
 8. separar comportamiento que se conserva de deuda técnica que no debe trasladarse;
 9. definir contratos/responsabilidades;
 10. implementar en pasos pequeños verificables;
 11. probar;
 12. no avanzar hasta confirmación del usuario;
-13. tras cada bloque principal, actualizar este documento.
+13. tras cada bloque principal, actualizar y entregar este documento.
+
+> **Regla de orientación obligatoria:** el listado completo del bloque y la explicación del paso actual deben aparecer **al comenzar cada paso**, no solo al comenzar un bloque principal.
+
+> **Regla de continuidad:** esta misma instrucción debe mantenerse en futuras versiones del Documento de continuidad y relevo.
 
 > No asumir que la implementación antigua es el diseño correcto. Debe utilizarse como fuente funcional, no como arquitectura obligatoria.
 
@@ -1934,133 +2042,138 @@ También:
 | 1.9 | 19 de agosto de 2026 | Refactor A–E completo + ajuste UX del buscador. Siguiente: Ventas 10. |
 | 2.0 | 20 de agosto de 2026 | Ventas 10 — Finalización y pagos completado. Pagos múltiples, efectivo/cambio, reembolsos, reserva con/sin ticket, configuración local de impresora, PDF, impresión silenciosa, errores de impresión, nueva venta automática y snapshot definitivo. Siguiente: Ventas 11 — Persistencia transaccional. |
 | **2.1** | **21 de agosto de 2026** | **Ventas 11A–11D completados: transacción SQLite real, trazabilidad de devoluciones/reservas, stock/histórico/caja, idempotencia, runner backend con SQLite real y wiring end-to-end hasta Angular. 11E.1 completado: snapshot persistido del ticket. Siguiente: 11E.2 — exposición IPC + servicio Angular del ticket.** |
+| **2.2** | **23 de agosto de 2026** | **Ventas 11 completado: persistencia transaccional, ticket definitivo desde snapshot SQLite, QR `-id`, HTML 80 mm, logo/redes/frases configurables, PDF histórico write-once, impresión silenciosa, post-COMMIT no bloqueante, invalidación de estadísticas de cliente y regresión final. Prueba física Star TSP100/TSP143 pendiente y no bloqueante. Siguiente: Ventas 12 — Postventa.** |
 
 ---
 
 # 21. Próximo paso
 
-El siguiente subapartado es:
+El siguiente bloque es:
 
-# Ventas 11E.2 — Exposición IPC + servicio Angular del ticket
+# Ventas 12 — Postventa
 
 Estado de entrada:
 
 ```text
-Venta transaccional real                  ✅
-GuardarVentaResult con ID definitivo      ✅
-IPC save de venta                         ✅
-Finalizar venta desde Angular             ✅
-Pruebas manuales end-to-end               ✅
-Snapshot persistido VentaTicketInterface  ✅
-Lectura TypeORM del ticket                ✅
-Test backend del snapshot                 ✅
+Installation + importación legacy            ✅
+Startup                                      ✅
+Auditoría + Refactor A–E                     ✅
+Ventas 1–10                                  ✅
+Ventas 11 — Persistencia transaccional       ✅
+Ticket definitivo + PDF histórico            ✅
+Post-COMMIT                                  ✅
+Regresión Ventas 11                          ✅
+Prueba física Star TSP100/TSP143             ⚠️ pendiente no bloqueante
 
-IPC getTicket                             ⬜
-Preload / VentasApi getTicket             ⬜
-Servicio Angular de ticket                ⬜
-QR -id                                    ⬜
-HTML 80 mm                                ⬜
-PDF histórico                             ⬜
-Impresión del ticket de venta             ⬜
+Ventas 12 — Postventa                        🟦 siguiente
 ```
 
-Tarea inmediata:
+Primera tarea de Ventas 12:
 
-1. revisar `main` actual;
-2. registrar `VentasTicketsService` y `TypeOrmVentasTicketsRepository` en el composition root;
-3. añadir canal `ventas:get-ticket`;
-4. añadir handler IPC;
-5. ampliar `VentasApi`;
-6. ampliar `preload.ts`;
-7. crear servicio Angular que recupere `VentaTicketInterface` por `idVenta`;
-8. ejecutar batería completa;
-9. no generar todavía QR/HTML hasta cerrar 11E.2.
+1. revisar el `main` actual;
+2. revisar Postventa/histórico/facturación/email/TicketBAI en `Osumi-TPV` y `TPV-API` antiguos;
+3. inventariar el comportamiento funcional completo antes de diseñar;
+4. revisar qué infraestructura actual ya puede reutilizarse, especialmente el PDF histórico de Ventas 11;
+5. revisar el estado actual de `@osumi/ticketbaiws` y la documentación/respuesta de Berein para el tramo fiscal;
+6. diseñar y acordar los subbloques de Ventas 12;
+7. no implementar hasta haber cerrado ese análisis inicial.
 
-No comenzar Ventas 12 ni reabrir la transacción de 11C salvo que aparezca una regresión demostrable.
+Recordatorio de hardware:
+
+- cuando haya acceso a la Star TSP100/TSP143, retomar la prueba física de 80 mm;
+- esa prueba no obliga a detener Postventa mientras siga pendiente.
 
 ---
 
 # 22. Prompt de arranque para una conversación nueva
 
 ```text
-Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” versión 2.1 como contexto principal.
+Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” versión 2.2 como contexto principal.
 
 Installation + importación legacy y Startup están completados y probados. También están cerrados la auditoría transversal, Refactor A–E y el ajuste UX del buscador.
 
-En Ventas están completados los bloques 1–10.
+En Ventas están completados y probados los bloques 1–11:
+1. Contexto operativo.
+2. Modelo de venta en curso + workspace persistente.
+3. Consulta/búsqueda de artículos y accesos directos.
+4. Estructura visual.
+5. Operaciones sobre líneas.
+6. Clientes y estadísticas rápidas.
+7. Varios.
+8. Devoluciones.
+9. Reservas.
+10. Finalización y pagos.
+11. Persistencia transaccional.
 
-Ventas 11 está EN CURSO con este estado:
+Ventas 11 quedó completamente conectado de extremo a extremo:
+- GuardarVentaCommand + mapper;
+- transacción SQLite real de venta, líneas, pagos, stock, histórico, devoluciones, reservas y caja;
+- secuencia_documento sincronizada con histórico legacy;
+- idempotencia mediante VentaEnCurso.idTemporal / venta.public_id;
+- rollback completo antes del COMMIT;
+- IPC/Angular y finalización real desde la UI;
+- snapshot documental releído desde SQLite por idVenta;
+- QR comercial compatible con devoluciones: venta id 123 → “-123”;
+- ticket HTML print-native de 80 mm;
+- logo de negocio, appData.nombre, redes sociales configuradas y frasesTicket[];
+- desglose de IVA usando importes firmados;
+- PDF histórico write-once en assets/files/ventas/tickets/{idVenta}.pdf;
+- impresión silenciosa mediante la impresora local configurada;
+- postprocesos estrictamente posteriores al COMMIT;
+- fallos de PDF/impresión/reservas/estadísticas no revierten ni repiten la venta;
+- invalidación de estadísticas cacheadas del cliente tras vender;
+- nueva venta automática y foco al localizador tras completar.
 
-✅ 11A — Análisis y diseño de la transacción.
-✅ 11B — Contratos + mapper de GuardarVenta + trazabilidad SQLite.
-✅ 11C — Caso de uso backend + transacción SQLite completa.
-✅ 11D — IPC + Angular + Finalizar venta + prueba manual end-to-end.
-🟦 11E — Ticket definitivo + QR + PDF + impresión.
-   ✅ 11E.1 — Snapshot persistido del ticket.
-   🟦 11E.2 — Exposición IPC + servicio Angular.
-   ⬜ 11E.3 — QR local + HTML 80 mm.
-   ⬜ 11E.4 — PDF + impresión silenciosa.
-   ⬜ 11E.5 — Post-COMMIT y errores no bloqueantes.
-   ⬜ 11E.6 — Prueba física y regresión.
-⬜ 11F — Regresión completa + cierre.
-⬜ 12 — Postventa.
+Regresión manual confirmada:
+- venta normal;
+- pagos mixtos y efectivo/cambio;
+- total cero;
+- devolución parcial y devolución netamente negativa;
+- venta procedente de reserva;
+- PDF histórico;
+- QR -id;
+- logo/redes/frases;
+- ausencia de impresora como warning no bloqueante;
+- estadísticas del cliente actualizadas después de vender.
 
-Decisiones críticas de Ventas 11:
-- una venta se guarda en una única transacción SQLite: venta, líneas, pagos, stock, histórico, devolución, reserva y caja;
-- cualquier fallo anterior al COMMIT hace rollback;
-- QR/PDF/impresión son post-COMMIT y nunca revierten una venta guardada;
-- VentaEnCurso.idTemporal es la idempotency key / venta.public_id;
-- secuencia_documento se sincroniza con ventas legacy y se incrementa dentro de la transacción;
-- devoluciones referencian venta y línea origen exactas y acumulan unidades_devueltas;
-- reservas se reconcilian por diferencia y se conservan en venta_reserva;
-- caja usa total/beneficio/descuento firmados y solo afecta cierre teórico según tipo_pago.afecta_caja;
-- el descuento de pagos mixtos se reparte proporcionalmente y el último absorbe redondeo;
-- no usar migraciones de esquema mientras la aplicación siga pre-release greenfield; DATABASE_SCHEMA_VERSION sigue en 1 y se recrea la DB de desarrollo cuando cambia el esquema.
+Pendiente no bloqueante:
+- prueba física con Star TSP100 Cutter / TSP143 y papel 80 mm. Cuando haya acceso al hardware hay que retomarla para validar márgenes, longitud, QR, logo, redes, textos y corte.
 
-Tests backend:
-- existe npm run test:electron;
-- usa Vitest + SQLite real;
-- scripts/test-electron.mjs recompila better-sqlite3 para Node, ejecuta tests y en finally lo reconstruye para Electron;
-- package.json contiene allowScripts para better-sqlite3@12.11.1;
-- tras 11E.1 hay 7 tests backend pasando;
-- la aplicación arranca correctamente después del runner.
+Configuración documental:
+- AppData contiene frasesTicket: readonly string[];
+- instalación: textarea, una frase por línea;
+- app_data antiguo sin el campo se normaliza a [];
+- importación .otpv legacy usa frasesTicket: [];
+- osumi://assets/logo sirve el logo instalado;
+- osumi://assets/app/... permite iconos estáticos seguros del ticket.
 
-11D está validado manualmente desde la UI con venta normal, pago mixto, total cero, devolución parcial y venta procedente de reserva. Tras COMMIT se cierra la operación, se crea UNA nueva venta vacía y vuelve el foco al localizador.
+Para TicketBAI/TicketBaiWS existe la librería propia publicada @osumi/ticketbaiws. Debe reutilizarse cuando llegue el tramo fiscal; no crear un cliente HTTP ad hoc. Antes de integrarla hay que revisar el estado actual del SDK y la documentación/respuesta de Berein.
 
-11E.1 creó:
-- electron/contracts/ventas/venta-ticket.interface.ts
-- electron/backend/domain/ventas/venta-ticket-record.interface.ts
-- electron/backend/contracts/ventas/ventas-tickets.repository.interface.ts
-- electron/backend/application/ventas/ventas-tickets.service.ts
-- electron/infrastructure/database/typeorm/typeorm-ventas-tickets.repository.ts
+El siguiente bloque es Ventas 12 — Postventa.
 
-El ticket definitivo NO debe construirse desde VentaEnCurso. Debe releerse desde SQLite usando GuardarVentaResult.id. El snapshot contiene cabecera definitiva, empleado, cliente, líneas y pagos persistidos.
+Antes de implementar Postventa:
+1. revisar main actual;
+2. revisar frontend/backend antiguos;
+3. inventariar histórico de ventas, reimpresión, email, facturación, TicketBAI y otras acciones postventa;
+4. distinguir comportamiento funcional de deuda técnica legacy;
+5. revisar la infraestructura ya disponible, especialmente el PDF histórico original;
+6. definir y acordar los subbloques de Ventas 12.
 
-El siguiente paso exacto es 11E.2:
-VentasTicketsService backend → composition root → IPC ventas:get-ticket → preload/VentasApi → servicio Angular.
-No generar todavía QR ni HTML hasta cerrar este subapartado.
-
-Después, 11E.3 debe generar el QR compatible con devoluciones: venta id 123 → contenido QR “-123”, y construir el documento print-native de 80 mm.
-
-La infraestructura printing ya existe desde Ventas 10: renderer Electron oculto, renderPdf() e impresión silenciosa. La impresora local es opcional. La validación física con Star TSP100/TSP143 y papel 80 mm sigue pendiente y no bloquea el desarrollo.
-
-Para TicketBAI/TicketBaiWS reutilizar @osumi/ticketbaiws cuando llegue fiscal/postventa; no crear un cliente HTTP ad hoc.
-
-Antes de cada fase/bloque/subapartado:
-1. dame el listado completo;
-2. marca lo completado;
-3. indica dónde estamos;
-4. indica todo lo pendiente;
-5. explica brevemente el apartado actual.
-
-Antes de modificar archivos existentes consulta siempre su versión actual en main. Si GitHub Raw parece cacheado, usa cache-busting.
+Regla de trabajo obligatoria para CADA paso/subapartado:
+1. mostrar primero el listado COMPLETO del bloque actual;
+2. marcar qué está completado;
+3. indicar exactamente el paso actual;
+4. indicar todos los pasos pendientes;
+5. después explicar en uno o dos párrafos qué vamos a hacer en ese paso;
+6. revisar siempre main antes de modificar archivos existentes;
+7. implementar en piezas pequeñas y no avanzar hasta mi confirmación.
 
 Convenciones:
 - tipado estricto, sin any;
 - un archivo con varios exports no usa export default;
 - líneas en blanco separan conceptos, no propiedades consecutivas de un objeto;
-- Angular y backend Electron/Node mantienen utilidades separadas;
-- no introducir abstractions genéricas prematuras;
+- Angular y Electron/backend mantienen utilidades separadas;
+- no introducir abstracciones genéricas prematuras;
 - archivo nuevo: completo; archivo existente: fichero completo o bloques grandes/localizables.
 
 Batería habitual:
@@ -2071,5 +2184,6 @@ npm run build
 npm run lint
 npm run build:desktop
 
-Al terminar cada bloque principal, después de que confirme que funciona y está subido, entrégame una nueva versión de este documento.
+Al terminar cada bloque principal, después de que confirme que funciona y está subido, entrégame una nueva versión del Documento de continuidad y relevo.
 ```
+
