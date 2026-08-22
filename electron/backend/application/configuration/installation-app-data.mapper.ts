@@ -19,6 +19,10 @@ export default function createAppData(command: InstallationCommand, installedAt:
     instagram: command.redes.instagram,
     web: command.redes.web,
 
+    frasesTicket: command.ticket.frases
+      .map((phrase: string): string => phrase.trim())
+      .filter((phrase: string): boolean => phrase !== ''),
+
     tipoIva: command.fiscalidad.tipoIva,
     ivaList: [...command.fiscalidad.ivaList],
     reList: [...command.fiscalidad.reList],

@@ -6,7 +6,7 @@ import type InstallationFinalizer from '@backend/contracts/configuration/install
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import ElectronApplicationPathsProvider from '@infrastructure/electron/electron-application-paths.provider';
-import { createMainWindow } from '@infrastructure/electron/main-window';
+import { createMainWindow, getRendererAssetsDirectory } from '@infrastructure/electron/main-window';
 import registerAssetsProtocol from '@infrastructure/electron/register-assets-protocol';
 import ApplicationDirectoriesService from '@infrastructure/filesystem/application-directories.service';
 import FileInstallationFinalizer from '@infrastructure/filesystem/file-installation-finalizer';
@@ -52,7 +52,7 @@ app
 
     app.setAppLogsPath(applicationPaths.logsDirectory);
 
-    registerAssetsProtocol(applicationPaths);
+    registerAssetsProtocol(applicationPaths, getRendererAssetsDirectory());
 
     /*
      * Recuperación de instalaciones interrumpidas.

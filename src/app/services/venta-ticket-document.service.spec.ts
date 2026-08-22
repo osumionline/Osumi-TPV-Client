@@ -245,6 +245,7 @@ function createAppData(): AppData {
     facebook: '',
     instagram: '',
     web: '',
+    frasesTicket: [],
     tipoIva: 'iva',
     ivaList: [21, 10, 4],
     reList: [],

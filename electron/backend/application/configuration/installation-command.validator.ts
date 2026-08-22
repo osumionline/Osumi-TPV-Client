@@ -26,6 +26,15 @@ function hasNumberArray(value: Record<string, unknown>, property: string): boole
   );
 }
 
+function hasStringArray(value: Record<string, unknown>, property: string): boolean {
+  const candidate: unknown = value[property];
+
+  return (
+    Array.isArray(candidate) &&
+    candidate.every((item: unknown): boolean => typeof item === 'string')
+  );
+}
+
 export function isInstallationCommand(value: unknown): value is InstallationCommand {
   if (!isRecord(value)) {
     return false;
@@ -40,11 +49,13 @@ export function isInstallationCommand(value: unknown): value is InstallationComm
   const opciones: unknown = value['opciones'];
   const secretos: unknown = value['secretos'];
   const logo: unknown = value['logo'];
+  const ticket: unknown = value['ticket'];
 
   if (
     !isRecord(negocio) ||
     !isRecord(empleadoInicial) ||
     !isRecord(redes) ||
+    !isRecord(ticket) ||
     !isRecord(valoresIniciales) ||
     !isRecord(fiscalidad) ||
     !isRecord(ventaOnline) ||
@@ -75,6 +86,8 @@ export function isInstallationCommand(value: unknown): value is InstallationComm
     hasString(redes, 'instagram') &&
     hasString(redes, 'web');
 
+  const validTicket: boolean = hasStringArray(ticket, 'frases');
+
   const validInitialValues: boolean =
     hasNumber(valoresIniciales, 'cajaInicial') &&
     hasNumber(valoresIniciales, 'ticketInicial') &&
@@ -102,6 +115,7 @@ export function isInstallationCommand(value: unknown): value is InstallationComm
     validBusiness &&
     validEmployee &&
     validSocial &&
+    validTicket &&
     validInitialValues &&
     validTaxData &&
     validOnlineStore &&

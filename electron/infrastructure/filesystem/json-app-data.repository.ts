@@ -13,7 +13,15 @@ function isNumberArray(value: unknown): value is number[] {
   );
 }
 
-function isAppData(value: unknown): value is AppData {
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item: unknown): boolean => typeof item === 'string');
+}
+
+type StoredAppData = Omit<AppData, 'frasesTicket'> & {
+  readonly frasesTicket?: readonly string[];
+};
+
+function isStoredAppData(value: unknown): value is StoredAppData {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return false;
   }
@@ -54,10 +62,14 @@ function isAppData(value: unknown): value is AppData {
       typeof data[property] === 'number' && Number.isFinite(data[property]),
   );
 
+  const validTicketPhrases: boolean =
+    data['frasesTicket'] === undefined || isStringArray(data['frasesTicket']);
+
   return (
     validStrings &&
     validBooleans &&
     validNumbers &&
+    validTicketPhrases &&
     isNumberArray(data['ivaList']) &&
     isNumberArray(data['reList']) &&
     isNumberArray(data['marginList']) &&
@@ -82,11 +94,14 @@ export default class JsonAppDataRepository implements AppDataRepository {
 
       const parsed: unknown = JSON.parse(content);
 
-      if (!isAppData(parsed)) {
+      if (!isStoredAppData(parsed)) {
         throw new Error('El archivo app_data.json no tiene una estructura válida.');
       }
 
-      return parsed;
+      return {
+        ...parsed,
+        frasesTicket: parsed.frasesTicket === undefined ? [] : [...parsed.frasesTicket],
+      };
     } catch (error: unknown) {
       if (isFileNotFoundError(error)) {
         return null;

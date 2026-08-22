@@ -105,6 +105,7 @@ export default class YauzlLegacyImportPackageConfigurationReader implements Lega
       facebook: this.getDecodedString(source, 'facebook'),
       instagram: this.getDecodedString(source, 'instagram'),
       web: this.getDecodedString(source, 'web'),
+      frasesTicket: [],
       tipoIva: this.getTaxType(source),
       ivaList: this.getNumberArray(source, 'ivaList', true),
       reList: this.getNumberArray(source, 'reList', false),

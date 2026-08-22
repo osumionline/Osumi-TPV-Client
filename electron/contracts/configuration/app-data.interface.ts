@@ -17,6 +17,8 @@ export default interface AppData {
   readonly instagram: string;
   readonly web: string;
 
+  readonly frasesTicket: readonly string[];
+
   readonly tipoIva: TipoIva;
   readonly ivaList: readonly number[];
   readonly reList: readonly number[];

@@ -25,6 +25,10 @@ export interface InstallationSocialFormModel {
   web: string;
 }
 
+export interface InstallationTicketFormModel {
+  frases: string;
+}
+
 export interface InstallationInitialValuesFormModel {
   cajaInicial: number;
   ticketInicial: number;
@@ -64,6 +68,7 @@ export interface InstallationFormModel {
   negocio: InstallationBusinessFormModel;
   empleado: InstallationEmployeeFormModel;
   redes: InstallationSocialFormModel;
+  ticket: InstallationTicketFormModel;
   valoresIniciales: InstallationInitialValuesFormModel;
   fiscalidad: InstallationTaxFormModel;
   ventaOnline: InstallationOnlineStoreFormModel;

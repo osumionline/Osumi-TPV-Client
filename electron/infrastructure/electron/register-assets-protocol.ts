@@ -10,7 +10,12 @@ const LOGO_PATH: string = '/logo';
 
 const FILES_PATH_PREFIX: string = '/files/';
 
-export default function registerAssetsProtocol(paths: ApplicationPaths): void {
+const APPLICATION_ASSETS_PATH_PREFIX: string = '/app/';
+
+export default function registerAssetsProtocol(
+  paths: ApplicationPaths,
+  applicationAssetsDirectory: string,
+): void {
   protocol.handle(
     'osumi',
 
@@ -25,7 +30,11 @@ export default function registerAssetsProtocol(paths: ApplicationPaths): void {
         return serveFile(paths.logoFile);
       }
 
-      const filePath: string | null = await resolveAssetFilePath(paths, url.pathname);
+      const filePath: string | null = await resolveAssetFilePath(
+        paths,
+        applicationAssetsDirectory,
+        url.pathname,
+      );
 
       if (filePath === null) {
         return notFound();
@@ -38,6 +47,7 @@ export default function registerAssetsProtocol(paths: ApplicationPaths): void {
 
 async function resolveAssetFilePath(
   paths: ApplicationPaths,
+  applicationAssetsDirectory: string,
   pathname: string,
 ): Promise<string | null> {
   let decodedPath: string;
@@ -48,19 +58,31 @@ async function resolveAssetFilePath(
     return null;
   }
 
-  if (!decodedPath.startsWith(FILES_PATH_PREFIX)) {
-    return null;
+  if (decodedPath.startsWith(FILES_PATH_PREFIX)) {
+    return resolveSafeFilePath(paths.filesDirectory, decodedPath.slice(FILES_PATH_PREFIX.length));
   }
 
-  const requestedRelativePath: string = decodedPath.slice(FILES_PATH_PREFIX.length);
+  if (decodedPath.startsWith(APPLICATION_ASSETS_PATH_PREFIX)) {
+    return resolveSafeFilePath(
+      applicationAssetsDirectory,
+      decodedPath.slice(APPLICATION_ASSETS_PATH_PREFIX.length),
+    );
+  }
 
+  return null;
+}
+
+async function resolveSafeFilePath(
+  rootDirectory: string,
+  requestedRelativePath: string,
+): Promise<string | null> {
   if (requestedRelativePath.length === 0 || requestedRelativePath.includes('\0')) {
     return null;
   }
 
-  const candidatePath: string = resolve(paths.filesDirectory, requestedRelativePath);
+  const candidatePath: string = resolve(rootDirectory, requestedRelativePath);
 
-  const relativeCandidatePath: string = relative(paths.filesDirectory, candidatePath);
+  const relativeCandidatePath: string = relative(rootDirectory, candidatePath);
 
   if (
     relativeCandidatePath.length === 0 ||
@@ -71,15 +93,15 @@ async function resolveAssetFilePath(
     return null;
   }
 
-  const realFilesDirectory: string | null = await getRealPath(paths.filesDirectory);
+  const realRootDirectory: string | null = await getRealPath(rootDirectory);
 
   const realCandidatePath: string | null = await getRealPath(candidatePath);
 
-  if (realFilesDirectory === null || realCandidatePath === null) {
+  if (realRootDirectory === null || realCandidatePath === null) {
     return null;
   }
 
-  const relativeRealPath: string = relative(realFilesDirectory, realCandidatePath);
+  const relativeRealPath: string = relative(realRootDirectory, realCandidatePath);
 
   if (
     relativeRealPath.length === 0 ||

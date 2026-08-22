@@ -27,6 +27,10 @@ export default function createInstallationFormInitialValue(): InstallationFormMo
       web: '',
     },
 
+    ticket: {
+      frases: '',
+    },
+
     valoresIniciales: {
       cajaInicial: 0,
       ticketInicial: 1,

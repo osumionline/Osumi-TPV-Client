@@ -23,6 +23,10 @@ export interface InstallationSocialData {
   readonly web: string;
 }
 
+export interface InstallationTicketData {
+  readonly frases: readonly string[];
+}
+
 export interface InstallationInitialValuesData {
   readonly cajaInicial: number;
   readonly ticketInicial: number;
@@ -61,6 +65,7 @@ export interface InstallationCommand {
   readonly negocio: InstallationBusinessData;
   readonly empleadoInicial: InstallationEmployeeData;
   readonly redes: InstallationSocialData;
+  readonly ticket: InstallationTicketData;
   readonly valoresIniciales: InstallationInitialValuesData;
   readonly fiscalidad: InstallationTaxData;
   readonly ventaOnline: InstallationOnlineStoreData;

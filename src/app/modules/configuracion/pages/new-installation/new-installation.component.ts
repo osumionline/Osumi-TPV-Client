@@ -221,6 +221,7 @@ export default class NewInstallationComponent {
         this.installationForm.negocio().markAsTouched();
         this.installationForm.empleado().markAsTouched();
         this.installationForm.redes().markAsTouched();
+        this.installationForm.ticket().markAsTouched();
         this.installationForm.valoresIniciales().markAsTouched();
         return !this.isStepOneInvalid();
       }
@@ -243,6 +244,7 @@ export default class NewInstallationComponent {
       this.installationForm.negocio().invalid() ||
       this.installationForm.empleado().invalid() ||
       this.installationForm.redes().invalid() ||
+      this.installationForm.ticket().invalid() ||
       this.installationForm.valoresIniciales().invalid()
     );
   }

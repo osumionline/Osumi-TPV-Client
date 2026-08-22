@@ -13,6 +13,21 @@ export function getMainWindow(): BrowserWindow | null {
 }
 
 /**
+ * Devuelve el directorio desde el que se sirven los assets
+ * estáticos del renderer.
+ *
+ * En desarrollo son los recursos de public/.
+ * En el build son los recursos copiados por Angular.
+ */
+export function getRendererAssetsDirectory(): string {
+  if (DEV_SERVER_URL !== undefined && DEV_SERVER_URL.length > 0) {
+    return join(app.getAppPath(), 'public');
+  }
+
+  return join(__dirname, '..', 'dist', 'osumi-tpv-client', 'browser');
+}
+
+/**
  * Crea, configura y carga la ventana principal.
  */
 export async function createMainWindow(): Promise<void> {
@@ -70,7 +85,5 @@ export async function createMainWindow(): Promise<void> {
     return;
   }
 
-  await browserWindow.loadFile(
-    join(__dirname, '..', 'dist', 'osumi-tpv-client', 'browser', 'index.html'),
-  );
+  await browserWindow.loadFile(join(getRendererAssetsDirectory(), 'index.html'));
 }

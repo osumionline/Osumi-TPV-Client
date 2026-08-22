@@ -271,6 +271,31 @@
       </div>
 
       <p>
+        <strong>Ticket</strong>
+      </p>
+
+      <p>
+        Puedes añadir frases personalizadas al pie del ticket.
+        Escribe una frase por línea. Este campo es opcional.
+      </p>
+
+      <div class="row">
+        <mat-form-field class="full">
+          <mat-label>Frases personalizadas del ticket</mat-label>
+
+          <textarea matInput
+                    rows="5"
+                    placeholder="Una frase por línea"
+                    [formField]="installationForm.ticket.frases">
+          </textarea>
+
+          <mat-hint>
+            Cada línea se mostrará centrada en el pie del ticket.
+          </mat-hint>
+        </mat-form-field>
+      </div>
+
+      <p>
         <strong>Caja inicial</strong>
       </p>
 

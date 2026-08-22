@@ -60,6 +60,10 @@ export default function createInstallationCommand(
       web: model.redes.web.trim(),
     },
 
+    ticket: {
+      frases: parseTicketPhrases(model.ticket.frases),
+    },
+
     valoresIniciales: {
       cajaInicial: model.valoresIniciales.cajaInicial,
       ticketInicial: model.valoresIniciales.ticketInicial,
@@ -90,4 +94,11 @@ export default function createInstallationCommand(
 
     logo,
   };
+}
+
+function parseTicketPhrases(value: string): readonly string[] {
+  return value
+    .split(/\r?\n/)
+    .map((phrase: string): string => phrase.trim())
+    .filter((phrase: string): boolean => phrase !== '');
 }
