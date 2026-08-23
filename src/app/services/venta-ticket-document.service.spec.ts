@@ -252,6 +252,8 @@ function createAppData(): AppData {
     marginList: [],
     ventaOnline: false,
     urlApi: '',
+    emailSmtp: null,
+    ticketBai: null,
     fechaCad: false,
     empleados: false,
   };

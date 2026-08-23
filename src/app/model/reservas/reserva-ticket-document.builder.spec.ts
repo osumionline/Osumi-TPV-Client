@@ -24,6 +24,8 @@ describe('buildReservaTicketDocument', (): void => {
     marginList: [],
     ventaOnline: false,
     urlApi: '',
+    emailSmtp: null,
+    ticketBai: null,
     fechaCad: false,
     empleados: false,
   };

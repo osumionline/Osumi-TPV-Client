@@ -9,6 +9,12 @@ function hasString(value: Record<string, unknown>, property: string): boolean {
   return typeof value[property] === 'string';
 }
 
+function hasNullableString(value: Record<string, unknown>, property: string): boolean {
+  const candidate: unknown = value[property];
+
+  return candidate === null || typeof candidate === 'string';
+}
+
 function hasNumber(value: Record<string, unknown>, property: string): boolean {
   return typeof value[property] === 'number' && Number.isFinite(value[property]);
 }
@@ -106,7 +112,10 @@ export function isInstallationCommand(value: unknown): value is InstallationComm
     hasBoolean(opciones, 'fechaCaducidad') && hasBoolean(opciones, 'empleados');
 
   const validSecrets: boolean =
-    hasString(secretos, 'secretApi') && hasString(secretos, 'backupApiKey');
+    hasString(secretos, 'secretApi') &&
+    hasString(secretos, 'backupApiKey') &&
+    hasNullableString(secretos, 'emailSmtpPass') &&
+    hasNullableString(secretos, 'ticketBaiToken');
 
   const validLogo: boolean =
     hasString(logo, 'fileName') && hasString(logo, 'mimeType') && hasString(logo, 'dataUrl');

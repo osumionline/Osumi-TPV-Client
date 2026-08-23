@@ -8,6 +8,14 @@ interface EncryptedSecretsFile {
   readonly encryptedData: string;
 }
 
+type StoredInstallationSecretsData = Omit<
+  InstallationSecretsData,
+  'emailSmtpPass' | 'ticketBaiToken'
+> & {
+  readonly emailSmtpPass?: string | null;
+  readonly ticketBaiToken?: string | null;
+};
+
 function isFileNotFoundError(error: unknown): boolean {
   return error instanceof Error && 'code' in error && error.code === 'ENOENT';
 }
@@ -22,14 +30,23 @@ function isEncryptedSecretsFile(value: unknown): value is EncryptedSecretsFile {
   return typeof data['schemaVersion'] === 'number' && typeof data['encryptedData'] === 'string';
 }
 
-function isInstallationSecretsData(value: unknown): value is InstallationSecretsData {
+function isOptionalNullableString(value: unknown): boolean {
+  return value === undefined || value === null || typeof value === 'string';
+}
+
+function isStoredInstallationSecretsData(value: unknown): value is StoredInstallationSecretsData {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return false;
   }
 
   const data: Record<string, unknown> = value as Record<string, unknown>;
 
-  return typeof data['secretApi'] === 'string' && typeof data['backupApiKey'] === 'string';
+  return (
+    typeof data['secretApi'] === 'string' &&
+    typeof data['backupApiKey'] === 'string' &&
+    isOptionalNullableString(data['emailSmtpPass']) &&
+    isOptionalNullableString(data['ticketBaiToken'])
+  );
 }
 
 export default class ElectronSafeStorageSecretStorage implements SecretStorage {
@@ -62,15 +79,22 @@ export default class ElectronSafeStorageSecretStorage implements SecretStorage {
 
       const parsedSecrets: unknown = JSON.parse(decryptedResult.result);
 
-      if (!isInstallationSecretsData(parsedSecrets)) {
+      if (!isStoredInstallationSecretsData(parsedSecrets)) {
         throw new Error('Los secretos almacenados no tienen una estructura válida.');
       }
 
+      const secrets: InstallationSecretsData = {
+        secretApi: parsedSecrets.secretApi,
+        backupApiKey: parsedSecrets.backupApiKey,
+        emailSmtpPass: parsedSecrets.emailSmtpPass ?? null,
+        ticketBaiToken: parsedSecrets.ticketBaiToken ?? null,
+      };
+
       if (decryptedResult.shouldReEncrypt) {
-        await this.save(parsedSecrets);
+        await this.save(secrets);
       }
 
-      return parsedSecrets;
+      return secrets;
     } catch (error: unknown) {
       if (isFileNotFoundError(error)) {
         return null;

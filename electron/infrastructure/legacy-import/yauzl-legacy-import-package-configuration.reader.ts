@@ -112,6 +112,8 @@ export default class YauzlLegacyImportPackageConfigurationReader implements Lega
       marginList: this.getNumberArray(source, 'marginList', false),
       ventaOnline: this.getBoolean(source, 'ventaOnline'),
       urlApi: this.getDecodedString(source, 'urlApi'),
+      emailSmtp: null,
+      ticketBai: null,
       fechaCad: this.getBoolean(source, 'fechaCad'),
       empleados: this.getBoolean(source, 'empleados'),
     };
@@ -119,6 +121,8 @@ export default class YauzlLegacyImportPackageConfigurationReader implements Lega
     const secrets: InstallationSecretsData = {
       secretApi: this.getDecodedString(source, 'secretApi'),
       backupApiKey: this.getDecodedString(source, 'backupApiKey'),
+      emailSmtpPass: null,
+      ticketBaiToken: null,
     };
 
     const mimeType: string = this.getRequiredLogoMimeType(logoItem);

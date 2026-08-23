@@ -31,6 +31,9 @@ export default function createAppData(command: InstallationCommand, installedAt:
     ventaOnline: command.ventaOnline.active,
     urlApi: command.ventaOnline.urlApi,
 
+    emailSmtp: null,
+    ticketBai: null,
+
     fechaCad: command.opciones.fechaCaducidad,
     empleados: command.opciones.empleados,
   };

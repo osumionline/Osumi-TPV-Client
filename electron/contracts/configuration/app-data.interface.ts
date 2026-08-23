@@ -1,3 +1,5 @@
+import type EmailSmtpConfig from '@desktop-contracts/configuration/email-smtp-config.interface';
+import type TicketBaiConfig from '@desktop-contracts/configuration/ticket-bai-config.interface';
 import type TipoIva from '@desktop-contracts/tipo-iva.type';
 
 export default interface AppData {
@@ -16,7 +18,6 @@ export default interface AppData {
   readonly facebook: string;
   readonly instagram: string;
   readonly web: string;
-
   readonly frasesTicket: readonly string[];
 
   readonly tipoIva: TipoIva;
@@ -26,6 +27,9 @@ export default interface AppData {
 
   readonly ventaOnline: boolean;
   readonly urlApi: string;
+
+  readonly emailSmtp: EmailSmtpConfig | null;
+  readonly ticketBai: TicketBaiConfig | null;
 
   readonly fechaCad: boolean;
   readonly empleados: boolean;

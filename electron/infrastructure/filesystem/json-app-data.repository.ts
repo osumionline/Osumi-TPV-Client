@@ -1,5 +1,7 @@
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
+import type EmailSmtpConfig from '@desktop-contracts/configuration/email-smtp-config.interface';
+import type TicketBaiConfig from '@desktop-contracts/configuration/ticket-bai-config.interface';
 import { readFile, rename, rm, writeFile } from 'node:fs/promises';
 
 function isFileNotFoundError(error: unknown): boolean {
@@ -17,8 +19,41 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item: unknown): boolean => typeof item === 'string');
 }
 
-type StoredAppData = Omit<AppData, 'frasesTicket'> & {
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === 'string';
+}
+
+function isEmailSmtpConfig(value: unknown): value is EmailSmtpConfig {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const data: Record<string, unknown> = value as Record<string, unknown>;
+  const port: unknown = data['port'];
+
+  return (
+    isNullableString(data['host']) &&
+    (port === null ||
+      (typeof port === 'number' && Number.isInteger(port) && port > 0 && port <= 65535)) &&
+    isNullableString(data['secure']) &&
+    isNullableString(data['user'])
+  );
+}
+
+function isTicketBaiConfig(value: unknown): value is TicketBaiConfig {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const data: Record<string, unknown> = value as Record<string, unknown>;
+
+  return isNullableString(data['nif']);
+}
+
+type StoredAppData = Omit<AppData, 'frasesTicket' | 'emailSmtp' | 'ticketBai'> & {
   readonly frasesTicket?: readonly string[];
+  readonly emailSmtp?: EmailSmtpConfig | null;
+  readonly ticketBai?: TicketBaiConfig | null;
 };
 
 function isStoredAppData(value: unknown): value is StoredAppData {
@@ -46,7 +81,6 @@ function isStoredAppData(value: unknown): value is StoredAppData {
   ];
 
   const booleanProperties: readonly string[] = ['ventaOnline', 'fechaCad', 'empleados'];
-
   const numberProperties: readonly string[] = ['schemaVersion'];
 
   const validStrings: boolean = stringProperties.every(
@@ -65,11 +99,23 @@ function isStoredAppData(value: unknown): value is StoredAppData {
   const validTicketPhrases: boolean =
     data['frasesTicket'] === undefined || isStringArray(data['frasesTicket']);
 
+  const validEmailSmtp: boolean =
+    data['emailSmtp'] === undefined ||
+    data['emailSmtp'] === null ||
+    isEmailSmtpConfig(data['emailSmtp']);
+
+  const validTicketBai: boolean =
+    data['ticketBai'] === undefined ||
+    data['ticketBai'] === null ||
+    isTicketBaiConfig(data['ticketBai']);
+
   return (
     validStrings &&
     validBooleans &&
     validNumbers &&
     validTicketPhrases &&
+    validEmailSmtp &&
+    validTicketBai &&
     isNumberArray(data['ivaList']) &&
     isNumberArray(data['reList']) &&
     isNumberArray(data['marginList']) &&
@@ -101,6 +147,8 @@ export default class JsonAppDataRepository implements AppDataRepository {
       return {
         ...parsed,
         frasesTicket: parsed.frasesTicket === undefined ? [] : [...parsed.frasesTicket],
+        emailSmtp: parsed.emailSmtp ?? null,
+        ticketBai: parsed.ticketBai ?? null,
       };
     } catch (error: unknown) {
       if (isFileNotFoundError(error)) {
@@ -113,7 +161,6 @@ export default class JsonAppDataRepository implements AppDataRepository {
 
   async save(appData: AppData): Promise<void> {
     const temporaryFilePath: string = `${this.filePath}.tmp`;
-
     const content: string = `${JSON.stringify(appData, null, 2)}\n`;
 
     await writeFile(temporaryFilePath, content, {

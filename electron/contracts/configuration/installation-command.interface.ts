@@ -53,6 +53,8 @@ export interface InstallationOptionsData {
 export interface InstallationSecretsData {
   readonly secretApi: string;
   readonly backupApiKey: string;
+  readonly emailSmtpPass: string | null;
+  readonly ticketBaiToken: string | null;
 }
 
 export interface InstallationLogoData {

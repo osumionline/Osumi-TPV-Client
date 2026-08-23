@@ -90,6 +90,8 @@ export default function createInstallationCommand(
     secretos: {
       secretApi: model.ventaOnline.active ? model.ventaOnline.secretApi : '',
       backupApiKey: model.opciones.backupApiKey,
+      emailSmtpPass: null,
+      ticketBaiToken: null,
     },
 
     logo,
