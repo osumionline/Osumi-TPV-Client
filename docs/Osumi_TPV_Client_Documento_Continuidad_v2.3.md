@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.2  
+**Versión:** 2.3  
 **Fecha:** 23 de agosto de 2026  
-**Estado:** Installation, importación legacy, Startup, auditoría/refactor transversal y los bloques **Ventas 1–11** están completados, probados y subidos. **Ventas 11 — Persistencia transaccional** queda cerrado de extremo a extremo: transacción SQLite, líneas/pagos/stock/histórico/caja, devoluciones/reservas, ticket definitivo, QR compatible, PDF histórico write-once, impresión silenciosa y postprocesos no bloqueantes. La única validación pendiente es la **prueba física con Star TSP100/TSP143 de 80 mm**, que queda expresamente documentada como no bloqueante. El siguiente bloque es **Ventas 12 — Postventa**.
+**Estado:** Installation, importación legacy, Startup, auditoría/refactor transversal y los bloques **Ventas 1–11** están completados, probados y subidos. **Ventas 12 — Postventa** está en fase de diseño: 12A y 12B.1–12B.3 están cerrados y el punto actual es **12B.4 — Envío por email**. La pausa técnica para evolucionar el formato `.otpv` a **v2** y añadir configuración local de **SMTP/TicketBAI** al Client está completada y validada end-to-end con una importación real. La única validación heredada pendiente sigue siendo la **prueba física con Star TSP100/TSP143 de 80 mm**, no bloqueante.
 
 ---
 
@@ -41,8 +41,13 @@ Hitos principales completados:
 - **Ventas 11D — IPC + Angular + Finalizar venta**, incluida prueba manual end-to-end.
 - **Ventas 11E — Ticket definitivo + QR + PDF + impresión**, incluida regresión funcional real.
 - **Ventas 11F — Regresión completa + cierre**.
+- **Ventas 12A — Análisis funcional legacy + inventario inicial**.
+- **Ventas 12B.1 — Histórico de ventas: comportamiento y modelo funcional**.
+- **Ventas 12B.2 — Política/artefacto histórico del ticket (diseño)**.
+- **Ventas 12B.3 — Reimpresión y ticket regalo (diseño)**.
+- **Pausa técnica `.otpv` v2 — SMTP/TicketBAI en importación e instalación manual**, completada y validada.
 
-Todos los bloques **Ventas 1–11** han sido probados con la aplicación real y están subidos al repositorio. La única comprobación pendiente de Ventas 11 es la prueba física con la impresora térmica Star TSP100/TSP143 de 80 mm; no bloquea el avance a Postventa.
+Todos los bloques **Ventas 1–11** han sido probados con la aplicación real y están subidos al repositorio. Ventas 12 ya está iniciado y se encuentra en diseño. La única comprobación pendiente de Ventas 11 es la prueba física con la impresora térmica Star TSP100/TSP143 de 80 mm; no bloquea Postventa.
 
 ---
 
@@ -52,9 +57,9 @@ Todos los bloques **Ventas 1–11** han sido probados con la aplicación real y 
 - Backend local: **Node.js/TypeScript dentro de Electron**.
 - Persistencia local: **SQLite mediante TypeORM y better-sqlite3**.
 - Instalación desde cero: completada.
-- Importación desde Osumi TPV antiguo mediante `.otpv`: completada.
+- Importación desde Osumi TPV antiguo mediante `.otpv` **formatVersion 2**: completada y validada con un paquete real.
 - Transformación de las 33 tablas legacy: completada.
-- Importación de imágenes, iconos, PDF, logo, configuración y secretos: completada.
+- Importación de imágenes, iconos, PDF, logo, configuración y secretos: completada. El `.otpv` v2 incorpora `plugin_config.json` para SMTP y TicketBAI.
 - Promoción atómica desde staging a la instalación definitiva: completada.
 - `ApplicationStateService`, `/startup` y precarga global: completados.
 - Conexión SQLite operativa persistente durante la sesión: implementada.
@@ -66,8 +71,8 @@ Todos los bloques **Ventas 1–11** han sido probados con la aplicación real y 
 - Ventas 11: persistencia transaccional real, ticket definitivo, PDF histórico, postprocesos y regresión completados.
 - Tras persistir una venta con cliente se invalida la caché de sus estadísticas para que la siguiente consulta refleje la nueva operación.
 - `app_data.json` dispone de `frasesTicket: string[]`; instalaciones/configuraciones anteriores se normalizan a `[]` y las importaciones legacy también parten de `[]`.
-- Los tickets de venta históricos se almacenan en `assets/files/ventas/tickets/{idVenta}.pdf` y son **write-once**.
-- Siguiente bloque: **Ventas 12 — Postventa**.
+- Implementación actual: los tickets de venta históricos se almacenan en `assets/files/ventas/tickets/{idVenta}.pdf` y siguen siendo **write-once**. En Ventas 12B.2 se ha diseñado su evolución futura hacia un PDF vigente versionado, pero todavía no está implementada.
+- Punto actual: **Ventas 12B.4 — Envío por email**, tras cerrar la pausa técnica `.otpv` v2.
 
 Validación de hardware pendiente y no bloqueante:
 
@@ -228,6 +233,125 @@ Las redes opcionales disponibles son:
 
 Solo se muestran las configuradas. Los iconos reutilizan los assets SVG de la propia aplicación a través del protocolo seguro `osumi://assets/app/...`.
 
+
+### 6.3 Formato `.otpv` v2 + configuración SMTP/TicketBAI ✅
+
+Durante Ventas 12 se hizo una pausa técnica para ampliar el importador/configuración antes de implementar el envío de tickets por email y el tramo fiscal.
+
+El formato legacy soportado por el Client es ahora **exclusivamente `formatVersion = 2`**. No se mantiene compatibilidad con `.otpv` v1 porque el proyecto sigue en desarrollo y no existen instalaciones externas que lo requieran.
+
+El paquete v2 exige:
+
+```text
+manifest.json
+  formatVersion = 2
+  schemaVersion = legacy-2026-07
+  contents.pluginConfig = true
+
+plugin_config.json        obligatorio
+checksums.json            incluye SHA-256 de plugin_config.json
+```
+
+El inspector acepta como estados válidos del informe:
+
+```text
+success
+success_with_warnings
+```
+
+`plugin_config.json` contiene siempre las claves:
+
+```json
+{
+  "email_smtp": null,
+  "ticketbai": null
+}
+```
+
+O, cuando están configuradas:
+
+```json
+{
+  "email_smtp": {
+    "host": "...",
+    "port": 587,
+    "secure": "tls",
+    "user": "...",
+    "pass": "..."
+  },
+  "ticketbai": {
+    "token": "...",
+    "nif": "..."
+  }
+}
+```
+
+Semántica de importación:
+
+- plugin `null` → integración no configurada;
+- plugin existente con algún campo `null` → configuración existente pero incompleta;
+- los valores legacy se importan sin `trim`, URL decode ni transformaciones previas;
+- contraseña SMTP y token TicketBAI nunca deben aparecer en logs, errores, `app_data.json` ni UI de diagnóstico.
+
+Persistencia en el Client:
+
+```text
+app_data.json
+├── emailSmtp
+│   ├── host
+│   ├── port
+│   ├── secure
+│   └── user
+└── ticketBai
+    └── nif
+
+secrets.json (safeStorage)
+├── emailSmtpPass
+└── ticketBaiToken
+```
+
+Los modelos normalizados son:
+
+```text
+emailSmtp: EmailSmtpConfig | null
+ticketBai: TicketBaiConfig | null
+emailSmtpPass: string | null
+ticketBaiToken: string | null
+```
+
+La instalación manual también permite configurar ambas integraciones de forma opcional.
+
+SMTP:
+
+- activación Sí/No;
+- host;
+- puerto, por defecto 587;
+- usuario;
+- contraseña, almacenada solo en secretos;
+- selector cerrado de seguridad:
+  - `none` → Sin cifrado;
+  - `tls` → TLS / STARTTLS;
+  - `ssl` → SSL / TLS implícito.
+
+TicketBAI:
+
+- activación Sí/No;
+- NIF;
+- token, almacenado solo en secretos.
+
+Si una integración está desactivada, su configuración se guarda como `null` y no se envía su secreto.
+
+Validación completada:
+
+- batería técnica completa;
+- instalación manual con los nuevos controles;
+- importación end-to-end de un `.otpv` v2 real;
+- `emailSmtp` y `ticketBai` comprobados en `app_data.json`;
+- secretos comprobados como no presentes en texto plano;
+- arranque y uso normal de la instalación importada correctos.
+
+Esta pausa técnica queda **cerrada**. La configuración SMTP necesaria para Ventas 12B.4 ya está disponible localmente y no depende de `TPV-Client-API`.
+
 ---
 
 ## 7. Startup ✅
@@ -280,35 +404,39 @@ Esta recapitulación debe aparecer al comenzar **cada fase, bloque, subapartado 
 8. ✅ **Devoluciones**.
 9. ✅ **Reservas**.
 10. ✅ **Finalización y pagos**.
-    - ✅ 10A — Modelo de finalización y pagos.
-    - ✅ 10B — Interfaz genérica de finalización.
-    - ✅ 10C — Efectivo, cambio y reembolsos.
-    - ✅ 10D — Reserva desde finalización.
-    - ✅ 10E — Contrato definitivo y regresión.
 11. ✅ **Persistencia transaccional**.
     - ✅ 11A — Análisis y diseño de la transacción.
     - ✅ 11B — Contratos + mapper de GuardarVenta + trazabilidad SQLite.
     - ✅ 11C — Caso de uso backend + transacción SQLite.
     - ✅ 11D — IPC + Angular + Finalizar venta.
     - ✅ 11E — Ticket definitivo + QR + PDF + impresión.
-      - ✅ 11E.1 — Snapshot persistido del ticket.
-      - ✅ 11E.2 — Exposición IPC + servicio Angular.
-      - ✅ 11E.3 — QR local + documento HTML de 80 mm.
-      - ✅ 11E.4 — PDF histórico + impresión silenciosa + regresión técnica.
-      - ✅ 11E.5 — Orquestación post-COMMIT y errores no bloqueantes.
-      - ✅ 11E.6 — Regresión funcional real.
-      - ⚠️ 11E.6.4 — Prueba física Star TSP100/TSP143 de 80 mm pendiente, **no bloqueante**.
+      - ⚠️ prueba física Star TSP100/TSP143 de 80 mm pendiente, **no bloqueante**.
     - ✅ 11F — Regresión completa + cierre.
-12. 🟦 **Postventa — siguiente bloque**.
+12. 🟦 **Postventa**.
+    - ✅ 12A — Análisis funcional legacy + inventario del estado actual.
+    - 🟦 12B — Diseño funcional y arquitectura nueva.
+      - ✅ 12B.1 — Histórico de ventas: comportamiento y modelo funcional.
+      - ✅ 12B.2 — Artefacto/política histórica del ticket.
+      - ✅ 12B.3 — Reimpresión y ticket regalo.
+      - 🟦 **12B.4 — Envío por email.**
+      - ⬜ 12B.5 — Facturación.
+      - ⬜ 12B.6 — TicketBAI / estado fiscal.
+      - ⬜ 12B.7 — Integración UI.
+    - ⬜ 12C en adelante — Implementación por subbloques, a concretar tras cerrar 12B.
+
+Pausa técnica intermedia ya cerrada:
+
+- ✅ `.otpv` `formatVersion = 2`;
+- ✅ `plugin_config.json` obligatorio y checksum validado;
+- ✅ importación SMTP/TicketBAI;
+- ✅ secretos protegidos mediante `safeStorage`;
+- ✅ SMTP/TicketBAI configurables en instalación manual;
+- ✅ importación real `.otpv` v2 validada end-to-end.
 
 Hitos transversales ya cerrados:
 
 - ✅ auditoría arquitectónica tras Ventas 9;
-- ✅ Refactor A;
-- ✅ Refactor B;
-- ✅ Refactor C;
-- ✅ Refactor D;
-- ✅ Refactor E;
+- ✅ Refactor A–E;
 - ✅ ajuste UX del buscador de artículos.
 
 ---
@@ -1779,37 +1907,319 @@ Reglas:
 
 ---
 
-# 13. Ventas 12 — Postventa 🟦 SIGUIENTE BLOQUE
+# 13. Ventas 12 — Postventa 🟦 EN DISEÑO
 
-Pendiente de analizar y descomponer antes de implementar.
+## 13.1 Estado del bloque
 
-Ámbito funcional conocido que debe revisarse:
+```text
+12A — Análisis funcional legacy + inventario              ✅
+12B — Diseño funcional y arquitectura                    🟦
+  12B.1 — Histórico de ventas                            ✅
+  12B.2 — Artefacto/política histórica del ticket        ✅ diseño
+  12B.3 — Reimpresión y ticket regalo                    ✅ diseño
+  12B.4 — Envío por email                                🟦 actual
+  12B.5 — Facturación                                    ⬜
+  12B.6 — TicketBAI / estado fiscal                      ⬜
+  12B.7 — Integración UI                                 ⬜
+12C+ — Implementación                                    ⬜
+```
 
-- histórico de ventas;
-- consulta del detalle de una venta persistida;
-- reimpresión utilizando el **PDF histórico original**, no regenerando el ticket;
-- envío de ticket por email reutilizando ese PDF histórico;
-- facturación;
-- TicketBAI/TicketBaiWS;
-- acciones posteriores sobre ventas ya persistidas;
-- posibles dependencias con devoluciones y facturas existentes.
+La pausa técnica `.otpv` v2 que interrumpió temporalmente 12B.4 está terminada. Debe retomarse Postventa exactamente en **12B.4 — Envío por email**.
 
-En el TPV antiguo el email adjuntaba el PDF del ticket. Esa capacidad debe recuperarse reutilizando el artefacto histórico creado en Ventas 11.
+## 13.2 Entrada al histórico
 
-### Inicio obligatorio de Ventas 12
+El Histórico no será una ruta independiente. Se abre como modal desde la pantalla de Ventas al hacer clic en el importe de la venta, actualmente el `div.sale__amount`.
 
-Antes de implementar:
+El modal contiene dos pestañas:
 
-1. mostrar el listado completo del bloque con completado / actual / pendiente;
-2. explicar en uno o dos párrafos qué resolverá el primer paso;
-3. revisar `main` actual;
-4. inventariar el comportamiento funcional de Postventa en el frontend y backend antiguos;
-5. revisar el esquema/repositorios y las capacidades actuales del Client;
-6. separar comportamiento que debe conservarse de deuda técnica legacy;
-7. diseñar los subbloques de Ventas 12 y sus responsabilidades;
-8. revisar el estado actual de `@osumi/ticketbaiws` y la documentación de Berein antes del tramo fiscal.
+```text
+Histórico de ventas   ← funcional en este bloque
+Salidas caja          ← placeholder; se desarrollará más adelante
+```
 
-No empezar directamente por TicketBAI sin haber hecho primero el análisis funcional completo de Postventa.
+## 13.3 Filtros del histórico
+
+Parte superior:
+
+- selector `Fecha / Rango`;
+- `Fecha` es el modo por defecto;
+- datepicker con la fecha actual;
+- botones anterior/siguiente para cambiar de día y consultar directamente;
+- en modo `Rango`, datepicker inicio + datepicker fin + botón Buscar;
+- validar `desde <= hasta`.
+
+## 13.4 Listado y resúmenes
+
+Columna izquierda:
+
+```text
+Fecha/hora | Importe | Tipo(s) de pago
+```
+
+Reglas:
+
+- una venta con varios medios de pago muestra, por ejemplo, `Efectivo + VISA`;
+- si tiene cliente, mostrar icono con tooltip del nombre;
+- la venta seleccionada queda resaltada.
+
+Resúmenes bajo la lista:
+
+- total del día/rango;
+- ticket medio = total / número de ventas;
+- total dinámico por cada tipo de pago utilizado;
+- beneficio.
+
+Definición de beneficio confirmada:
+
+```text
+importe final vendido - coste
+```
+
+Debe respetarse el signo y calcularse de forma autoritativa en backend/SQLite.
+
+## 13.5 Detalle de la venta
+
+Columna derecha:
+
+```text
+Localizador
+Marca
+Descripción
+Cantidad
+PVP
+Descuento
+Importe
+```
+
+Fila final de totales:
+
+- sumatorio de cantidad;
+- sumatorio de importe;
+- conservar también información total de descuento cuando corresponda.
+
+El histórico debe usar un **modelo de lectura**, no `VentaEnCurso`.
+
+Diseño propuesto:
+
+```text
+consulta fecha/rango
+→ VentaHistoricoResumen[] + ResumenHistorico
+
+seleccionar venta
+→ getDetalle(idVenta)
+→ VentaHistoricoDetalle
+```
+
+No cargar todas las líneas de todas las ventas de un rango cuando no son necesarias.
+
+## 13.6 Modificaciones postventa permitidas
+
+### Cambiar tipo de pago
+
+Solo cuando:
+
+```text
+exactamente 1 pago
++
+caja original todavía abierta
+=
+acción habilitada
+```
+
+Casos:
+
+```text
+0 pagos / total cero     → deshabilitado
+1 pago + caja abierta    → habilitado
+1 pago + caja cerrada    → deshabilitado
+2+ pagos                 → deshabilitado
+```
+
+La operación debe ser transaccional y corregir no solo `venta_pago`, sino también los acumulados de caja correspondientes al tipo anterior/nuevo y el cierre teórico cuando proceda.
+
+Normalización acordada:
+
+```text
+Efectivo → no efectivo
+entregado = null
+cambio = 0
+
+No efectivo → efectivo, venta positiva
+entregado = importe aplicado
+cambio = 0
+
+No efectivo → efectivo, devolución
+entregado = null
+cambio = 0
+```
+
+### Cambiar/asignar cliente
+
+- permitido mientras la venta no forme parte de una factura;
+- si la venta ya está facturada, la acción debe quedar bloqueada;
+- una corrección de cliente deberá invalidar las estadísticas cacheadas del cliente anterior y del nuevo cuando se implemente.
+
+No crear un `updateVenta()` genérico. Cliente y tipo de pago deben ser casos de uso expresivos distintos porque sus efectos de negocio son diferentes.
+
+## 13.7 Política documental diseñada en 12B.2
+
+**Importante:** esto está diseñado, pero todavía no implementado. La implementación actual de Ventas 11 sigue siendo write-once.
+
+Objetivo futuro:
+
+```text
+{idVenta}.pdf
+→ PDF vigente según los datos actuales de la venta
+
+{idVenta}_{timestamp}.pdf
+→ versiones anteriores archivadas e inmutables
+```
+
+Las versiones archivadas:
+
+- no se muestran en la aplicación;
+- no participan en reimpresión/email;
+- no se borran automáticamente;
+- pueden recuperarse manualmente desde la carpeta si alguna vez hace falta.
+
+Para detectar persistentemente si el PDF coincide con la venta se ha diseñado una revisión documental, conceptualmente:
+
+```text
+ticket_revision
+ticket_pdf_revision
+```
+
+Cambios de cliente/pago incrementan la revisión del ticket. El PDF se regenera post-COMMIT. Si la regeneración falla, la corrección de negocio permanece y el sistema sabe que el PDF vigente debe repararse antes de reutilizarlo.
+
+Ventas legacy sin PDF histórico deben poder generar su PDF desde el snapshot persistido cuando se necesite. Regla final de negocio:
+
+> **Cualquier ticket, nuevo o legacy, debe poder reimprimirse y enviarse.**
+
+Para ventas legacy con información TicketBAI, cuando llegue el tramo fiscal se deberán representar en el ticket los datos fiscales históricos ya almacenados. Eso no adelanta la comunicación fiscal completa.
+
+## 13.8 Reimpresión y ticket regalo
+
+### Ticket normal
+
+Debe representar siempre los **datos actuales persistidos** de la venta. Si cliente/pago se corrigieron, la reimpresión no debe mostrar los datos originales obsoletos.
+
+La simple reimpresión no debe crear versiones documentales nuevas si el PDF ya está actualizado.
+
+### Ticket regalo
+
+Es una representación bajo demanda, no un artefacto PDF histórico persistente.
+
+Conserva:
+
+- logo y datos del negocio;
+- redes;
+- fecha/hora;
+- referencia;
+- empleado;
+- artículos y cantidades;
+- QR comercial;
+- frases personalizadas;
+- información TicketBAI cuando corresponda.
+
+Oculta:
+
+- cliente;
+- PVP;
+- descuentos;
+- importes de línea;
+- total;
+- pagos;
+- entregado/cambio;
+- desglose de IVA.
+
+Debe mostrar claramente `TICKET REGALO`.
+
+Operaciones con devoluciones:
+
+- operación mixta → mostrar solo líneas de compra con cantidad positiva;
+- devolución pura → acción Ticket regalo deshabilitada porque no existen líneas positivas.
+
+## 13.9 Acciones del histórico
+
+Acciones previstas:
+
+```text
+Imprimir ticket
+Imprimir ticket regalo
+Generar factura
+Enviar ticket por email
+Devolución
+```
+
+`Obtener imagen ticket` desaparece: no se traslada al Client nuevo.
+
+`Generar factura` debe reservarse visualmente pero su comportamiento se revisará más adelante junto al módulo de Clientes/Facturación; no implementar prematuramente.
+
+`Devolución` reutilizará el flujo de devoluciones ya validado en Ventas 8/11: cerrar modal, cargar la venta persistida como origen de devolución y continuar con el selector existente.
+
+## 13.10 12B.4 — Envío por email 🟦 ACTUAL
+
+Decisión arquitectónica cerrada:
+
+```text
+Electron/backend local
+→ SMTP
+→ servidor de correo del comercio
+→ cliente
+```
+
+El envío **no depende de `TPV-Client-API`**. Debe funcionar en pequeños puestos/tiendas sin servidor remoto asociado.
+
+La configuración necesaria ya está implementada en Installation/importación `.otpv` v2:
+
+```text
+appData.emailSmtp
+secrets.emailSmtpPass
+```
+
+Regla documental:
+
+- el email adjunta siempre el PDF vigente;
+- antes de enviar se debe garantizar que exista y corresponda a la revisión actual;
+- si el PDF ya está actualizado, enviar no debe regenerarlo innecesariamente.
+
+Comportamiento funcional conocido:
+
+- venta con cliente y email → usar inicialmente ese email;
+- venta sin cliente → preguntar si se quiere asignar cliente o introducir una dirección manual;
+- el PDF actual del ticket será el adjunto.
+
+Decisiones que **siguen abiertas y deben aclararse antes de implementar 12B.4**:
+
+1. qué hacer si la venta tiene cliente asignado pero ese cliente no tiene email: introducir dirección manual, ofrecer editar/asignar cliente u otra UX;
+2. si asunto/cuerpo del email serán textos fijos del Client o configurables por tienda.
+
+Por la regla general del proyecto, no asumir ninguna de estas dos decisiones: preguntar y cerrar antes de continuar.
+
+## 13.11 Facturación
+
+Pendiente. Conocemos que:
+
+- el legacy permitía generar una factura directa desde una venta;
+- el módulo Clientes también agrupa varias ventas en una factura;
+- la venta facturada ya no puede cambiar de cliente.
+
+La acción del histórico puede dejarse reservada hasta revisar el módulo de Clientes/Facturación completo.
+
+## 13.12 TicketBAI
+
+Existe la librería propia:
+
+```text
+@osumi/ticketbaiws
+```
+
+Reglas:
+
+- reutilizarla; no crear cliente HTTP ad hoc;
+- distinguir QR comercial `-id` y QR/huella fiscal;
+- representar datos fiscales legacy ya almacenados cuando corresponda;
+- revisar documentación/respuesta de Berein y estado de la librería antes de fijar la integración fiscal definitiva.
 
 ---
 
@@ -1967,6 +2377,8 @@ Para **cada fase, bloque, subapartado o paso**:
 
 > **Regla de continuidad:** esta misma instrucción debe mantenerse en futuras versiones del Documento de continuidad y relevo.
 
+> **Regla de aclaración obligatoria:** ante cualquier duda funcional, de negocio, UX, fiscal, documental o arquitectónica que pueda afectar al resultado, **detener el desarrollo y preguntarla antes de continuar**. No rellenar ambigüedades ni asumir decisiones por cuenta propia. Esta regla debe conservarse explícitamente en futuras versiones del documento.
+
 > No asumir que la implementación antigua es el diseño correcto. Debe utilizarse como fuente funcional, no como arquitectura obligatoria.
 
 ---
@@ -2043,138 +2455,147 @@ También:
 | 2.0 | 20 de agosto de 2026 | Ventas 10 — Finalización y pagos completado. Pagos múltiples, efectivo/cambio, reembolsos, reserva con/sin ticket, configuración local de impresora, PDF, impresión silenciosa, errores de impresión, nueva venta automática y snapshot definitivo. Siguiente: Ventas 11 — Persistencia transaccional. |
 | **2.1** | **21 de agosto de 2026** | **Ventas 11A–11D completados: transacción SQLite real, trazabilidad de devoluciones/reservas, stock/histórico/caja, idempotencia, runner backend con SQLite real y wiring end-to-end hasta Angular. 11E.1 completado: snapshot persistido del ticket. Siguiente: 11E.2 — exposición IPC + servicio Angular del ticket.** |
 | **2.2** | **23 de agosto de 2026** | **Ventas 11 completado: persistencia transaccional, ticket definitivo desde snapshot SQLite, QR `-id`, HTML 80 mm, logo/redes/frases configurables, PDF histórico write-once, impresión silenciosa, post-COMMIT no bloqueante, invalidación de estadísticas de cliente y regresión final. Prueba física Star TSP100/TSP143 pendiente y no bloqueante. Siguiente: Ventas 12 — Postventa.** |
+| **2.3** | **23 de agosto de 2026** | **Ventas 12 iniciado: 12A y 12B.1–12B.3 cerrados a nivel de diseño. Pausa técnica `.otpv` v2 completada: `plugin_config.json`, SMTP/TicketBAI, secretos con `safeStorage`, configuración en instalación manual e importación real end-to-end validada. Punto de reanudación: 12B.4 — Envío por email mediante SMTP local.** |
 
 ---
 
 # 21. Próximo paso
 
-El siguiente bloque es:
+El punto exacto de reanudación es:
 
-# Ventas 12 — Postventa
+# Ventas 12B.4 — Envío de ticket por email
 
-Estado de entrada:
+Estado:
 
 ```text
-Installation + importación legacy            ✅
-Startup                                      ✅
-Auditoría + Refactor A–E                     ✅
-Ventas 1–10                                  ✅
-Ventas 11 — Persistencia transaccional       ✅
-Ticket definitivo + PDF histórico            ✅
-Post-COMMIT                                  ✅
-Regresión Ventas 11                          ✅
-Prueba física Star TSP100/TSP143             ⚠️ pendiente no bloqueante
-
-Ventas 12 — Postventa                        🟦 siguiente
+Installation + importación `.otpv` v2            ✅
+Configuración SMTP/TicketBAI local               ✅
+Startup                                          ✅
+Ventas 1–11                                      ✅
+Ventas 12A                                       ✅
+Ventas 12B.1 — Histórico                         ✅
+Ventas 12B.2 — Política documental               ✅ diseño
+Ventas 12B.3 — Reimpresión/ticket regalo         ✅ diseño
+Ventas 12B.4 — Email                             🟦 actual
+Ventas 12B.5 — Facturación                       ⬜
+Ventas 12B.6 — TicketBAI                         ⬜
+Ventas 12B.7 — Integración UI                    ⬜
 ```
 
-Primera tarea de Ventas 12:
+La pausa técnica ya no bloquea el email: SMTP se configura localmente tanto en instalación manual como por importación `.otpv` v2, y la contraseña permanece en `secrets.json` cifrado.
 
-1. revisar el `main` actual;
-2. revisar Postventa/histórico/facturación/email/TicketBAI en `Osumi-TPV` y `TPV-API` antiguos;
-3. inventariar el comportamiento funcional completo antes de diseñar;
-4. revisar qué infraestructura actual ya puede reutilizarse, especialmente el PDF histórico de Ventas 11;
-5. revisar el estado actual de `@osumi/ticketbaiws` y la documentación/respuesta de Berein para el tramo fiscal;
-6. diseñar y acordar los subbloques de Ventas 12;
-7. no implementar hasta haber cerrado ese análisis inicial.
+Antes de diseñar el servicio SMTP definitivo deben aclararse dos decisiones funcionales pendientes:
+
+1. UX cuando una venta tiene cliente asignado pero el cliente no tiene email;
+2. asunto/cuerpo fijo o configurable por tienda.
+
+Después de cerrar esas dos decisiones:
+
+1. diseñar contrato backend de envío;
+2. escoger/revisar la librería SMTP Node adecuada;
+3. diseñar lectura segura de configuración/secreto sin exponerlos a Angular;
+4. integrar la garantía de PDF vigente antes de adjuntarlo;
+5. diseñar IPC y UX de envío/error/éxito;
+6. implementar solo cuando 12B.4 quede funcionalmente cerrado.
 
 Recordatorio de hardware:
 
-- cuando haya acceso a la Star TSP100/TSP143, retomar la prueba física de 80 mm;
-- esa prueba no obliga a detener Postventa mientras siga pendiente.
+- prueba física Star TSP100/TSP143 de 80 mm pendiente y no bloqueante.
 
 ---
 
 # 22. Prompt de arranque para una conversación nueva
 
 ```text
-Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” versión 2.2 como contexto principal.
+Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” versión 2.3 como contexto principal.
 
-Installation + importación legacy y Startup están completados y probados. También están cerrados la auditoría transversal, Refactor A–E y el ajuste UX del buscador.
+Estado general:
+- Installation + importación legacy `.otpv` v2: completadas y probadas.
+- Startup: completado.
+- Auditoría transversal y Refactor A–E: completados.
+- Ventas 1–11: completados y probados.
+- Ventas 12 — Postventa: EN DISEÑO.
 
-En Ventas están completados y probados los bloques 1–11:
-1. Contexto operativo.
-2. Modelo de venta en curso + workspace persistente.
-3. Consulta/búsqueda de artículos y accesos directos.
-4. Estructura visual.
-5. Operaciones sobre líneas.
-6. Clientes y estadísticas rápidas.
-7. Varios.
-8. Devoluciones.
-9. Reservas.
-10. Finalización y pagos.
-11. Persistencia transaccional.
+Ventas 11 cerró la persistencia transaccional de extremo a extremo: transacción SQLite real, venta/líneas/pagos/stock/histórico/caja, devoluciones/reservas, snapshot documental desde SQLite, QR comercial `-id`, HTML 80 mm, logo/redes/frases, PDF histórico actual write-once, impresión silenciosa, post-COMMIT no bloqueante e invalidación de estadísticas del cliente. Solo queda pendiente, sin bloquear, la prueba física con Star TSP100/TSP143 de 80 mm.
 
-Ventas 11 quedó completamente conectado de extremo a extremo:
-- GuardarVentaCommand + mapper;
-- transacción SQLite real de venta, líneas, pagos, stock, histórico, devoluciones, reservas y caja;
-- secuencia_documento sincronizada con histórico legacy;
-- idempotencia mediante VentaEnCurso.idTemporal / venta.public_id;
-- rollback completo antes del COMMIT;
-- IPC/Angular y finalización real desde la UI;
-- snapshot documental releído desde SQLite por idVenta;
-- QR comercial compatible con devoluciones: venta id 123 → “-123”;
-- ticket HTML print-native de 80 mm;
-- logo de negocio, appData.nombre, redes sociales configuradas y frasesTicket[];
-- desglose de IVA usando importes firmados;
-- PDF histórico write-once en assets/files/ventas/tickets/{idVenta}.pdf;
-- impresión silenciosa mediante la impresora local configurada;
-- postprocesos estrictamente posteriores al COMMIT;
-- fallos de PDF/impresión/reservas/estadísticas no revierten ni repiten la venta;
-- invalidación de estadísticas cacheadas del cliente tras vender;
-- nueva venta automática y foco al localizador tras completar.
+Ventas 12:
+- 12A — análisis funcional legacy: COMPLETADO.
+- 12B.1 — histórico de ventas: DISEÑO CERRADO.
+- 12B.2 — política/artefacto histórico del ticket: DISEÑO CERRADO.
+- 12B.3 — reimpresión y ticket regalo: DISEÑO CERRADO.
+- 12B.4 — envío por email: PASO ACTUAL.
+- 12B.5 — facturación: pendiente.
+- 12B.6 — TicketBAI/estado fiscal: pendiente.
+- 12B.7 — integración UI: pendiente.
 
-Regresión manual confirmada:
-- venta normal;
-- pagos mixtos y efectivo/cambio;
-- total cero;
-- devolución parcial y devolución netamente negativa;
-- venta procedente de reserva;
-- PDF histórico;
-- QR -id;
-- logo/redes/frases;
-- ausencia de impresora como warning no bloqueante;
-- estadísticas del cliente actualizadas después de vender.
+Histórico de ventas:
+- se abre en modal al hacer clic en `sale__amount` de Ventas;
+- tabs: Histórico de ventas + Salidas caja placeholder;
+- filtros Fecha/Rango con datepickers y navegación anterior/siguiente;
+- listado con fecha, importe y tipos de pago; cliente mediante icono/tooltip;
+- resúmenes de total, ticket medio, total por tipo de pago y beneficio;
+- beneficio = importe final vendido - coste;
+- detalle derecho con líneas y totales;
+- varios pagos se muestran como `Efectivo + VISA`; el cambio de pago se deshabilita si hay más de uno;
+- cambiar pago solo si existe exactamente un pago y la caja original sigue abierta; debe corregir caja transaccionalmente;
+- cambiar cliente está prohibido si la venta ya forma parte de una factura.
 
-Pendiente no bloqueante:
-- prueba física con Star TSP100 Cutter / TSP143 y papel 80 mm. Cuando haya acceso al hardware hay que retomarla para validar márgenes, longitud, QR, logo, redes, textos y corte.
+Política documental diseñada para Postventa (NO implementada todavía; el storage actual sigue write-once):
+- `{id}.pdf` será el PDF vigente;
+- al regenerar por una corrección, el anterior se archivará como `{id}_{timestamp}.pdf`;
+- las versiones antiguas no se muestran en UI;
+- se plantea `ticket_revision` / `ticket_pdf_revision` para detectar PDF desactualizado;
+- cualquier ticket nuevo o legacy debe acabar pudiendo reimprimirse y enviarse;
+- ventas legacy con datos TicketBAI deben representar la información fiscal histórica cuando llegue el tramo fiscal.
 
-Configuración documental:
-- AppData contiene frasesTicket: readonly string[];
-- instalación: textarea, una frase por línea;
-- app_data antiguo sin el campo se normaliza a [];
-- importación .otpv legacy usa frasesTicket: [];
-- osumi://assets/logo sirve el logo instalado;
-- osumi://assets/app/... permite iconos estáticos seguros del ticket.
+Ticket regalo:
+- mismo ticket base, pero sin cliente, precios, descuentos, importes, total, pagos ni IVA;
+- muestra `TICKET REGALO`;
+- en una operación mixta solo incluye líneas de compra con cantidad positiva;
+- en una devolución pura queda deshabilitado;
+- no se persiste como PDF histórico, se genera bajo demanda para imprimir.
 
-Para TicketBAI/TicketBaiWS existe la librería propia publicada @osumi/ticketbaiws. Debe reutilizarse cuando llegue el tramo fiscal; no crear un cliente HTTP ad hoc. Antes de integrarla hay que revisar el estado actual del SDK y la documentación/respuesta de Berein.
+Pausa técnica `.otpv` v2 COMPLETADA:
+- el Client soporta exclusivamente formatVersion 2;
+- `plugin_config.json` es obligatorio y su checksum se valida;
+- se aceptan `success` y `success_with_warnings`;
+- `email_smtp` y `ticketbai` pueden ser objeto o null;
+- app_data.json guarda host/port/secure/user y nif;
+- secrets.json cifrado con safeStorage guarda emailSmtpPass y ticketBaiToken;
+- instalación manual permite activar SMTP y TicketBAI;
+- seguridad SMTP es selector cerrado: none / tls / ssl;
+- importación real de un `.otpv` v2 validada end-to-end.
 
-El siguiente bloque es Ventas 12 — Postventa.
+Decisión de email:
+- el propio Electron/backend local enviará por SMTP;
+- no depender de TPV-Client-API porque puede haber instalaciones sin servidor asociado;
+- el email adjuntará el PDF vigente de la venta.
 
-Antes de implementar Postventa:
-1. revisar main actual;
-2. revisar frontend/backend antiguos;
-3. inventariar histórico de ventas, reimpresión, email, facturación, TicketBAI y otras acciones postventa;
-4. distinguir comportamiento funcional de deuda técnica legacy;
-5. revisar la infraestructura ya disponible, especialmente el PDF histórico original;
-6. definir y acordar los subbloques de Ventas 12.
+Al retomar 12B.4 todavía hay que aclarar ANTES DE IMPLEMENTAR:
+1. qué hacer si la venta tiene cliente pero ese cliente no tiene email;
+2. si asunto/cuerpo del correo serán fijos o configurables por tienda.
+
+TicketBAI:
+- usar la librería propia `@osumi/ticketbaiws`;
+- no crear cliente HTTP ad hoc;
+- revisar documentación/respuesta de Berein antes del tramo fiscal.
 
 Regla de trabajo obligatoria para CADA paso/subapartado:
 1. mostrar primero el listado COMPLETO del bloque actual;
-2. marcar qué está completado;
-3. indicar exactamente el paso actual;
-4. indicar todos los pasos pendientes;
-5. después explicar en uno o dos párrafos qué vamos a hacer en ese paso;
-6. revisar siempre main antes de modificar archivos existentes;
-7. implementar en piezas pequeñas y no avanzar hasta mi confirmación.
+2. marcar completado / actual / pendiente;
+3. explicar en 1–2 párrafos el objetivo del paso actual;
+4. revisar `main` antes de modificar archivos existentes;
+5. implementar en pasos pequeños y no avanzar hasta mi confirmación;
+6. ante CUALQUIER duda funcional, negocio, UX, fiscal, documental o arquitectónica relevante, PAUSAR y preguntarme antes de asumir una decisión;
+7. al cerrar cada bloque principal, actualizar este documento.
 
 Convenciones:
 - tipado estricto, sin any;
-- un archivo con varios exports no usa export default;
-- líneas en blanco separan conceptos, no propiedades consecutivas de un objeto;
-- Angular y Electron/backend mantienen utilidades separadas;
-- no introducir abstracciones genéricas prematuras;
-- archivo nuevo: completo; archivo existente: fichero completo o bloques grandes/localizables.
+- varios exports → no default export;
+- líneas en blanco separan conceptos, no propiedades del mismo objeto;
+- utilidades Angular y Electron/backend separadas;
+- no abstracciones genéricas prematuras;
+- archivo nuevo completo; archivo existente con ruta y ubicación clara.
 
 Batería habitual:
 npm test
@@ -2183,7 +2604,4 @@ npm run typecheck:electron
 npm run build
 npm run lint
 npm run build:desktop
-
-Al terminar cada bloque principal, después de que confirme que funciona y está subido, entrégame una nueva versión del Documento de continuidad y relevo.
 ```
-
