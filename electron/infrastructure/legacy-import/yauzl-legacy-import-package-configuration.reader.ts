@@ -2,10 +2,12 @@ import type LegacyImportPackageConfigurationReader from '@backend/contracts/lega
 import type LegacyImportFileInventoryItem from '@backend/domain/legacy-import/legacy-import-file-inventory-item.interface';
 import type LegacyImportPackageConfiguration from '@backend/domain/legacy-import/legacy-import-package-configuration.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
+import type EmailSmtpConfig from '@desktop-contracts/configuration/email-smtp-config.interface';
 import type {
   InstallationLogoData,
   InstallationSecretsData,
 } from '@desktop-contracts/configuration/installation-command.interface';
+import type TicketBaiConfig from '@desktop-contracts/configuration/ticket-bai-config.interface';
 import type TipoIva from '@desktop-contracts/tipo-iva.type';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
@@ -17,12 +19,21 @@ import type { Entry, Options, ZipFile } from 'yauzl';
 import { open } from 'yauzl';
 
 const APP_DATA_ENTRY_NAME: string = 'app_data.json';
+const PLUGIN_CONFIG_ENTRY_NAME: string = 'plugin_config.json';
 
 const LOGO_LOGICAL_CATEGORY: string = 'logo';
 
 const MAXIMUM_APP_DATA_SIZE: number = 1024 * 1024;
+const MAXIMUM_PLUGIN_CONFIG_SIZE: number = 1024 * 1024;
 
 const MAXIMUM_LOGO_SIZE: number = 5 * 1024 * 1024;
+
+interface LegacyPluginConfiguration {
+  readonly emailSmtp: EmailSmtpConfig | null;
+  readonly emailSmtpPass: string | null;
+  readonly ticketBai: TicketBaiConfig | null;
+  readonly ticketBaiToken: string | null;
+}
 
 export default class YauzlLegacyImportPackageConfigurationReader implements LegacyImportPackageConfigurationReader {
   async read(
@@ -51,6 +62,22 @@ export default class YauzlLegacyImportPackageConfigurationReader implements Lega
         APP_DATA_ENTRY_NAME,
       );
 
+      const pluginConfigEntry: Entry = this.getRequiredEntry(entries, PLUGIN_CONFIG_ENTRY_NAME);
+
+      const pluginConfigBuffer: Buffer = await this.readEntryBuffer(
+        zipFile,
+        pluginConfigEntry,
+        MAXIMUM_PLUGIN_CONFIG_SIZE,
+      );
+
+      const legacyPluginConfig: Record<string, unknown> = this.parseJsonObject(
+        pluginConfigBuffer,
+        PLUGIN_CONFIG_ENTRY_NAME,
+      );
+
+      const pluginConfiguration: LegacyPluginConfiguration =
+        this.createPluginConfiguration(legacyPluginConfig);
+
       const logoInventoryItem: LegacyImportFileInventoryItem =
         this.getLogoInventoryItem(fileInventory);
 
@@ -74,6 +101,7 @@ export default class YauzlLegacyImportPackageConfigurationReader implements Lega
 
       return this.createConfiguration(
         legacyAppData,
+        pluginConfiguration,
         logoInventoryItem,
         logoPackagePath,
         logoBuffer,
@@ -84,8 +112,57 @@ export default class YauzlLegacyImportPackageConfigurationReader implements Lega
     }
   }
 
+  private createPluginConfiguration(source: Record<string, unknown>): LegacyPluginConfiguration {
+    const emailSmtpSource: Record<string, unknown> | null = this.getNullableRecord(
+      source,
+      'email_smtp',
+      PLUGIN_CONFIG_ENTRY_NAME,
+    );
+
+    const ticketBaiSource: Record<string, unknown> | null = this.getNullableRecord(
+      source,
+      'ticketbai',
+      PLUGIN_CONFIG_ENTRY_NAME,
+    );
+
+    const emailSmtp: EmailSmtpConfig | null =
+      emailSmtpSource === null
+        ? null
+        : {
+            host: this.getNullableString(emailSmtpSource, 'host', 'plugin_config.json.email_smtp'),
+            port: this.getNullablePort(emailSmtpSource, 'port', 'plugin_config.json.email_smtp'),
+            secure: this.getNullableString(
+              emailSmtpSource,
+              'secure',
+              'plugin_config.json.email_smtp',
+            ),
+            user: this.getNullableString(emailSmtpSource, 'user', 'plugin_config.json.email_smtp'),
+          };
+
+    const ticketBai: TicketBaiConfig | null =
+      ticketBaiSource === null
+        ? null
+        : {
+            nif: this.getNullableString(ticketBaiSource, 'nif', 'plugin_config.json.ticketbai'),
+          };
+
+    return {
+      emailSmtp,
+      emailSmtpPass:
+        emailSmtpSource === null
+          ? null
+          : this.getNullableString(emailSmtpSource, 'pass', 'plugin_config.json.email_smtp'),
+      ticketBai,
+      ticketBaiToken:
+        ticketBaiSource === null
+          ? null
+          : this.getNullableString(ticketBaiSource, 'token', 'plugin_config.json.ticketbai'),
+    };
+  }
+
   private createConfiguration(
     source: Record<string, unknown>,
+    pluginConfiguration: LegacyPluginConfiguration,
     logoItem: LegacyImportFileInventoryItem,
     logoPackagePath: string,
     logoBuffer: Buffer,
@@ -112,8 +189,8 @@ export default class YauzlLegacyImportPackageConfigurationReader implements Lega
       marginList: this.getNumberArray(source, 'marginList', false),
       ventaOnline: this.getBoolean(source, 'ventaOnline'),
       urlApi: this.getDecodedString(source, 'urlApi'),
-      emailSmtp: null,
-      ticketBai: null,
+      emailSmtp: pluginConfiguration.emailSmtp,
+      ticketBai: pluginConfiguration.ticketBai,
       fechaCad: this.getBoolean(source, 'fechaCad'),
       empleados: this.getBoolean(source, 'empleados'),
     };
@@ -121,8 +198,8 @@ export default class YauzlLegacyImportPackageConfigurationReader implements Lega
     const secrets: InstallationSecretsData = {
       secretApi: this.getDecodedString(source, 'secretApi'),
       backupApiKey: this.getDecodedString(source, 'backupApiKey'),
-      emailSmtpPass: null,
-      ticketBaiToken: null,
+      emailSmtpPass: pluginConfiguration.emailSmtpPass,
+      ticketBaiToken: pluginConfiguration.ticketBaiToken,
     };
 
     const mimeType: string = this.getRequiredLogoMimeType(logoItem);
@@ -225,6 +302,60 @@ export default class YauzlLegacyImportPackageConfigurationReader implements Lega
     }
 
     return parsed;
+  }
+
+  private getNullableRecord(
+    source: Record<string, unknown>,
+    property: string,
+    sourceName: string,
+  ): Record<string, unknown> | null {
+    const value: unknown = source[property];
+
+    if (value === null) {
+      return null;
+    }
+
+    if (!this.isRecord(value)) {
+      throw new Error(`La propiedad ${property} de ${sourceName} no es un objeto o null.`);
+    }
+
+    return value;
+  }
+
+  private getNullableString(
+    source: Record<string, unknown>,
+    property: string,
+    sourceName: string,
+  ): string | null {
+    const value: unknown = source[property];
+
+    if (value === null) {
+      return null;
+    }
+
+    if (typeof value !== 'string') {
+      throw new Error(`La propiedad ${property} de ${sourceName} no es una cadena o null.`);
+    }
+
+    return value;
+  }
+
+  private getNullablePort(
+    source: Record<string, unknown>,
+    property: string,
+    sourceName: string,
+  ): number | null {
+    const value: unknown = source[property];
+
+    if (value === null) {
+      return null;
+    }
+
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0 || value > 65_535) {
+      throw new Error(`La propiedad ${property} de ${sourceName} no es un puerto válido o null.`);
+    }
+
+    return value;
   }
 
   private getRequiredDecodedString(source: Record<string, unknown>, property: string): string {
