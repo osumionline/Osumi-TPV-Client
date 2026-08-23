@@ -76,6 +76,7 @@ export default class YauzlLegacyImportPackageInspector implements LegacyImportPa
       );
 
       await this.readJsonEntry(zipFile, this.getRequiredEntry(entriesByName, 'app_data.json'));
+      await this.readJsonEntry(zipFile, this.getRequiredEntry(entriesByName, 'plugin_config.json'));
 
       const manifestData: {
         readonly formatVersion: number;
@@ -469,6 +470,8 @@ export default class YauzlLegacyImportPackageInspector implements LegacyImportPa
 
     const createdAt: string = this.getString(manifest, 'createdAt', 'manifest.json');
 
+    const contents: Record<string, unknown> = this.getRecord(manifest, 'contents', 'manifest.json');
+
     if (formatVersion !== LEGACY_IMPORT_SUPPORTED_FORMAT_VERSION) {
       throw new Error(`Versión de formato .otpv no soportada: ${formatVersion}.`);
     }
@@ -479,6 +482,12 @@ export default class YauzlLegacyImportPackageInspector implements LegacyImportPa
 
     if (schemaVersion !== LEGACY_IMPORT_SUPPORTED_SCHEMA_VERSION) {
       throw new Error(`Versión de esquema legacy no soportada: ${schemaVersion}.`);
+    }
+
+    if (contents['pluginConfig'] !== true) {
+      throw new Error(
+        'El manifest.json no declara la configuración de plugins como contenido obligatorio.',
+      );
     }
 
     if (Number.isNaN(Date.parse(createdAt))) {
@@ -498,7 +507,7 @@ export default class YauzlLegacyImportPackageInspector implements LegacyImportPa
   private validateExportReport(report: Record<string, unknown>): LegacyExportReportData {
     const status: string = this.getString(report, 'status', 'export-report.json');
 
-    if (status !== 'success') {
+    if (status !== 'success' && status !== 'success_with_warnings') {
       throw new Error('El informe indica que la exportación no terminó correctamente.');
     }
 
@@ -560,10 +569,28 @@ export default class YauzlLegacyImportPackageInspector implements LegacyImportPa
       dumpSize: this.getNumber(database, 'dumpSize', 'export-report.json'),
       includedFiles: this.getNumber(files, 'included', 'export-report.json'),
       optionalFilesNotPresent: this.getNumber(files, 'optionalNotPresent', 'export-report.json'),
-      warnings: this.getStringArray(report, 'warnings', 'export-report.json'),
+      warnings: this.getExportWarningMessages(report),
       tableRows,
       fileInventory,
     };
+  }
+
+  private getExportWarningMessages(report: Record<string, unknown>): readonly string[] {
+    const warningsValue: unknown = report['warnings'];
+
+    if (!Array.isArray(warningsValue)) {
+      throw new Error('La propiedad warnings de export-report.json no es válida.');
+    }
+
+    return warningsValue.map((warning: unknown, index: number): string => {
+      if (!this.isRecord(warning)) {
+        throw new Error(
+          `La advertencia ${index} de export-report.json no tiene una estructura válida.`,
+        );
+      }
+
+      return this.getString(warning, 'message', `export-report.json.warnings[${index}]`);
+    });
   }
 
   private validateFileInventory(

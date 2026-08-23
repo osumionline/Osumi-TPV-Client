@@ -1,4 +1,4 @@
-export const LEGACY_IMPORT_SUPPORTED_FORMAT_VERSION: number = 1;
+export const LEGACY_IMPORT_SUPPORTED_FORMAT_VERSION: number = 2;
 
 export const LEGACY_IMPORT_SUPPORTED_SCHEMA_VERSION: string = 'legacy-2026-07';
 
@@ -10,10 +10,10 @@ export const LEGACY_IMPORT_REQUIRED_ENTRIES: readonly string[] = [
   'database.sql',
   'export-report.json',
   'manifest.json',
+  'plugin_config.json',
 ];
 
 export const LEGACY_IMPORT_MAX_PACKAGE_SIZE: number = 2 * 1024 * 1024 * 1024;
-
 export const LEGACY_IMPORT_MAX_UNCOMPRESSED_SIZE: number = 8 * 1024 * 1024 * 1024;
 
 export const LEGACY_IMPORT_MAX_ENTRY_COUNT: number = 100_000;
