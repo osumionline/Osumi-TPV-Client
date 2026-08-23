@@ -140,6 +140,21 @@ export default function createInstallationFormInitialValue(): InstallationFormMo
       secretApi: '',
     },
 
+    emailSmtp: {
+      active: false,
+      host: '',
+      port: 587,
+      secure: 'tls',
+      user: '',
+      pass: '',
+    },
+
+    ticketBai: {
+      active: false,
+      nif: '',
+      token: '',
+    },
+
     opciones: {
       backupApiKey: '',
       fechaCaducidad: false,

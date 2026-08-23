@@ -1,3 +1,4 @@
+import type EmailSmtpSecurity from '@desktop-contracts/configuration/email-smtp-security.type';
 import type TipoIva from '@desktop-contracts/tipo-iva.type';
 
 export interface InstallationBusinessFormModel {
@@ -58,6 +59,21 @@ export interface InstallationOnlineStoreFormModel {
   secretApi: string;
 }
 
+export interface InstallationEmailSmtpFormModel {
+  active: boolean;
+  host: string;
+  port: number;
+  secure: EmailSmtpSecurity;
+  user: string;
+  pass: string;
+}
+
+export interface InstallationTicketBaiFormModel {
+  active: boolean;
+  nif: string;
+  token: string;
+}
+
 export interface InstallationOptionsFormModel {
   backupApiKey: string;
   fechaCaducidad: boolean;
@@ -72,5 +88,7 @@ export interface InstallationFormModel {
   valoresIniciales: InstallationInitialValuesFormModel;
   fiscalidad: InstallationTaxFormModel;
   ventaOnline: InstallationOnlineStoreFormModel;
+  emailSmtp: InstallationEmailSmtpFormModel;
+  ticketBai: InstallationTicketBaiFormModel;
   opciones: InstallationOptionsFormModel;
 }

@@ -569,8 +569,155 @@
       }
 
       <p>
-        ¿Los artículos de la aplicación tienen fecha de
-        caducidad?
+        ¿Quieres configurar el envío de emails por SMTP?
+      </p>
+
+      <mat-radio-group class="option-margin"
+                       aria-label="Email SMTP"
+                       [formField]="installationForm.emailSmtp.active">
+        <mat-radio-button [value]="false">
+          No
+        </mat-radio-button>
+        <mat-radio-button [value]="true">
+          Sí
+        </mat-radio-button>
+      </mat-radio-group>
+
+      @if (installationForm.emailSmtp.active().value()) {
+      <div class="row">
+        <mat-form-field class="three">
+          <mat-label>Servidor SMTP</mat-label>
+          <input matInput
+                 placeholder="smtp.example.com"
+                 [formField]="installationForm.emailSmtp.host">
+          @if (
+          installationForm.emailSmtp.host().touched() &&
+          installationForm.emailSmtp.host().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.emailSmtp.host().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field class="three">
+          <mat-label>Puerto</mat-label>
+          <input matInput
+                 type="number"
+                 step="1"
+                 [formField]="installationForm.emailSmtp.port">
+          @if (
+          installationForm.emailSmtp.port().touched() &&
+          installationForm.emailSmtp.port().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.emailSmtp.port().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field class="three">
+          <mat-label>Seguridad</mat-label>
+          <mat-select [formField]="installationForm.emailSmtp.secure">
+            <mat-option value="none">
+              Sin cifrado
+            </mat-option>
+            <mat-option value="tls">
+              TLS / STARTTLS
+            </mat-option>
+            <mat-option value="ssl">
+              SSL / TLS implícito
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="row">
+        <mat-form-field class="two">
+          <mat-label>Usuario SMTP</mat-label>
+          <input matInput
+                 placeholder="Usuario SMTP"
+                 [formField]="installationForm.emailSmtp.user">
+          @if (
+          installationForm.emailSmtp.user().touched() &&
+          installationForm.emailSmtp.user().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.emailSmtp.user().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field class="two">
+          <mat-label>Contraseña SMTP</mat-label>
+          <input matInput
+                 type="password"
+                 placeholder="Contraseña SMTP"
+                 [formField]="installationForm.emailSmtp.pass">
+          @if (
+          installationForm.emailSmtp.pass().touched() &&
+          installationForm.emailSmtp.pass().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.emailSmtp.pass().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+      </div>
+      }
+
+      <p>
+        ¿Quieres configurar TicketBAI?
+      </p>
+
+      <mat-radio-group class="option-margin"
+                       aria-label="TicketBAI"
+                       [formField]="installationForm.ticketBai.active">
+        <mat-radio-button [value]="false">
+          No
+        </mat-radio-button>
+        <mat-radio-button [value]="true">
+          Sí
+        </mat-radio-button>
+      </mat-radio-group>
+
+      @if (installationForm.ticketBai.active().value()) {
+      <div class="row">
+        <mat-form-field class="two">
+          <mat-label>NIF TicketBAI</mat-label>
+          <input matInput
+                 placeholder="NIF"
+                 [formField]="installationForm.ticketBai.nif">
+          @if (
+          installationForm.ticketBai.nif().touched() &&
+          installationForm.ticketBai.nif().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.ticketBai.nif().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field class="two">
+          <mat-label>Token TicketBAI</mat-label>
+          <input matInput
+                 type="password"
+                 placeholder="Token TicketBAI"
+                 [formField]="installationForm.ticketBai.token">
+          @if (
+          installationForm.ticketBai.token().touched() &&
+          installationForm.ticketBai.token().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.ticketBai.token().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+      </div>
+      }
+
+      <p>
+        ¿Los artículos de la aplicación tienen fecha de caducidad?
       </p>
 
       <mat-radio-group class="option-margin"

@@ -82,6 +82,19 @@ export default function createInstallationCommand(
       urlApi: model.ventaOnline.active ? model.ventaOnline.urlApi.trim() : '',
     },
 
+    emailSmtp: {
+      active: model.emailSmtp.active,
+      host: model.emailSmtp.active ? model.emailSmtp.host.trim() : '',
+      port: model.emailSmtp.port,
+      secure: model.emailSmtp.secure,
+      user: model.emailSmtp.active ? model.emailSmtp.user.trim() : '',
+    },
+
+    ticketBai: {
+      active: model.ticketBai.active,
+      nif: model.ticketBai.active ? model.ticketBai.nif.trim() : '',
+    },
+
     opciones: {
       fechaCaducidad: model.opciones.fechaCaducidad,
       empleados: model.opciones.empleados,
@@ -90,8 +103,8 @@ export default function createInstallationCommand(
     secretos: {
       secretApi: model.ventaOnline.active ? model.ventaOnline.secretApi : '',
       backupApiKey: model.opciones.backupApiKey,
-      emailSmtpPass: null,
-      ticketBaiToken: null,
+      emailSmtpPass: model.emailSmtp.active ? model.emailSmtp.pass : null,
+      ticketBaiToken: model.ticketBai.active ? model.ticketBai.token : null,
     },
 
     logo,

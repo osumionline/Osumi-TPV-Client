@@ -15,6 +15,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
+import { MatSelectModule } from '@angular/material/select';
 import { MatToolbar } from '@angular/material/toolbar';
 import { Router } from '@angular/router';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
@@ -47,6 +48,7 @@ import DesktopConfigurationService from '@services/desktop-configuration.service
     MatInput,
     MatRadioModule,
     MatCheckbox,
+    MatSelectModule,
   ],
 })
 export default class NewInstallationComponent {
@@ -232,6 +234,8 @@ export default class NewInstallationComponent {
       case 3: {
         this.installationForm.ventaOnline().markAsTouched();
         this.installationForm.opciones().markAsTouched();
+        this.installationForm.emailSmtp().markAsTouched();
+        this.installationForm.ticketBai().markAsTouched();
         return !this.isStepThreeInvalid();
       }
       default:
@@ -251,7 +255,10 @@ export default class NewInstallationComponent {
 
   private isStepThreeInvalid(): boolean {
     return (
-      this.installationForm.ventaOnline().invalid() || this.installationForm.opciones().invalid()
+      this.installationForm.ventaOnline().invalid() ||
+      this.installationForm.emailSmtp().invalid() ||
+      this.installationForm.ticketBai().invalid() ||
+      this.installationForm.opciones().invalid()
     );
   }
 
@@ -298,6 +305,8 @@ export default class NewInstallationComponent {
     this.installationForm.ventaOnline.secretApi().value.set('');
     this.installationForm.opciones.backupApiKey().value.set('');
     this.installationForm.negocio.logoDataUrl().value.set('');
+    this.installationForm.emailSmtp.pass().value.set('');
+    this.installationForm.ticketBai.token().value.set('');
     this.logoFileName.set('');
     this.logoMimeType.set('');
   }

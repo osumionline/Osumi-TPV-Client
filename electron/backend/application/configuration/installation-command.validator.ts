@@ -56,12 +56,16 @@ export function isInstallationCommand(value: unknown): value is InstallationComm
   const secretos: unknown = value['secretos'];
   const logo: unknown = value['logo'];
   const ticket: unknown = value['ticket'];
+  const emailSmtp: unknown = value['emailSmtp'];
+  const ticketBai: unknown = value['ticketBai'];
 
   if (
     !isRecord(negocio) ||
     !isRecord(empleadoInicial) ||
     !isRecord(redes) ||
     !isRecord(ticket) ||
+    !isRecord(emailSmtp) ||
+    !isRecord(ticketBai) ||
     !isRecord(valoresIniciales) ||
     !isRecord(fiscalidad) ||
     !isRecord(ventaOnline) ||
@@ -108,6 +112,17 @@ export function isInstallationCommand(value: unknown): value is InstallationComm
   const validOnlineStore: boolean =
     hasBoolean(ventaOnline, 'active') && hasString(ventaOnline, 'urlApi');
 
+  const validEmailSmtp: boolean =
+    hasBoolean(emailSmtp, 'active') &&
+    hasString(emailSmtp, 'host') &&
+    hasNumber(emailSmtp, 'port') &&
+    (emailSmtp['secure'] === 'none' ||
+      emailSmtp['secure'] === 'tls' ||
+      emailSmtp['secure'] === 'ssl') &&
+    hasString(emailSmtp, 'user');
+
+  const validTicketBai: boolean = hasBoolean(ticketBai, 'active') && hasString(ticketBai, 'nif');
+
   const validOptions: boolean =
     hasBoolean(opciones, 'fechaCaducidad') && hasBoolean(opciones, 'empleados');
 
@@ -125,6 +140,8 @@ export function isInstallationCommand(value: unknown): value is InstallationComm
     validEmployee &&
     validSocial &&
     validTicket &&
+    validEmailSmtp &&
+    validTicketBai &&
     validInitialValues &&
     validTaxData &&
     validOnlineStore &&
@@ -229,6 +246,48 @@ export function validateInstallationCommand(
     if (command.secretos.secretApi === '') {
       addError('secretos.secretApi', 'El secreto de la API es obligatorio.');
     }
+  }
+
+  if (command.emailSmtp.active) {
+    if (command.emailSmtp.host.trim() === '') {
+      addError('emailSmtp.host', 'El servidor SMTP es obligatorio.');
+    }
+
+    if (
+      !Number.isSafeInteger(command.emailSmtp.port) ||
+      command.emailSmtp.port < 1 ||
+      command.emailSmtp.port > 65_535
+    ) {
+      addError('emailSmtp.port', 'El puerto SMTP no es válido.');
+    }
+
+    if (command.emailSmtp.user.trim() === '') {
+      addError('emailSmtp.user', 'El usuario SMTP es obligatorio.');
+    }
+
+    if (command.secretos.emailSmtpPass === null || command.secretos.emailSmtpPass === '') {
+      addError('secretos.emailSmtpPass', 'La contraseña SMTP es obligatoria.');
+    }
+  } else if (command.secretos.emailSmtpPass !== null) {
+    addError(
+      'secretos.emailSmtpPass',
+      'No debe enviarse una contraseña SMTP si SMTP está desactivado.',
+    );
+  }
+
+  if (command.ticketBai.active) {
+    if (command.ticketBai.nif.trim() === '') {
+      addError('ticketBai.nif', 'El NIF de TicketBAI es obligatorio.');
+    }
+
+    if (command.secretos.ticketBaiToken === null || command.secretos.ticketBaiToken === '') {
+      addError('secretos.ticketBaiToken', 'El token de TicketBAI es obligatorio.');
+    }
+  } else if (command.secretos.ticketBaiToken !== null) {
+    addError(
+      'secretos.ticketBaiToken',
+      'No debe enviarse un token de TicketBAI si TicketBAI está desactivado.',
+    );
   }
 
   const acceptedLogoTypes: readonly string[] = ['image/jpeg', 'image/png'];

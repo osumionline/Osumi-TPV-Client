@@ -127,9 +127,60 @@ export default function installationFormSchema(path: SchemaPathTree<Installation
     when: ({ valueOf }): boolean => valueOf(path.ventaOnline.active),
   });
 
+  // Paso 3: SMTP
+
+  required(path.emailSmtp.host, {
+    message: 'El servidor SMTP es obligatorio.',
+    when: ({ valueOf }): boolean => valueOf(path.emailSmtp.active),
+  });
+
+  required(path.emailSmtp.secure, {
+    message: 'Debes elegir el tipo de seguridad SMTP.',
+    when: ({ valueOf }): boolean => valueOf(path.emailSmtp.active),
+  });
+
+  required(path.emailSmtp.user, {
+    message: 'El usuario SMTP es obligatorio.',
+    when: ({ valueOf }): boolean => valueOf(path.emailSmtp.active),
+  });
+
+  required(path.emailSmtp.pass, {
+    message: 'La contraseña SMTP es obligatoria.',
+    when: ({ valueOf }): boolean => valueOf(path.emailSmtp.active),
+  });
+
+  validate(path.emailSmtp.port, ({ value, valueOf }) => {
+    const active: boolean = valueOf(path.emailSmtp.active);
+    const port: number = value();
+
+    if (!active) {
+      return null;
+    }
+
+    if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+      return {
+        kind: 'invalidSmtpPort',
+        message: 'El puerto SMTP debe estar entre 1 y 65535.',
+      };
+    }
+
+    return null;
+  });
+
+  // Paso 3: TicketBAI
+
+  required(path.ticketBai.nif, {
+    message: 'El NIF de TicketBAI es obligatorio.',
+    when: ({ valueOf }): boolean => valueOf(path.ticketBai.active),
+  });
+
+  required(path.ticketBai.token, {
+    message: 'El token de TicketBAI es obligatorio.',
+    when: ({ valueOf }): boolean => valueOf(path.ticketBai.active),
+  });
+
   validate(path.ventaOnline.urlApi, ({ value, valueOf }) => {
     const active: boolean = valueOf(path.ventaOnline.active);
-
     const url: string = value();
 
     if (!active || url === '') {

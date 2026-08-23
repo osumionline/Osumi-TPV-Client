@@ -1,3 +1,4 @@
+import type EmailSmtpSecurity from '@desktop-contracts/configuration/email-smtp-security.type';
 import type TipoIva from '@desktop-contracts/tipo-iva.type';
 
 export interface InstallationBusinessData {
@@ -45,6 +46,19 @@ export interface InstallationOnlineStoreData {
   readonly urlApi: string;
 }
 
+export interface InstallationEmailSmtpData {
+  readonly active: boolean;
+  readonly host: string;
+  readonly port: number;
+  readonly secure: EmailSmtpSecurity;
+  readonly user: string;
+}
+
+export interface InstallationTicketBaiData {
+  readonly active: boolean;
+  readonly nif: string;
+}
+
 export interface InstallationOptionsData {
   readonly fechaCaducidad: boolean;
   readonly empleados: boolean;
@@ -71,6 +85,8 @@ export interface InstallationCommand {
   readonly valoresIniciales: InstallationInitialValuesData;
   readonly fiscalidad: InstallationTaxData;
   readonly ventaOnline: InstallationOnlineStoreData;
+  readonly emailSmtp: InstallationEmailSmtpData;
+  readonly ticketBai: InstallationTicketBaiData;
   readonly opciones: InstallationOptionsData;
   readonly secretos: InstallationSecretsData;
   readonly logo: InstallationLogoData;
