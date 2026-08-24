@@ -11,65 +11,41 @@ import type { QueryRunner } from 'typeorm';
 
 interface LegacySaleRow {
   readonly id: number;
-
   readonly number: number;
-
   readonly employeeId: number;
-
   readonly customerId: number | null;
-
   readonly total: number;
-
   readonly createdAt: string;
-
   readonly updatedAt: string;
-
   readonly deletedAt: string | null;
 }
 
 interface LegacySaleLineRow {
   readonly id: number;
-
   readonly saleId: number;
-
   readonly articleId: number | null;
-
   readonly articleName: string | null;
-
   readonly purchasePrice: number;
-
   readonly salePrice: number;
-
   readonly taxRate: number;
-
   readonly total: number;
-
   readonly discount: number | null;
-
   readonly discountAmount: number | null;
-
   readonly returnedUnits: number;
-
   readonly units: number;
-
   readonly gift: boolean;
-
   readonly createdAt: string;
-
   readonly updatedAt: string;
 }
 
 interface MutableSalesDataState {
   readonly sales: LegacySaleRow[];
-
   readonly saleLines: LegacySaleLineRow[];
 }
 
 interface MutableImportCounters {
   importedRows: number;
-
   skippedRows: number;
-
   warningCount: number;
 }
 
@@ -77,35 +53,32 @@ interface IdRow {
   readonly id: number;
 }
 
-interface ArticleRow {
-  readonly id: number;
-
+interface ArticleSnapshot {
   readonly nombre: string;
+  readonly localizador: number;
+  readonly marca: string;
+}
+
+interface ArticleRow extends ArticleSnapshot {
+  readonly id: number;
 }
 
 interface CashRegisterRow {
   readonly id: number;
-
   readonly apertura: string;
-
   readonly cierre: string | null;
 }
 
 interface SalesReferenceState {
   readonly employeeIds: ReadonlySet<number>;
-
   readonly fallbackEmployeeId: number;
-
   readonly customerIds: ReadonlySet<number>;
-
-  readonly articleNames: ReadonlyMap<number, string>;
-
+  readonly articleSnapshots: ReadonlyMap<number, ArticleSnapshot>;
   readonly cashRegisters: readonly CashRegisterRow[];
 }
 
 interface CashRegisterResolution {
   readonly cashRegisterId: number;
-
   readonly exact: boolean;
 }
 
@@ -189,7 +162,7 @@ export default class LegacyImportSalesDataImporter implements LegacyImportPhaseI
         command,
         state.saleLines,
         insertedSaleIds,
-        references.articleNames,
+        references.articleSnapshots,
         counters,
       );
 
@@ -390,17 +363,7 @@ export default class LegacyImportSalesDataImporter implements LegacyImportPhaseI
             deleted_at
           )
           VALUES (
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            '',
-            ?,
-            ?,
-            ?,
-            ?,
-            ?
+            ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?
           )
         `,
         [
@@ -430,7 +393,7 @@ export default class LegacyImportSalesDataImporter implements LegacyImportPhaseI
     command: LegacyImportExecutionCommand,
     lines: readonly LegacySaleLineRow[],
     saleIds: ReadonlySet<number>,
-    articleNames: ReadonlyMap<number, string>,
+    articleSnapshots: ReadonlyMap<number, ArticleSnapshot>,
     counters: MutableImportCounters,
   ): Promise<void> {
     const insertedLineIds: Set<number> = new Set<number>();
@@ -454,16 +417,15 @@ export default class LegacyImportSalesDataImporter implements LegacyImportPhaseI
 
       let articleId: number | null = line.articleId;
 
-      if (articleId !== null && !articleNames.has(articleId)) {
+      if (articleId !== null && !articleSnapshots.has(articleId)) {
         articleId = null;
-
         counters.warningCount++;
       }
 
-      const fallbackArticleName: string =
-        articleId === null
-          ? `Artículo legacy ${line.id}`
-          : (articleNames.get(articleId) ?? `Artículo legacy ${line.id}`);
+      const articleSnapshot: ArticleSnapshot | null =
+        articleId === null ? null : (articleSnapshots.get(articleId) ?? null);
+
+      const fallbackArticleName: string = articleSnapshot?.nombre ?? `Artículo legacy ${line.id}`;
 
       const articleName: string = this.normalizeRequiredText(
         line.articleName,
@@ -471,6 +433,9 @@ export default class LegacyImportSalesDataImporter implements LegacyImportPhaseI
         200,
         counters,
       );
+
+      const localizador: number = articleSnapshot?.localizador ?? 0;
+      const marca: string = articleSnapshot?.marca ?? 'Sin marca';
 
       const returnedUnits: number = this.normalizeReturnedUnits(line.returnedUnits, counters);
 
@@ -481,6 +446,8 @@ export default class LegacyImportSalesDataImporter implements LegacyImportPhaseI
             public_id,
             id_venta,
             id_articulo,
+            localizador,
+            marca,
             nombre_articulo,
             puc_micros,
             pvp_micros,
@@ -495,22 +462,7 @@ export default class LegacyImportSalesDataImporter implements LegacyImportPhaseI
             updated_at
           )
           VALUES (
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
           )
         `,
         [
@@ -518,6 +470,8 @@ export default class LegacyImportSalesDataImporter implements LegacyImportPhaseI
           this.publicIdFactory.create(command.sourceHash, 'linea_venta', line.id),
           line.saleId,
           articleId,
+          localizador,
+          marca,
           articleName,
           this.numberConverter.toMicros(
             this.normalizeNonNegativeNumber(line.purchasePrice, counters),
@@ -572,9 +526,13 @@ export default class LegacyImportSalesDataImporter implements LegacyImportPhaseI
     const articleRows: readonly ArticleRow[] = (await queryRunner.query(
       `
             SELECT
-              id,
-              nombre
+              articulo.id,
+              articulo.nombre,
+              articulo.localizador,
+              marca.nombre AS marca
             FROM articulo
+            INNER JOIN marca
+              ON marca.id = articulo.id_marca
           `,
     )) as readonly ArticleRow[];
 
@@ -599,8 +557,15 @@ export default class LegacyImportSalesDataImporter implements LegacyImportPhaseI
       employeeIds: new Set<number>(employeeRows.map((row: IdRow): number => row.id)),
       fallbackEmployeeId,
       customerIds: new Set<number>(customerRows.map((row: IdRow): number => row.id)),
-      articleNames: new Map<number, string>(
-        articleRows.map((row: ArticleRow): [number, string] => [row.id, row.nombre]),
+      articleSnapshots: new Map<number, ArticleSnapshot>(
+        articleRows.map((row: ArticleRow): [number, ArticleSnapshot] => [
+          row.id,
+          {
+            nombre: row.nombre,
+            localizador: row.localizador,
+            marca: row.marca,
+          },
+        ]),
       ),
       cashRegisters,
     };
