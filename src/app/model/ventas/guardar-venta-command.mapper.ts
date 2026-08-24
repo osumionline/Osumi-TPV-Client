@@ -98,6 +98,8 @@ function mapLineaOrdinaria(linea: VentaLineaEnCurso): GuardarVentaLineaCommand {
 
   return {
     articuloPublicId: linea.articuloPublicId,
+    localizador: linea.localizador ?? 0,
+    marca: linea.marca.trim() || 'Sin marca',
     nombre: linea.descripcion,
     pucMicros: linea.pucMicros,
     pvpMicros: linea.pvpMicros,
@@ -118,6 +120,8 @@ function mapLineaReserva(
 ): GuardarVentaLineaCommand {
   return {
     articuloPublicId: linea.articuloPublicId,
+    localizador: linea.localizador ?? 0,
+    marca: linea.marca.trim() || 'Sin marca',
     nombre: linea.descripcion,
     pucMicros: linea.pucMicros,
     pvpMicros: linea.pvpMicros,
@@ -140,6 +144,8 @@ function mapLineaDevolucion(
 
   return {
     articuloPublicId: linea.articuloPublicId,
+    localizador: linea.localizador ?? 0,
+    marca: linea.marca.trim() || 'Sin marca',
     nombre: linea.descripcion,
     pucMicros: linea.pucMicros,
     pvpMicros: linea.pvpMicros,

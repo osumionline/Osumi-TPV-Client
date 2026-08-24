@@ -277,6 +277,28 @@ const statements: readonly string[] = [
        */
       id_linea_reserva_origen INTEGER,
 
+      /*
+       * Snapshot histórico del localizador y la marca
+       * que tenía el artículo al persistirse la línea.
+       *
+       * Para líneas Varios o artículos legacy que no
+       * hayan podido recuperarse se utiliza localizador 0.
+       */
+      localizador INTEGER NOT NULL
+        DEFAULT 0
+        CHECK (
+          localizador >= 0
+        ),
+
+      marca TEXT NOT NULL
+        DEFAULT 'Sin marca'
+        COLLATE NOCASE
+        CHECK (
+          marca = trim(marca)
+          AND length(marca)
+            BETWEEN 1 AND 200
+        ),
+
       nombre_articulo TEXT NOT NULL
         COLLATE NOCASE
         CHECK (

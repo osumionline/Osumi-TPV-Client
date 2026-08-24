@@ -7,7 +7,8 @@ export interface GuardarVentaPagoRecordCommand {
 
 export interface GuardarVentaLineaRecordCommand {
   readonly articuloPublicId: string | null;
-
+  readonly localizador: number;
+  readonly marca: string;
   readonly nombre: string;
   readonly pucMicros: number;
   readonly pvpMicros: number;
@@ -17,7 +18,6 @@ export interface GuardarVentaLineaRecordCommand {
   readonly importeDescuentoMicros: number;
   readonly unidades: number;
   readonly regalo: boolean;
-
   readonly devolucionLineaOrigenPublicId: string | null;
   readonly reservaLineaOrigenPublicId: string | null;
 }

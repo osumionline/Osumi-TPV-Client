@@ -11,7 +11,12 @@ export interface GuardarVentaLineaCommand {
    * o un artículo histórico que ya no exista.
    */
   readonly articuloPublicId: string | null;
-
+  /**
+   * Snapshot del localizador y la marca mostrados
+   * en el momento en que se finaliza la venta.
+   */
+  readonly localizador: number;
+  readonly marca: string;
   /**
    * Snapshot histórico de la línea tal y como
    * se ha vendido realmente.
@@ -25,7 +30,6 @@ export interface GuardarVentaLineaCommand {
   readonly importeDescuentoMicros: number;
   readonly unidades: number;
   readonly regalo: boolean;
-
   /**
    * Solo una línea de devolución conserva esta referencia.
    *
@@ -33,7 +37,6 @@ export interface GuardarVentaLineaCommand {
    * sus unidades devueltas dentro de la transacción.
    */
   readonly devolucionLineaOrigenPublicId: string | null;
-
   /**
    * Identifica la línea concreta de reserva de la que
    * procede esta línea cuando corresponda.
