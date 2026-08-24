@@ -40,7 +40,7 @@ describe('VentaPostCommitService', (): void => {
   it('ejecuta PDF e impresión después del COMMIT', async (): Promise<void> => {
     const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
 
-    const warnings: readonly string[] = await service.run(123, false, null);
+    const warnings: readonly string[] = await service.run(123, false, null, true);
 
     expect(warnings).toEqual([]);
 
@@ -54,7 +54,7 @@ describe('VentaPostCommitService', (): void => {
   it('recarga las reservas cuando la venta procedía de ellas', async (): Promise<void> => {
     const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
 
-    const warnings: readonly string[] = await service.run(123, true, null);
+    const warnings: readonly string[] = await service.run(123, true, null, true);
 
     expect(warnings).toEqual([]);
     expect(reservasService.reloadCalls).toBe(1);
@@ -65,7 +65,7 @@ describe('VentaPostCommitService', (): void => {
 
     const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
 
-    const warnings: readonly string[] = await service.run(123, false, null);
+    const warnings: readonly string[] = await service.run(123, false, null, true);
 
     expect(warnings).toEqual([
       'No se ha podido conservar el PDF histórico del ticket. No se ha podido generar el PDF.',
@@ -81,7 +81,7 @@ describe('VentaPostCommitService', (): void => {
 
     const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
 
-    const warnings: readonly string[] = await service.run(123, false, null);
+    const warnings: readonly string[] = await service.run(123, false, null, true);
 
     expect(warnings).toEqual([
       'No se ha podido imprimir el ticket. No hay una impresora de tickets configurada.',
@@ -99,7 +99,7 @@ describe('VentaPostCommitService', (): void => {
 
     const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
 
-    const warnings: readonly string[] = await service.run(123, false, null);
+    const warnings: readonly string[] = await service.run(123, false, null, true);
 
     expect(warnings).toEqual([
       'No se ha podido conservar el PDF histórico del ticket. Fallo PDF.',
@@ -112,7 +112,7 @@ describe('VentaPostCommitService', (): void => {
 
     const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
 
-    const warnings: readonly string[] = await service.run(123, true, null);
+    const warnings: readonly string[] = await service.run(123, true, null, true);
 
     expect(warnings).toEqual([
       'No se ha podido actualizar la lista de reservas. No se han podido cargar las reservas.',
@@ -126,7 +126,7 @@ describe('VentaPostCommitService', (): void => {
   it('invalida las estadísticas del cliente después del COMMIT', async (): Promise<void> => {
     const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
 
-    const warnings: readonly string[] = await service.run(123, false, 'cliente-1');
+    const warnings: readonly string[] = await service.run(123, false, 'cliente-1', true);
 
     expect(warnings).toEqual([]);
 
@@ -136,7 +136,7 @@ describe('VentaPostCommitService', (): void => {
   it('no invalida estadísticas cuando la venta no tiene cliente', async (): Promise<void> => {
     const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
 
-    await service.run(123, false, null);
+    await service.run(123, false, null, true);
 
     expect(clientesService.invalidatedPublicIds).toEqual([]);
   });
@@ -146,7 +146,7 @@ describe('VentaPostCommitService', (): void => {
 
     const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
 
-    const warnings: readonly string[] = await service.run(123, false, 'cliente-1');
+    const warnings: readonly string[] = await service.run(123, false, 'cliente-1', true);
 
     expect(warnings).toEqual([
       'No se han podido actualizar las estadísticas del cliente. Fallo de caché.',
@@ -155,6 +155,17 @@ describe('VentaPostCommitService', (): void => {
     expect(documentService.generatePdfVentaIds).toEqual([123]);
 
     expect(documentService.printVentaIds).toEqual([123]);
+  });
+
+  it('conserva el PDF pero no imprime cuando el usuario elige no imprimir ticket', async (): Promise<void> => {
+    const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
+
+    const warnings: readonly string[] = await service.run(123, false, null, false);
+
+    expect(warnings).toEqual([]);
+
+    expect(documentService.generatePdfVentaIds).toEqual([123]);
+    expect(documentService.printVentaIds).toEqual([]);
   });
 });
 

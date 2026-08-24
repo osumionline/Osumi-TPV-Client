@@ -332,38 +332,19 @@
         }
     }
 
-    /*
-     * Temporal hasta R.5, cuando Reserva se integrará
-     * en el selector único de acción final.
-     */
-    .finalization__reservation {
-        flex: 0 0 auto;
-        padding-top: 16px;
-        border-top: 1px solid var(--separator-color);
-    }
-
-    .finalization__reservation-info {
-        h3 {
-            margin: 0;
-        }
-
-        p {
-            margin: 4px 0 0;
-            color: var(--disabled-color);
-        }
-    }
-
-    .finalization__reservation-actions {
+    .finalization__sale-action {
         display: flex;
-        justify-content: flex-start;
+        align-items: center;
         gap: 12px;
-        flex-wrap: wrap;
 
-        button {
-            mat-icon {
-                margin-right: 6px;
-            }
+        mat-form-field {
+            width: min(320px, 100%);
         }
+    }
+
+    .finalization__reservation-hint {
+        color: var(--disabled-color);
+        font-size: .85rem;
     }
 
     .finalization__notice,

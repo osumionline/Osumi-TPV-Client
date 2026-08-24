@@ -25,6 +25,7 @@ export default class VentaPostCommitService {
     idVenta: number,
     reloadReservas: boolean,
     clientePublicId: string | null,
+    imprimirTicket: boolean,
   ): Promise<readonly string[]> {
     const warnings: string[] = [];
 
@@ -38,7 +39,9 @@ export default class VentaPostCommitService {
 
     await this.generateAndSavePdf(idVenta, warnings);
 
-    await this.printTicket(idVenta, warnings);
+    if (imprimirTicket) {
+      await this.printTicket(idVenta, warnings);
+    }
 
     return warnings;
   }

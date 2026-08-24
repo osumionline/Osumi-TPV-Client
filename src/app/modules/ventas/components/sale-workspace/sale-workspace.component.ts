@@ -31,7 +31,7 @@ import type ArticuloVenta from '@model/ventas/articulo-venta.model';
 import type VentaDevolucionSeleccion from '@model/ventas/venta-devolucion-seleccion.interface';
 import type VentaDevolucionSelectorState from '@model/ventas/venta-devolucion-selector-state.interface';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
-import type { VentaFinalizacionResultado } from '@model/ventas/venta-finalizacion-resultado.interface';
+import type VentaFinalizacionSolicitud from '@model/ventas/venta-finalizacion-solicitud.interface';
 import type VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
 import type VentaVariosData from '@model/ventas/venta-varios-data.interface';
 import type VentaVariosEditorState from '@model/ventas/venta-varios-editor-state.interface';
@@ -933,12 +933,13 @@ export default class SaleWorkspaceComponent {
    * Cualquier incidencia posterior se limita a informar al usuario,
    * porque la venta ya existe definitivamente en SQLite.
    */
-  async finalizeVenta(finalizacion: VentaFinalizacionResultado): Promise<void> {
+  async finalizeVenta(solicitud: VentaFinalizacionSolicitud): Promise<void> {
     if (this.ventaSaving() || this.reservaSaving()) {
       return;
     }
 
     const venta: VentaEnCurso = this.venta();
+    const { finalizacion, imprimirTicket } = solicitud;
 
     this.ventaSaving.set(true);
 
@@ -972,6 +973,7 @@ export default class SaleWorkspaceComponent {
         result.id,
         venta.tieneReservas,
         venta.cliente?.publicId ?? null,
+        imprimirTicket,
       );
     } catch (error: unknown) {
       /*

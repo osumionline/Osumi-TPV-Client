@@ -344,71 +344,60 @@
                             }}
                         </strong>
                     </div>
+
+                    <div class="finalization__sale-action">
+                        <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>
+                                Acción
+                            </mat-label>
+
+                            <mat-select [value]="accion()"
+                                        [disabled]="saving()"
+                                        (selectionChange)="onAccionChange($event)">
+                                <mat-option value="imprimir-ticket">
+                                    Imprimir ticket
+                                </mat-option>
+
+                                <mat-option value="no-imprimir-ticket">
+                                    No imprimir ticket
+                                </mat-option>
+
+                                <mat-option value="ticket-regalo"
+                                            disabled>
+                                    Imprimir ticket regalo
+                                </mat-option>
+
+                                <mat-option value="reserva"
+                                            [disabled]="reservaBlockedReason() !== null">
+                                    Crear reserva
+                                </mat-option>
+
+                                <mat-option value="reserva-sin-ticket"
+                                            [disabled]="reservaBlockedReason() !== null">
+                                    Crear reserva sin ticket
+                                </mat-option>
+
+                                <mat-option value="factura"
+                                            disabled>
+                                    Generar factura
+                                </mat-option>
+
+                                <mat-option value="email"
+                                            disabled>
+                                    Enviar ticket por email
+                                </mat-option>
+                            </mat-select>
+                        </mat-form-field>
+
+                        @if (reservaBlockedReason() !== null) {
+                        <span class="finalization__reservation-hint">
+                            Las opciones de reserva no están disponibles para esta venta: {{ reservaBlockedReason() }}
+                        </span>
+                        }
+                    </div>
                 </section>
             </div>
         </div>
-
-        <!--
-            Temporal durante R.3/R.4.
-            En R.5 estas acciones desaparecerán de aquí y pasarán
-            al selector único de acción final.
-        -->
-        <section class="finalization__section finalization__reservation">
-            <div class="finalization__reservation-info">
-                <h3>
-                    Reserva
-                </h3>
-
-                <p>
-                    Guarda los artículos de la venta actual
-                    como una reserva para el cliente seleccionado.
-                </p>
-            </div>
-
-            @if (reservaBlockedReason() !== null) {
-            <div class="finalization__notice">
-                {{ reservaBlockedReason() }}
-            </div>
-            }
-
-            <div class="finalization__reservation-actions">
-                <button mat-stroked-button
-                        type="button"
-                        [disabled]="
-                            saving() ||
-                            reservaBlockedReason() !== null
-                        "
-                        (click)="createReservaConTicket()">
-                    <mat-icon>
-                        print
-                    </mat-icon>
-
-                    {{
-                        reservaSaving()
-                            ? 'Guardando reserva...'
-                            : 'Reserva'
-                    }}
-                </button>
-
-                <button mat-stroked-button
-                        type="button"
-                        [disabled]="
-                            saving() ||
-                            reservaBlockedReason() !== null
-                        "
-                        (click)="createReservaSinTicket()">
-                    <mat-icon>
-                        bookmark_add
-                    </mat-icon>
-
-                    {{
-                        reservaSaving()
-                            ? 'Guardando reserva...'
-                            : 'Reserva sin ticket'
-                    }}
-                </button>
-            </div>
-        </section>
 
         @if (error() !== null) {
         <div class="finalization__error"
@@ -427,10 +416,16 @@
 
             <button mat-flat-button
                     type="button"
-                    [disabled]="saving() || !state.completa"
-                    (click)="finalizeVenta()">
-                @if (ventaSaving()) {
+                    [disabled]="!puedeEjecutarAccion()"
+                    (click)="executeSelectedAction()">
+                @if (reservaSaving()) {
+                Guardando reserva...
+                }
+                @else if (ventaSaving()) {
                 Guardando venta...
+                }
+                @else if (accionEsReserva()) {
+                Crear reserva
                 }
                 @else if (state.totalCents > 0) {
                 Finalizar venta

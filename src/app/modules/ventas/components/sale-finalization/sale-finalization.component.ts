@@ -18,9 +18,12 @@ import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
+import { MatSelectModule, type MatSelectChange } from '@angular/material/select';
 import type TipoPago from '@model/tipos-pago/tipo-pago.model';
+import type VentaFinalizacionAccion from '@model/ventas/venta-finalizacion-accion.type';
 import VentaFinalizacionEnCurso from '@model/ventas/venta-finalizacion-en-curso.model';
 import type { VentaFinalizacionResultado } from '@model/ventas/venta-finalizacion-resultado.interface';
+import type VentaFinalizacionSolicitud from '@model/ventas/venta-finalizacion-solicitud.interface';
 import type VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
 import type VentaPagoEnCurso from '@model/ventas/venta-pago-en-curso.model';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
@@ -39,6 +42,7 @@ import { centsToEuros, eurosToCents } from '@utils/money.utils';
     MatIcon,
     MatIconButton,
     MatInput,
+    MatSelectModule,
     CentsToEurosPipe,
     MicrosToEurosPipe,
   ],
@@ -56,8 +60,8 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
 
   readonly cancelEvent: OutputEmitterRef<void> = output<void>();
 
-  readonly finalizeEvent: OutputEmitterRef<VentaFinalizacionResultado> =
-    output<VentaFinalizacionResultado>();
+  readonly finalizeEvent: OutputEmitterRef<VentaFinalizacionSolicitud> =
+    output<VentaFinalizacionSolicitud>();
 
   readonly reservaSinTicketEvent: OutputEmitterRef<void> = output<void>();
   readonly reservaConTicketEvent: OutputEmitterRef<void> = output<void>();
@@ -138,6 +142,42 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
   readonly tipoPagoActivoPublicId: WritableSignal<string | null> = signal<string | null>(null);
 
   private readonly efectivoInput = viewChild<ElementRef<HTMLInputElement>>('efectivoInput');
+
+  readonly accion: WritableSignal<VentaFinalizacionAccion> =
+    signal<VentaFinalizacionAccion>('imprimir-ticket');
+
+  readonly accionEsReserva: Signal<boolean> = computed((): boolean => {
+    const accion: VentaFinalizacionAccion = this.accion();
+
+    return accion === 'reserva' || accion === 'reserva-sin-ticket';
+  });
+
+  readonly puedeEjecutarAccion: Signal<boolean> = computed((): boolean => {
+    if (this.saving()) {
+      return false;
+    }
+
+    const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
+
+    if (finalizacion === null) {
+      return false;
+    }
+
+    switch (this.accion()) {
+      case 'imprimir-ticket':
+      case 'no-imprimir-ticket':
+        return finalizacion.completa;
+
+      case 'reserva':
+      case 'reserva-sin-ticket':
+        return this.reservaBlockedReason() === null;
+
+      case 'ticket-regalo':
+      case 'factura':
+      case 'email':
+        return false;
+    }
+  });
 
   /**
    * Cada apertura del componente crea una finalización nueva.
@@ -343,6 +383,29 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
     } catch (error: unknown) {
       this.error.set(getErrorMessage(error, 'No se ha podido actualizar el pago en efectivo.'));
     }
+  }
+
+  onAccionChange(event: MatSelectChange): void {
+    const accion: unknown = event.value;
+
+    if (!this.isVentaFinalizacionAccion(accion)) {
+      return;
+    }
+
+    this.accion.set(accion);
+    this.error.set(null);
+  }
+
+  private isVentaFinalizacionAccion(value: unknown): value is VentaFinalizacionAccion {
+    return (
+      value === 'imprimir-ticket' ||
+      value === 'no-imprimir-ticket' ||
+      value === 'ticket-regalo' ||
+      value === 'reserva' ||
+      value === 'reserva-sin-ticket' ||
+      value === 'factura' ||
+      value === 'email'
+    );
   }
 
   normalizeEfectivoRapido(event: FocusEvent): void {
@@ -556,7 +619,7 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
    * Produce el snapshot económico definitivo y solicita
    * al workspace la persistencia de la venta.
    */
-  finalizeVenta(): void {
+  private finalizeVenta(imprimirTicket: boolean): void {
     if (this.saving()) {
       return;
     }
@@ -572,11 +635,47 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
 
       this.error.set(null);
 
-      this.finalizeEvent.emit(resultado);
+      this.finalizeEvent.emit({
+        finalizacion: resultado,
+        imprimirTicket,
+      });
     } catch (error: unknown) {
       this.error.set(
         getErrorMessage(error, 'No se ha podido preparar la finalización de la venta.'),
       );
+    }
+  }
+
+  executeSelectedAction(): void {
+    if (!this.puedeEjecutarAccion()) {
+      return;
+    }
+
+    switch (this.accion()) {
+      case 'imprimir-ticket':
+        this.finalizeVenta(true);
+
+        return;
+
+      case 'no-imprimir-ticket':
+        this.finalizeVenta(false);
+
+        return;
+
+      case 'reserva':
+        this.createReservaConTicket();
+
+        return;
+
+      case 'reserva-sin-ticket':
+        this.createReservaSinTicket();
+
+        return;
+
+      case 'ticket-regalo':
+      case 'factura':
+      case 'email':
+        return;
     }
   }
 
