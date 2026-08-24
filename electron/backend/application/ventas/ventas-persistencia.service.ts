@@ -99,6 +99,12 @@ export default class VentasPersistenciaService {
       'artículo de la línea',
     );
 
+    const localizador: number = this.requireNonNegativeSafeInteger(
+      linea.localizador,
+      'El localizador de una línea no es válido.',
+    );
+    const marca: string = this.requireMarcaLinea(linea.marca);
+
     const nombre: string = this.requireNombreLinea(linea.nombre);
 
     const pucMicros: number = this.requireNonNegativeSafeInteger(
@@ -215,6 +221,8 @@ export default class VentasPersistenciaService {
 
     return {
       articuloPublicId,
+      localizador,
+      marca,
       nombre,
       pucMicros,
       pvpMicros,
@@ -431,6 +439,23 @@ export default class VentasPersistenciaService {
     }
 
     return nombre;
+  }
+
+  /**
+   * Normaliza y valida la marca histórica de una línea de venta.
+   */
+  private requireMarcaLinea(value: string): string {
+    if (typeof value !== 'string') {
+      throw new Error('La marca de una línea no es válida.');
+    }
+
+    const marca: string = value.trim();
+
+    if (marca.length === 0 || marca.length > 200) {
+      throw new Error('La marca de una línea debe contener entre 1 y 200 caracteres.');
+    }
+
+    return marca;
   }
 
   private normalizeEntregadoCents(value: number | null): number | null {
