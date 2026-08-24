@@ -10,7 +10,6 @@
              role="dialog"
              aria-modal="true"
              aria-labelledby="sale-finalization-title">
-
         @if (finalizacion(); as state) {
         <header class="finalization__header">
             <div>
@@ -55,269 +54,312 @@
                               }
                               </p>
             </div>
-
-            <div class="finalization__total">
-                <span>Total</span>
-
-                <strong>
-                    {{
-                        state.totalCents
-                            | centsToEuros
-                            | currency:'EUR':'symbol':'1.2-2'
-                    }}
-                </strong>
-            </div>
         </header>
 
-        <div class="finalization__summary">
-            <div>
-                <span>
-                    Total
-                </span>
+        <div class="finalization__content">
+            <div class="finalization__payment-column">
+                <section class="finalization__section">
+                    <h3>
+                        @if (state.totalCents < 0)
+                          {
+                          Reembolso
+                          }
+                          @else
+                          {
+                          Cobro
+                          }
+                          </h3>
 
-                <strong>
-                    {{
-                        state.totalCents
-                            | centsToEuros
-                            | currency:'EUR':'symbol':'1.2-2'
-                    }}
-                </strong>
-            </div>
+                            @if (state.totalCents !== 0) {
+                            @if (tiposPagoFisicos().length > 0) {
+                            <div class="finalization__payment-types">
+                                @for (
+                                tipoPago of tiposPagoFisicos();
+                                track tipoPago.publicId
+                                ) {
+                                <button class="finalization__payment-type"
+                                        type="button"
+                                        [class.finalization__payment-type--added]="
+                                    isTipoPagoAdded(tipoPago)
+                                "
+                                        [disabled]="saving() || !canAddTipoPago(tipoPago)"
+                                        (click)="addTipoPago(tipoPago)">
+                                    <mat-icon aria-hidden="true">
+                                        {{
+                                    tipoPago.slug === 'efectivo'
+                                        ? 'payments'
+                                        : 'account_balance_wallet'
+                                }}
+                                    </mat-icon>
 
-            <div>
-                <span>
-                    {{
-                        state.totalCents < 0
-                            ? 'Reembolsado'
-                            : 'Pagado'
-                    }}
-                </span>
+                                    <span>
+                                        {{ tipoPago.nombre }}
+                                    </span>
 
-                <strong>
-                    {{
-                        state.totalPagadoCents
-                            | centsToEuros
-                            | currency:'EUR':'symbol':'1.2-2'
-                    }}
-                </strong>
-            </div>
+                                    @if (isTipoPagoAdded(tipoPago)) {
+                                    <mat-icon class="finalization__payment-added"
+                                              aria-hidden="true">
+                                        check_circle
+                                    </mat-icon>
+                                    }
+                                </button>
+                                }
+                            </div>
+                            }
+                            @else {
+                            <div class="finalization__notice">
+                                No hay medios de pago físicos disponibles.
+                            </div>
+                            }
+                            }
+                            @else {
+                            <div class="finalization__notice">
+                                El total de la operación es 0,00 €. No es necesario
+                                seleccionar ningún medio de pago.
+                            </div>
+                            }
+                </section>
 
-            <div class="finalization__pending"
-                 [class.finalization__pending--complete]="state.completa">
-                <span>
-                    Pendiente
-                </span>
-
-                <strong>
-                    {{
-                        state.pendienteCents
-                            | centsToEuros
-                            | currency:'EUR':'symbol':'1.2-2'
-                    }}
-                </strong>
-            </div>
-
-            @if (cambioTotalCents() > 0) {
-            <div class="finalization__change-summary">
-                <span>
-                    Cambio
-                </span>
-
-                <strong>
-                    {{
-                        cambioTotalCents()
-                            | centsToEuros
-                            | currency:'EUR':'symbol':'1.2-2'
-                    }}
-                </strong>
-            </div>
-            }
-        </div>
-
-        @if (state.totalCents !== 0) {
-        <section class="finalization__section">
-            <h3>
-                Medios de pago
-            </h3>
-
-            @if (tiposPagoFisicos().length > 0) {
-            <div class="finalization__payment-types">
-                @for (
-                tipoPago of tiposPagoFisicos();
-                track tipoPago.publicId
-                ) {
-                <button class="finalization__payment-type"
-                        type="button"
-                        [class.finalization__payment-type--added]="
-                            isTipoPagoAdded(tipoPago)
-                        "
-                        [disabled]="saving() || !canAddTipoPago(tipoPago)"
-                        (click)="addTipoPago(tipoPago)">
-                    <mat-icon aria-hidden="true">
+                @if (state.pagos.length > 0) {
+                <section class="finalization__section">
+                    <h3>
                         {{
-                            tipoPago.slug === 'efectivo'
-                                ? 'payments'
-                                : 'account_balance_wallet'
+                            state.totalCents < 0
+                                ? 'Reembolsos aplicados'
+                                : 'Pagos aplicados'
                         }}
-                    </mat-icon>
+                    </h3>
 
+                    <div class="finalization__payments">
+                        @for (
+                        pago of state.pagos;
+                        track pago.tipoPagoPublicId
+                        ) {
+                        <div class="finalization__payment"
+                             [class.finalization__payment--cash]="
+                                pago.esEfectivo &&
+                                state.totalCents > 0
+                             ">
+                            <div class="finalization__payment-name">
+                                <mat-icon aria-hidden="true">
+                                    {{
+                                        pago.esEfectivo
+                                            ? 'payments'
+                                            : 'account_balance_wallet'
+                                    }}
+                                </mat-icon>
+
+                                <strong>
+                                    {{ pago.tipoPago.nombre }}
+                                </strong>
+                            </div>
+
+                            <mat-form-field class="finalization__payment-field"
+                                            subscriptSizing="dynamic">
+                                <mat-label>
+                                    {{
+                                        state.totalCents < 0
+                                            ? 'Reembolso'
+                                            : 'Importe'
+                                    }}
+                                </mat-label>
+
+                                <input matInput
+                                       type="number"
+                                       inputmode="decimal"
+                                       min="0.01"
+                                       step="0.01"
+                                       autocomplete="off"
+                                       [disabled]="saving()"
+                                       [max]="getPagoMaxEuros(pago)"
+                                       [value]="getPagoImporteEuros(pago)"
+                                       (focus)="selectInputContent($event)"
+                                       (change)="updatePagoImporte(pago, $event)"
+                                       (keydown.enter)="updatePagoImporte(pago, $event)">
+
+                                <span matTextSuffix>
+                                    €
+                                </span>
+                            </mat-form-field>
+
+                            @if (
+                            pago.esEfectivo &&
+                            state.totalCents > 0
+                            ) {
+                            <mat-form-field class="finalization__payment-field"
+                                            subscriptSizing="dynamic">
+                                <mat-label>
+                                    Entregado
+                                </mat-label>
+
+                                <input matInput
+                                       type="number"
+                                       inputmode="decimal"
+                                       min="0.01"
+                                       step="0.01"
+                                       autocomplete="off"
+                                       [disabled]="saving()"
+                                       [min]="getPagoImporteEuros(pago)"
+                                       [value]="getPagoEntregadoEuros(pago)"
+                                       (focus)="selectInputContent($event)"
+                                       (change)="updatePagoEntregado(pago, $event)"
+                                       (keydown.enter)="updatePagoEntregado(pago, $event)">
+
+                                <span matTextSuffix>
+                                    €
+                                </span>
+                            </mat-form-field>
+
+                            <div class="finalization__payment-change"
+                                 [class.finalization__payment-change--active]="
+                                    pago.cambioCents > 0
+                                 ">
+                                <span>
+                                    Cambio
+                                </span>
+
+                                <strong>
+                                    {{
+                                        pago.cambioCents
+                                            | centsToEuros
+                                            | currency:'EUR':'symbol':'1.2-2'
+                                    }}
+                                </strong>
+                            </div>
+                            }
+
+                            <button mat-icon-button
+                                    class="finalization__payment-delete"
+                                    type="button"
+                                    [attr.aria-label]="
+                                        'Eliminar ' + pago.tipoPago.nombre
+                                    "
+                                    [disabled]="saving()"
+                                    (click)="removePago(pago.tipoPagoPublicId)">
+                                <mat-icon>
+                                    delete
+                                </mat-icon>
+                            </button>
+                        </div>
+                        }
+                    </div>
+                </section>
+                }
+
+                @if (state.totalCents !== 0 && !state.completa) {
+                <div class="finalization__pending-compact">
                     <span>
-                        {{ tipoPago.nombre }}
+                        Pendiente
                     </span>
 
-                    @if (isTipoPagoAdded(tipoPago)) {
-                    <mat-icon class="finalization__payment-added"
-                              aria-hidden="true">
-                        check_circle
-                    </mat-icon>
-                    }
-                </button>
+                    <strong>
+                        {{
+                            state.pendienteCents
+                                | centsToEuros
+                                | currency:'EUR':'symbol':'1.2-2'
+                        }}
+                    </strong>
+                </div>
                 }
             </div>
-            }
-            @else {
-            <div class="finalization__notice">
-                No hay medios de pago físicos disponibles.
-            </div>
-            }
-        </section>
-        }
 
-        @if (state.pagos.length > 0) {
-        <section class="finalization__section">
-            <h3>
-                {{
-                    state.totalCents < 0
-                        ? 'Reembolsos'
-                        : 'Pagos aplicados'
-                }}
-            </h3>
+            <div class="finalization__sale-column">
+                <section class="finalization__sale-summary">
+                    <h3>
+                        Resumen de la venta
+                    </h3>
 
-            <div class="finalization__payments">
-                @for (
-                pago of state.pagos;
-                track pago.tipoPagoPublicId
-                ) {
-                <div class="finalization__payment"
-                     [class.finalization__payment--cash]="
-                        pago.esEfectivo &&
-                        state.totalCents > 0
-                     ">
-                    <div class="finalization__payment-name">
-                        <mat-icon aria-hidden="true">
-                            {{
-                                pago.esEfectivo
-                                    ? 'payments'
-                                    : 'account_balance_wallet'
-                            }}
-                        </mat-icon>
+                    <div class="finalization__sale-table-wrapper">
+                        <table class="finalization__sale-table">
+                            <thead>
+                                <tr>
+                                    <th class="finalization__sale-localizador">
+                                        Localizador
+                                    </th>
+                                    <th>
+                                        Descripción
+                                    </th>
+                                    <th class="finalization__sale-number">
+                                        Cant.
+                                    </th>
+                                    <th class="finalization__sale-money">
+                                        Desc.
+                                    </th>
+                                    <th class="finalization__sale-money">
+                                        Importe
+                                    </th>
+                                </tr>
+                            </thead>
 
-                        <strong>
-                            {{ pago.tipoPago.nombre }}
-                        </strong>
+                            <tbody>
+                                @for (
+                                linea of lineas();
+                                track linea.idTemporal
+                                ) {
+                                <tr>
+                                    <td class="finalization__sale-localizador">
+                                        {{ linea.localizador ?? '-' }}
+                                    </td>
+
+                                    <td>
+                                        {{ linea.descripcion }}
+                                    </td>
+
+                                    <td class="finalization__sale-number">
+                                        {{ linea.cantidad }}
+                                    </td>
+
+                                    <td class="finalization__sale-money">
+                                        @if (linea.regalo) {
+                                        Regalo
+                                        }
+                                        @else if (getLineaDescuentoMicros(linea) > 0) {
+                                        {{
+                                            getLineaDescuentoMicros(linea)
+                                                | microsToEuros
+                                                | currency:'EUR':'symbol':'1.2-2'
+                                        }}
+                                        }
+                                        @else {
+                                        -
+                                        }
+                                    </td>
+
+                                    <td class="finalization__sale-money">
+                                        {{
+                                            linea.importeFinalMicros
+                                                | microsToEuros
+                                                | currency:'EUR':'symbol':'1.2-2'
+                                        }}
+                                    </td>
+                                </tr>
+                                }
+                            </tbody>
+                        </table>
                     </div>
 
-                    <mat-form-field class="finalization__payment-field"
-                                    subscriptSizing="dynamic">
-
-                        <mat-label>
-                            {{
-                                state.totalCents < 0
-                                    ? 'Reembolso'
-                                    : 'Importe'
-                            }}
-                        </mat-label>
-
-                        <input matInput
-                               type="number"
-                               inputmode="decimal"
-                               min="0.01"
-                               step="0.01"
-                               autocomplete="off"
-                               [disabled]="saving()"
-                               [max]="getPagoMaxEuros(pago)"
-                               [value]="getPagoImporteEuros(pago)"
-                               (focus)="selectInputContent($event)"
-                               (change)="updatePagoImporte(pago, $event)"
-                               (keydown.enter)="updatePagoImporte(pago, $event)">
-
-                        <span matTextSuffix>
-                            €
-                        </span>
-                    </mat-form-field>
-
-                    @if (
-                    pago.esEfectivo &&
-                    state.totalCents > 0
-                    ) {
-                    <mat-form-field class="finalization__payment-field"
-                                    subscriptSizing="dynamic">
-
-                        <mat-label>
-                            Entregado
-                        </mat-label>
-
-                        <input matInput
-                               type="number"
-                               inputmode="decimal"
-                               min="0.01"
-                               step="0.01"
-                               autocomplete="off"
-                               [disabled]="saving()"
-                               [min]="getPagoImporteEuros(pago)"
-                               [value]="getPagoEntregadoEuros(pago)"
-                               (focus)="selectInputContent($event)"
-                               (change)="updatePagoEntregado(pago, $event)"
-                               (keydown.enter)="updatePagoEntregado(pago, $event)">
-
-                        <span matTextSuffix>
-                            €
-                        </span>
-                    </mat-form-field>
-
-                    <div class="finalization__payment-change"
-                         [class.finalization__payment-change--active]="
-                            pago.cambioCents > 0
-                         ">
-                        <span>
-                            Cambio
-                        </span>
+                    <div class="finalization__sale-total">
+                        <strong>
+                            TOTAL
+                        </strong>
 
                         <strong>
                             {{
-                                pago.cambioCents
+                                state.totalCents
                                     | centsToEuros
                                     | currency:'EUR':'symbol':'1.2-2'
                             }}
                         </strong>
                     </div>
-                    }
-
-                    <button mat-icon-button
-                            class="finalization__payment-delete"
-                            type="button"
-                            [attr.aria-label]="
-                                'Eliminar ' + pago.tipoPago.nombre
-                            "
-                            [disabled]="saving()"
-                            (click)="removePago(pago.tipoPagoPublicId)">
-                        <mat-icon>
-                            delete
-                        </mat-icon>
-                    </button>
-                </div>
-                }
+                </section>
             </div>
-        </section>
-        }
-
-        @if (state.totalCents === 0) {
-        <div class="finalization__notice">
-            El total de la operación es 0,00 €. No es necesario
-            seleccionar ningún medio de pago.
         </div>
-        }
 
+        <!--
+            Temporal durante R.3/R.4.
+            En R.5 estas acciones desaparecerán de aquí y pasarán
+            al selector único de acción final.
+        -->
         <section class="finalization__section finalization__reservation">
             <div class="finalization__reservation-info">
                 <h3>

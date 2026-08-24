@@ -7,19 +7,16 @@
 
     .finalization {
         display: flex;
-        width: min(920px, 100%);
-        max-height: min(760px, calc(100vh - 48px));
+        width: min(1220px, 100%);
+        max-height: min(820px, calc(100vh - 48px));
         padding: 24px;
         flex-direction: column;
         gap: 20px;
-        overflow-y: auto;
+        overflow: hidden;
     }
 
     .finalization__header {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 24px;
+        flex: 0 0 auto;
 
         h2 {
             margin: 0 0 4px;
@@ -31,64 +28,32 @@
         }
     }
 
-    .finalization__total {
-        display: flex;
-        min-width: 180px;
-        flex-direction: column;
-        align-items: flex-end;
-
-        span {
-            color: var(--disabled-color);
-        }
-
-        strong {
-            font-size: 2rem;
-            font-weight: 500;
-        }
-    }
-
-    .finalization__summary {
+    .finalization__content {
         display: grid;
-        grid-template-columns: repeat(auto-fit,
-                minmax(150px, 1fr));
-        gap: 12px;
-
-        >div {
-            display: flex;
-            min-width: 0;
-            padding: 12px 16px;
-            border: 1px solid var(--separator-color);
-            border-radius: 6px;
-            flex-direction: column;
-
-            span {
-                color: var(--disabled-color);
-                font-size: .9rem;
-            }
-
-            strong {
-                margin-top: 4px;
-                font-size: 1.25rem;
-            }
-        }
+        min-height: 0;
+        flex: 1 1 auto;
+        grid-template-columns: minmax(360px, 42%) minmax(0, 58%);
+        gap: 20px;
     }
 
-    .finalization__pending {
-        background-color: var(--color-very-light-grey);
-
-        &.finalization__pending--complete {
-            border-color: var(--main-color);
-            background-color: var(--table-row-selected);
-        }
+    .finalization__payment-column,
+    .finalization__sale-column {
+        min-width: 0;
+        min-height: 0;
     }
 
-    .finalization__change-summary {
-        border-color: var(--main-color) !important;
-        background-color: var(--table-row-selected);
+    .finalization__payment-column {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        overflow-y: auto;
+        padding-right: 4px;
+    }
 
-        strong {
-            color: var(--main-color);
-        }
+    .finalization__sale-column {
+        display: flex;
+        border-left: 1px solid var(--separator-color);
+        padding-left: 20px;
     }
 
     .finalization__section {
@@ -105,15 +70,14 @@
 
     .finalization__payment-types {
         display: grid;
-        grid-template-columns: repeat(auto-fill,
-                minmax(160px, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
     }
 
     .finalization__payment-type {
         position: relative;
         display: flex;
-        min-height: 72px;
+        min-height: 64px;
         padding: 12px;
         border: 1px solid var(--separator-color);
         border-radius: 6px;
@@ -156,12 +120,11 @@
 
     .finalization__payment {
         display: grid;
-        min-height: 72px;
+        min-height: 68px;
         padding: 10px 12px;
-        grid-template-columns:
-            minmax(180px, 1fr) minmax(160px, 200px) 40px;
+        grid-template-columns: minmax(0, 1fr) minmax(120px, 150px) 40px;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
         border-bottom: 1px solid var(--separator-color);
 
         &:last-child {
@@ -170,7 +133,11 @@
 
         &.finalization__payment--cash {
             grid-template-columns:
-                minmax(180px, 1fr) minmax(150px, 180px) minmax(150px, 180px) 110px 40px;
+                minmax(0, 1fr) minmax(110px, 140px) minmax(110px, 140px) 90px 40px;
+
+            .finalization__payment-name {
+                grid-column: 1 / -1;
+            }
         }
     }
 
@@ -210,7 +177,7 @@
         }
 
         strong {
-            font-size: 1.1rem;
+            font-size: 1.05rem;
             white-space: nowrap;
         }
 
@@ -225,7 +192,116 @@
         color: var(--color-red);
     }
 
+    .finalization__pending-compact {
+        display: flex;
+        padding: 10px 12px;
+        border: 1px solid var(--separator-color);
+        border-radius: 6px;
+        align-items: center;
+        justify-content: space-between;
+        background-color: var(--color-very-light-grey);
+
+        span {
+            color: var(--disabled-color);
+        }
+
+        strong {
+            font-size: 1.1rem;
+        }
+    }
+
+    .finalization__sale-summary {
+        display: flex;
+        width: 100%;
+        min-height: 0;
+        flex-direction: column;
+        gap: 10px;
+
+        h3 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+    }
+
+    .finalization__sale-table-wrapper {
+        min-height: 180px;
+        flex: 1 1 auto;
+        overflow: auto;
+        border: 1px solid var(--separator-color);
+        border-radius: 6px;
+    }
+
+    .finalization__sale-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+
+        th,
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--separator-color);
+            vertical-align: top;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background-color: var(--color-very-light-grey);
+            font-size: .85rem;
+            font-weight: 500;
+            text-align: left;
+        }
+
+        td {
+            font-size: .9rem;
+        }
+
+        tbody {
+            tr:last-child {
+                td {
+                    border-bottom: 0;
+                }
+            }
+        }
+    }
+
+    .finalization__sale-localizador {
+        width: 100px;
+    }
+
+    .finalization__sale-number {
+        width: 64px;
+        text-align: right !important;
+    }
+
+    .finalization__sale-money {
+        width: 105px;
+        text-align: right !important;
+        white-space: nowrap;
+    }
+
+    .finalization__sale-total {
+        display: flex;
+        padding: 12px 14px;
+        border: 1px solid var(--separator-color);
+        border-radius: 6px;
+        align-items: center;
+        justify-content: space-between;
+
+        strong:last-child {
+            font-size: 1.6rem;
+            font-weight: 500;
+        }
+    }
+
+    /*
+     * Temporal hasta R.5, cuando Reserva se integrará
+     * en el selector único de acción final.
+     */
     .finalization__reservation {
+        flex: 0 0 auto;
         padding-top: 16px;
         border-top: 1px solid var(--separator-color);
     }
@@ -265,59 +341,48 @@
     }
 
     .finalization__error {
+        flex: 0 0 auto;
         border: 1px solid var(--color-red);
         background-color: rgb(255 51 51 / 8%);
     }
 
     .finalization__actions {
         display: flex;
+        flex: 0 0 auto;
         justify-content: flex-end;
         gap: 12px;
     }
 
-    @media (max-width: 850px) {
-        .finalization__payment {
-            grid-template-columns:
-                minmax(0, 1fr) minmax(140px, 180px) 40px;
-
-            &.finalization__payment--cash {
-                grid-template-columns:
-                    minmax(0, 1fr) minmax(140px, 180px) minmax(140px, 180px) 40px;
-
-                .finalization__payment-name {
-                    grid-column: 1 / -1;
-                }
-
-                .finalization__payment-change {
-                    grid-column: 1 / 4;
-                    grid-row: 3;
-                    align-items: flex-end;
-                }
-
-                .finalization__payment-delete {
-                    grid-column: 4;
-                    grid-row: 3;
-                }
-            }
+    @media (max-width: 1000px) {
+        .finalization {
+            overflow-y: auto;
         }
-    }
 
-    @media (max-width: 700px) {
-        .finalization__header {
+        .finalization__content {
+            display: flex;
             flex-direction: column;
         }
 
-        .finalization__total {
-            align-items: flex-start;
+        .finalization__payment-column {
+            overflow: visible;
         }
 
-        .finalization__summary {
+        .finalization__sale-column {
+            min-height: 360px;
+            border-top: 1px solid var(--separator-color);
+            border-left: 0;
+            padding-top: 20px;
+            padding-left: 0;
+        }
+    }
+
+    @media (max-width: 620px) {
+        .finalization__payment-types {
             grid-template-columns: 1fr;
         }
 
         .finalization__payment {
-            grid-template-columns:
-                minmax(0, 1fr) 40px;
+            grid-template-columns: minmax(0, 1fr) 40px;
 
             .finalization__payment-name {
                 grid-column: 1 / -1;
@@ -328,8 +393,7 @@
             }
 
             &.finalization__payment--cash {
-                grid-template-columns:
-                    minmax(0, 1fr) 40px;
+                grid-template-columns: minmax(0, 1fr) 40px;
 
                 .finalization__payment-name {
                     grid-column: 1 / -1;
@@ -337,23 +401,25 @@
 
                 .finalization__payment-field {
                     grid-column: 1;
-
-                    &:nth-of-type(2) {
-                        grid-row: 3;
-                    }
                 }
 
                 .finalization__payment-change {
                     grid-column: 1;
-                    grid-row: auto;
                     align-items: flex-start;
                 }
 
                 .finalization__payment-delete {
                     grid-column: 2;
-                    grid-row: auto;
                 }
             }
+        }
+
+        .finalization__sale-localizador {
+            width: 80px;
+        }
+
+        .finalization__sale-money {
+            width: 90px;
         }
     }
 }

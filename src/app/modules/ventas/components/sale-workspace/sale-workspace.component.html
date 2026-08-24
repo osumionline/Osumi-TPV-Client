@@ -500,6 +500,7 @@
 
     @if (finalizationOpen()) {
     <otpv-sale-finalization [totalCents]="ventaView().totalCents"
+                            [lineas]="ventaView().lineas"
                             [tiposPago]="tiposPago()"
                             [reservaBlockedReason]="reservaBlockedReason()"
                             [ventaSaving]="ventaSaving()"

@@ -18,8 +18,10 @@ import { MatInput } from '@angular/material/input';
 import type TipoPago from '@model/tipos-pago/tipo-pago.model';
 import VentaFinalizacionEnCurso from '@model/ventas/venta-finalizacion-en-curso.model';
 import type { VentaFinalizacionResultado } from '@model/ventas/venta-finalizacion-resultado.interface';
+import type VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
 import type VentaPagoEnCurso from '@model/ventas/venta-pago-en-curso.model';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
+import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
 import { getErrorMessage } from '@utils/error.utils';
 import { centsToEuros, eurosToCents } from '@utils/money.utils';
 
@@ -35,10 +37,13 @@ import { centsToEuros, eurosToCents } from '@utils/money.utils';
     MatIconButton,
     MatInput,
     CentsToEurosPipe,
+    MicrosToEurosPipe,
   ],
 })
 export default class SaleFinalizationComponent implements OnInit {
   readonly totalCents: InputSignal<number> = input.required<number>();
+  readonly lineas: InputSignal<readonly VentaLineaEnCurso[]> =
+    input.required<readonly VentaLineaEnCurso[]>();
   readonly tiposPago: InputSignal<readonly TipoPago[]> = input.required<readonly TipoPago[]>();
 
   readonly reservaBlockedReason: InputSignal<string | null> = input<string | null>(null);
@@ -81,6 +86,17 @@ export default class SaleFinalizationComponent implements OnInit {
       0,
     );
   });
+
+  getLineaDescuentoMicros(linea: VentaLineaEnCurso): number {
+    if (linea.regalo) {
+      return 0;
+    }
+
+    const importeBaseMicros: number = Math.abs(linea.importeBaseMicros);
+    const importeFinalMicros: number = Math.abs(linea.importeFinalMicros);
+
+    return Math.max(0, importeBaseMicros - importeFinalMicros);
+  }
 
   readonly error: WritableSignal<string | null> = signal<string | null>(null);
 
