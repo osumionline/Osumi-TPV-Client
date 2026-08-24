@@ -57,7 +57,8 @@
         </header>
 
         <div class="finalization__content">
-            <div class="finalization__payment-column">
+            <div class="finalization__payment-column"
+                 [class.finalization__payment-column--disabled]="accionEsReserva()">
                 <section class="finalization__section">
                     <h3>
                         @if (state.totalCents < 0)
@@ -86,7 +87,7 @@
                                            inputmode="decimal"
                                            step="0.01"
                                            autocomplete="off"
-                                           [disabled]="saving()"
+                                           [disabled]="saving() || accionEsReserva()"
                                            (focus)="selectInputContent($event)"
                                            (input)="updateEfectivoRapido($event)"
                                            (blur)="normalizeEfectivoRapido($event)">
@@ -125,7 +126,11 @@
                                 <button class="finalization__payment-type"
                                         type="button"
                                         [class.finalization__payment-type--added]="isTipoPagoSelected(tipoPago)"
-                                        [disabled]="saving() || !canAddTipoPago(tipoPago)"
+                                        [disabled]="
+                                            saving() ||
+                                            accionEsReserva() ||
+                                            !canAddTipoPago(tipoPago)
+                                        "
                                         (click)="selectTipoPago(tipoPago)">
                                     <mat-icon aria-hidden="true">
                                         {{
@@ -163,7 +168,10 @@
                             }
                 </section>
 
-                @if (pagosEditables().length > 0) {
+                @if (
+                !accionEsReserva() &&
+                pagosEditables().length > 0
+                ) {
                 <section class="finalization__section">
                     <h3>
                         {{
@@ -239,7 +247,11 @@
                 </section>
                 }
 
-                @if (state.totalCents !== 0 && !state.completa) {
+                @if (
+                !accionEsReserva() &&
+                state.totalCents !== 0 &&
+                !state.completa
+                ) {
                 <div class="finalization__pending-compact">
                     <span>
                         Pendiente
@@ -353,7 +365,8 @@
 
                             <mat-select [value]="accion()"
                                         [disabled]="saving()"
-                                        (selectionChange)="onAccionChange($event)">
+                                        (selectionChange)="onAccionChange($event)"
+                                        (closed)="onAccionSelectClosed()">
                                 <mat-option value="imprimir-ticket">
                                     Imprimir ticket
                                 </mat-option>
@@ -367,13 +380,11 @@
                                     Imprimir ticket regalo
                                 </mat-option>
 
-                                <mat-option value="reserva"
-                                            [disabled]="reservaBlockedReason() !== null">
+                                <mat-option value="reserva">
                                     Crear reserva
                                 </mat-option>
 
-                                <mat-option value="reserva-sin-ticket"
-                                            [disabled]="reservaBlockedReason() !== null">
+                                <mat-option value="reserva-sin-ticket">
                                     Crear reserva sin ticket
                                 </mat-option>
 
@@ -388,12 +399,6 @@
                                 </mat-option>
                             </mat-select>
                         </mat-form-field>
-
-                        @if (reservaBlockedReason() !== null) {
-                        <span class="finalization__reservation-hint">
-                            Las opciones de reserva no están disponibles para esta venta: {{ reservaBlockedReason() }}
-                        </span>
-                        }
                     </div>
                 </section>
             </div>

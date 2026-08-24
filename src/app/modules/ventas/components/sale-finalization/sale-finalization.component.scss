@@ -48,6 +48,11 @@
         gap: 18px;
         overflow-y: auto;
         padding-right: 4px;
+        transition: opacity 120ms ease;
+
+        &.finalization__payment-column--disabled {
+            opacity: .6;
+        }
     }
 
     .finalization__sale-column {

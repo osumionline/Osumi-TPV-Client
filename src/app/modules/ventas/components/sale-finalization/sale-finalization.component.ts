@@ -200,10 +200,17 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
     }
   }
 
+  /**
+   * Selecciona un medio de pago y aplica su comportamiento rápido.
+   *
+   * Efectivo únicamente recupera el foco de su campo rápido, mientras
+   * que el resto de medios absorbe inicialmente todo el pendiente.
+   * En modo reserva no se permite modificar pagos.
+   */
   selectTipoPago(tipoPago: TipoPago): void {
     const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
 
-    if (this.saving() || finalizacion === null || finalizacion.completa) {
+    if (this.saving() || this.accionEsReserva() || finalizacion === null || finalizacion.completa) {
       return;
     }
 
@@ -298,12 +305,20 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
     return centsToEuros(pago.entregadoCents);
   }
 
+  /**
+   * Actualiza en tiempo real el efectivo entregado mientras
+   * el usuario escribe en el campo rápido.
+   *
+   * El importe aplicado nunca supera el pendiente y el exceso
+   * se transforma automáticamente en cambio.
+   */
   updateEfectivoRapido(event: Event): void {
     const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
     const tipoPagoEfectivo: TipoPago | null = this.tipoPagoEfectivo();
 
     if (
       this.saving() ||
+      this.accionEsReserva() ||
       finalizacion === null ||
       finalizacion.totalCents <= 0 ||
       tipoPagoEfectivo === null
@@ -385,17 +400,66 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
     }
   }
 
+  /**
+   * Aplica la acción final seleccionada y adapta el estado económico
+   * del modal al modo venta o reserva.
+   *
+   * Al entrar en una reserva se descartan todos los pagos porque
+   * la operación deja de representar un cobro. Al volver desde una
+   * reserva a una acción de venta, el cobro comienza desde cero.
+   */
   onAccionChange(event: MatSelectChange): void {
-    const accion: unknown = event.value;
+    const nuevaAccion: unknown = event.value;
 
-    if (!this.isVentaFinalizacionAccion(accion)) {
+    if (!this.isVentaFinalizacionAccion(nuevaAccion)) {
       return;
     }
 
-    this.accion.set(accion);
+    const accionAnterior: VentaFinalizacionAccion = this.accion();
+    const anteriorEsReserva: boolean =
+      accionAnterior === 'reserva' || accionAnterior === 'reserva-sin-ticket';
+
+    const nuevaEsReserva: boolean =
+      nuevaAccion === 'reserva' || nuevaAccion === 'reserva-sin-ticket';
+
+    this.accion.set(nuevaAccion);
+
+    if (nuevaEsReserva) {
+      this.activateReservaMode();
+
+      const blockedReason: string | null = this.reservaBlockedReason();
+
+      this.error.set(blockedReason);
+
+      return;
+    }
+
+    if (anteriorEsReserva) {
+      this.activateVentaMode();
+    }
+
     this.error.set(null);
   }
 
+  /**
+   * Recupera el foco en el campo rápido de efectivo cuando se cierra
+   * el selector de acción estando en modo venta.
+   *
+   * Esperar al cierre del mat-select evita que Material restaure después
+   * el foco sobre el propio selector y anule nuestro foco de caja.
+   */
+  onAccionSelectClosed(): void {
+    if (this.saving() || this.accionEsReserva() || this.totalCents() <= 0) {
+      return;
+    }
+
+    this.focusEfectivoInput();
+  }
+
+  /**
+   * Comprueba que un valor recibido desde el mat-select
+   * pertenece al conjunto cerrado de acciones de finalización.
+   */
   private isVentaFinalizacionAccion(value: unknown): value is VentaFinalizacionAccion {
     return (
       value === 'imprimir-ticket' ||
@@ -602,13 +666,17 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
   }
 
   /**
-   * Indica si el medio puede añadirse en el estado actual.
+   * Indica si un tipo de pago puede añadirse en el estado actual.
+   *
+   * Los medios de pago nunca están disponibles cuando la acción
+   * seleccionada es crear una reserva.
    */
   canAddTipoPago(tipoPago: TipoPago): boolean {
     const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
 
     return (
       !this.saving() &&
+      !this.accionEsReserva() &&
       finalizacion !== null &&
       !finalizacion.completa &&
       !this.isTipoPagoAdded(tipoPago)
@@ -714,6 +782,10 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
     this.cancelEvent.emit();
   }
 
+  /**
+   * Sitúa el foco en el campo rápido de efectivo y selecciona
+   * su contenido para poder sustituirlo inmediatamente.
+   */
   private focusEfectivoInput(): void {
     const inputElement: HTMLInputElement | undefined = this.efectivoInput()?.nativeElement;
 
@@ -744,5 +816,52 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
     }
 
     this.error.set(null);
+  }
+
+  /**
+   * Activa el modo reserva.
+   *
+   * Descarta cualquier pago introducido, elimina la selección visual
+   * de medios de pago y muestra el efectivo como cero. Una reserva
+   * no debe conservar ningún estado económico de una venta.
+   */
+  private activateReservaMode(): void {
+    this.finalizacion.set(new VentaFinalizacionEnCurso(this.totalCents()));
+
+    this.tipoPagoActivoPublicId.set(null);
+    this.setEfectivoInputValue('0');
+  }
+
+  /**
+   * Activa nuevamente el modo venta después de haber seleccionado
+   * una reserva.
+   *
+   * Se crea una finalización económica completamente nueva y, para
+   * ventas positivas, Efectivo vuelve a quedar como medio inicial.
+   */
+  private activateVentaMode(): void {
+    this.finalizacion.set(new VentaFinalizacionEnCurso(this.totalCents()));
+
+    this.tipoPagoActivoPublicId.set(
+      this.totalCents() > 0 ? (this.tipoPagoEfectivo()?.publicId ?? null) : null,
+    );
+
+    this.setEfectivoInputValue('');
+  }
+
+  /**
+   * Cambia directamente el valor visible del campo rápido de efectivo.
+   *
+   * El input mantiene deliberadamente su propio valor de edición y no
+   * usa un binding [value] para no interferir mientras el usuario escribe.
+   */
+  private setEfectivoInputValue(value: string): void {
+    const inputElement: HTMLInputElement | undefined = this.efectivoInput()?.nativeElement;
+
+    if (inputElement === undefined) {
+      return;
+    }
+
+    inputElement.value = value;
   }
 }
