@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.4  
-**Fecha:** 23 de agosto de 2026  
-**Estado:** Installation, importación legacy, Startup, auditoría/refactor transversal y los bloques **Ventas 1–11** están completados, probados y subidos. **Ventas 12 — Postventa** tiene cerrado el análisis 12A y prácticamente todo el diseño 12B: Histórico, política documental, reimpresión/ticket regalo, email, facturación diferida e integración UI están definidos; TicketBAI está diseñado para ventas ordinarias y queda bloqueada únicamente la semántica fiscal de devoluciones/operaciones mixtas hasta recibir respuesta de Berein. El **plan de implementación 12C** ya está definido, pero todavía no ha comenzado. Antes de iniciar 12C.1 se abre una nueva **pausa técnica para rediseñar el modal de Finalizar venta**, cuyo alcance funcional será explicado por el usuario en el siguiente paso. La pausa `.otpv` v2 + SMTP/TicketBAI está completada y validada end-to-end. La única validación heredada pendiente sigue siendo la **prueba física con Star TSP100/TSP143 de 80 mm**, no bloqueante.
+**Versión:** 2.5  
+**Fecha:** 24 de agosto de 2026  
+**Estado:** Installation, importación legacy, Startup, auditoría/refactor transversal y los bloques **Ventas 1–11** están completados, probados y subidos. **Ventas 12 — Postventa** tiene cerrado el análisis 12A y prácticamente todo el diseño 12B: Histórico, política documental, reimpresión/ticket regalo, email, facturación diferida e integración UI están definidos; TicketBAI está diseñado para ventas ordinarias y queda bloqueada únicamente la semántica fiscal de devoluciones/operaciones mixtas hasta recibir respuesta de Berein. El **plan de implementación 12C** está definido y el punto de reanudación es **12C.1 — Infraestructura del Histórico**. La pausa técnica **Rediseño modal Finalizar venta** está completada, probada y subida: nuevo layout de dos columnas con resumen de artículos, flujo rápido de efectivo, soporte de N pagos, selector único de acción, reservas integradas, `No imprimir ticket`, gestión contextual de errores y foco automático. La pausa `.otpv` v2 + SMTP/TicketBAI también está completada y validada end-to-end. La única validación heredada pendiente sigue siendo la **prueba física con Star TSP100/TSP143 de 80 mm**, no bloqueante.
 
 ---
 
@@ -51,8 +51,9 @@ Hitos principales completados:
 - **Ventas 12B.7 — Integración UI del Histórico (diseño)**.
 - **Ventas 12C — Plan de implementación de Postventa definido**, todavía sin iniciar.
 - **Pausa técnica `.otpv` v2 — SMTP/TicketBAI en importación e instalación manual**, completada y validada.
+- **Pausa técnica Rediseño modal Finalizar venta**, completada, probada y subida.
 
-Todos los bloques **Ventas 1–11** han sido probados con la aplicación real y están subidos al repositorio. Ventas 12 ya está iniciado y se encuentra en diseño. La única comprobación pendiente de Ventas 11 es la prueba física con la impresora térmica Star TSP100/TSP143 de 80 mm; no bloquea Postventa.
+Todos los bloques **Ventas 1–11** han sido probados con la aplicación real y están subidos al repositorio. Ventas 12 ya está iniciado: el diseño está cerrado salvo la semántica TicketBAI de devoluciones y la implementación 12C comienza ahora por 12C.1. La única comprobación pendiente de Ventas 11 es la prueba física con la impresora térmica Star TSP100/TSP143 de 80 mm; no bloquea Postventa.
 
 ---
 
@@ -77,7 +78,7 @@ Todos los bloques **Ventas 1–11** han sido probados con la aplicación real y 
 - Tras persistir una venta con cliente se invalida la caché de sus estadísticas para que la siguiente consulta refleje la nueva operación.
 - `app_data.json` dispone de `frasesTicket: string[]`; instalaciones/configuraciones anteriores se normalizan a `[]` y las importaciones legacy también parten de `[]`.
 - Implementación actual: los tickets de venta históricos se almacenan en `assets/files/ventas/tickets/{idVenta}.pdf` y siguen siendo **write-once**. En Ventas 12B.2 se ha diseñado su evolución futura hacia un PDF vigente versionado, pero todavía no está implementada.
-- Punto actual: **pausa técnica previa a Ventas 12C.1 para rediseñar el modal de Finalizar venta**. El plan de Postventa 12C está definido, pero su implementación todavía no ha empezado.
+- Punto actual: **Ventas 12C.1 — Infraestructura del Histórico**. La pausa técnica de rediseño del modal de Finalizar venta está cerrada, probada y subida.
 
 Validación de hardware pendiente y no bloqueante:
 
@@ -142,6 +143,7 @@ Osumi TPV Client es la evolución instalable de Osumi TPV. La primera etapa es m
 - No asumir que fragmentos de respuestas anteriores siguen existiendo.
 - No depender de renders accidentales: los modelos mutables vivos deben tener notificación reactiva explícita.
 - Mantener accesibilidad: no `autofocus` HTML, evitar elementos no interactivos con `(click)`, usar controles reales y gestión explícita de foco.
+- **Todo método TypeScript/JavaScript propuesto o añadido debe llevar un comentario JSDoc breve** que explique su propósito y, cuando aporte valor, parámetros, retorno o efectos relevantes.
 
 Aliases relevantes:
 
@@ -430,7 +432,7 @@ Esta recapitulación debe aparecer al comenzar **cada fase, bloque, subapartado 
         - ⏸️ devoluciones/operaciones mixtas, pendientes de Berein.
       - ✅ 12B.7 — Integración UI.
     - ✅ 12C — Plan de implementación definido.
-      - ⬜ 12C.1 — Infraestructura del Histórico.
+      - 🟦 12C.1 — Infraestructura del Histórico.
       - ⬜ 12C.2 — Filtros, listado y totales.
       - ⬜ 12C.3 — Detalle de una venta.
       - ⬜ 12C.4 — Correcciones postventa.
@@ -441,12 +443,9 @@ Esta recapitulación debe aparecer al comenzar **cada fase, bloque, subapartado 
       - ⏸️ 12C.9 — Devoluciones TicketBAI, pendiente de Berein.
       - ⬜ 12C.10 — Regresión integral y cierre.
 
-Pausa técnica actual antes de 12C.1:
+Pausas técnicas ya cerradas antes de 12C.1:
 
-- 🟦 rediseño del modal de Finalizar venta; alcance funcional pendiente de la explicación del usuario.
-
-Pausa técnica intermedia ya cerrada:
-
+- ✅ rediseño del modal de Finalizar venta, completado, probado y subido;
 - ✅ `.otpv` `formatVersion = 2`;
 - ✅ `plugin_config.json` obligatorio y checksum validado;
 - ✅ importación SMTP/TicketBAI;
@@ -700,7 +699,7 @@ Las actualizaciones inválidas son atómicas: no sustituyen el pago anterior.
 
 ## 11.3 10B — Interfaz genérica ✅
 
-Se creó:
+Se mantiene el componente:
 
 ```text
 src/app/modules/ventas/components/sale-finalization/
@@ -709,29 +708,55 @@ src/app/modules/ventas/components/sale-finalization/
 └── sale-finalization.component.scss
 ```
 
-Características:
+Tras la pausa técnica de agosto de 2026, el modal quedó rediseñado con estas reglas:
 
-- overlay;
-- resumen Total / Pagado-Reembolsado / Pendiente;
-- tipos de pago físicos ordenados por `orden`;
-- selección rápida del pendiente completo;
-- edición de importes;
-- eliminación;
-- selección del contenido del input al enfocarlo;
-- cantidades visualmente positivas en devolución aunque internamente sean negativas;
-- cancelación destruye el modelo temporal.
+- layout de dos columnas;
+- izquierda: cobro/reembolso y medios de pago;
+- derecha: resumen de la venta con columnas **Localizador / Descripción / Cantidad / Descuento / Importe**;
+- total visible bajo la tabla;
+- la tabla tiene scroll propio para no hacer crecer indefinidamente el modal;
+- se mantienen **N medios de pago**;
+- para venta positiva, **Efectivo** aparece seleccionado por defecto, su importe está vacío y el foco inicial cae en ese campo;
+- el efectivo se valida en tiempo real con cada pulsación; no hace falta pulsar Enter;
+- `Cambio` se recalcula mientras se escribe;
+- los bloques grandes `Total / Pagado / Pendiente` desaparecen; `Pendiente` solo se muestra de forma compacta mientras falte importe;
+- el botón principal sigue deshabilitado mientras una venta/devolución no tenga cubierta toda la cantidad requerida;
+- total cero: no requiere pagos y puede finalizarse directamente;
+- devolución neta negativa: los medios de pago representan el reembolso y no se utiliza el concepto de efectivo entregado/cambio.
 
-La finalización ya dispone de botón funcional para **Finalizar venta / devolución / operación** desde Ventas 11D. El modal produce `VentaFinalizacionResultado`, el workspace persiste la operación y solo tras el COMMIT emite `completedEvent`.
+La zona permanente de Reserva desapareció. En su lugar existe un selector único de acción:
 
-### Nota UX
+```text
+Imprimir ticket
+No imprimir ticket
+Imprimir ticket regalo      ← visible, deshabilitado hasta su implementación
+Crear reserva
+Crear reserva sin ticket
+Generar factura             ← visible, deshabilitado hasta su implementación
+Enviar ticket por email     ← visible, deshabilitado hasta su implementación
+```
 
-El usuario ha expresado dudas sobre el aspecto final que está tomando el modal.
+Reglas del selector:
 
-Decisión:
+- `Imprimir ticket` es la acción por defecto;
+- `No imprimir ticket` guarda la venta y genera/conserva el PDF histórico, pero omite la impresión física;
+- una reserva **no representa una venta cobrada** y por tanto no exige completar pagos;
+- al entrar en modo reserva se descartan todos los pagos temporales, Efectivo pasa visualmente a `0`, Cambio a `0`, se deshabilitan medios de pago y desaparece Pendiente;
+- si la reserva está bloqueada, la opción sigue siendo seleccionable y el motivo concreto se muestra solo entonces como error contextual;
+- si se vuelve de Reserva a `Imprimir ticket` o `No imprimir ticket`, el cobro se reinicia desde cero y el foco vuelve automáticamente a Efectivo;
+- cambiar entre `Imprimir ticket` y `No imprimir ticket` no borra los pagos ya introducidos.
 
-- no rediseñarlo en mitad del desarrollo;
-- cerrar primero flujo, persistencia y salidas;
-- reevaluar composición/jerarquía visual cuando la funcionalidad completa de venta esté dentro.
+El componente emite una `VentaFinalizacionSolicitud`, que separa:
+
+```text
+finalizacion
+→ snapshot económico persistible
+
+imprimirTicket
+→ decisión de postprocesado
+```
+
+El workspace persiste siempre la operación comercial. Tras COMMIT, `VentaPostCommitService` genera el PDF y solo intenta impresión física si `imprimirTicket === true`.
 
 ---
 
@@ -761,15 +786,7 @@ Efectivo entregado:   50 €
 Cambio:               30 €
 ```
 
-El resumen sigue mostrando:
-
-```text
-Pagado:    60 €
-Pendiente:  0 €
-Cambio:    30 €
-```
-
-Nunca se suman los 50 € entregados como si fueran importe de venta.
+La UI rediseñada ya no muestra tarjetas grandes de `Pagado/Pendiente`. Para el flujo habitual muestra **Efectivo** y **Cambio**, y `Pendiente` aparece solo de forma compacta mientras falte importe. Nunca se suma el efectivo entregado como si fuera importe de venta.
 
 Si se modifica el importe aplicado de un pago en efectivo, el `entregado` se resetea al nuevo importe y el cambio vuelve a cero. Esto evita conservar accidentalmente un valor físico antiguo y generar un cambio ficticio.
 
@@ -1952,11 +1969,11 @@ Reglas y decisiones ya cerradas para Postventa:
     devoluciones / operaciones mixtas                     ⏸️ Berein
   12B.7 — Integración UI                                  ✅ diseño
 12C — Plan de implementación                              ✅ definido
-12C.1 — Infraestructura del Histórico                     ⬜ no iniciado
+12C.1 — Infraestructura del Histórico                     🟦 actual
 12C.2–12C.10 — Implementación/regresión                   ⬜
 ```
 
-La pausa técnica `.otpv` v2 está terminada. Antes de iniciar **12C.1** se abre una nueva **pausa técnica para rediseñar el modal de Finalizar venta**. El alcance concreto de esta pausa todavía no forma parte de este documento: debe recogerse a partir de la explicación funcional del usuario en el siguiente paso y, ante cualquier duda, detenerse y preguntar antes de implementar.
+Las pausas técnicas `.otpv` v2 y **Rediseño modal Finalizar venta** están terminadas, probadas y subidas. El punto actual vuelve exactamente al plan original: **12C.1 — Infraestructura del Histórico**. La semántica TicketBAI de devoluciones/operaciones mixtas sigue bloqueada hasta respuesta de Berein.
 
 ## 13.2 Entrada al histórico
 
@@ -2551,26 +2568,132 @@ El protocolo `osumi://assets/...` permite al renderer documental acceder de form
 
 # 15. Decisiones de UX pendientes
 
-## 15.1 Modal de Finalizar — nueva pausa técnica 🟦
+## 15.1 Modal de Finalizar — pausa técnica completada ✅
 
-El modal de Finalizar venta está funcionalmente operativo desde Ventas 10/11, pero antes de comenzar la implementación 12C de Postventa el usuario ha solicitado una **pausa técnica específica para rediseñarlo**.
+La pausa técnica de rediseño del modal de Finalizar venta se cerró el **24 de agosto de 2026**, con pruebas automatizadas y regresión manual correctas y todos los cambios subidos al repositorio.
 
-Estado:
+Estado final:
 
 ```text
-funcionalidad actual                  ✅
-rediseño funcional/UX                 🟦 siguiente paso
-implementación del rediseño           ⬜
-retomar Ventas 12C.1                  ⬜ después de la pausa
+R.1 — Contexto funcional                               ✅
+R.2 — Diseño funcional y comportamiento                ✅
+R.3 — Layout + tabla resumen                           ✅
+R.4 — Flujo rápido de medios de pago                   ✅
+R.5 — Selector único de acción                         ✅
+R.6 — Limpieza técnica + auditoría JSDoc               ✅
+R.7 — Tests + regresión manual                         ✅
+R.8 — Cierre y vuelta a Ventas 12C.1                   ✅
 ```
 
-No asumir todavía el alcance del rediseño. En el siguiente paso el usuario explicará:
+### Layout
 
-- qué existe actualmente;
-- qué hacía la aplicación antigua;
-- qué comportamiento/diseño quiere para la nueva versión.
+El modal usa dos columnas:
 
-Aplicar la regla general del proyecto: inventariar comportamiento actual/legacy, aclarar cualquier duda antes de decidir y no alterar la lógica transaccional ya validada sin una razón funcional explícita.
+```text
+izquierda
+→ cobro / reembolso y medios de pago
+
+derecha
+→ resumen de líneas + total + selector de acción
+```
+
+La tabla de resumen utiliza:
+
+```text
+Localizador | Descripción | Cantidad | Descuento | Importe
+```
+
+y tiene scroll propio.
+
+### Flujo rápido de pagos
+
+Para ventas positivas:
+
+- Efectivo aparece seleccionado de inicio;
+- el campo queda vacío y recibe el foco automáticamente;
+- el importe se procesa con cada pulsación, sin Enter;
+- Cambio se actualiza en tiempo real;
+- si Efectivo es parcial, otro medio de pago absorbe inicialmente el pendiente;
+- se conserva el soporte de **N medios de pago**;
+- `Finalizar venta` permanece deshabilitado hasta cubrir al menos el total;
+- al cerrar y reabrir el modal, el modelo temporal de pagos comienza limpio.
+
+Para total cero:
+
+- no se exige ningún pago;
+- `Finalizar operación` puede ejecutarse directamente.
+
+Para devolución neta negativa:
+
+- los medios de pago representan el reembolso;
+- no existe el concepto de efectivo entregado/cambio del flujo positivo.
+
+### Selector de acción
+
+Opciones visibles:
+
+```text
+Imprimir ticket               ✅ implementado / por defecto
+No imprimir ticket            ✅ implementado
+Imprimir ticket regalo        🔒 pendiente de Ventas 12
+Crear reserva                 ✅ implementado
+Crear reserva sin ticket      ✅ implementado
+Generar factura               🔒 diferido a Clientes/Facturación
+Enviar ticket por email       🔒 pendiente de Ventas 12
+```
+
+`No imprimir ticket` significa:
+
+```text
+venta persistida
+→ PDF histórico generado/conservado
+→ NO se llama a impresión física
+```
+
+### Reservas
+
+Una reserva no es una venta cobrada:
+
+- no requiere pagos;
+- sus opciones no están deshabilitadas preventivamente;
+- si el usuario selecciona Reserva y la operación está bloqueada, se muestra en ese momento el motivo concreto y el botón principal queda deshabilitado;
+- al entrar en modo reserva se descartan todos los pagos temporales;
+- Efectivo pasa visualmente a `0` y queda deshabilitado;
+- Cambio pasa a `0`;
+- se deshabilitan los botones de tipos de pago;
+- desaparece Pendiente y cualquier pago adicional;
+- al volver a `Imprimir ticket` o `No imprimir ticket`, el cobro se reinicia desde cero y el foco vuelve automáticamente al campo Efectivo;
+- cambiar solo entre `Imprimir ticket` y `No imprimir ticket` conserva los pagos introducidos.
+
+Reglas de reserva existentes se mantienen, entre ellas:
+
+- cliente obligatorio;
+- no crear una nueva reserva desde una venta que ya procede de una reserva.
+
+### Contrato de finalización
+
+El modal ya no emite únicamente `VentaFinalizacionResultado`, sino `VentaFinalizacionSolicitud`:
+
+```text
+finalizacion
+→ resultado económico
+
+imprimirTicket
+→ decisión de impresión física
+```
+
+El PDF histórico sigue siendo parte del post-COMMIT aunque el usuario seleccione `No imprimir ticket`.
+
+### Foco y accesibilidad
+
+- no se utiliza `autofocus`;
+- el foco inicial se aplica programáticamente sobre Efectivo;
+- al volver desde una acción de reserva a una acción de venta, el foco se difiere al siguiente ciclo del navegador para esperar a que Angular haya habilitado físicamente el input;
+- el comportamiento fue validado manualmente.
+
+### Convención JSDoc
+
+Queda fijada explícitamente la convención: **todo método TypeScript/JavaScript propuesto o añadido debe incluir JSDoc breve**. Durante R.6 se documentaron los métodos recientes del componente y se eliminó código/SCSS obsoleto del diseño anterior.
 
 ## 15.2 Impresora en configuración
 
@@ -2660,6 +2783,7 @@ Para **cada fase, bloque, subapartado o paso**:
 - Archivo existente: ruta exacta y punto de inserción/reemplazo.
 - Si un cambio es amplio y el archivo puede haberse movido, revisar primero `main`.
 - Mantener tipado explícito.
+- Todo método TypeScript/JavaScript añadido o propuesto debe llevar JSDoc breve.
 - No usar `any`.
 - Respetar reglas de exports:
   - un único export → puede ser `default`;
@@ -2728,69 +2852,96 @@ También:
 | **2.2** | **23 de agosto de 2026** | **Ventas 11 completado: persistencia transaccional, ticket definitivo desde snapshot SQLite, QR `-id`, HTML 80 mm, logo/redes/frases configurables, PDF histórico write-once, impresión silenciosa, post-COMMIT no bloqueante, invalidación de estadísticas de cliente y regresión final. Prueba física Star TSP100/TSP143 pendiente y no bloqueante. Siguiente: Ventas 12 — Postventa.** |
 | **2.3** | **23 de agosto de 2026** | **Ventas 12 iniciado: 12A y 12B.1–12B.3 cerrados a nivel de diseño. Pausa técnica `.otpv` v2 completada: `plugin_config.json`, SMTP/TicketBAI, secretos con `safeStorage`, configuración en instalación manual e importación real end-to-end validada. Punto de reanudación: 12B.4 — Envío por email mediante SMTP local.** |
 | **2.4** | **23 de agosto de 2026** | **Ventas 12: diseño 12B completado salvo semántica TicketBAI de devoluciones pendiente de Berein; email, facturación diferida, TicketBAI ordinario e integración UI definidos. Plan 12C.1–12C.10 fijado. Antes de implementar 12C.1 se abre una pausa técnica para rediseñar el modal de Finalizar venta.** |
+| **2.5** | **24 de agosto de 2026** | **Pausa técnica Rediseño modal Finalizar venta completada: layout de dos columnas y resumen de líneas, flujo rápido con Efectivo/foco/cambio en tiempo real, N pagos, selector único de acción, reservas sin cobro, `No imprimir ticket`, errores contextuales, foco restaurado y limpieza/JSDoc. Regresión completa correcta. Punto actual: Ventas 12C.1 — Infraestructura del Histórico.** |
 
 ---
 
 # 21. Próximo paso
 
-El punto exacto de reanudación es una **pausa técnica previa a Ventas 12C.1**:
+El punto exacto de reanudación es:
 
-# Rediseño del modal de Finalizar venta
+# Ventas 12C.1 — Infraestructura del Histórico
 
 Estado global:
 
 ```text
-Installation + importación `.otpv` v2            ✅
-Configuración SMTP/TicketBAI local               ✅
-Startup                                          ✅
-Ventas 1–11                                      ✅
-Ventas 12A                                       ✅
-Ventas 12B.1–12B.5                               ✅ diseño
-Ventas 12B.6 — TicketBAI ordinario               ✅ diseño
-Ventas 12B.6 — devoluciones TicketBAI             ⏸️ Berein
-Ventas 12B.7 — Integración UI                    ✅ diseño
-Ventas 12C — Plan de implementación              ✅ definido
-Pausa técnica: modal Finalizar venta              🟦 actual
-Ventas 12C.1 — Infraestructura Histórico          ⬜ después
+Installation + importación `.otpv` v2             ✅
+Configuración SMTP/TicketBAI local                ✅
+Startup                                           ✅
+Ventas 1–11                                       ✅
+Ventas 12A                                        ✅
+Ventas 12B.1–12B.5                                ✅ diseño
+Ventas 12B.6 — TicketBAI ordinario                ✅ diseño
+Ventas 12B.6 — devoluciones TicketBAI              ⏸️ Berein
+Ventas 12B.7 — Integración UI                     ✅ diseño
+Pausa rediseño modal Finalizar venta               ✅
+Ventas 12C — Plan de implementación               ✅ definido
+Ventas 12C.1 — Infraestructura Histórico           🟦 actual
+Ventas 12C.2–12C.8                                ⬜ después
+Ventas 12C.9 — Devoluciones TicketBAI              ⏸️ Berein
+Ventas 12C.10 — Regresión integral                 ⬜ después
 ```
 
-El usuario explicará en el siguiente paso:
+Objetivo de **12C.1**:
 
-1. qué contiene hoy el modal de Finalizar venta;
-2. cómo era el flujo/modal de la aplicación antigua;
-3. qué rediseño quiere para la nueva aplicación.
+- abrir el modal Histórico al hacer clic en `sale__amount`;
+- introducir tabs `Histórico de ventas` y `Salidas caja` como placeholder;
+- definir contratos backend/IPC de consulta;
+- definir read models de resumen y detalle sin reutilizar `VentaEnCurso`;
+- dejar la infraestructura preparada para que 12C.2 implemente filtros, listado y totales.
 
 Antes de proponer código:
 
 1. revisar `main`;
-2. inventariar el comportamiento actual y legacy;
-3. separar cambios visuales de cambios funcionales;
-4. detectar cualquier impacto sobre Ventas 10/11 (pagos, reservas, persistencia, post-COMMIT, impresión, TicketBAI futuro);
-5. preguntar cualquier duda antes de asumir una decisión;
-6. definir un pequeño plan de la pausa técnica y solo entonces implementar.
-
-Cuando esta pausa quede cerrada, retomar exactamente en **Ventas 12C.1 — Infraestructura del Histórico** siguiendo el plan 12C definido en la sección 13.13.
+2. inventariar componentes/servicios/IPC/consultas SQLite actuales relacionados con Ventas;
+3. revisar el legacy únicamente para comportamiento, no para copiar arquitectura;
+4. separar read models de histórico del modelo mutable de venta en curso;
+5. mantener la carga del detalle bajo demanda;
+6. ante cualquier duda funcional, de negocio, UX, fiscal, documental o arquitectónica, detenerse y preguntar antes de asumir.
 
 Recordatorios:
 
 - devoluciones/operaciones mixtas TicketBAI siguen bloqueadas hasta respuesta de Berein;
-- prueba física Star TSP100/TSP143 de 80 mm pendiente y no bloqueante.
+- la prueba física Star TSP100/TSP143 de 80 mm sigue pendiente y no bloquea Postventa;
+- `Imprimir ticket regalo`, email y otras acciones del selector de finalización se activarán cuando llegue su subbloque de Ventas 12;
+- toda propuesta de métodos TypeScript/JavaScript debe incluir JSDoc.
 
 ---
 
 # 22. Prompt de arranque para una conversación nueva
 
 ```text
-Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” versión 2.4 como contexto principal.
+Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” versión 2.5 como contexto principal.
 
 Estado general:
 - Installation + importación legacy `.otpv` v2: completadas y probadas.
 - Startup: completado.
 - Auditoría transversal y Refactor A–E: completados.
 - Ventas 1–11: completados y probados.
-- Ventas 12 — Postventa: diseño prácticamente cerrado; implementación todavía no iniciada.
+- Ventas 12 — Postventa: diseño cerrado salvo la semántica TicketBAI de devoluciones/operaciones mixtas, que sigue pendiente de Berein.
+- Pausa técnica Rediseño modal Finalizar venta: COMPLETADA, PROBADA Y SUBIDA.
+- Punto actual: 12C.1 — Infraestructura del Histórico.
 
 Ventas 11 cerró la persistencia transaccional de extremo a extremo: transacción SQLite real, venta/líneas/pagos/stock/histórico/caja, devoluciones/reservas, snapshot documental desde SQLite, QR comercial `-id`, HTML 80 mm, logo/redes/frases, PDF histórico actual write-once, impresión silenciosa, post-COMMIT no bloqueante e invalidación de estadísticas del cliente. Solo queda pendiente, sin bloquear, la prueba física con Star TSP100/TSP143 de 80 mm.
+
+Pausa Rediseño modal Finalizar venta:
+- layout de dos columnas;
+- izquierda = cobro/reembolso;
+- derecha = resumen de la venta con Localizador/Descripción/Cantidad/Descuento/Importe + total;
+- soporte de N medios de pago;
+- Efectivo seleccionado por defecto, campo vacío y con foco;
+- efectivo/cambio se actualizan con cada pulsación, sin Enter;
+- Pendiente solo aparece de forma compacta cuando falta importe;
+- botón Finalizar deshabilitado hasta cubrir la operación;
+- total cero no exige pagos;
+- devolución neta negativa usa medios como reembolso;
+- selector único: Imprimir ticket, No imprimir ticket, Ticket regalo (deshabilitado), Reserva, Reserva sin ticket, Factura (deshabilitada), Email (deshabilitado);
+- Reserva no exige pagos; al seleccionarla se descartan pagos temporales, Efectivo/Cambio pasan a 0, se deshabilita cobro y se oculta Pendiente;
+- si Reserva está bloqueada, la opción se puede elegir y entonces se muestra el motivo concreto;
+- al volver de Reserva a una acción de venta, el cobro empieza desde cero y el foco vuelve a Efectivo;
+- No imprimir ticket sigue generando/conservando PDF histórico, solo omite impresión física;
+- el modal emite VentaFinalizacionSolicitud { finalizacion, imprimirTicket };
+- todo método TypeScript/JavaScript propuesto o añadido debe llevar JSDoc breve.
 
 Ventas 12:
 - 12A — análisis funcional legacy: COMPLETADO.
@@ -2801,7 +2952,7 @@ Ventas 12:
 - 12B.5 — facturación: ALCANCE DIFERIDO a Clientes/Facturación.
 - 12B.6 — TicketBAI ordinario: DISEÑO CERRADO; devoluciones/operaciones mixtas EN ESPERA DE BEREIN.
 - 12B.7 — integración UI: DISEÑO CERRADO.
-- 12C — plan de implementación: DEFINIDO, todavía no iniciado.
+- 12C — plan de implementación: DEFINIDO.
 
 Plan 12C:
 12C.1 — Infraestructura del Histórico
@@ -2815,7 +2966,7 @@ Plan 12C:
 12C.9 — Devoluciones TicketBAI (bloqueado hasta Berein)
 12C.10 — Regresión integral y cierre
 
-Histórico de ventas:
+Histórico de ventas diseñado:
 - modal al hacer clic en `sale__amount`;
 - tabs Histórico de ventas + Salidas caja placeholder;
 - filtros Fecha/Rango con datepickers y navegación anterior/siguiente;
@@ -2856,10 +3007,8 @@ Email:
 - remitente = emailSmtp.user; nombre visible = appData.nombre;
 - asunto/cuerpo configurables desde instalación/configuración;
 - variables simples `{nombreNegocio}` y `{referencia}`;
-- defaults: `{nombreNegocio} - Ticket {referencia}` y `Adjuntamos el ticket correspondiente a su compra.
-Gracias por su confianza.`;
 - adjuntar siempre el PDF vigente;
-- arquitectura prevista: contrato EmailSender + implementación SMTP Node (se propuso Nodemailer).
+- arquitectura prevista: contrato EmailSender + implementación SMTP Node.
 
 Facturas:
 - son recopilatorios oficiales de ventas ya realizadas;
@@ -2887,9 +3036,14 @@ Pausa técnica `.otpv` v2 COMPLETADA:
 - importación real v2 validada end-to-end.
 
 PUNTO ACTUAL:
-Antes de empezar 12C.1, el usuario quiere una PAUSA TÉCNICA para REDISEÑAR EL MODAL DE FINALIZAR VENTA. En el siguiente mensaje explicará lo que existe ahora, lo que había en la aplicación antigua y lo que quiere hacer. NO asumir el alcance antes de esa explicación.
+Ventas 12C.1 — Infraestructura del Histórico.
 
-Tras cerrar esa pausa, retomar exactamente en 12C.1 — Infraestructura del Histórico.
+Objetivo inmediato:
+- abrir modal Histórico desde `sale__amount`;
+- tabs Histórico de ventas + Salidas caja placeholder;
+- contratos backend/IPC de consulta;
+- read models de resumen y detalle separados de VentaEnCurso;
+- detalle preparado para carga bajo demanda.
 
 Regla de trabajo obligatoria para CADA paso/subapartado:
 1. mostrar primero el listado COMPLETO del bloque actual;
@@ -2902,6 +3056,7 @@ Regla de trabajo obligatoria para CADA paso/subapartado:
 
 Convenciones:
 - tipado estricto, sin any;
+- TODO método TypeScript/JavaScript propuesto o añadido lleva JSDoc breve;
 - varios exports → no default export;
 - líneas en blanco separan conceptos, no propiedades del mismo objeto;
 - utilidades Angular y Electron/backend separadas;
