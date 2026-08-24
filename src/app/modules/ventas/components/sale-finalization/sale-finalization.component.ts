@@ -445,15 +445,22 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
    * Recupera el foco en el campo rápido de efectivo cuando se cierra
    * el selector de acción estando en modo venta.
    *
-   * Esperar al cierre del mat-select evita que Material restaure después
-   * el foco sobre el propio selector y anule nuestro foco de caja.
+   * El foco se difiere al siguiente ciclo del navegador para permitir
+   * que Angular aplique primero al DOM la habilitación del campo después
+   * de abandonar el modo reserva.
    */
   onAccionSelectClosed(): void {
     if (this.saving() || this.accionEsReserva() || this.totalCents() <= 0) {
       return;
     }
 
-    this.focusEfectivoInput();
+    setTimeout((): void => {
+      if (this.saving() || this.accionEsReserva() || this.totalCents() <= 0) {
+        return;
+      }
+
+      this.focusEfectivoInput();
+    });
   }
 
   /**
