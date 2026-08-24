@@ -648,6 +648,8 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
           id_articulo,
           id_linea_venta_origen_devolucion,
           id_linea_reserva_origen,
+          localizador,
+          marca,
           nombre_articulo,
           puc_micros,
           pvp_micros,
@@ -662,7 +664,7 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
           updated_at
         )
         VALUES (
-          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?
         )
       `,
       [
@@ -671,6 +673,8 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
         origen.idArticulo,
         origen.idLineaVentaOrigen,
         origen.idLineaReservaOrigen,
+        linea.localizador,
+        linea.marca,
         linea.nombre,
         linea.pucMicros,
         linea.pvpMicros,
