@@ -5,6 +5,9 @@ import {
   input,
   output,
   signal,
+  viewChild,
+  type AfterViewInit,
+  type ElementRef,
   type InputSignal,
   type OnInit,
   type OutputEmitterRef,
@@ -40,7 +43,7 @@ import { centsToEuros, eurosToCents } from '@utils/money.utils';
     MicrosToEurosPipe,
   ],
 })
-export default class SaleFinalizationComponent implements OnInit {
+export default class SaleFinalizationComponent implements AfterViewInit, OnInit {
   readonly totalCents: InputSignal<number> = input.required<number>();
   readonly lineas: InputSignal<readonly VentaLineaEnCurso[]> =
     input.required<readonly VentaLineaEnCurso[]>();
@@ -109,13 +112,83 @@ export default class SaleFinalizationComponent implements OnInit {
       ),
   );
 
+  readonly tipoPagoEfectivo: Signal<TipoPago | null> = computed((): TipoPago | null => {
+    return (
+      this.tiposPagoFisicos().find((tipoPago: TipoPago): boolean => tipoPago.slug === 'efectivo') ??
+      null
+    );
+  });
+
+  readonly pagosEditables: Signal<readonly VentaPagoEnCurso[]> = computed(
+    (): readonly VentaPagoEnCurso[] => {
+      const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
+
+      if (finalizacion === null) {
+        return [];
+      }
+
+      if (finalizacion.totalCents > 0) {
+        return finalizacion.pagos.filter((pago: VentaPagoEnCurso): boolean => !pago.esEfectivo);
+      }
+
+      return finalizacion.pagos;
+    },
+  );
+
+  readonly tipoPagoActivoPublicId: WritableSignal<string | null> = signal<string | null>(null);
+
+  private readonly efectivoInput = viewChild<ElementRef<HTMLInputElement>>('efectivoInput');
+
   /**
    * Cada apertura del componente crea una finalización nueva.
    *
    * Cancelar el overlay descarta por tanto todo su estado.
    */
   ngOnInit(): void {
-    this.finalizacion.set(new VentaFinalizacionEnCurso(this.totalCents()));
+    const finalizacion: VentaFinalizacionEnCurso = new VentaFinalizacionEnCurso(this.totalCents());
+
+    this.finalizacion.set(finalizacion);
+
+    if (finalizacion.totalCents > 0) {
+      this.tipoPagoActivoPublicId.set(this.tipoPagoEfectivo()?.publicId ?? null);
+    }
+  }
+
+  ngAfterViewInit(): void {
+    if (this.totalCents() > 0) {
+      this.focusEfectivoInput();
+    }
+  }
+
+  selectTipoPago(tipoPago: TipoPago): void {
+    const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
+
+    if (this.saving() || finalizacion === null || finalizacion.completa) {
+      return;
+    }
+
+    if (finalizacion.totalCents > 0 && tipoPago.slug === 'efectivo') {
+      this.tipoPagoActivoPublicId.set(tipoPago.publicId);
+      this.focusEfectivoInput();
+
+      return;
+    }
+
+    const alreadyAdded: boolean = this.isTipoPagoAdded(tipoPago);
+
+    this.addTipoPago(tipoPago);
+
+    if (!alreadyAdded && this.isTipoPagoAdded(tipoPago)) {
+      this.tipoPagoActivoPublicId.set(tipoPago.publicId);
+    }
+  }
+
+  isTipoPagoSelected(tipoPago: TipoPago): boolean {
+    if (this.isTipoPagoAdded(tipoPago)) {
+      return true;
+    }
+
+    return tipoPago.publicId !== null && this.tipoPagoActivoPublicId() === tipoPago.publicId;
   }
 
   /**
@@ -173,6 +246,86 @@ export default class SaleFinalizationComponent implements OnInit {
     }
 
     return centsToEuros(pago.entregadoCents);
+  }
+
+  getEfectivoEntregadoEuros(): number | '' {
+    const pago: VentaPagoEnCurso | null = this.getPagoEfectivo();
+
+    if (pago === null || pago.entregadoCents === null) {
+      return '';
+    }
+
+    return centsToEuros(pago.entregadoCents);
+  }
+
+  updateEfectivoRapido(event: Event): void {
+    const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
+    const tipoPagoEfectivo: TipoPago | null = this.tipoPagoEfectivo();
+
+    if (
+      this.saving() ||
+      finalizacion === null ||
+      finalizacion.totalCents <= 0 ||
+      tipoPagoEfectivo === null
+    ) {
+      return;
+    }
+
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
+    this.tipoPagoActivoPublicId.set(tipoPagoEfectivo.publicId);
+
+    if (inputElement.value.trim() === '') {
+      this.clearPagoEfectivo(finalizacion);
+
+      return;
+    }
+
+    const euros: number = inputElement.valueAsNumber;
+
+    if (!Number.isFinite(euros) || euros <= 0) {
+      this.clearPagoEfectivo(finalizacion);
+      inputElement.value = '';
+
+      return;
+    }
+
+    try {
+      const entregadoCents: number = eurosToCents(euros);
+
+      if (entregadoCents <= 0) {
+        this.clearPagoEfectivo(finalizacion);
+        inputElement.value = '';
+
+        return;
+      }
+
+      const pagoActual: VentaPagoEnCurso | null = this.getPagoEfectivo();
+
+      const importeActualCents: number = pagoActual?.importeCents ?? 0;
+
+      const maxImporteCents: number = importeActualCents + finalizacion.pendienteCents;
+
+      if (maxImporteCents <= 0) {
+        throw new RangeError('No queda importe pendiente que pueda asignarse al efectivo.');
+      }
+
+      const importeCents: number = Math.min(entregadoCents, maxImporteCents);
+
+      const pagoActualizado: VentaPagoEnCurso =
+        pagoActual === null
+          ? finalizacion.addPago(tipoPagoEfectivo, importeCents, entregadoCents)
+          : finalizacion.updatePago(pagoActual.tipoPagoPublicId, importeCents, entregadoCents);
+
+      this.error.set(null);
+      this.finalizacion.set(finalizacion);
+
+      inputElement.value = String(centsToEuros(pagoActualizado.entregadoCents ?? entregadoCents));
+    } catch (error: unknown) {
+      this.error.set(getErrorMessage(error, 'No se ha podido actualizar el pago en efectivo.'));
+
+      inputElement.value = String(this.getEfectivoEntregadoEuros());
+    }
   }
 
   /**
@@ -331,6 +484,12 @@ export default class SaleFinalizationComponent implements OnInit {
 
     finalizacion.removePago(tipoPagoPublicId);
 
+    if (this.tipoPagoActivoPublicId() === tipoPagoPublicId) {
+      this.tipoPagoActivoPublicId.set(
+        finalizacion.totalCents > 0 ? (this.tipoPagoEfectivo()?.publicId ?? null) : null,
+      );
+    }
+
     this.error.set(null);
 
     this.finalizacion.set(finalizacion);
@@ -429,5 +588,37 @@ export default class SaleFinalizationComponent implements OnInit {
     }
 
     this.cancelEvent.emit();
+  }
+
+  private focusEfectivoInput(): void {
+    const inputElement: HTMLInputElement | undefined = this.efectivoInput()?.nativeElement;
+
+    if (inputElement === undefined) {
+      return;
+    }
+
+    inputElement.focus();
+    inputElement.select();
+  }
+
+  private getPagoEfectivo(): VentaPagoEnCurso | null {
+    const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
+
+    if (finalizacion === null) {
+      return null;
+    }
+
+    return finalizacion.pagos.find((pago: VentaPagoEnCurso): boolean => pago.esEfectivo) ?? null;
+  }
+
+  private clearPagoEfectivo(finalizacion: VentaFinalizacionEnCurso): void {
+    const pago: VentaPagoEnCurso | null = this.getPagoEfectivo();
+
+    if (pago !== null) {
+      finalizacion.removePago(pago.tipoPagoPublicId);
+      this.finalizacion.set(finalizacion);
+    }
+
+    this.error.set(null);
   }
 }

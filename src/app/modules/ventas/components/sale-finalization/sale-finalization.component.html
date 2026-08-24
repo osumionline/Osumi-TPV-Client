@@ -70,6 +70,52 @@
                           }
                           </h3>
 
+                            @if (
+                            state.totalCents > 0 &&
+                            tipoPagoEfectivo() !== null
+                            ) {
+                            <div class="finalization__quick-payment">
+                                <mat-form-field subscriptSizing="dynamic">
+                                    <mat-label>
+                                        Efectivo
+                                    </mat-label>
+
+                                    <input #efectivoInput
+                                           matInput
+                                           type="number"
+                                           inputmode="decimal"
+                                           step="0.01"
+                                           autocomplete="off"
+                                           [disabled]="saving()"
+                                           [value]="getEfectivoEntregadoEuros()"
+                                           (focus)="selectInputContent($event)"
+                                           (change)="updateEfectivoRapido($event)"
+                                           (keydown.enter)="updateEfectivoRapido($event)">
+
+                                    <span matTextSuffix>
+                                        €
+                                    </span>
+                                </mat-form-field>
+
+                                <div class="finalization__quick-change"
+                                     [class.finalization__quick-change--active]="
+                                    cambioTotalCents() > 0
+                                 ">
+                                    <span>
+                                        Cambio
+                                    </span>
+
+                                    <strong>
+                                        {{
+                                        cambioTotalCents()
+                                            | centsToEuros
+                                            | currency:'EUR':'symbol':'1.2-2'
+                                    }}
+                                    </strong>
+                                </div>
+                            </div>
+                            }
+
                             @if (state.totalCents !== 0) {
                             @if (tiposPagoFisicos().length > 0) {
                             <div class="finalization__payment-types">
@@ -79,11 +125,9 @@
                                 ) {
                                 <button class="finalization__payment-type"
                                         type="button"
-                                        [class.finalization__payment-type--added]="
-                                    isTipoPagoAdded(tipoPago)
-                                "
+                                        [class.finalization__payment-type--added]="isTipoPagoSelected(tipoPago)"
                                         [disabled]="saving() || !canAddTipoPago(tipoPago)"
-                                        (click)="addTipoPago(tipoPago)">
+                                        (click)="selectTipoPago(tipoPago)">
                                     <mat-icon aria-hidden="true">
                                         {{
                                     tipoPago.slug === 'efectivo'
@@ -120,26 +164,22 @@
                             }
                 </section>
 
-                @if (state.pagos.length > 0) {
+                @if (pagosEditables().length > 0) {
                 <section class="finalization__section">
                     <h3>
                         {{
                             state.totalCents < 0
                                 ? 'Reembolsos aplicados'
-                                : 'Pagos aplicados'
+                                : 'Otros pagos'
                         }}
                     </h3>
 
                     <div class="finalization__payments">
                         @for (
-                        pago of state.pagos;
+                        pago of pagosEditables();
                         track pago.tipoPagoPublicId
                         ) {
-                        <div class="finalization__payment"
-                             [class.finalization__payment--cash]="
-                                pago.esEfectivo &&
-                                state.totalCents > 0
-                             ">
+                        <div class="finalization__payment">
                             <div class="finalization__payment-name">
                                 <mat-icon aria-hidden="true">
                                     {{
@@ -181,52 +221,6 @@
                                     €
                                 </span>
                             </mat-form-field>
-
-                            @if (
-                            pago.esEfectivo &&
-                            state.totalCents > 0
-                            ) {
-                            <mat-form-field class="finalization__payment-field"
-                                            subscriptSizing="dynamic">
-                                <mat-label>
-                                    Entregado
-                                </mat-label>
-
-                                <input matInput
-                                       type="number"
-                                       inputmode="decimal"
-                                       min="0.01"
-                                       step="0.01"
-                                       autocomplete="off"
-                                       [disabled]="saving()"
-                                       [min]="getPagoImporteEuros(pago)"
-                                       [value]="getPagoEntregadoEuros(pago)"
-                                       (focus)="selectInputContent($event)"
-                                       (change)="updatePagoEntregado(pago, $event)"
-                                       (keydown.enter)="updatePagoEntregado(pago, $event)">
-
-                                <span matTextSuffix>
-                                    €
-                                </span>
-                            </mat-form-field>
-
-                            <div class="finalization__payment-change"
-                                 [class.finalization__payment-change--active]="
-                                    pago.cambioCents > 0
-                                 ">
-                                <span>
-                                    Cambio
-                                </span>
-
-                                <strong>
-                                    {{
-                                        pago.cambioCents
-                                            | centsToEuros
-                                            | currency:'EUR':'symbol':'1.2-2'
-                                    }}
-                                </strong>
-                            </div>
-                            }
 
                             <button mat-icon-button
                                     class="finalization__payment-delete"
