@@ -171,15 +171,6 @@
         &:last-child {
             border-bottom: 0;
         }
-
-        &.finalization__payment--cash {
-            grid-template-columns:
-                minmax(0, 1fr) minmax(110px, 140px) minmax(110px, 140px) 90px 40px;
-
-            .finalization__payment-name {
-                grid-column: 1 / -1;
-            }
-        }
     }
 
     .finalization__payment-name {
@@ -204,29 +195,6 @@
     .finalization__payment-field {
         width: 100%;
         min-width: 0;
-    }
-
-    .finalization__payment-change {
-        display: flex;
-        min-width: 0;
-        flex-direction: column;
-        align-items: flex-end;
-
-        span {
-            color: var(--disabled-color);
-            font-size: .8rem;
-        }
-
-        strong {
-            font-size: 1.05rem;
-            white-space: nowrap;
-        }
-
-        &.finalization__payment-change--active {
-            strong {
-                color: var(--main-color);
-            }
-        }
     }
 
     .finalization__payment-delete {
@@ -347,11 +315,6 @@
         }
     }
 
-    .finalization__reservation-hint {
-        color: var(--disabled-color);
-        font-size: .85rem;
-    }
-
     .finalization__notice,
     .finalization__error {
         padding: 10px 12px;
@@ -412,27 +375,6 @@
 
             .finalization__payment-field {
                 grid-column: 1;
-            }
-
-            &.finalization__payment--cash {
-                grid-template-columns: minmax(0, 1fr) 40px;
-
-                .finalization__payment-name {
-                    grid-column: 1 / -1;
-                }
-
-                .finalization__payment-field {
-                    grid-column: 1;
-                }
-
-                .finalization__payment-change {
-                    grid-column: 1;
-                    align-items: flex-start;
-                }
-
-                .finalization__payment-delete {
-                    grid-column: 2;
-                }
             }
         }
 

@@ -94,6 +94,12 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
     );
   });
 
+  /**
+   * Calcula el descuento económico efectivo de una línea.
+   *
+   * Se utilizan valores absolutos para que el resumen muestre
+   * correctamente el descuento tanto en ventas como en devoluciones.
+   */
   getLineaDescuentoMicros(linea: VentaLineaEnCurso): number {
     if (linea.regalo) {
       return 0;
@@ -194,6 +200,10 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
     }
   }
 
+  /**
+   * Sitúa el foco inicial en el campo rápido de efectivo
+   * cuando se abre una operación de importe positivo.
+   */
   ngAfterViewInit(): void {
     if (this.totalCents() > 0) {
       this.focusEfectivoInput();
@@ -230,6 +240,12 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
     }
   }
 
+  /**
+   * Indica si un medio de pago debe mostrarse visualmente seleccionado.
+   *
+   * Efectivo puede estar seleccionado como opción inicial aunque todavía
+   * no exista un VentaPagoEnCurso asociado.
+   */
   isTipoPagoSelected(tipoPago: TipoPago): boolean {
     if (this.isTipoPagoAdded(tipoPago)) {
       return true;
@@ -250,6 +266,7 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
 
     if (
       this.saving() ||
+      this.accionEsReserva() ||
       finalizacion === null ||
       finalizacion.completa ||
       this.isTipoPagoAdded(tipoPago)
@@ -284,17 +301,11 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
   }
 
   /**
-   * Devuelve el efectivo entregado por el cliente
-   * como cantidad positiva expresada en euros.
+   * Devuelve la cantidad entregada en efectivo expresada en euros.
+   *
+   * Si todavía no existe pago en efectivo devuelve cadena vacía
+   * para mantener vacío el campo rápido durante el cobro inicial.
    */
-  getPagoEntregadoEuros(pago: VentaPagoEnCurso): number {
-    if (!pago.esEfectivo || pago.entregadoCents === null) {
-      return 0;
-    }
-
-    return centsToEuros(pago.entregadoCents);
-  }
-
   getEfectivoEntregadoEuros(): number | '' {
     const pago: VentaPagoEnCurso | null = this.getPagoEfectivo();
 
@@ -479,8 +490,22 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
     );
   }
 
+  /**
+   * Normaliza el valor visible del campo rápido de efectivo
+   * cuando pierde el foco.
+   *
+   * Durante una reserva el campo siempre debe mostrar cero.
+   * En una venta se sincroniza con el importe entregado actualmente
+   * almacenado en el modelo económico.
+   */
   normalizeEfectivoRapido(event: FocusEvent): void {
     const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
+    if (this.accionEsReserva()) {
+      inputElement.value = '0';
+
+      return;
+    }
 
     const entregadoEuros: number | '' = this.getEfectivoEntregadoEuros();
 
@@ -579,59 +604,6 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
   }
 
   /**
-   * Actualiza la cantidad físicamente entregada
-   * por el cliente para un pago en efectivo.
-   *
-   * No modifica el importe aplicado a la venta.
-   */
-  updatePagoEntregado(pago: VentaPagoEnCurso, event: Event): void {
-    const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
-
-    if (this.saving() || finalizacion === null || !pago.esEfectivo || pago.importeCents < 0) {
-      return;
-    }
-
-    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
-
-    const euros: number = inputElement.valueAsNumber;
-
-    if (Number.isNaN(euros) || !Number.isFinite(euros) || euros <= 0) {
-      this.error.set('La cantidad entregada debe ser mayor que 0,00 €.');
-
-      inputElement.value = String(this.getPagoEntregadoEuros(pago));
-
-      return;
-    }
-
-    try {
-      const entregadoCents: number = eurosToCents(euros);
-
-      if (entregadoCents < pago.importeCents) {
-        throw new RangeError(
-          `La cantidad entregada no puede ser inferior a ${centsToEuros(pago.importeCents).toFixed(
-            2,
-          )} €.`,
-        );
-      }
-
-      const pagoActualizado: VentaPagoEnCurso = finalizacion.updatePago(
-        pago.tipoPagoPublicId,
-        pago.importeCents,
-        entregadoCents,
-      );
-
-      this.error.set(null);
-      this.finalizacion.set(finalizacion);
-
-      inputElement.value = String(this.getPagoEntregadoEuros(pagoActualizado));
-    } catch (error: unknown) {
-      this.error.set(getErrorMessage(error, 'No se ha podido modificar la cantidad entregada.'));
-
-      inputElement.value = String(this.getPagoEntregadoEuros(pago));
-    }
-  }
-
-  /**
    * Elimina un medio de pago de la finalización.
    */
   removePago(tipoPagoPublicId: string): void {
@@ -721,6 +693,14 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
     }
   }
 
+  /**
+   * Ejecuta la acción disponible seleccionada en el modal.
+   *
+   * Las acciones de venta producen una finalización económica,
+   * mientras que las reservas utilizan su flujo específico.
+   * Las acciones futuras permanecen sin ejecución hasta que
+   * sus respectivos bloques estén implementados.
+   */
   executeSelectedAction(): void {
     if (!this.puedeEjecutarAccion()) {
       return;
@@ -804,6 +784,12 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
     inputElement.select();
   }
 
+  /**
+   * Recupera el pago en efectivo existente en la finalización actual.
+   *
+   * Devuelve null cuando todavía no se ha introducido efectivo
+   * o no existe una finalización activa.
+   */
   private getPagoEfectivo(): VentaPagoEnCurso | null {
     const finalizacion: VentaFinalizacionEnCurso | null = this.finalizacion();
 
@@ -814,6 +800,10 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
     return finalizacion.pagos.find((pago: VentaPagoEnCurso): boolean => pago.esEfectivo) ?? null;
   }
 
+  /**
+   * Elimina el pago en efectivo de la finalización actual
+   * y limpia cualquier error asociado a su edición.
+   */
   private clearPagoEfectivo(finalizacion: VentaFinalizacionEnCurso): void {
     const pago: VentaPagoEnCurso | null = this.getPagoEfectivo();
 

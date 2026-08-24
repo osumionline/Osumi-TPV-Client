@@ -126,11 +126,7 @@
                                 <button class="finalization__payment-type"
                                         type="button"
                                         [class.finalization__payment-type--added]="isTipoPagoSelected(tipoPago)"
-                                        [disabled]="
-                                            saving() ||
-                                            accionEsReserva() ||
-                                            !canAddTipoPago(tipoPago)
-                                        "
+                                        [disabled]="!canAddTipoPago(tipoPago)"
                                         (click)="selectTipoPago(tipoPago)">
                                     <mat-icon aria-hidden="true">
                                         {{
