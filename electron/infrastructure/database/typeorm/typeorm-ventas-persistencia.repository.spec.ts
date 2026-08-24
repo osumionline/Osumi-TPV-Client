@@ -74,6 +74,11 @@ interface LineaReservaTrazabilidadRow {
   readonly linea_origen_public_id: string;
 }
 
+interface LineaVentaSnapshotRow {
+  readonly localizador: number;
+  readonly marca: string;
+}
+
 let tempDirectory: string | null = null;
 let applicationDatabase: TypeOrmApplicationDatabase | null = null;
 let ventasPersistenciaService: VentasPersistenciaService | null = null;
@@ -135,6 +140,29 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
     expect(await countRows(dataSource, 'venta')).toBe(1);
 
     expect(await countRows(dataSource, 'linea_venta')).toBe(2);
+
+    const lineaSnapshot: LineaVentaSnapshotRow = await queryOne<LineaVentaSnapshotRow>(
+      dataSource,
+      `
+      SELECT
+        localizador,
+        marca
+      FROM linea_venta
+      WHERE
+        id_venta = ?
+        AND id_articulo = (
+          SELECT id
+          FROM articulo
+          WHERE public_id = ?
+        )
+    `,
+      [result.id, 'articulo-1'],
+    );
+
+    expect(lineaSnapshot).toEqual({
+      localizador: 1,
+      marca: 'Marca test',
+    });
 
     expect(await countRows(dataSource, 'venta_pago')).toBe(2);
 
@@ -405,6 +433,8 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
       lineas: [
         {
           articuloPublicId: 'articulo-1',
+          localizador: 1,
+          marca: 'Marca test',
           nombre: 'Artículo de prueba',
           pucMicros: 4_000_000,
           pvpMicros: 10_000_000,
@@ -1097,6 +1127,8 @@ function createNormalSaleCommand(publicId: string): GuardarVentaCommand {
     lineas: [
       {
         articuloPublicId: 'articulo-1',
+        localizador: 1,
+        marca: 'Marca test',
         nombre: 'Artículo de prueba',
         pucMicros: 4_000_000,
         pvpMicros: 10_000_000,
@@ -1111,6 +1143,8 @@ function createNormalSaleCommand(publicId: string): GuardarVentaCommand {
       },
       {
         articuloPublicId: null,
+        localizador: 0,
+        marca: 'Varios',
         nombre: 'Varios',
         pucMicros: 0,
         pvpMicros: 5_000_000,
@@ -1181,6 +1215,8 @@ async function seedReturnOrigin(dataSource: DataSource): Promise<void> {
         public_id,
         id_venta,
         id_articulo,
+        localizador,
+        marca,
         nombre_articulo,
         puc_micros,
         pvp_micros,
@@ -1204,6 +1240,8 @@ async function seedReturnOrigin(dataSource: DataSource): Promise<void> {
           FROM articulo
           WHERE public_id = 'articulo-1'
         ),
+        1,
+        'Marca test',
         'Artículo de prueba',
         4000000,
         10000000,
@@ -1231,6 +1269,8 @@ function createPartialReturnCommand(publicId: string): GuardarVentaCommand {
     lineas: [
       {
         articuloPublicId: 'articulo-1',
+        localizador: 1,
+        marca: 'Marca test',
         nombre: 'Artículo de prueba',
         pucMicros: 4_000_000,
         pvpMicros: 10_000_000,
@@ -1382,6 +1422,8 @@ function createReservationSaleCommand(): GuardarVentaCommand {
     lineas: [
       {
         articuloPublicId: 'articulo-1',
+        localizador: 1,
+        marca: 'Marca test',
         nombre: 'Artículo de prueba',
         pucMicros: 4_000_000,
         pvpMicros: 10_000_000,
@@ -1418,6 +1460,8 @@ function createZeroTotalGiftCommand(): GuardarVentaCommand {
     lineas: [
       {
         articuloPublicId: 'articulo-1',
+        localizador: 1,
+        marca: 'Marca test',
         nombre: 'Artículo de prueba',
         pucMicros: 4_000_000,
         pvpMicros: 10_000_000,
