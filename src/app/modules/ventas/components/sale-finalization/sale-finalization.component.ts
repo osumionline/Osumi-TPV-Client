@@ -275,17 +275,38 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
 
     this.tipoPagoActivoPublicId.set(tipoPagoEfectivo.publicId);
 
-    if (inputElement.value.trim() === '') {
+    const value: string = inputElement.value.trim();
+
+    if (value === '') {
       this.clearPagoEfectivo(finalizacion);
+
+      return;
+    }
+
+    const decimalSeparatorIndex: number = value.indexOf('.');
+
+    if (decimalSeparatorIndex !== -1 && value.length - decimalSeparatorIndex - 1 > 2) {
+      this.clearPagoEfectivo(finalizacion);
+      this.error.set('El importe en efectivo no puede tener más de dos decimales.');
 
       return;
     }
 
     const euros: number = inputElement.valueAsNumber;
 
-    if (!Number.isFinite(euros) || euros <= 0) {
+    /*
+     * Durante la edición pueden existir estados transitorios,
+     * por ejemplo justo después de escribir el separador decimal.
+     *
+     * No tocamos ni el input ni el modelo hasta que vuelva
+     * a contener un número interpretable.
+     */
+    if (!Number.isFinite(euros)) {
+      return;
+    }
+
+    if (euros <= 0) {
       this.clearPagoEfectivo(finalizacion);
-      inputElement.value = '';
 
       return;
     }
@@ -295,7 +316,6 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
 
       if (entregadoCents <= 0) {
         this.clearPagoEfectivo(finalizacion);
-        inputElement.value = '';
 
         return;
       }
@@ -312,20 +332,25 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
 
       const importeCents: number = Math.min(entregadoCents, maxImporteCents);
 
-      const pagoActualizado: VentaPagoEnCurso =
-        pagoActual === null
-          ? finalizacion.addPago(tipoPagoEfectivo, importeCents, entregadoCents)
-          : finalizacion.updatePago(pagoActual.tipoPagoPublicId, importeCents, entregadoCents);
+      if (pagoActual === null) {
+        finalizacion.addPago(tipoPagoEfectivo, importeCents, entregadoCents);
+      } else {
+        finalizacion.updatePago(pagoActual.tipoPagoPublicId, importeCents, entregadoCents);
+      }
 
       this.error.set(null);
       this.finalizacion.set(finalizacion);
-
-      inputElement.value = String(centsToEuros(pagoActualizado.entregadoCents ?? entregadoCents));
     } catch (error: unknown) {
       this.error.set(getErrorMessage(error, 'No se ha podido actualizar el pago en efectivo.'));
-
-      inputElement.value = String(this.getEfectivoEntregadoEuros());
     }
+  }
+
+  normalizeEfectivoRapido(event: FocusEvent): void {
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
+    const entregadoEuros: number | '' = this.getEfectivoEntregadoEuros();
+
+    inputElement.value = entregadoEuros === '' ? '' : String(entregadoEuros);
   }
 
   /**

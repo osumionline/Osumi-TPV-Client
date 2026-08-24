@@ -87,10 +87,9 @@
                                            step="0.01"
                                            autocomplete="off"
                                            [disabled]="saving()"
-                                           [value]="getEfectivoEntregadoEuros()"
                                            (focus)="selectInputContent($event)"
-                                           (change)="updateEfectivoRapido($event)"
-                                           (keydown.enter)="updateEfectivoRapido($event)">
+                                           (input)="updateEfectivoRapido($event)"
+                                           (blur)="normalizeEfectivoRapido($event)">
 
                                     <span matTextSuffix>
                                         €
