@@ -7,6 +7,7 @@ import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticke
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
+import TypeOrmVentasHistoricoRepository from '@infrastructure/database/typeorm/typeorm-ventas-historico.repository';
 import TypeOrmVentasPersistenciaRepository from '@infrastructure/database/typeorm/typeorm-ventas-persistencia.repository';
 import TypeOrmVentasTicketsRepository from '@infrastructure/database/typeorm/typeorm-ventas-tickets.repository';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -82,6 +83,7 @@ interface LineaVentaSnapshotRow {
 let tempDirectory: string | null = null;
 let applicationDatabase: TypeOrmApplicationDatabase | null = null;
 let ventasPersistenciaService: VentasPersistenciaService | null = null;
+let ventasHistoricoRepository: TypeOrmVentasHistoricoRepository | null = null;
 
 describe('TypeOrmVentasPersistenciaRepository', (): void => {
   beforeEach(async (): Promise<void> => {
@@ -101,6 +103,7 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
     ventasPersistenciaService = new VentasPersistenciaService(
       new TypeOrmVentasPersistenciaRepository(applicationDatabase),
     );
+    ventasHistoricoRepository = new TypeOrmVentasHistoricoRepository(applicationDatabase);
   });
 
   afterEach(async (): Promise<void> => {
@@ -117,6 +120,7 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
 
     applicationDatabase = null;
     ventasPersistenciaService = null;
+    ventasHistoricoRepository = null;
     tempDirectory = null;
   });
 
@@ -343,6 +347,196 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
         },
       ],
     });
+  });
+
+  it('recupera el histórico de un periodo con pagos y agregados económicos', async (): Promise<void> => {
+    const command: GuardarVentaCommand = createNormalSaleCommand('venta-historico-periodo-1');
+
+    const result: VentaPersistidaRecord = await requireService().save(command);
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+      UPDATE venta
+      SET
+        created_at = ?,
+        updated_at = ?
+      WHERE id = ?
+    `,
+      ['2026-08-25T10:00:00.000Z', '2026-08-25T10:00:00.000Z', result.id],
+    );
+
+    const historico = await requireHistoricoRepository().findByPeriod(
+      '2026-08-25T00:00:00.000Z',
+      '2026-08-26T00:00:00.000Z',
+    );
+
+    expect(historico.ventas).toHaveLength(1);
+
+    const venta = historico.ventas[0];
+
+    expect(venta).toBeDefined();
+
+    if (venta === undefined) {
+      throw new Error('No se ha recuperado la venta esperada del histórico.');
+    }
+
+    expect(venta.id).toBe(result.id);
+    expect(venta.publicId).toBe(command.publicId);
+    expect(venta.fecha).toBe('2026-08-25T10:00:00.000Z');
+    expect(venta.totalCents).toBe(2_200);
+    expect(venta.clienteNombre).toBeNull();
+    expect(venta.tieneIncidenciaTicketBai).toBe(false);
+
+    expect(
+      venta.pagos.map((pago) => ({
+        tipoPagoPublicId: pago.tipoPagoPublicId,
+        nombre: pago.nombre,
+        importeCents: pago.importeCents,
+      })),
+    ).toEqual([
+      {
+        tipoPagoPublicId: 'tipo-pago-efectivo',
+        nombre: 'Efectivo',
+        importeCents: 1_200,
+      },
+      {
+        tipoPagoPublicId: 'tipo-pago-tarjeta',
+        nombre: 'Tarjeta',
+        importeCents: 1_000,
+      },
+    ]);
+
+    expect(historico.resumen.numeroVentas).toBe(1);
+    expect(historico.resumen.totalCents).toBe(2_200);
+    expect(historico.resumen.ticketMedioCents).toBe(2_200);
+    expect(historico.resumen.beneficioCents).toBe(1_400);
+
+    expect(historico.resumen.totalesPorTipoPago).toEqual([
+      {
+        tipoPagoPublicId: 'tipo-pago-efectivo',
+        nombre: 'Efectivo',
+        importeCents: 1_200,
+      },
+      {
+        tipoPagoPublicId: 'tipo-pago-tarjeta',
+        nombre: 'Tarjeta',
+        importeCents: 1_000,
+      },
+    ]);
+  });
+
+  it('recupera el detalle histórico desde los snapshots persistidos', async (): Promise<void> => {
+    const result: VentaPersistidaRecord = await requireService().save(
+      createNormalSaleCommand('venta-historico-detalle-1'),
+    );
+
+    const detalle = await requireHistoricoRepository().findDetalleByVentaId(result.id);
+
+    expect(detalle).not.toBeNull();
+
+    if (detalle === null) {
+      throw new Error('No se ha recuperado el detalle histórico esperado.');
+    }
+
+    expect(detalle.id).toBe(result.id);
+    expect(detalle.publicId).toBe('venta-historico-detalle-1');
+    expect(detalle.serie).toBe('');
+    expect(detalle.numero).toBe(1);
+    expect(detalle.empleadoNombre).toBe('Empleado test');
+    expect(detalle.cliente).toBeNull();
+    expect(detalle.totalCents).toBe(2_200);
+
+    expect(detalle.numeroPagos).toBe(2);
+    expect(detalle.cajaAbierta).toBe(true);
+    expect(detalle.facturada).toBe(false);
+    expect(detalle.tieneLineasPositivas).toBe(true);
+    expect(detalle.tieneIncidenciaTicketBai).toBe(false);
+
+    expect(detalle.pagos).toEqual([
+      {
+        tipoPagoPublicId: 'tipo-pago-efectivo',
+        nombre: 'Efectivo',
+        importeCents: 1_200,
+        entregadoCents: 2_000,
+        cambioCents: 800,
+      },
+      {
+        tipoPagoPublicId: 'tipo-pago-tarjeta',
+        nombre: 'Tarjeta',
+        importeCents: 1_000,
+        entregadoCents: null,
+        cambioCents: 0,
+      },
+    ]);
+
+    expect(detalle.lineas).toEqual([
+      {
+        id: expect.any(Number),
+        localizador: 1,
+        marca: 'Marca test',
+        descripcion: 'Artículo de prueba',
+        unidades: 2,
+        pvpMicros: 10_000_000,
+        descuentoBps: 1_000,
+        importeDescuentoMicros: 0,
+        importeMicros: 18_000_000,
+        regalo: false,
+      },
+      {
+        id: expect.any(Number),
+        localizador: 0,
+        marca: 'Varios',
+        descripcion: 'Varios',
+        unidades: 1,
+        pvpMicros: 5_000_000,
+        descuentoBps: 0,
+        importeDescuentoMicros: 1_000_000,
+        importeMicros: 4_000_000,
+        regalo: false,
+      },
+    ]);
+  });
+
+  it('aplica un inicio inclusivo y un final exclusivo al consultar el periodo', async (): Promise<void> => {
+    const result: VentaPersistidaRecord = await requireService().save(
+      createNormalSaleCommand('venta-historico-limite-1'),
+    );
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+      UPDATE venta
+      SET
+        created_at = ?,
+        updated_at = ?
+      WHERE id = ?
+    `,
+      ['2026-08-26T00:00:00.000Z', '2026-08-26T00:00:00.000Z', result.id],
+    );
+
+    const historico = await requireHistoricoRepository().findByPeriod(
+      '2026-08-25T00:00:00.000Z',
+      '2026-08-26T00:00:00.000Z',
+    );
+
+    expect(historico.ventas).toEqual([]);
+
+    expect(historico.resumen).toEqual({
+      numeroVentas: 0,
+      totalCents: 0,
+      ticketMedioCents: 0,
+      beneficioCents: 0,
+      totalesPorTipoPago: [],
+    });
+  });
+
+  it('devuelve null al solicitar el detalle de una venta inexistente', async (): Promise<void> => {
+    const detalle = await requireHistoricoRepository().findDetalleByVentaId(999_999);
+
+    expect(detalle).toBeNull();
   });
 
   it('es idempotente y no repite ningún efecto al guardar dos veces la misma venta', async (): Promise<void> => {
@@ -1493,6 +1687,17 @@ function requireService(): VentasPersistenciaService {
   }
 
   return ventasPersistenciaService;
+}
+
+/**
+ * Devuelve el repository de Histórico inicializado para el test actual.
+ */
+function requireHistoricoRepository(): TypeOrmVentasHistoricoRepository {
+  if (ventasHistoricoRepository === null) {
+    throw new Error('El repository de histórico de ventas de test no está inicializado.');
+  }
+
+  return ventasHistoricoRepository;
 }
 
 async function countRows(dataSource: DataSource, table: string): Promise<number> {
