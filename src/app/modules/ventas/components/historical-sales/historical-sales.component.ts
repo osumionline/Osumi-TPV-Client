@@ -19,9 +19,11 @@ import { MatTooltip } from '@angular/material/tooltip';
 import type {
   ResumenHistorico,
   VentaHistoricoConsulta,
+  VentaHistoricoDetalle,
   VentaHistoricoResumen,
   VentasHistoricoResultado,
 } from '@desktop-contracts/ventas/venta-historico.interface';
+import HistoricalSaleDetailComponent from '@modules/ventas/components/historical-sale-detail/historical-sale-detail.component';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import VentasHistoricoService from '@services/ventas-historico.service';
 import { getErrorMessage } from '@utils/error.utils';
@@ -38,6 +40,7 @@ type HistoricalSalesFilterMode = 'fecha' | 'rango';
   templateUrl: './historical-sales.component.html',
   styleUrl: './historical-sales.component.scss',
   imports: [
+    HistoricalSaleDetailComponent,
     CurrencyPipe,
     DatePipe,
     MatButton,
@@ -69,26 +72,19 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
 
   readonly selectedVentaId: WritableSignal<number | null> = signal<number | null>(null);
 
+  readonly detalleLoading: WritableSignal<boolean> = signal<boolean>(false);
+
+  readonly detalleError: WritableSignal<string | null> = signal<string | null>(null);
+
+  readonly detalle: WritableSignal<VentaHistoricoDetalle | null> =
+    signal<VentaHistoricoDetalle | null>(null);
+
   readonly ventas: Signal<readonly VentaHistoricoResumen[]> = computed(
     (): readonly VentaHistoricoResumen[] => this.resultado()?.ventas ?? [],
   );
 
   readonly resumen: Signal<ResumenHistorico | null> = computed(
     (): ResumenHistorico | null => this.resultado()?.resumen ?? null,
-  );
-
-  readonly selectedVenta: Signal<VentaHistoricoResumen | null> = computed(
-    (): VentaHistoricoResumen | null => {
-      const idVenta: number | null = this.selectedVentaId();
-
-      if (idVenta === null) {
-        return null;
-      }
-
-      return (
-        this.ventas().find((venta: VentaHistoricoResumen): boolean => venta.id === idVenta) ?? null
-      );
-    },
   );
 
   readonly canSearchRange: Signal<boolean> = computed((): boolean => {
@@ -102,6 +98,7 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
     viewChild<ElementRef<HTMLButtonElement>>('closeButton');
 
   private loadRequestId: number = 0;
+  private detailRequestId: number = 0;
 
   /**
    * Inicializa los filtros con la fecha local actual
@@ -223,12 +220,32 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
   }
 
   /**
-   * Marca una venta como seleccionada.
-   *
-   * El detalle se recuperará bajo demanda en el siguiente bloque.
+   * Selecciona una venta y recupera bajo demanda
+   * su snapshot histórico completo.
    */
   selectVenta(idVenta: number): void {
+    if (this.selectedVentaId() === idVenta && this.detalle()?.id === idVenta) {
+      return;
+    }
+
     this.selectedVentaId.set(idVenta);
+    this.detalle.set(null);
+    this.detalleError.set(null);
+
+    void this.loadDetalle(idVenta);
+  }
+
+  /**
+   * Reintenta la carga del detalle actualmente seleccionado.
+   */
+  retryDetalle(): void {
+    const idVenta: number | null = this.selectedVentaId();
+
+    if (idVenta === null) {
+      return;
+    }
+
+    void this.loadDetalle(idVenta);
   }
 
   /**
@@ -284,7 +301,7 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
           (venta: VentaHistoricoResumen): boolean => venta.id === selectedVentaId,
         )
       ) {
-        this.selectedVentaId.set(null);
+        this.clearDetalleSelection();
       }
     } catch (error: unknown) {
       if (requestId !== this.loadRequestId) {
@@ -292,7 +309,7 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
       }
 
       this.resultado.set(null);
-      this.selectedVentaId.set(null);
+      this.clearDetalleSelection();
 
       this.error.set(getErrorMessage(error, 'No se ha podido recuperar el histórico de ventas.'));
     } finally {
@@ -300,6 +317,62 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
         this.loading.set(false);
       }
     }
+  }
+
+  /**
+   * Recupera el detalle de una venta protegiendo la UI
+   * frente a respuestas antiguas de selecciones anteriores.
+   */
+  private async loadDetalle(idVenta: number): Promise<void> {
+    const requestId: number = ++this.detailRequestId;
+
+    this.detalleLoading.set(true);
+    this.detalleError.set(null);
+
+    try {
+      const detalle: VentaHistoricoDetalle | null =
+        await this.ventasHistoricoService.getDetalle(idVenta);
+
+      if (requestId !== this.detailRequestId || this.selectedVentaId() !== idVenta) {
+        return;
+      }
+
+      if (detalle === null) {
+        this.detalle.set(null);
+        this.detalleError.set('La venta seleccionada ya no se encuentra disponible.');
+
+        return;
+      }
+
+      this.detalle.set(detalle);
+    } catch (error: unknown) {
+      if (requestId !== this.detailRequestId || this.selectedVentaId() !== idVenta) {
+        return;
+      }
+
+      this.detalle.set(null);
+
+      this.detalleError.set(
+        getErrorMessage(error, 'No se ha podido recuperar el detalle de la venta.'),
+      );
+    } finally {
+      if (requestId === this.detailRequestId && this.selectedVentaId() === idVenta) {
+        this.detalleLoading.set(false);
+      }
+    }
+  }
+
+  /**
+   * Descarta la selección y cualquier detalle asociado,
+   * invalidando además las cargas todavía en curso.
+   */
+  private clearDetalleSelection(): void {
+    this.detailRequestId++;
+
+    this.selectedVentaId.set(null);
+    this.detalle.set(null);
+    this.detalleError.set(null);
+    this.detalleLoading.set(false);
   }
 
   /**

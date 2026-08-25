@@ -1,0 +1,211 @@
+.historical-sale-detail {
+    display: flex;
+    min-height: 100%;
+    padding: 16px;
+    box-sizing: border-box;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.historical-sale-detail__header {
+    display: flex;
+    min-height: 34px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.historical-sale-detail__sale-reference {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 12px;
+
+    strong {
+        font-size: 1.15rem;
+        white-space: nowrap;
+    }
+
+    span {
+        color: var(--disabled-color);
+        white-space: nowrap;
+    }
+}
+
+.historical-sale-detail__total {
+    font-size: 1.4rem;
+    white-space: nowrap;
+}
+
+.historical-sale-detail__secondary-info {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(320px, 2fr);
+    gap: 12px;
+    align-items: stretch;
+}
+
+.historical-sale-detail__payment-section {
+    min-width: 0;
+}
+
+.historical-sale-detail__metadata {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+
+    div {
+        display: flex;
+        min-width: 0;
+        padding: 9px 10px;
+        flex-direction: column;
+        gap: 2px;
+        border-radius: 4px;
+        background-color: var(--color-very-light-grey);
+    }
+
+    span {
+        color: var(--disabled-color);
+        font-size: 0.75rem;
+    }
+
+    strong {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+.historical-sale-detail__section {
+    h4 {
+        margin: 0 0 8px;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+}
+
+.historical-sale-detail__payments {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.historical-sale-detail__payment {
+    display: flex;
+    padding: 8px 10px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid var(--separator-color);
+    border-radius: 4px;
+
+    div {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+    }
+
+    small {
+        color: var(--disabled-color);
+    }
+}
+
+.historical-sale-detail__empty {
+    margin: 0;
+    color: var(--disabled-color);
+}
+
+.historical-sale-detail__lines-section {
+    min-height: 0;
+}
+
+.historical-sale-detail__table-wrapper {
+    max-height: min(40vh, 440px);
+    border: 1px solid var(--separator-color);
+    border-radius: 4px;
+    overflow: auto;
+}
+
+.historical-sale-detail__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+
+    th,
+    td {
+        padding: 7px 8px;
+        border-bottom: 1px solid var(--separator-color);
+        text-align: left;
+        vertical-align: top;
+    }
+
+    th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background-color: var(--color-very-light-grey);
+        font-weight: 500;
+    }
+
+    tbody tr:last-child td {
+        border-bottom: 1px solid var(--separator-color);
+    }
+
+    tfoot td {
+        position: sticky;
+        bottom: 0;
+        background-color: var(--color-very-light-grey);
+        border-bottom: 0;
+    }
+}
+
+.historical-sale-detail__number,
+.historical-sale-detail__money {
+    text-align: right !important;
+    white-space: nowrap;
+}
+
+.historical-sale-detail__capabilities {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.historical-sale-detail__capability {
+    display: flex;
+    padding: 8px;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--separator-color);
+    border-radius: 4px;
+    color: var(--disabled-color);
+
+    mat-icon {
+        flex: 0 0 auto;
+    }
+
+    div {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+    }
+
+    small {
+        font-size: 0.72rem;
+    }
+
+    &.historical-sale-detail__capability--available {
+        color: inherit;
+
+        mat-icon {
+            color: var(--main-color);
+        }
+    }
+}
+
+@media (max-width: 700px) {
+
+    .historical-sale-detail__metadata,
+    .historical-sale-detail__capabilities {
+        grid-template-columns: 1fr;
+    }
+}

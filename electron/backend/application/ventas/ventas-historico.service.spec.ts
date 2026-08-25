@@ -113,7 +113,7 @@ describe('VentasHistoricoService', (): void => {
           unidades: 3,
           pvpMicros: 10_000_000,
           descuentoBps: 1_000,
-          importeDescuentoMicros: 3_000_000,
+          importeDescuentoMicros: 0,
           importeMicros: 27_000_000,
           regalo: false,
         },

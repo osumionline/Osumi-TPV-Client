@@ -142,7 +142,7 @@ export default class VentasHistoricoService {
         unidades: linea.unidades,
         pvpMicros: linea.pvpMicros,
         descuentoBps: linea.descuentoBps,
-        importeDescuentoMicros: linea.importeDescuentoMicros,
+        importeDescuentoMicros: this.getLineaDescuentoMicros(linea),
         importeMicros: linea.importeMicros,
         regalo: linea.regalo,
       }),
@@ -160,7 +160,7 @@ export default class VentasHistoricoService {
 
       totalDescuentoMicros = this.safeAdd(
         totalDescuentoMicros,
-        linea.importeDescuentoMicros,
+        this.getLineaDescuentoMicros(linea),
         'El descuento total del histórico supera el rango numérico seguro.',
       );
     }
@@ -249,6 +249,36 @@ export default class VentasHistoricoService {
     date.setHours(0, 0, 0, 0);
 
     return date;
+  }
+
+  /**
+   * Calcula el descuento económico efectivo de una línea histórica.
+   *
+   * Los regalos no se contabilizan como descuento. Para el resto
+   * se compara el importe base teórico con el importe final persistido,
+   * utilizando valores absolutos para soportar también devoluciones.
+   */
+  private getLineaDescuentoMicros(linea: VentaHistoricoLineaRecord): number {
+    if (linea.regalo) {
+      return 0;
+    }
+
+    const importeBaseMicros: number = linea.pvpMicros * linea.unidades;
+
+    if (!Number.isSafeInteger(importeBaseMicros)) {
+      throw new Error('El importe base de una línea histórica supera el rango numérico seguro.');
+    }
+
+    const importeDescuentoMicros: number = Math.max(
+      0,
+      Math.abs(importeBaseMicros) - Math.abs(linea.importeMicros),
+    );
+
+    if (!Number.isSafeInteger(importeDescuentoMicros)) {
+      throw new Error('El descuento de una línea histórica supera el rango numérico seguro.');
+    }
+
+    return importeDescuentoMicros;
   }
 
   /**

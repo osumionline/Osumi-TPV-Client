@@ -221,24 +221,26 @@
                                 </strong>
 
                                 <span class="historical-sales__payment">
-                                    {{ getPagosLabel(venta) }}
-                                </span>
+                                    <span class="historical-sales__payment-icons">
+                                        @if (venta.clienteNombre !== null) {
+                                        <mat-icon [matTooltip]="venta.clienteNombre"
+                                                  aria-label="Venta asociada a cliente">
+                                            person
+                                        </mat-icon>
+                                        }
 
-                                <span class="historical-sales__icons">
-                                    @if (venta.clienteNombre !== null) {
-                                    <mat-icon [matTooltip]="venta.clienteNombre"
-                                              aria-label="Venta asociada a cliente">
-                                        person
-                                    </mat-icon>
-                                    }
+                                        @if (venta.tieneIncidenciaTicketBai) {
+                                        <mat-icon class="historical-sales__ticketbai-error"
+                                                  matTooltip="Incidencia TicketBAI"
+                                                  aria-label="Incidencia TicketBAI">
+                                            error
+                                        </mat-icon>
+                                        }
+                                    </span>
 
-                                    @if (venta.tieneIncidenciaTicketBai) {
-                                    <mat-icon class="historical-sales__ticketbai-error"
-                                              matTooltip="Incidencia TicketBAI"
-                                              aria-label="Incidencia TicketBAI">
-                                        error
-                                    </mat-icon>
-                                    }
+                                    <span class="historical-sales__payment-label">
+                                        {{ getPagosLabel(venta) }}
+                                    </span>
                                 </span>
                             </button>
                             }
@@ -246,32 +248,60 @@
                         </div>
                     </section>
 
-                    <aside class="historical-sales__detail-placeholder">
-                        @if (selectedVenta(); as venta) {
-                        <mat-icon aria-hidden="true">
-                            receipt_long
-                        </mat-icon>
+                    <aside class="historical-sales__detail">
+                        @if (detalleLoading()) {
+                        <div class="historical-sales__detail-state">
+                            <mat-icon aria-hidden="true">
+                                hourglass_top
+                            </mat-icon>
 
-                        <h3>
-                            Venta {{ getVentaReferencia(venta) }}
-                        </h3>
+                            <h3>
+                                Cargando detalle
+                            </h3>
 
-                        <p>
-                            Seleccionada para consultar su detalle.
-                        </p>
+                            <p>
+                                Recuperando la información histórica de la venta.
+                            </p>
+                        </div>
+                        }
+                        @else if (detalleError() !== null) {
+                        <div class="historical-sales__detail-state historical-sales__detail-state--error">
+                            <mat-icon aria-hidden="true">
+                                error_outline
+                            </mat-icon>
+
+                            <h3>
+                                No se ha podido cargar el detalle
+                            </h3>
+
+                            <p>
+                                {{ detalleError() }}
+                            </p>
+
+                            <button mat-stroked-button
+                                    type="button"
+                                    (click)="retryDetalle()">
+                                Reintentar
+                            </button>
+                        </div>
+                        }
+                        @else if (detalle(); as detalleVenta) {
+                        <otpv-historical-sale-detail [detalle]="detalleVenta" />
                         }
                         @else {
-                        <mat-icon aria-hidden="true">
-                            touch_app
-                        </mat-icon>
+                        <div class="historical-sales__detail-state">
+                            <mat-icon aria-hidden="true">
+                                touch_app
+                            </mat-icon>
 
-                        <h3>
-                            Detalle de venta
-                        </h3>
+                            <h3>
+                                Detalle de venta
+                            </h3>
 
-                        <p>
-                            Selecciona una venta para consultar sus líneas y acciones postventa.
-                        </p>
+                            <p>
+                                Selecciona una venta para consultar sus líneas y acciones postventa.
+                            </p>
+                        </div>
                         }
                     </aside>
                 </div>

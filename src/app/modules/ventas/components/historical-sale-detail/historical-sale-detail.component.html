@@ -1,0 +1,349 @@
+<section class="historical-sale-detail">
+    <header class="historical-sale-detail__header">
+        <div class="historical-sale-detail__sale-reference">
+            <strong>
+                Venta {{ getReferencia() }}
+            </strong>
+
+            <span>
+                {{ detalle().fecha | date:'dd/MM/yyyy HH:mm' }}
+            </span>
+        </div>
+
+        <strong class="historical-sale-detail__total">
+            {{
+                detalle().totalCents
+                    | centsToEuros
+                    | currency:'EUR':'symbol':'1.2-2'
+            }}
+        </strong>
+    </header>
+
+    <section class="historical-sale-detail__section historical-sale-detail__lines-section">
+        <h4>
+            Líneas
+        </h4>
+
+        <div class="historical-sale-detail__table-wrapper">
+            <table class="historical-sale-detail__table">
+                <thead>
+                    <tr>
+                        <th>
+                            Loc.
+                        </th>
+
+                        <th>
+                            Marca
+                        </th>
+
+                        <th>
+                            Descripción
+                        </th>
+
+                        <th class="historical-sale-detail__number">
+                            Cant.
+                        </th>
+
+                        <th class="historical-sale-detail__money">
+                            PVP
+                        </th>
+
+                        <th class="historical-sale-detail__money">
+                            Descuento
+                        </th>
+
+                        <th class="historical-sale-detail__money">
+                            Importe
+                        </th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @for (linea of detalle().lineas; track linea.id) {
+                    <tr>
+                        <td>
+                            {{ linea.localizador }}
+                        </td>
+
+                        <td>
+                            {{ linea.marca }}
+                        </td>
+
+                        <td>
+                            {{ linea.descripcion }}
+                        </td>
+
+                        <td class="historical-sale-detail__number">
+                            {{ linea.unidades }}
+                        </td>
+
+                        <td class="historical-sale-detail__money">
+                            {{
+                                linea.pvpMicros
+                                    | microsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </td>
+
+                        <td class="historical-sale-detail__money">
+                            @if (linea.regalo) {
+                            Regalo
+                            }
+                            @else if (linea.importeDescuentoMicros > 0) {
+                            {{
+                                linea.importeDescuentoMicros
+                                    | microsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                            }
+                            @else {
+                            -
+                            }
+                        </td>
+
+                        <td class="historical-sale-detail__money">
+                            {{
+                                linea.importeMicros
+                                    | microsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </td>
+                    </tr>
+                    }
+                </tbody>
+
+                <tfoot>
+                    <tr>
+                        <td colspan="3">
+                            <strong>
+                                Total
+                            </strong>
+                        </td>
+
+                        <td class="historical-sale-detail__number">
+                            <strong>
+                                {{ detalle().totalUnidades }}
+                            </strong>
+                        </td>
+
+                        <td></td>
+
+                        <td class="historical-sale-detail__money">
+                            <strong>
+                                {{
+                                    detalle().totalDescuentoMicros
+                                        | microsToEuros
+                                        | currency:'EUR':'symbol':'1.2-2'
+                                }}
+                            </strong>
+                        </td>
+
+                        <td class="historical-sale-detail__money">
+                            <strong>
+                                {{
+                                    detalle().totalCents
+                                        | centsToEuros
+                                        | currency:'EUR':'symbol':'1.2-2'
+                                }}
+                            </strong>
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </section>
+
+    <section class="historical-sale-detail__section">
+        <h4>
+            Acciones postventa
+        </h4>
+
+        <div class="historical-sale-detail__capabilities">
+            <div class="historical-sale-detail__capability"
+                 [class.historical-sale-detail__capability--available]="
+                    detalle().capacidades.puedeCambiarCliente
+                 ">
+                <mat-icon aria-hidden="true">
+                    {{
+                        detalle().capacidades.puedeCambiarCliente
+                            ? 'check_circle'
+                            : 'block'
+                    }}
+                </mat-icon>
+
+                <div>
+                    <strong>
+                        Cambiar cliente
+                    </strong>
+
+                    <small>
+                        {{
+                            detalle().capacidades.puedeCambiarCliente
+                                ? 'Disponible'
+                                : 'No disponible'
+                        }}
+                    </small>
+                </div>
+            </div>
+
+            <div class="historical-sale-detail__capability"
+                 [class.historical-sale-detail__capability--available]="
+                    detalle().capacidades.puedeCambiarTipoPago
+                 ">
+                <mat-icon aria-hidden="true">
+                    {{
+                        detalle().capacidades.puedeCambiarTipoPago
+                            ? 'check_circle'
+                            : 'block'
+                    }}
+                </mat-icon>
+
+                <div>
+                    <strong>
+                        Cambiar tipo de pago
+                    </strong>
+
+                    <small>
+                        {{
+                            detalle().capacidades.puedeCambiarTipoPago
+                                ? 'Disponible'
+                                : 'No disponible'
+                        }}
+                    </small>
+                </div>
+            </div>
+
+            <div class="historical-sale-detail__capability"
+                 [class.historical-sale-detail__capability--available]="
+                    detalle().capacidades.puedeImprimirTicketRegalo
+                 ">
+                <mat-icon aria-hidden="true">
+                    {{
+                        detalle().capacidades.puedeImprimirTicketRegalo
+                            ? 'check_circle'
+                            : 'block'
+                    }}
+                </mat-icon>
+
+                <div>
+                    <strong>
+                        Ticket regalo
+                    </strong>
+
+                    <small>
+                        {{
+                            detalle().capacidades.puedeImprimirTicketRegalo
+                                ? 'Disponible'
+                                : 'No disponible'
+                        }}
+                    </small>
+                </div>
+            </div>
+
+            <div class="historical-sale-detail__capability"
+                 [class.historical-sale-detail__capability--available]="
+                    detalle().capacidades.puedeReintentarTicketBai
+                 ">
+                <mat-icon aria-hidden="true">
+                    {{
+                        detalle().capacidades.puedeReintentarTicketBai
+                            ? 'check_circle'
+                            : 'block'
+                    }}
+                </mat-icon>
+
+                <div>
+                    <strong>
+                        Reintentar TicketBAI
+                    </strong>
+
+                    <small>
+                        {{
+                            detalle().capacidades.puedeReintentarTicketBai
+                                ? 'Disponible'
+                                : 'No disponible'
+                        }}
+                    </small>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="historical-sale-detail__secondary-info">
+        <div class="historical-sale-detail__metadata">
+            <div>
+                <span>
+                    Empleado
+                </span>
+
+                <strong>
+                    {{ detalle().empleadoNombre }}
+                </strong>
+            </div>
+
+            <div>
+                <span>
+                    Cliente
+                </span>
+
+                <strong>
+                    {{ detalle().cliente?.nombre ?? 'Sin cliente' }}
+                </strong>
+            </div>
+        </div>
+
+        <div class="historical-sale-detail__payment-section">
+            @if (detalle().pagos.length === 0) {
+            <p class="historical-sale-detail__empty">
+                Sin movimientos de pago.
+            </p>
+            }
+            @else {
+            <div class="historical-sale-detail__payments">
+                @for (
+                pago of detalle().pagos;
+                track pago.tipoPagoPublicId
+                ) {
+                <div class="historical-sale-detail__payment">
+                    <div>
+                        <strong>
+                            {{ pago.nombre }}
+                        </strong>
+
+                        @if (pago.entregadoCents !== null) {
+                        <small>
+                            Entregado:
+                            {{
+                                pago.entregadoCents
+                                    | centsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </small>
+                        }
+
+                        @if (pago.cambioCents !== 0) {
+                        <small>
+                            Cambio:
+                            {{
+                                pago.cambioCents
+                                    | centsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </small>
+                        }
+                    </div>
+
+                    <strong>
+                        {{
+                            pago.importeCents
+                                | centsToEuros
+                                | currency:'EUR':'symbol':'1.2-2'
+                        }}
+                    </strong>
+                </div>
+                }
+            </div>
+            }
+        </div>
+    </section>
+</section>
