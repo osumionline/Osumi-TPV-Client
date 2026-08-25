@@ -64,19 +64,287 @@
                      class="historical-sales__panel"
                      role="tabpanel"
                      aria-labelledby="historical-sales-tab-ventas">
-                <div class="historical-sales__placeholder">
-                    <mat-icon aria-hidden="true">
-                        receipt_long
-                    </mat-icon>
+                <div class="historical-sales__filters">
+                    <div class="historical-sales__filter-mode"
+                         aria-label="Tipo de búsqueda">
+                        <button type="button"
+                                [class.historical-sales__filter-mode-button--active]="filterMode() === 'fecha'"
+                                [attr.aria-pressed]="filterMode() === 'fecha'"
+                                (click)="selectFilterMode('fecha')">
+                            Fecha
+                        </button>
 
-                    <h3>
-                        Histórico de ventas
-                    </h3>
+                        <button type="button"
+                                [class.historical-sales__filter-mode-button--active]="filterMode() === 'rango'"
+                                [attr.aria-pressed]="filterMode() === 'rango'"
+                                (click)="selectFilterMode('rango')">
+                            Rango
+                        </button>
+                    </div>
 
-                    <p>
-                        Selecciona un periodo para consultar las ventas realizadas.
-                    </p>
+                    @if (filterMode() === 'fecha') {
+                    <div class="historical-sales__date-filter">
+                        <button mat-icon-button
+                                type="button"
+                                aria-label="Día anterior"
+                                matTooltip="Día anterior"
+                                [disabled]="loading()"
+                                (click)="moveFecha(-1)">
+                            <mat-icon>
+                                chevron_left
+                            </mat-icon>
+                        </button>
+
+                        <label>
+                            <span>
+                                Fecha
+                            </span>
+
+                            <input type="date"
+                                   [value]="fecha()"
+                                   [disabled]="loading()"
+                                   (change)="onFechaChange($event)">
+                        </label>
+
+                        <button mat-icon-button
+                                type="button"
+                                aria-label="Día siguiente"
+                                matTooltip="Día siguiente"
+                                [disabled]="loading()"
+                                (click)="moveFecha(1)">
+                            <mat-icon>
+                                chevron_right
+                            </mat-icon>
+                        </button>
+                    </div>
+                    }
+                    @else {
+                    <div class="historical-sales__range-filter">
+                        <label>
+                            <span>
+                                Desde
+                            </span>
+
+                            <input type="date"
+                                   [value]="desde()"
+                                   [disabled]="loading()"
+                                   (change)="onDesdeChange($event)">
+                        </label>
+
+                        <label>
+                            <span>
+                                Hasta
+                            </span>
+
+                            <input type="date"
+                                   [value]="hasta()"
+                                   [disabled]="loading()"
+                                   (change)="onHastaChange($event)">
+                        </label>
+
+                        <button mat-flat-button
+                                type="button"
+                                [disabled]="loading() || !canSearchRange()"
+                                (click)="searchRange()">
+                            Buscar
+                        </button>
+                    </div>
+                    }
                 </div>
+
+                @if (error() !== null) {
+                <div class="historical-sales__error"
+                     role="alert">
+                    {{ error() }}
+                </div>
+                }
+
+                <div class="historical-sales__workspace">
+                    <section class="historical-sales__list"
+                             aria-label="Ventas encontradas">
+                        <div class="historical-sales__list-header">
+                            <span>
+                                Fecha / hora
+                            </span>
+
+                            <span class="historical-sales__money">
+                                Importe
+                            </span>
+
+                            <span>
+                                Tipo(s) pago
+                            </span>
+
+                            <span></span>
+                        </div>
+
+                        <div class="historical-sales__list-body">
+                            @if (loading()) {
+                            <div class="historical-sales__empty">
+                                <mat-icon aria-hidden="true">
+                                    hourglass_top
+                                </mat-icon>
+
+                                <span>
+                                    Cargando histórico...
+                                </span>
+                            </div>
+                            }
+                            @else if (ventas().length === 0) {
+                            <div class="historical-sales__empty">
+                                <mat-icon aria-hidden="true">
+                                    receipt_long
+                                </mat-icon>
+
+                                <span>
+                                    No hay ventas en el periodo seleccionado.
+                                </span>
+                            </div>
+                            }
+                            @else {
+                            @for (venta of ventas(); track venta.id) {
+                            <button class="historical-sales__sale"
+                                    type="button"
+                                    [class.historical-sales__sale--selected]="selectedVentaId() === venta.id"
+                                    [attr.aria-pressed]="selectedVentaId() === venta.id"
+                                    (click)="selectVenta(venta.id)">
+                                <span>
+                                    {{ venta.fecha | date:'dd/MM/yyyy HH:mm' }}
+                                </span>
+
+                                <strong class="historical-sales__money">
+                                    {{
+                                        venta.totalCents
+                                            | centsToEuros
+                                            | currency:'EUR':'symbol':'1.2-2'
+                                    }}
+                                </strong>
+
+                                <span class="historical-sales__payment">
+                                    {{ getPagosLabel(venta) }}
+                                </span>
+
+                                <span class="historical-sales__icons">
+                                    @if (venta.clienteNombre !== null) {
+                                    <mat-icon [matTooltip]="venta.clienteNombre"
+                                              aria-label="Venta asociada a cliente">
+                                        person
+                                    </mat-icon>
+                                    }
+
+                                    @if (venta.tieneIncidenciaTicketBai) {
+                                    <mat-icon class="historical-sales__ticketbai-error"
+                                              matTooltip="Incidencia TicketBAI"
+                                              aria-label="Incidencia TicketBAI">
+                                        error
+                                    </mat-icon>
+                                    }
+                                </span>
+                            </button>
+                            }
+                            }
+                        </div>
+                    </section>
+
+                    <aside class="historical-sales__detail-placeholder">
+                        @if (selectedVenta(); as venta) {
+                        <mat-icon aria-hidden="true">
+                            receipt_long
+                        </mat-icon>
+
+                        <h3>
+                            Venta {{ getVentaReferencia(venta) }}
+                        </h3>
+
+                        <p>
+                            Seleccionada para consultar su detalle.
+                        </p>
+                        }
+                        @else {
+                        <mat-icon aria-hidden="true">
+                            touch_app
+                        </mat-icon>
+
+                        <h3>
+                            Detalle de venta
+                        </h3>
+
+                        <p>
+                            Selecciona una venta para consultar sus líneas y acciones postventa.
+                        </p>
+                        }
+                    </aside>
+                </div>
+
+                @if (resumen(); as resumenHistorico) {
+                <footer class="historical-sales__summary">
+                    <div class="historical-sales__summary-card">
+                        <span>
+                            Total
+                        </span>
+
+                        <strong>
+                            {{
+                                resumenHistorico.totalCents
+                                    | centsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </strong>
+                    </div>
+
+                    <div class="historical-sales__summary-card">
+                        <span>
+                            Ticket medio
+                        </span>
+
+                        <strong>
+                            {{
+                                resumenHistorico.ticketMedioCents
+                                    | centsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </strong>
+
+                        <small>
+                            {{ resumenHistorico.numeroVentas }}
+                            {{ resumenHistorico.numeroVentas === 1 ? 'venta' : 'ventas' }}
+                        </small>
+                    </div>
+
+                    @for (
+                    totalTipoPago of resumenHistorico.totalesPorTipoPago;
+                    track totalTipoPago.tipoPagoPublicId
+                    ) {
+                    <div class="historical-sales__summary-card">
+                        <span>
+                            {{ totalTipoPago.nombre }}
+                        </span>
+
+                        <strong>
+                            {{
+                                totalTipoPago.importeCents
+                                    | centsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </strong>
+                    </div>
+                    }
+
+                    <div class="historical-sales__summary-card">
+                        <span>
+                            Beneficio
+                        </span>
+
+                        <strong>
+                            {{
+                                resumenHistorico.beneficioCents
+                                    | centsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </strong>
+                    </div>
+                </footer>
+                }
             </section>
             }
             @else {
