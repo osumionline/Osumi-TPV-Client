@@ -43,6 +43,8 @@ const IPC_CHANNELS = {
   ventasGetDevolucion: 'ventas:get-devolucion',
   ventasGetHistorico: 'ventas:get-historico',
   ventasGetHistoricoDetalle: 'ventas:get-historico-detalle',
+  ventasCambiarCliente: 'ventas:cambiar-cliente',
+  ventasCambiarTipoPago: 'ventas:cambiar-tipo-pago',
   ventasGetTicket: 'ventas:get-ticket',
   ventasSaveTicketPdf: 'ventas:save-ticket-pdf',
   ventasSave: 'ventas:save',

@@ -1,25 +1,30 @@
 import type VentasArticulosService from '@backend/application/ventas/ventas-articulos.service';
 import type VentasContextService from '@backend/application/ventas/ventas-context.service';
 import type VentasDevolucionesService from '@backend/application/ventas/ventas-devoluciones.service';
+import type VentasHistoricoService from '@backend/application/ventas/ventas-historico.service';
 import type VentasPersistenciaService from '@backend/application/ventas/ventas-persistencia.service';
+import type VentasPostventaService from '@backend/application/ventas/ventas-postventa.service';
 import type VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
 import type AccesoDirectoVentaInterface from '@desktop-contracts/ventas/acceso-directo-venta.interface';
 import type ArticuloVentaInterface from '@desktop-contracts/ventas/articulo-venta.interface';
 import type { GuardarVentaCommand } from '@desktop-contracts/ventas/guardar-venta-command.interface';
 import type GuardarVentaResult from '@desktop-contracts/ventas/guardar-venta-result.interface';
 import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devolucion.interface';
+import type {
+  VentaHistoricoConsulta,
+  VentaHistoricoDetalle,
+  VentasHistoricoResultado,
+} from '@desktop-contracts/ventas/venta-historico.interface';
+import type {
+  VentaPostventaCambiarClienteCommand,
+  VentaPostventaCambiarTipoPagoCommand,
+} from '@desktop-contracts/ventas/venta-postventa.interface';
 import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
 import type VentasContextInterface from '@desktop-contracts/ventas/ventas-context.interface';
 import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
 import { assertTrustedSender } from '@ipc/assert-trusted-sender';
 import IPC_CHANNELS from '@ipc/channels';
 import { ipcMain } from 'electron';
-import type VentasHistoricoService from '@backend/application/ventas/ventas-historico.service';
-import type {
-  VentaHistoricoConsulta,
-  VentaHistoricoDetalle,
-  VentasHistoricoResultado,
-} from '@desktop-contracts/ventas/venta-historico.interface';
 
 /**
  * Registra los canales IPC relacionados con el módulo de ventas.
@@ -30,6 +35,7 @@ export default function registerVentasIpc(
   ventasArticulosService: VentasArticulosService,
   ventasDevolucionesService: VentasDevolucionesService,
   ventasHistoricoService: VentasHistoricoService,
+  ventasPostventaService: VentasPostventaService,
   ventasPersistenciaService: VentasPersistenciaService,
   ventasTicketsService: VentasTicketsService,
 ): void {
@@ -90,6 +96,27 @@ export default function registerVentasIpc(
       assertTrustedSender(event, getMainWindow);
 
       return ventasHistoricoService.findDetalleByVentaId(idVenta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.ventasCambiarCliente,
+    async (event, command: VentaPostventaCambiarClienteCommand): Promise<VentaHistoricoDetalle> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return ventasPostventaService.cambiarCliente(command);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.ventasCambiarTipoPago,
+    async (
+      event,
+      command: VentaPostventaCambiarTipoPagoCommand,
+    ): Promise<VentaHistoricoDetalle> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return ventasPostventaService.cambiarTipoPago(command);
     },
   );
 

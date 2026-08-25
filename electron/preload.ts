@@ -27,16 +27,20 @@ import type ArticuloVentaInterface from '@desktop-contracts/ventas/articulo-vent
 import type { GuardarVentaCommand } from '@desktop-contracts/ventas/guardar-venta-command.interface';
 import type GuardarVentaResult from '@desktop-contracts/ventas/guardar-venta-result.interface';
 import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devolucion.interface';
-import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
-import type VentasContextInterface from '@desktop-contracts/ventas/ventas-context.interface';
-import IPC_CHANNELS from '@ipc/channels';
-import type { IpcRendererEvent } from 'electron';
-import { contextBridge, ipcRenderer } from 'electron';
 import type {
   VentaHistoricoConsulta,
   VentaHistoricoDetalle,
   VentasHistoricoResultado,
 } from '@desktop-contracts/ventas/venta-historico.interface';
+import type {
+  VentaPostventaCambiarClienteCommand,
+  VentaPostventaCambiarTipoPagoCommand,
+} from '@desktop-contracts/ventas/venta-postventa.interface';
+import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
+import type VentasContextInterface from '@desktop-contracts/ventas/ventas-context.interface';
+import IPC_CHANNELS from '@ipc/channels';
+import type { IpcRendererEvent } from 'electron';
+import { contextBridge, ipcRenderer } from 'electron';
 
 const desktopApi: OsumiDesktopApi = Object.freeze({
   isElectron: true,
@@ -220,6 +224,22 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         IPC_CHANNELS.ventasGetHistoricoDetalle,
         idVenta,
       ) as Promise<VentaHistoricoDetalle | null>,
+
+    cambiarCliente: (
+      command: VentaPostventaCambiarClienteCommand,
+    ): Promise<VentaHistoricoDetalle> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.ventasCambiarCliente,
+        command,
+      ) as Promise<VentaHistoricoDetalle>,
+
+    cambiarTipoPago: (
+      command: VentaPostventaCambiarTipoPagoCommand,
+    ): Promise<VentaHistoricoDetalle> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.ventasCambiarTipoPago,
+        command,
+      ) as Promise<VentaHistoricoDetalle>,
 
     getTicket: (idVenta: number): Promise<VentaTicketInterface | null> =>
       ipcRenderer.invoke(

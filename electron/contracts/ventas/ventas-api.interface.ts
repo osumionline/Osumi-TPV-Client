@@ -10,6 +10,10 @@ import type {
 } from '@desktop-contracts/ventas/venta-historico.interface';
 import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
 import type VentasContextInterface from '@desktop-contracts/ventas/ventas-context.interface';
+import type {
+  VentaPostventaCambiarClienteCommand,
+  VentaPostventaCambiarTipoPagoCommand,
+} from '@desktop-contracts/ventas/venta-postventa.interface';
 
 export default interface VentasApi {
   getContext(): Promise<VentasContextInterface>;
@@ -25,6 +29,16 @@ export default interface VentasApi {
   getHistorico(consulta: VentaHistoricoConsulta): Promise<VentasHistoricoResultado>;
 
   getHistoricoDetalle(idVenta: number): Promise<VentaHistoricoDetalle | null>;
+
+  /**
+   * Cambia el cliente de una venta histórica.
+   */
+  cambiarCliente(command: VentaPostventaCambiarClienteCommand): Promise<VentaHistoricoDetalle>;
+
+  /**
+   * Cambia el único tipo de pago de una venta histórica.
+   */
+  cambiarTipoPago(command: VentaPostventaCambiarTipoPagoCommand): Promise<VentaHistoricoDetalle>;
 
   getTicket(idVenta: number): Promise<VentaTicketInterface | null>;
 

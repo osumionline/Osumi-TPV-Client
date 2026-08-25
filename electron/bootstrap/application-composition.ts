@@ -98,6 +98,9 @@ import registerVentasIpc from '@ipc/register-ventas-ipc';
 import VentasHistoricoService from '@backend/application/ventas/ventas-historico.service';
 import type VentasHistoricoRepository from '@backend/contracts/ventas/ventas-historico.repository.interface';
 import TypeOrmVentasHistoricoRepository from '@infrastructure/database/typeorm/typeorm-ventas-historico.repository';
+import VentasPostventaService from '@backend/application/ventas/ventas-postventa.service';
+import type VentasPostventaRepository from '@backend/contracts/ventas/ventas-postventa.repository.interface';
+import TypeOrmVentasPostventaRepository from '@infrastructure/database/typeorm/typeorm-ventas-postventa.repository';
 
 /**
  * Construye el grafo de dependencias de la aplicación,
@@ -242,6 +245,15 @@ export default function createApplicationComposition(
     ventasHistoricoRepository,
   );
 
+  const ventasPostventaRepository: VentasPostventaRepository = new TypeOrmVentasPostventaRepository(
+    operationalDatabase,
+  );
+
+  const ventasPostventaService: VentasPostventaService = new VentasPostventaService(
+    ventasPostventaRepository,
+    ventasHistoricoService,
+  );
+
   const ventasTicketsRepository: VentasTicketsRepository = new TypeOrmVentasTicketsRepository(
     operationalDatabase,
   );
@@ -362,6 +374,7 @@ export default function createApplicationComposition(
     ventasArticulosService,
     ventasDevolucionesService,
     ventasHistoricoService,
+    ventasPostventaService,
     ventasPersistenciaService,
     ventasTicketsService,
   );
