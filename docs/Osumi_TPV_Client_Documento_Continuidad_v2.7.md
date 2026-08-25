@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.6  
-**Fecha:** 25 de agosto de 2026  
-**Estado:** Installation, importación legacy, Startup, auditoría/refactor transversal y los bloques **Ventas 1–11** están completados, probados y subidos. En **Ventas 12 — Postventa**, el análisis 12A y el diseño 12B están cerrados salvo la semántica TicketBAI de devoluciones/operaciones mixtas, pendiente de Berein. La implementación 12C está avanzada: **12C.1 — Infraestructura del Histórico**, **12C.2 — Filtros/listado/totales** y **12C.3 — Detalle** están completados, probados y subidos. **12C.4 — Correcciones postventa** está en curso: contratos, servicio backend, repository transaccional y tests SQLite reales están implementados, probados y subidos; el siguiente paso es completar tests del servicio y realizar el wiring **composition root + IPC + preload + Angular + UI** para cambiar cliente y tipo de pago. La prueba física con **Star TSP100/TSP143 de 80 mm** sigue pendiente y no bloquea el desarrollo.
+**Versión:** 2.7  
+**Fecha:** 26 de agosto de 2026  
+**Estado:** Installation, importación legacy, Startup, auditoría/refactor transversal y los bloques **Ventas 1–11** están completados, probados y subidos. En **Ventas 12 — Postventa**, el análisis 12A y el diseño 12B están cerrados salvo la semántica TicketBAI de devoluciones/operaciones mixtas, pendiente de Berein. La implementación 12C está avanzada: **12C.1 — Infraestructura del Histórico**, **12C.2 — Filtros/listado/totales**, **12C.3 — Detalle** y **12C.4 — Correcciones postventa** están completados, probados manualmente y subidos. El siguiente bloque es **12C.5 — Pipeline documental postventa**, donde se introducirá versionado/archivo del PDF vigente y la noción de revisión documental para que cambios postventa como cliente, pago o futura aceptación TicketBAI puedan regenerar el ticket sin perder versiones anteriores. La prueba física con **Star TSP100/TSP143 de 80 mm** sigue pendiente y no bloquea el desarrollo.
 
 ---
 
@@ -31,7 +31,8 @@ Debe tratarse como un documento vivo. Al completar un bloque principal de Ventas
 - Ventas 12C.1: completado.
 - Ventas 12C.2: completado.
 - Ventas 12C.3: completado.
-- Ventas 12C.4: **en curso**; backend y tests SQLite reales completados.
+- Ventas 12C.4: completado, probado manualmente y subido.
+- Ventas 12C.5: **siguiente bloque** — pipeline documental postventa.
 - Hardware Star TSP100/TSP143 80 mm: prueba física pendiente y no bloqueante.
 
 Estado resumido:
@@ -49,8 +50,8 @@ Ventas 12B.7                               ✅
 Ventas 12C.1 Histórico infraestructura      ✅
 Ventas 12C.2 Filtros/listado/totales        ✅
 Ventas 12C.3 Detalle                        ✅
-Ventas 12C.4 Correcciones postventa         🟦 actual
-Ventas 12C.5 Pipeline documental            ⬜
+Ventas 12C.4 Correcciones postventa         ✅
+Ventas 12C.5 Pipeline documental            🟦 siguiente
 Ventas 12C.6 Impresión                      ⬜
 Ventas 12C.7 Email                          ⬜
 Ventas 12C.8 TicketBAI ordinario            ⬜
@@ -750,11 +751,11 @@ Completado, probado, visualmente validado y subido al repositorio.
 
 ---
 
-## 8.4 12C.4 — Correcciones postventa 🟦 ACTUAL
+## 8.4 12C.4 — Correcciones postventa ✅
 
-Este bloque permite modificar ciertos datos de una venta ya persistida sin reabrir la operación comercial.
+Este bloque permite modificar ciertos datos de una venta ya persistida sin reabrir la operación comercial. Está **completado, probado y subido**.
 
-Se mantienen **casos de uso separados**:
+Se mantienen casos de uso separados:
 
 ```text
 cambiar cliente
@@ -763,61 +764,20 @@ cambiar tipo de pago
 
 No existe un `updateVenta()` genérico.
 
-### 8.4.1 Contratos públicos ✅
+### 8.4.1 Contratos y backend ✅
 
-Nuevo:
+Implementados:
 
 ```text
 electron/contracts/ventas/venta-postventa.interface.ts
-```
-
-Contratos:
-
-```text
-VentaPostventaCambiarClienteCommand
-VentaPostventaCambiarTipoPagoCommand
-```
-
-### 8.4.2 Contrato backend ✅
-
-Nuevo:
-
-```text
 electron/backend/contracts/ventas/ventas-postventa.repository.interface.ts
-```
-
-Métodos:
-
-```text
-cambiarCliente(idVenta, clientePublicId)
-cambiarTipoPago(idVenta, tipoPagoPublicId)
-```
-
-### 8.4.3 Servicio backend ✅
-
-Nuevo:
-
-```text
 electron/backend/application/ventas/ventas-postventa.service.ts
-```
-
-Responsabilidades:
-
-- validar `idVenta`;
-- normalizar/validar publicIds;
-- delegar escritura al repository;
-- releer el detalle autoritativo mediante `VentasHistoricoService`;
-- devolver `VentaHistoricoDetalle` actualizado.
-
-### 8.4.4 Repository transaccional ✅
-
-Nuevo:
-
-```text
 electron/infrastructure/database/typeorm/typeorm-ventas-postventa.repository.ts
 ```
 
-#### Cambiar cliente
+El servicio valida comandos, delega la escritura y relee el detalle autoritativo mediante `VentasHistoricoService`.
+
+### 8.4.2 Cambiar cliente ✅
 
 Regla:
 
@@ -831,21 +791,20 @@ UPDATE venta.id_cliente
 COMMIT
 ```
 
-- si la venta aparece en `factura_venta`, se rechaza;
-- se permite quitar cliente (`null`);
+- si existe relación en `factura_venta`, se rechaza;
+- se puede asignar, sustituir o quitar cliente;
 - seleccionar el mismo cliente es no-op;
-- backend vuelve a validar todo aunque Angular muestre capacidad disponible.
+- backend revalida aunque Angular muestre la capacidad habilitada.
 
-#### Cambiar tipo de pago
+### 8.4.3 Cambiar tipo de pago ✅
 
-Condiciones:
+Condiciones autoritativas:
 
 ```text
-venta activa
-+ total != 0
+total != 0
 + exactamente 1 venta_pago
 + caja original abierta
-+ nuevo tipo de pago activo y físico
++ nuevo tipo activo y físico
 ```
 
 Transacción:
@@ -859,7 +818,7 @@ resolver tipo anterior histórico
 ↓
 resolver tipo nuevo activo/físico
 ↓
-calcular descuento firmado de la venta
+calcular descuento firmado
 ↓
 retirar impacto de caja_tipo anterior
 ↓
@@ -883,13 +842,10 @@ caja.descuentos_cents
 linea_venta
 stock
 historico_articulo
+importe_real_cents
 ```
 
-La operación económica no cambia: solo cambia la clasificación/canal del pago.
-
-`importe_real_cents` tampoco se toca; corresponde al recuento físico/cierre.
-
-#### Normalización de pago
+Normalización:
 
 ```text
 efectivo → no efectivo
@@ -905,77 +861,82 @@ entregado = null
 cambio = 0
 ```
 
-Si el usuario selecciona el mismo tipo actual: no-op.
+El cierre teórico usa el **importe aplicado del pago**, nunca el efectivo entregado.
 
-#### `afecta_caja`
+### 8.4.4 Tests backend ✅
 
-El cierre teórico se ajusta usando **importe aplicado del pago**, no efectivo entregado.
-
-```text
-impacto = importeCents si tipoPago.afecta_caja == 1
-impacto = 0            en otro caso
-```
-
-Se resta el impacto anterior y se añade el nuevo.
-
-### 8.4.5 Tests SQLite reales ✅
-
-Nuevo:
+Existe spec SQLite real:
 
 ```text
 electron/infrastructure/database/typeorm/typeorm-ventas-postventa.repository.spec.ts
 ```
 
-Usa SQLite temporal real + esquema completo.
+Cubre:
 
-Casos ya probados:
+1. cambiar y quitar cliente;
+2. venta facturada bloqueada;
+3. efectivo → tarjeta;
+4. tarjeta → efectivo;
+5. devolución → efectivo;
+6. multipago bloqueado;
+7. caja original cerrada;
+8. rollback completo si falla después de retirar el impacto anterior.
 
-1. cambiar cliente de una venta no facturada;
-2. quitar cliente (`null`);
-3. rechazar cambio de cliente en venta facturada;
-4. efectivo → tarjeta;
-5. tarjeta → efectivo;
-6. devolución → efectivo sin `entregado` ni `cambio`;
-7. rechazar pagos múltiples;
-8. rechazar caja original cerrada;
-9. rollback completo si falla después de retirar el impacto anterior.
+También se añadió spec unitario de `VentasPostventaService`, validando normalización, delegación, detalle actualizado y errores previos al repository.
 
-El test de rollback fuerza un overflow al sumar la operación al nuevo `caja_tipo`. Se comprueba que al fallar también se revierten:
+### 8.4.5 Wiring desktop/Angular ✅
 
-- la resta previa del tipo antiguo;
-- el cierre teórico;
-- `venta_pago`.
-
-El usuario confirmó que:
+Completado:
 
 ```text
-npm run test:electron
-npm run typecheck:electron
+composition root
+IPC channels
+registerVentasIpc
+VentasApi
+preload
+VentasPostventaService Angular
 ```
 
-pasan y que los cambios están subidos al repositorio.
+Los dos casos de uso devuelven `VentaHistoricoDetalle` actualizado directamente desde backend.
 
-### 8.4.6 Pendiente de 12C.4
+### 8.4.6 UI de postventa ✅
 
-Siguiente lote:
+Las dos primeras capacidades del detalle son acciones reales.
 
-1. **spec unitario breve de `VentasPostventaService`;**
-2. wiring backend/desktop:
-   - composition root;
-   - IPC;
-   - channels;
-   - `VentasApi`;
-   - preload;
-3. servicio Angular de postventa;
-4. UI real de las dos acciones:
-   - cambiar cliente;
-   - cambiar tipo de pago;
-5. invalidar estadísticas cacheadas del cliente anterior y nuevo cuando cambia cliente;
-6. refrescar detalle/listado/resumen tras una corrección;
-7. batería completa y prueba manual;
-8. cerrar 12C.4.
+**Cambiar cliente**:
 
-**Importante:** antes de conectar Angular debe revisarse el archivo real actual `src/app/services/clientes.service.ts`. En el último intercambio se recibió por error su spec en lugar del servicio. El spec confirma que existe `invalidateEstadisticas(publicId)` y que una invalidación obliga a consultar de nuevo, pero para el wiring se debe usar el archivo actual real.
+- reutiliza `ClientSelectorComponent`;
+- el selector admite un `overlayZIndex` configurable para aparecer sobre el Histórico;
+- permite seleccionar, crear o quitar cliente;
+- la creación conserva la impresión del documento de protección de datos;
+- tras COMMIT se invalidan estadísticas del cliente anterior y del nuevo;
+- después se refresca la consulta histórica visible.
+
+**Cambiar tipo de pago**:
+
+- usa selector inline dentro del detalle, no otro modal;
+- muestra solo medios físicos alternativos disponibles;
+- no ofrece el tipo ya usado;
+- backend sigue siendo autoridad final;
+- tras COMMIT actualiza detalle y refresca listado/resumen/totales por tipo de pago.
+
+Mientras se guarda una corrección se bloquean interacciones conflictivas. Los fallos de refresco posteriores al COMMIT se muestran como aviso sin deshacer la corrección ya confirmada.
+
+### 8.4.7 Validación final ✅
+
+El usuario confirmó:
+
+```text
+npm test
+npm run test:electron
+npm run typecheck:electron
+npm run build
+npm run lint
+```
+
+Todos pasan. El wiring Electron también fue validado previamente con `npm run build:desktop`.
+
+La aplicación se probó manualmente y los flujos de corrección de cliente y tipo de pago funcionan correctamente. Todos los cambios están subidos al repositorio.
 
 ---
 
@@ -1011,9 +972,9 @@ Todas las mutaciones de Caja deben estar dentro de la misma transacción SQLite.
 
 ## 9.3 Documento histórico tras correcciones
 
-En 12C.4 una corrección puede dejar el PDF actual conceptualmente desactualizado.
+Tras cerrar 12C.4, una corrección puede dejar el PDF vigente conceptualmente desactualizado.
 
-No intentar resolverlo parcialmente.
+Esto es deliberado hasta entrar en 12C.5.
 
 12C.5 introducirá la revisión/versionado documental y será el punto correcto para regenerar/archivar PDFs tras cambios postventa.
 
@@ -1021,23 +982,39 @@ No intentar resolverlo parcialmente.
 
 # 10. Diseño de los siguientes bloques
 
-## 10.1 12C.5 — Pipeline documental postventa
+## 10.1 12C.5 — Pipeline documental postventa 🟦 SIGUIENTE
 
-Implementar:
+Objetivo: convertir el PDF de ticket de Ventas 11, actualmente write-once, en un documento **vigente + versiones archivadas**.
+
+Política diseñada:
 
 ```text
-{id}.pdf             → vigente
-{id}_{timestamp}.pdf → archivo de versión anterior
+{id}.pdf             → versión vigente
+{id}_{timestamp}.pdf → versión anterior archivada e inmutable
 ```
 
-Casos que pueden provocar revisión:
+Nunca borrar primero el documento vigente.
+
+Cambios que pueden provocar una nueva revisión documental:
 
 - cambio de cliente;
-- cambio de pago;
-- TicketBAI aceptado/reintentado;
-- otros cambios documentales futuros.
+- cambio de tipo de pago;
+- aceptación/reintento TicketBAI;
+- futuros cambios que modifiquen contenido documental.
 
-Nunca borrar primero el documento vigente.
+La arquitectura prevista incluye distinguir la **revisión de datos documentales de la venta** de la **revisión del PDF materializado** (`ticket_revision` / `ticket_pdf_revision` o equivalente final tras revisar el esquema actual). Así puede detectarse un PDF desactualizado y regenerarlo de forma segura.
+
+Antes de implementar debe revisarse el estado actual de:
+
+- schema de `venta`;
+- `VentasTicketsService`;
+- `VentasTicketsRepository`;
+- `VentaTicketPdfStorage`;
+- `FileVentaTicketPdfStorage`;
+- servicio Angular `VentaTicketDocumentService`;
+- tests existentes del ticket/PDF.
+
+Al cerrar este bloque, una corrección postventa deberá poder dejar el ticket vigente actualizado sin perder la versión anterior y sin invalidar nunca la venta si falla la generación del PDF.
 
 ## 10.2 12C.6 — Impresión
 
@@ -1152,21 +1129,18 @@ Pruebas manuales relevantes para Histórico ya realizadas:
 - cliente/sin cliente;
 - layout amplio.
 
-Pruebas manuales que deberán añadirse al cerrar 12C.4:
+Pruebas manuales de 12C.4 realizadas y validadas:
 
-- asignar cliente a venta sin cliente;
-- cambiar cliente existente;
-- quitar cliente;
-- venta facturada bloqueada;
-- efectivo → tarjeta;
-- tarjeta → efectivo;
-- retorno → efectivo;
-- caja cerrada;
-- multipago;
-- total cero;
-- refresco de icono/cliente/pago en listado;
-- refresco de detalle;
-- estadísticas de cliente viejo/nuevo invalidadas.
+- asignar/cambiar/quitar cliente;
+- restricciones de capacidad aplicadas por backend;
+- cambio de tipo de pago;
+- normalización del pago;
+- refresco de detalle/listado/resumen;
+- UI de selector de cliente y selector inline de pago;
+- invalidación post-COMMIT de estadísticas de cliente;
+- flujo completo probado en aplicación real.
+
+Los casos de caja cerrada, multipago, total cero, venta facturada y rollback están además cubiertos por backend/tests automatizados.
 
 ---
 
@@ -1174,7 +1148,7 @@ Pruebas manuales que deberán añadirse al cerrar 12C.4:
 
 1. **TicketBAI devoluciones/operaciones mixtas**: pendiente de Berein.
 2. **Star TSP100/TSP143 80 mm**: prueba física pendiente, no bloqueante.
-3. **PDF postventa**: hasta 12C.5 sigue vigente la infraestructura write-once de Ventas 11; no implementar soluciones parciales durante 12C.4.
+3. **PDF postventa**: 12C.4 ya está cerrado y el PDF puede quedar desactualizado tras una corrección; 12C.5 debe resolverlo mediante versionado/revisión documental.
 4. GitHub Raw puede devolver contenido cacheado/stale; si no se puede verificar frescura, usar archivos adjuntos actuales.
 
 ---
@@ -1183,49 +1157,42 @@ Pruebas manuales que deberán añadirse al cerrar 12C.4:
 
 Continuar por:
 
-# Ventas 12C.4 — Correcciones postventa
+# Ventas 12C.5 — Pipeline documental postventa
 
 Estado de entrada al siguiente turno:
 
 ```text
-Contratos públicos postventa                   ✅
-VentasPostventaRepository                      ✅
-VentasPostventaService                         ✅
-TypeOrmVentasPostventaRepository               ✅
-Cambio cliente transaccional                   ✅
-Cambio tipo pago + caja_tipo                   ✅
-Normalización efectivo/no efectivo             ✅
-Ajuste cierre teórico                          ✅
-Tests SQLite reales                            ✅
-Tests servicio backend                         ⬜ siguiente
-Composition root / IPC / preload              ⬜
-Servicio Angular                               ⬜
-UI cambiar cliente                             ⬜
-UI cambiar tipo pago                           ⬜
-Invalidación estadísticas cliente             ⬜
-Refresco histórico                             ⬜
-Regresión completa 12C.4                       ⬜
+12C.1 Infraestructura Histórico                ✅
+12C.2 Filtros/listado/totales                 ✅
+12C.3 Detalle                                 ✅
+12C.4 Correcciones postventa                  ✅
+12C.5 Pipeline documental                     🟦 siguiente
+12C.6 Impresión                               ⬜
+12C.7 Email                                   ⬜
+12C.8 TicketBAI ordinario                     ⬜
+12C.9 TicketBAI devoluciones                  ⏸️ Berein
+12C.10 Regresión/cierre                       ⬜
 ```
 
-Orden recomendado:
+Punto de partida de 12C.5:
 
-1. crear spec unitario breve de `VentasPostventaService`;
-2. revisar archivos actuales de composition/IPC/preload/`VentasApi`;
-3. añadir wiring completo;
-4. revisar `src/app/services/clientes.service.ts` real;
-5. implementar servicio Angular y UI de ambas acciones;
-6. invalidar estadísticas del cliente antiguo/nuevo;
-7. refrescar detalle y consulta actual tras cambios;
-8. ejecutar batería completa;
-9. prueba manual;
-10. cerrar 12C.4 y actualizar de nuevo este documento.
+1. revisar la implementación actual de ticket/PDF de Ventas 11;
+2. revisar schema actual de `venta` y decidir la forma final de `ticket_revision` / `ticket_pdf_revision`;
+3. diseñar el flujo seguro de archivo + generación del PDF vigente;
+4. adaptar storage/backend/servicio Angular;
+5. conectar cambio de cliente/pago para provocar revisión documental;
+6. cubrir versionado, errores y compatibilidad con tickets legacy mediante tests;
+7. batería completa + prueba manual;
+8. cerrar 12C.5 y actualizar este documento.
+
+Regla ya cerrada: un fallo documental post-COMMIT **no puede invalidar ni revertir la venta ni la corrección postventa**.
 
 ---
 
 # 15. Prompt de arranque para una conversación nueva
 
 ```text
-Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” versión 2.6 como contexto principal.
+Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” versión 2.7 como contexto principal.
 
 Estado general:
 - Installation + importación `.otpv` v2: completadas y probadas.
@@ -1236,42 +1203,39 @@ Estado general:
 - Ventas 12C.1 — Infraestructura del Histórico: completado.
 - Ventas 12C.2 — Filtros/listado/totales: completado.
 - Ventas 12C.3 — Detalle: completado.
-- Ventas 12C.4 — Correcciones postventa: EN CURSO.
+- Ventas 12C.4 — Correcciones postventa: COMPLETADO, probado y subido.
+- Ventas 12C.5 — Pipeline documental postventa: SIGUIENTE.
 
 Histórico actual:
-- modal desde el importe de Ventas;
+- modal workspace ~95vw/95vh;
 - Fecha/Rango;
-- listado con fecha, importe, iconos cliente/TicketBAI y tipos de pago;
+- listado fecha/importe/iconos cliente-TicketBAI/pagos;
 - agregados total/ticket medio/tipos de pago/beneficio;
-- detalle bajo demanda con protección frente a respuestas stale;
-- snapshots localizador/marca persistidos en `linea_venta`;
-- líneas + capacidades postventa;
-- modal workspace grande ~95vw/95vh y reparto aprox. 36/64 listado/detalle;
-- 12C.1–12C.3 están probados y subidos.
+- detalle bajo demanda con protección stale;
+- snapshots localizador/marca;
+- acciones reales Cambiar cliente y Cambiar tipo de pago.
 
-12C.4 ya tiene implementados y subidos:
-- `venta-postventa.interface.ts`;
-- `ventas-postventa.repository.interface.ts`;
-- `ventas-postventa.service.ts`;
-- `typeorm-ventas-postventa.repository.ts`;
-- capacidad de cambio de pago exige total != 0 + un único pago + caja original abierta;
-- cambio de cliente bloqueado si facturada;
-- cambio de pago traslada `caja_tipo` y `importe_cierre_teorico_cents` dentro de una sola transacción;
+12C.4 cerrado:
+- `VentasPostventaService` + repository transaccional;
+- cliente bloqueado si venta facturada;
+- cambio pago exige total != 0 + un pago + caja original abierta;
+- traslado `caja_tipo` y cierre teórico atómico;
 - normalización efectivo/no efectivo;
-- tests SQLite reales para cliente, efectivo↔tarjeta, devolución, multipago, caja cerrada y rollback completo;
-- `npm run test:electron` y `npm run typecheck:electron` pasan.
+- tests SQLite con rollback;
+- IPC/preload/Angular completos;
+- selector de cliente reutilizado sobre Histórico;
+- selector inline de tipo de pago;
+- invalidación estadísticas cliente viejo/nuevo;
+- refresco post-COMMIT de detalle/listado/resumen;
+- toda la batería pasa y la aplicación se ha probado manualmente.
 
-Siguiente paso exacto:
-1. añadir spec unitario breve de `VentasPostventaService`;
-2. wiring composition root + IPC + channels + `VentasApi` + preload;
-3. servicio Angular;
-4. UI real de Cambiar cliente y Cambiar tipo de pago;
-5. invalidar estadísticas del cliente anterior/nuevo;
-6. refrescar detalle/listado/resumen;
-7. batería completa y prueba manual;
-8. cerrar 12C.4.
-
-Para la UI, antes de modificar clientes, revisar el archivo real actual `src/app/services/clientes.service.ts`; en el intercambio anterior se recibió accidentalmente su spec en lugar del servicio.
+Siguiente paso exacto — 12C.5:
+- revisar schema actual de venta;
+- revisar `VentasTicketsService`, repository, `VentaTicketPdfStorage`, `FileVentaTicketPdfStorage`, `VentaTicketDocumentService` y tests;
+- convertir `{id}.pdf` write-once en PDF vigente con archivo `{id}_{timestamp}.pdf`;
+- introducir revisión documental (`ticket_revision` / `ticket_pdf_revision` o equivalente final);
+- cambio cliente/pago debe poder provocar regeneración/versionado post-COMMIT;
+- un fallo de PDF nunca invalida la venta/corrección.
 
 Reglas de trabajo:
 - al inicio de cada bloque/subpaso, mostrar lista completa ✅/🟦/⬜/⏸️ y explicar el objetivo;
@@ -1305,4 +1269,5 @@ La prueba física Star TSP100/TSP143 de 80 mm sigue pendiente pero no bloquea Po
 | 2.3 | 23-08-2026 | Avance del diseño 12B y configuración SMTP/TicketBAI. |
 | 2.4 | 23-08-2026 | Diseño 12B prácticamente cerrado; pausa para rediseño de Finalizar venta. |
 | 2.5 | 24-08-2026 | Rediseño Finalizar venta cerrado; 12C listo para comenzar. |
-| **2.6** | **25-08-2026** | **12C.1, 12C.2 y 12C.3 completados. 12C.4 avanzado: contratos, servicio backend, repository transaccional y tests SQLite reales completados y subidos. Siguiente: tests del servicio + wiring IPC/Angular/UI.** |
+| 2.6 | 25-08-2026 | 12C.1, 12C.2 y 12C.3 completados. 12C.4 avanzado: contratos, servicio backend, repository transaccional y tests SQLite reales completados y subidos. |
+| **2.7** | **26-08-2026** | **12C.4 completado, probado manualmente y subido: backend transaccional, tests, IPC/preload, Angular, UI, invalidación de estadísticas y refresco Histórico. Siguiente: 12C.5 Pipeline documental postventa.** |
