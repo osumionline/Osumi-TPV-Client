@@ -369,6 +369,12 @@
         }
     }
 
+    .historical-sales--saving {
+        .historical-sales__content {
+            pointer-events: none;
+        }
+    }
+
     @media (max-width: 900px) {
         .historical-sales {
             width: calc(100vw - 24px);

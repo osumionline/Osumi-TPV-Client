@@ -158,15 +158,35 @@
             Acciones postventa
         </h4>
 
+        @if (postventaError() !== null) {
+        <div class="historical-sale-detail__message historical-sale-detail__message--error"
+             role="alert">
+            {{ postventaError() }}
+        </div>
+        }
+
+        @if (postventaWarning() !== null) {
+        <div class="historical-sale-detail__message"
+             role="status">
+            {{ postventaWarning() }}
+        </div>
+        }
+
         <div class="historical-sale-detail__capabilities">
-            <div class="historical-sale-detail__capability"
-                 [class.historical-sale-detail__capability--available]="
-                    detalle().capacidades.puedeCambiarCliente
-                 ">
+            <button class="historical-sale-detail__capability historical-sale-detail__capability--action"
+                    type="button"
+                    [class.historical-sale-detail__capability--available]="
+                        detalle().capacidades.puedeCambiarCliente
+                    "
+                    [disabled]="
+                        saving() ||
+                        !detalle().capacidades.puedeCambiarCliente
+                    "
+                    (click)="requestCambiarCliente()">
                 <mat-icon aria-hidden="true">
                     {{
                         detalle().capacidades.puedeCambiarCliente
-                            ? 'check_circle'
+                            ? 'person'
                             : 'block'
                     }}
                 </mat-icon>
@@ -184,16 +204,23 @@
                         }}
                     </small>
                 </div>
-            </div>
+            </button>
 
-            <div class="historical-sale-detail__capability"
-                 [class.historical-sale-detail__capability--available]="
-                    detalle().capacidades.puedeCambiarTipoPago
-                 ">
+            <button class="historical-sale-detail__capability historical-sale-detail__capability--action"
+                    type="button"
+                    [class.historical-sale-detail__capability--available]="
+                        detalle().capacidades.puedeCambiarTipoPago
+                    "
+                    [disabled]="
+                        saving() ||
+                        !detalle().capacidades.puedeCambiarTipoPago ||
+                        tiposPagoAlternativos().length === 0
+                    "
+                    (click)="openTipoPagoSelection()">
                 <mat-icon aria-hidden="true">
                     {{
                         detalle().capacidades.puedeCambiarTipoPago
-                            ? 'check_circle'
+                            ? 'payments'
                             : 'block'
                     }}
                 </mat-icon>
@@ -204,14 +231,18 @@
                     </strong>
 
                     <small>
-                        {{
-                            detalle().capacidades.puedeCambiarTipoPago
-                                ? 'Disponible'
-                                : 'No disponible'
-                        }}
+                        @if (!detalle().capacidades.puedeCambiarTipoPago) {
+                        No disponible
+                        }
+                        @else if (tiposPagoAlternativos().length === 0) {
+                        Sin alternativas disponibles
+                        }
+                        @else {
+                        Disponible
+                        }
                     </small>
                 </div>
-            </div>
+            </button>
 
             <div class="historical-sale-detail__capability"
                  [class.historical-sale-detail__capability--available]="
@@ -267,6 +298,53 @@
                 </div>
             </div>
         </div>
+
+        @if (selectingTipoPago()) {
+        <div class="historical-sale-detail__payment-selector">
+            <div class="historical-sale-detail__payment-selector-header">
+                <div>
+                    <strong>
+                        Nuevo tipo de pago
+                    </strong>
+
+                    <span>
+                        Selecciona el medio que sustituirá al actual.
+                    </span>
+                </div>
+
+                <button mat-stroked-button
+                        type="button"
+                        [disabled]="saving()"
+                        (click)="closeTipoPagoSelection()">
+                    Cancelar
+                </button>
+            </div>
+
+            <div class="historical-sale-detail__payment-types">
+                @for (
+                tipoPago of tiposPagoAlternativos();
+                track tipoPago.publicId
+                ) {
+                <button class="historical-sale-detail__payment-type"
+                        type="button"
+                        [disabled]="saving()"
+                        (click)="selectTipoPago(tipoPago)">
+                    <mat-icon aria-hidden="true">
+                        {{
+                            tipoPago.slug === 'efectivo'
+                                ? 'payments'
+                                : 'account_balance_wallet'
+                        }}
+                    </mat-icon>
+
+                    <span>
+                        {{ tipoPago.nombre }}
+                    </span>
+                </button>
+                }
+            </div>
+        </div>
+        }
     </section>
 
     <section class="historical-sale-detail__secondary-info">

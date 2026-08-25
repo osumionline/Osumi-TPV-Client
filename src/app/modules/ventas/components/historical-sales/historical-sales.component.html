@@ -1,11 +1,13 @@
 <div class="overlay">
     <button class="overlay__backdrop"
+            [disabled]="postventaSaving()"
             type="button"
             aria-label="Cerrar histórico"
             (click)="close()">
     </button>
 
     <section class="historical-sales overlay__panel"
+             [class.historical-sales--saving]="postventaSaving()"
              role="dialog"
              aria-modal="true"
              aria-labelledby="historical-sales-title"
@@ -25,6 +27,7 @@
                     mat-icon-button
                     type="button"
                     aria-label="Cerrar histórico"
+                    [disabled]="postventaSaving()"
                     (click)="close()">
                 <mat-icon>
                     close
@@ -174,8 +177,6 @@
                             <span>
                                 Tipo(s) pago
                             </span>
-
-                            <span></span>
                         </div>
 
                         <div class="historical-sales__list-body">
@@ -286,7 +287,13 @@
                         </div>
                         }
                         @else if (detalle(); as detalleVenta) {
-                        <otpv-historical-sale-detail [detalle]="detalleVenta" />
+                        <otpv-historical-sale-detail [detalle]="detalleVenta"
+                                                     [tiposPago]="ventasContextService.tiposPago()"
+                                                     [saving]="postventaSaving()"
+                                                     [postventaError]="postventaError()"
+                                                     [postventaWarning]="postventaWarning()"
+                                                     (changeClientEvent)="openClientSelection()"
+                                                     (changeTipoPagoEvent)="changeTipoPago($event)" />
                         }
                         @else {
                         <div class="historical-sales__detail-state">
@@ -400,3 +407,13 @@
         </div>
     </section>
 </div>
+
+@if (selectingClient() && detalle(); as detalleVenta) {
+<otpv-client-selector [clientes]="clientesService.clientes()"
+                      [selectedPublicId]="detalleVenta.cliente?.publicId ?? null"
+                      [overlayZIndex]="120"
+                      (selectEvent)="selectCliente($event)"
+                      (createdEvent)="createdCliente($event)"
+                      (clearEvent)="clearCliente()"
+                      (cancelEvent)="cancelClientSelection()" />
+}

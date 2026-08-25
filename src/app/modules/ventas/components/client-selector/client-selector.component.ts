@@ -34,23 +34,17 @@ export default class ClientSelectorComponent {
   private readonly clientesService: ClientesService = inject(ClientesService);
 
   readonly clientes: InputSignal<readonly Cliente[]> = input.required<readonly Cliente[]>();
-
   readonly selectedPublicId: InputSignal<string | null> = input<string | null>(null);
+  readonly overlayZIndex: InputSignal<number> = input<number>(100);
 
   readonly selectEvent: OutputEmitterRef<Cliente> = output<Cliente>();
-
   readonly createdEvent: OutputEmitterRef<Cliente> = output<Cliente>();
-
   readonly clearEvent: OutputEmitterRef<void> = output<void>();
-
   readonly cancelEvent: OutputEmitterRef<void> = output<void>();
 
   readonly mode: WritableSignal<ClientSelectorMode> = signal<ClientSelectorMode>('search');
-
   readonly query: WritableSignal<string> = signal<string>('');
-
   readonly saving: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly creationError: WritableSignal<string | null> = signal<string | null>(null);
 
   readonly filteredClientes: Signal<readonly Cliente[]> = computed((): readonly Cliente[] => {

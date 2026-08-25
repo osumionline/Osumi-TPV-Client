@@ -202,6 +202,95 @@
     }
 }
 
+.historical-sale-detail__message {
+    margin-bottom: 8px;
+    padding: 9px 10px;
+    border: 1px solid var(--separator-color);
+    border-radius: 4px;
+    background-color: var(--color-very-light-grey);
+
+    &.historical-sale-detail__message--error {
+        border-color: #b3261e;
+        background-color: #fdecec;
+        color: #9b1c1c;
+    }
+}
+
+button.historical-sale-detail__capability {
+    width: 100%;
+    background-color: transparent;
+    font: inherit;
+    text-align: left;
+
+    &.historical-sale-detail__capability--action:not(:disabled) {
+        cursor: pointer;
+
+        &:hover {
+            background-color: var(--color-very-light-grey);
+        }
+    }
+
+    &:disabled {
+        cursor: default;
+    }
+}
+
+.historical-sale-detail__payment-selector {
+    margin-top: 8px;
+    padding: 10px;
+    border: 1px solid var(--separator-color);
+    border-radius: 6px;
+    background-color: var(--color-very-light-grey);
+}
+
+.historical-sale-detail__payment-selector-header {
+    display: flex;
+    margin-bottom: 10px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    div {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    span {
+        color: var(--disabled-color);
+        font-size: 0.78rem;
+    }
+}
+
+.historical-sale-detail__payment-types {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.historical-sale-detail__payment-type {
+    display: flex;
+    min-width: 130px;
+    padding: 8px 10px;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--separator-color);
+    border-radius: 4px;
+    background-color: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+        border-color: var(--main-color);
+        background-color: var(--color-white);
+    }
+
+    &:disabled {
+        cursor: default;
+    }
+}
+
 @media (max-width: 700px) {
 
     .historical-sale-detail__metadata,
