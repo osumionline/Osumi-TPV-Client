@@ -186,7 +186,8 @@ export default class VentasHistoricoService {
       totalDescuentoMicros,
       capacidades: {
         puedeCambiarCliente: !record.facturada,
-        puedeCambiarTipoPago: record.numeroPagos === 1 && record.cajaAbierta,
+        puedeCambiarTipoPago:
+          record.totalCents !== 0 && record.numeroPagos === 1 && record.cajaAbierta,
         puedeImprimirTicketRegalo: record.tieneLineasPositivas,
         puedeReintentarTicketBai: record.tieneIncidenciaTicketBai,
       },
