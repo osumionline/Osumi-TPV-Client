@@ -41,6 +41,8 @@ const IPC_CHANNELS = {
   ventasSearchArticulos: 'ventas:search-articulos',
   ventasGetAccesosDirectos: 'ventas:get-accesos-directos',
   ventasGetDevolucion: 'ventas:get-devolucion',
+  ventasGetHistorico: 'ventas:get-historico',
+  ventasGetHistoricoDetalle: 'ventas:get-historico-detalle',
   ventasGetTicket: 'ventas:get-ticket',
   ventasSaveTicketPdf: 'ventas:save-ticket-pdf',
   ventasSave: 'ventas:save',

@@ -14,6 +14,12 @@ import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
 import { assertTrustedSender } from '@ipc/assert-trusted-sender';
 import IPC_CHANNELS from '@ipc/channels';
 import { ipcMain } from 'electron';
+import type VentasHistoricoService from '@backend/application/ventas/ventas-historico.service';
+import type {
+  VentaHistoricoConsulta,
+  VentaHistoricoDetalle,
+  VentasHistoricoResultado,
+} from '@desktop-contracts/ventas/venta-historico.interface';
 
 /**
  * Registra los canales IPC relacionados con el módulo de ventas.
@@ -23,6 +29,7 @@ export default function registerVentasIpc(
   ventasContextService: VentasContextService,
   ventasArticulosService: VentasArticulosService,
   ventasDevolucionesService: VentasDevolucionesService,
+  ventasHistoricoService: VentasHistoricoService,
   ventasPersistenciaService: VentasPersistenciaService,
   ventasTicketsService: VentasTicketsService,
 ): void {
@@ -65,6 +72,24 @@ export default function registerVentasIpc(
       assertTrustedSender(event, getMainWindow);
 
       return ventasDevolucionesService.getByVentaId(idVenta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.ventasGetHistorico,
+    async (event, consulta: VentaHistoricoConsulta): Promise<VentasHistoricoResultado> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return ventasHistoricoService.findByPeriod(consulta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.ventasGetHistoricoDetalle,
+    async (event, idVenta: number): Promise<VentaHistoricoDetalle | null> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return ventasHistoricoService.findDetalleByVentaId(idVenta);
     },
   );
 

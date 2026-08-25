@@ -32,6 +32,11 @@ import type VentasContextInterface from '@desktop-contracts/ventas/ventas-contex
 import IPC_CHANNELS from '@ipc/channels';
 import type { IpcRendererEvent } from 'electron';
 import { contextBridge, ipcRenderer } from 'electron';
+import type {
+  VentaHistoricoConsulta,
+  VentaHistoricoDetalle,
+  VentasHistoricoResultado,
+} from '@desktop-contracts/ventas/venta-historico.interface';
 
 const desktopApi: OsumiDesktopApi = Object.freeze({
   isElectron: true,
@@ -203,6 +208,18 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         IPC_CHANNELS.ventasGetDevolucion,
         idVenta,
       ) as Promise<VentaDevolucionInterface | null>,
+
+    getHistorico: (consulta: VentaHistoricoConsulta): Promise<VentasHistoricoResultado> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.ventasGetHistorico,
+        consulta,
+      ) as Promise<VentasHistoricoResultado>,
+
+    getHistoricoDetalle: (idVenta: number): Promise<VentaHistoricoDetalle | null> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.ventasGetHistoricoDetalle,
+        idVenta,
+      ) as Promise<VentaHistoricoDetalle | null>,
 
     getTicket: (idVenta: number): Promise<VentaTicketInterface | null> =>
       ipcRenderer.invoke(
