@@ -1,0 +1,104 @@
+<div class="overlay">
+    <button class="overlay__backdrop"
+            type="button"
+            aria-label="Cerrar histórico"
+            (click)="close()">
+    </button>
+
+    <section class="historical-sales overlay__panel"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="historical-sales-title"
+             (keydown.escape)="close()">
+        <header class="historical-sales__header">
+            <div>
+                <h2 id="historical-sales-title">
+                    Histórico
+                </h2>
+
+                <p>
+                    Consulta operaciones realizadas anteriormente.
+                </p>
+            </div>
+
+            <button #closeButton
+                    mat-icon-button
+                    type="button"
+                    aria-label="Cerrar histórico"
+                    (click)="close()">
+                <mat-icon>
+                    close
+                </mat-icon>
+            </button>
+        </header>
+
+        <nav class="historical-sales__tabs"
+             role="tablist"
+             aria-label="Secciones del histórico">
+            <button id="historical-sales-tab-ventas"
+                    class="historical-sales__tab"
+                    type="button"
+                    role="tab"
+                    [class.historical-sales__tab--active]="activeTab() === 'ventas'"
+                    [attr.aria-selected]="activeTab() === 'ventas'"
+                    aria-controls="historical-sales-panel-ventas"
+                    (click)="selectTab('ventas')">
+                Histórico de ventas
+            </button>
+
+            <button id="historical-sales-tab-caja"
+                    class="historical-sales__tab"
+                    type="button"
+                    role="tab"
+                    [class.historical-sales__tab--active]="activeTab() === 'salidas-caja'"
+                    [attr.aria-selected]="activeTab() === 'salidas-caja'"
+                    aria-controls="historical-sales-panel-caja"
+                    (click)="selectTab('salidas-caja')">
+                Salidas caja
+            </button>
+        </nav>
+
+        <div class="historical-sales__content">
+            @if (activeTab() === 'ventas') {
+            <section id="historical-sales-panel-ventas"
+                     class="historical-sales__panel"
+                     role="tabpanel"
+                     aria-labelledby="historical-sales-tab-ventas">
+                <div class="historical-sales__placeholder">
+                    <mat-icon aria-hidden="true">
+                        receipt_long
+                    </mat-icon>
+
+                    <h3>
+                        Histórico de ventas
+                    </h3>
+
+                    <p>
+                        Selecciona un periodo para consultar las ventas realizadas.
+                    </p>
+                </div>
+            </section>
+            }
+            @else {
+            <section id="historical-sales-panel-caja"
+                     class="historical-sales__panel"
+                     role="tabpanel"
+                     aria-labelledby="historical-sales-tab-caja">
+                <div class="historical-sales__placeholder">
+                    <mat-icon aria-hidden="true">
+                        point_of_sale
+                    </mat-icon>
+
+                    <h3>
+                        Salidas caja
+                    </h3>
+
+                    <p>
+                        Esta sección se desarrollará en el módulo de Caja.
+                    </p>
+                </div>
+            </section>
+            }
+        </div>
+    </section>
+</div>

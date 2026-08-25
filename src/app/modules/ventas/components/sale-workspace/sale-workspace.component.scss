@@ -286,12 +286,23 @@
     }
 
     .sale__amount {
+        display: block;
+        width: calc(100% - 20px);
         margin: 10px;
         padding: 12px;
+        border: 0;
         background-color: var(--color-very-light-grey);
+        color: inherit;
+        font: inherit;
         font-size: 2rem;
         font-weight: 500;
         text-align: right;
+        cursor: pointer;
+
+        &:hover,
+        &:focus-visible {
+            background-color: var(--color-light-grey);
+        }
     }
 
     .sale__controls {

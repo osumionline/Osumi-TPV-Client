@@ -65,6 +65,7 @@ import VentasService from '@services/ventas.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { eurosToMicros, microsToEuros } from '@utils/money.utils';
 import { bpsToPercent, percentToBps } from '@utils/percentage.utils';
+import HistoricalSalesComponent from '@modules/ventas/components/historical-sales/historical-sales.component';
 
 /**
  * Muestra y gestiona la estructura visual de una venta abierta.
@@ -86,6 +87,7 @@ import { bpsToPercent, percentToBps } from '@utils/percentage.utils';
     VariosEditorComponent,
     ReturnSelectorComponent,
     SaleFinalizationComponent,
+    HistoricalSalesComponent,
     BpsToPercentPipe,
     CentsToEurosPipe,
     MicrosToEurosPipe,
@@ -152,6 +154,8 @@ export default class SaleWorkspaceComponent {
     signal<VentaDevolucionSelectorState | null>(null);
 
   readonly finalizationOpen: WritableSignal<boolean> = signal<boolean>(false);
+
+  readonly historicalSalesOpen: WritableSignal<boolean> = signal<boolean>(false);
 
   readonly tiposPago: Signal<readonly TipoPago[]> = this.ventasContextService.tiposPago;
 
@@ -232,7 +236,8 @@ export default class SaleWorkspaceComponent {
         this.directAccessOpen() ||
         this.variosEditorState() !== null ||
         this.devolucionSelectorState() !== null ||
-        this.finalizationOpen()
+        this.finalizationOpen() ||
+        this.historicalSalesOpen()
       ) {
         return;
       }
@@ -896,6 +901,23 @@ export default class SaleWorkspaceComponent {
    */
   cancelVenta(): void {
     this.cancelEvent.emit();
+  }
+
+  /**
+   * Abre el Histórico de operaciones desde el panel de total.
+   */
+  openHistoricalSales(): void {
+    this.localizador.set('');
+    this.historicalSalesOpen.set(true);
+  }
+
+  /**
+   * Cierra el Histórico y recupera el flujo operativo de la venta.
+   */
+  closeHistoricalSales(): void {
+    this.historicalSalesOpen.set(false);
+
+    this.focusLocalizador();
   }
 
   /**

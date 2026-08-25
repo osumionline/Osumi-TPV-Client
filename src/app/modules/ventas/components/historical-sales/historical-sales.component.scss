@@ -1,0 +1,133 @@
+.overlay {
+    z-index: 110;
+
+    .historical-sales {
+        display: flex;
+        width: min(1180px, calc(100vw - 48px));
+        height: min(780px, calc(100vh - 48px));
+        padding: 0;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .historical-sales__header {
+        display: flex;
+        padding: 20px 24px 14px;
+        flex: 0 0 auto;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+
+        h2 {
+            margin: 0 0 4px;
+        }
+
+        p {
+            margin: 0;
+            color: var(--disabled-color);
+        }
+    }
+
+    .historical-sales__tabs {
+        display: flex;
+        padding: 0 24px;
+        flex: 0 0 auto;
+        gap: 4px;
+        border-bottom: 1px solid var(--separator-color);
+    }
+
+    .historical-sales__tab {
+        position: relative;
+        padding: 12px 16px;
+        border: 0;
+        background-color: transparent;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+
+        &::after {
+            position: absolute;
+            right: 0;
+            bottom: -1px;
+            left: 0;
+            height: 2px;
+            background-color: transparent;
+            content: '';
+        }
+
+        &:hover {
+            background-color: var(--color-very-light-grey);
+        }
+
+        &.historical-sales__tab--active {
+            color: var(--main-color);
+            font-weight: 500;
+
+            &::after {
+                background-color: var(--main-color);
+            }
+        }
+    }
+
+    .historical-sales__content {
+        min-height: 0;
+        flex: 1 1 auto;
+        overflow: auto;
+    }
+
+    .historical-sales__panel {
+        min-height: 100%;
+        padding: 24px;
+    }
+
+    .historical-sales__placeholder {
+        display: flex;
+        min-height: 300px;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 8px;
+        text-align: center;
+
+        mat-icon {
+            width: 42px;
+            height: 42px;
+            color: var(--disabled-color);
+            font-size: 42px;
+        }
+
+        h3 {
+            margin: 8px 0 0;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        p {
+            margin: 0;
+            color: var(--disabled-color);
+        }
+    }
+
+    @media (max-width: 700px) {
+        .historical-sales {
+            width: 100%;
+            height: 100%;
+        }
+
+        .historical-sales__header {
+            padding: 16px;
+        }
+
+        .historical-sales__tabs {
+            padding: 0 8px;
+        }
+
+        .historical-sales__tab {
+            flex: 1;
+        }
+
+        .historical-sales__panel {
+            padding: 16px;
+        }
+    }
+}

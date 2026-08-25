@@ -433,13 +433,17 @@
            cdkDrag
            [cdkDragFreeDragPosition]="workspace.totalPosition"
            (cdkDragEnded)="onTotalDragEnded($event)">
-        <div class="sale__amount">
+        <button class="sale__amount"
+                type="button"
+                matTooltip="Abrir histórico de ventas"
+                aria-label="Abrir histórico de ventas"
+                (click)="openHistoricalSales()">
             {{
                 ventaView().totalCents
                     | centsToEuros
                     | currency:'EUR':'symbol':'1.2-2'
             }}
-        </div>
+        </button>
 
         <div class="sale__controls">
             <mat-icon class="sale__drag-handle"
@@ -463,6 +467,10 @@
             </button>
         </div>
     </aside>
+    }
+
+    @if (historicalSalesOpen()) {
+    <otpv-historical-sales (closeEvent)="closeHistoricalSales()" />
     }
 
     @if (searchOpen()) {

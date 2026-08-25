@@ -224,6 +224,8 @@ describe('mapVentaToGuardarVentaCommand', (): void => {
       {
         articuloPublicId: 'articulo-10',
         nombre: 'Artículo normal',
+        localizador: 25,
+        marca: 'Marca',
         pucMicros: 4_000_000,
         pvpMicros: 10_000_000,
         ivaBps: 2_100,
@@ -237,6 +239,8 @@ describe('mapVentaToGuardarVentaCommand', (): void => {
       },
       {
         articuloPublicId: null,
+        localizador: 0,
+        marca: 'Varios',
         nombre: 'Servicio especial',
         pucMicros: 0,
         pvpMicros: 5_000_000,
@@ -329,6 +333,8 @@ describe('mapVentaToGuardarVentaCommand', (): void => {
 
     expect(command.lineas[0]).toEqual({
       articuloPublicId: 'articulo-10',
+      localizador: 25,
+      marca: 'Marca',
       nombre: 'Artículo reservado A',
       pucMicros: 5_000_000,
       pvpMicros: 10_000_000,
@@ -441,6 +447,8 @@ describe('mapVentaToGuardarVentaCommand', (): void => {
 
     expect(linea).toEqual({
       articuloPublicId: 'articulo-10',
+      localizador: 25,
+      marca: 'Sin marca',
       nombre: 'Artículo devuelto',
       pucMicros: 4_000_000,
       pvpMicros: 10_000_000,
