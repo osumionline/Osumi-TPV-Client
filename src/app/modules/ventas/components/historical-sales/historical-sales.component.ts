@@ -360,6 +360,34 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
   }
 
   /**
+   * Imprime bajo demanda el ticket regalo
+   * de la venta actualmente seleccionada.
+   */
+  async printGiftTicket(): Promise<void> {
+    const detalle: VentaHistoricoDetalle | null = this.detalle();
+
+    if (
+      detalle === null ||
+      this.postventaSaving() ||
+      !detalle.capacidades.puedeImprimirTicketRegalo
+    ) {
+      return;
+    }
+
+    this.postventaSaving.set(true);
+    this.postventaError.set(null);
+    this.postventaWarning.set(null);
+
+    try {
+      await this.ventaTicketDocumentService.printGift(detalle.id);
+    } catch (error: unknown) {
+      this.postventaError.set(getErrorMessage(error, 'No se ha podido imprimir el ticket regalo.'));
+    } finally {
+      this.postventaSaving.set(false);
+    }
+  }
+
+  /**
    * Solicita cerrar el modal de Histórico.
    */
   close(): void {

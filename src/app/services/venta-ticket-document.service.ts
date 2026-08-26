@@ -1,6 +1,7 @@
 import { inject, Service } from '@angular/core';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
+import buildVentaGiftTicketDocument from '@model/ventas/venta-gift-ticket-document.builder';
 import buildVentaTicketDocument from '@model/ventas/venta-ticket-document.builder';
 import VentasContextService from '@services/ventas-context.service';
 import VentasTicketsService from '@services/ventas-tickets.service';
@@ -44,6 +45,31 @@ export default class VentaTicketDocumentService {
     const document: VentaTicketDocumentSnapshot = await this.buildDocument(idVenta);
 
     await window.osumiDesktop.printing.printTicket(document.html);
+  }
+
+  /**
+   * Genera e imprime bajo demanda un ticket regalo
+   * sin crear ni modificar ningún artefacto PDF histórico.
+   */
+  async printGift(idVenta: number): Promise<void> {
+    const ticket: VentaTicketInterface | null =
+      await this.ventasTicketsService.getByVentaId(idVenta);
+
+    if (ticket === null) {
+      throw new Error('No se ha podido recuperar la venta para generar su ticket regalo.');
+    }
+
+    const appData: AppData | null = this.ventasContextService.appData();
+
+    if (appData === null) {
+      throw new Error(
+        'No se han podido obtener los datos del negocio para generar el ticket regalo.',
+      );
+    }
+
+    const documentHtml: string = buildVentaGiftTicketDocument(appData, ticket);
+
+    await window.osumiDesktop.printing.printTicket(documentHtml);
   }
 
   /**

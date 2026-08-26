@@ -36,6 +36,7 @@ export default class HistoricalSaleDetailComponent {
 
   readonly changeClientEvent: OutputEmitterRef<void> = output<void>();
   readonly changeTipoPagoEvent: OutputEmitterRef<string> = output<string>();
+  readonly printGiftTicketEvent: OutputEmitterRef<void> = output<void>();
 
   readonly selectingTipoPago: WritableSignal<boolean> = signal<boolean>(false);
 
@@ -123,5 +124,18 @@ export default class HistoricalSaleDetailComponent {
 
     this.selectingTipoPago.set(false);
     this.changeTipoPagoEvent.emit(tipoPago.publicId);
+  }
+
+  /**
+   * Solicita imprimir un ticket regalo de la venta.
+   */
+  requestPrintGiftTicket(): void {
+    if (this.saving() || !this.detalle().capacidades.puedeImprimirTicketRegalo) {
+      return;
+    }
+
+    this.selectingTipoPago.set(false);
+
+    this.printGiftTicketEvent.emit();
   }
 }

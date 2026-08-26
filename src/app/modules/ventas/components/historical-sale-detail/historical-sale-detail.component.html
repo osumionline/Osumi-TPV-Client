@@ -244,14 +244,20 @@
                 </div>
             </button>
 
-            <div class="historical-sale-detail__capability"
-                 [class.historical-sale-detail__capability--available]="
-                    detalle().capacidades.puedeImprimirTicketRegalo
-                 ">
+            <button class="historical-sale-detail__capability historical-sale-detail__capability--action"
+                    type="button"
+                    [class.historical-sale-detail__capability--available]="
+                        detalle().capacidades.puedeImprimirTicketRegalo
+                    "
+                    [disabled]="
+                        saving() ||
+                        !detalle().capacidades.puedeImprimirTicketRegalo
+                    "
+                    (click)="requestPrintGiftTicket()">
                 <mat-icon aria-hidden="true">
                     {{
                         detalle().capacidades.puedeImprimirTicketRegalo
-                            ? 'check_circle'
+                            ? 'card_giftcard'
                             : 'block'
                     }}
                 </mat-icon>
@@ -264,12 +270,12 @@
                     <small>
                         {{
                             detalle().capacidades.puedeImprimirTicketRegalo
-                                ? 'Disponible'
+                                ? 'Imprimir'
                                 : 'No disponible'
                         }}
                     </small>
                 </div>
-            </div>
+            </button>
 
             <div class="historical-sale-detail__capability"
                  [class.historical-sale-detail__capability--available]="

@@ -182,6 +182,47 @@ describe('VentaTicketDocumentService', (): void => {
     expect(ticketsService.savedPdfs).toEqual([]);
   });
 
+  it('imprime un ticket regalo sin generar ni guardar un PDF', async (): Promise<void> => {
+    const service: VentaTicketDocumentService = TestBed.inject(VentaTicketDocumentService);
+
+    await service.printGift(123);
+
+    expect(printTicketCalls).toHaveLength(1);
+
+    expect(printTicketCalls[0]).toContain('TICKET REGALO');
+
+    expect(printTicketCalls[0]).toContain('Artículo de prueba');
+
+    expect(printTicketCalls[0]).not.toContain('Cliente de prueba');
+
+    expect(renderPdfCalls).toEqual([]);
+    expect(ticketsService.savedPdfs).toEqual([]);
+  });
+
+  it('rechaza imprimir un ticket regalo para una devolución pura', async (): Promise<void> => {
+    const currentTicket: VentaTicketInterface = createTicket();
+
+    ticketsService.ticket = {
+      ...currentTicket,
+      totalCents: -1_210,
+      lineas: currentTicket.lineas.map((linea) => ({
+        ...linea,
+        unidades: -Math.abs(linea.unidades),
+        importeMicros: -Math.abs(linea.importeMicros),
+      })),
+    };
+
+    const service: VentaTicketDocumentService = TestBed.inject(VentaTicketDocumentService);
+
+    await expect(service.printGift(123)).rejects.toThrow(
+      'No se puede generar un ticket regalo para una operación sin líneas de compra.',
+    );
+
+    expect(printTicketCalls).toEqual([]);
+    expect(renderPdfCalls).toEqual([]);
+    expect(ticketsService.savedPdfs).toEqual([]);
+  });
+
   it('rechaza generar el documento si no están disponibles los datos del negocio', async (): Promise<void> => {
     contextService.appDataValue = null;
 

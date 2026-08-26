@@ -17,10 +17,6 @@
                 <h2 id="historical-sales-title">
                     Histórico
                 </h2>
-
-                <p>
-                    Consulta operaciones realizadas anteriormente.
-                </p>
             </div>
 
             <button #closeButton
@@ -293,7 +289,8 @@
                                                      [postventaError]="postventaError()"
                                                      [postventaWarning]="postventaWarning()"
                                                      (changeClientEvent)="openClientSelection()"
-                                                     (changeTipoPagoEvent)="changeTipoPago($event)" />
+                                                     (changeTipoPagoEvent)="changeTipoPago($event)"
+                                                     (printGiftTicketEvent)="printGiftTicket()" />
                         }
                         @else {
                         <div class="historical-sales__detail-state">
