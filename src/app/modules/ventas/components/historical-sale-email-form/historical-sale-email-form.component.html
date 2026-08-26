@@ -29,8 +29,14 @@
              (input)="onDestinatarioInput($event)">
 
       <mat-hint>
+        @if (destinatarioInicial().trim() !== '') {
+        Se ha usado el email de la ficha.
+        Puedes cambiarlo solo para este envío.
+        }
+        @else {
         Esta dirección solo se usará
         para este envío.
+        }
       </mat-hint>
     </mat-form-field>
 

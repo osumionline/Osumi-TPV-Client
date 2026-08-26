@@ -38,6 +38,7 @@ export interface VentasHistoricoResultadoRecord {
 export interface VentaHistoricoClienteRecord {
   readonly publicId: string;
   readonly nombre: string;
+  readonly email: string | null;
 }
 
 export interface VentaHistoricoPagoRecord {

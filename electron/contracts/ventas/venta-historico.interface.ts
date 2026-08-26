@@ -50,6 +50,7 @@ export interface VentasHistoricoResultado {
 export interface VentaHistoricoCliente {
   readonly publicId: string;
   readonly nombre: string;
+  readonly email: string | null;
 }
 
 export interface VentaHistoricoPago {

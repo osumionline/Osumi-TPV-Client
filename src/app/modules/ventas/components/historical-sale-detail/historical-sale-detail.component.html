@@ -411,6 +411,7 @@
 
         @if (selectingEmail()) {
         <otpv-historical-sale-email-form [saving]="saving()"
+                                         [destinatarioInicial]="detalle().cliente?.email ?? ''"
                                          (sendEvent)="sendTicketEmail($event)"
                                          (cancelEvent)="cancelEmailSelection()" />
         }

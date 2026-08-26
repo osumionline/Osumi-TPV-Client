@@ -3,7 +3,7 @@ import {
   computed,
   input,
   output,
-  signal,
+  linkedSignal,
   type InputSignal,
   type OutputEmitterRef,
   type Signal,
@@ -22,12 +22,14 @@ import { MatInput } from '@angular/material/input';
 })
 export default class HistoricalSaleEmailFormComponent {
   readonly saving: InputSignal<boolean> = input<boolean>(false);
+  readonly destinatarioInicial: InputSignal<string> = input<string>('');
 
   readonly sendEvent: OutputEmitterRef<string> = output<string>();
-
   readonly cancelEvent: OutputEmitterRef<void> = output<void>();
 
-  readonly destinatario: WritableSignal<string> = signal<string>('');
+  readonly destinatario: WritableSignal<string> = linkedSignal((): string =>
+    this.destinatarioInicial(),
+  );
 
   readonly destinatarioValido: Signal<boolean> = computed((): boolean =>
     this.isValidRecipient(this.destinatario()),

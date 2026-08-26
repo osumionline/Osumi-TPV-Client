@@ -51,6 +51,7 @@ interface VentaHistoricoDetalleDatabaseRow {
   readonly empleado_nombre: string;
   readonly cliente_public_id: string | null;
   readonly cliente_nombre: string | null;
+  readonly cliente_email: string | null;
   readonly total_cents: number;
   readonly numero_pagos: number;
   readonly caja_abierta: number;
@@ -150,6 +151,7 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
           e.nombre AS empleado_nombre,
           c.public_id AS cliente_public_id,
           c.nombre_apellidos AS cliente_nombre,
+          c.email AS cliente_email,
           v.total_cents,
           (
             SELECT COUNT(*)
@@ -210,6 +212,7 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
         : {
             publicId: row.cliente_public_id,
             nombre: row.cliente_nombre,
+            email: row.cliente_email,
           };
 
     const pagos: readonly VentaHistoricoPagoRecord[] = await this.findDetallePagos(

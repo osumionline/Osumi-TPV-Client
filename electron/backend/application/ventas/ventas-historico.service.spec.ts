@@ -93,6 +93,7 @@ describe('VentasHistoricoService', (): void => {
       cliente: {
         publicId: 'cliente-1',
         nombre: 'Cliente test',
+        email: 'cliente@example.com',
       },
       totalCents: 2_000,
       pagos: [
@@ -151,6 +152,7 @@ describe('VentasHistoricoService', (): void => {
       cliente: {
         publicId: 'cliente-1',
         nombre: 'Cliente test',
+        email: 'cliente@example.com',
       },
       totalCents: 2_000,
       pagos: [

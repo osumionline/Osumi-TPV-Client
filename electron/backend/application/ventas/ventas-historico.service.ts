@@ -178,6 +178,7 @@ export default class VentasHistoricoService {
           : {
               publicId: record.cliente.publicId,
               nombre: record.cliente.nombre,
+              email: record.cliente.email,
             },
       totalCents: record.totalCents,
       pagos,

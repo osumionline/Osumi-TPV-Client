@@ -29,6 +29,7 @@ describe('VentasPostventaService', (): void => {
     historicoRepository.detalleResult = createDetalleRecord({
       clientePublicId: 'cliente-2',
       clienteNombre: 'Cliente dos',
+      clienteEmail: 'cliente2@example.com',
     });
 
     const detalle: VentaHistoricoDetalle = await service.cambiarCliente({
@@ -44,6 +45,7 @@ describe('VentasPostventaService', (): void => {
     expect(detalle.cliente).toEqual({
       publicId: 'cliente-2',
       nombre: 'Cliente dos',
+      email: 'cliente2@example.com',
     });
   });
 
@@ -219,13 +221,14 @@ function createDetalleRecord(
   options: {
     readonly clientePublicId?: string | null;
     readonly clienteNombre?: string | null;
+    readonly clienteEmail?: string | null;
     readonly tipoPagoPublicId?: string;
     readonly tipoPagoNombre?: string;
   } = {},
 ): VentaHistoricoDetalleRecord {
   const clientePublicId: string | null = options.clientePublicId ?? null;
-
   const clienteNombre: string | null = options.clienteNombre ?? null;
+  const clienteEmail: string | null = options.clienteEmail ?? null;
 
   return {
     id: 15,
@@ -240,6 +243,7 @@ function createDetalleRecord(
         : {
             publicId: clientePublicId,
             nombre: clienteNombre,
+            email: clienteEmail,
           },
     totalCents: 900,
     pagos: [
