@@ -129,6 +129,22 @@ describe('buildVentaGiftTicketDocument', (): void => {
 
     expect(documentHtml).not.toContain('<script>empleado</script>');
   });
+
+  it('mantiene el branding y las redes del negocio', (): void => {
+    const documentHtml: string = buildVentaGiftTicketDocument(appData, createTicket());
+
+    expect(documentHtml).toContain('src="osumi://assets/logo"');
+
+    expect(documentHtml).toContain('Empresa &amp; Compañía');
+
+    expect(documentHtml).toContain('osumi://assets/app/icons/twitter.svg');
+
+    expect(documentHtml).toContain('@empresa');
+
+    expect(documentHtml).toContain('osumi://assets/app/icons/instagram.svg');
+
+    expect(documentHtml).not.toContain('osumi://assets/app/icons/facebook.svg');
+  });
 });
 
 /**

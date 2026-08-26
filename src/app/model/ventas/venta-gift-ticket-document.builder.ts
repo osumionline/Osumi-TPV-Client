@@ -4,21 +4,17 @@ import type {
   VentaTicketLineaInterface,
 } from '@desktop-contracts/ventas/venta-ticket.interface';
 import {
+  formatTicketDateTime,
+  renderTicketBusinessHeader,
+  renderTicketPhrases,
+  resolveFiscalTicketBusinessName,
+} from '@model/tickets/ticket-document-shared.utils';
+import {
   buildVentaTicketQrContent,
   buildVentaTicketQrSvg,
 } from '@model/ventas/venta-ticket-qr.utils';
 import { escapeHtml } from '@utils/html.utils';
 import { trimToNull } from '@utils/string.utils';
-
-const BUSINESS_LOGO_URL: string = 'osumi://assets/logo';
-
-const TWITTER_ICON_URL: string = 'osumi://assets/app/icons/twitter.svg';
-
-const FACEBOOK_ICON_URL: string = 'osumi://assets/app/icons/facebook.svg';
-
-const INSTAGRAM_ICON_URL: string = 'osumi://assets/app/icons/instagram.svg';
-
-const WEB_ICON_URL: string = 'osumi://assets/app/icons/web.svg';
 
 /**
  * Construye un ticket regalo efímero a partir del
@@ -41,14 +37,7 @@ export default function buildVentaGiftTicketDocument(
     );
   }
 
-  const businessName: string = trimToNull(appData.nombre) ?? 'Osumi TPV';
-
-  const address: string | null = joinNotEmpty(appData.direccion, appData.poblacion);
-
-  const businessSecondaryData: readonly string[] = [
-    trimToNull(appData.cif) === null ? null : `CIF/NIF: ${appData.cif.trim()}`,
-    trimToNull(appData.telefono) === null ? null : `Tel: ${appData.telefono.trim()}`,
-  ].filter((value: string | null): value is string => value !== null);
+  const businessName: string = resolveFiscalTicketBusinessName(appData);
 
   const ticketReference: string = formatTicketReference(ticket);
 
@@ -240,39 +229,7 @@ export default function buildVentaGiftTicketDocument(
 </head>
 <body>
   <main class="ticket">
-    <header class="business">
-      <img
-        class="business__logo"
-        src="${BUSINESS_LOGO_URL}"
-        alt=""
-      >
-
-      <div class="business__name">
-        ${escapeHtml(businessName)}
-      </div>
-
-      ${
-        address === null
-          ? ''
-          : `
-            <div class="business__line">
-              ${escapeHtml(address)}
-            </div>
-          `
-      }
-
-      ${
-        businessSecondaryData.length === 0
-          ? ''
-          : `
-            <div class="business__line">
-              ${escapeHtml(businessSecondaryData.join(' · '))}
-            </div>
-          `
-      }
-
-      ${renderSocial(appData)}
-    </header>
+    ${renderTicketBusinessHeader(appData, businessName, 'branded')}
 
     <div class="ticket__title">
       TICKET REGALO
@@ -289,7 +246,7 @@ export default function buildVentaGiftTicketDocument(
         </span>
 
         <span class="data__value">
-          ${escapeHtml(formatVentaFecha(ticket.fecha))}
+          ${escapeHtml(formatTicketDateTime(ticket.fecha))}
         </span>
       </div>
 
@@ -341,123 +298,10 @@ function renderLinea(linea: VentaTicketLineaInterface): string {
 }
 
 /**
- * Renderiza las redes sociales configuradas para el negocio.
- */
-function renderSocial(appData: AppData): string {
-  const items: string[] = [];
-
-  addSocialItem(items, TWITTER_ICON_URL, 'Twitter', appData.twitter);
-
-  addSocialItem(items, FACEBOOK_ICON_URL, 'Facebook', appData.facebook);
-
-  addSocialItem(items, INSTAGRAM_ICON_URL, 'Instagram', appData.instagram);
-
-  addSocialItem(items, WEB_ICON_URL, 'Web', appData.web);
-
-  if (items.length === 0) {
-    return '';
-  }
-
-  return `
-    <div class="social">
-      ${items.join('')}
-    </div>
-  `;
-}
-
-/**
- * Añade una red social cuando tiene un valor configurado.
- */
-function addSocialItem(items: string[], iconUrl: string, iconAlt: string, value: string): void {
-  const normalizedValue: string | null = trimToNull(value);
-
-  if (normalizedValue === null) {
-    return;
-  }
-
-  items.push(`
-    <div class="social__item">
-      <img
-        class="social__icon"
-        src="${iconUrl}"
-        alt="${escapeHtml(iconAlt)}"
-      >
-
-      <span class="social__value">
-        ${escapeHtml(normalizedValue)}
-      </span>
-    </div>
-  `);
-}
-
-/**
- * Renderiza las frases configuradas al pie del ticket.
- */
-function renderTicketPhrases(phrases: readonly string[]): string {
-  const normalizedPhrases: readonly string[] = phrases
-    .map((phrase: string): string => phrase.trim())
-    .filter((phrase: string): boolean => phrase !== '');
-
-  if (normalizedPhrases.length === 0) {
-    return '';
-  }
-
-  return `
-    <footer class="footer">
-      ${normalizedPhrases
-        .map(
-          (phrase: string): string => `
-            <div class="footer__phrase">
-              ${escapeHtml(phrase)}
-            </div>
-          `,
-        )
-        .join('')}
-    </footer>
-  `;
-}
-
-/**
  * Construye la referencia visible de la venta original.
  */
 function formatTicketReference(ticket: VentaTicketInterface): string {
   const serie: string | null = trimToNull(ticket.serie);
 
   return serie === null ? String(ticket.numero) : `${serie}-${ticket.numero}`;
-}
-
-/**
- * Convierte la fecha persistida al formato local del ticket.
- */
-function formatVentaFecha(value: string): string {
-  const normalizedValue: string = value.trim();
-
-  const date: Date = new Date(normalizedValue);
-
-  if (Number.isNaN(date.getTime())) {
-    return normalizedValue;
-  }
-
-  return (
-    [pad2(date.getDate()), pad2(date.getMonth() + 1), date.getFullYear()].join('/') +
-    ` ${pad2(date.getHours())}:${pad2(date.getMinutes())}`
-  );
-}
-
-/**
- * Formatea un componente de fecha con dos dígitos.
- */
-function pad2(value: number): string {
-  return String(value).padStart(2, '0');
-}
-
-/**
- * Une únicamente valores de dirección no vacíos.
- */
-function joinNotEmpty(...values: readonly string[]): string | null {
-  const normalizedValues: readonly string[] = values
-    .map((value: string): string | null => trimToNull(value))
-    .filter((value: string | null): value is string => value !== null);
-
-  return normalizedValues.length === 0 ? null : normalizedValues.join(', ');
 }

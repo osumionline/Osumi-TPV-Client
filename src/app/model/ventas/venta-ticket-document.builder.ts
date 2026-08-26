@@ -5,6 +5,15 @@ import type {
   VentaTicketPagoInterface,
 } from '@desktop-contracts/ventas/venta-ticket.interface';
 import {
+  formatTicketCents,
+  formatTicketDateTime,
+  formatTicketMicros,
+  formatTicketPercentage,
+  renderTicketBusinessHeader,
+  renderTicketPhrases,
+  resolveFiscalTicketBusinessName,
+} from '@model/tickets/ticket-document-shared.utils';
+import {
   buildVentaTicketIvaResumen,
   type VentaTicketIvaResumen,
 } from '@model/ventas/venta-ticket-iva.utils';
@@ -13,30 +22,7 @@ import {
   buildVentaTicketQrSvg,
 } from '@model/ventas/venta-ticket-qr.utils';
 import { escapeHtml } from '@utils/html.utils';
-import { centsToEuros, microsToEuros } from '@utils/money.utils';
 import { trimToNull } from '@utils/string.utils';
-
-const BUSINESS_LOGO_URL: string = 'osumi://assets/logo';
-
-const TWITTER_ICON_URL: string = 'osumi://assets/app/icons/twitter.svg';
-
-const FACEBOOK_ICON_URL: string = 'osumi://assets/app/icons/facebook.svg';
-
-const INSTAGRAM_ICON_URL: string = 'osumi://assets/app/icons/instagram.svg';
-
-const WEB_ICON_URL: string = 'osumi://assets/app/icons/web.svg';
-
-const currencyFormatter: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
-  style: 'currency',
-  currency: 'EUR',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-const percentageFormatter: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
-});
 
 /**
  * Construye el documento definitivo de una venta a partir
@@ -48,14 +34,7 @@ export default function buildVentaTicketDocument(
   appData: AppData,
   ticket: VentaTicketInterface,
 ): string {
-  const businessName: string = trimToNull(appData.nombre) ?? 'Osumi TPV';
-
-  const address: string | null = joinNotEmpty(appData.direccion, appData.poblacion);
-
-  const businessSecondaryData: readonly string[] = [
-    trimToNull(appData.cif) === null ? null : `CIF/NIF: ${appData.cif.trim()}`,
-    trimToNull(appData.telefono) === null ? null : `Tel: ${appData.telefono.trim()}`,
-  ].filter((value: string | null): value is string => value !== null);
+  const businessName: string = resolveFiscalTicketBusinessName(appData);
 
   const ticketReference: string = formatTicketReference(ticket);
   const operationTitle: string = ticket.totalCents < 0 ? 'DEVOLUCIÓN' : 'TICKET';
@@ -357,38 +336,7 @@ export default function buildVentaTicketDocument(
 </head>
 <body>
   <main class="ticket">
-    <header class="business">
-      <img
-        class="business__logo"
-        src="${BUSINESS_LOGO_URL}"
-        alt=""
-      >
-
-      <div class="business__name">
-        ${escapeHtml(businessName)}
-      </div>
-
-      ${
-        address === null
-          ? ''
-          : `
-            <div class="business__line">
-              ${escapeHtml(address)}
-            </div>
-          `
-      }
-
-      ${
-        businessSecondaryData.length === 0
-          ? ''
-          : `
-            <div class="business__line">
-              ${escapeHtml(businessSecondaryData.join(' · '))}
-            </div>
-          `
-      }
-      ${renderSocial(appData)}
-    </header>
+    ${renderTicketBusinessHeader(appData, businessName, 'branded')}
 
     <div class="ticket__title">
       ${operationTitle}
@@ -405,7 +353,7 @@ export default function buildVentaTicketDocument(
         </span>
 
         <span class="data__value">
-          ${escapeHtml(formatVentaFecha(ticket.fecha))}
+          ${escapeHtml(formatTicketDateTime(ticket.fecha))}
         </span>
       </div>
 
@@ -448,7 +396,7 @@ export default function buildVentaTicketDocument(
       </span>
 
       <span>
-        ${escapeHtml(formatCents(ticket.totalCents))}
+        ${escapeHtml(formatTicketCents(ticket.totalCents))}
       </span>
     </div>
 
@@ -471,74 +419,6 @@ export default function buildVentaTicketDocument(
   `.trim();
 }
 
-function renderSocial(appData: AppData): string {
-  const items: string[] = [];
-
-  addSocialItem(items, TWITTER_ICON_URL, 'Twitter', appData.twitter);
-
-  addSocialItem(items, FACEBOOK_ICON_URL, 'Facebook', appData.facebook);
-
-  addSocialItem(items, INSTAGRAM_ICON_URL, 'Instagram', appData.instagram);
-
-  addSocialItem(items, WEB_ICON_URL, 'Web', appData.web);
-
-  if (items.length === 0) {
-    return '';
-  }
-
-  return `
-    <div class="social">
-      ${items.join('')}
-    </div>
-  `;
-}
-
-function addSocialItem(items: string[], iconUrl: string, iconAlt: string, value: string): void {
-  const normalizedValue: string | null = trimToNull(value);
-
-  if (normalizedValue === null) {
-    return;
-  }
-
-  items.push(`
-    <div class="social__item">
-      <img
-        class="social__icon"
-        src="${iconUrl}"
-        alt="${escapeHtml(iconAlt)}"
-      >
-
-      <span class="social__value">
-        ${escapeHtml(normalizedValue)}
-      </span>
-    </div>
-  `);
-}
-
-function renderTicketPhrases(phrases: readonly string[]): string {
-  const normalizedPhrases: readonly string[] = phrases
-    .map((phrase: string): string => phrase.trim())
-    .filter((phrase: string): boolean => phrase !== '');
-
-  if (normalizedPhrases.length === 0) {
-    return '';
-  }
-
-  return `
-    <footer class="footer">
-      ${normalizedPhrases
-        .map(
-          (phrase: string): string => `
-            <div class="footer__phrase">
-              ${escapeHtml(phrase)}
-            </div>
-          `,
-        )
-        .join('')}
-    </footer>
-  `;
-}
-
 function renderLinea(linea: VentaTicketLineaInterface): string {
   return `
     <article class="line">
@@ -554,11 +434,11 @@ function renderLinea(linea: VentaTicketLineaInterface): string {
 
       <div class="line__amounts">
         <span class="line__unit-price">
-          ${escapeHtml(formatMicros(linea.pvpMicros))} / ud.
+          ${escapeHtml(formatTicketMicros(linea.pvpMicros))} / ud.
         </span>
 
         <span class="line__total">
-          ${escapeHtml(formatMicros(linea.importeMicros))}
+          ${escapeHtml(formatTicketMicros(linea.importeMicros))}
         </span>
       </div>
 
@@ -579,11 +459,11 @@ function renderLineaDescuento(linea: VentaTicketLineaInterface): string {
   const discountParts: string[] = [];
 
   if (linea.descuentoBps > 0) {
-    discountParts.push(formatPercentage(linea.descuentoBps));
+    discountParts.push(formatTicketPercentage(linea.descuentoBps));
   }
 
   if (linea.importeDescuentoMicros !== 0) {
-    discountParts.push(formatMicros(Math.abs(linea.importeDescuentoMicros)));
+    discountParts.push(formatTicketMicros(Math.abs(linea.importeDescuentoMicros)));
   }
 
   if (discountParts.length === 0) {
@@ -632,7 +512,7 @@ function renderPago(pago: VentaTicketPagoInterface): string {
         </span>
 
         <span class="payment__value">
-          ${escapeHtml(formatCents(pago.importeCents))}
+          ${escapeHtml(formatTicketCents(pago.importeCents))}
         </span>
       </div>
 
@@ -646,7 +526,7 @@ function renderPago(pago: VentaTicketPagoInterface): string {
               </span>
 
               <span class="payment__value">
-                ${escapeHtml(formatCents(pago.entregadoCents))}
+                ${escapeHtml(formatTicketCents(pago.entregadoCents))}
               </span>
             </div>
 
@@ -656,7 +536,7 @@ function renderPago(pago: VentaTicketPagoInterface): string {
               </span>
 
               <span class="payment__value">
-                ${escapeHtml(formatCents(pago.cambioCents))}
+                ${escapeHtml(formatTicketCents(pago.cambioCents))}
               </span>
             </div>
           `
@@ -709,15 +589,15 @@ function renderIva(resumen: readonly VentaTicketIvaResumen[]): string {
               (iva: VentaTicketIvaResumen): string => `
                 <tr>
                   <td>
-                    ${escapeHtml(formatPercentage(iva.ivaBps))}
+                    ${escapeHtml(formatTicketPercentage(iva.ivaBps))}
                   </td>
 
                   <td>
-                    ${escapeHtml(formatMicros(iva.baseMicros))}
+                    ${escapeHtml(formatTicketMicros(iva.baseMicros))}
                   </td>
 
                   <td>
-                    ${escapeHtml(formatMicros(iva.cuotaMicros))}
+                    ${escapeHtml(formatTicketMicros(iva.cuotaMicros))}
                   </td>
                 </tr>
               `,
@@ -733,42 +613,4 @@ function formatTicketReference(ticket: VentaTicketInterface): string {
   const serie: string | null = trimToNull(ticket.serie);
 
   return serie === null ? String(ticket.numero) : `${serie}-${ticket.numero}`;
-}
-
-function formatVentaFecha(value: string): string {
-  const normalizedValue: string = value.trim();
-  const date: Date = new Date(normalizedValue);
-
-  if (Number.isNaN(date.getTime())) {
-    return normalizedValue;
-  }
-
-  return (
-    [pad2(date.getDate()), pad2(date.getMonth() + 1), date.getFullYear()].join('/') +
-    ` ${pad2(date.getHours())}:${pad2(date.getMinutes())}`
-  );
-}
-
-function pad2(value: number): string {
-  return String(value).padStart(2, '0');
-}
-
-function formatCents(cents: number): string {
-  return currencyFormatter.format(centsToEuros(cents));
-}
-
-function formatMicros(micros: number): string {
-  return currencyFormatter.format(microsToEuros(micros));
-}
-
-function formatPercentage(bps: number): string {
-  return `${percentageFormatter.format(bps / 100)} %`;
-}
-
-function joinNotEmpty(...values: readonly string[]): string | null {
-  const normalizedValues: readonly string[] = values
-    .map((value: string): string | null => trimToNull(value))
-    .filter((value: string | null): value is string => value !== null);
-
-  return normalizedValues.length === 0 ? null : normalizedValues.join(', ');
 }

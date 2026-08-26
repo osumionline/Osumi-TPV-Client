@@ -89,4 +89,14 @@ describe('buildReservaTicketDocument', (): void => {
 
     expect(documentHtml).toContain('No constituye un ticket o factura de venta.');
   });
+
+  it('mantiene la cabecera sencilla y prioriza el nombre comercial', (): void => {
+    const documentHtml: string = buildReservaTicketDocument(appData, reserva);
+
+    expect(documentHtml).toMatch(/<div class="business__name">\s*Mi comercio\s*<\/div>/);
+
+    expect(documentHtml).not.toContain('src="osumi://assets/logo"');
+
+    expect(documentHtml).not.toContain('class="social"');
+  });
 });

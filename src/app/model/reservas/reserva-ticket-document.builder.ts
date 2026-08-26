@@ -3,17 +3,14 @@ import type {
   default as ReservaInterface,
   ReservaLineaInterface,
 } from '@desktop-contracts/reservas/reserva.interface';
+import {
+  formatTicketMicros,
+  renderTicketBusinessHeader,
+  resolveCommercialTicketBusinessName,
+} from '@model/tickets/ticket-document-shared.utils';
 import { formatIsoDateToSpanishDate } from '@utils/date.utils';
 import { escapeHtml } from '@utils/html.utils';
-import { microsToEuros } from '@utils/money.utils';
 import { trimToNull } from '@utils/string.utils';
-
-const currencyFormatter: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
-  style: 'currency',
-  currency: 'EUR',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
 
 /**
  * Construye el comprobante imprimible de una reserva.
@@ -26,15 +23,7 @@ export default function buildReservaTicketDocument(
   appData: AppData,
   reserva: ReservaInterface,
 ): string {
-  const businessName: string =
-    firstNotEmpty(appData.nombreComercial, appData.nombre) ?? 'Osumi TPV';
-
-  const address: string | null = joinNotEmpty(appData.direccion, appData.poblacion);
-
-  const businessSecondaryData: readonly string[] = [
-    trimToNull(appData.cif) === null ? null : `CIF/NIF: ${appData.cif.trim()}`,
-    trimToNull(appData.telefono) === null ? null : `Tel: ${appData.telefono.trim()}`,
-  ].filter((value: string | null): value is string => value !== null);
+  const businessName: string = resolveCommercialTicketBusinessName(appData);
 
   const documentTitle: string = `Reserva ${reserva.id} - ${businessName}`;
 
@@ -218,31 +207,7 @@ export default function buildReservaTicketDocument(
 
 <body>
   <main class="ticket">
-    <header class="business">
-      <div class="business__name">
-        ${escapeHtml(businessName)}
-      </div>
-
-      ${
-        address === null
-          ? ''
-          : `
-            <div class="business__line">
-              ${escapeHtml(address)}
-            </div>
-          `
-      }
-
-      ${
-        businessSecondaryData.length === 0
-          ? ''
-          : `
-            <div class="business__line">
-              ${escapeHtml(businessSecondaryData.join(' · '))}
-            </div>
-          `
-      }
-    </header>
+    ${renderTicketBusinessHeader(appData, businessName, 'plain')}
 
     <div class="ticket__title">
       RESERVA
@@ -284,7 +249,7 @@ export default function buildReservaTicketDocument(
       </span>
 
       <span>
-        ${escapeHtml(formatMicros(reserva.totalMicros))}
+        ${escapeHtml(formatTicketMicros(reserva.totalMicros))}
       </span>
     </div>
 
@@ -329,11 +294,11 @@ function renderLinea(linea: ReservaLineaInterface): string {
 
       <div class="line__amounts">
         <span class="line__unit-price">
-          ${escapeHtml(formatMicros(linea.pvpMicros))} / ud.
+          ${escapeHtml(formatTicketMicros(linea.pvpMicros))} / ud.
         </span>
 
         <span class="line__total">
-          ${escapeHtml(formatMicros(linea.importeMicros))}
+          ${escapeHtml(formatTicketMicros(linea.importeMicros))}
         </span>
       </div>
     </article>
@@ -352,28 +317,4 @@ function formatReservaFecha(value: string): string {
   }
 
   return `${date} ${timeMatch[1]}:${timeMatch[2]}`;
-}
-
-function formatMicros(micros: number): string {
-  return currencyFormatter.format(microsToEuros(micros));
-}
-
-function firstNotEmpty(...values: readonly string[]): string | null {
-  for (const value of values) {
-    const normalizedValue: string | null = trimToNull(value);
-
-    if (normalizedValue !== null) {
-      return normalizedValue;
-    }
-  }
-
-  return null;
-}
-
-function joinNotEmpty(...values: readonly string[]): string | null {
-  const normalizedValues: readonly string[] = values
-    .map((value: string): string | null => trimToNull(value))
-    .filter((value: string | null): value is string => value !== null);
-
-  return normalizedValues.length === 0 ? null : normalizedValues.join(', ');
 }
