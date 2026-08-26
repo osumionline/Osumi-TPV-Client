@@ -8,12 +8,12 @@ import type {
   VentaHistoricoDetalle,
   VentasHistoricoResultado,
 } from '@desktop-contracts/ventas/venta-historico.interface';
-import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
-import type VentasContextInterface from '@desktop-contracts/ventas/ventas-context.interface';
 import type {
   VentaPostventaCambiarClienteCommand,
   VentaPostventaCambiarTipoPagoCommand,
 } from '@desktop-contracts/ventas/venta-postventa.interface';
+import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
+import type VentasContextInterface from '@desktop-contracts/ventas/ventas-context.interface';
 
 export default interface VentasApi {
   getContext(): Promise<VentasContextInterface>;
@@ -42,7 +42,11 @@ export default interface VentasApi {
 
   getTicket(idVenta: number): Promise<VentaTicketInterface | null>;
 
-  saveTicketPdf(idVenta: number, pdf: Uint8Array): Promise<void>;
+  /**
+   * Materializa el PDF correspondiente a una revisión
+   * documental concreta de una venta.
+   */
+  saveTicketPdf(idVenta: number, ticketRevision: number, pdf: Uint8Array): Promise<void>;
 
   save(command: GuardarVentaCommand): Promise<GuardarVentaResult>;
 }

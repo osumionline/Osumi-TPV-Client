@@ -4,18 +4,18 @@ import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticke
 @Service()
 export default class VentasTicketsService {
   /**
-   * Recupera desde SQLite el snapshot definitivo
-   * necesario para generar el ticket de una venta.
+   * Recupera desde SQLite el snapshot documental
+   * vigente de una venta.
    */
   async getByVentaId(idVenta: number): Promise<VentaTicketInterface | null> {
     return window.osumiDesktop.ventas.getTicket(idVenta);
   }
 
   /**
-   * Conserva en el backend el PDF histórico
-   * correspondiente a una venta persistida.
+   * Conserva el PDF correspondiente exactamente
+   * a la revisión documental indicada.
    */
-  async savePdf(idVenta: number, pdf: Uint8Array): Promise<void> {
-    await window.osumiDesktop.ventas.saveTicketPdf(idVenta, pdf);
+  async savePdf(idVenta: number, ticketRevision: number, pdf: Uint8Array): Promise<void> {
+    await window.osumiDesktop.ventas.saveTicketPdf(idVenta, ticketRevision, pdf);
   }
 }

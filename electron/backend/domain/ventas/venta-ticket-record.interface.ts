@@ -34,6 +34,8 @@ export interface VentaTicketRecord {
   readonly clienteNombre: string | null;
 
   readonly totalCents: number;
+  readonly ticketRevision: number;
+  readonly ticketPdfRevision: number;
 
   readonly pagos: readonly VentaTicketPagoRecord[];
   readonly lineas: readonly VentaTicketLineaRecord[];

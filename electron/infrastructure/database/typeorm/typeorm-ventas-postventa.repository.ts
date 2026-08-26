@@ -85,6 +85,7 @@ export default class TypeOrmVentasPostventaRepository implements VentasPostventa
             UPDATE venta
             SET
               id_cliente = ?,
+              ticket_revision = ticket_revision + 1,
               updated_at = ?
             WHERE
               id = ?
@@ -189,7 +190,9 @@ export default class TypeOrmVentasPostventaRepository implements VentasPostventa
       await queryRunner.query(
         `
             UPDATE venta
-            SET updated_at = ?
+            SET
+              ticket_revision = ticket_revision + 1,
+              updated_at = ?
             WHERE id = ?
           `,
         [timestamp, idVenta],

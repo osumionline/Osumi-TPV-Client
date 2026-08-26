@@ -39,6 +39,8 @@ describe('buildVentaTicketDocument', (): void => {
     empleadoNombre: 'Empleado & Prueba',
     clienteNombre: 'Cliente <Prueba>',
     totalCents: 2_000,
+    ticketRevision: 1,
+    ticketPdfRevision: 0,
     pagos: [
       {
         nombre: 'Tarjeta <VISA>',

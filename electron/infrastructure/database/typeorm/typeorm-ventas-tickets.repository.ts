@@ -20,6 +20,8 @@ interface VentaTicketDatabaseRow {
   readonly cliente_nombre: string | null;
 
   readonly total_cents: number;
+  readonly ticket_revision: number;
+  readonly ticket_pdf_revision: number;
 }
 
 interface VentaTicketPagoDatabaseRow {
@@ -61,7 +63,9 @@ export default class TypeOrmVentasTicketsRepository implements VentasTicketsRepo
             v.created_at AS fecha,
             e.nombre AS empleado_nombre,
             c.nombre_apellidos AS cliente_nombre,
-            v.total_cents
+            v.total_cents,
+            v.ticket_revision,
+            v.ticket_pdf_revision
           FROM venta v
 
           INNER JOIN empleado e
@@ -100,7 +104,60 @@ export default class TypeOrmVentasTicketsRepository implements VentasTicketsRepo
       totalCents: venta.total_cents,
       pagos,
       lineas,
+      ticketRevision: venta.ticket_revision,
+      ticketPdfRevision: venta.ticket_pdf_revision,
     };
+  }
+
+  /**
+   * Confirma que un PDF representa la revisión esperada.
+   *
+   * Si otra operación incrementó ticket_revision durante
+   * la generación, la revisión no se marca como vigente.
+   */
+  async markPdfRevision(idVenta: number, expectedRevision: number): Promise<boolean> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    await dataSource.query(
+      `
+        UPDATE venta
+        SET ticket_pdf_revision = ?
+        WHERE
+          id = ?
+          AND deleted_at IS NULL
+          AND ticket_revision = ?
+          AND ticket_pdf_revision <= ?
+      `,
+      [expectedRevision, idVenta, expectedRevision, expectedRevision],
+    );
+
+    const rows: readonly {
+      readonly ticket_revision: number;
+      readonly ticket_pdf_revision: number;
+    }[] = (await dataSource.query(
+      `
+        SELECT
+          ticket_revision,
+          ticket_pdf_revision
+        FROM venta
+        WHERE
+          id = ?
+          AND deleted_at IS NULL
+        LIMIT 1
+      `,
+      [idVenta],
+    )) as readonly {
+      readonly ticket_revision: number;
+      readonly ticket_pdf_revision: number;
+    }[];
+
+    const row = rows[0];
+
+    return (
+      row !== undefined &&
+      row.ticket_revision === expectedRevision &&
+      row.ticket_pdf_revision === expectedRevision
+    );
   }
 
   private async findPagos(

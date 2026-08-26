@@ -116,6 +116,8 @@ describe('VentaTicketDocumentService', (): void => {
     expect(ticketsService.savedPdfs[0]?.idVenta).toBe(123);
 
     expect(ticketsService.savedPdfs[0]?.pdf).toBe(renderedPdf);
+
+    expect(ticketsService.savedPdfs[0]?.ticketRevision).toBe(1);
   });
 
   it('no intenta guardar el PDF si falla el renderer', async (): Promise<void> => {
@@ -199,6 +201,7 @@ class FakeVentasContextService {
 
 interface SavedPdf {
   readonly idVenta: number;
+  readonly ticketRevision: number;
   readonly pdf: Uint8Array;
 }
 
@@ -216,13 +219,17 @@ class FakeVentasTicketsService {
     return Promise.resolve(this.ticket);
   }
 
-  savePdf(idVenta: number, pdf: Uint8Array): Promise<void> {
+  /**
+   * Registra el PDF y la revisión exacta solicitada.
+   */
+  savePdf(idVenta: number, ticketRevision: number, pdf: Uint8Array): Promise<void> {
     if (this.savePdfError !== null) {
       return Promise.reject(this.savePdfError);
     }
 
     this.savedPdfs.push({
       idVenta,
+      ticketRevision,
       pdf,
     });
 
@@ -289,5 +296,7 @@ function createTicket(): VentaTicketInterface {
         regalo: false,
       },
     ],
+    ticketRevision: 1,
+    ticketPdfRevision: 0,
   };
 }

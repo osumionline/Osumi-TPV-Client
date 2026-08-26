@@ -34,6 +34,8 @@ export interface VentaTicketInterface {
   readonly clienteNombre: string | null;
 
   readonly totalCents: number;
+  readonly ticketRevision: number;
+  readonly ticketPdfRevision: number;
 
   readonly pagos: readonly VentaTicketPagoInterface[];
   readonly lineas: readonly VentaTicketLineaInterface[];

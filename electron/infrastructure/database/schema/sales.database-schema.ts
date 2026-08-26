@@ -41,6 +41,32 @@ const statements: readonly string[] = [
       total_cents INTEGER NOT NULL
         DEFAULT 0,
 
+      /*
+       * Revisión del contenido que debería representar
+       * actualmente el ticket de la venta.
+       *
+       * Cualquier cambio documental posterior incrementa
+       * esta revisión dentro de su misma transacción.
+       */
+      ticket_revision INTEGER NOT NULL
+        DEFAULT 1
+        CHECK (
+          ticket_revision >= 1
+        ),
+
+      /*
+       * Última revisión que sabemos materializada
+       * correctamente en el PDF vigente.
+       *
+       * Cero significa que todavía no existe una
+       * materialización confirmada.
+       */
+      ticket_pdf_revision INTEGER NOT NULL
+        DEFAULT 0
+        CHECK (
+          ticket_pdf_revision >= 0
+        ),
+
       created_at TEXT NOT NULL
         DEFAULT (${SQLITE_TIMESTAMP_DEFAULT}),
 
@@ -49,6 +75,9 @@ const statements: readonly string[] = [
 
       deleted_at TEXT,
 
+      CHECK (
+        ticket_pdf_revision <= ticket_revision
+      ),
       UNIQUE (
         serie,
         numero

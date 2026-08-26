@@ -29,6 +29,7 @@ import HistoricalSaleDetailComponent from '@modules/ventas/components/historical
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import ClienteProteccionDatosPrintService from '@services/cliente-proteccion-datos-print.service';
 import ClientesService from '@services/clientes.service';
+import VentaTicketDocumentService from '@services/venta-ticket-document.service';
 import VentasContextService from '@services/ventas-context.service';
 import VentasHistoricoService from '@services/ventas-historico.service';
 import VentasPostventaService from '@services/ventas-postventa.service';
@@ -64,6 +65,9 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
   readonly ventasContextService: VentasContextService = inject(VentasContextService);
   private readonly clienteProteccionDatosPrintService: ClienteProteccionDatosPrintService = inject(
     ClienteProteccionDatosPrintService,
+  );
+  private readonly ventaTicketDocumentService: VentaTicketDocumentService = inject(
+    VentaTicketDocumentService,
   );
 
   readonly closeEvent: OutputEmitterRef<void> = output<void>();
@@ -538,10 +542,13 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
         this.detalle.set(detalleActualizado);
       }
 
-      await this.invalidateClienteEstadisticas(
-        clienteAnteriorPublicId,
-        detalleActualizado.cliente?.publicId ?? null,
-      );
+      const clienteNuevoPublicId: string | null = detalleActualizado.cliente?.publicId ?? null;
+
+      if (clienteAnteriorPublicId !== clienteNuevoPublicId) {
+        await this.regenerateTicketAfterPostventa(detalleAnterior.id);
+      }
+
+      await this.invalidateClienteEstadisticas(clienteAnteriorPublicId, clienteNuevoPublicId);
 
       await this.refreshHistoricoAfterPostventa();
     } catch (error: unknown) {
@@ -581,6 +588,8 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
       if (this.selectedVentaId() === detalleAnterior.id) {
         this.detalle.set(detalleActualizado);
       }
+
+      await this.regenerateTicketAfterPostventa(detalleAnterior.id);
 
       await this.refreshHistoricoAfterPostventa();
     } catch (error: unknown) {
@@ -713,6 +722,23 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
         `El cliente se ha creado correctamente, pero ${getErrorMessage(
           error,
           'no se ha podido imprimir el documento de protección de datos.',
+        )}`,
+      );
+    }
+  }
+
+  /**
+   * Intenta materializar la nueva revisión documental después
+   * del COMMIT sin invalidar una corrección ya confirmada.
+   */
+  private async regenerateTicketAfterPostventa(idVenta: number): Promise<void> {
+    try {
+      await this.ventaTicketDocumentService.generateAndSavePdf(idVenta);
+    } catch (error: unknown) {
+      this.appendPostventaWarning(
+        `La venta se ha actualizado, pero su ticket PDF está pendiente de regeneración. ${getErrorMessage(
+          error,
+          'No se ha podido regenerar el PDF del ticket.',
         )}`,
       );
     }

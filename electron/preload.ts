@@ -247,8 +247,13 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         idVenta,
       ) as Promise<VentaTicketInterface | null>,
 
-    saveTicketPdf: (idVenta: number, pdf: Uint8Array): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.ventasSaveTicketPdf, idVenta, pdf) as Promise<void>,
+    saveTicketPdf: (idVenta: number, ticketRevision: number, pdf: Uint8Array): Promise<void> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.ventasSaveTicketPdf,
+        idVenta,
+        ticketRevision,
+        pdf,
+      ) as Promise<void>,
 
     save: (command: GuardarVentaCommand): Promise<GuardarVentaResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.ventasSave, command) as Promise<GuardarVentaResult>,

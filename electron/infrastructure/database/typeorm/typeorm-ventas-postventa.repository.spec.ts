@@ -33,6 +33,11 @@ interface CajaTipoRow {
   readonly importe_descuento_cents: number;
 }
 
+interface TicketRevisionRow {
+  readonly ticket_revision: number;
+  readonly ticket_pdf_revision: number;
+}
+
 let tempDirectory: string | null = null;
 let applicationDatabase: TypeOrmApplicationDatabase | null = null;
 let repository: TypeOrmVentasPostventaRepository | null = null;
@@ -85,6 +90,11 @@ describe('TypeOrmVentasPostventaRepository', (): void => {
 
     await requireRepository().cambiarCliente(idVenta, 'cliente-2');
 
+    expect(await getTicketRevision(dataSource, idVenta)).toEqual({
+      ticket_revision: 2,
+      ticket_pdf_revision: 0,
+    });
+
     const venta: VentaClienteRow = await queryOne<VentaClienteRow>(
       dataSource,
       `
@@ -101,6 +111,11 @@ describe('TypeOrmVentasPostventaRepository', (): void => {
     expect(venta.cliente_public_id).toBe('cliente-2');
 
     await requireRepository().cambiarCliente(idVenta, null);
+
+    expect(await getTicketRevision(dataSource, idVenta)).toEqual({
+      ticket_revision: 3,
+      ticket_pdf_revision: 0,
+    });
 
     const ventaSinCliente: VentaClienteRow = await queryOne<VentaClienteRow>(
       dataSource,
@@ -167,6 +182,11 @@ describe('TypeOrmVentasPostventaRepository', (): void => {
 
     await requireRepository().cambiarTipoPago(idVenta, 'tipo-pago-tarjeta');
 
+    expect(await getTicketRevision(dataSource, idVenta)).toEqual({
+      ticket_revision: 2,
+      ticket_pdf_revision: 0,
+    });
+
     expect(await getPago(dataSource, idVenta)).toEqual({
       tipo_pago_public_id: 'tipo-pago-tarjeta',
       importe_cents: 1_800,
@@ -211,6 +231,11 @@ describe('TypeOrmVentasPostventaRepository', (): void => {
 
     await requireRepository().cambiarTipoPago(idVenta, 'tipo-pago-efectivo');
 
+    expect(await getTicketRevision(dataSource, idVenta)).toEqual({
+      ticket_revision: 2,
+      ticket_pdf_revision: 0,
+    });
+
     expect(await getPago(dataSource, idVenta)).toEqual({
       tipo_pago_public_id: 'tipo-pago-efectivo',
       importe_cents: 1_800,
@@ -253,6 +278,11 @@ describe('TypeOrmVentasPostventaRepository', (): void => {
 
     await requireRepository().cambiarTipoPago(idVenta, 'tipo-pago-efectivo');
 
+    expect(await getTicketRevision(dataSource, idVenta)).toEqual({
+      ticket_revision: 2,
+      ticket_pdf_revision: 0,
+    });
+
     expect(await getPago(dataSource, idVenta)).toEqual({
       tipo_pago_public_id: 'tipo-pago-efectivo',
       importe_cents: -1_800,
@@ -293,6 +323,11 @@ describe('TypeOrmVentasPostventaRepository', (): void => {
 
     await insertPago(dataSource, idVenta, 'pago-multipago-2', 'tipo-pago-tarjeta', 1, 800, null, 0);
 
+    expect(await getTicketRevision(dataSource, idVenta)).toEqual({
+      ticket_revision: 1,
+      ticket_pdf_revision: 0,
+    });
+
     await expect(requireRepository().cambiarTipoPago(idVenta, 'tipo-pago-tarjeta')).rejects.toThrow(
       'Solo se puede cambiar el tipo de pago de una venta con un único pago.',
     );
@@ -321,6 +356,11 @@ describe('TypeOrmVentasPostventaRepository', (): void => {
         WHERE public_id = 'caja-1'
       `,
     );
+
+    expect(await getTicketRevision(dataSource, idVenta)).toEqual({
+      ticket_revision: 1,
+      ticket_pdf_revision: 0,
+    });
 
     await expect(requireRepository().cambiarTipoPago(idVenta, 'tipo-pago-tarjeta')).rejects.toThrow(
       'No se puede cambiar el tipo de pago porque la caja original ya está cerrada.',
@@ -364,6 +404,11 @@ describe('TypeOrmVentasPostventaRepository', (): void => {
       `,
       [Number.MAX_SAFE_INTEGER],
     );
+
+    expect(await getTicketRevision(dataSource, idVenta)).toEqual({
+      ticket_revision: 1,
+      ticket_pdf_revision: 0,
+    });
 
     await expect(requireRepository().cambiarTipoPago(idVenta, 'tipo-pago-tarjeta')).rejects.toThrow(
       'El número de operaciones del nuevo tipo de pago supera el rango numérico seguro.',
@@ -819,6 +864,26 @@ async function getCaja(dataSource: DataSource): Promise<CajaRow> {
       FROM caja
       WHERE public_id = 'caja-1'
     `,
+  );
+}
+
+/**
+ * Recupera el estado documental de una venta.
+ */
+async function getTicketRevision(
+  dataSource: DataSource,
+  idVenta: number,
+): Promise<TicketRevisionRow> {
+  return queryOne<TicketRevisionRow>(
+    dataSource,
+    `
+      SELECT
+        ticket_revision,
+        ticket_pdf_revision
+      FROM venta
+      WHERE id = ?
+    `,
+    [idVenta],
   );
 }
 

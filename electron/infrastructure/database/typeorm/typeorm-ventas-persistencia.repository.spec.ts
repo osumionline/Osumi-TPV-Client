@@ -310,6 +310,8 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
       empleadoNombre: 'Empleado test',
       clienteNombre: null,
       totalCents: 2_200,
+      ticketRevision: 1,
+      ticketPdfRevision: 0,
       pagos: [
         {
           nombre: 'Efectivo',
@@ -1746,6 +1748,16 @@ async function queryRows<T>(
 }
 
 class NoopVentaTicketPdfStorage implements VentaTicketPdfStorage {
+  /**
+   * Simula que todavía no existe un PDF materializado.
+   */
+  exists(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+
+  /**
+   * Descarta el PDF recibido durante este test.
+   */
   save(): Promise<void> {
     return Promise.resolve();
   }

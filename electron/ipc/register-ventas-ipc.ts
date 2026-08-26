@@ -131,10 +131,10 @@ export default function registerVentasIpc(
 
   ipcMain.handle(
     IPC_CHANNELS.ventasSaveTicketPdf,
-    async (event, idVenta: number, pdf: Uint8Array): Promise<void> => {
+    async (event, idVenta: number, ticketRevision: number, pdf: Uint8Array): Promise<void> => {
       assertTrustedSender(event, getMainWindow);
 
-      await ventasTicketsService.savePdf(idVenta, pdf);
+      await ventasTicketsService.savePdf(idVenta, ticketRevision, pdf);
     },
   );
 

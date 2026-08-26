@@ -18,8 +18,7 @@ export default class VentasTicketsService {
   ) {}
 
   /**
-   * Recupera el snapshot persistido necesario para generar
-   * el ticket definitivo de una venta.
+   * Recupera el snapshot documental vigente de una venta.
    */
   async getByVentaId(idVenta: number): Promise<VentaTicketInterface | null> {
     this.validateVentaId(idVenta);
@@ -40,6 +39,8 @@ export default class VentasTicketsService {
       empleadoNombre: venta.empleadoNombre,
       clienteNombre: venta.clienteNombre,
       totalCents: venta.totalCents,
+      ticketRevision: venta.ticketRevision,
+      ticketPdfRevision: venta.ticketPdfRevision,
       pagos: venta.pagos.map((pago: VentaTicketPagoRecord): VentaTicketPagoInterface => ({
         nombre: pago.nombre,
         importeCents: pago.importeCents,
@@ -60,14 +61,14 @@ export default class VentasTicketsService {
   }
 
   /**
-   * Conserva el PDF histórico correspondiente a una venta
-   * que ya existe definitivamente en SQLite.
+   * Materializa exactamente la revisión documental indicada.
    *
-   * La existencia de la venta se verifica antes de entregar
-   * el documento al almacenamiento write-once.
+   * Una revisión que haya quedado obsoleta durante el render
+   * nunca puede marcarse como PDF vigente.
    */
-  async savePdf(idVenta: number, pdf: Uint8Array): Promise<void> {
+  async savePdf(idVenta: number, expectedRevision: number, pdf: Uint8Array): Promise<void> {
     this.validateVentaId(idVenta);
+    this.validateTicketRevision(expectedRevision);
 
     const venta: VentaTicketRecord | null =
       await this.ventasTicketsRepository.findByVentaId(idVenta);
@@ -76,12 +77,44 @@ export default class VentasTicketsService {
       throw new Error('No se ha encontrado la venta asociada al PDF del ticket.');
     }
 
+    if (venta.ticketRevision !== expectedRevision) {
+      throw new Error('El ticket ha cambiado mientras se generaba el PDF.');
+    }
+
+    if (
+      venta.ticketPdfRevision === expectedRevision &&
+      (await this.ventaTicketPdfStorage.exists(idVenta))
+    ) {
+      return;
+    }
+
     await this.ventaTicketPdfStorage.save(idVenta, pdf);
+
+    const marked: boolean = await this.ventasTicketsRepository.markPdfRevision(
+      idVenta,
+      expectedRevision,
+    );
+
+    if (!marked) {
+      throw new Error('El ticket ha cambiado mientras se guardaba el PDF.');
+    }
   }
 
+  /**
+   * Valida el identificador interno de una venta.
+   */
   private validateVentaId(idVenta: number): void {
     if (!Number.isSafeInteger(idVenta) || idVenta <= 0) {
       throw new RangeError('El identificador de la venta no es válido.');
+    }
+  }
+
+  /**
+   * Valida una revisión documental esperada.
+   */
+  private validateTicketRevision(revision: number): void {
+    if (!Number.isSafeInteger(revision) || revision <= 0) {
+      throw new RangeError('La revisión del ticket no es válida.');
     }
   }
 }
