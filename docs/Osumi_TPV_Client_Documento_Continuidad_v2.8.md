@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.7  
+**Versión:** 2.8  
 **Fecha:** 26 de agosto de 2026  
-**Estado:** Installation, importación legacy, Startup, auditoría/refactor transversal y los bloques **Ventas 1–11** están completados, probados y subidos. En **Ventas 12 — Postventa**, el análisis 12A y el diseño 12B están cerrados salvo la semántica TicketBAI de devoluciones/operaciones mixtas, pendiente de Berein. La implementación 12C está avanzada: **12C.1 — Infraestructura del Histórico**, **12C.2 — Filtros/listado/totales**, **12C.3 — Detalle** y **12C.4 — Correcciones postventa** están completados, probados manualmente y subidos. El siguiente bloque es **12C.5 — Pipeline documental postventa**, donde se introducirá versionado/archivo del PDF vigente y la noción de revisión documental para que cambios postventa como cliente, pago o futura aceptación TicketBAI puedan regenerar el ticket sin perder versiones anteriores. La prueba física con **Star TSP100/TSP143 de 80 mm** sigue pendiente y no bloquea el desarrollo.
+**Estado:** Installation, importación legacy, Startup, auditoría/refactor transversal y los bloques **Ventas 1–11** están completados, probados y subidos. En **Ventas 12 — Postventa**, el análisis 12A y el diseño 12B están cerrados salvo la semántica TicketBAI de devoluciones/operaciones mixtas, pendiente de Berein. La implementación 12C está avanzada: **12C.1 — Infraestructura del Histórico**, **12C.2 — Filtros/listado/totales**, **12C.3 — Detalle**, **12C.4 — Correcciones postventa** y **12C.5 — Pipeline documental postventa** están completados, probados manualmente y subidos. El siguiente bloque es **12C.6 — Impresión**, centrado en reimpresión del ticket vigente y ticket regalo bajo demanda reutilizando el pipeline documental ya versionado. La prueba física con **Star TSP100/TSP143 de 80 mm** sigue pendiente y no bloquea el desarrollo.
 
 ---
 
@@ -32,7 +32,8 @@ Debe tratarse como un documento vivo. Al completar un bloque principal de Ventas
 - Ventas 12C.2: completado.
 - Ventas 12C.3: completado.
 - Ventas 12C.4: completado, probado manualmente y subido.
-- Ventas 12C.5: **siguiente bloque** — pipeline documental postventa.
+- Ventas 12C.5: completado, probado manualmente y subido.
+- Ventas 12C.6: **siguiente bloque** — reimpresión y ticket regalo.
 - Hardware Star TSP100/TSP143 80 mm: prueba física pendiente y no bloqueante.
 
 Estado resumido:
@@ -51,8 +52,8 @@ Ventas 12C.1 Histórico infraestructura      ✅
 Ventas 12C.2 Filtros/listado/totales        ✅
 Ventas 12C.3 Detalle                        ✅
 Ventas 12C.4 Correcciones postventa         ✅
-Ventas 12C.5 Pipeline documental            🟦 siguiente
-Ventas 12C.6 Impresión                      ⬜
+Ventas 12C.5 Pipeline documental            ✅
+Ventas 12C.6 Impresión                      🟦 siguiente
 Ventas 12C.7 Email                          ⬜
 Ventas 12C.8 TicketBAI ordinario            ⬜
 Ventas 12C.9 TicketBAI devoluciones         ⏸️ Berein
@@ -938,6 +939,155 @@ Todos pasan. El wiring Electron también fue validado previamente con `npm run b
 
 La aplicación se probó manualmente y los flujos de corrección de cliente y tipo de pago funcionan correctamente. Todos los cambios están subidos al repositorio.
 
+## 8.5 12C.5 — Pipeline documental postventa ✅
+
+Este bloque convierte el ticket PDF de Ventas 11, originalmente write-once, en un documento **vigente + versiones históricas archivadas**, con control explícito de revisión documental y protección frente a carreras entre Angular, SQLite y filesystem. Está **completado, probado manualmente y subido**.
+
+### 8.5.1 Revisión documental en `venta` ✅
+
+Se añadieron a `venta`:
+
+```text
+ticket_revision     INTEGER NOT NULL DEFAULT 1
+ticket_pdf_revision INTEGER NOT NULL DEFAULT 0
+```
+
+Invariantes:
+
+```text
+ticket_revision >= 1
+ticket_pdf_revision >= 0
+ticket_pdf_revision <= ticket_revision
+```
+
+Semántica:
+
+```text
+ticket_revision
+= versión de los datos comerciales/fiscales que debería representar el ticket
+
+ticket_pdf_revision
+= última revisión que SQLite sabe materializada correctamente como PDF vigente
+```
+
+Venta recién persistida:
+
+```text
+1 / 0
+```
+
+PDF generado correctamente:
+
+```text
+1 / 1
+```
+
+### 8.5.2 Integración transaccional con Postventa ✅
+
+`TypeOrmVentasPostventaRepository` incrementa `ticket_revision` dentro de la misma transacción SQLite cuando cambia materialmente:
+
+- el cliente;
+- el único tipo de pago.
+
+Los no-op no incrementan revisión. Si la corrección hace rollback, la revisión tampoco cambia.
+
+Así nunca puede confirmarse una corrección comercial con una revisión documental antigua.
+
+### 8.5.3 Snapshot documental revision-aware ✅
+
+`VentaTicketRecord` y `VentaTicketInterface` incluyen:
+
+```text
+ticketRevision
+ticketPdfRevision
+```
+
+`TypeOrmVentasTicketsRepository` los recupera junto al snapshot comercial.
+
+El guardado de PDF ya no recibe solo `idVenta + pdf`; recibe también la revisión exacta que produjo ese documento:
+
+```text
+savePdf(idVenta, expectedRevision, pdf)
+```
+
+### 8.5.4 Protección frente a carreras ✅
+
+Flujo:
+
+```text
+getTicket() → revisión N
+↓
+construir HTML
+↓
+renderPdf()
+↓
+savePdf(idVenta, N, pdf)
+```
+
+Backend relee SQLite antes de tocar filesystem. Si `ticket_revision !== N`, rechaza el PDF como obsoleto.
+
+Después de guardar físicamente, `markPdfRevision(idVenta, N)` confirma la revisión solo si `ticket_revision` sigue siendo N. Si otra operación incrementó la revisión durante el guardado, el PDF no se marca como vigente.
+
+SQLite es la fuente de verdad; no se pretende una transacción distribuida ficticia entre SQLite y filesystem. Una inconsistencia física queda detectable por:
+
+```text
+ticket_revision != ticket_pdf_revision
+```
+
+### 8.5.5 Versionado físico de PDFs ✅
+
+Política final:
+
+```text
+{id}.pdf             → PDF vigente
+{id}_{timestamp}.pdf → revisión anterior archivada e inmutable
+```
+
+El timestamp es compatible con Windows.
+
+El storage:
+
+1. valida y escribe el nuevo PDF en temporal;
+2. si existe `{id}.pdf`, lo renombra a histórico;
+3. promueve el temporal como `{id}.pdf`;
+4. si falla la promoción, intenta restaurar el PDF anterior;
+5. limpia temporales sin ocultar el error principal.
+
+También expone `exists(idVenta)`. Si SQLite marca una revisión como materializada pero el archivo ha desaparecido físicamente, se permite regenerarlo.
+
+### 8.5.6 Regeneración tras correcciones postventa ✅
+
+Después del COMMIT de cambio de cliente o pago, `HistoricalSalesComponent` intenta regenerar el PDF mediante `VentaTicketDocumentService`.
+
+Es una tarea post-COMMIT no crítica:
+
+```text
+corrección guardada
+↓
+regeneración PDF
+   ├─ éxito → ticket_revision == ticket_pdf_revision
+   └─ fallo → corrección sigue válida y se muestra aviso
+```
+
+Un fallo documental nunca revierte cliente, pago, Caja ni la venta.
+
+### 8.5.7 Tests y validación final ✅
+
+Se añadieron/ajustaron tests para:
+
+- revisión inicial `1 / 0`;
+- incremento de revisión en cambios postventa reales;
+- ausencia de incremento en errores/rollback;
+- snapshot de ticket con revisiones;
+- rechazo de revisión obsoleta antes de guardar;
+- idempotencia si revisión y archivo ya están materializados;
+- regeneración si falta físicamente el PDF;
+- rechazo si la revisión cambia durante el guardado;
+- versionado físico y archivo del PDF anterior;
+- propagación de la revisión exacta desde Angular al backend.
+
+El usuario confirmó batería completa verde, prueba manual correcta, valores `ticket_revision` / `ticket_pdf_revision` correctos en SQLite y PDFs vigentes/históricos correctamente creados. Todos los cambios están subidos.
+
 ---
 
 # 9. Reglas funcionales de Postventa que no deben perderse
@@ -948,7 +1098,7 @@ La aplicación se probó manualmente y los flujos de corrección de cliente y ti
 - asignar o quitar cliente;
 - backend revalida aunque la UI lo muestre habilitado;
 - después del cambio deben invalidarse estadísticas del cliente anterior y del nuevo;
-- no regenerar todavía PDF en 12C.4: la política documental llega en 12C.5.
+- tras un cambio material, `ticket_revision` aumenta dentro de la transacción y el PDF se regenera post-COMMIT mediante el pipeline de 12C.5.
 
 ## 9.2 Cambio de pago
 
@@ -972,56 +1122,48 @@ Todas las mutaciones de Caja deben estar dentro de la misma transacción SQLite.
 
 ## 9.3 Documento histórico tras correcciones
 
-Tras cerrar 12C.4, una corrección puede dejar el PDF vigente conceptualmente desactualizado.
+12C.5 está cerrado. Cualquier corrección que modifique el contenido documental incrementa `ticket_revision` dentro de la misma transacción SQLite.
 
-Esto es deliberado hasta entrar en 12C.5.
+El PDF vigente se materializa después del COMMIT. Si la regeneración funciona, `ticket_pdf_revision` alcanza la misma revisión. Si falla, la corrección permanece guardada y el desfase entre ambas revisiones identifica que el PDF está pendiente/desactualizado.
 
-12C.5 introducirá la revisión/versionado documental y será el punto correcto para regenerar/archivar PDFs tras cambios postventa.
+Nunca revertir una venta o corrección por un fallo de generación/archivo del PDF.
 
 ---
 
 # 10. Diseño de los siguientes bloques
 
-## 10.1 12C.5 — Pipeline documental postventa 🟦 SIGUIENTE
+## 10.1 12C.5 — Pipeline documental postventa ✅
 
-Objetivo: convertir el PDF de ticket de Ventas 11, actualmente write-once, en un documento **vigente + versiones archivadas**.
-
-Política diseñada:
+Cerrado. Política final:
 
 ```text
 {id}.pdf             → versión vigente
 {id}_{timestamp}.pdf → versión anterior archivada e inmutable
 ```
 
-Nunca borrar primero el documento vigente.
+SQLite mantiene `ticket_revision` y `ticket_pdf_revision`; el guardado es revision-aware y las correcciones postventa regeneran el ticket tras COMMIT sin comprometer la operación comercial.
 
-Cambios que pueden provocar una nueva revisión documental:
+Este mismo mecanismo queda preparado para una futura aceptación/reintento TicketBAI que modifique el contenido fiscal del ticket.
 
-- cambio de cliente;
-- cambio de tipo de pago;
-- aceptación/reintento TicketBAI;
-- futuros cambios que modifiquen contenido documental.
+## 10.2 12C.6 — Impresión 🟦 SIGUIENTE
 
-La arquitectura prevista incluye distinguir la **revisión de datos documentales de la venta** de la **revisión del PDF materializado** (`ticket_revision` / `ticket_pdf_revision` o equivalente final tras revisar el esquema actual). Así puede detectarse un PDF desactualizado y regenerarlo de forma segura.
+Objetivo:
 
-Antes de implementar debe revisarse el estado actual de:
+- permitir reimprimir desde Histórico el ticket vigente de cualquier venta nueva o legacy;
+- generar e imprimir ticket regalo bajo demanda;
+- no persistir el ticket regalo como histórico separado;
+- reutilizar la infraestructura de impresión silenciosa ya existente;
+- un fallo de impresión nunca modifica venta ni revisiones documentales.
 
-- schema de `venta`;
-- `VentasTicketsService`;
-- `VentasTicketsRepository`;
-- `VentaTicketPdfStorage`;
-- `FileVentaTicketPdfStorage`;
-- servicio Angular `VentaTicketDocumentService`;
-- tests existentes del ticket/PDF.
+Reglas de ticket regalo ya cerradas:
 
-Al cerrar este bloque, una corrección postventa deberá poder dejar el ticket vigente actualizado sin perder la versión anterior y sin invalidar nunca la venta si falla la generación del PDF.
+- mantener negocio, fecha, referencia, empleado, artículos/cantidades, QR comercial, frases y futuros datos fiscales aplicables;
+- ocultar cliente, PVP, descuentos, importes de línea, total, pagos, entregado/cambio e IVA;
+- mostrar claramente `TICKET REGALO`;
+- en operación mixta, incluir solo líneas positivas;
+- devolución pura: deshabilitado.
 
-## 10.2 12C.6 — Impresión
-
-- reimprimir ticket vigente;
-- ticket regalo bajo demanda;
-- impresión silenciosa con infraestructura existente;
-- fallo de impresión no cambia la venta.
+Antes de implementar debe revisarse el builder HTML actual del ticket, la infraestructura de impresión y la UI actual del detalle Histórico para decidir la forma más simple de reutilizar el documento vigente y construir la variante regalo.
 
 ## 10.3 12C.7 — Email
 
@@ -1142,13 +1284,22 @@ Pruebas manuales de 12C.4 realizadas y validadas:
 
 Los casos de caja cerrada, multipago, total cero, venta facturada y rollback están además cubiertos por backend/tests automatizados.
 
+Pruebas manuales de 12C.5 realizadas y validadas:
+
+- venta nueva termina con revisión documental/PDF sincronizadas tras generar el ticket;
+- cambio de cliente incrementa revisión, regenera `{id}.pdf` y archiva la versión anterior;
+- cambio de pago vuelve a incrementar revisión y archiva una segunda versión;
+- `ticket_revision` y `ticket_pdf_revision` se comprobaron directamente en SQLite;
+- los PDFs vigentes e históricos se comprobaron físicamente en el directorio de tickets;
+- batería completa verde y cambios subidos al repositorio.
+
 ---
 
 # 13. Limitaciones / bloqueos conocidos
 
 1. **TicketBAI devoluciones/operaciones mixtas**: pendiente de Berein.
 2. **Star TSP100/TSP143 80 mm**: prueba física pendiente, no bloqueante.
-3. **PDF postventa**: 12C.4 ya está cerrado y el PDF puede quedar desactualizado tras una corrección; 12C.5 debe resolverlo mediante versionado/revisión documental.
+3. **PDF postventa**: resuelto en 12C.5 mediante revisiones y versionado físico. Un fallo post-COMMIT puede dejar `ticket_revision != ticket_pdf_revision`, pero nunca invalida la venta/corrección.
 4. GitHub Raw puede devolver contenido cacheado/stale; si no se puede verificar frescura, usar archivos adjuntos actuales.
 
 ---
@@ -1157,7 +1308,7 @@ Los casos de caja cerrada, multipago, total cero, venta facturada y rollback est
 
 Continuar por:
 
-# Ventas 12C.5 — Pipeline documental postventa
+# Ventas 12C.6 — Impresión
 
 Estado de entrada al siguiente turno:
 
@@ -1166,33 +1317,35 @@ Estado de entrada al siguiente turno:
 12C.2 Filtros/listado/totales                 ✅
 12C.3 Detalle                                 ✅
 12C.4 Correcciones postventa                  ✅
-12C.5 Pipeline documental                     🟦 siguiente
-12C.6 Impresión                               ⬜
+12C.5 Pipeline documental                     ✅
+12C.6 Impresión                               🟦 siguiente
 12C.7 Email                                   ⬜
 12C.8 TicketBAI ordinario                     ⬜
 12C.9 TicketBAI devoluciones                  ⏸️ Berein
 12C.10 Regresión/cierre                       ⬜
 ```
 
-Punto de partida de 12C.5:
+Punto de partida de 12C.6:
 
-1. revisar la implementación actual de ticket/PDF de Ventas 11;
-2. revisar schema actual de `venta` y decidir la forma final de `ticket_revision` / `ticket_pdf_revision`;
-3. diseñar el flujo seguro de archivo + generación del PDF vigente;
-4. adaptar storage/backend/servicio Angular;
-5. conectar cambio de cliente/pago para provocar revisión documental;
-6. cubrir versionado, errores y compatibilidad con tickets legacy mediante tests;
-7. batería completa + prueba manual;
-8. cerrar 12C.5 y actualizar este documento.
+1. revisar el builder HTML actual del ticket normal y sus tests;
+2. revisar `PrintingService`/contratos e implementación Electron de impresión;
+3. revisar el servicio Angular actual de documento de ticket y el detalle Histórico;
+4. decidir si la reimpresión debe usar el HTML revision-aware actual o el PDF vigente sin introducir complejidad innecesaria;
+5. implementar acción real **Reimprimir ticket** en Histórico;
+6. implementar variante **Ticket regalo** bajo demanda con las reglas funcionales ya cerradas;
+7. mantener el ticket regalo fuera del histórico documental persistido;
+8. cubrir normal, operación mixta y devolución pura;
+9. batería completa + prueba manual;
+10. cerrar 12C.6 y actualizar este documento.
 
-Regla ya cerrada: un fallo documental post-COMMIT **no puede invalidar ni revertir la venta ni la corrección postventa**.
+Regla ya cerrada: un fallo de impresión **no cambia la venta, Caja, `ticket_revision` ni `ticket_pdf_revision`**.
 
 ---
 
 # 15. Prompt de arranque para una conversación nueva
 
 ```text
-Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” versión 2.7 como contexto principal.
+Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” versión 2.8 como contexto principal.
 
 Estado general:
 - Installation + importación `.otpv` v2: completadas y probadas.
@@ -1203,39 +1356,34 @@ Estado general:
 - Ventas 12C.1 — Infraestructura del Histórico: completado.
 - Ventas 12C.2 — Filtros/listado/totales: completado.
 - Ventas 12C.3 — Detalle: completado.
-- Ventas 12C.4 — Correcciones postventa: COMPLETADO, probado y subido.
-- Ventas 12C.5 — Pipeline documental postventa: SIGUIENTE.
+- Ventas 12C.4 — Correcciones postventa: completado, probado y subido.
+- Ventas 12C.5 — Pipeline documental postventa: COMPLETADO, probado y subido.
+- Ventas 12C.6 — Impresión: SIGUIENTE.
 
-Histórico actual:
-- modal workspace ~95vw/95vh;
-- Fecha/Rango;
-- listado fecha/importe/iconos cliente-TicketBAI/pagos;
-- agregados total/ticket medio/tipos de pago/beneficio;
-- detalle bajo demanda con protección stale;
-- snapshots localizador/marca;
-- acciones reales Cambiar cliente y Cambiar tipo de pago.
+12C.5 cerrado:
+- `venta` tiene `ticket_revision` y `ticket_pdf_revision`;
+- venta nueva comienza 1/0 y el PDF generado la lleva a 1/1;
+- cambio material de cliente/pago incrementa `ticket_revision` dentro de la misma transacción;
+- `VentaTicketRecord` / `VentaTicketInterface` incluyen revisiones;
+- `savePdf(idVenta, expectedRevision, pdf)` rechaza snapshots obsoletos;
+- `markPdfRevision` solo confirma si la revisión sigue vigente;
+- `{id}.pdf` es vigente y `{id}_{timestamp}.pdf` archiva versiones anteriores;
+- el storage usa temporal, archivo previo y restauración defensiva;
+- si falta físicamente un PDF marcado vigente, se puede regenerar;
+- cambio cliente/pago regenera PDF post-COMMIT;
+- fallo documental no revierte la corrección;
+- tests de carrera/versionado verdes;
+- comprobados manualmente campos de SQLite y PDFs archivados/vigentes.
 
-12C.4 cerrado:
-- `VentasPostventaService` + repository transaccional;
-- cliente bloqueado si venta facturada;
-- cambio pago exige total != 0 + un pago + caja original abierta;
-- traslado `caja_tipo` y cierre teórico atómico;
-- normalización efectivo/no efectivo;
-- tests SQLite con rollback;
-- IPC/preload/Angular completos;
-- selector de cliente reutilizado sobre Histórico;
-- selector inline de tipo de pago;
-- invalidación estadísticas cliente viejo/nuevo;
-- refresco post-COMMIT de detalle/listado/resumen;
-- toda la batería pasa y la aplicación se ha probado manualmente.
-
-Siguiente paso exacto — 12C.5:
-- revisar schema actual de venta;
-- revisar `VentasTicketsService`, repository, `VentaTicketPdfStorage`, `FileVentaTicketPdfStorage`, `VentaTicketDocumentService` y tests;
-- convertir `{id}.pdf` write-once en PDF vigente con archivo `{id}_{timestamp}.pdf`;
-- introducir revisión documental (`ticket_revision` / `ticket_pdf_revision` o equivalente final);
-- cambio cliente/pago debe poder provocar regeneración/versionado post-COMMIT;
-- un fallo de PDF nunca invalida la venta/corrección.
+Siguiente paso exacto — 12C.6:
+- reimpresión desde Histórico;
+- ticket regalo bajo demanda, no persistido;
+- mantener negocio, fecha, referencia, empleado, artículos/cantidades, QR comercial, frases y futuros datos fiscales;
+- ocultar cliente, precios, descuentos, importes, total, pagos, entregado/cambio e IVA;
+- marcar `TICKET REGALO`;
+- operación mixta: solo líneas positivas;
+- devolución pura: deshabilitado;
+- fallo de impresión nunca modifica venta ni revisiones documentales.
 
 Reglas de trabajo:
 - al inicio de cada bloque/subpaso, mostrar lista completa ✅/🟦/⬜/⏸️ y explicar el objetivo;
@@ -1270,4 +1418,5 @@ La prueba física Star TSP100/TSP143 de 80 mm sigue pendiente pero no bloquea Po
 | 2.4 | 23-08-2026 | Diseño 12B prácticamente cerrado; pausa para rediseño de Finalizar venta. |
 | 2.5 | 24-08-2026 | Rediseño Finalizar venta cerrado; 12C listo para comenzar. |
 | 2.6 | 25-08-2026 | 12C.1, 12C.2 y 12C.3 completados. 12C.4 avanzado: contratos, servicio backend, repository transaccional y tests SQLite reales completados y subidos. |
-| **2.7** | **26-08-2026** | **12C.4 completado, probado manualmente y subido: backend transaccional, tests, IPC/preload, Angular, UI, invalidación de estadísticas y refresco Histórico. Siguiente: 12C.5 Pipeline documental postventa.** |
+| 2.7 | 26-08-2026 | 12C.4 completado, probado manualmente y subido: backend transaccional, tests, IPC/preload, Angular, UI, invalidación de estadísticas y refresco Histórico. Siguiente: 12C.5 Pipeline documental postventa. |
+| **2.8** | **26-08-2026** | **12C.5 completado y validado: revisiones documentales en SQLite, guardado revision-aware, versionado físico de PDFs, regeneración postventa y tests de carrera. Siguiente: 12C.6 Impresión/reimpresión y ticket regalo.** |
