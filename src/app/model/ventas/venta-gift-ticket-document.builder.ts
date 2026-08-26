@@ -202,14 +202,6 @@ export default function buildVentaGiftTicketDocument(
       overflow-wrap: anywhere;
     }
 
-    .gift-note {
-      margin-top: 4mm;
-      padding-top: 3mm;
-      border-top: 1px dashed #555;
-      font-size: 8pt;
-      text-align: center;
-    }
-
     .qr {
       width: 30mm;
       margin: 4mm auto 0;
@@ -315,10 +307,6 @@ export default function buildVentaGiftTicketDocument(
     <section class="lines">
       ${lineas.map((linea: VentaTicketLineaInterface): string => renderLinea(linea)).join('')}
     </section>
-
-    <div class="gift-note">
-      Ticket regalo sin información económica.
-    </div>
 
     <div
       class="qr"
