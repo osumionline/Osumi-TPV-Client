@@ -40,6 +40,11 @@ export default function createAppData(command: InstallationCommand, installedAt:
         }
       : null,
 
+    ticketEmail: {
+      subjectTemplate: command.ticketEmail.subjectTemplate,
+      bodyTemplate: command.ticketEmail.bodyTemplate,
+    },
+
     ticketBai: command.ticketBai.active
       ? {
           nif: command.ticketBai.nif,

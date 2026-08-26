@@ -68,6 +68,11 @@ export interface InstallationEmailSmtpFormModel {
   pass: string;
 }
 
+export interface InstallationTicketEmailFormModel {
+  subjectTemplate: string;
+  bodyTemplate: string;
+}
+
 export interface InstallationTicketBaiFormModel {
   active: boolean;
   nif: string;
@@ -89,6 +94,7 @@ export interface InstallationFormModel {
   fiscalidad: InstallationTaxFormModel;
   ventaOnline: InstallationOnlineStoreFormModel;
   emailSmtp: InstallationEmailSmtpFormModel;
+  ticketEmail: InstallationTicketEmailFormModel;
   ticketBai: InstallationTicketBaiFormModel;
   opciones: InstallationOptionsFormModel;
 }

@@ -80,6 +80,10 @@ export default class NewInstallationComponent {
   readonly logoError: WritableSignal<string> = signal<string>('');
   readonly saving: WritableSignal<boolean> = signal<boolean>(false);
 
+  readonly ticketEmailBusinessVariable: string = '{nombreNegocio}';
+  readonly ticketEmailReferenceVariable: string = '{referencia}';
+  readonly ticketEmailSubjectPlaceholder: string = '{nombreNegocio} - Ticket {referencia}';
+
   addLogo(): void {
     this.logoInput().nativeElement.click();
   }
@@ -235,6 +239,7 @@ export default class NewInstallationComponent {
         this.installationForm.ventaOnline().markAsTouched();
         this.installationForm.opciones().markAsTouched();
         this.installationForm.emailSmtp().markAsTouched();
+        this.installationForm.ticketEmail().markAsTouched();
         this.installationForm.ticketBai().markAsTouched();
         return !this.isStepThreeInvalid();
       }
@@ -257,6 +262,7 @@ export default class NewInstallationComponent {
     return (
       this.installationForm.ventaOnline().invalid() ||
       this.installationForm.emailSmtp().invalid() ||
+      this.installationForm.ticketEmail().invalid() ||
       this.installationForm.ticketBai().invalid() ||
       this.installationForm.opciones().invalid()
     );

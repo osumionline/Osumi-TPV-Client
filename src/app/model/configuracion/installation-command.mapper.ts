@@ -90,6 +90,12 @@ export default function createInstallationCommand(
       user: model.emailSmtp.active ? model.emailSmtp.user.trim() : '',
     },
 
+    ticketEmail: {
+      subjectTemplate: model.ticketEmail.subjectTemplate.trim(),
+
+      bodyTemplate: model.ticketEmail.bodyTemplate.trim(),
+    },
+
     ticketBai: {
       active: model.ticketBai.active,
       nif: model.ticketBai.active ? model.ticketBai.nif.trim() : '',

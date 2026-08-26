@@ -1,5 +1,6 @@
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type { InstallationValidationError } from '@desktop-contracts/configuration/installation-result.interface';
+import { TICKET_EMAIL_TEMPLATE_VARIABLES } from '@desktop-contracts/configuration/ticket-email-config.interface';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -57,6 +58,7 @@ export function isInstallationCommand(value: unknown): value is InstallationComm
   const logo: unknown = value['logo'];
   const ticket: unknown = value['ticket'];
   const emailSmtp: unknown = value['emailSmtp'];
+  const ticketEmail: unknown = value['ticketEmail'];
   const ticketBai: unknown = value['ticketBai'];
 
   if (
@@ -65,6 +67,7 @@ export function isInstallationCommand(value: unknown): value is InstallationComm
     !isRecord(redes) ||
     !isRecord(ticket) ||
     !isRecord(emailSmtp) ||
+    !isRecord(ticketEmail) ||
     !isRecord(ticketBai) ||
     !isRecord(valoresIniciales) ||
     !isRecord(fiscalidad) ||
@@ -121,6 +124,9 @@ export function isInstallationCommand(value: unknown): value is InstallationComm
       emailSmtp['secure'] === 'ssl') &&
     hasString(emailSmtp, 'user');
 
+  const validTicketEmail: boolean =
+    hasString(ticketEmail, 'subjectTemplate') && hasString(ticketEmail, 'bodyTemplate');
+
   const validTicketBai: boolean = hasBoolean(ticketBai, 'active') && hasString(ticketBai, 'nif');
 
   const validOptions: boolean =
@@ -141,6 +147,7 @@ export function isInstallationCommand(value: unknown): value is InstallationComm
     validSocial &&
     validTicket &&
     validEmailSmtp &&
+    validTicketEmail &&
     validTicketBai &&
     validInitialValues &&
     validTaxData &&
@@ -268,6 +275,36 @@ export function validateInstallationCommand(
     if (command.secretos.emailSmtpPass === null || command.secretos.emailSmtpPass === '') {
       addError('secretos.emailSmtpPass', 'La contraseña SMTP es obligatoria.');
     }
+
+    if (command.ticketEmail.subjectTemplate.trim() === '') {
+      addError('ticketEmail.subjectTemplate', 'El asunto del email del ticket es obligatorio.');
+    } else {
+      const unsupportedVariable: string | null = findUnsupportedTicketEmailVariable(
+        command.ticketEmail.subjectTemplate,
+      );
+
+      if (unsupportedVariable !== null) {
+        addError(
+          'ticketEmail.subjectTemplate',
+          `La variable ${unsupportedVariable} no está permitida en el asunto.`,
+        );
+      }
+    }
+
+    if (command.ticketEmail.bodyTemplate.trim() === '') {
+      addError('ticketEmail.bodyTemplate', 'El cuerpo del email del ticket es obligatorio.');
+    } else {
+      const unsupportedVariable: string | null = findUnsupportedTicketEmailVariable(
+        command.ticketEmail.bodyTemplate,
+      );
+
+      if (unsupportedVariable !== null) {
+        addError(
+          'ticketEmail.bodyTemplate',
+          `La variable ${unsupportedVariable} no está permitida en el cuerpo.`,
+        );
+      }
+    }
   } else if (command.secretos.emailSmtpPass !== null) {
     addError(
       'secretos.emailSmtpPass',
@@ -303,4 +340,21 @@ export function validateInstallationCommand(
   }
 
   return errors;
+}
+
+/**
+ * Busca la primera variable de plantilla de email
+ * que no forme parte del conjunto permitido.
+ */
+function findUnsupportedTicketEmailVariable(value: string): string | null {
+  const variables: readonly string[] = value.match(/\{[^{}]+\}/g) ?? [];
+
+  return (
+    variables.find(
+      (variable: string): boolean =>
+        !TICKET_EMAIL_TEMPLATE_VARIABLES.some(
+          (allowedVariable: string): boolean => allowedVariable === variable,
+        ),
+    ) ?? null
+  );
 }

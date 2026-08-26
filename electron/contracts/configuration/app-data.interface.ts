@@ -1,5 +1,6 @@
 import type EmailSmtpConfig from '@desktop-contracts/configuration/email-smtp-config.interface';
 import type TicketBaiConfig from '@desktop-contracts/configuration/ticket-bai-config.interface';
+import type { TicketEmailConfig } from '@desktop-contracts/configuration/ticket-email-config.interface';
 import type TipoIva from '@desktop-contracts/tipo-iva.type';
 
 export default interface AppData {
@@ -19,6 +20,7 @@ export default interface AppData {
   readonly instagram: string;
   readonly web: string;
   readonly frasesTicket: readonly string[];
+  readonly ticketEmail: TicketEmailConfig;
 
   readonly tipoIva: TipoIva;
   readonly ivaList: readonly number[];

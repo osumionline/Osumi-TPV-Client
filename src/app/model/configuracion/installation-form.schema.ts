@@ -1,4 +1,5 @@
 import { email, min, required, validate, type SchemaPathTree } from '@angular/forms/signals';
+import { TICKET_EMAIL_TEMPLATE_VARIABLES } from '@desktop-contracts/configuration/ticket-email-config.interface';
 import {
   InstallationFormModel,
   IvaOptionFormModel,
@@ -167,6 +168,50 @@ export default function installationFormSchema(path: SchemaPathTree<Installation
     return null;
   });
 
+  required(path.ticketEmail.subjectTemplate, {
+    message: 'El asunto del email es obligatorio.',
+    when: ({ valueOf }): boolean => valueOf(path.emailSmtp.active),
+  });
+
+  required(path.ticketEmail.bodyTemplate, {
+    message: 'El cuerpo del email es obligatorio.',
+    when: ({ valueOf }): boolean => valueOf(path.emailSmtp.active),
+  });
+
+  validate(path.ticketEmail.subjectTemplate, ({ value, valueOf }) => {
+    if (!valueOf(path.emailSmtp.active)) {
+      return null;
+    }
+
+    const unsupportedVariable: string | null = findUnsupportedTicketEmailVariable(value());
+
+    if (unsupportedVariable === null) {
+      return null;
+    }
+
+    return {
+      kind: 'unsupportedTicketEmailVariable',
+      message: `La variable ${unsupportedVariable} no está permitida en el asunto.`,
+    };
+  });
+
+  validate(path.ticketEmail.bodyTemplate, ({ value, valueOf }) => {
+    if (!valueOf(path.emailSmtp.active)) {
+      return null;
+    }
+
+    const unsupportedVariable: string | null = findUnsupportedTicketEmailVariable(value());
+
+    if (unsupportedVariable === null) {
+      return null;
+    }
+
+    return {
+      kind: 'unsupportedTicketEmailVariable',
+      message: `La variable ${unsupportedVariable} no está permitida en el cuerpo.`,
+    };
+  });
+
   // Paso 3: TicketBAI
 
   required(path.ticketBai.nif, {
@@ -198,4 +243,20 @@ export default function installationFormSchema(path: SchemaPathTree<Installation
       };
     }
   });
+}
+
+/**
+ * Busca la primera variable de plantilla no soportada.
+ */
+function findUnsupportedTicketEmailVariable(value: string): string | null {
+  const variables: readonly string[] = value.match(/\{[^{}]+\}/g) ?? [];
+
+  return (
+    variables.find(
+      (variable: string): boolean =>
+        !TICKET_EMAIL_TEMPLATE_VARIABLES.some(
+          (allowedVariable: string): boolean => allowedVariable === variable,
+        ),
+    ) ?? null
+  );
 }

@@ -8,6 +8,10 @@ import type {
   InstallationSecretsData,
 } from '@desktop-contracts/configuration/installation-command.interface';
 import type TicketBaiConfig from '@desktop-contracts/configuration/ticket-bai-config.interface';
+import {
+  DEFAULT_TICKET_EMAIL_BODY_TEMPLATE,
+  DEFAULT_TICKET_EMAIL_SUBJECT_TEMPLATE,
+} from '@desktop-contracts/configuration/ticket-email-config.interface';
 import type TipoIva from '@desktop-contracts/tipo-iva.type';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
@@ -183,6 +187,10 @@ export default class YauzlLegacyImportPackageConfigurationReader implements Lega
       instagram: this.getDecodedString(source, 'instagram'),
       web: this.getDecodedString(source, 'web'),
       frasesTicket: [],
+      ticketEmail: {
+        subjectTemplate: DEFAULT_TICKET_EMAIL_SUBJECT_TEMPLATE,
+        bodyTemplate: DEFAULT_TICKET_EMAIL_BODY_TEMPLATE,
+      },
       tipoIva: this.getTaxType(source),
       ivaList: this.getNumberArray(source, 'ivaList', true),
       reList: this.getNumberArray(source, 'reList', false),

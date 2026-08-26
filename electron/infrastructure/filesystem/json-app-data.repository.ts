@@ -2,6 +2,11 @@ import type AppDataRepository from '@backend/contracts/configuration/app-data.re
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type EmailSmtpConfig from '@desktop-contracts/configuration/email-smtp-config.interface';
 import type TicketBaiConfig from '@desktop-contracts/configuration/ticket-bai-config.interface';
+import {
+  DEFAULT_TICKET_EMAIL_BODY_TEMPLATE,
+  DEFAULT_TICKET_EMAIL_SUBJECT_TEMPLATE,
+  type TicketEmailConfig,
+} from '@desktop-contracts/configuration/ticket-email-config.interface';
 import { readFile, rename, rm, writeFile } from 'node:fs/promises';
 
 function isFileNotFoundError(error: unknown): boolean {
@@ -40,6 +45,20 @@ function isEmailSmtpConfig(value: unknown): value is EmailSmtpConfig {
   );
 }
 
+/**
+ * Comprueba la estructura persistida de la configuración
+ * de las plantillas de email del ticket.
+ */
+function isTicketEmailConfig(value: unknown): value is TicketEmailConfig {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const data: Record<string, unknown> = value as Record<string, unknown>;
+
+  return typeof data['subjectTemplate'] === 'string' && typeof data['bodyTemplate'] === 'string';
+}
+
 function isTicketBaiConfig(value: unknown): value is TicketBaiConfig {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return false;
@@ -50,8 +69,9 @@ function isTicketBaiConfig(value: unknown): value is TicketBaiConfig {
   return isNullableString(data['nif']);
 }
 
-type StoredAppData = Omit<AppData, 'frasesTicket' | 'emailSmtp' | 'ticketBai'> & {
+type StoredAppData = Omit<AppData, 'frasesTicket' | 'ticketEmail' | 'emailSmtp' | 'ticketBai'> & {
   readonly frasesTicket?: readonly string[];
+  readonly ticketEmail?: TicketEmailConfig;
   readonly emailSmtp?: EmailSmtpConfig | null;
   readonly ticketBai?: TicketBaiConfig | null;
 };
@@ -99,6 +119,9 @@ function isStoredAppData(value: unknown): value is StoredAppData {
   const validTicketPhrases: boolean =
     data['frasesTicket'] === undefined || isStringArray(data['frasesTicket']);
 
+  const validTicketEmail: boolean =
+    data['ticketEmail'] === undefined || isTicketEmailConfig(data['ticketEmail']);
+
   const validEmailSmtp: boolean =
     data['emailSmtp'] === undefined ||
     data['emailSmtp'] === null ||
@@ -114,6 +137,7 @@ function isStoredAppData(value: unknown): value is StoredAppData {
     validBooleans &&
     validNumbers &&
     validTicketPhrases &&
+    validTicketEmail &&
     validEmailSmtp &&
     validTicketBai &&
     isNumberArray(data['ivaList']) &&
@@ -146,7 +170,20 @@ export default class JsonAppDataRepository implements AppDataRepository {
 
       return {
         ...parsed,
+
         frasesTicket: parsed.frasesTicket === undefined ? [] : [...parsed.frasesTicket],
+
+        ticketEmail:
+          parsed.ticketEmail === undefined
+            ? {
+                subjectTemplate: DEFAULT_TICKET_EMAIL_SUBJECT_TEMPLATE,
+                bodyTemplate: DEFAULT_TICKET_EMAIL_BODY_TEMPLATE,
+              }
+            : {
+                subjectTemplate: parsed.ticketEmail.subjectTemplate,
+                bodyTemplate: parsed.ticketEmail.bodyTemplate,
+              },
+
         emailSmtp: parsed.emailSmtp ?? null,
         ticketBai: parsed.ticketBai ?? null,
       };

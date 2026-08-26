@@ -18,6 +18,10 @@ describe('buildVentaGiftTicketDocument', (): void => {
     instagram: 'empresa_instagram',
     web: '',
     frasesTicket: ['Gracias por su compra.'],
+    ticketEmail: {
+      subjectTemplate: '{nombreNegocio} - Ticket {referencia}',
+      bodyTemplate: 'Adjuntamos el ticket correspondiente a su compra.\nGracias por su confianza.',
+    },
     tipoIva: 'iva',
     ivaList: [21, 10, 4],
     reList: [],

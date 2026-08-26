@@ -86,8 +86,14 @@ export interface InstallationCommand {
   readonly fiscalidad: InstallationTaxData;
   readonly ventaOnline: InstallationOnlineStoreData;
   readonly emailSmtp: InstallationEmailSmtpData;
+  readonly ticketEmail: InstallationTicketEmailData;
   readonly ticketBai: InstallationTicketBaiData;
   readonly opciones: InstallationOptionsData;
   readonly secretos: InstallationSecretsData;
   readonly logo: InstallationLogoData;
+}
+
+export interface InstallationTicketEmailData {
+  readonly subjectTemplate: string;
+  readonly bodyTemplate: string;
 }

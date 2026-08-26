@@ -1,3 +1,7 @@
+import {
+  DEFAULT_TICKET_EMAIL_BODY_TEMPLATE,
+  DEFAULT_TICKET_EMAIL_SUBJECT_TEMPLATE,
+} from '@desktop-contracts/configuration/ticket-email-config.interface';
 import { InstallationFormModel } from '@model/configuracion/installation-form.model';
 
 export default function createInstallationFormInitialValue(): InstallationFormModel {
@@ -147,6 +151,11 @@ export default function createInstallationFormInitialValue(): InstallationFormMo
       secure: 'tls',
       user: '',
       pass: '',
+    },
+
+    ticketEmail: {
+      subjectTemplate: DEFAULT_TICKET_EMAIL_SUBJECT_TEMPLATE,
+      bodyTemplate: DEFAULT_TICKET_EMAIL_BODY_TEMPLATE,
     },
 
     ticketBai: {

@@ -664,6 +664,67 @@
           }
         </mat-form-field>
       </div>
+
+      <p>
+        <strong>Contenido del email del ticket</strong>
+      </p>
+
+      <p>
+        Puedes utilizar las variables
+        <code>&#123;nombreNegocio&#125;</code>
+        y
+        <code>&#123;referencia&#125;</code>.
+      </p>
+
+      <p>
+        Puedes utilizar las variables
+        <code>{{ ticketEmailBusinessVariable }}</code>
+        y
+        <code>{{ ticketEmailReferenceVariable }}</code>.
+      </p>
+
+      <div class="row">
+        <mat-form-field class="full">
+          <mat-label>Asunto</mat-label>
+
+          <input matInput
+                 [placeholder]="ticketEmailSubjectPlaceholder"
+                 [formField]="installationForm.ticketEmail.subjectTemplate">
+
+          @if (
+          installationForm.ticketEmail.subjectTemplate().touched() &&
+          installationForm.ticketEmail.subjectTemplate().invalid()
+          ) {
+          <mat-error>
+            {{
+              installationForm.ticketEmail.subjectTemplate().errors()[0]?.message
+            }}
+          </mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <div class="row">
+        <mat-form-field class="full">
+          <mat-label>Cuerpo del email</mat-label>
+
+          <textarea matInput
+                    rows="4"
+                    [formField]="installationForm.ticketEmail.bodyTemplate">
+          </textarea>
+
+          @if (
+          installationForm.ticketEmail.bodyTemplate().touched() &&
+          installationForm.ticketEmail.bodyTemplate().invalid()
+          ) {
+          <mat-error>
+            {{
+              installationForm.ticketEmail.bodyTemplate().errors()[0]?.message
+            }}
+          </mat-error>
+          }
+        </mat-form-field>
+      </div>
       }
 
       <p>
