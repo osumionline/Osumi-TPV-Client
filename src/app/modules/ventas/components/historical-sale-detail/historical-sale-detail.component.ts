@@ -14,6 +14,7 @@ import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import type { VentaHistoricoDetalle } from '@desktop-contracts/ventas/venta-historico.interface';
 import type TipoPago from '@model/tipos-pago/tipo-pago.model';
+import HistoricalSaleEmailFormComponent from '@modules/ventas/components/historical-sale-email-form/historical-sale-email-form.component';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
 
@@ -24,20 +25,31 @@ import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
   selector: 'otpv-historical-sale-detail',
   templateUrl: './historical-sale-detail.component.html',
   styleUrl: './historical-sale-detail.component.scss',
-  imports: [CurrencyPipe, DatePipe, MatButton, MatIcon, CentsToEurosPipe, MicrosToEurosPipe],
+  imports: [
+    HistoricalSaleEmailFormComponent,
+    CurrencyPipe,
+    DatePipe,
+    MatButton,
+    MatIcon,
+    CentsToEurosPipe,
+    MicrosToEurosPipe,
+  ],
 })
 export default class HistoricalSaleDetailComponent {
   readonly detalle: InputSignal<VentaHistoricoDetalle> = input.required<VentaHistoricoDetalle>();
   readonly tiposPago: InputSignal<readonly TipoPago[]> = input<readonly TipoPago[]>([]);
   readonly saving: InputSignal<boolean> = input<boolean>(false);
-
   readonly postventaError: InputSignal<string | null> = input<string | null>(null);
   readonly postventaWarning: InputSignal<string | null> = input<string | null>(null);
+  readonly emailConfigured: InputSignal<boolean> = input<boolean>(false);
+  readonly postventaInfo: InputSignal<string | null> = input<string | null>(null);
 
   readonly changeClientEvent: OutputEmitterRef<void> = output<void>();
   readonly changeTipoPagoEvent: OutputEmitterRef<string> = output<string>();
   readonly printGiftTicketEvent: OutputEmitterRef<void> = output<void>();
   readonly reprintTicketEvent: OutputEmitterRef<void> = output<void>();
+  readonly sendTicketEmailEvent: OutputEmitterRef<string> = output<string>();
+  readonly selectingEmail: WritableSignal<boolean> = signal<boolean>(false);
 
   readonly selectingTipoPago: WritableSignal<boolean> = signal<boolean>(false);
 
@@ -79,6 +91,7 @@ export default class HistoricalSaleDetailComponent {
       return;
     }
 
+    this.selectingEmail.set(false);
     this.selectingTipoPago.set(false);
     this.changeClientEvent.emit();
   }
@@ -95,6 +108,7 @@ export default class HistoricalSaleDetailComponent {
       return;
     }
 
+    this.selectingEmail.set(false);
     this.selectingTipoPago.set(true);
   }
 
@@ -135,6 +149,7 @@ export default class HistoricalSaleDetailComponent {
       return;
     }
 
+    this.selectingEmail.set(false);
     this.selectingTipoPago.set(false);
 
     this.printGiftTicketEvent.emit();
@@ -148,8 +163,46 @@ export default class HistoricalSaleDetailComponent {
       return;
     }
 
+    this.selectingEmail.set(false);
     this.selectingTipoPago.set(false);
 
     this.reprintTicketEvent.emit();
+  }
+
+  /**
+   * Muestra el formulario de destinatario
+   * para enviar el ticket por email.
+   */
+  requestSendTicketEmail(): void {
+    if (this.saving() || !this.emailConfigured()) {
+      return;
+    }
+
+    this.selectingTipoPago.set(false);
+    this.selectingEmail.set(true);
+  }
+
+  /**
+   * Cancela la introducción del destinatario.
+   */
+  cancelEmailSelection(): void {
+    if (this.saving()) {
+      return;
+    }
+
+    this.selectingEmail.set(false);
+  }
+
+  /**
+   * Solicita el envío al destinatario indicado.
+   */
+  sendTicketEmail(destinatario: string): void {
+    if (this.saving() || !this.emailConfigured()) {
+      return;
+    }
+
+    this.selectingEmail.set(false);
+
+    this.sendTicketEmailEvent.emit(destinatario);
   }
 }

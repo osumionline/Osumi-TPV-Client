@@ -286,12 +286,15 @@
                         <otpv-historical-sale-detail [detalle]="detalleVenta"
                                                      [tiposPago]="ventasContextService.tiposPago()"
                                                      [saving]="postventaSaving()"
+                                                     [emailConfigured]="ventasContextService.appData()?.emailSmtp !== null"
                                                      [postventaError]="postventaError()"
+                                                     [postventaInfo]="postventaInfo()"
                                                      [postventaWarning]="postventaWarning()"
                                                      (changeClientEvent)="openClientSelection()"
                                                      (changeTipoPagoEvent)="changeTipoPago($event)"
                                                      (reprintTicketEvent)="reprintTicket()"
-                                                     (printGiftTicketEvent)="printGiftTicket()" />
+                                                     (printGiftTicketEvent)="printGiftTicket()"
+                                                     (sendTicketEmailEvent)="sendTicketEmail($event)" />
                         }
                         @else {
                         <div class="historical-sales__detail-state">

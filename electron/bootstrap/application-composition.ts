@@ -16,7 +16,10 @@ import { SystemService } from '@backend/application/system/system.service';
 import VentasArticulosService from '@backend/application/ventas/ventas-articulos.service';
 import VentasContextService from '@backend/application/ventas/ventas-context.service';
 import VentasDevolucionesService from '@backend/application/ventas/ventas-devoluciones.service';
+import VentasHistoricoService from '@backend/application/ventas/ventas-historico.service';
 import VentasPersistenciaService from '@backend/application/ventas/ventas-persistencia.service';
+import VentasPostventaService from '@backend/application/ventas/ventas-postventa.service';
+import VentasTicketEmailService from '@backend/application/ventas/ventas-ticket-email.service';
 import VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';
@@ -27,6 +30,7 @@ import type InstallationFinalizer from '@backend/contracts/configuration/install
 import type InstallationStaging from '@backend/contracts/configuration/installation-staging.interface';
 import type LogoStorage from '@backend/contracts/configuration/logo-storage.interface';
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
+import { type EmailSender } from '@backend/contracts/email/email-sender.interface';
 import type EmpleadoRepository from '@backend/contracts/empleados/empleado.repository.interface';
 import type MarcaRepository from '@backend/contracts/marcas/marca.repository.interface';
 import type HtmlDocumentRenderer from '@backend/contracts/printing/html-document-renderer.interface';
@@ -41,7 +45,9 @@ import type VentaTicketPdfStorage from '@backend/contracts/ventas/venta-ticket-p
 import type VentasArticulosRepository from '@backend/contracts/ventas/ventas-articulos.repository.interface';
 import type VentasContextRepository from '@backend/contracts/ventas/ventas-context.repository.interface';
 import type VentasDevolucionesRepository from '@backend/contracts/ventas/ventas-devoluciones.repository.interface';
+import type VentasHistoricoRepository from '@backend/contracts/ventas/ventas-historico.repository.interface';
 import type VentasPersistenciaRepository from '@backend/contracts/ventas/ventas-persistencia.repository.interface';
+import type VentasPostventaRepository from '@backend/contracts/ventas/ventas-postventa.repository.interface';
 import type VentasTicketsRepository from '@backend/contracts/ventas/ventas-tickets.repository.interface';
 import DefaultLegacyImportReviewDecisionValidator from '@backend/domain/legacy-import/default-legacy-import-review-decision.validator';
 import NewInstallationDataService from '@infrastructure/database/initial-data/new-installation-data.service';
@@ -61,7 +67,9 @@ import TypeOrmReservasRepository from '@infrastructure/database/typeorm/typeorm-
 import TypeOrmVentasArticulosRepository from '@infrastructure/database/typeorm/typeorm-ventas-articulos.repository';
 import TypeOrmVentasContextRepository from '@infrastructure/database/typeorm/typeorm-ventas-context.repository';
 import TypeOrmVentasDevolucionesRepository from '@infrastructure/database/typeorm/typeorm-ventas-devoluciones.repository';
+import TypeOrmVentasHistoricoRepository from '@infrastructure/database/typeorm/typeorm-ventas-historico.repository';
 import TypeOrmVentasPersistenciaRepository from '@infrastructure/database/typeorm/typeorm-ventas-persistencia.repository';
+import TypeOrmVentasPostventaRepository from '@infrastructure/database/typeorm/typeorm-ventas-postventa.repository';
 import TypeOrmVentasTicketsRepository from '@infrastructure/database/typeorm/typeorm-ventas-tickets.repository';
 import ElectronAssetUrlBuilder from '@infrastructure/electron/electron-asset-url.builder';
 import ElectronHtmlDocumentRenderer from '@infrastructure/electron/electron-html-document.renderer';
@@ -71,6 +79,7 @@ import ElectronPrinterProvider from '@infrastructure/electron/electron-printer.p
 import { ElectronRuntimeInfoProvider } from '@infrastructure/electron/electron-runtime-info.provider';
 import ElectronSafeStorageSecretStorage from '@infrastructure/electron/electron-safe-storage-secret-storage';
 import { getMainWindow } from '@infrastructure/electron/main-window';
+import NodemailerEmailSender from '@infrastructure/email/nodemailer-email.sender';
 import FileInstallationStaging from '@infrastructure/filesystem/file-installation-staging';
 import FileVentaTicketPdfStorage from '@infrastructure/filesystem/file-venta-ticket-pdf.storage';
 import JsonAppDataRepository from '@infrastructure/filesystem/json-app-data.repository';
@@ -95,12 +104,6 @@ import registerProveedoresIpc from '@ipc/register-proveedores-ipc';
 import registerReservasIpc from '@ipc/register-reservas-ipc';
 import { registerSystemIpc } from '@ipc/register-system-ipc';
 import registerVentasIpc from '@ipc/register-ventas-ipc';
-import VentasHistoricoService from '@backend/application/ventas/ventas-historico.service';
-import type VentasHistoricoRepository from '@backend/contracts/ventas/ventas-historico.repository.interface';
-import TypeOrmVentasHistoricoRepository from '@infrastructure/database/typeorm/typeorm-ventas-historico.repository';
-import VentasPostventaService from '@backend/application/ventas/ventas-postventa.service';
-import type VentasPostventaRepository from '@backend/contracts/ventas/ventas-postventa.repository.interface';
-import TypeOrmVentasPostventaRepository from '@infrastructure/database/typeorm/typeorm-ventas-postventa.repository';
 
 /**
  * Construye el grafo de dependencias de la aplicación,
@@ -120,6 +123,10 @@ export default function createApplicationComposition(
   );
 
   const configurationService: ConfigurationService = new ConfigurationService(appDataRepository);
+
+  const operationalSecretStorage: SecretStorage = new ElectronSafeStorageSecretStorage(
+    applicationPaths.secretsFile,
+  );
 
   /*
    * Almacenamiento temporal utilizado durante
@@ -267,6 +274,15 @@ export default function createApplicationComposition(
     ventaTicketPdfStorage,
   );
 
+  const emailSender: EmailSender = new NodemailerEmailSender();
+
+  const ventasTicketEmailService: VentasTicketEmailService = new VentasTicketEmailService(
+    configurationService,
+    operationalSecretStorage,
+    ventasTicketsService,
+    emailSender,
+  );
+
   /*
    * Importación legacy.
    */
@@ -377,6 +393,7 @@ export default function createApplicationComposition(
     ventasPostventaService,
     ventasPersistenciaService,
     ventasTicketsService,
+    ventasTicketEmailService,
   );
 
   registerLegacyImportIpc(legacyImportService);

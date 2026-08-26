@@ -1,0 +1,59 @@
+<section class="ticket-email-form">
+  <header class="ticket-email-form__header">
+    <div>
+      <strong>
+        Enviar ticket por email
+      </strong>
+
+      <p>
+        Introduce la dirección que recibirá
+        el PDF vigente del ticket.
+      </p>
+    </div>
+  </header>
+
+  <form class="ticket-email-form__form"
+        (submit)="submit($event)">
+    <mat-form-field class="ticket-email-form__field"
+                    appearance="outline">
+      <mat-label>
+        Destinatario
+      </mat-label>
+
+      <input matInput
+             type="email"
+             autocomplete="email"
+             placeholder="cliente@ejemplo.com"
+             [disabled]="saving()"
+             [value]="destinatario()"
+             (input)="onDestinatarioInput($event)">
+
+      <mat-hint>
+        Esta dirección solo se usará
+        para este envío.
+      </mat-hint>
+    </mat-form-field>
+
+    <div class="ticket-email-form__actions">
+      <button mat-stroked-button
+              type="button"
+              [disabled]="saving()"
+              (click)="cancel()">
+        Cancelar
+      </button>
+
+      <button mat-flat-button
+              type="submit"
+              [disabled]="
+                saving() ||
+                !destinatarioValido()
+              ">
+        <mat-icon>
+          send
+        </mat-icon>
+
+        Enviar
+      </button>
+    </div>
+  </form>
+</section>

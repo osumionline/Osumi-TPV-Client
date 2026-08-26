@@ -4,6 +4,7 @@ import type VentasDevolucionesService from '@backend/application/ventas/ventas-d
 import type VentasHistoricoService from '@backend/application/ventas/ventas-historico.service';
 import type VentasPersistenciaService from '@backend/application/ventas/ventas-persistencia.service';
 import type VentasPostventaService from '@backend/application/ventas/ventas-postventa.service';
+import type VentasTicketEmailService from '@backend/application/ventas/ventas-ticket-email.service';
 import type VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
 import type AccesoDirectoVentaInterface from '@desktop-contracts/ventas/acceso-directo-venta.interface';
 import type ArticuloVentaInterface from '@desktop-contracts/ventas/articulo-venta.interface';
@@ -19,6 +20,7 @@ import type {
   VentaPostventaCambiarClienteCommand,
   VentaPostventaCambiarTipoPagoCommand,
 } from '@desktop-contracts/ventas/venta-postventa.interface';
+import type { VentaTicketEmailCommand } from '@desktop-contracts/ventas/venta-ticket-email.interface';
 import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
 import type VentasContextInterface from '@desktop-contracts/ventas/ventas-context.interface';
 import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
@@ -38,6 +40,7 @@ export default function registerVentasIpc(
   ventasPostventaService: VentasPostventaService,
   ventasPersistenciaService: VentasPersistenciaService,
   ventasTicketsService: VentasTicketsService,
+  ventasTicketEmailService: VentasTicketEmailService,
 ): void {
   ipcMain.handle(IPC_CHANNELS.ventasGetContext, async (event): Promise<VentasContextInterface> => {
     assertTrustedSender(event, getMainWindow);
@@ -144,6 +147,15 @@ export default function registerVentasIpc(
       assertTrustedSender(event, getMainWindow);
 
       await ventasTicketsService.savePdf(idVenta, ticketRevision, pdf);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.ventasSendTicketEmail,
+    async (event, command: VentaTicketEmailCommand): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await ventasTicketEmailService.send(command);
     },
   );
 

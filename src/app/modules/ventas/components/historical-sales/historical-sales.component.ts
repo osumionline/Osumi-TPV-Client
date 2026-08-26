@@ -30,6 +30,7 @@ import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import ClienteProteccionDatosPrintService from '@services/cliente-proteccion-datos-print.service';
 import ClientesService from '@services/clientes.service';
 import VentaTicketDocumentService from '@services/venta-ticket-document.service';
+import VentaTicketEmailService from '@services/venta-ticket-email.service';
 import VentasContextService from '@services/ventas-context.service';
 import VentasHistoricoService from '@services/ventas-historico.service';
 import VentasPostventaService from '@services/ventas-postventa.service';
@@ -69,6 +70,8 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
   private readonly ventaTicketDocumentService: VentaTicketDocumentService = inject(
     VentaTicketDocumentService,
   );
+  private readonly ventaTicketEmailService: VentaTicketEmailService =
+    inject(VentaTicketEmailService);
 
   readonly closeEvent: OutputEmitterRef<void> = output<void>();
 
@@ -91,6 +94,7 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
   readonly postventaSaving: WritableSignal<boolean> = signal<boolean>(false);
   readonly postventaError: WritableSignal<string | null> = signal<string | null>(null);
   readonly postventaWarning: WritableSignal<string | null> = signal<string | null>(null);
+  readonly postventaInfo: WritableSignal<string | null> = signal<string | null>(null);
 
   readonly ventas: Signal<readonly VentaHistoricoResumen[]> = computed(
     (): readonly VentaHistoricoResumen[] => this.resultado()?.ventas ?? [],
@@ -243,6 +247,7 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
 
     this.postventaError.set(null);
     this.postventaWarning.set(null);
+    this.postventaInfo.set(null);
 
     if (this.selectedVentaId() === idVenta && this.detalle()?.id === idVenta) {
       return;
@@ -299,6 +304,7 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
 
     this.postventaError.set(null);
     this.postventaWarning.set(null);
+    this.postventaInfo.set(null);
 
     try {
       await this.clientesService.load();
@@ -355,6 +361,7 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
   changeTipoPago(tipoPagoPublicId: string): void {
     this.postventaError.set(null);
     this.postventaWarning.set(null);
+    this.postventaInfo.set(null);
 
     void this.cambiarTipoPago(tipoPagoPublicId);
   }
@@ -373,6 +380,7 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
     this.postventaSaving.set(true);
     this.postventaError.set(null);
     this.postventaWarning.set(null);
+    this.postventaInfo.set(null);
 
     try {
       await this.ventaTicketDocumentService.reprint(detalle.id);
@@ -401,11 +409,43 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
     this.postventaSaving.set(true);
     this.postventaError.set(null);
     this.postventaWarning.set(null);
+    this.postventaInfo.set(null);
 
     try {
       await this.ventaTicketDocumentService.printGift(detalle.id);
     } catch (error: unknown) {
       this.postventaError.set(getErrorMessage(error, 'No se ha podido imprimir el ticket regalo.'));
+    } finally {
+      this.postventaSaving.set(false);
+    }
+  }
+
+  /**
+   * Garantiza el PDF vigente y envía el ticket
+   * a una dirección manual de un solo uso.
+   */
+  async sendTicketEmail(destinatario: string): Promise<void> {
+    const detalle: VentaHistoricoDetalle | null = this.detalle();
+
+    if (detalle === null || this.postventaSaving()) {
+      return;
+    }
+
+    const normalizedRecipient: string = destinatario.trim();
+
+    this.postventaSaving.set(true);
+    this.postventaError.set(null);
+    this.postventaWarning.set(null);
+    this.postventaInfo.set(null);
+
+    try {
+      await this.ventaTicketEmailService.send(detalle.id, normalizedRecipient);
+
+      this.postventaInfo.set(`El ticket se ha enviado correctamente a ${normalizedRecipient}.`);
+    } catch (error: unknown) {
+      this.postventaError.set(
+        getErrorMessage(error, 'No se ha podido enviar el ticket por email.'),
+      );
     } finally {
       this.postventaSaving.set(false);
     }

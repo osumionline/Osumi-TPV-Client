@@ -36,6 +36,7 @@ import type {
   VentaPostventaCambiarClienteCommand,
   VentaPostventaCambiarTipoPagoCommand,
 } from '@desktop-contracts/ventas/venta-postventa.interface';
+import type { VentaTicketEmailCommand } from '@desktop-contracts/ventas/venta-ticket-email.interface';
 import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
 import type VentasContextInterface from '@desktop-contracts/ventas/ventas-context.interface';
 import IPC_CHANNELS from '@ipc/channels';
@@ -260,6 +261,9 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         ticketRevision,
         pdf,
       ) as Promise<void>,
+
+    sendTicketEmail: (command: VentaTicketEmailCommand): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ventasSendTicketEmail, command) as Promise<void>,
 
     save: (command: GuardarVentaCommand): Promise<GuardarVentaResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.ventasSave, command) as Promise<GuardarVentaResult>,

@@ -49,6 +49,7 @@ const IPC_CHANNELS = {
   ventasGetTicket: 'ventas:get-ticket',
   ventasGetTicketPdf: 'ventas:get-ticket-pdf',
   ventasSaveTicketPdf: 'ventas:save-ticket-pdf',
+  ventasSendTicketEmail: 'ventas:send-ticket-email',
   ventasSave: 'ventas:save',
 } as const;
 

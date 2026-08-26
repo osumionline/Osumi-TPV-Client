@@ -12,6 +12,7 @@ import type {
   VentaPostventaCambiarClienteCommand,
   VentaPostventaCambiarTipoPagoCommand,
 } from '@desktop-contracts/ventas/venta-postventa.interface';
+import type { VentaTicketEmailCommand } from '@desktop-contracts/ventas/venta-ticket-email.interface';
 import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
 import type VentasContextInterface from '@desktop-contracts/ventas/ventas-context.interface';
 
@@ -53,6 +54,11 @@ export default interface VentasApi {
    * documental concreta de una venta.
    */
   saveTicketPdf(idVenta: number, ticketRevision: number, pdf: Uint8Array): Promise<void>;
+
+  /**
+   * Envía por email el PDF vigente de una venta.
+   */
+  sendTicketEmail(command: VentaTicketEmailCommand): Promise<void>;
 
   save(command: GuardarVentaCommand): Promise<GuardarVentaResult>;
 }

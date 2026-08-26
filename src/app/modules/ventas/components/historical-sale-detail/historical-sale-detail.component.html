@@ -165,6 +165,13 @@
         </div>
         }
 
+        @if (postventaInfo() !== null) {
+        <div class="historical-sale-detail__message"
+             role="status">
+            {{ postventaInfo() }}
+        </div>
+        }
+
         @if (postventaWarning() !== null) {
         <div class="historical-sale-detail__message"
              role="status">
@@ -296,6 +303,37 @@
                 </div>
             </button>
 
+            <button class="historical-sale-detail__capability historical-sale-detail__capability--action"
+                    type="button"
+                    [class.historical-sale-detail__capability--available]="emailConfigured()"
+                    [disabled]="
+                      saving() ||
+                      !emailConfigured()
+                    "
+                    (click)="requestSendTicketEmail()">
+                <mat-icon aria-hidden="true">
+                    {{
+                  emailConfigured()
+                    ? 'mail'
+                    : 'block'
+                }}
+                </mat-icon>
+
+                <div>
+                    <strong>
+                        Enviar por email
+                    </strong>
+
+                    <small>
+                        {{
+                    emailConfigured()
+                      ? 'Enviar ticket PDF'
+                      : 'SMTP no configurado'
+                  }}
+                    </small>
+                </div>
+            </button>
+
             <div class="historical-sale-detail__capability"
                  [class.historical-sale-detail__capability--available]="
                     detalle().capacidades.puedeReintentarTicketBai
@@ -369,6 +407,12 @@
                 }
             </div>
         </div>
+        }
+
+        @if (selectingEmail()) {
+        <otpv-historical-sale-email-form [saving]="saving()"
+                                         (sendEvent)="sendTicketEmail($event)"
+                                         (cancelEvent)="cancelEmailSelection()" />
         }
     </section>
 
