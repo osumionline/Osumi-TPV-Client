@@ -136,6 +136,45 @@ describe('PrintingService', (): void => {
       service.printTicket('<html><body>Ticket definitivo</body></html>'),
     ).rejects.toThrow('El trabajo de impresión ha fallado.');
   });
+
+  it('envía exactamente el PDF a la impresora configurada', async (): Promise<void> => {
+    const printer: PrinterInterface = {
+      deviceName: 'printer-1',
+      displayName: 'Star TSP100',
+      description: 'Impresora térmica',
+    };
+
+    const renderer: FakeHtmlDocumentRenderer = new FakeHtmlDocumentRenderer();
+
+    const service: PrintingService = new PrintingService(
+      new FakePrintingSettingsRepository('printer-1'),
+      new FakePrinterProvider([printer]),
+      renderer,
+    );
+
+    const pdf: Uint8Array = new TextEncoder().encode('%PDF-1.7\nticket\n%%EOF');
+
+    await service.printPdf(pdf);
+
+    expect(renderer.printPdfCalls).toEqual([
+      {
+        pdf,
+        deviceName: 'printer-1',
+      },
+    ]);
+  });
+
+  it('rechaza contenido que no sea un PDF al reimprimir', async (): Promise<void> => {
+    const service: PrintingService = new PrintingService(
+      new FakePrintingSettingsRepository('printer-1'),
+      new FakePrinterProvider([]),
+      new FakeHtmlDocumentRenderer(),
+    );
+
+    await expect(service.printPdf(new TextEncoder().encode('no-pdf'))).rejects.toThrow(
+      'El documento recibido no contiene un PDF válido.',
+    );
+  });
 });
 
 class FakePrintingSettingsRepository implements PrintingSettingsRepository {
@@ -188,6 +227,13 @@ class FakeHtmlDocumentRenderer implements HtmlDocumentRenderer {
   renderPdfError: Error | null = null;
   printError: Error | null = null;
 
+  readonly printPdfCalls: {
+    readonly pdf: Uint8Array;
+    readonly deviceName: string;
+  }[] = [];
+
+  printPdfError: Error | null = null;
+
   renderPdf(documentHtml: string): Promise<Buffer> {
     this.renderPdfCalls.push(documentHtml);
 
@@ -206,6 +252,22 @@ class FakeHtmlDocumentRenderer implements HtmlDocumentRenderer {
 
     if (this.printError !== null) {
       return Promise.reject(this.printError);
+    }
+
+    return Promise.resolve();
+  }
+
+  /**
+   * Registra una impresión PDF simulada.
+   */
+  printPdf(pdf: Uint8Array, deviceName: string): Promise<void> {
+    this.printPdfCalls.push({
+      pdf,
+      deviceName,
+    });
+
+    if (this.printPdfError !== null) {
+      return Promise.reject(this.printPdfError);
     }
 
     return Promise.resolve();

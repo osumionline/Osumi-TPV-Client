@@ -50,4 +50,10 @@ export default function registerPrintingIpc(
       await printingService.printTicket(documentHtml);
     },
   );
+
+  ipcMain.handle(IPC_CHANNELS.printingPrintPdf, async (event, pdf: unknown): Promise<void> => {
+    assertTrustedSender(event, getMainWindow);
+
+    await printingService.printPdf(pdf);
+  });
 }

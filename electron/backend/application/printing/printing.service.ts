@@ -7,6 +7,10 @@ import type { Buffer } from 'node:buffer';
 
 const MAX_DOCUMENT_HTML_LENGTH: number = 2_000_000;
 
+const PDF_SIGNATURE: Uint8Array = new TextEncoder().encode('%PDF-');
+
+const MAX_PDF_SIZE: number = 10 * 1024 * 1024;
+
 export default class PrintingService {
   constructor(
     private readonly settingsRepository: PrintingSettingsRepository,
@@ -68,6 +72,28 @@ export default class PrintingService {
   async printTicket(value: unknown): Promise<void> {
     const documentHtml: string = this.normalizeDocumentHtml(value);
 
+    const deviceName: string = await this.requireTicketPrinterDeviceName();
+
+    await this.documentRenderer.print(documentHtml, deviceName);
+  }
+
+  /**
+   * Imprime directamente un PDF materializado en la
+   * impresora de tickets configurada.
+   */
+  async printPdf(value: unknown): Promise<void> {
+    const pdf: Uint8Array = this.normalizePdf(value);
+
+    const deviceName: string = await this.requireTicketPrinterDeviceName();
+
+    await this.documentRenderer.printPdf(pdf, deviceName);
+  }
+
+  /**
+   * Recupera y valida la impresora de tickets
+   * actualmente configurada.
+   */
+  private async requireTicketPrinterDeviceName(): Promise<string> {
     const settings: PrintingSettings = await this.settingsRepository.load();
 
     const deviceName: string | null = settings.ticketPrinterDeviceName;
@@ -76,14 +102,6 @@ export default class PrintingService {
       throw new Error('No hay una impresora de tickets configurada.');
     }
 
-    /*
-     * Comprobamos antes que la impresora siga
-     * existiendo en este equipo.
-     *
-     * No modificamos la configuración si ha
-     * desaparecido: puede ser una desconexión
-     * temporal.
-     */
     const printers: readonly PrinterInterface[] = await this.printerProvider.getPrinters();
 
     const printerExists: boolean = printers.some(
@@ -94,7 +112,32 @@ export default class PrintingService {
       throw new Error('La impresora de tickets configurada no está disponible en este equipo.');
     }
 
-    await this.documentRenderer.print(documentHtml, deviceName);
+    return deviceName;
+  }
+
+  /**
+   * Valida defensivamente los bytes recibidos como PDF.
+   */
+  private normalizePdf(value: unknown): Uint8Array {
+    if (!(value instanceof Uint8Array)) {
+      throw new TypeError('El documento PDF no es válido.');
+    }
+
+    if (value.length < PDF_SIGNATURE.length) {
+      throw new Error('El documento recibido no contiene un PDF válido.');
+    }
+
+    if (value.length > MAX_PDF_SIZE) {
+      throw new RangeError('El PDF supera el tamaño máximo permitido.');
+    }
+
+    for (let index: number = 0; index < PDF_SIGNATURE.length; index += 1) {
+      if (value[index] !== PDF_SIGNATURE[index]) {
+        throw new Error('El documento recibido no contiene un PDF válido.');
+      }
+    }
+
+    return value;
   }
 
   private normalizeDocumentHtml(value: unknown): string {

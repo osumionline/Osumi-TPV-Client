@@ -1,6 +1,9 @@
 import type HtmlDocumentRenderer from '@backend/contracts/printing/html-document-renderer.interface';
 import { BrowserWindow, type WebContents } from 'electron';
 import type { Buffer } from 'node:buffer';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const MILLIMETERS_PER_INCH: number = 25.4;
 const MICRONS_PER_MILLIMETER: number = 1_000;
@@ -103,6 +106,100 @@ export default class ElectronHtmlDocumentRenderer implements HtmlDocumentRendere
         });
       },
     );
+  }
+
+  /**
+   * Imprime silenciosamente un PDF ya materializado.
+   *
+   * El fichero temporal solo existe mientras Chromium
+   * mantiene cargado el documento para enviarlo a la
+   * cola de impresión.
+   */
+  async printPdf(pdf: Uint8Array, deviceName: string): Promise<void> {
+    const temporaryDirectory: string = await mkdtemp(join(tmpdir(), 'osumi-tpv-print-pdf-'));
+
+    const temporaryFilePath: string = join(temporaryDirectory, 'ticket.pdf');
+
+    const documentWindow: BrowserWindow = new BrowserWindow({
+      show: false,
+      width: 360,
+      height: 100,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: true,
+        backgroundThrottling: false,
+
+        /*
+         * Necesario para que Chromium pueda mostrar
+         * el PDF mediante su visor integrado.
+         */
+        plugins: true,
+      },
+    });
+
+    documentWindow.webContents.setWindowOpenHandler((): { action: 'deny' } => ({
+      action: 'deny',
+    }));
+
+    try {
+      await writeFile(temporaryFilePath, pdf, {
+        mode: 0o600,
+      });
+
+      await documentWindow.loadFile(temporaryFilePath);
+
+      await new Promise<void>((resolve, reject): void => {
+        documentWindow.webContents.print(
+          {
+            silent: true,
+            printBackground: true,
+            deviceName,
+            landscape: false,
+            margins: {
+              marginType: 'none',
+            },
+
+            /*
+             * El PDF ya contiene su geometría.
+             *
+             * El driver de la impresora térmica debe
+             * estar configurado con su papel de 80 mm.
+             */
+            usePrinterDefaultPageSize: true,
+
+            copies: 1,
+            duplexMode: 'simplex',
+          },
+          (success: boolean, failureReason: string): void => {
+            if (success) {
+              resolve();
+
+              return;
+            }
+
+            const reason: string = failureReason.trim();
+
+            reject(
+              new Error(
+                reason.length === 0
+                  ? 'No se ha podido imprimir el PDF.'
+                  : `No se ha podido imprimir el PDF: ${reason}`,
+              ),
+            );
+          },
+        );
+      });
+    } finally {
+      if (!documentWindow.isDestroyed()) {
+        documentWindow.destroy();
+      }
+
+      await rm(temporaryDirectory, {
+        recursive: true,
+        force: true,
+      });
+    }
   }
 
   /**

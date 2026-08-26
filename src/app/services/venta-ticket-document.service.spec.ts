@@ -19,6 +19,9 @@ describe('VentaTicketDocumentService', (): void => {
   let renderPdfError: Error | null;
   let printTicketError: Error | null;
 
+  let printPdfCalls: Uint8Array[];
+  let printPdfError: Error | null;
+
   beforeEach((): void => {
     originalDesktopDescriptor = Object.getOwnPropertyDescriptor(window, 'osumiDesktop');
 
@@ -33,6 +36,9 @@ describe('VentaTicketDocumentService', (): void => {
 
     renderPdfError = null;
     printTicketError = null;
+
+    printPdfCalls = [];
+    printPdfError = null;
 
     Object.defineProperty(window, 'osumiDesktop', {
       configurable: true,
@@ -53,6 +59,16 @@ describe('VentaTicketDocumentService', (): void => {
 
             if (printTicketError !== null) {
               return Promise.reject(printTicketError);
+            }
+
+            return Promise.resolve();
+          },
+
+          printPdf: (pdf: Uint8Array): Promise<void> => {
+            printPdfCalls.push(pdf);
+
+            if (printPdfError !== null) {
+              return Promise.reject(printPdfError);
             }
 
             return Promise.resolve();
@@ -232,6 +248,47 @@ describe('VentaTicketDocumentService', (): void => {
       'No se han podido obtener los datos del negocio para generar el ticket.',
     );
   });
+
+  it('reimprime el PDF vigente sin reconstruir ni regenerar el ticket', async (): Promise<void> => {
+    const service: VentaTicketDocumentService = TestBed.inject(VentaTicketDocumentService);
+
+    const currentPdf: Uint8Array = ticketsService.currentPdf!;
+
+    await service.reprint(123);
+
+    expect(ticketsService.currentPdfRequests).toEqual([123]);
+
+    expect(printPdfCalls).toEqual([currentPdf]);
+
+    expect(renderPdfCalls).toEqual([]);
+    expect(ticketsService.requestedVentaIds).toEqual([]);
+    expect(ticketsService.savedPdfs).toEqual([]);
+  });
+
+  it('repara un PDF ausente antes de reimprimirlo', async (): Promise<void> => {
+    ticketsService.currentPdf = null;
+
+    const service: VentaTicketDocumentService = TestBed.inject(VentaTicketDocumentService);
+
+    await service.reprint(123);
+
+    expect(ticketsService.currentPdfRequests).toEqual([123, 123]);
+
+    expect(renderPdfCalls).toHaveLength(1);
+    expect(ticketsService.savedPdfs).toHaveLength(1);
+
+    expect(printPdfCalls).toEqual([renderedPdf]);
+  });
+
+  it('propaga un fallo al reimprimir el PDF vigente', async (): Promise<void> => {
+    printPdfError = new Error('No hay una impresora de tickets configurada.');
+
+    const service: VentaTicketDocumentService = TestBed.inject(VentaTicketDocumentService);
+
+    await expect(service.reprint(123)).rejects.toThrow(
+      'No hay una impresora de tickets configurada.',
+    );
+  });
 });
 
 class FakeVentasContextService {
@@ -248,16 +305,27 @@ interface SavedPdf {
 
 class FakeVentasTicketsService {
   ticket: VentaTicketInterface | null = createTicket();
-
   savePdfError: Error | null = null;
 
   readonly requestedVentaIds: number[] = [];
   readonly savedPdfs: SavedPdf[] = [];
 
+  currentPdf: Uint8Array | null = new TextEncoder().encode('%PDF-1.7\npdf vigente\n%%EOF');
+  readonly currentPdfRequests: number[] = [];
+
   getByVentaId(idVenta: number): Promise<VentaTicketInterface | null> {
     this.requestedVentaIds.push(idVenta);
 
     return Promise.resolve(this.ticket);
+  }
+
+  /**
+   * Devuelve el PDF vigente configurado para el test.
+   */
+  getCurrentPdf(idVenta: number): Promise<Uint8Array | null> {
+    this.currentPdfRequests.push(idVenta);
+
+    return Promise.resolve(this.currentPdf);
   }
 
   /**
@@ -273,6 +341,7 @@ class FakeVentasTicketsService {
       ticketRevision,
       pdf,
     });
+    this.currentPdf = pdf;
 
     return Promise.resolve();
   }

@@ -38,6 +38,30 @@ describe('FileVentaTicketPdfStorage', (): void => {
     expect(await storage.exists(123)).toBe(true);
   });
 
+  it('recupera exactamente los bytes del PDF vigente', async (): Promise<void> => {
+    const directory: string = getTicketsDirectory();
+
+    const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(directory);
+
+    const pdf: Uint8Array = createPdf('ticket-vigente');
+
+    await storage.save(123, pdf);
+
+    const recoveredPdf: Uint8Array | null = await storage.read(123);
+
+    expect(recoveredPdf).not.toBeNull();
+
+    expect(Buffer.from(recoveredPdf ?? []).toString('utf8')).toBe(
+      Buffer.from(pdf).toString('utf8'),
+    );
+  });
+
+  it('devuelve null al leer un PDF que no existe', async (): Promise<void> => {
+    const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(getTicketsDirectory());
+
+    expect(await storage.read(123)).toBeNull();
+  });
+
   it('crea el directorio de tickets si todavía no existe', async (): Promise<void> => {
     const directory: string = join(requireTempDirectory(), 'uno', 'dos', 'ventas', 'tickets');
 
@@ -89,11 +113,7 @@ describe('FileVentaTicketPdfStorage', (): void => {
   it('rechaza identificadores de venta no válidos', async (): Promise<void> => {
     const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(getTicketsDirectory());
 
-    const pdf: Uint8Array = createPdf('ticket');
-
-    await expect(storage.save(0, pdf)).rejects.toThrow(
-      'El identificador de la venta no es válido.',
-    );
+    await expect(storage.read(0)).rejects.toThrow('El identificador de la venta no es válido.');
 
     await expect(storage.exists(-1)).rejects.toThrow('El identificador de la venta no es válido.');
   });

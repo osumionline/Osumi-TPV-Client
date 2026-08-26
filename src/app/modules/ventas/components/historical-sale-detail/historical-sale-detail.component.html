@@ -244,6 +244,25 @@
                 </div>
             </button>
 
+            <button class="historical-sale-detail__capability historical-sale-detail__capability--action historical-sale-detail__capability--available"
+                    type="button"
+                    [disabled]="saving()"
+                    (click)="requestReprintTicket()">
+                <mat-icon aria-hidden="true">
+                    print
+                </mat-icon>
+
+                <div>
+                    <strong>
+                        Reimprimir ticket
+                    </strong>
+
+                    <small>
+                        Imprimir PDF vigente
+                    </small>
+                </div>
+            </button>
+
             <button class="historical-sale-detail__capability historical-sale-detail__capability--action"
                     type="button"
                     [class.historical-sale-detail__capability--available]="

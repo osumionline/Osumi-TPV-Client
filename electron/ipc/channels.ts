@@ -14,6 +14,7 @@ const IPC_CHANNELS = {
   printingSetTicketPrinter: 'printing:set-ticket-printer',
   printingRenderPdf: 'printing:render-pdf',
   printingPrintTicket: 'printing:print-ticket',
+  printingPrintPdf: 'printing:print-pdf',
 
   applicationGetState: 'application:get-state',
 
@@ -46,6 +47,7 @@ const IPC_CHANNELS = {
   ventasCambiarCliente: 'ventas:cambiar-cliente',
   ventasCambiarTipoPago: 'ventas:cambiar-tipo-pago',
   ventasGetTicket: 'ventas:get-ticket',
+  ventasGetTicketPdf: 'ventas:get-ticket-pdf',
   ventasSaveTicketPdf: 'ventas:save-ticket-pdf',
   ventasSave: 'ventas:save',
 } as const;

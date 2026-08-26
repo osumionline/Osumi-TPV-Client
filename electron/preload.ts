@@ -132,6 +132,9 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
 
     printTicket: (documentHtml: string): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.printingPrintTicket, documentHtml) as Promise<void>,
+
+    printPdf: (pdf: Uint8Array): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.printingPrintPdf, pdf) as Promise<void>,
   }),
 
   marcas: Object.freeze({
@@ -246,6 +249,9 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         IPC_CHANNELS.ventasGetTicket,
         idVenta,
       ) as Promise<VentaTicketInterface | null>,
+
+    getTicketPdf: (idVenta: number): Promise<Uint8Array | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ventasGetTicketPdf, idVenta) as Promise<Uint8Array | null>,
 
     saveTicketPdf: (idVenta: number, ticketRevision: number, pdf: Uint8Array): Promise<void> =>
       ipcRenderer.invoke(

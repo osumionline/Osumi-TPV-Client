@@ -130,6 +130,15 @@ export default function registerVentasIpc(
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.ventasGetTicketPdf,
+    async (event, idVenta: number): Promise<Uint8Array | null> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return ventasTicketsService.getCurrentPdf(idVenta);
+    },
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.ventasSaveTicketPdf,
     async (event, idVenta: number, ticketRevision: number, pdf: Uint8Array): Promise<void> => {
       assertTrustedSender(event, getMainWindow);

@@ -61,6 +61,50 @@ export default class VentasTicketsService {
   }
 
   /**
+   * Recupera el PDF únicamente cuando representa todavía
+   * la revisión documental vigente de la venta.
+   *
+   * La revisión se comprueba antes y después de leer el
+   * filesystem para evitar devolver bytes obsoletos si
+   * cambia la venta durante la lectura.
+   */
+  async getCurrentPdf(idVenta: number): Promise<Uint8Array | null> {
+    this.validateVentaId(idVenta);
+
+    const ventaAntes: VentaTicketRecord | null =
+      await this.ventasTicketsRepository.findByVentaId(idVenta);
+
+    if (ventaAntes === null) {
+      return null;
+    }
+
+    const currentRevision: number = ventaAntes.ticketRevision;
+
+    if (ventaAntes.ticketPdfRevision !== currentRevision) {
+      return null;
+    }
+
+    const pdf: Uint8Array | null = await this.ventaTicketPdfStorage.read(idVenta);
+
+    if (pdf === null) {
+      return null;
+    }
+
+    const ventaDespues: VentaTicketRecord | null =
+      await this.ventasTicketsRepository.findByVentaId(idVenta);
+
+    if (
+      ventaDespues === null ||
+      ventaDespues.ticketRevision !== currentRevision ||
+      ventaDespues.ticketPdfRevision !== currentRevision
+    ) {
+      return null;
+    }
+
+    return pdf;
+  }
+
+  /**
    * Materializa exactamente la revisión documental indicada.
    *
    * Una revisión que haya quedado obsoleta durante el render

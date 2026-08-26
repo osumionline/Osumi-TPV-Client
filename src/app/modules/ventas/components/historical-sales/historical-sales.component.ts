@@ -360,6 +360,30 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
   }
 
   /**
+   * Reimprime el PDF documental vigente de la
+   * venta actualmente seleccionada.
+   */
+  async reprintTicket(): Promise<void> {
+    const detalle: VentaHistoricoDetalle | null = this.detalle();
+
+    if (detalle === null || this.postventaSaving()) {
+      return;
+    }
+
+    this.postventaSaving.set(true);
+    this.postventaError.set(null);
+    this.postventaWarning.set(null);
+
+    try {
+      await this.ventaTicketDocumentService.reprint(detalle.id);
+    } catch (error: unknown) {
+      this.postventaError.set(getErrorMessage(error, 'No se ha podido reimprimir el ticket.'));
+    } finally {
+      this.postventaSaving.set(false);
+    }
+  }
+
+  /**
    * Imprime bajo demanda el ticket regalo
    * de la venta actualmente seleccionada.
    */

@@ -37,6 +37,7 @@ export default class HistoricalSaleDetailComponent {
   readonly changeClientEvent: OutputEmitterRef<void> = output<void>();
   readonly changeTipoPagoEvent: OutputEmitterRef<string> = output<string>();
   readonly printGiftTicketEvent: OutputEmitterRef<void> = output<void>();
+  readonly reprintTicketEvent: OutputEmitterRef<void> = output<void>();
 
   readonly selectingTipoPago: WritableSignal<boolean> = signal<boolean>(false);
 
@@ -137,5 +138,18 @@ export default class HistoricalSaleDetailComponent {
     this.selectingTipoPago.set(false);
 
     this.printGiftTicketEvent.emit();
+  }
+
+  /**
+   * Solicita reimprimir el PDF vigente de la venta.
+   */
+  requestReprintTicket(): void {
+    if (this.saving()) {
+      return;
+    }
+
+    this.selectingTipoPago.set(false);
+
+    this.reprintTicketEvent.emit();
   }
 }

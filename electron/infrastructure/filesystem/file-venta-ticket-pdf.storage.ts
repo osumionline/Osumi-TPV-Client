@@ -1,6 +1,6 @@
 import type VentaTicketPdfStorage from '@backend/contracts/ventas/venta-ticket-pdf-storage.interface';
 import { randomUUID } from 'node:crypto';
-import { access, mkdir, rename, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const PDF_SIGNATURE: Uint8Array = new TextEncoder().encode('%PDF-');
@@ -19,6 +19,28 @@ export default class FileVentaTicketPdfStorage implements VentaTicketPdfStorage 
     this.validateVentaId(idVenta);
 
     return this.fileExists(this.getFilePath(idVenta));
+  }
+
+  /**
+   * Recupera el PDF vigente y valida que siga siendo
+   * un documento PDF aceptable antes de devolverlo.
+   */
+  async read(idVenta: number): Promise<Uint8Array | null> {
+    this.validateVentaId(idVenta);
+
+    try {
+      const pdf: Uint8Array = new Uint8Array(await readFile(this.getFilePath(idVenta)));
+
+      this.validatePdf(pdf);
+
+      return pdf;
+    } catch (error: unknown) {
+      if (this.hasErrorCode(error, 'ENOENT')) {
+        return null;
+      }
+
+      throw error;
+    }
   }
 
   /**
@@ -161,6 +183,18 @@ export default class FileVentaTicketPdfStorage implements VentaTicketPdfStorage 
     } catch (error: unknown) {
       console.error('No se ha podido restaurar el PDF anterior del ticket:', error);
     }
+  }
+
+  /**
+   * Comprueba defensivamente el código de un error de Node.
+   */
+  private hasErrorCode(error: unknown, code: string): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { readonly code: unknown }).code === code
+    );
   }
 
   /**

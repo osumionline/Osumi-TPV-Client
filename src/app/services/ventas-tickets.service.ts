@@ -12,6 +12,14 @@ export default class VentasTicketsService {
   }
 
   /**
+   * Recupera el PDF únicamente cuando representa
+   * la revisión documental vigente.
+   */
+  async getCurrentPdf(idVenta: number): Promise<Uint8Array | null> {
+    return window.osumiDesktop.ventas.getTicketPdf(idVenta);
+  }
+
+  /**
    * Conserva el PDF correspondiente exactamente
    * a la revisión documental indicada.
    */

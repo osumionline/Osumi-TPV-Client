@@ -48,6 +48,28 @@ export default class VentaTicketDocumentService {
   }
 
   /**
+   * Reimprime exactamente el PDF vigente de una venta.
+   *
+   * Si el PDF falta o está desactualizado, lo repara
+   * primero mediante el pipeline documental revisionado.
+   */
+  async reprint(idVenta: number): Promise<void> {
+    let pdf: Uint8Array | null = await this.ventasTicketsService.getCurrentPdf(idVenta);
+
+    if (pdf === null) {
+      await this.generateAndSavePdf(idVenta);
+
+      pdf = await this.ventasTicketsService.getCurrentPdf(idVenta);
+    }
+
+    if (pdf === null) {
+      throw new Error('No se ha podido obtener el PDF vigente del ticket.');
+    }
+
+    await window.osumiDesktop.printing.printPdf(pdf);
+  }
+
+  /**
    * Genera e imprime bajo demanda un ticket regalo
    * sin crear ni modificar ningún artefacto PDF histórico.
    */

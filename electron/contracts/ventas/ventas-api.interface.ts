@@ -43,6 +43,12 @@ export default interface VentasApi {
   getTicket(idVenta: number): Promise<VentaTicketInterface | null>;
 
   /**
+   * Recupera el PDF únicamente cuando coincide con
+   * la revisión documental vigente.
+   */
+  getTicketPdf(idVenta: number): Promise<Uint8Array | null>;
+
+  /**
    * Materializa el PDF correspondiente a una revisión
    * documental concreta de una venta.
    */

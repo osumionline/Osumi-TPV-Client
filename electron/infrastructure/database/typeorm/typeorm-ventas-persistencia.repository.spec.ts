@@ -1756,6 +1756,13 @@ class NoopVentaTicketPdfStorage implements VentaTicketPdfStorage {
   }
 
   /**
+   * Simula la ausencia de un PDF persistido.
+   */
+  read(): Promise<Uint8Array | null> {
+    return Promise.resolve(null);
+  }
+
+  /**
    * Descarta el PDF recibido durante este test.
    */
   save(): Promise<void> {

@@ -16,6 +16,62 @@ describe('VentasTicketsService', (): void => {
     service = new VentasTicketsService(repository, storage);
   });
 
+  it('recupera el PDF cuando representa la revisión documental vigente', async (): Promise<void> => {
+    const pdf: Uint8Array = createPdf();
+
+    repository.ticket = createTicketRecord({
+      ticketRevision: 2,
+      ticketPdfRevision: 2,
+    });
+
+    storage.readResult = pdf;
+
+    const result: Uint8Array | null = await service.getCurrentPdf(123);
+
+    expect(result).toBe(pdf);
+    expect(storage.readCalls).toBe(1);
+  });
+
+  it('no lee el filesystem cuando el PDF ya está marcado como desactualizado', async (): Promise<void> => {
+    repository.ticket = createTicketRecord({
+      ticketRevision: 3,
+      ticketPdfRevision: 2,
+    });
+
+    const result: Uint8Array | null = await service.getCurrentPdf(123);
+
+    expect(result).toBeNull();
+    expect(storage.readCalls).toBe(0);
+  });
+
+  it('devuelve null cuando falta físicamente el PDF vigente', async (): Promise<void> => {
+    repository.ticket = createTicketRecord({
+      ticketRevision: 2,
+      ticketPdfRevision: 2,
+    });
+
+    storage.readResult = null;
+
+    expect(await service.getCurrentPdf(123)).toBeNull();
+  });
+
+  it('descarta el PDF si la revisión cambia mientras se está leyendo', async (): Promise<void> => {
+    repository.queuedTickets.push(
+      createTicketRecord({
+        ticketRevision: 2,
+        ticketPdfRevision: 2,
+      }),
+      createTicketRecord({
+        ticketRevision: 3,
+        ticketPdfRevision: 2,
+      }),
+    );
+
+    storage.readResult = createPdf();
+
+    expect(await service.getCurrentPdf(123)).toBeNull();
+  });
+
   it('no materializa una revisión que ya quedó obsoleta', async (): Promise<void> => {
     repository.ticket = createTicketRecord({
       ticketRevision: 2,
@@ -92,18 +148,19 @@ describe('VentasTicketsService', (): void => {
 
 class FakeVentasTicketsRepository implements VentasTicketsRepository {
   ticket: VentaTicketRecord | null = createTicketRecord();
-
   markResult: boolean = true;
-
   markCalls: number = 0;
-
   lastMarkedRevision: number | null = null;
+  readonly queuedTickets: (VentaTicketRecord | null)[] = [];
 
   /**
-   * Devuelve el snapshot configurado para el test.
+   * Devuelve el siguiente snapshot encolado o el
+   * snapshot estable configurado para el test.
    */
   findByVentaId(): Promise<VentaTicketRecord | null> {
-    return Promise.resolve(this.ticket);
+    const queuedTicket: VentaTicketRecord | null | undefined = this.queuedTickets.shift();
+
+    return Promise.resolve(queuedTicket === undefined ? this.ticket : queuedTicket);
   }
 
   /**
@@ -119,14 +176,24 @@ class FakeVentasTicketsRepository implements VentasTicketsRepository {
 
 class FakeVentaTicketPdfStorage implements VentaTicketPdfStorage {
   existsResult: boolean = false;
-
   saveCalls: number = 0;
+  readResult: Uint8Array | null = null;
+  readCalls: number = 0;
 
   /**
    * Devuelve la existencia configurada para el test.
    */
   exists(): Promise<boolean> {
     return Promise.resolve(this.existsResult);
+  }
+
+  /**
+   * Simula la lectura del PDF vigente.
+   */
+  read(): Promise<Uint8Array | null> {
+    this.readCalls += 1;
+
+    return Promise.resolve(this.readResult);
   }
 
   /**

@@ -11,4 +11,9 @@ export default interface PrintingApi {
   renderPdf(documentHtml: string): Promise<Uint8Array>;
 
   printTicket(documentHtml: string): Promise<void>;
+
+  /**
+   * Imprime directamente un PDF ya materializado.
+   */
+  printPdf(pdf: Uint8Array): Promise<void>;
 }
