@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.8  
+**Versión:** 2.9  
 **Fecha:** 26 de agosto de 2026  
-**Estado:** Installation, importación legacy, Startup, auditoría/refactor transversal y los bloques **Ventas 1–11** están completados, probados y subidos. En **Ventas 12 — Postventa**, el análisis 12A y el diseño 12B están cerrados salvo la semántica TicketBAI de devoluciones/operaciones mixtas, pendiente de Berein. La implementación 12C está avanzada: **12C.1 — Infraestructura del Histórico**, **12C.2 — Filtros/listado/totales**, **12C.3 — Detalle**, **12C.4 — Correcciones postventa** y **12C.5 — Pipeline documental postventa** están completados, probados manualmente y subidos. El siguiente bloque es **12C.6 — Impresión**, centrado en reimpresión del ticket vigente y ticket regalo bajo demanda reutilizando el pipeline documental ya versionado. La prueba física con **Star TSP100/TSP143 de 80 mm** sigue pendiente y no bloquea el desarrollo.
+**Estado:** Installation, importación legacy, Startup, auditoría/refactor transversal y los bloques **Ventas 1–11** están completados, probados y subidos. En **Ventas 12 — Postventa**, el análisis 12A y el diseño 12B están cerrados salvo la semántica TicketBAI de devoluciones/operaciones mixtas, pendiente de Berein. La implementación 12C está avanzada: **12C.1 — Infraestructura del Histórico**, **12C.2 — Filtros/listado/totales**, **12C.3 — Detalle**, **12C.4 — Correcciones postventa**, **12C.5 — Pipeline documental postventa** y **12C.6 — Impresión** están completados, probados y subidos. 12C.6 incluye ticket regalo efímero, reimpresión exacta del PDF vigente con reparación documental cuando falta/está desactualizado y un refactor compartido de los builders de venta, reserva y regalo sin mezclar su semántica. El siguiente bloque es **12C.7 — Email**. La prueba física con **Star TSP100/TSP143 de 80 mm** sigue pendiente y no bloquea el desarrollo.
 
 ---
 
@@ -33,7 +33,8 @@ Debe tratarse como un documento vivo. Al completar un bloque principal de Ventas
 - Ventas 12C.3: completado.
 - Ventas 12C.4: completado, probado manualmente y subido.
 - Ventas 12C.5: completado, probado manualmente y subido.
-- Ventas 12C.6: **siguiente bloque** — reimpresión y ticket regalo.
+- Ventas 12C.6: completado, probado y subido; prueba física Star pendiente/no bloqueante.
+- Ventas 12C.7: **siguiente bloque** — envío del ticket vigente por email mediante SMTP local.
 - Hardware Star TSP100/TSP143 80 mm: prueba física pendiente y no bloqueante.
 
 Estado resumido:
@@ -53,8 +54,8 @@ Ventas 12C.2 Filtros/listado/totales        ✅
 Ventas 12C.3 Detalle                        ✅
 Ventas 12C.4 Correcciones postventa         ✅
 Ventas 12C.5 Pipeline documental            ✅
-Ventas 12C.6 Impresión                      🟦 siguiente
-Ventas 12C.7 Email                          ⬜
+Ventas 12C.6 Impresión                      ✅
+Ventas 12C.7 Email                          🟦 siguiente
 Ventas 12C.8 TicketBAI ordinario            ⬜
 Ventas 12C.9 TicketBAI devoluciones         ⏸️ Berein
 Ventas 12C.10 Regresión/cierre              ⬜
@@ -1145,33 +1146,93 @@ SQLite mantiene `ticket_revision` y `ticket_pdf_revision`; el guardado es revisi
 
 Este mismo mecanismo queda preparado para una futura aceptación/reintento TicketBAI que modifique el contenido fiscal del ticket.
 
-## 10.2 12C.6 — Impresión 🟦 SIGUIENTE
+## 10.2 12C.6 — Impresión ✅
 
-Objetivo:
+Cerrado, probado y subido. El bloque se dividió en tres piezas coherentes.
 
-- permitir reimprimir desde Histórico el ticket vigente de cualquier venta nueva o legacy;
-- generar e imprimir ticket regalo bajo demanda;
-- no persistir el ticket regalo como histórico separado;
-- reutilizar la infraestructura de impresión silenciosa ya existente;
-- un fallo de impresión nunca modifica venta ni revisiones documentales.
+### 10.2.1 Ticket regalo efímero ✅
 
-Reglas de ticket regalo ya cerradas:
+- builder propio `venta-gift-ticket-document.builder.ts`;
+- se genera desde el snapshot persistido de la venta;
+- no crea PDF histórico, no toca `ticket_revision` ni `ticket_pdf_revision`;
+- se imprime mediante el pipeline HTML de impresión silenciosa ya existente;
+- conserva cabecera del negocio, fecha, referencia, empleado, artículos/cantidades, QR comercial local y frases;
+- oculta cliente, PVP, descuentos, importes de línea, total, pagos, entregado/cambio e IVA;
+- muestra `TICKET REGALO`;
+- en operación mixta incluye solo líneas con `unidades > 0`;
+- devolución pura: UI deshabilitada por capacidad backend y builder rechaza defensivamente una operación sin líneas positivas;
+- **nunca debe incorporar QR ni datos específicos de TicketBAI**. El QR que conserva es exclusivamente el QR comercial/local asociado a `-idVenta`.
 
-- mantener negocio, fecha, referencia, empleado, artículos/cantidades, QR comercial, frases y futuros datos fiscales aplicables;
-- ocultar cliente, PVP, descuentos, importes de línea, total, pagos, entregado/cambio e IVA;
-- mostrar claramente `TICKET REGALO`;
-- en operación mixta, incluir solo líneas positivas;
-- devolución pura: deshabilitado.
+### 10.2.2 Reimpresión exacta del PDF vigente ✅
 
-Antes de implementar debe revisarse el builder HTML actual del ticket, la infraestructura de impresión y la UI actual del detalle Histórico para decidir la forma más simple de reutilizar el documento vigente y construir la variante regalo.
+La reimpresión histórica no reconstruye HTML si existe un PDF vigente. Flujo:
 
-## 10.3 12C.7 — Email
+```text
+Histórico → Reimprimir
+  ↓
+VentasTicketsService.getCurrentPdf(idVenta)
+  ├─ revisión DB vigente + archivo presente → devuelve exactamente esos bytes
+  └─ ausente/desactualizado → null
+                               ↓
+                    generateAndSavePdf(idVenta)
+                               ↓
+                    pipeline revision-aware 12C.5
+                               ↓
+                    volver a leer PDF vigente
+  ↓
+PrintingService.printPdf(pdf)
+  ↓
+Electron imprime el PDF materializado
+```
 
-- backend SMTP local;
-- destinatario manual;
-- adjuntar PDF vigente;
-- sin persistir email introducido;
-- errores de SMTP no modifican venta.
+Detalles:
+
+- `VentaTicketPdfStorage` expone `read(idVenta)` además de `exists/save`;
+- `getCurrentPdf` comprueba `ticket_revision == ticket_pdf_revision` antes de leer y vuelve a comprobar después para descartar carreras;
+- si falta físicamente `{id}.pdf` o está desactualizado, Angular repara primero mediante el pipeline 12C.5;
+- una reimpresión correcta no incrementa revisiones ni crea una revisión histórica nueva;
+- el renderer Electron carga temporalmente los bytes PDF en una `BrowserWindow` oculta y los envía silenciosamente a la impresora configurada;
+- el temporal se elimina al finalizar;
+- `PrintingService` comparte la misma validación de impresora para HTML y PDF;
+- los errores de impresión nunca modifican venta, Caja ni revisiones documentales.
+
+La prueba física Star TSP100/TSP143 80 mm sigue pendiente. Sin impresora se validó que el flujo llega correctamente al error de impresora y que no altera revisiones/archivos indebidamente.
+
+### 10.2.3 Refactor documental común ✅
+
+Se creó `src/app/model/tickets/ticket-document-shared.utils.ts` para extraer solo duplicación demostrada entre builders:
+
+- resolución de nombre fiscal/comercial;
+- cabecera del negocio;
+- logo/redes en variante `branded`;
+- cabecera simple en variante `plain`;
+- frases de ticket;
+- formato compartido de fecha/importes/porcentajes.
+
+Se mantienen builders independientes para venta, reserva y regalo. No existe un builder genérico con flags de negocio.
+
+Diferencias preservadas:
+
+- venta y regalo: cabecera `branded`, logo, nombre fiscal y redes;
+- reserva: cabecera `plain`, sin logo ni redes, prioriza `nombreComercial`;
+- reserva mantiene su tratamiento temporal propio;
+- venta mantiene economía/IVA/pagos;
+- regalo mantiene exclusión económica y exclusión explícita de TicketBAI.
+
+## 10.3 12C.7 — Email 🟦 SIGUIENTE
+
+Diseño funcional ya acordado:
+
+- envío SMTP desde Electron/backend local, no desde la futura API remota;
+- configuración no secreta en `appData.emailSmtp` (`host`, `port`, `secure`, `user`) y contraseña en almacenamiento seguro;
+- destinatario introducido manualmente para ese envío; no se persiste por defecto;
+- remitente SMTP = usuario configurado; nombre visible = `appData.nombre`;
+- adjuntar siempre el PDF vigente de la venta;
+- si el PDF falta o está desactualizado, debe repararse usando el pipeline documental ya existente antes de adjuntarlo;
+- error de SMTP o de preparación del email nunca modifica venta, Caja ni revisiones comerciales;
+- asunto/cuerpo configurables podrán añadirse después, con placeholders como `{nombreNegocio}` y `{referencia}`; no introducir abstracción prematura si aún no existe UI/config para ello.
+
+Antes de implementar se debe revisar la configuración SMTP actual importada, el almacenamiento seguro de secretos, composition root, contratos IPC y la UI actual del detalle Histórico.
 
 ## 10.4 12C.8 — TicketBAI ordinario
 
@@ -1293,12 +1354,23 @@ Pruebas manuales de 12C.5 realizadas y validadas:
 - los PDFs vigentes e históricos se comprobaron físicamente en el directorio de tickets;
 - batería completa verde y cambios subidos al repositorio.
 
+Pruebas manuales de 12C.6 realizadas y validadas:
+
+- ticket regalo visible en Histórico y generado desde snapshot persistido;
+- preview del ticket regalo validada mediante `renderPdf()` desde DevTools, sin persistir el documento;
+- ticket regalo sin información económica/cliente y con QR comercial local;
+- reimpresión de PDF vigente no modifica revisiones ni crea archivo histórico nuevo;
+- ausencia física del PDF vigente fuerza reparación mediante 12C.5 antes de intentar imprimir;
+- sin impresora física, el flujo alcanza correctamente el error de impresora configurada/no disponible sin mutar la venta;
+- refactor compartido de builders conserva las diferencias de venta/reserva/regalo;
+- batería automatizada verde y cambios subidos.
+
 ---
 
 # 13. Limitaciones / bloqueos conocidos
 
 1. **TicketBAI devoluciones/operaciones mixtas**: pendiente de Berein.
-2. **Star TSP100/TSP143 80 mm**: prueba física pendiente, no bloqueante.
+2. **Star TSP100/TSP143 80 mm**: prueba física pendiente, no bloqueante. 12C.6 está funcionalmente cerrado sin esa validación de hardware.
 3. **PDF postventa**: resuelto en 12C.5 mediante revisiones y versionado físico. Un fallo post-COMMIT puede dejar `ticket_revision != ticket_pdf_revision`, pero nunca invalida la venta/corrección.
 4. GitHub Raw puede devolver contenido cacheado/stale; si no se puede verificar frescura, usar archivos adjuntos actuales.
 
@@ -1308,7 +1380,7 @@ Pruebas manuales de 12C.5 realizadas y validadas:
 
 Continuar por:
 
-# Ventas 12C.6 — Impresión
+# Ventas 12C.7 — Email
 
 Estado de entrada al siguiente turno:
 
@@ -1318,34 +1390,34 @@ Estado de entrada al siguiente turno:
 12C.3 Detalle                                 ✅
 12C.4 Correcciones postventa                  ✅
 12C.5 Pipeline documental                     ✅
-12C.6 Impresión                               🟦 siguiente
-12C.7 Email                                   ⬜
+12C.6 Impresión                               ✅
+12C.7 Email                                   🟦 siguiente
 12C.8 TicketBAI ordinario                     ⬜
 12C.9 TicketBAI devoluciones                  ⏸️ Berein
 12C.10 Regresión/cierre                       ⬜
 ```
 
-Punto de partida de 12C.6:
+Punto de partida de 12C.7:
 
-1. revisar el builder HTML actual del ticket normal y sus tests;
-2. revisar `PrintingService`/contratos e implementación Electron de impresión;
-3. revisar el servicio Angular actual de documento de ticket y el detalle Histórico;
-4. decidir si la reimpresión debe usar el HTML revision-aware actual o el PDF vigente sin introducir complejidad innecesaria;
-5. implementar acción real **Reimprimir ticket** en Histórico;
-6. implementar variante **Ticket regalo** bajo demanda con las reglas funcionales ya cerradas;
-7. mantener el ticket regalo fuera del histórico documental persistido;
-8. cubrir normal, operación mixta y devolución pura;
-9. batería completa + prueba manual;
-10. cerrar 12C.6 y actualizar este documento.
+1. revisar el contrato `AppData` y la configuración `emailSmtp` importada desde `.otpv`;
+2. revisar cómo se persiste/recupera `emailSmtpPass` mediante `safeStorage`;
+3. revisar composition root y fronteras IPC disponibles para un servicio backend de email;
+4. crear un contrato backend `EmailSender` separado de la orquestación de Ventas;
+5. implementar SMTP local (previsiblemente Nodemailer) sin exponer contraseña al renderer;
+6. obtener/reparar el PDF vigente reutilizando 12C.5/12C.6;
+7. UI en Histórico para introducir un destinatario de un solo uso y enviar el ticket;
+8. no persistir el email manual introducido;
+9. error SMTP/preparación documental nunca modifica la venta;
+10. tests + prueba manual controlada y cierre 12C.7.
 
-Regla ya cerrada: un fallo de impresión **no cambia la venta, Caja, `ticket_revision` ni `ticket_pdf_revision`**.
+Regla ya cerrada: el PDF adjunto debe ser el **PDF vigente materializado**; no debe reconstruirse un HTML alternativo para el email.
 
 ---
 
 # 15. Prompt de arranque para una conversación nueva
 
 ```text
-Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” versión 2.8 como contexto principal.
+Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” versión 2.9 como contexto principal.
 
 Estado general:
 - Installation + importación `.otpv` v2: completadas y probadas.
@@ -1357,33 +1429,39 @@ Estado general:
 - Ventas 12C.2 — Filtros/listado/totales: completado.
 - Ventas 12C.3 — Detalle: completado.
 - Ventas 12C.4 — Correcciones postventa: completado, probado y subido.
-- Ventas 12C.5 — Pipeline documental postventa: COMPLETADO, probado y subido.
-- Ventas 12C.6 — Impresión: SIGUIENTE.
+- Ventas 12C.5 — Pipeline documental postventa: completado, probado y subido.
+- Ventas 12C.6 — Impresión: COMPLETADO, probado y subido.
+- Ventas 12C.7 — Email: SIGUIENTE.
 
 12C.5 cerrado:
 - `venta` tiene `ticket_revision` y `ticket_pdf_revision`;
-- venta nueva comienza 1/0 y el PDF generado la lleva a 1/1;
-- cambio material de cliente/pago incrementa `ticket_revision` dentro de la misma transacción;
-- `VentaTicketRecord` / `VentaTicketInterface` incluyen revisiones;
-- `savePdf(idVenta, expectedRevision, pdf)` rechaza snapshots obsoletos;
-- `markPdfRevision` solo confirma si la revisión sigue vigente;
 - `{id}.pdf` es vigente y `{id}_{timestamp}.pdf` archiva versiones anteriores;
-- el storage usa temporal, archivo previo y restauración defensiva;
-- si falta físicamente un PDF marcado vigente, se puede regenerar;
-- cambio cliente/pago regenera PDF post-COMMIT;
-- fallo documental no revierte la corrección;
-- tests de carrera/versionado verdes;
-- comprobados manualmente campos de SQLite y PDFs archivados/vigentes.
+- guardado revision-aware y protección frente a carreras;
+- postventa incrementa revisión dentro de la transacción y regenera PDF post-COMMIT;
+- fallo documental nunca revierte la operación.
 
-Siguiente paso exacto — 12C.6:
-- reimpresión desde Histórico;
-- ticket regalo bajo demanda, no persistido;
-- mantener negocio, fecha, referencia, empleado, artículos/cantidades, QR comercial, frases y futuros datos fiscales;
-- ocultar cliente, precios, descuentos, importes, total, pagos, entregado/cambio e IVA;
-- marcar `TICKET REGALO`;
-- operación mixta: solo líneas positivas;
-- devolución pura: deshabilitado;
-- fallo de impresión nunca modifica venta ni revisiones documentales.
+12C.6 cerrado:
+- ticket regalo efímero, no persistido, sin cambios de revisión;
+- ticket regalo: líneas positivas, sin cliente/economía/IVA/pagos, con QR comercial local;
+- ticket regalo nunca llevará QR ni datos TicketBAI;
+- reimpresión histórica usa exactamente el PDF vigente, no reconstruye HTML si el PDF está materializado;
+- storage permite leer `{id}.pdf` y backend valida revisión antes/después de la lectura;
+- PDF ausente/desactualizado se repara mediante pipeline 12C.5 antes de reimprimir;
+- `PrintingService.printPdf()` imprime los bytes PDF mediante Electron;
+- fallo de impresión no modifica venta ni revisiones;
+- refactor `ticket-document-shared.utils.ts` comparte cabecera/redes/frases/formato sin fusionar builders;
+- venta/regalo mantienen cabecera branded y reserva cabecera plain;
+- prueba física Star 80 mm sigue pendiente/no bloqueante.
+
+Siguiente paso exacto — 12C.7 Email:
+- SMTP local desde Electron/backend;
+- `appData.emailSmtp` contiene host/port/secure/user;
+- contraseña SMTP se mantiene en almacenamiento seguro, nunca en renderer;
+- destinatario manual de un solo uso, no persistido por defecto;
+- From SMTP user + display name `appData.nombre`;
+- adjuntar siempre PDF vigente; si falta/desactualizado, repararlo antes;
+- errores de SMTP no cambian venta/Caja/revisiones;
+- diseñar contrato `EmailSender`, implementación SMTP, IPC y UI Histórico sin abstracciones prematuras.
 
 Reglas de trabajo:
 - al inicio de cada bloque/subpaso, mostrar lista completa ✅/🟦/⬜/⏸️ y explicar el objetivo;
@@ -1419,4 +1497,5 @@ La prueba física Star TSP100/TSP143 de 80 mm sigue pendiente pero no bloquea Po
 | 2.5 | 24-08-2026 | Rediseño Finalizar venta cerrado; 12C listo para comenzar. |
 | 2.6 | 25-08-2026 | 12C.1, 12C.2 y 12C.3 completados. 12C.4 avanzado: contratos, servicio backend, repository transaccional y tests SQLite reales completados y subidos. |
 | 2.7 | 26-08-2026 | 12C.4 completado, probado manualmente y subido: backend transaccional, tests, IPC/preload, Angular, UI, invalidación de estadísticas y refresco Histórico. Siguiente: 12C.5 Pipeline documental postventa. |
-| **2.8** | **26-08-2026** | **12C.5 completado y validado: revisiones documentales en SQLite, guardado revision-aware, versionado físico de PDFs, regeneración postventa y tests de carrera. Siguiente: 12C.6 Impresión/reimpresión y ticket regalo.** |
+| 2.8 | 26-08-2026 | 12C.5 completado y validado: revisiones documentales en SQLite, guardado revision-aware, versionado físico de PDFs, regeneración postventa y tests de carrera. Siguiente: 12C.6 Impresión/reimpresión y ticket regalo. |
+| **2.9** | **26-08-2026** | **12C.6 completado y validado: ticket regalo efímero, reimpresión exacta/reparación del PDF vigente, impresión PDF binaria y refactor común de builders. Siguiente: 12C.7 Email.** |
