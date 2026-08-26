@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.9  
+**Versión:** 2.10  
 **Fecha:** 26 de agosto de 2026  
-**Estado:** Installation, importación legacy, Startup, auditoría/refactor transversal y los bloques **Ventas 1–11** están completados, probados y subidos. En **Ventas 12 — Postventa**, el análisis 12A y el diseño 12B están cerrados salvo la semántica TicketBAI de devoluciones/operaciones mixtas, pendiente de Berein. La implementación 12C está avanzada: **12C.1 — Infraestructura del Histórico**, **12C.2 — Filtros/listado/totales**, **12C.3 — Detalle**, **12C.4 — Correcciones postventa**, **12C.5 — Pipeline documental postventa** y **12C.6 — Impresión** están completados, probados y subidos. 12C.6 incluye ticket regalo efímero, reimpresión exacta del PDF vigente con reparación documental cuando falta/está desactualizado y un refactor compartido de los builders de venta, reserva y regalo sin mezclar su semántica. El siguiente bloque es **12C.7 — Email**. La prueba física con **Star TSP100/TSP143 de 80 mm** sigue pendiente y no bloquea el desarrollo.
+**Estado:** Installation, importación legacy, Startup, auditoría/refactor transversal y los bloques **Ventas 1–11** están completados, probados y subidos. En **Ventas 12 — Postventa**, el análisis 12A y el diseño 12B están cerrados salvo la semántica TicketBAI de devoluciones/operaciones mixtas, pendiente de Berein. La implementación 12C está muy avanzada: **12C.1–12C.6** están completados, probados y subidos. En **12C.7 — Email**, los subbloques **12C.7A — Configuración + secretos + infraestructura SMTP** y **12C.7B — Caso de uso backend de envío** están completados, con batería de tests verde y cambios subidos. El siguiente paso exacto es **12C.7C — Wiring IPC + Angular + UI de Histórico**, que conectará el `SecretStorage` operacional, `NodemailerEmailSender` y `VentasTicketEmailService`, añadirá el canal IPC y permitirá introducir un destinatario manual de un solo uso, reparar el PDF vigente si hiciera falta y solicitar su envío. La prueba física con **Star TSP100/TSP143 de 80 mm** sigue pendiente y no bloquea el desarrollo.
 
 ---
 
@@ -34,7 +34,9 @@ Debe tratarse como un documento vivo. Al completar un bloque principal de Ventas
 - Ventas 12C.4: completado, probado manualmente y subido.
 - Ventas 12C.5: completado, probado manualmente y subido.
 - Ventas 12C.6: completado, probado y subido; prueba física Star pendiente/no bloqueante.
-- Ventas 12C.7: **siguiente bloque** — envío del ticket vigente por email mediante SMTP local.
+- Ventas 12C.7A: completado, probado y subido — configuración `ticketEmail`, compatibilidad, `EmailSender` y Nodemailer.
+- Ventas 12C.7B: completado, probado y subido — caso de uso backend `VentasTicketEmailService`.
+- Ventas 12C.7C: **siguiente subbloque** — composition root, IPC/preload, Angular y UI Histórico.
 - Hardware Star TSP100/TSP143 80 mm: prueba física pendiente y no bloqueante.
 
 Estado resumido:
@@ -55,7 +57,11 @@ Ventas 12C.3 Detalle                        ✅
 Ventas 12C.4 Correcciones postventa         ✅
 Ventas 12C.5 Pipeline documental            ✅
 Ventas 12C.6 Impresión                      ✅
-Ventas 12C.7 Email                          🟦 siguiente
+Ventas 12C.7 Email                          🟦 en curso
+  12C.7A Config + secretos + SMTP            ✅
+  12C.7B Caso de uso backend                 ✅
+  12C.7C IPC + Angular + UI Histórico         🟦 siguiente
+  12C.7D Prueba SMTP real y cierre            ⬜
 Ventas 12C.8 TicketBAI ordinario            ⬜
 Ventas 12C.9 TicketBAI devoluciones         ⏸️ Berein
 Ventas 12C.10 Regresión/cierre              ⬜
@@ -1219,20 +1225,284 @@ Diferencias preservadas:
 - venta mantiene economía/IVA/pagos;
 - regalo mantiene exclusión económica y exclusión explícita de TicketBAI.
 
-## 10.3 12C.7 — Email 🟦 SIGUIENTE
+## 10.3 12C.7 — Email 🟦 EN CURSO
 
-Diseño funcional ya acordado:
+El bloque se ha dividido en cuatro subbloques para mantener separadas configuración, caso de uso, wiring/UI y validación real.
 
-- envío SMTP desde Electron/backend local, no desde la futura API remota;
-- configuración no secreta en `appData.emailSmtp` (`host`, `port`, `secure`, `user`) y contraseña en almacenamiento seguro;
-- destinatario introducido manualmente para ese envío; no se persiste por defecto;
-- remitente SMTP = usuario configurado; nombre visible = `appData.nombre`;
-- adjuntar siempre el PDF vigente de la venta;
-- si el PDF falta o está desactualizado, debe repararse usando el pipeline documental ya existente antes de adjuntarlo;
-- error de SMTP o de preparación del email nunca modifica venta, Caja ni revisiones comerciales;
-- asunto/cuerpo configurables podrán añadirse después, con placeholders como `{nombreNegocio}` y `{referencia}`; no introducir abstracción prematura si aún no existe UI/config para ello.
+### 10.3.1 12C.7A — Configuración + secretos + infraestructura SMTP ✅
 
-Antes de implementar se debe revisar la configuración SMTP actual importada, el almacenamiento seguro de secretos, composition root, contratos IPC y la UI actual del detalle Histórico.
+Completado, probado y subido.
+
+#### Configuración persistida
+
+Se añadió una configuración propia para el contenido del email, separada deliberadamente del transporte SMTP:
+
+```text
+appData.emailSmtp
+├── host
+├── port
+├── secure
+└── user
+
+appData.ticketEmail
+├── subjectTemplate
+└── bodyTemplate
+
+secrets.json (safeStorage)
+└── emailSmtpPass
+```
+
+`emailSmtp` sigue representando exclusivamente **cómo conectar con el servidor**. `ticketEmail` representa **qué asunto/cuerpo enviar**.
+
+Valores por defecto:
+
+```text
+Asunto:
+{nombreNegocio} - Ticket {referencia}
+
+Cuerpo:
+Adjuntamos el ticket correspondiente a su compra.
+Gracias por su confianza.
+```
+
+Variables admitidas:
+
+```text
+{nombreNegocio}
+{referencia}
+```
+
+No se admiten variables arbitrarias. Frontend y backend validan las plantillas.
+
+#### Compatibilidad hacia atrás
+
+`AppData` actual exige siempre `ticketEmail`, pero las fuentes antiguas se normalizan al entrar:
+
+- `JsonAppDataRepository`: si un `app_data.json` anterior no contiene `ticketEmail`, aplica los valores por defecto;
+- importación `.otpv`: `YauzlLegacyImportPackageConfigurationReader` construye `ticketEmail` con los defaults, porque el paquete legacy no conocía esta configuración;
+- los fixtures `AppData` existentes se actualizaron para representar el modelo normalizado actual.
+
+No se hizo opcional `ticketEmail` en el dominio actual solo para acomodar formatos antiguos.
+
+#### Installation
+
+La nueva instalación permite configurar en el paso SMTP:
+
+- host;
+- puerto;
+- seguridad `none | tls | ssl`;
+- usuario;
+- contraseña;
+- asunto del email;
+- cuerpo del email.
+
+El formulario muestra las variables permitidas y valida asunto/cuerpo cuando SMTP está activo. El comando de instalación incluye un bloque `ticketEmail`, que `installation-app-data.mapper.ts` conserva en `AppData`. La contraseña SMTP sigue entrando exclusivamente por `InstallationSecretsData.emailSmtpPass`.
+
+#### Almacenamiento seguro
+
+La infraestructura existente ya cubría la necesidad:
+
+```text
+ElectronSafeStorageSecretStorage
+  ↓
+safeStorage de Electron
+  ↓
+secrets.json cifrado
+```
+
+`ApplicationPaths` distingue:
+
+```text
+secretsFile
+stagingSecretsFile
+```
+
+Durante 12C.7A **no se creó aún el storage operacional en el composition root**, porque todavía no existía un consumidor conectado. Ese wiring se hará en 12C.7C.
+
+#### `EmailSender` + Nodemailer
+
+Se añadió un contrato backend independiente de Ventas:
+
+```text
+electron/backend/contracts/email/email-sender.interface.ts
+```
+
+Conceptos principales:
+
+```text
+EmailSenderSmtpConfig
+EmailSenderAttachment
+EmailSendRequest
+EmailSender
+```
+
+El contrato no conoce `AppData`, Ventas, `safeStorage` ni Histórico.
+
+Implementación:
+
+```text
+electron/infrastructure/email/nodemailer-email.sender.ts
+```
+
+Se añadió Nodemailer al proyecto y se mantiene dentro del bundle Electron; `build-electron.mjs` no necesita externalizarlo.
+
+Semántica de seguridad acordada:
+
+```text
+none → secure=false + ignoreTLS=true
+tls  → secure=false + requireTLS=true
+ssl  → secure=true
+```
+
+El adaptador:
+
+- construye el adjunto desde `Uint8Array`/`Buffer`, no desde rutas o URLs;
+- activa `disableFileAccess` y `disableUrlAccess`;
+- cierra siempre el transporter;
+- no propaga el error SMTP original al caller, para evitar filtrar credenciales o detalles sensibles.
+
+Tests cubren `tls`, `ssl`, `none`, adjunto, cierre del transporter y sanitización del error.
+
+### 10.3.2 12C.7B — Caso de uso backend de envío ✅
+
+Completado, probado y subido.
+
+Nuevo contrato público:
+
+```text
+electron/contracts/ventas/venta-ticket-email.interface.ts
+
+VentaTicketEmailCommand
+├── idVenta
+└── destinatario
+```
+
+Nuevo caso de uso:
+
+```text
+electron/backend/application/ventas/ventas-ticket-email.service.ts
+```
+
+Dependencias:
+
+```text
+ConfigurationService
+        +
+SecretStorage operacional
+        +
+VentasTicketsService
+        +
+EmailSender
+        ↓
+VentasTicketEmailService
+```
+
+El storage operacional todavía no está conectado en composition root; en los tests se inyecta un fake. La conexión real se hará en 12C.7C.
+
+#### Flujo autoritativo
+
+```text
+send({ idVenta, destinatario })
+  ↓
+validar idVenta + email manual
+  ↓
+ConfigurationService.load()
+  ↓
+validar appData.emailSmtp
+  ↓
+SecretStorage.load() → emailSmtpPass
+  ↓
+VentasTicketsService.getByVentaId()
+  ↓
+VentasTicketsService.getCurrentPdf()
+  ├─ null → error: PDF vigente no disponible
+  └─ bytes vigentes
+  ↓
+releer ticket y comprobar revisión
+  ↓
+renderizar plantillas
+  ↓
+EmailSender.send(...)
+```
+
+`VentasTicketEmailService` **no genera PDFs**. Si el vigente falta o está desactualizado, rechaza el envío. En 12C.7C Angular reparará primero el documento reutilizando `VentaTicketDocumentService.generateAndSavePdf()` y después volverá a solicitar el envío.
+
+#### Destinatario y persistencia
+
+- el destinatario se introduce manualmente para esa operación;
+- se normaliza con `trim()` y se valida defensivamente;
+- no se guarda en `venta`, `cliente`, `AppData` ni ningún otro almacenamiento;
+- el backend no altera venta, Caja ni revisiones por un envío correcto o fallido.
+
+#### Remitente y plantillas
+
+- dirección `From`: usuario SMTP configurado;
+- display name `From`: `appData.nombre`;
+- `{nombreNegocio}`: prioriza `appData.nombreComercial`; fallback al nombre fiscal / `Osumi TPV`;
+- `{referencia}`: serie + número con forma `A-456` cuando existe serie;
+- adjunto: `ticket-{referencia}.pdf`, sanitizando la referencia para nombre de archivo.
+
+#### Protección frente a PDF obsoleto
+
+`VentasTicketsService.getCurrentPdf()` ya comprueba la revisión documental antes y después de leer el filesystem. El caso de uso hace además una última relectura del ticket antes de entregarlo a SMTP:
+
+```text
+getByVentaId()                → revisión N
+getCurrentPdf()
+  ├─ DB N/N
+  ├─ leer {id}.pdf
+  └─ DB N/N
+getByVentaId()                → sigue N/N ?
+  ├─ sí → preparar SMTP
+  └─ no → cancelar
+```
+
+No se intenta mantener una transacción SQLite abierta durante SMTP ni fingir atomicidad distribuida. La garantía práctica es no seleccionar conscientemente un PDF que ya esté marcado como obsoleto y volver a comprobar el snapshot inmediatamente antes del envío.
+
+Tests cubren:
+
+- envío correcto con configuración + secreto;
+- destinatario normalizado;
+- adjunto PDF vigente;
+- SMTP no configurado;
+- contraseña SMTP ausente;
+- destinatario inválido;
+- PDF vigente ausente;
+- cambio de revisión durante la preparación.
+
+El usuario confirmó batería verde y subió todos los cambios al repositorio.
+
+### 10.3.3 12C.7C — Wiring IPC + Angular + UI Histórico 🟦 SIGUIENTE
+
+Siguiente lote exacto:
+
+1. crear `SecretStorage` operacional apuntando a `applicationPaths.secretsFile`;
+2. instanciar `NodemailerEmailSender`;
+3. instanciar `VentasTicketEmailService` con `ConfigurationService`, storage operacional, `VentasTicketsService` y `EmailSender`;
+4. conectar el servicio al composition root;
+5. añadir canal IPC de envío de ticket por email;
+6. ampliar `VentasApi` y preload sin exponer configuración secreta ni contraseña;
+7. crear/ajustar servicio Angular para solicitar el envío;
+8. incorporar acción **Enviar por email** en el detalle Histórico;
+9. pedir un email manual de un solo uso, con validación UI;
+10. antes de enviar, comprobar si existe PDF vigente y, si falta/desactualizado, materializarlo mediante `VentaTicketDocumentService.generateAndSavePdf()`;
+11. después solicitar el envío backend;
+12. mostrar éxito/error sin modificar venta, Caja ni revisiones.
+
+No se debe enviar HTML alternativo ni reconstruir un documento específico para correo. El adjunto es siempre el **PDF vigente materializado**.
+
+### 10.3.4 12C.7D — Prueba SMTP real y cierre ⬜
+
+Pendiente después del wiring/UI:
+
+- batería completa;
+- prueba manual con SMTP real/controlado;
+- validar `none/tls/ssl` hasta donde permita el servidor de pruebas;
+- comprobar adjunto recibido y nombre de archivo;
+- comprobar asunto/cuerpo y sustitución de variables;
+- comprobar error de credenciales/servidor sin mutaciones comerciales;
+- comprobar reparación previa de PDF ausente/desactualizado;
+- cerrar 12C.7 y actualizar este documento.
 
 ## 10.4 12C.8 — TicketBAI ordinario
 
@@ -1365,6 +1635,26 @@ Pruebas manuales de 12C.6 realizadas y validadas:
 - refactor compartido de builders conserva las diferencias de venta/reserva/regalo;
 - batería automatizada verde y cambios subidos.
 
+Pruebas de 12C.7A realizadas y validadas:
+
+- compatibilidad de `app_data.json` sin `ticketEmail` mediante defaults;
+- instalación nueva con asunto/cuerpo configurables y variables permitidas;
+- validator frontend/backend rechaza variables no soportadas;
+- importación `.otpv` legacy crea `ticketEmail` con defaults;
+- `NodemailerEmailSender` cubre `tls`, `ssl`, `none`, adjuntos, cierre del transporter y sanitización de errores;
+- `npm run typecheck:electron` detectó y se corrigió el constructor `AppData` del reader legacy;
+- batería completa verde y cambios subidos.
+
+Pruebas de 12C.7B realizadas y validadas:
+
+- caso de uso backend envía configuración, secreto y PDF vigente al `EmailSender` fake;
+- rechaza SMTP ausente, contraseña ausente, destinatario inválido y PDF vigente ausente;
+- cancela si cambia la revisión mientras se prepara el envío;
+- el destinatario no se persiste;
+- batería de tests/typecheck/lint/build verde y cambios subidos.
+
+La prueba SMTP real queda pendiente de 12C.7D, después del wiring IPC/UI.
+
 ---
 
 # 13. Limitaciones / bloqueos conocidos
@@ -1372,7 +1662,8 @@ Pruebas manuales de 12C.6 realizadas y validadas:
 1. **TicketBAI devoluciones/operaciones mixtas**: pendiente de Berein.
 2. **Star TSP100/TSP143 80 mm**: prueba física pendiente, no bloqueante. 12C.6 está funcionalmente cerrado sin esa validación de hardware.
 3. **PDF postventa**: resuelto en 12C.5 mediante revisiones y versionado físico. Un fallo post-COMMIT puede dejar `ticket_revision != ticket_pdf_revision`, pero nunca invalida la venta/corrección.
-4. GitHub Raw puede devolver contenido cacheado/stale; si no se puede verificar frescura, usar archivos adjuntos actuales.
+4. **Email SMTP real**: la infraestructura y el caso de uso están probados con fakes; la prueba contra un servidor SMTP real/controlado queda para 12C.7D después del wiring/UI.
+5. GitHub Raw puede devolver contenido cacheado/stale; si no se puede verificar frescura, usar archivos adjuntos actuales.
 
 ---
 
@@ -1380,7 +1671,7 @@ Pruebas manuales de 12C.6 realizadas y validadas:
 
 Continuar por:
 
-# Ventas 12C.7 — Email
+# Ventas 12C.7C — Wiring IPC + Angular + UI Histórico
 
 Estado de entrada al siguiente turno:
 
@@ -1391,33 +1682,52 @@ Estado de entrada al siguiente turno:
 12C.4 Correcciones postventa                  ✅
 12C.5 Pipeline documental                     ✅
 12C.6 Impresión                               ✅
-12C.7 Email                                   🟦 siguiente
+12C.7 Email                                   🟦 en curso
+  12C.7A Config + secretos + SMTP             ✅
+  12C.7B Caso de uso backend                  ✅
+  12C.7C IPC + Angular + UI Histórico         🟦 siguiente
+  12C.7D Prueba SMTP real y cierre            ⬜
 12C.8 TicketBAI ordinario                     ⬜
 12C.9 TicketBAI devoluciones                  ⏸️ Berein
 12C.10 Regresión/cierre                       ⬜
 ```
 
-Punto de partida de 12C.7:
+Punto de partida exacto de 12C.7C:
 
-1. revisar el contrato `AppData` y la configuración `emailSmtp` importada desde `.otpv`;
-2. revisar cómo se persiste/recupera `emailSmtpPass` mediante `safeStorage`;
-3. revisar composition root y fronteras IPC disponibles para un servicio backend de email;
-4. crear un contrato backend `EmailSender` separado de la orquestación de Ventas;
-5. implementar SMTP local (previsiblemente Nodemailer) sin exponer contraseña al renderer;
-6. obtener/reparar el PDF vigente reutilizando 12C.5/12C.6;
-7. UI en Histórico para introducir un destinatario de un solo uso y enviar el ticket;
-8. no persistir el email manual introducido;
-9. error SMTP/preparación documental nunca modifica la venta;
-10. tests + prueba manual controlada y cierre 12C.7.
+1. `EmailSender` y `NodemailerEmailSender` ya existen y están probados;
+2. `VentasTicketEmailService` ya existe y está probado de forma aislada;
+3. `AppData.ticketEmail` es obligatorio en el modelo normalizado;
+4. `JsonAppDataRepository` aplica defaults a configuraciones antiguas;
+5. el importador `.otpv` crea `ticketEmail` con defaults;
+6. `emailSmtpPass` ya se guarda/carga mediante `ElectronSafeStorageSecretStorage`;
+7. todavía falta crear el `SecretStorage` **operacional** en composition root usando `applicationPaths.secretsFile`;
+8. todavía falta instanciar `NodemailerEmailSender` y `VentasTicketEmailService` en el grafo real;
+9. añadir IPC/API/preload para `sendTicketEmail(command)` sin exponer secretos;
+10. Angular debe reparar el PDF si `getCurrentPdf(idVenta)` devuelve `null`, usando `generateAndSavePdf(idVenta)`, y después solicitar el envío;
+11. Histórico debe permitir introducir un destinatario manual de un solo uso y lanzar la acción;
+12. no persistir el destinatario manual;
+13. mostrar éxito/error de manera postventa, sin tocar venta/Caja/revisiones;
+14. el adjunto debe ser siempre el PDF vigente materializado, nunca HTML alternativo;
+15. después realizar 12C.7D con SMTP real/controlado y cerrar Email.
 
-Regla ya cerrada: el PDF adjunto debe ser el **PDF vigente materializado**; no debe reconstruirse un HTML alternativo para el email.
+Reglas cerradas:
+
+```text
+From.address = appData.emailSmtp.user
+From.name    = appData.nombre
+{nombreNegocio} prioriza appData.nombreComercial
+{referencia} = serie-numero, por ejemplo A-456
+adjunto      = ticket-{referencia}.pdf
+```
+
+El backend `VentasTicketEmailService` no genera PDFs: si el vigente no está disponible, falla. La reparación documental pertenece al flujo Angular ya existente y el backend vuelve a validar el PDF/revisión antes del SMTP.
 
 ---
 
 # 15. Prompt de arranque para una conversación nueva
 
 ```text
-Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” versión 2.9 como contexto principal.
+Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” versión 2.10 como contexto principal.
 
 Estado general:
 - Installation + importación `.otpv` v2: completadas y probadas.
@@ -1425,13 +1735,11 @@ Estado general:
 - Auditoría transversal + Refactor A–E: completados.
 - Ventas 1–11: completados, probados y subidos.
 - Ventas 12A y diseño 12B: cerrados salvo TicketBAI para devoluciones/operaciones mixtas, pendiente de Berein.
-- Ventas 12C.1 — Infraestructura del Histórico: completado.
-- Ventas 12C.2 — Filtros/listado/totales: completado.
-- Ventas 12C.3 — Detalle: completado.
-- Ventas 12C.4 — Correcciones postventa: completado, probado y subido.
-- Ventas 12C.5 — Pipeline documental postventa: completado, probado y subido.
-- Ventas 12C.6 — Impresión: COMPLETADO, probado y subido.
-- Ventas 12C.7 — Email: SIGUIENTE.
+- Ventas 12C.1–12C.6: COMPLETADOS, probados y subidos.
+- Ventas 12C.7A — Configuración + secretos + infraestructura SMTP: COMPLETADO, probado y subido.
+- Ventas 12C.7B — Caso de uso backend de envío: COMPLETADO, probado y subido.
+- Ventas 12C.7C — Wiring IPC + Angular + UI Histórico: SIGUIENTE.
+- Ventas 12C.7D — Prueba SMTP real y cierre: pendiente.
 
 12C.5 cerrado:
 - `venta` tiene `ticket_revision` y `ticket_pdf_revision`;
@@ -1444,24 +1752,54 @@ Estado general:
 - ticket regalo efímero, no persistido, sin cambios de revisión;
 - ticket regalo: líneas positivas, sin cliente/economía/IVA/pagos, con QR comercial local;
 - ticket regalo nunca llevará QR ni datos TicketBAI;
-- reimpresión histórica usa exactamente el PDF vigente, no reconstruye HTML si el PDF está materializado;
-- storage permite leer `{id}.pdf` y backend valida revisión antes/después de la lectura;
+- reimpresión histórica usa exactamente el PDF vigente;
 - PDF ausente/desactualizado se repara mediante pipeline 12C.5 antes de reimprimir;
-- `PrintingService.printPdf()` imprime los bytes PDF mediante Electron;
+- `PrintingService.printPdf()` imprime bytes PDF mediante Electron;
 - fallo de impresión no modifica venta ni revisiones;
-- refactor `ticket-document-shared.utils.ts` comparte cabecera/redes/frases/formato sin fusionar builders;
-- venta/regalo mantienen cabecera branded y reserva cabecera plain;
+- refactor `ticket-document-shared.utils.ts` comparte piezas comunes sin fusionar builders;
 - prueba física Star 80 mm sigue pendiente/no bloqueante.
 
-Siguiente paso exacto — 12C.7 Email:
-- SMTP local desde Electron/backend;
-- `appData.emailSmtp` contiene host/port/secure/user;
-- contraseña SMTP se mantiene en almacenamiento seguro, nunca en renderer;
-- destinatario manual de un solo uso, no persistido por defecto;
-- From SMTP user + display name `appData.nombre`;
-- adjuntar siempre PDF vigente; si falta/desactualizado, repararlo antes;
-- errores de SMTP no cambian venta/Caja/revisiones;
-- diseñar contrato `EmailSender`, implementación SMTP, IPC y UI Histórico sin abstracciones prematuras.
+12C.7A cerrado:
+- `AppData` tiene `ticketEmail` separado de `emailSmtp`;
+- defaults: `{nombreNegocio} - Ticket {referencia}` y cuerpo estándar de agradecimiento;
+- variables soportadas: `{nombreNegocio}` y `{referencia}`;
+- `JsonAppDataRepository` normaliza app_data antiguos con defaults;
+- importación `.otpv` legacy también crea `ticketEmail` con defaults;
+- Installation permite configurar asunto/cuerpo y los valida frontend/backend;
+- contraseña SMTP sigue en `secrets.json` mediante Electron `safeStorage`;
+- contrato backend `EmailSender` independiente de Ventas;
+- implementación `NodemailerEmailSender` con:
+  none → secure=false + ignoreTLS=true
+  tls  → secure=false + requireTLS=true
+  ssl  → secure=true
+- Nodemailer no recibe rutas/URLs de adjuntos; se usan bytes y se bloquea file/url access;
+- errores SMTP originales no se propagan para evitar filtrar información sensible.
+
+12C.7B cerrado:
+- contrato público `VentaTicketEmailCommand { idVenta, destinatario }`;
+- servicio `VentasTicketEmailService` depende de `ConfigurationService`, `SecretStorage`, `VentasTicketsService` y `EmailSender`;
+- valida destinatario manual y no lo persiste;
+- valida SMTP + carga `emailSmtpPass` desde SecretStorage;
+- obtiene snapshot y PDF vigente;
+- vuelve a comprobar la revisión antes de entregar el documento al SMTP;
+- `{nombreNegocio}` prioriza `nombreComercial`;
+- From usa `emailSmtp.user` + display name `appData.nombre`;
+- adjunto `ticket-{referencia}.pdf`;
+- si no existe PDF vigente, el backend falla: NO lo genera;
+- tests cubren envío correcto, SMTP/secreto/PDF ausentes, destinatario inválido y carrera de revisión;
+- batería verde y cambios subidos.
+
+Siguiente paso exacto — 12C.7C:
+- crear `ElectronSafeStorageSecretStorage(applicationPaths.secretsFile)` operacional en composition root;
+- instanciar `NodemailerEmailSender`;
+- instanciar y conectar `VentasTicketEmailService`;
+- añadir canal IPC, `VentasApi` y preload para envío;
+- no exponer contraseña ni configuración sensible al renderer;
+- Angular debe comprobar/reparar PDF vigente con el pipeline documental antes de solicitar envío;
+- añadir acción “Enviar por email” en Histórico;
+- introducir destinatario manual de un solo uso, no persistido;
+- mostrar éxito/error sin modificar venta/Caja/revisiones;
+- después ejecutar 12C.7D con SMTP real/controlado y cerrar Email.
 
 Reglas de trabajo:
 - al inicio de cada bloque/subpaso, mostrar lista completa ✅/🟦/⬜/⏸️ y explicar el objetivo;
@@ -1499,3 +1837,4 @@ La prueba física Star TSP100/TSP143 de 80 mm sigue pendiente pero no bloquea Po
 | 2.7 | 26-08-2026 | 12C.4 completado, probado manualmente y subido: backend transaccional, tests, IPC/preload, Angular, UI, invalidación de estadísticas y refresco Histórico. Siguiente: 12C.5 Pipeline documental postventa. |
 | 2.8 | 26-08-2026 | 12C.5 completado y validado: revisiones documentales en SQLite, guardado revision-aware, versionado físico de PDFs, regeneración postventa y tests de carrera. Siguiente: 12C.6 Impresión/reimpresión y ticket regalo. |
 | **2.9** | **26-08-2026** | **12C.6 completado y validado: ticket regalo efímero, reimpresión exacta/reparación del PDF vigente, impresión PDF binaria y refactor común de builders. Siguiente: 12C.7 Email.** |
+| **2.10** | **26-08-2026** | **12C.7A y 12C.7B completados, probados y subidos: `ticketEmail`, compatibilidad legacy, `EmailSender` + Nodemailer y `VentasTicketEmailService` con PDF vigente, secreto seguro, plantillas y protección de revisión. Siguiente: 12C.7C IPC + Angular + UI Histórico.** |
