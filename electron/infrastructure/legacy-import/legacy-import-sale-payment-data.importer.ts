@@ -12,75 +12,50 @@ import type { QueryRunner } from 'typeorm';
 
 interface LegacySalePaymentRow {
   readonly id: number;
-
   readonly saleNumber: number;
-
   readonly total: number;
-
   readonly delivered: number;
-
   readonly mixedPayment: boolean;
-
   readonly paymentTypeId: number | null;
-
   readonly deliveredOther: number | null;
-
   readonly resultingBalance: number | null;
-
   readonly invoiced: boolean;
-
   readonly ticketBaiFingerprint: string | null;
-
   readonly ticketBaiQr: string | null;
-
   readonly ticketBaiUrl: string | null;
-
   readonly createdAt: string;
-
   readonly updatedAt: string;
-
   readonly deletedAt: string | null;
 }
 
 interface LegacyInvoiceSaleRow {
   readonly invoiceId: number;
-
   readonly saleId: number;
-
   readonly createdAt: string;
-
   readonly updatedAt: string;
 }
 
 interface MutableSalePaymentDataState {
   readonly sales: LegacySalePaymentRow[];
-
   readonly invoiceSales: LegacyInvoiceSaleRow[];
 }
 
 interface MutableImportCounters {
   importedRows: number;
-
   skippedRows: number;
-
   warningCount: number;
 }
 
 interface SaleDatabaseRow {
   readonly id: number;
-
   readonly total_cents: number;
-
   readonly created_at: string;
-
   readonly updated_at: string;
-
   readonly deleted_at: string | null;
 }
 
 interface PaymentTypeDatabaseRow {
   readonly id: number;
-
   readonly slug: string;
 }
 
@@ -90,19 +65,14 @@ interface IdRow {
 
 interface DeliveredResolution {
   readonly deliveredCents: number;
-
   readonly preserveZero: boolean;
 }
 
 interface SalePaymentDraft {
   readonly paymentTypeId: number;
-
   readonly amountCents: number;
-
   readonly deliveredCents: number | null;
-
   readonly changeCents: number;
-
   readonly resultingBalanceCents: number | null;
 }
 
@@ -118,6 +88,10 @@ const SALE_PAYMENT_DATA_TABLES: readonly string[] = ['venta', 'factura_venta'];
 const CASH_PAYMENT_TYPE_SLUG: string = 'efectivo';
 
 const MAXIMUM_REASONABLE_DELIVERED_AMOUNT: number = 1_000_000;
+
+const LEGACY_TICKET_BAI_ENVIRONMENT: string = 'production';
+
+const LEGACY_TICKET_BAI_SERIES: string = 'TPV01';
 
 export default class LegacyImportSalePaymentDataImporter implements LegacyImportPhaseImporter {
   constructor(
@@ -715,19 +689,24 @@ export default class LegacyImportSalePaymentDataImporter implements LegacyImport
       }
 
       const fingerprint: string | null = this.normalizeOptionalText(sale.ticketBaiFingerprint);
-
       const qr: string | null = this.normalizeOptionalText(sale.ticketBaiQr);
-
       const url: string | null = this.normalizeOptionalText(sale.ticketBaiUrl);
-
       const hasTicketBaiData: boolean = fingerprint !== null || qr !== null || url !== null;
-
       const status: 'legacy' | 'no_aplica' = hasTicketBaiData ? 'legacy' : 'no_aplica';
+      const environment: string | null = hasTicketBaiData ? LEGACY_TICKET_BAI_ENVIRONMENT : null;
+      const series: string | null = hasTicketBaiData ? LEGACY_TICKET_BAI_SERIES : null;
+      const number: string | null = hasTicketBaiData
+        ? String(sale.saleNumber).padStart(6, '0')
+        : null;
 
       await queryRunner.query(
         `
           INSERT INTO venta_ticketbai (
             id_venta,
+            entorno,
+            nif_emisor,
+            serie,
+            numero,
             estado,
             identificador,
             huella,
@@ -743,23 +722,21 @@ export default class LegacyImportSalePaymentDataImporter implements LegacyImport
             updated_at
           )
           VALUES (
-            ?,
-            ?,
-            NULL,
-            ?,
-            ?,
-            ?,
-            0,
-            NULL,
-            NULL,
-            NULL,
-            NULL,
-            NULL,
-            ?,
-            ?
+            ?, ?, NULL, ?, ?, ?, NULL, ?, ?, ?, 0, NULL, NULL, NULL, NULL, NULL, ?, ?
           )
         `,
-        [sale.id, status, fingerprint, qr, url, databaseSale.created_at, databaseSale.updated_at],
+        [
+          sale.id,
+          environment,
+          series,
+          number,
+          status,
+          fingerprint,
+          qr,
+          url,
+          databaseSale.created_at,
+          databaseSale.updated_at,
+        ],
       );
 
       counters.importedRows++;

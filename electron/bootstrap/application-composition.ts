@@ -30,7 +30,7 @@ import type InstallationFinalizer from '@backend/contracts/configuration/install
 import type InstallationStaging from '@backend/contracts/configuration/installation-staging.interface';
 import type LogoStorage from '@backend/contracts/configuration/logo-storage.interface';
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
-import { type EmailSender } from '@backend/contracts/email/email-sender.interface';
+import type { EmailSender } from '@backend/contracts/email/email-sender.interface';
 import type EmpleadoRepository from '@backend/contracts/empleados/empleado.repository.interface';
 import type MarcaRepository from '@backend/contracts/marcas/marca.repository.interface';
 import type HtmlDocumentRenderer from '@backend/contracts/printing/html-document-renderer.interface';

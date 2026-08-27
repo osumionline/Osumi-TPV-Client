@@ -3,6 +3,10 @@ import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type EmailSmtpConfig from '@desktop-contracts/configuration/email-smtp-config.interface';
 import type TicketBaiConfig from '@desktop-contracts/configuration/ticket-bai-config.interface';
 import {
+  DEFAULT_TICKET_BAI_ENVIRONMENT,
+  type TicketBaiEnvironment,
+} from '@desktop-contracts/configuration/ticket-bai-environment.type';
+import {
   DEFAULT_TICKET_EMAIL_BODY_TEMPLATE,
   DEFAULT_TICKET_EMAIL_SUBJECT_TEMPLATE,
   type TicketEmailConfig,
@@ -26,6 +30,14 @@ function isStringArray(value: unknown): value is string[] {
 
 function isNullableString(value: unknown): value is string | null {
   return value === null || typeof value === 'string';
+}
+
+/**
+ * Comprueba si un valor representa un entorno
+ * TicketBAI reconocido por la aplicación.
+ */
+function isTicketBaiEnvironment(value: unknown): value is TicketBaiEnvironment {
+  return value === 'test' || value === 'production';
 }
 
 function isEmailSmtpConfig(value: unknown): value is EmailSmtpConfig {
@@ -59,21 +71,32 @@ function isTicketEmailConfig(value: unknown): value is TicketEmailConfig {
   return typeof data['subjectTemplate'] === 'string' && typeof data['bodyTemplate'] === 'string';
 }
 
-function isTicketBaiConfig(value: unknown): value is TicketBaiConfig {
+type StoredTicketBaiConfig = Omit<TicketBaiConfig, 'environment'> & {
+  readonly environment?: TicketBaiEnvironment;
+};
+
+/**
+ * Comprueba tanto la configuración TicketBAI
+ * actual como el formato anterior sin entorno.
+ */
+function isStoredTicketBaiConfig(value: unknown): value is StoredTicketBaiConfig {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return false;
   }
 
   const data: Record<string, unknown> = value as Record<string, unknown>;
 
-  return isNullableString(data['nif']);
+  return (
+    isNullableString(data['nif']) &&
+    (data['environment'] === undefined || isTicketBaiEnvironment(data['environment']))
+  );
 }
 
 type StoredAppData = Omit<AppData, 'frasesTicket' | 'ticketEmail' | 'emailSmtp' | 'ticketBai'> & {
   readonly frasesTicket?: readonly string[];
   readonly ticketEmail?: TicketEmailConfig;
   readonly emailSmtp?: EmailSmtpConfig | null;
-  readonly ticketBai?: TicketBaiConfig | null;
+  readonly ticketBai?: StoredTicketBaiConfig | null;
 };
 
 function isStoredAppData(value: unknown): value is StoredAppData {
@@ -130,7 +153,7 @@ function isStoredAppData(value: unknown): value is StoredAppData {
   const validTicketBai: boolean =
     data['ticketBai'] === undefined ||
     data['ticketBai'] === null ||
-    isTicketBaiConfig(data['ticketBai']);
+    isStoredTicketBaiConfig(data['ticketBai']);
 
   return (
     validStrings &&
@@ -185,7 +208,13 @@ export default class JsonAppDataRepository implements AppDataRepository {
               },
 
         emailSmtp: parsed.emailSmtp ?? null,
-        ticketBai: parsed.ticketBai ?? null,
+        ticketBai:
+          parsed.ticketBai === undefined || parsed.ticketBai === null
+            ? null
+            : {
+                nif: parsed.ticketBai.nif,
+                environment: parsed.ticketBai.environment ?? DEFAULT_TICKET_BAI_ENVIRONMENT,
+              },
       };
     } catch (error: unknown) {
       if (isFileNotFoundError(error)) {

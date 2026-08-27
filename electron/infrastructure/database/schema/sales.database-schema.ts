@@ -551,6 +551,39 @@ const statements: readonly string[] = [
     CREATE TABLE venta_ticketbai (
       id_venta INTEGER PRIMARY KEY,
 
+      /*
+       * Entorno utilizado realmente para esta
+       * identidad fiscal.
+       *
+       * Puede ser NULL para estados históricos
+       * donde esa información no se conoce.
+       */
+      entorno TEXT
+        CHECK (
+          entorno IS NULL
+          OR entorno IN (
+            'test',
+            'production'
+          )
+        ),
+
+      /*
+       * NIF que se utilizó realmente como emisor.
+       *
+       * No se reconstruye artificialmente en
+       * registros legacy históricos.
+       */
+      nif_emisor TEXT,
+
+      /*
+       * Serie y número utilizados ante TicketBaiWS.
+       *
+       * Son independientes de la representación
+       * documental interna de venta.
+       */
+      serie TEXT,
+      numero TEXT,
+
       estado TEXT NOT NULL
         CHECK (
           estado IN (
@@ -627,6 +660,22 @@ const statements: readonly string[] = [
       identificador
     )
     WHERE identificador IS NOT NULL
+  `,
+
+  `
+    CREATE UNIQUE INDEX
+      uq_venta_ticketbai_identidad_fiscal
+    ON venta_ticketbai (
+      entorno,
+      nif_emisor,
+      serie,
+      numero
+    )
+    WHERE
+      entorno IS NOT NULL
+      AND nif_emisor IS NOT NULL
+      AND serie IS NOT NULL
+      AND numero IS NOT NULL
   `,
 
   `

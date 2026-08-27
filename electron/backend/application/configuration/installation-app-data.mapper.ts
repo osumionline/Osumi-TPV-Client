@@ -1,5 +1,6 @@
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
+import { DEFAULT_TICKET_BAI_ENVIRONMENT } from '@desktop-contracts/configuration/ticket-bai-environment.type';
 
 export default function createAppData(command: InstallationCommand, installedAt: string): AppData {
   return {
@@ -48,6 +49,7 @@ export default function createAppData(command: InstallationCommand, installedAt:
     ticketBai: command.ticketBai.active
       ? {
           nif: command.ticketBai.nif,
+          environment: DEFAULT_TICKET_BAI_ENVIRONMENT,
         }
       : null,
 

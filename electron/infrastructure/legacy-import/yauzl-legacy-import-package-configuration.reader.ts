@@ -8,6 +8,7 @@ import type {
   InstallationSecretsData,
 } from '@desktop-contracts/configuration/installation-command.interface';
 import type TicketBaiConfig from '@desktop-contracts/configuration/ticket-bai-config.interface';
+import { DEFAULT_TICKET_BAI_ENVIRONMENT } from '@desktop-contracts/configuration/ticket-bai-environment.type';
 import {
   DEFAULT_TICKET_EMAIL_BODY_TEMPLATE,
   DEFAULT_TICKET_EMAIL_SUBJECT_TEMPLATE,
@@ -148,6 +149,7 @@ export default class YauzlLegacyImportPackageConfigurationReader implements Lega
         ? null
         : {
             nif: this.getNullableString(ticketBaiSource, 'nif', 'plugin_config.json.ticketbai'),
+            environment: DEFAULT_TICKET_BAI_ENVIRONMENT,
           };
 
     return {
