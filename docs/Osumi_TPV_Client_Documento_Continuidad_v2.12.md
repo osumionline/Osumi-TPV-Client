@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.11  
-**Fecha:** 27 de agosto de 2026  
-**Estado:** Installation, importación legacy, Startup, auditoría/refactor transversal y los bloques **Ventas 1–11** están completados, probados y subidos. En **Ventas 12 — Postventa**, el análisis 12A y el diseño 12B están cerrados salvo la semántica TicketBAI de devoluciones/operaciones mixtas, pendiente de Berein. La implementación 12C está muy avanzada: **12C.1–12C.7** están completados, probados manualmente y subidos. **12C.7 — Email** está cerrado de extremo a extremo: configuración y secretos, Nodemailer, caso de uso backend, wiring IPC/preload/Angular, UI en Histórico, reparación del PDF vigente, prueba SMTP real y prerrelleno del destinatario con el email actual de la ficha del cliente cuando existe. El siguiente bloque es **12C.8 — TicketBAI ordinario**. La prueba física con **Star TSP100/TSP143 de 80 mm** sigue pendiente y no bloquea el desarrollo.
+**Versión:** 2.12  
+**Fecha:** 28 de agosto de 2026  
+**Estado:** Installation, importación legacy, Startup, auditoría/refactor transversal y los bloques **Ventas 1–11** están completados, probados y subidos. En **Ventas 12 — Postventa**, el análisis 12A y el diseño 12B están cerrados salvo la semántica TicketBAI de devoluciones/operaciones mixtas, pendiente de Berein. La implementación 12C está muy avanzada: **12C.1–12C.7** están completados y **12C.8A + 12C.8B** están completados, probados y subidos. TicketBAI ordinario ya dispone de configuración técnica `production|test`, compatibilidad legacy, identidad fiscal persistente, mapping fiscal, adaptador a `@osumi/ticketbaiws`, clasificación de errores y máquina de estados transaccional `venta_ticketbai` con invalidación documental al aceptar. El siguiente bloque es **12C.8C — Envío automático post-COMMIT**. La configuración por defecto de TicketBAI es `production`, pero **durante el desarrollo actual se trabajará con `environment: "test"` editado manualmente en `app_data.json`** para evitar envíos fiscales reales. La prueba física con **Star TSP100/TSP143 de 80 mm** sigue pendiente y no bloquea el desarrollo.
 
 ---
 
@@ -38,7 +38,9 @@ Debe tratarse como un documento vivo. Al completar un bloque principal de Ventas
 - Ventas 12C.7B: completado, probado y subido — caso de uso backend `VentasTicketEmailService`.
 - Ventas 12C.7C: completado, probado y subido — composition root, SecretStorage operacional, IPC/preload, Angular y UI Histórico.
 - Ventas 12C.7D: completado y validado con SMTP real — envío correcto, PDF vigente, sin mutaciones comerciales/documentales y prerrelleno del email actual del cliente.
-- Ventas 12C.8: **siguiente bloque** — TicketBAI para ventas ordinarias mediante `@osumi/ticketbaiws`.
+- Ventas 12C.8A: completado, probado y subido — configuración técnica, compatibilidad legacy, mapping fiscal y modelo persistente.
+- Ventas 12C.8B: completado, probado y subido — frontera `@osumi/ticketbaiws`, mapper fiscal, repository `venta_ticketbai` y máquina de estados.
+- Ventas 12C.8C: **siguiente bloque** — envío automático TicketBAI post-COMMIT.
 - Hardware Star TSP100/TSP143 80 mm: prueba física pendiente y no bloqueante.
 
 Estado resumido:
@@ -64,7 +66,13 @@ Ventas 12C.7 Email                          ✅
   12C.7B Caso de uso backend                 ✅
   12C.7C IPC + Angular + UI Histórico         ✅
   12C.7D SMTP real + prefill cliente          ✅
-Ventas 12C.8 TicketBAI ordinario            🟦 siguiente
+Ventas 12C.8 TicketBAI ordinario            🟦 en curso
+  12C.8A Modelo/mapping/legacy                ✅
+  12C.8B SDK + persistencia/estados           ✅
+  12C.8C Envío automático post-COMMIT         🟦 siguiente
+  12C.8D Ticket fiscal + PDF                   ⬜
+  12C.8E Histórico + reintento                 ⬜
+  12C.8F Pruebas reales/cierre                 ⬜
 Ventas 12C.9 TicketBAI devoluciones         ⏸️ Berein
 Ventas 12C.10 Regresión/cierre              ⬜
 ```
@@ -191,7 +199,8 @@ app_data.json
 │   ├── secure
 │   └── user
 └── ticketBai
-    └── nif
+    ├── nif
+    └── environment   # production por defecto; test solo por edición técnica manual
 
 secrets.json (safeStorage)
 ├── emailSmtpPass
@@ -1514,23 +1523,255 @@ Si se cambia el cliente de la venta mediante Postventa, el detalle actualizado d
 
 Tests y typecheck se actualizaron en Histórico/Postventa para cubrir el nuevo campo. La batería completa pasó y todos los cambios fueron subidos al repositorio.
 
-## 10.4 12C.8 — TicketBAI ordinario 🟦 SIGUIENTE
+## 10.4 12C.8 — TicketBAI ordinario 🟦 EN CURSO
 
-Diseño funcional ya cerrado para ventas ordinarias:
+### 10.4.1 12C.8A — Modelo, mapping fiscal y compatibilidad legacy ✅
 
-- usar obligatoriamente `@osumi/ticketbaiws`;
-- `simplificada: true` incluso cuando la venta tenga cliente;
-- envío automático **post-COMMIT** solo cuando TicketBAI esté configurado;
-- un fallo fiscal nunca invalida ni revierte la venta;
-- si el envío falla, el ticket comercial puede existir/imprimirse sin QR fiscal;
-- no hacer reintentos automáticos posteriores;
-- reintento manual únicamente desde Histórico;
-- una aceptación posterior debe actualizar estado fiscal y producir una nueva revisión/versionado del PDF vigente;
-- el reintento exitoso no auto-imprime;
-- la incidencia/error TicketBAI debe reflejarse en Histórico;
-- devoluciones y operaciones mixtas siguen fuera de alcance hasta respuesta de Berein.
+Este subbloque está completado, probado con una importación `.otpv` limpia y subido.
 
-Antes de implementar debe auditarse el estado actual de `main` y concretar el modelo persistente `venta_ticketbai`, el contrato exacto de `@osumi/ticketbaiws` que usará el cliente y los datos del snapshot de venta necesarios para construir la petición.
+#### Configuración técnica del entorno
+
+`TicketBaiConfig` contiene:
+
+```text
+ticketBai
+├── nif
+└── environment: 'test' | 'production'
+```
+
+Reglas acordadas:
+
+- el valor por defecto de aplicación es **`production`**;
+- Installation no expone ningún selector al usuario;
+- la importación `.otpv` legacy normaliza siempre a `production` porque el paquete antiguo no conserva el entorno OFW original;
+- `JsonAppDataRepository` acepta configuraciones antiguas sin `environment` y las normaliza a `production`;
+- un valor explícito `test` o `production` en `app_data.json` se respeta;
+- cualquier otro valor invalida la configuración;
+- el token sigue exclusivamente en `secrets.json` protegido mediante `safeStorage`.
+
+**Consideración operativa vigente durante el desarrollo:** aunque el default de producto es `production`, mientras continúe el desarrollo de TicketBAI el desarrollador cambiará manualmente `app_data.json` a:
+
+```json
+{
+  "ticketBai": {
+    "nif": "...",
+    "environment": "test"
+  }
+}
+```
+
+Por tanto, en pruebas/manuales actuales debe **asumirse entorno `test`**, salvo indicación expresa en contrario. Esto no modifica el default del producto ni debe introducir UI para cambiarlo.
+
+#### Identidad fiscal persistente
+
+`venta_ticketbai` se amplió con:
+
+```text
+entorno
+nif_emisor
+serie
+numero
+```
+
+Una identidad fiscal nueva queda congelada como combinación de entorno, NIF, serie y número. Existe índice único parcial para impedir reutilizaciones accidentales.
+
+Los registros legacy no inventan `nif_emisor`: queda `NULL` porque la configuración presente al exportar no demuestra qué NIF se utilizó en una venta histórica concreta.
+
+#### Importación TicketBAI legacy
+
+La importación mantiene dos estados históricos:
+
+```text
+legacy con huella/QR/URL
+→ estado = legacy
+→ entorno = production
+→ serie = TPV01
+→ numero = venta legacy con padStart(6, '0')
+→ nif_emisor = NULL
+→ nunca se reenvía
+
+legacy sin datos TicketBAI
+→ estado = no_aplica
+→ no se fiscaliza retrospectivamente
+```
+
+Se validó borrando los datos locales, reinstalando desde `.otpv` y comprobando la nueva configuración `ticketBai` en `app_data.json`.
+
+#### Mapping fiscal ordinario
+
+Se revisó `Venta::getDatosTBai()` del backend antiguo y se decidió conservar su semántica fiscal útil:
+
+```text
+simplificada               = true
+serie                       = TPV01
+numero                      = venta.numero con 6 dígitos
+rectificativa               = false
+retencion                   = 0
+modo_recargo_equivalencia   = true
+tipo_req                    = 0
+```
+
+Fecha/hora se obtienen del snapshot persistido de la venta en hora local.
+
+Cada línea ordinaria genera una línea fiscal positiva con `importe_unitario` sin IVA, redondeado a cuatro decimales. El descuento económico se representa mediante una segunda línea negativa `Descuento - ...`, derivada del resultado económico persistido:
+
+```text
+pvp histórico × unidades - importe final histórico
+```
+
+Esto cubre descuentos porcentuales, importes fijos y regalos sin depender de configuración mutable posterior.
+
+No se añadió snapshot de recargo de equivalencia a `linea_venta`: el sistema legacy enviaba siempre `tipo_req = 0` y esa es la semántica adoptada para el alcance ordinario actual.
+
+Devoluciones y operaciones mixtas siguen rechazadas por el mapper ordinario y pertenecen a 12C.9.
+
+### 10.4.2 12C.8B.1 — SDK + frontera backend + mapper fiscal ✅
+
+Se instaló `@osumi/ticketbaiws` y se creó una frontera backend independiente del SDK:
+
+```text
+VentaTicketInterface
+      ↓
+VentaTicketBaiMapper
+      ↓
+TicketBaiCreateInvoiceRequest interno
+      ↓
+TicketBaiClient
+      ↓
+TicketBaiWsTicketBaiClient
+      ↓
+@osumi/ticketbaiws
+```
+
+El adaptador:
+
+- construye `TicketBaiWsClient` con token, `issuerNif` y entorno explícito;
+- usa `invoices.create()`;
+- normaliza `huella_tbai`, QR y URL;
+- conserva payload de respuesta serializado;
+- permite inyectar `fetch` en tests;
+- no filtra tipos/errores concretos del SDK hacia aplicación.
+
+Errores normalizados:
+
+```text
+rejected
+→ TicketBaiWS respondió y rechazó funcionalmente el documento
+
+temporary
+→ red, timeout/5xx/429/408/425 o respuesta que no puede interpretarse;
+  el resultado remoto puede ser ambiguo
+
+permanent
+→ configuración local o error no susceptible de repetición simple
+```
+
+Un error de red se considera especialmente **temporal/ambiguo**: nunca prueba que TicketBaiWS no haya recibido el documento. El futuro reintento manual deberá consultar/reconciliar antes de crear de nuevo.
+
+Tests del mapper cubren venta ordinaria, descuentos, regalo y bloqueo de devoluciones/mixtas. Tests del adaptador usan `fetch` fake y no contactan con Berein.
+
+### 10.4.3 12C.8B.2 — Repository `venta_ticketbai` + máquina de estados ✅
+
+Se creó el record/contrato/repository dedicado a TicketBAI.
+
+Estados disponibles:
+
+```text
+no_aplica
+legacy
+pendiente
+enviando
+aceptada
+rechazada
+error_temporal
+error_permanente
+anulada
+```
+
+Flujo local ordinario preparado:
+
+```text
+pendiente
+   │
+   │ beginInitialAttempt()
+   ▼
+enviando
+   ├────────→ aceptada
+   ├────────→ rechazada
+   ├────────→ error_temporal
+   └────────→ error_permanente
+                 │
+                 │ beginManualAttempt()
+                 ▼
+              enviando
+```
+
+Propiedades importantes:
+
+- `initializeNoAplica()` es idempotente;
+- `initializePending()` congela identidad y payload sin sobrescribir una decisión existente;
+- `beginInitialAttempt()` adquiere atómicamente `pendiente → enviando`, evitando dos primeros envíos concurrentes;
+- `beginManualAttempt()` solo parte de estados de rechazo/error y queda preparado para 12C.8E;
+- `markFailure()` no cambia la revisión documental;
+- `markAccepted()` actualiza estado, huella, QR, URL y respuesta, e incrementa **en la misma transacción** `venta.ticket_revision`;
+- al incrementar `ticket_revision`, el PDF anterior queda obsoleto (`ticket_pdf_revision` permanece anterior) hasta que 12C.8D regenere/materialice la nueva revisión;
+- repetir `markAccepted()` con exactamente el mismo resultado fiscal es idempotente y no vuelve a incrementar revisión.
+
+Los tests usan SQLite real sobre el esquema canónico y cubren identidad, concurrencia lógica, fallos, intento manual, aceptación e invalidación documental. Toda la batería pasó y los cambios fueron subidos.
+
+### 10.4.4 12C.8C — Envío automático post-COMMIT 🟦 SIGUIENTE
+
+Este es el siguiente subbloque.
+
+Objetivo:
+
+```text
+venta comercial ya confirmada por COMMIT
+        ↓
+¿TicketBAI configurado y operación ordinaria?
+        ├─ no → initializeNoAplica()
+        └─ sí
+             ↓
+        AppData + SecretStorage
+             ↓
+        snapshot VentaTicket desde SQLite
+             ↓
+        VentaTicketBaiMapper
+             ↓
+        initializePending()
+             ↓
+        beginInitialAttempt()
+             ↓
+        TicketBaiClient.createInvoice()
+             ├─ éxito → markAccepted()
+             └─ error → markFailure()
+```
+
+Reglas que no deben romperse:
+
+- TicketBAI se ejecuta **después del COMMIT comercial**;
+- ningún error fiscal revierte venta, stock, reservas, pagos ni caja;
+- no hay reintentos automáticos posteriores;
+- no mantener transacciones SQLite abiertas durante red;
+- `beginInitialAttempt()` es la adquisición local del derecho al primer envío;
+- la operación fiscal ordinaria no debe ejecutarse para devoluciones/mixtas mientras 12C.9 siga bloqueado;
+- durante las pruebas de desarrollo actuales, asumir `appData.ticketBai.environment = 'test'` aunque el default de producto sea `production`.
+
+### 10.4.5 12C.8D — Ticket fiscal + PDF/versionado ⬜
+
+Pendiente integrar huella/QR/URL aceptadas en el snapshot/documento del ticket, regenerar/materializar la revisión fiscal y conservar el versionado de 12C.5. El ticket comercial puede existir/imprimirse sin QR fiscal si el envío inicial falla.
+
+### 10.4.6 12C.8E — Histórico + reconciliación/reintento manual ⬜
+
+Pendiente conectar `tieneIncidenciaTicketBai` / `puedeReintentarTicketBai` a persistencia real y diseñar el reintento seguro.
+
+Para errores de red/respuesta ambigua no se hará `create()` a ciegas. La estrategia prevista es consultar/reconciliar la identidad remota y usar `resend()` cuando el documento remoto exista en error, o crear únicamente cuando se haya demostrado que no existe.
+
+Un reintento exitoso actualizará estado/documento pero no auto-imprimirá.
+
+### 10.4.7 12C.8F — Pruebas reales y cierre ⬜
+
+Pendiente prueba contra TicketBaiWS en entorno **test**, regresión y cierre del bloque ordinario.
 
 ## 10.5 12C.9 — TicketBAI devoluciones
 
@@ -1688,6 +1929,31 @@ Pruebas de 12C.7C/12C.7D realizadas y validadas:
 - tests de Histórico y Postventa actualizados al nuevo `cliente.email`;
 - batería completa verde y cambios subidos.
 
+Pruebas de 12C.8A realizadas y validadas:
+
+- `TicketBaiConfig.environment` normalizado con `production` por defecto;
+- `test` se puede establecer manualmente en `app_data.json` y se respeta;
+- importación `.otpv` legacy asigna `production`;
+- reinstalación real desde `.otpv` comprobada tras borrar datos locales;
+- `venta_ticketbai` conserva identidad fiscal y datos legacy sin inventar `nif_emisor`;
+- mapper fiscal ordinario contrastado con `Venta::getDatosTBai()` legacy;
+- ventas ordinarias, descuentos, regalos y exclusión de devoluciones/mixtas cubiertos;
+- batería completa verde y cambios subidos.
+
+Pruebas de 12C.8B realizadas y validadas:
+
+- `@osumi/ticketbaiws` integrado detrás de `TicketBaiClient`;
+- adaptador probado con `fetch` inyectado, sin llamadas reales;
+- respuesta TicketBAI normalizada a huella/QR/URL;
+- rechazo API, red y respuestas inesperadas clasificados;
+- repository `venta_ticketbai` probado sobre SQLite real;
+- inicialización idempotente, identidad congelada y adquisición única del primer intento;
+- fallos no cambian `ticket_revision`;
+- aceptación incrementa una sola vez `ticket_revision` y deja el PDF anterior obsoleto;
+- batería completa verde y cambios subidos.
+
+**Entorno de pruebas TicketBAI vigente:** durante el desarrollo actual las pruebas manuales/futuras contra TicketBaiWS deben ejecutarse con `app_data.json → ticketBai.environment = "test"`. El producto sigue generando `production` por defecto.
+
 ---
 
 # 13. Limitaciones / bloqueos conocidos
@@ -1696,7 +1962,8 @@ Pruebas de 12C.7C/12C.7D realizadas y validadas:
 2. **Star TSP100/TSP143 80 mm**: prueba física pendiente, no bloqueante. 12C.6 está funcionalmente cerrado sin esa validación de hardware.
 3. **PDF postventa**: resuelto en 12C.5 mediante revisiones y versionado físico. Un fallo post-COMMIT puede dejar `ticket_revision != ticket_pdf_revision`, pero nunca invalida la venta/corrección.
 4. **Email SMTP**: 12C.7 está cerrado y validado con envío real. El destinatario manual no se persiste; cuando hay cliente con email se usa solo como valor inicial editable.
-5. GitHub Raw puede devolver contenido cacheado/stale; si no se puede verificar frescura, usar archivos adjuntos actuales.
+5. **TicketBAI entorno:** el default de producto es `production`, pero durante el desarrollo actual se cambia manualmente `app_data.json` a `test`; asumir `test` para cualquier prueba real hasta indicación contraria.
+6. GitHub Raw puede devolver contenido cacheado/stale; si no se puede verificar frescura, usar archivos adjuntos actuales.
 
 ---
 
@@ -1704,7 +1971,7 @@ Pruebas de 12C.7C/12C.7D realizadas y validadas:
 
 Continuar por:
 
-# Ventas 12C.8 — TicketBAI ordinario
+# Ventas 12C.8C — Envío automático TicketBAI post-COMMIT
 
 Estado de entrada al siguiente turno:
 
@@ -1716,38 +1983,40 @@ Estado de entrada al siguiente turno:
 12C.5 Pipeline documental                     ✅
 12C.6 Impresión                               ✅
 12C.7 Email                                   ✅
-  12C.7A Config + secretos + SMTP             ✅
-  12C.7B Caso de uso backend                  ✅
-  12C.7C IPC + Angular + UI Histórico         ✅
-  12C.7D SMTP real + prefill cliente          ✅
-12C.8 TicketBAI ordinario                     🟦 siguiente
+12C.8 TicketBAI ordinario                     🟦 en curso
+  12C.8A Modelo/mapping/legacy                ✅
+  12C.8B SDK + persistencia/estados           ✅
+  12C.8C Envío automático post-COMMIT         🟦 siguiente
+  12C.8D Ticket fiscal + PDF                   ⬜
+  12C.8E Histórico + reintento                 ⬜
+  12C.8F Pruebas reales/cierre                 ⬜
 12C.9 TicketBAI devoluciones                  ⏸️ Berein
 12C.10 Regresión/cierre                       ⬜
 ```
 
-Punto de partida funcional de 12C.8:
+Punto de partida técnico ya disponible:
 
-1. TicketBAI solo se implementa ahora para **ventas ordinarias**;
-2. devoluciones puras y operaciones mixtas siguen bloqueadas hasta respuesta de Berein;
-3. debe utilizarse `@osumi/ticketbaiws`, ya publicado como SDK propio;
-4. configuración no secreta: `appData.ticketBai.nif`;
-5. secreto: `secrets.json → ticketBaiToken` mediante `ElectronSafeStorageSecretStorage`;
-6. las ventas ordinarias se envían como `simplificada: true` incluso si tienen cliente;
-7. envío automático post-COMMIT cuando TicketBAI esté configurado;
-8. fallo fiscal nunca revierte la venta ni impide disponer del ticket comercial;
-9. no existen reintentos automáticos posteriores;
-10. reintento manual únicamente desde Histórico;
-11. Histórico ya tiene `tieneIncidenciaTicketBai` / `puedeReintentarTicketBai`, actualmente alimentados con placeholder `false` y deben conectarse a persistencia real;
-12. éxito fiscal inicial o tras reintento puede cambiar el contenido fiscal del ticket y debe integrarse con `ticket_revision` / `ticket_pdf_revision` y versionado de 12C.5;
-13. reintento exitoso no auto-imprime;
-14. ticket regalo permanece fuera de TicketBAI y nunca debe recibir QR/bloque fiscal TicketBAI.
+1. `@osumi/ticketbaiws` instalado;
+2. `TicketBaiClient` interno + adaptador `TicketBaiWsTicketBaiClient`;
+3. `VentaTicketBaiMapper` desde snapshot SQLite;
+4. entorno `production|test` explícito en `AppData.ticketBai`;
+5. default de producto/import legacy = `production`;
+6. **desarrollo actual = `test` mediante edición manual de `app_data.json`**;
+7. token solo en `secrets.json` mediante `ElectronSafeStorageSecretStorage`;
+8. `venta_ticketbai` con identidad fiscal congelada, payloads, estados e intentos;
+9. repository con `initializeNoAplica`, `initializePending`, `beginInitialAttempt`, `beginManualAttempt`, `markAccepted`, `markFailure`;
+10. `markAccepted` incrementa `ticket_revision` atómicamente;
+11. devoluciones/mixtas son rechazadas por el mapper ordinario y siguen fuera de alcance;
+12. no hay todavía ningún wiring que ejecute TicketBAI al finalizar una venta.
 
-Primer subpaso recomendado: **12C.8A — auditoría técnica y modelo persistente**. Antes de proponer cambios deben revisarse los archivos actuales de configuración TicketBAI, persistencia/schema de Ventas, snapshot documental, finalización de venta y composición backend, además del API concreto disponible en `@osumi/ticketbaiws`.
+Objetivo exacto de 12C.8C: crear el caso de uso backend que, después de que la venta comercial haya hecho COMMIT, lea configuración/secreto/snapshot, inicialice la identidad fiscal, adquiera el intento y ejecute `TicketBaiClient`, persistiendo aceptación o error sin poder revertir la venta.
+
+Antes de modificar archivos existentes, revisar `main` o pedir las copias actuales de composition root, servicio/orquestador de finalización de venta, IPC/contratos afectados y servicios de configuración/secretos que participen en el wiring.
 
 # 15. Prompt de arranque para una conversación nueva
 
 ```text
-Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” versión 2.11 como contexto principal.
+Estoy continuando el desarrollo de Osumi TPV Client. Usa el archivo “Osumi TPV Client — Documento de continuidad y relevo” versión 2.12 como contexto principal.
 
 Estado general:
 - Installation + importación `.otpv` v2: completadas y probadas.
@@ -1755,9 +2024,46 @@ Estado general:
 - Auditoría transversal + Refactor A–E: completados.
 - Ventas 1–11: completados, probados y subidos.
 - Ventas 12A y diseño 12B: cerrados salvo TicketBAI para devoluciones/operaciones mixtas, pendiente de Berein.
-- Ventas 12C.1–12C.7: COMPLETADOS, probados y subidos.
-- Ventas 12C.8 — TicketBAI ordinario: SIGUIENTE.
+- Ventas 12C.1–12C.7: completados.
+- Ventas 12C.8A: completado — configuración/mapping/legacy/modelo persistente.
+- Ventas 12C.8B: completado — SDK/frontera backend/repository/máquina de estados.
+- Ventas 12C.8C — envío automático TicketBAI post-COMMIT: SIGUIENTE.
 - Ventas 12C.9 — TicketBAI devoluciones/mixtas: BLOQUEADO por Berein.
+
+TicketBAI ordinario ya disponible:
+- usar obligatoriamente `@osumi/ticketbaiws`;
+- `TicketBaiClient` aísla la aplicación del SDK y `TicketBaiWsTicketBaiClient` es el adaptador real;
+- `VentaTicketBaiMapper` construye simplificada `true`, serie `TPV01`, número a 6 dígitos, `tipo_req = 0`, descuentos como líneas negativas y bloquea devoluciones/mixtas;
+- `venta_ticketbai` conserva entorno, NIF emisor, serie, número, estados, intentos, errores, payloads, huella, QR y URL;
+- `initializePending()` congela identidad/payload;
+- `beginInitialAttempt()` adquiere atómicamente el primer envío;
+- `markFailure()` no cambia revisión documental;
+- `markAccepted()` incrementa `ticket_revision` en la misma transacción y es idempotente para el mismo resultado;
+- `beginManualAttempt()` queda preparado para el futuro reintento desde Histórico;
+- errores normalizados: rejected / temporary / permanent;
+- un error de red es ambiguo y nunca debe provocar `create()` a ciegas en un reintento.
+
+Configuración de entorno TicketBAI:
+- EL DEFAULT DEL PRODUCTO ES `production`;
+- Installation no permite elegir entorno;
+- importación legacy usa `production`;
+- `test` solo se activa editando técnicamente `app_data.json`;
+- DURANTE EL DESARROLLO ACTUAL DEBES ASUMIR QUE `appData.ticketBai.environment` ESTÁ CAMBIADO MANUALMENTE A `test`, para evitar envíos fiscales reales;
+- no cambies el default a `test` en código ni añadas UI para ello salvo petición expresa.
+
+Siguiente paso exacto — 12C.8C:
+- conectar TicketBAI al flujo de finalización únicamente DESPUÉS del COMMIT comercial;
+- obtener `AppData.ticketBai` + `ticketBaiToken` desde safeStorage;
+- releer `VentaTicketInterface` desde SQLite;
+- mapper fiscal → `initializePending` → `beginInitialAttempt` → `TicketBaiClient.createInvoice`;
+- éxito → `markAccepted`;
+- error normalizado → `markFailure`;
+- si TicketBAI no está configurado → `initializeNoAplica`;
+- ningún fallo TicketBAI revierte venta, stock, reservas, pagos o caja;
+- no hacer reintentos automáticos posteriores;
+- no mantener una transacción SQLite abierta durante la llamada de red;
+- no enviar devoluciones/mixtas en este bloque;
+- todavía no regenerar/mostrar QR fiscal hasta 12C.8D salvo que el diseño del wiring obligue a coordinar el paso post-aceptación.
 
 12C.5 cerrado:
 - `venta` tiene `ticket_revision` y `ticket_pdf_revision`;
@@ -1768,48 +2074,20 @@ Estado general:
 
 12C.6 cerrado:
 - ticket regalo efímero, no persistido, sin cambios de revisión;
-- ticket regalo: líneas positivas, sin cliente/economía/IVA/pagos, con QR comercial local;
-- ticket regalo nunca llevará QR ni datos TicketBAI;
-- reimpresión histórica usa exactamente el PDF vigente;
-- PDF ausente/desactualizado se repara mediante pipeline 12C.5 antes de reimprimir;
-- `PrintingService.printPdf()` imprime bytes PDF mediante Electron;
-- prueba física Star 80 mm sigue pendiente/no bloqueante.
+- ticket regalo nunca lleva información fiscal TicketBAI;
+- reimpresión histórica usa el PDF vigente y repara si falta;
+- prueba física Star 80 mm pendiente/no bloqueante.
 
 12C.7 Email cerrado:
-- `AppData.ticketEmail` separado de `emailSmtp`, con defaults y variables `{nombreNegocio}` / `{referencia}`;
-- compatibilidad `app_data.json` e importación `.otpv` legacy;
-- contraseña SMTP solo en `secrets.json` mediante Electron `safeStorage`;
-- `EmailSender` + `NodemailerEmailSender` soportan none/tls/ssl y adjuntos por bytes;
-- `VentasTicketEmailService` valida configuración/secreto/destinatario y exige PDF vigente;
-- composition root tiene SecretStorage operacional + Nodemailer + servicio email;
-- IPC/preload solo exponen `{ idVenta, destinatario }`, nunca credenciales;
-- Angular repara el PDF con `generateAndSavePdf()` si falta y luego solicita envío;
-- Histórico tiene acción “Enviar por email” y formulario inline;
-- envío SMTP real probado correctamente;
-- enviar no modifica venta, Caja, revisiones ni archivos históricos;
-- `VentaHistoricoCliente` incluye `email` actual de la ficha;
-- venta con cliente + email prerrellena el destinatario; cliente sin email/sin cliente deja vacío;
-- el email inicial es editable y cualquier cambio solo sirve para ese envío, no se persiste;
-- batería completa verde y cambios subidos.
-
-Siguiente paso exacto — 12C.8 TicketBAI ordinario:
-- usar obligatoriamente `@osumi/ticketbaiws`;
-- `simplificada: true` incluso con cliente;
-- envío automático post-COMMIT solo si TicketBAI está configurado;
-- fallo fiscal nunca revierte la venta;
-- no reintentar automáticamente más tarde;
-- reintento manual desde Histórico;
-- persistir estado fiscal en `venta_ticketbai`;
-- conectar `tieneIncidenciaTicketBai` y `puedeReintentarTicketBai` a estado real;
-- aceptación inicial/reintento debe integrarse con revisión/versionado del PDF si cambia el contenido fiscal;
-- reintento exitoso no auto-imprime;
-- devoluciones/mixtas siguen bloqueadas hasta Berein;
-- ticket regalo nunca debe incorporar QR/bloque TicketBAI.
-
-Comenzar 12C.8 por auditoría técnica/modelo persistente. Revisar `main` antes de modificar archivos; si GitHub está cacheado/stale, pedir solo los archivos actuales necesarios. También revisar el API concreto disponible en `@osumi/ticketbaiws` antes de diseñar el adaptador.
+- SMTP/Nodemailer/IPC/Angular/Histórico completos;
+- PDF vigente adjunto y reparación previa si falta;
+- SMTP real probado;
+- email actual del cliente se prerrellena pero puede cambiarse solo para ese envío;
+- el envío no modifica venta/revisiones.
 
 Reglas de trabajo:
 - al inicio de cada bloque/subpaso, mostrar lista completa ✅/🟦/⬜/⏸️ y explicar el objetivo;
+- revisar `main` antes de modificar existentes; si GitHub está stale, pedir solo archivos actuales necesarios;
 - implementar en lotes pequeños pero coherentes;
 - no inventar decisiones fiscales;
 - todo método TS/JS añadido debe tener JSDoc breve;
@@ -1824,8 +2102,6 @@ Batería:
 `npm run build`
 `npm run lint`
 `npm run build:desktop` si se toca Electron/preload/IPC.
-
-La prueba física Star TSP100/TSP143 de 80 mm sigue pendiente pero no bloquea Postventa.
 ```
 
 ---
@@ -1844,3 +2120,4 @@ La prueba física Star TSP100/TSP143 de 80 mm sigue pendiente pero no bloquea Po
 | **2.9** | **26-08-2026** | **12C.6 completado y validado: ticket regalo efímero, reimpresión exacta/reparación del PDF vigente, impresión PDF binaria y refactor común de builders. Siguiente: 12C.7 Email.** |
 | **2.10** | **26-08-2026** | **12C.7A y 12C.7B completados, probados y subidos: `ticketEmail`, compatibilidad legacy, `EmailSender` + Nodemailer y `VentasTicketEmailService` con PDF vigente, secreto seguro, plantillas y protección de revisión. Siguiente: 12C.7C IPC + Angular + UI Histórico.** |
 | **2.11** | **27-08-2026** | **12C.7 Email cerrado y validado de extremo a extremo: wiring IPC/Angular, SMTP real, reparación del PDF vigente, ausencia de mutaciones por envío y prerrelleno editable con el email actual del cliente. Siguiente: 12C.8 TicketBAI ordinario.** |
+| **2.12** | **28-08-2026** | **12C.8A y 12C.8B completados y subidos: configuración/mapping/legacy, `@osumi/ticketbaiws`, adaptador, repository `venta_ticketbai`, máquina de estados e invalidación documental al aceptar. Default TicketBAI = production; durante desarrollo se usa test mediante edición manual de `app_data.json`. Siguiente: 12C.8C envío automático post-COMMIT.** |
