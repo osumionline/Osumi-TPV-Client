@@ -149,6 +149,31 @@ describe('buildVentaGiftTicketDocument', (): void => {
 
     expect(documentHtml).not.toContain('osumi://assets/app/icons/facebook.svg');
   });
+
+  it('usa la referencia fiscal sin incorporar TicketBAI al ticket regalo', (): void => {
+    const fiscalTicket: VentaTicketInterface = {
+      ...createTicket(),
+      ticketBai: {
+        serie: 'TPV01',
+        numero: '000456',
+        identificativo: 'TBAI-TEST-000456',
+        qr: 'QUJD',
+        url: 'https://ticketbai.example/validar',
+      },
+    };
+
+    const documentHtml: string = buildVentaGiftTicketDocument(appData, fiscalTicket);
+
+    expect(documentHtml).toContain('F. simplificada TPV01-000456');
+
+    expect(documentHtml).not.toContain('F. simplificada A-456');
+
+    expect(documentHtml).toContain('data-qr-content="-123"');
+
+    expect(documentHtml).not.toContain('TBAI-TEST-000456');
+
+    expect(documentHtml).not.toContain('data:image/png;base64');
+  });
 });
 
 /**
@@ -163,6 +188,7 @@ function createTicket(): VentaTicketInterface {
     fecha: '2026-08-21T16:30:00.000Z',
     empleadoNombre: 'Empleado & Prueba',
     clienteNombre: 'Cliente de prueba',
+    ticketBai: null,
     totalCents: 2_000,
     ticketRevision: 3,
     ticketPdfRevision: 3,

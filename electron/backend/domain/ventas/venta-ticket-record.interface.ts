@@ -21,6 +21,15 @@ export interface VentaTicketLineaRecord {
   readonly regalo: boolean;
 }
 
+export interface VentaTicketBaiDocumentRecord {
+  readonly serie: string;
+  readonly numero: string;
+
+  readonly identificativo: string | null;
+  readonly qr: string | null;
+  readonly url: string | null;
+}
+
 export interface VentaTicketRecord {
   readonly id: number;
   readonly publicId: string;
@@ -32,6 +41,8 @@ export interface VentaTicketRecord {
 
   readonly empleadoNombre: string;
   readonly clienteNombre: string | null;
+
+  readonly ticketBai: VentaTicketBaiDocumentRecord | null;
 
   readonly totalCents: number;
   readonly ticketRevision: number;

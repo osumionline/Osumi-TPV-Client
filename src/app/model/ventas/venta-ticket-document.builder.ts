@@ -1,5 +1,6 @@
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type {
+  VentaTicketBaiDocumentInterface,
   VentaTicketInterface,
   VentaTicketLineaInterface,
   VentaTicketPagoInterface,
@@ -310,6 +311,30 @@ export default function buildVentaTicketDocument(
       height: 30mm;
     }
 
+    .ticketbai {
+      margin-top: 4mm;
+      padding-top: 3mm;
+      border-top: 1px dashed #555;
+      text-align: center;
+    }
+
+    .ticketbai__identifier {
+      font-size: 7.5pt;
+      white-space: nowrap;
+    }
+
+    .ticketbai__qr {
+      margin-top: 2mm;
+    }
+
+    .ticketbai__qr img {
+      display: block;
+      width: 34mm;
+      height: 34mm;
+      margin: 0 auto;
+      object-fit: contain;
+    }
+
     .footer {
       margin-top: 4mm;
       font-size: 8pt;
@@ -407,12 +432,13 @@ export default function buildVentaTicketDocument(
     <div
       class="qr"
       data-qr-content="${escapeHtml(qrContent)}"
-      aria-label="Código QR del ticket"
-    >
+      aria-label="Código QR del ticket">
       ${qrSvg}
     </div>
 
     ${renderTicketPhrases(appData.frasesTicket)}
+
+    ${renderTicketBai(ticket.ticketBai)}
   </main>
 </body>
 </html>
@@ -609,7 +635,73 @@ function renderIva(resumen: readonly VentaTicketIvaResumen[]): string {
   `;
 }
 
+/**
+ * Renderiza al pie del documento los datos fiscales TicketBAI.
+ *
+ * El identificativo se sitúa sobre el QR y el QR se conserva
+ * con un tamaño apto para la representación impresa.
+ */
+function renderTicketBai(ticketBai: VentaTicketBaiDocumentInterface | null): string {
+  if (ticketBai === null) {
+    return '';
+  }
+
+  const identificativo: string | null = trimToNull(ticketBai.identificativo);
+
+  const qr: string | null = trimToNull(ticketBai.qr);
+
+  if (identificativo === null && qr === null) {
+    return '';
+  }
+
+  const qrSource: string | null =
+    qr === null ? null : `data:image/png;base64,${qr.replace(/\s+/g, '')}`;
+
+  return `
+    <section class="ticketbai">
+      ${
+        identificativo === null
+          ? ''
+          : `
+            <div class="ticketbai__identifier">
+              ${escapeHtml(identificativo)}
+            </div>
+          `
+      }
+
+      ${
+        qrSource === null
+          ? ''
+          : `
+            <div class="ticketbai__qr">
+              <img
+                src="${escapeHtml(qrSource)}"
+                alt="Código QR TicketBAI"
+              >
+            </div>
+          `
+      }
+    </section>
+  `;
+}
+
+/**
+ * Construye la referencia principal del documento.
+ *
+ * Una venta fiscalizada utiliza la identidad TicketBAI congelada.
+ * En ausencia de fiscalización conserva la referencia comercial.
+ */
 function formatTicketReference(ticket: VentaTicketInterface): string {
+  if (ticket.ticketBai !== null) {
+    const fiscalSerie: string | null = trimToNull(ticket.ticketBai.serie);
+
+    const fiscalNumero: string | null = trimToNull(ticket.ticketBai.numero);
+
+    if (fiscalSerie !== null && fiscalNumero !== null) {
+      return `${fiscalSerie}-${fiscalNumero}`;
+    }
+  }
+
   const serie: string | null = trimToNull(ticket.serie);
 
   return serie === null ? String(ticket.numero) : `${serie}-${ticket.numero}`;

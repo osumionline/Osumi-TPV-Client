@@ -42,6 +42,7 @@ describe('buildVentaTicketDocument', (): void => {
     fecha: '2026-08-21T16:30:00.000Z',
     empleadoNombre: 'Empleado & Prueba',
     clienteNombre: 'Cliente <Prueba>',
+    ticketBai: null,
     totalCents: 2_000,
     ticketRevision: 1,
     ticketPdfRevision: 0,
@@ -129,6 +130,39 @@ describe('buildVentaTicketDocument', (): void => {
 
     expect(documentHtml).toContain('data-qr-content="-123"');
     expect(documentHtml).toContain('<svg');
+  });
+
+  it('usa la identidad fiscal y mantiene separados los dos QR', (): void => {
+    const fiscalTicket: VentaTicketInterface = {
+      ...ticket,
+      ticketBai: {
+        serie: 'TPV01',
+        numero: '000456',
+        identificativo: 'TBAI-TEST-000456',
+        qr: 'QUJD',
+        url: 'https://ticketbai.example/validar',
+      },
+    };
+
+    const documentHtml: string = buildVentaTicketDocument(appData, fiscalTicket);
+
+    expect(documentHtml).toContain('F. simplificada TPV01-000456');
+
+    expect(documentHtml).not.toContain('F. simplificada A-456');
+
+    expect(documentHtml).toContain('data-qr-content="-123"');
+
+    expect(documentHtml).toContain('TBAI-TEST-000456');
+
+    expect(documentHtml).toContain('src="data:image/png;base64,QUJD"');
+
+    expect(documentHtml).not.toContain('https://ticketbai.example/validar');
+  });
+
+  it('no incorpora bloque fiscal si el snapshot no está fiscalizado', (): void => {
+    const documentHtml: string = buildVentaTicketDocument(appData, ticket);
+
+    expect(documentHtml).not.toContain('class="ticketbai"');
   });
 
   it('escapa todo texto dinámico', (): void => {

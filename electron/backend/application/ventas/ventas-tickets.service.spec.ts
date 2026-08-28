@@ -16,6 +16,29 @@ describe('VentasTicketsService', (): void => {
     service = new VentasTicketsService(repository, storage);
   });
 
+  it('expone los datos documentales TicketBAI del snapshot', async (): Promise<void> => {
+    repository.ticket = {
+      ...createTicketRecord(),
+      ticketBai: {
+        serie: 'TPV01',
+        numero: '000123',
+        identificativo: 'TBAI-TEST-000123',
+        qr: 'QUJD',
+        url: 'https://example.test/ticketbai/123',
+      },
+    };
+
+    const ticket = await service.getByVentaId(123);
+
+    expect(ticket?.ticketBai).toEqual({
+      serie: 'TPV01',
+      numero: '000123',
+      identificativo: 'TBAI-TEST-000123',
+      qr: 'QUJD',
+      url: 'https://example.test/ticketbai/123',
+    });
+  });
+
   it('recupera el PDF cuando representa la revisión documental vigente', async (): Promise<void> => {
     const pdf: Uint8Array = createPdf();
 
@@ -223,6 +246,7 @@ function createTicketRecord(
     fecha: '2026-08-26T00:00:00.000Z',
     empleadoNombre: 'Empleado',
     clienteNombre: null,
+    ticketBai: null,
     totalCents: 1_000,
     ticketRevision: overrides.ticketRevision ?? 1,
     ticketPdfRevision: overrides.ticketPdfRevision ?? 0,

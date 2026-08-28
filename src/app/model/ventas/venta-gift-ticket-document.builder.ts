@@ -299,8 +299,22 @@ function renderLinea(linea: VentaTicketLineaInterface): string {
 
 /**
  * Construye la referencia visible de la venta original.
+ *
+ * Si la venta está fiscalizada se identifica mediante su
+ * serie y número TicketBAI, sin incorporar datos fiscales
+ * adicionales al ticket regalo.
  */
 function formatTicketReference(ticket: VentaTicketInterface): string {
+  if (ticket.ticketBai !== null) {
+    const fiscalSerie: string | null = trimToNull(ticket.ticketBai.serie);
+
+    const fiscalNumero: string | null = trimToNull(ticket.ticketBai.numero);
+
+    if (fiscalSerie !== null && fiscalNumero !== null) {
+      return `${fiscalSerie}-${fiscalNumero}`;
+    }
+  }
+
   const serie: string | null = trimToNull(ticket.serie);
 
   return serie === null ? String(ticket.numero) : `${serie}-${ticket.numero}`;

@@ -38,6 +38,16 @@ export default class VentasTicketsService {
       fecha: venta.fecha,
       empleadoNombre: venta.empleadoNombre,
       clienteNombre: venta.clienteNombre,
+      ticketBai:
+        venta.ticketBai === null
+          ? null
+          : {
+              serie: venta.ticketBai.serie,
+              numero: venta.ticketBai.numero,
+              identificativo: venta.ticketBai.identificativo,
+              qr: venta.ticketBai.qr,
+              url: venta.ticketBai.url,
+            },
       totalCents: venta.totalCents,
       ticketRevision: venta.ticketRevision,
       ticketPdfRevision: venta.ticketPdfRevision,

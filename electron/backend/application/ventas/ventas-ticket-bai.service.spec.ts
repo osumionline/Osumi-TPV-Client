@@ -436,6 +436,7 @@ function createTicket(): VentaTicketInterface {
     fecha: '2026-08-28T10:30:00.000Z',
     empleadoNombre: 'Empleado test',
     clienteNombre: null,
+    ticketBai: null,
     totalCents: 1_210,
     ticketRevision: 1,
     ticketPdfRevision: 0,

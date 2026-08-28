@@ -383,6 +383,7 @@ function createTicketRecord(
 
     empleadoNombre: 'Empleado',
     clienteNombre: 'Cliente',
+    ticketBai: null,
 
     totalCents: 2_000,
 

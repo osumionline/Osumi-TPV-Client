@@ -389,6 +389,7 @@ function createTicket(): VentaTicketInterface {
     fecha: '2026-08-21T18:00:00.000Z',
     empleadoNombre: 'Empleado de prueba',
     clienteNombre: 'Cliente de prueba',
+    ticketBai: null,
     totalCents: 1_210,
     pagos: [
       {

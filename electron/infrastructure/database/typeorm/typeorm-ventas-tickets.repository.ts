@@ -1,5 +1,6 @@
 import type VentasTicketsRepository from '@backend/contracts/ventas/ventas-tickets.repository.interface';
 import type {
+  VentaTicketBaiDocumentRecord,
   VentaTicketLineaRecord,
   VentaTicketPagoRecord,
   VentaTicketRecord,
@@ -22,6 +23,13 @@ interface VentaTicketDatabaseRow {
   readonly total_cents: number;
   readonly ticket_revision: number;
   readonly ticket_pdf_revision: number;
+
+  readonly ticketbai_estado: string | null;
+  readonly ticketbai_serie: string | null;
+  readonly ticketbai_numero: string | null;
+  readonly ticketbai_huella: string | null;
+  readonly ticketbai_qr: string | null;
+  readonly ticketbai_url: string | null;
 }
 
 interface VentaTicketPagoDatabaseRow {
@@ -65,7 +73,13 @@ export default class TypeOrmVentasTicketsRepository implements VentasTicketsRepo
             c.nombre_apellidos AS cliente_nombre,
             v.total_cents,
             v.ticket_revision,
-            v.ticket_pdf_revision
+            v.ticket_pdf_revision,
+            vtb.estado AS ticketbai_estado,
+            vtb.serie AS ticketbai_serie,
+            vtb.numero AS ticketbai_numero,
+            vtb.huella AS ticketbai_huella,
+            vtb.qr AS ticketbai_qr,
+            vtb.url AS ticketbai_url
           FROM venta v
 
           INNER JOIN empleado e
@@ -73,6 +87,9 @@ export default class TypeOrmVentasTicketsRepository implements VentasTicketsRepo
 
           LEFT JOIN cliente c
             ON c.id = v.id_cliente
+
+          LEFT JOIN venta_ticketbai vtb
+            ON vtb.id_venta = v.id
 
           WHERE
             v.id = ?
@@ -93,6 +110,8 @@ export default class TypeOrmVentasTicketsRepository implements VentasTicketsRepo
 
     const lineas: readonly VentaTicketLineaRecord[] = await this.findLineas(dataSource, idVenta);
 
+    const ticketBai: VentaTicketBaiDocumentRecord | null = this.mapTicketBai(venta);
+
     return {
       id: venta.id,
       publicId: venta.public_id,
@@ -101,6 +120,7 @@ export default class TypeOrmVentasTicketsRepository implements VentasTicketsRepo
       fecha: venta.fecha,
       empleadoNombre: venta.empleado_nombre,
       clienteNombre: venta.cliente_nombre,
+      ticketBai,
       totalCents: venta.total_cents,
       pagos,
       lineas,
@@ -158,6 +178,58 @@ export default class TypeOrmVentasTicketsRepository implements VentasTicketsRepo
       row.ticket_revision === expectedRevision &&
       row.ticket_pdf_revision === expectedRevision
     );
+  }
+
+  /**
+   * Expone únicamente los datos TicketBAI que ya pueden
+   * formar parte de un documento definitivo.
+   */
+  private mapTicketBai(row: VentaTicketDatabaseRow): VentaTicketBaiDocumentRecord | null {
+    if (row.ticketbai_estado !== 'aceptada' && row.ticketbai_estado !== 'legacy') {
+      return null;
+    }
+
+    const serie: string = row.ticketbai_serie?.trim() ?? '';
+
+    const numero: string = row.ticketbai_numero?.trim() ?? '';
+
+    if (serie === '' || numero === '') {
+      throw new Error('La identidad fiscal TicketBAI del ticket está incompleta.');
+    }
+
+    const identificativo: string | null = this.normalizeNullableText(row.ticketbai_huella);
+
+    const qr: string | null = this.normalizeNullableText(row.ticketbai_qr);
+
+    const url: string | null = this.normalizeNullableText(row.ticketbai_url);
+
+    if (
+      row.ticketbai_estado === 'aceptada' &&
+      (identificativo === null || qr === null || url === null)
+    ) {
+      throw new Error('Los datos fiscales TicketBAI aceptados están incompletos.');
+    }
+
+    return {
+      serie,
+      numero,
+      identificativo,
+      qr,
+      url,
+    };
+  }
+
+  /**
+   * Normaliza un texto fiscal nullable recuperado de SQLite.
+   */
+  private normalizeNullableText(value: string | null): string | null {
+    if (value === null) {
+      return null;
+    }
+
+    const normalizedValue: string = value.trim();
+
+    return normalizedValue === '' ? null : normalizedValue;
   }
 
   private async findPagos(
