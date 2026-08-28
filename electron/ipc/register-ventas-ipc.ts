@@ -4,6 +4,7 @@ import type VentasDevolucionesService from '@backend/application/ventas/ventas-d
 import type VentasHistoricoService from '@backend/application/ventas/ventas-historico.service';
 import type VentasPersistenciaService from '@backend/application/ventas/ventas-persistencia.service';
 import type VentasPostventaService from '@backend/application/ventas/ventas-postventa.service';
+import type VentasTicketBaiService from '@backend/application/ventas/ventas-ticket-bai.service';
 import type VentasTicketEmailService from '@backend/application/ventas/ventas-ticket-email.service';
 import type VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
 import type AccesoDirectoVentaInterface from '@desktop-contracts/ventas/acceso-directo-venta.interface';
@@ -41,6 +42,7 @@ export default function registerVentasIpc(
   ventasPersistenciaService: VentasPersistenciaService,
   ventasTicketsService: VentasTicketsService,
   ventasTicketEmailService: VentasTicketEmailService,
+  ventasTicketBaiService: VentasTicketBaiService,
 ): void {
   ipcMain.handle(IPC_CHANNELS.ventasGetContext, async (event): Promise<VentasContextInterface> => {
     assertTrustedSender(event, getMainWindow);
@@ -156,6 +158,15 @@ export default function registerVentasIpc(
       assertTrustedSender(event, getMainWindow);
 
       await ventasTicketEmailService.send(command);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.ventasProcessTicketBai,
+    async (event, idVenta: number): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await ventasTicketBaiService.processInitial(idVenta);
     },
   );
 

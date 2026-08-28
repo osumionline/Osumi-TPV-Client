@@ -265,6 +265,9 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
     sendTicketEmail: (command: VentaTicketEmailCommand): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.ventasSendTicketEmail, command) as Promise<void>,
 
+    processTicketBai: (idVenta: number): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.ventasProcessTicketBai, idVenta) as Promise<void>,
+
     save: (command: GuardarVentaCommand): Promise<GuardarVentaResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.ventasSave, command) as Promise<GuardarVentaResult>,
   }),

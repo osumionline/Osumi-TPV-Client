@@ -60,5 +60,11 @@ export default interface VentasApi {
    */
   sendTicketEmail(command: VentaTicketEmailCommand): Promise<void>;
 
+  /**
+   * Ejecuta el procesamiento TicketBAI inicial
+   * de una venta ya persistida.
+   */
+  processTicketBai(idVenta: number): Promise<void>;
+
   save(command: GuardarVentaCommand): Promise<GuardarVentaResult>;
 }

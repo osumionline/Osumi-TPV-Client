@@ -13,12 +13,14 @@ import PrintingService from '@backend/application/printing/printing.service';
 import ProveedoresService from '@backend/application/proveedores/proveedores.service';
 import ReservasService from '@backend/application/reservas/reservas.service';
 import { SystemService } from '@backend/application/system/system.service';
+import VentaTicketBaiMapper from '@backend/application/ventas/venta-ticket-bai.mapper';
 import VentasArticulosService from '@backend/application/ventas/ventas-articulos.service';
 import VentasContextService from '@backend/application/ventas/ventas-context.service';
 import VentasDevolucionesService from '@backend/application/ventas/ventas-devoluciones.service';
 import VentasHistoricoService from '@backend/application/ventas/ventas-historico.service';
 import VentasPersistenciaService from '@backend/application/ventas/ventas-persistencia.service';
 import VentasPostventaService from '@backend/application/ventas/ventas-postventa.service';
+import VentasTicketBaiService from '@backend/application/ventas/ventas-ticket-bai.service';
 import VentasTicketEmailService from '@backend/application/ventas/ventas-ticket-email.service';
 import VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
@@ -41,6 +43,7 @@ import type ReservasRepository from '@backend/contracts/reservas/reservas.reposi
 import type PasswordHasher from '@backend/contracts/security/password-hasher.interface';
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
+import type { TicketBaiClient } from '@backend/contracts/ticket-bai/ticket-bai-client.interface';
 import type VentaTicketPdfStorage from '@backend/contracts/ventas/venta-ticket-pdf-storage.interface';
 import type VentasArticulosRepository from '@backend/contracts/ventas/ventas-articulos.repository.interface';
 import type VentasContextRepository from '@backend/contracts/ventas/ventas-context.repository.interface';
@@ -48,6 +51,7 @@ import type VentasDevolucionesRepository from '@backend/contracts/ventas/ventas-
 import type VentasHistoricoRepository from '@backend/contracts/ventas/ventas-historico.repository.interface';
 import type VentasPersistenciaRepository from '@backend/contracts/ventas/ventas-persistencia.repository.interface';
 import type VentasPostventaRepository from '@backend/contracts/ventas/ventas-postventa.repository.interface';
+import type VentasTicketBaiRepository from '@backend/contracts/ventas/ventas-ticket-bai.repository.interface';
 import type VentasTicketsRepository from '@backend/contracts/ventas/ventas-tickets.repository.interface';
 import DefaultLegacyImportReviewDecisionValidator from '@backend/domain/legacy-import/default-legacy-import-review-decision.validator';
 import NewInstallationDataService from '@infrastructure/database/initial-data/new-installation-data.service';
@@ -70,6 +74,7 @@ import TypeOrmVentasDevolucionesRepository from '@infrastructure/database/typeor
 import TypeOrmVentasHistoricoRepository from '@infrastructure/database/typeorm/typeorm-ventas-historico.repository';
 import TypeOrmVentasPersistenciaRepository from '@infrastructure/database/typeorm/typeorm-ventas-persistencia.repository';
 import TypeOrmVentasPostventaRepository from '@infrastructure/database/typeorm/typeorm-ventas-postventa.repository';
+import TypeOrmVentasTicketBaiRepository from '@infrastructure/database/typeorm/typeorm-ventas-ticket-bai.repository';
 import TypeOrmVentasTicketsRepository from '@infrastructure/database/typeorm/typeorm-ventas-tickets.repository';
 import ElectronAssetUrlBuilder from '@infrastructure/electron/electron-asset-url.builder';
 import ElectronHtmlDocumentRenderer from '@infrastructure/electron/electron-html-document.renderer';
@@ -91,6 +96,7 @@ import YauzlLegacyImportDumpAnalyzer from '@infrastructure/legacy-import/yauzl-l
 import YauzlLegacyImportPackageConfigurationReader from '@infrastructure/legacy-import/yauzl-legacy-import-package-configuration.reader';
 import YauzlLegacyImportPackageInspector from '@infrastructure/legacy-import/yauzl-legacy-import-package.inspector';
 import NodeScryptPasswordHasher from '@infrastructure/security/node-scrypt-password-hasher';
+import TicketBaiWsTicketBaiClient from '@infrastructure/ticket-bai/ticket-bai-ws.client';
 import registerApplicationIpc from '@ipc/register-application-ipc';
 import registerCajaIpc from '@ipc/register-caja-ipc';
 import registerCategoriasIpc from '@ipc/register-categorias-ipc';
@@ -274,6 +280,23 @@ export default function createApplicationComposition(
     ventaTicketPdfStorage,
   );
 
+  const ventasTicketBaiRepository: VentasTicketBaiRepository = new TypeOrmVentasTicketBaiRepository(
+    operationalDatabase,
+  );
+
+  const ventaTicketBaiMapper: VentaTicketBaiMapper = new VentaTicketBaiMapper();
+
+  const ticketBaiClient: TicketBaiClient = new TicketBaiWsTicketBaiClient();
+
+  const ventasTicketBaiService: VentasTicketBaiService = new VentasTicketBaiService(
+    configurationService,
+    operationalSecretStorage,
+    ventasTicketsService,
+    ventaTicketBaiMapper,
+    ventasTicketBaiRepository,
+    ticketBaiClient,
+  );
+
   const emailSender: EmailSender = new NodemailerEmailSender();
 
   const ventasTicketEmailService: VentasTicketEmailService = new VentasTicketEmailService(
@@ -394,6 +417,7 @@ export default function createApplicationComposition(
     ventasPersistenciaService,
     ventasTicketsService,
     ventasTicketEmailService,
+    ventasTicketBaiService,
   );
 
   registerLegacyImportIpc(legacyImportService);
