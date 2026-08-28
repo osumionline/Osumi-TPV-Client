@@ -32,7 +32,7 @@
     "@angular/platform-browser": "^22.1.4",
     "@angular/router": "^22.1.4",
     "@osumi/angular-tools": "^1.5.2",
-    "@osumi/ticketbaiws": "^1.0.0",
+    "@osumi/ticketbaiws": "^1.0.1",
     "better-sqlite3": "^12.11.1",
     "nodemailer": "^9.0.6",
     "qrcode-generator": "^2.0.4",
