@@ -2,17 +2,23 @@ import { TestBed } from '@angular/core/testing';
 import ClientesService from '@services/clientes.service';
 import ReservasService from '@services/reservas.service';
 import VentaPostCommitService from '@services/venta-post-commit.service';
+import VentaTicketBaiService from '@services/venta-ticket-bai.service';
 import VentaTicketDocumentService from '@services/venta-ticket-document.service';
 
 describe('VentaPostCommitService', (): void => {
   let clientesService: FakeClientesService;
   let reservasService: FakeReservasService;
+  let ticketBaiService: FakeVentaTicketBaiService;
   let documentService: FakeVentaTicketDocumentService;
+  let executionOrder: string[];
 
   beforeEach((): void => {
+    executionOrder = [];
+
     clientesService = new FakeClientesService();
     reservasService = new FakeReservasService();
-    documentService = new FakeVentaTicketDocumentService();
+    ticketBaiService = new FakeVentaTicketBaiService(executionOrder);
+    documentService = new FakeVentaTicketDocumentService(executionOrder);
 
     TestBed.configureTestingModule({
       providers: [
@@ -24,6 +30,10 @@ describe('VentaPostCommitService', (): void => {
         {
           provide: ReservasService,
           useValue: reservasService,
+        },
+        {
+          provide: VentaTicketBaiService,
+          useValue: ticketBaiService,
         },
         {
           provide: VentaTicketDocumentService,
@@ -43,12 +53,27 @@ describe('VentaPostCommitService', (): void => {
     const warnings: readonly string[] = await service.run(123, false, null, true);
 
     expect(warnings).toEqual([]);
-
+    expect(ticketBaiService.processedVentaIds).toEqual([123]);
     expect(documentService.generatePdfVentaIds).toEqual([123]);
-
     expect(documentService.printVentaIds).toEqual([123]);
-
+    expect(executionOrder).toEqual(['ticketbai', 'pdf', 'print']);
     expect(reservasService.reloadCalls).toBe(0);
+  });
+
+  it('continúa con PDF e impresión cuando falla TicketBAI', async (): Promise<void> => {
+    ticketBaiService.error = new Error('TicketBAI no disponible.');
+
+    const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
+
+    const warnings: readonly string[] = await service.run(123, false, null, true);
+
+    expect(warnings).toEqual([
+      'No se ha podido completar TicketBAI. El ticket se imprimirá sin el código QR fiscal. TicketBAI no disponible.',
+    ]);
+    expect(ticketBaiService.processedVentaIds).toEqual([123]);
+    expect(documentService.generatePdfVentaIds).toEqual([123]);
+    expect(documentService.printVentaIds).toEqual([123]);
+    expect(executionOrder).toEqual(['ticketbai', 'pdf', 'print']);
   });
 
   it('recarga las reservas cuando la venta procedía de ellas', async (): Promise<void> => {
@@ -166,6 +191,7 @@ describe('VentaPostCommitService', (): void => {
 
     expect(documentService.generatePdfVentaIds).toEqual([123]);
     expect(documentService.printVentaIds).toEqual([]);
+    expect(executionOrder).toEqual(['ticketbai', 'pdf']);
   });
 });
 
@@ -183,15 +209,43 @@ class FakeReservasService {
   }
 }
 
+class FakeVentaTicketBaiService {
+  readonly processedVentaIds: number[] = [];
+  error: Error | null = null;
+
+  constructor(private readonly executionOrder: string[]) {}
+
+  /**
+   * Simula el procesamiento TicketBAI
+   * posterior al COMMIT.
+   */
+  processInitial(idVenta: number): Promise<void> {
+    this.processedVentaIds.push(idVenta);
+    this.executionOrder.push('ticketbai');
+
+    if (this.error !== null) {
+      return Promise.reject(this.error);
+    }
+
+    return Promise.resolve();
+  }
+}
+
 class FakeVentaTicketDocumentService {
   readonly generatePdfVentaIds: number[] = [];
   readonly printVentaIds: number[] = [];
-
   generatePdfError: Error | null = null;
   printError: Error | null = null;
 
+  constructor(private readonly executionOrder: string[]) {}
+
+  /**
+   * Simula la generación y persistencia
+   * del PDF documental de la venta.
+   */
   generateAndSavePdf(idVenta: number): Promise<void> {
     this.generatePdfVentaIds.push(idVenta);
+    this.executionOrder.push('pdf');
 
     if (this.generatePdfError !== null) {
       return Promise.reject(this.generatePdfError);
@@ -200,8 +254,13 @@ class FakeVentaTicketDocumentService {
     return Promise.resolve();
   }
 
+  /**
+   * Simula la impresión física
+   * del ticket de venta.
+   */
   print(idVenta: number): Promise<void> {
     this.printVentaIds.push(idVenta);
+    this.executionOrder.push('print');
 
     if (this.printError !== null) {
       return Promise.reject(this.printError);

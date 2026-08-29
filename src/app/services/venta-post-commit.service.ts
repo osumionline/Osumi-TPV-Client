@@ -1,16 +1,15 @@
 import { inject, Service } from '@angular/core';
-
 import ClientesService from '@services/clientes.service';
 import ReservasService from '@services/reservas.service';
+import VentaTicketBaiService from '@services/venta-ticket-bai.service';
 import VentaTicketDocumentService from '@services/venta-ticket-document.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 @Service()
 export default class VentaPostCommitService {
   private readonly clientesService: ClientesService = inject(ClientesService);
-
   private readonly reservasService: ReservasService = inject(ReservasService);
-
+  private readonly ventaTicketBaiService: VentaTicketBaiService = inject(VentaTicketBaiService);
   private readonly ventaTicketDocumentService: VentaTicketDocumentService = inject(
     VentaTicketDocumentService,
   );
@@ -37,6 +36,7 @@ export default class VentaPostCommitService {
       await this.reloadReservas(warnings);
     }
 
+    await this.processTicketBai(idVenta, warnings);
     await this.generateAndSavePdf(idVenta, warnings);
 
     if (imprimirTicket) {
@@ -74,6 +74,23 @@ export default class VentaPostCommitService {
     } catch (error: unknown) {
       warnings.push(
         `No se ha podido actualizar la lista de reservas. ${getErrorMessage(
+          error,
+          'Se ha producido un error inesperado.',
+        )}`,
+      );
+    }
+  }
+
+  /**
+   * Procesa TicketBAI sin impedir que el ticket
+   * comercial se genere e imprima ante una incidencia.
+   */
+  private async processTicketBai(idVenta: number, warnings: string[]): Promise<void> {
+    try {
+      await this.ventaTicketBaiService.processInitial(idVenta);
+    } catch (error: unknown) {
+      warnings.push(
+        `No se ha podido completar TicketBAI. El ticket se imprimirá sin el código QR fiscal. ${getErrorMessage(
           error,
           'Se ha producido un error inesperado.',
         )}`,
