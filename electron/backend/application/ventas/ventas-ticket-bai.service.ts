@@ -12,6 +12,7 @@ import type {
   TicketBaiCreateInvoiceRequest,
   TicketBaiCreateInvoiceResult,
   TicketBaiGetInvoiceResult,
+  TicketBaiResendInvoiceResult,
 } from '@backend/contracts/ticket-bai/ticket-bai-client.interface';
 import type VentasTicketBaiRepository from '@backend/contracts/ventas/ventas-ticket-bai.repository.interface';
 import type {
@@ -262,6 +263,88 @@ export default class VentasTicketBaiService {
       qr: result.qr,
       url: result.url,
       ultimoError: 'TicketBaiWS informa que la factura se encuentra en estado ERROR.',
+      respuestaPayload: result.responsePayload,
+    });
+  }
+
+  /**
+   * Reencola manualmente una factura previamente
+   * rechazada sin recrear el documento fiscal.
+   */
+  async retry(idVenta: number): Promise<void> {
+    this.validateVentaId(idVenta);
+
+    const record: VentaTicketBaiRecord | null = await this.repository.findByVentaId(idVenta);
+
+    if (record === null) {
+      throw new Error('La venta no tiene estado TicketBAI para reintentar.');
+    }
+
+    if (record.estado !== 'rechazada') {
+      return;
+    }
+
+    /*
+     * Validamos secretos e identidad antes de adquirir
+     * el intento. Así un problema local de configuración
+     * no deja innecesariamente la fila en "enviando".
+     */
+    const configuration: TicketBaiClientConfiguration = {
+      token: await this.requireToken(),
+      issuerNif: this.requireFrozenText(
+        record.nifEmisor,
+        'El NIF emisor TicketBAI de la venta no está disponible.',
+      ),
+      environment: this.requireFrozenEnvironment(record),
+    };
+    const serie: string = this.requireFrozenText(
+      record.serie,
+      'La serie TicketBAI de la venta no está disponible.',
+    );
+    const numero: string = this.requireFrozenText(
+      record.numero,
+      'El número TicketBAI de la venta no está disponible.',
+    );
+
+    const attempt: VentaTicketBaiRecord | null = await this.repository.beginManualAttempt(idVenta);
+
+    if (attempt === null) {
+      return;
+    }
+
+    let result: TicketBaiResendInvoiceResult;
+
+    try {
+      result = await this.client.resendInvoice(configuration, {
+        serie,
+        numero,
+      });
+    } catch (error: unknown) {
+      /*
+       * Igual que en el envío inicial, solo una
+       * clasificación conocida permite cerrar el intento.
+       *
+       * Un error inesperado deja "enviando", porque el
+       * proveedor podría haber recibido el resend.
+       */
+      if (!(error instanceof TicketBaiClientError)) {
+        throw error;
+      }
+
+      await this.repository.markFailure({
+        idVenta,
+        estado: this.mapFailureState(error.kind),
+        ultimoError: error.message,
+        respuestaPayload: error.responsePayload,
+      });
+
+      throw new Error(error.message, {
+        cause: error,
+      });
+    }
+
+    await this.repository.markAttemptAcknowledged({
+      idVenta,
       respuestaPayload: result.responsePayload,
     });
   }

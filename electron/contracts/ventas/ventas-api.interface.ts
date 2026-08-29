@@ -72,5 +72,11 @@ export default interface VentasApi {
    */
   reconcileTicketBai(idVenta: number): Promise<void>;
 
+  /**
+   * Solicita el reintento manual de una factura
+   * TicketBAI previamente rechazada.
+   */
+  retryTicketBai(idVenta: number): Promise<void>;
+
   save(command: GuardarVentaCommand): Promise<GuardarVentaResult>;
 }

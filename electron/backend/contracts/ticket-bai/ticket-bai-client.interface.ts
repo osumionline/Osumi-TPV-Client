@@ -52,6 +52,10 @@ export interface TicketBaiGetInvoiceResult {
   readonly responsePayload: string;
 }
 
+export interface TicketBaiResendInvoiceResult {
+  readonly responsePayload: string;
+}
+
 export interface TicketBaiClient {
   /**
    * Crea una factura simplificada mediante
@@ -70,4 +74,13 @@ export interface TicketBaiClient {
     configuration: TicketBaiClientConfiguration,
     reference: TicketBaiInvoiceReference,
   ): Promise<TicketBaiGetInvoiceResult>;
+
+  /**
+   * Solicita al proveedor que reencole una
+   * factura TicketBAI ya existente.
+   */
+  resendInvoice(
+    configuration: TicketBaiClientConfiguration,
+    reference: TicketBaiInvoiceReference,
+  ): Promise<TicketBaiResendInvoiceResult>;
 }

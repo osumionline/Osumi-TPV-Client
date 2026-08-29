@@ -18,6 +18,11 @@ export interface MarkVentaTicketBaiRemotePendingRecordCommand {
   readonly respuestaPayload: string;
 }
 
+export interface MarkVentaTicketBaiAttemptAcknowledgedRecordCommand {
+  readonly idVenta: number;
+  readonly respuestaPayload: string;
+}
+
 export interface MarkVentaTicketBaiReconciledRejectedRecordCommand {
   readonly idVenta: number;
   readonly huella: string;

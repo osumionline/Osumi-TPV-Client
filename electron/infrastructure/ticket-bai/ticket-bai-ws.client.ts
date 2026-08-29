@@ -10,6 +10,7 @@ import type {
   TicketBaiGetInvoiceResult,
   TicketBaiInvoiceLine,
   TicketBaiInvoiceReference,
+  TicketBaiResendInvoiceResult,
 } from '@backend/contracts/ticket-bai/ticket-bai-client.interface';
 import {
   TicketBaiWsApiError,
@@ -114,6 +115,29 @@ export default class TicketBaiWsTicketBaiClient implements TicketBaiClient {
         throw error;
       }
 
+      throw this.mapError(error);
+    }
+  }
+
+  /**
+   * Solicita el reenvío de una factura ya almacenada
+   * sin recrear ni modificar sus datos fiscales.
+   */
+  async resendInvoice(
+    configuration: TicketBaiClientConfiguration,
+    reference: TicketBaiInvoiceReference,
+  ): Promise<TicketBaiResendInvoiceResult> {
+    try {
+      const client: TicketBaiWsClient = this.createClient(configuration);
+      const response = await client.invoices.resend({
+        serie: reference.serie,
+        numero: reference.numero,
+      });
+
+      return {
+        responsePayload: this.serializePayload(response),
+      };
+    } catch (error: unknown) {
       throw this.mapError(error);
     }
   }

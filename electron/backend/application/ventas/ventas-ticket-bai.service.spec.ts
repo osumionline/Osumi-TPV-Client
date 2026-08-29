@@ -8,10 +8,12 @@ import type {
   TicketBaiCreateInvoiceResult,
   TicketBaiGetInvoiceResult,
   TicketBaiInvoiceReference,
+  TicketBaiResendInvoiceResult,
 } from '@backend/contracts/ticket-bai/ticket-bai-client.interface';
 import type {
   InitializeVentaTicketBaiPendingRecordCommand,
   MarkVentaTicketBaiAcceptedRecordCommand,
+  MarkVentaTicketBaiAttemptAcknowledgedRecordCommand,
   MarkVentaTicketBaiFailureRecordCommand,
   MarkVentaTicketBaiReconciledRejectedRecordCommand,
   MarkVentaTicketBaiRemotePendingRecordCommand,
@@ -270,6 +272,148 @@ describe('VentasTicketBaiService', (): void => {
     expect(client.getCalls).toBe(0);
     expect(repository.record?.estado).toBe('aceptada');
   });
+
+  it('reenvía una factura rechazada usando su identidad fiscal congelada', async (): Promise<void> => {
+    repository.record = createRejectedRecord();
+
+    configurationService.appData = {
+      ...createAppData(),
+      ticketBai: {
+        nif: 'B11111111',
+        environment: 'production',
+      },
+    };
+
+    await service.retry(15);
+
+    expect(client.resendCalls).toBe(1);
+    expect(client.lastResendConfiguration).toEqual({
+      token: 'ticketbai-token',
+      issuerNif: 'B87654321',
+      environment: 'test',
+    });
+    expect(client.lastResendReference).toEqual({
+      serie: 'TPV01',
+      numero: '000015',
+    });
+
+    expect(repository.record?.estado).toBe('enviando');
+    expect(repository.record?.intentos).toBe(2);
+    expect(repository.record?.ultimoError).toBeNull();
+    expect(repository.record?.respuestaPayload).toBe('{"result":"OK","return":{}}');
+
+    expect(client.getCalls).toBe(0);
+  });
+
+  it('persiste un nuevo rechazo cuando falla así el reenvío manual', async (): Promise<void> => {
+    repository.record = createRejectedRecord();
+
+    client.resendError = new TicketBaiClientError(
+      'rejected',
+      'TicketBaiWS sigue rechazando la factura.',
+      '{"result":"ERROR"}',
+    );
+
+    await expect(service.retry(15)).rejects.toThrow('TicketBaiWS sigue rechazando la factura.');
+
+    expect(client.resendCalls).toBe(1);
+    expect(repository.record?.estado).toBe('rechazada');
+    expect(repository.record?.intentos).toBe(2);
+    expect(repository.record?.ultimoError).toBe('TicketBaiWS sigue rechazando la factura.');
+    expect(repository.record?.respuestaPayload).toBe('{"result":"ERROR"}');
+  });
+
+  it('persiste error_temporal cuando el reenvío queda ambiguo de forma conocida', async (): Promise<void> => {
+    repository.record = createRejectedRecord();
+
+    client.resendError = new TicketBaiClientError(
+      'temporary',
+      'No se ha podido confirmar el resultado del reenvío.',
+    );
+
+    await expect(service.retry(15)).rejects.toThrow(
+      'No se ha podido confirmar el resultado del reenvío.',
+    );
+
+    expect(client.resendCalls).toBe(1);
+    expect(repository.record?.estado).toBe('error_temporal');
+    expect(repository.record?.intentos).toBe(2);
+    expect(repository.record?.ultimoError).toBe(
+      'No se ha podido confirmar el resultado del reenvío.',
+    );
+  });
+
+  it('no permite reintentar manualmente un error temporal', async (): Promise<void> => {
+    repository.record = {
+      ...createReconcilableRecord('error_temporal'),
+      intentos: 2,
+      ultimoError: 'No se ha podido confirmar el resultado del reenvío.',
+    };
+
+    await service.retry(15);
+
+    expect(client.resendCalls).toBe(0);
+    expect(repository.record?.estado).toBe('error_temporal');
+    expect(repository.record?.intentos).toBe(2);
+  });
+
+  it('persiste error_permanente cuando el reenvío falla de forma definitiva', async (): Promise<void> => {
+    repository.record = createRejectedRecord();
+
+    client.resendError = new TicketBaiClientError(
+      'permanent',
+      'La configuración utilizada por TicketBAI no es válida.',
+    );
+
+    await expect(service.retry(15)).rejects.toThrow(
+      'La configuración utilizada por TicketBAI no es válida.',
+    );
+
+    expect(client.resendCalls).toBe(1);
+    expect(repository.record?.estado).toBe('error_permanente');
+    expect(repository.record?.intentos).toBe(2);
+    expect(repository.record?.ultimoError).toBe(
+      'La configuración utilizada por TicketBAI no es válida.',
+    );
+  });
+
+  it('no permite reintentar manualmente un error permanente', async (): Promise<void> => {
+    repository.record = {
+      ...createReconcilableRecord('error_permanente'),
+      intentos: 2,
+      ultimoError: 'La configuración utilizada por TicketBAI no es válida.',
+    };
+
+    await service.retry(15);
+
+    expect(client.resendCalls).toBe(0);
+    expect(repository.record?.estado).toBe('error_permanente');
+    expect(repository.record?.intentos).toBe(2);
+  });
+
+  it('mantiene enviando ante un fallo no normalizado durante el reenvío', async (): Promise<void> => {
+    repository.record = createRejectedRecord();
+
+    client.resendError = new Error('La conexión se perdió después de enviar la petición.');
+
+    await expect(service.retry(15)).rejects.toThrow(
+      'La conexión se perdió después de enviar la petición.',
+    );
+
+    expect(client.resendCalls).toBe(1);
+    expect(repository.record?.estado).toBe('enviando');
+    expect(repository.record?.intentos).toBe(2);
+  });
+
+  it('solo realiza un resend ante dos reintentos manuales concurrentes', async (): Promise<void> => {
+    repository.record = createRejectedRecord();
+
+    await Promise.all([service.retry(15), service.retry(15)]);
+
+    expect(client.resendCalls).toBe(1);
+    expect(repository.record?.estado).toBe('enviando');
+    expect(repository.record?.intentos).toBe(2);
+  });
 });
 
 class FakeConfigurationService {
@@ -323,6 +467,11 @@ class FakeTicketBaiClient implements TicketBaiClient {
   lastReference: TicketBaiInvoiceReference | null = null;
   getError: Error | null = null;
   getStatus: TicketBaiGetInvoiceResult['status'] = 'pending';
+  resendCalls: number = 0;
+  lastResendConfiguration: TicketBaiClientConfiguration | null = null;
+  lastResendReference: TicketBaiInvoiceReference | null = null;
+  resendError: Error | null = null;
+  resendResponsePayload: string = '{"result":"OK","return":{}}';
 
   /**
    * Simula la creación remota de un TicketBAI.
@@ -370,6 +519,27 @@ class FakeTicketBaiClient implements TicketBaiClient {
       qr: 'QR-GET',
       url: 'https://example.test/tbai/get',
       responsePayload: `{"result":"OK","return":{"status":"${this.getStatus}"}}`,
+    });
+  }
+
+  /**
+   * Simula la solicitud de reenvío de una
+   * factura TicketBAI ya existente.
+   */
+  resendInvoice(
+    configuration: TicketBaiClientConfiguration,
+    reference: TicketBaiInvoiceReference,
+  ): Promise<TicketBaiResendInvoiceResult> {
+    this.resendCalls++;
+    this.lastResendConfiguration = configuration;
+    this.lastResendReference = reference;
+
+    if (this.resendError !== null) {
+      return Promise.reject(this.resendError);
+    }
+
+    return Promise.resolve({
+      responsePayload: this.resendResponsePayload,
     });
   }
 }
@@ -434,13 +604,43 @@ class FakeVentasTicketBaiRepository implements VentasTicketBaiRepository {
   }
 
   /**
-   * Simula la adquisición de un intento manual.
-   *
-   * No se utiliza en estos tests porque el servicio
-   * inicial nunca debe realizar reintentos.
+   * Adquiere un intento manual únicamente
+   * desde un rechazo fiscal simulado.
    */
   beginManualAttempt(): Promise<VentaTicketBaiRecord | null> {
-    return Promise.resolve(null);
+    if (this.record === null || this.record.estado !== 'rechazada') {
+      return Promise.resolve(null);
+    }
+
+    this.record = {
+      ...this.record,
+      estado: 'enviando',
+      intentos: this.record.intentos + 1,
+      ultimoError: null,
+      respuestaPayload: null,
+      enviadoAt: '2026-08-29T18:00:00.000Z',
+    };
+
+    return Promise.resolve(this.record);
+  }
+
+  /**
+   * Conserva la confirmación técnica simulada
+   * de un reenvío TicketBAI.
+   */
+  markAttemptAcknowledged(
+    command: MarkVentaTicketBaiAttemptAcknowledgedRecordCommand,
+  ): Promise<VentaTicketBaiRecord> {
+    if (this.record === null || this.record.estado !== 'enviando') {
+      return Promise.reject(new Error('No existe un intento TicketBAI activo.'));
+    }
+
+    this.record = {
+      ...this.record,
+      respuestaPayload: command.respuestaPayload,
+    };
+
+    return Promise.resolve(this.record);
   }
 
   /**
@@ -647,6 +847,19 @@ function createReconcilableRecord(
     qr: estado === 'pendiente_remoto' ? 'QR-INICIAL' : null,
     url: estado === 'pendiente_remoto' ? 'https://example.test/tbai/inicial' : null,
     respuestaPayload: estado === 'pendiente_remoto' ? '{"result":"PENDING"}' : null,
+  };
+}
+
+/**
+ * Construye una factura rechazada apta
+ * para iniciar un reintento manual.
+ */
+function createRejectedRecord(): VentaTicketBaiRecord {
+  return {
+    ...createReconcilableRecord('rechazada'),
+    intentos: 1,
+    ultimoError: 'TicketBAI ha rechazado la factura.',
+    respuestaPayload: '{"result":"ERROR"}',
   };
 }
 

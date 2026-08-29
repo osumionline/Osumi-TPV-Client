@@ -1,6 +1,7 @@
 import type {
   InitializeVentaTicketBaiPendingRecordCommand,
   MarkVentaTicketBaiAcceptedRecordCommand,
+  MarkVentaTicketBaiAttemptAcknowledgedRecordCommand,
   MarkVentaTicketBaiFailureRecordCommand,
   MarkVentaTicketBaiReconciledRejectedRecordCommand,
   MarkVentaTicketBaiRemotePendingRecordCommand,
@@ -251,7 +252,7 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
   }
 
   /**
-   * Cambia atómicamente un error/rechazo → enviando
+   * Cambia atómicamente rechazada → enviando
    * y contabiliza un nuevo intento manual.
    */
   async beginManualAttempt(idVenta: number): Promise<VentaTicketBaiRecord | null> {
@@ -274,11 +275,7 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
               updated_at = ?
             WHERE
               id_venta = ?
-              AND estado IN (
-                'rechazada',
-                'error_temporal',
-                'error_permanente'
-              )
+              AND estado = 'rechazada'
           `,
           [timestamp, timestamp, idVenta],
         );
@@ -288,6 +285,61 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
         }
 
         return this.requireByVentaId(queryRunner, idVenta);
+      },
+    );
+  }
+
+  /**
+   * Conserva la respuesta técnica de un reenvío
+   * que todavía debe reconciliarse remotamente.
+   */
+  async markAttemptAcknowledged(
+    command: MarkVentaTicketBaiAttemptAcknowledgedRecordCommand,
+  ): Promise<VentaTicketBaiRecord> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<VentaTicketBaiRecord> => {
+        const timestamp: string = new Date().toISOString();
+
+        await queryRunner.query(
+          `
+          UPDATE venta_ticketbai
+          SET
+            respuesta_payload = ?,
+            updated_at = ?
+          WHERE
+            id_venta = ?
+            AND estado = 'enviando'
+        `,
+          [command.respuestaPayload, timestamp, command.idVenta],
+        );
+
+        const updatedRows: number = await this.getChanges(queryRunner);
+
+        if (updatedRows === 0) {
+          const current: VentaTicketBaiRecord = await this.requireByVentaId(
+            queryRunner,
+            command.idVenta,
+          );
+
+          if (
+            current.estado === 'enviando' &&
+            current.respuestaPayload === command.respuestaPayload
+          ) {
+            return current;
+          }
+
+          throw new Error(
+            [
+              'La venta no se encuentra en un estado',
+              'válido para confirmar el reenvío TicketBAI.',
+            ].join(' '),
+          );
+        }
+
+        return this.requireByVentaId(queryRunner, command.idVenta);
       },
     );
   }

@@ -4,6 +4,7 @@ import type {
   TicketBaiCreateInvoiceRequest,
   TicketBaiCreateInvoiceResult,
   TicketBaiGetInvoiceResult,
+  TicketBaiResendInvoiceResult,
 } from '@backend/contracts/ticket-bai/ticket-bai-client.interface';
 import TicketBaiWsTicketBaiClient from '@infrastructure/ticket-bai/ticket-bai-ws.client';
 import { describe, expect, it } from 'vitest';
@@ -234,6 +235,44 @@ describe('TicketBaiWsTicketBaiClient', (): void => {
     expect(result.huella).toBe('TBAI-HUELLA-ERROR');
     expect(result.qr).toBe('QR-BASE64-ERROR');
     expect(result.url).toBe('https://example.test/tbai/error');
+  });
+
+  it('solicita el reenvío de una factura existente sin recrearla', async (): Promise<void> => {
+    let capturedInput: FetchInput | null = null;
+    let capturedInit: RequestInit | undefined;
+
+    const fetchImplementation: typeof globalThis.fetch = async (
+      input: FetchInput,
+      init?: RequestInit,
+    ): Promise<Response> => {
+      capturedInput = input;
+      capturedInit = init;
+
+      return new Response(
+        JSON.stringify({
+          result: 'OK',
+          return: {},
+          msg: null,
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+    };
+
+    const client = new TicketBaiWsTicketBaiClient(fetchImplementation);
+
+    const result: TicketBaiResendInvoiceResult = await client.resendInvoice(createConfiguration(), {
+      serie: 'TPV01',
+      numero: '000123',
+    });
+
+    expect(result.responsePayload).toBe('{"result":"OK","return":{},"msg":null}');
+    expect(capturedInit?.method).toBe('PUT');
+    expect(getInputUrl(capturedInput)).toContain('reset-tbai/');
   });
 
   it('clasifica un rechazo del API como rejected', async (): Promise<void> => {

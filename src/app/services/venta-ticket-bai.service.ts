@@ -17,4 +17,12 @@ export default class VentaTicketBaiService {
   reconcile(idVenta: number): Promise<void> {
     return window.osumiDesktop.ventas.reconcileTicketBai(idVenta);
   }
+
+  /**
+   * Solicita al backend el reintento manual
+   * de una factura TicketBAI rechazada.
+   */
+  retry(idVenta: number): Promise<void> {
+    return window.osumiDesktop.ventas.retryTicketBai(idVenta);
+  }
 }

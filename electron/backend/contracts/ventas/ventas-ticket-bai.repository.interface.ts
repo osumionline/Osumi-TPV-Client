@@ -1,6 +1,7 @@
 import type {
   InitializeVentaTicketBaiPendingRecordCommand,
   MarkVentaTicketBaiAcceptedRecordCommand,
+  MarkVentaTicketBaiAttemptAcknowledgedRecordCommand,
   MarkVentaTicketBaiFailureRecordCommand,
   MarkVentaTicketBaiReconciledRejectedRecordCommand,
   MarkVentaTicketBaiRemotePendingRecordCommand,
@@ -40,6 +41,14 @@ export default interface VentasTicketBaiRepository {
    * Solo parte de un estado de error/rechazo.
    */
   beginManualAttempt(idVenta: number): Promise<VentaTicketBaiRecord | null>;
+
+  /**
+   * Conserva la confirmación técnica del reenvío
+   * mientras el estado fiscal sigue sin reconciliar.
+   */
+  markAttemptAcknowledged(
+    command: MarkVentaTicketBaiAttemptAcknowledgedRecordCommand,
+  ): Promise<VentaTicketBaiRecord>;
 
   /**
    * Persiste un resultado remoto pendiente que ya

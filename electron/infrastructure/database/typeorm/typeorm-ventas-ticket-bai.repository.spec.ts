@@ -136,11 +136,10 @@ describe('TypeOrmVentasTicketBaiRepository', (): void => {
     expect(secondAttempt).toBeNull();
   });
 
-  it('registra un fallo y permite después adquirir un intento manual', async (): Promise<void> => {
+  it('no permite adquirir un intento manual desde un error temporal', async (): Promise<void> => {
     const currentRepository = requireRepository();
 
     await currentRepository.initializePending(createPendingCommand());
-
     await currentRepository.beginInitialAttempt(1);
 
     const failed: VentaTicketBaiRecord = await currentRepository.markFailure({
@@ -151,15 +150,77 @@ describe('TypeOrmVentasTicketBaiRepository', (): void => {
     });
 
     expect(failed.estado).toBe('error_temporal');
-
     expect(failed.intentos).toBe(1);
 
     const retry: VentaTicketBaiRecord | null = await currentRepository.beginManualAttempt(1);
 
-    expect(retry?.estado).toBe('enviando');
+    expect(retry).toBeNull();
 
-    expect(retry?.intentos).toBe(2);
-    expect(retry?.ultimoError).toBeNull();
+    const current: VentaTicketBaiRecord | null = await currentRepository.findByVentaId(1);
+
+    expect(current?.estado).toBe('error_temporal');
+    expect(current?.intentos).toBe(1);
+  });
+
+  it('adquiere una sola vez un intento manual desde una factura rechazada', async (): Promise<void> => {
+    const currentRepository = requireRepository();
+
+    await currentRepository.initializePending(createPendingCommand());
+    await currentRepository.beginInitialAttempt(1);
+
+    const rejected: VentaTicketBaiRecord = await currentRepository.markFailure({
+      idVenta: 1,
+      estado: 'rechazada',
+      ultimoError: 'TicketBAI ha rechazado la factura.',
+      respuestaPayload: '{"result":"ERROR"}',
+    });
+
+    expect(rejected.estado).toBe('rechazada');
+    expect(rejected.intentos).toBe(1);
+
+    const firstRetry: VentaTicketBaiRecord | null = await currentRepository.beginManualAttempt(1);
+
+    const secondRetry: VentaTicketBaiRecord | null = await currentRepository.beginManualAttempt(1);
+
+    expect(firstRetry?.estado).toBe('enviando');
+    expect(firstRetry?.intentos).toBe(2);
+    expect(firstRetry?.ultimoError).toBeNull();
+    expect(firstRetry?.respuestaPayload).toBeNull();
+
+    expect(secondRetry).toBeNull();
+  });
+
+  it('conserva el acknowledgement del reenvío sin alterar la revisión documental', async (): Promise<void> => {
+    const currentRepository = requireRepository();
+
+    await currentRepository.initializePending(createPendingCommand());
+    await currentRepository.beginInitialAttempt(1);
+    await currentRepository.markFailure({
+      idVenta: 1,
+      estado: 'rechazada',
+      ultimoError: 'TicketBAI ha rechazado la factura.',
+      respuestaPayload: '{"result":"ERROR"}',
+    });
+
+    const attempt: VentaTicketBaiRecord | null = await currentRepository.beginManualAttempt(1);
+
+    expect(attempt?.estado).toBe('enviando');
+    expect(attempt?.intentos).toBe(2);
+
+    const acknowledged: VentaTicketBaiRecord = await currentRepository.markAttemptAcknowledged({
+      idVenta: 1,
+      respuestaPayload: '{"result":"OK","return":{}}',
+    });
+
+    expect(acknowledged.estado).toBe('enviando');
+    expect(acknowledged.intentos).toBe(2);
+    expect(acknowledged.ultimoError).toBeNull();
+    expect(acknowledged.respuestaPayload).toBe('{"result":"OK","return":{}}');
+
+    expect(await readVentaRevision()).toEqual({
+      ticket_revision: 1,
+      ticket_pdf_revision: 0,
+    });
   });
 
   it('acepta TicketBAI e invalida exactamente una vez la revisión documental', async (): Promise<void> => {
