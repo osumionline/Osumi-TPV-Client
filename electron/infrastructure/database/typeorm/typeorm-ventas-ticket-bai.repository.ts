@@ -2,6 +2,7 @@ import type {
   InitializeVentaTicketBaiPendingRecordCommand,
   MarkVentaTicketBaiAcceptedRecordCommand,
   MarkVentaTicketBaiFailureRecordCommand,
+  MarkVentaTicketBaiRemotePendingRecordCommand,
 } from '@backend/contracts/ventas/venta-ticket-bai-record-command.interface';
 import type VentasTicketBaiRepository from '@backend/contracts/ventas/ventas-ticket-bai.repository.interface';
 import type {
@@ -291,11 +292,14 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
   }
 
   /**
-   * Persiste una aceptación y aumenta en la misma
-   * transacción la revisión documental de la venta.
+   * Persiste un PENDING remoto que ya contiene
+   * huella, QR y URL fiscales.
+   *
+   * La primera aparición del artefacto fiscal hace
+   * obsoleta la revisión documental anterior.
    */
-  async markAccepted(
-    command: MarkVentaTicketBaiAcceptedRecordCommand,
+  async markRemotePending(
+    command: MarkVentaTicketBaiRemotePendingRecordCommand,
   ): Promise<VentaTicketBaiRecord> {
     const dataSource: DataSource = await this.applicationDatabase.connect();
 
@@ -306,20 +310,109 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
 
         await queryRunner.query(
           `
-            UPDATE venta_ticketbai
-            SET
-              estado = 'aceptada',
-              huella = ?,
-              qr = ?,
-              url = ?,
-              ultimo_error = NULL,
-              respuesta_payload = ?,
-              aceptado_at = ?,
-              updated_at = ?
-            WHERE
-              id_venta = ?
-              AND estado = 'enviando'
-          `,
+        UPDATE venta_ticketbai
+        SET
+          estado = 'pendiente_remoto',
+          huella = ?,
+          qr = ?,
+          url = ?,
+          ultimo_error = NULL,
+          respuesta_payload = ?,
+          updated_at = ?
+        WHERE
+          id_venta = ?
+          AND estado = 'enviando'
+        `,
+          [
+            command.huella,
+            command.qr,
+            command.url,
+            command.respuestaPayload,
+            timestamp,
+            command.idVenta,
+          ],
+        );
+
+        const updatedRows: number = await this.getChanges(queryRunner);
+
+        if (updatedRows === 0) {
+          const current: VentaTicketBaiRecord = await this.requireByVentaId(
+            queryRunner,
+            command.idVenta,
+          );
+
+          if (
+            current.estado === 'pendiente_remoto' &&
+            this.hasSameFiscalArtifact(current, command) &&
+            current.respuestaPayload === command.respuestaPayload
+          ) {
+            return current;
+          }
+
+          throw new Error(
+            [
+              'La venta no se encuentra en un estado',
+              'válido para registrar TicketBAI pendiente.',
+            ].join(' '),
+          );
+        }
+
+        await this.incrementTicketRevision(queryRunner, command.idVenta, timestamp);
+
+        return this.requireByVentaId(queryRunner, command.idVenta);
+      },
+    );
+  }
+
+  /**
+   * Confirma una aceptación remota y actualiza la
+   * revisión documental solo si cambia el artefacto fiscal.
+   */
+  async markAccepted(
+    command: MarkVentaTicketBaiAcceptedRecordCommand,
+  ): Promise<VentaTicketBaiRecord> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<VentaTicketBaiRecord> => {
+        const timestamp: string = new Date().toISOString();
+        const current: VentaTicketBaiRecord = await this.requireByVentaId(
+          queryRunner,
+          command.idVenta,
+        );
+
+        if (this.isSameAcceptedResult(current, command)) {
+          return current;
+        }
+
+        if (current.estado !== 'enviando' && current.estado !== 'pendiente_remoto') {
+          throw new Error(
+            ['La venta no se encuentra en un estado', 'válido para aceptar TicketBAI.'].join(' '),
+          );
+        }
+
+        const fiscalArtifactChanged: boolean = !this.hasSameFiscalArtifact(current, command);
+
+        await queryRunner.query(
+          `
+        UPDATE venta_ticketbai
+        SET
+          estado = 'aceptada',
+          huella = ?,
+          qr = ?,
+          url = ?,
+          ultimo_error = NULL,
+          respuesta_payload = ?,
+          aceptado_at = ?,
+          updated_at = ?
+        WHERE
+          id_venta = ?
+          AND estado IN (
+            'enviando',
+            'pendiente_remoto'
+          )
+        `,
           [
             command.huella,
             command.qr,
@@ -334,13 +427,13 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
         const updatedRows: number = await this.getChanges(queryRunner);
 
         if (updatedRows === 0) {
-          const current: VentaTicketBaiRecord = await this.requireByVentaId(
+          const latest: VentaTicketBaiRecord = await this.requireByVentaId(
             queryRunner,
             command.idVenta,
           );
 
-          if (this.isSameAcceptedResult(current, command)) {
-            return current;
+          if (this.isSameAcceptedResult(latest, command)) {
+            return latest;
           }
 
           throw new Error(
@@ -348,28 +441,8 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
           );
         }
 
-        await queryRunner.query(
-          `
-            UPDATE venta
-            SET
-              ticket_revision =
-                ticket_revision + 1,
-              updated_at = ?
-            WHERE
-              id = ?
-              AND deleted_at IS NULL
-              AND ticket_revision < ?
-          `,
-          [timestamp, command.idVenta, MAXIMUM_SAFE_INTEGER],
-        );
-
-        if ((await this.getChanges(queryRunner)) !== 1) {
-          throw new Error(
-            [
-              'No se ha podido actualizar la revisión',
-              'documental después de aceptar TicketBAI.',
-            ].join(' '),
-          );
+        if (fiscalArtifactChanged) {
+          await this.incrementTicketRevision(queryRunner, command.idVenta, timestamp);
         }
 
         return this.requireByVentaId(queryRunner, command.idVenta);
@@ -484,6 +557,39 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
   }
 
   /**
+   * Invalida la revisión documental vigente después
+   * de aparecer o cambiar el artefacto fiscal TicketBAI.
+   */
+  private async incrementTicketRevision(
+    queryRunner: QueryRunner,
+    idVenta: number,
+    timestamp: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+    UPDATE venta
+    SET
+      ticket_revision = ticket_revision + 1,
+      updated_at = ?
+    WHERE
+      id = ?
+      AND deleted_at IS NULL
+      AND ticket_revision < ?
+    `,
+      [timestamp, idVenta, MAXIMUM_SAFE_INTEGER],
+    );
+
+    if ((await this.getChanges(queryRunner)) !== 1) {
+      throw new Error(
+        [
+          'No se ha podido actualizar la revisión',
+          'documental después de actualizar TicketBAI.',
+        ].join(' '),
+      );
+    }
+  }
+
+  /**
    * Impide que una repetición del flujo cambie
    * silenciosamente una identidad fiscal ya congelada.
    */
@@ -516,6 +622,19 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
   }
 
   /**
+   * Comprueba si dos resultados representan exactamente
+   * el mismo artefacto fiscal visible en los documentos.
+   */
+  private hasSameFiscalArtifact(
+    record: VentaTicketBaiRecord,
+    command: Pick<MarkVentaTicketBaiAcceptedRecordCommand, 'huella' | 'qr' | 'url'>,
+  ): boolean {
+    return (
+      record.huella === command.huella && record.qr === command.qr && record.url === command.url
+    );
+  }
+
+  /**
    * Comprueba si una aceptación repetida representa
    * exactamente el mismo resultado fiscal ya guardado.
    */
@@ -525,9 +644,7 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
   ): boolean {
     return (
       record.estado === 'aceptada' &&
-      record.huella === command.huella &&
-      record.qr === command.qr &&
-      record.url === command.url &&
+      this.hasSameFiscalArtifact(record, command) &&
       record.respuestaPayload === command.respuestaPayload
     );
   }

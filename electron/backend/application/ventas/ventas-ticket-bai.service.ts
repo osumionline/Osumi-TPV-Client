@@ -1,5 +1,7 @@
-import VentaTicketBaiMapper from '@backend/application/ventas/venta-ticket-bai.mapper';
 import type ConfigurationService from '@backend/application/configuration/configuration.service';
+import VentaTicketBaiMapper from '@backend/application/ventas/venta-ticket-bai.mapper';
+import type VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
+import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
 import {
   TicketBaiClientError,
   type TicketBaiClientErrorKind,
@@ -9,13 +11,11 @@ import type {
   TicketBaiCreateInvoiceRequest,
   TicketBaiCreateInvoiceResult,
 } from '@backend/contracts/ticket-bai/ticket-bai-client.interface';
-import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
 import type VentasTicketBaiRepository from '@backend/contracts/ventas/ventas-ticket-bai.repository.interface';
 import type {
   VentaTicketBaiFailureEstado,
   VentaTicketBaiRecord,
 } from '@backend/domain/ventas/venta-ticket-bai-record.interface';
-import type VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { InstallationSecretsData } from '@desktop-contracts/configuration/installation-command.interface';
 import type TicketBaiConfig from '@desktop-contracts/configuration/ticket-bai-config.interface';
@@ -164,6 +164,18 @@ export default class VentasTicketBaiService {
       throw new Error(error.message, {
         cause: error,
       });
+    }
+
+    if (result.status === 'pending') {
+      await this.repository.markRemotePending({
+        idVenta,
+        huella: result.huella,
+        qr: result.qr,
+        url: result.url,
+        respuestaPayload: result.responsePayload,
+      });
+
+      return;
     }
 
     await this.repository.markAccepted({

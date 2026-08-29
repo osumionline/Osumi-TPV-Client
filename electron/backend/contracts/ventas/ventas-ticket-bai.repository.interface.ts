@@ -2,6 +2,7 @@ import type {
   InitializeVentaTicketBaiPendingRecordCommand,
   MarkVentaTicketBaiAcceptedRecordCommand,
   MarkVentaTicketBaiFailureRecordCommand,
+  MarkVentaTicketBaiRemotePendingRecordCommand,
 } from '@backend/contracts/ventas/venta-ticket-bai-record-command.interface';
 import type { VentaTicketBaiRecord } from '@backend/domain/ventas/venta-ticket-bai-record.interface';
 
@@ -40,8 +41,16 @@ export default interface VentasTicketBaiRepository {
   beginManualAttempt(idVenta: number): Promise<VentaTicketBaiRecord | null>;
 
   /**
-   * Confirma una aceptación y hace obsoleto
-   * el PDF anterior incrementando ticket_revision.
+   * Persiste un resultado remoto pendiente que ya
+   * contiene el artefacto fiscal TicketBAI.
+   */
+  markRemotePending(
+    command: MarkVentaTicketBaiRemotePendingRecordCommand,
+  ): Promise<VentaTicketBaiRecord>;
+
+  /**
+   * Confirma una aceptación remota y actualiza la
+   * revisión documental solo si cambia el artefacto fiscal.
    */
   markAccepted(command: MarkVentaTicketBaiAcceptedRecordCommand): Promise<VentaTicketBaiRecord>;
 

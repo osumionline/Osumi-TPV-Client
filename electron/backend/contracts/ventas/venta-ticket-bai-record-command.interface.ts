@@ -10,6 +10,14 @@ export interface InitializeVentaTicketBaiPendingRecordCommand {
   readonly solicitudPayload: string;
 }
 
+export interface MarkVentaTicketBaiRemotePendingRecordCommand {
+  readonly idVenta: number;
+  readonly huella: string;
+  readonly qr: string;
+  readonly url: string;
+  readonly respuestaPayload: string;
+}
+
 export interface MarkVentaTicketBaiAcceptedRecordCommand {
   readonly idVenta: number;
   readonly huella: string;

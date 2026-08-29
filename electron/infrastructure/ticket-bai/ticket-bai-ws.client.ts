@@ -65,6 +65,7 @@ export default class TicketBaiWsTicketBaiClient implements TicketBaiClient {
       }
 
       return {
+        status: response.result === 'PENDING' ? 'pending' : 'accepted',
         huella: response.return.huella_tbai,
         qr: response.return.qr,
         url: response.return.url,

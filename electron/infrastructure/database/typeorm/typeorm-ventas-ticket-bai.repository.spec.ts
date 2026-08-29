@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DataSource } from 'typeorm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import TypeOrmVentasTicketsRepository from '@infrastructure/database/typeorm/typeorm-ventas-tickets.repository';
 
 interface VentaRevisionRow {
   readonly ticket_revision: number;
@@ -201,6 +202,123 @@ describe('TypeOrmVentasTicketBaiRepository', (): void => {
 
     expect(revisionAfterRepeat).toEqual({
       ticket_revision: 2,
+      ticket_pdf_revision: 0,
+    });
+  });
+
+  it('persiste PENDING y acepta después sin duplicar la revisión documental', async (): Promise<void> => {
+    const currentRepository = requireRepository();
+
+    await currentRepository.initializePending(createPendingCommand());
+    await currentRepository.beginInitialAttempt(1);
+
+    const remotePending: VentaTicketBaiRecord = await currentRepository.markRemotePending({
+      idVenta: 1,
+      huella: 'HUELLA-TBAI',
+      qr: 'QR-BASE64',
+      url: 'https://example.test/tbai',
+      respuestaPayload: '{"result":"PENDING"}',
+    });
+
+    expect(remotePending.estado).toBe('pendiente_remoto');
+    expect(remotePending.huella).toBe('HUELLA-TBAI');
+    expect(remotePending.qr).toBe('QR-BASE64');
+    expect(remotePending.url).toBe('https://example.test/tbai');
+    expect(remotePending.respuestaPayload).toBe('{"result":"PENDING"}');
+    expect(remotePending.aceptadoAt).toBeNull();
+
+    const revisionAfterPending: VentaRevisionRow = await readVentaRevision();
+
+    expect(revisionAfterPending).toEqual({
+      ticket_revision: 2,
+      ticket_pdf_revision: 0,
+    });
+
+    const ticketsRepository = new TypeOrmVentasTicketsRepository(requireDatabase());
+    const ticket = await ticketsRepository.findByVentaId(1);
+
+    expect(ticket?.ticketBai).toEqual({
+      serie: 'TPV01',
+      numero: '000001',
+      identificativo: 'HUELLA-TBAI',
+      qr: 'QR-BASE64',
+      url: 'https://example.test/tbai',
+    });
+
+    const repeatedPending: VentaTicketBaiRecord = await currentRepository.markRemotePending({
+      idVenta: 1,
+      huella: 'HUELLA-TBAI',
+      qr: 'QR-BASE64',
+      url: 'https://example.test/tbai',
+      respuestaPayload: '{"result":"PENDING"}',
+    });
+
+    expect(repeatedPending.estado).toBe('pendiente_remoto');
+
+    const revisionAfterPendingRepeat: VentaRevisionRow = await readVentaRevision();
+
+    expect(revisionAfterPendingRepeat).toEqual({
+      ticket_revision: 2,
+      ticket_pdf_revision: 0,
+    });
+
+    const accepted: VentaTicketBaiRecord = await currentRepository.markAccepted({
+      idVenta: 1,
+      huella: 'HUELLA-TBAI',
+      qr: 'QR-BASE64',
+      url: 'https://example.test/tbai',
+      respuestaPayload: '{"result":"OK"}',
+    });
+
+    expect(accepted.estado).toBe('aceptada');
+    expect(accepted.huella).toBe('HUELLA-TBAI');
+    expect(accepted.qr).toBe('QR-BASE64');
+    expect(accepted.url).toBe('https://example.test/tbai');
+    expect(accepted.respuestaPayload).toBe('{"result":"OK"}');
+    expect(accepted.aceptadoAt).not.toBeNull();
+
+    const revisionAfterAcceptance: VentaRevisionRow = await readVentaRevision();
+
+    expect(revisionAfterAcceptance).toEqual({
+      ticket_revision: 2,
+      ticket_pdf_revision: 0,
+    });
+  });
+
+  it('incrementa otra revisión si el artefacto cambia al aceptar un PENDING', async (): Promise<void> => {
+    const currentRepository = requireRepository();
+
+    await currentRepository.initializePending(createPendingCommand());
+    await currentRepository.beginInitialAttempt(1);
+
+    await currentRepository.markRemotePending({
+      idVenta: 1,
+      huella: 'HUELLA-PENDING',
+      qr: 'QR-PENDING',
+      url: 'https://example.test/tbai/pending',
+      respuestaPayload: '{"result":"PENDING"}',
+    });
+
+    expect(await readVentaRevision()).toEqual({
+      ticket_revision: 2,
+      ticket_pdf_revision: 0,
+    });
+
+    const accepted: VentaTicketBaiRecord = await currentRepository.markAccepted({
+      idVenta: 1,
+      huella: 'HUELLA-OK',
+      qr: 'QR-OK',
+      url: 'https://example.test/tbai/ok',
+      respuestaPayload: '{"result":"OK"}',
+    });
+
+    expect(accepted.estado).toBe('aceptada');
+    expect(accepted.huella).toBe('HUELLA-OK');
+    expect(accepted.qr).toBe('QR-OK');
+    expect(accepted.url).toBe('https://example.test/tbai/ok');
+
+    expect(await readVentaRevision()).toEqual({
+      ticket_revision: 3,
       ticket_pdf_revision: 0,
     });
   });

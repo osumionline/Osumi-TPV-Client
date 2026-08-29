@@ -5,6 +5,7 @@ export type VentaTicketBaiEstado =
   | 'legacy'
   | 'pendiente'
   | 'enviando'
+  | 'pendiente_remoto'
   | 'aceptada'
   | 'rechazada'
   | 'error_temporal'

@@ -182,15 +182,18 @@ export default class TypeOrmVentasTicketsRepository implements VentasTicketsRepo
 
   /**
    * Expone únicamente los datos TicketBAI que ya pueden
-   * formar parte de un documento definitivo.
+   * formar parte del documento fiscal.
    */
   private mapTicketBai(row: VentaTicketDatabaseRow): VentaTicketBaiDocumentRecord | null {
-    if (row.ticketbai_estado !== 'aceptada' && row.ticketbai_estado !== 'legacy') {
+    if (
+      row.ticketbai_estado !== 'pendiente_remoto' &&
+      row.ticketbai_estado !== 'aceptada' &&
+      row.ticketbai_estado !== 'legacy'
+    ) {
       return null;
     }
 
     const serie: string = row.ticketbai_serie?.trim() ?? '';
-
     const numero: string = row.ticketbai_numero?.trim() ?? '';
 
     if (serie === '' || numero === '') {
@@ -198,16 +201,14 @@ export default class TypeOrmVentasTicketsRepository implements VentasTicketsRepo
     }
 
     const identificativo: string | null = this.normalizeNullableText(row.ticketbai_huella);
-
     const qr: string | null = this.normalizeNullableText(row.ticketbai_qr);
-
     const url: string | null = this.normalizeNullableText(row.ticketbai_url);
 
     if (
-      row.ticketbai_estado === 'aceptada' &&
+      (row.ticketbai_estado === 'pendiente_remoto' || row.ticketbai_estado === 'aceptada') &&
       (identificativo === null || qr === null || url === null)
     ) {
-      throw new Error('Los datos fiscales TicketBAI aceptados están incompletos.');
+      throw new Error('Los datos fiscales TicketBAI del ticket están incompletos.');
     }
 
     return {

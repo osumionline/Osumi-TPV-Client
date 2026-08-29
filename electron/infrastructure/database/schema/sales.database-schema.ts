@@ -585,19 +585,20 @@ const statements: readonly string[] = [
       numero TEXT,
 
       estado TEXT NOT NULL
-        CHECK (
-          estado IN (
-            'no_aplica',
-            'legacy',
-            'pendiente',
-            'enviando',
-            'aceptada',
-            'rechazada',
-            'error_temporal',
-            'error_permanente',
-            'anulada'
-          )
-        ),
+      CHECK (
+        estado IN (
+          'no_aplica',
+          'legacy',
+          'pendiente',
+          'enviando',
+          'pendiente_remoto',
+          'aceptada',
+          'rechazada',
+          'error_temporal',
+          'error_permanente',
+          'anulada'
+        )
+      ),
 
       identificador TEXT,
 

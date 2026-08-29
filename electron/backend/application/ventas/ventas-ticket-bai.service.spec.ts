@@ -11,6 +11,7 @@ import type {
   InitializeVentaTicketBaiPendingRecordCommand,
   MarkVentaTicketBaiAcceptedRecordCommand,
   MarkVentaTicketBaiFailureRecordCommand,
+  MarkVentaTicketBaiRemotePendingRecordCommand,
 } from '@backend/contracts/ventas/venta-ticket-bai-record-command.interface';
 import type VentasTicketBaiRepository from '@backend/contracts/ventas/ventas-ticket-bai.repository.interface';
 import type { VentaTicketBaiRecord } from '@backend/domain/ventas/venta-ticket-bai-record.interface';
@@ -20,27 +21,18 @@ import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticke
 import { beforeEach, describe, expect, it } from 'vitest';
 
 let configurationService: FakeConfigurationService;
-
 let secretStorage: FakeSecretStorage;
-
 let ticketsService: FakeVentasTicketsService;
-
 let repository: FakeVentasTicketBaiRepository;
-
 let client: FakeTicketBaiClient;
-
 let service: VentasTicketBaiService;
 
 describe('VentasTicketBaiService', (): void => {
   beforeEach((): void => {
     configurationService = new FakeConfigurationService();
-
     secretStorage = new FakeSecretStorage();
-
     ticketsService = new FakeVentasTicketsService();
-
     repository = new FakeVentasTicketBaiRepository();
-
     client = new FakeTicketBaiClient();
 
     service = new VentasTicketBaiService(
@@ -62,7 +54,6 @@ describe('VentasTicketBaiService', (): void => {
     await service.processInitial(15);
 
     expect(repository.record?.estado).toBe('no_aplica');
-
     expect(client.calls).toBe(0);
     expect(ticketsService.calls).toBe(0);
   });
@@ -71,22 +62,37 @@ describe('VentasTicketBaiService', (): void => {
     await service.processInitial(15);
 
     expect(client.calls).toBe(1);
-
     expect(client.lastConfiguration).toEqual({
       token: 'ticketbai-token',
       issuerNif: 'B12345678',
       environment: 'test',
     });
-
     expect(client.lastRequest?.serie).toBe('TPV01');
-
     expect(client.lastRequest?.numero).toBe('000015');
-
     expect(repository.record?.estado).toBe('aceptada');
-
+    expect(repository.record?.respuestaPayload).toBe('{"result":"OK"}');
     expect(repository.record?.intentos).toBe(1);
-
     expect(repository.record?.huella).toBe('HUELLA-TBAI');
+  });
+
+  it('persiste un PENDING remoto y no vuelve a enviarlo automáticamente', async (): Promise<void> => {
+    client.status = 'pending';
+
+    await service.processInitial(15);
+
+    expect(client.calls).toBe(1);
+    expect(repository.record?.estado).toBe('pendiente_remoto');
+    expect(repository.record?.intentos).toBe(1);
+    expect(repository.record?.huella).toBe('HUELLA-TBAI');
+    expect(repository.record?.qr).toBe('QR-TBAI');
+    expect(repository.record?.url).toBe('https://example.test/tbai');
+    expect(repository.record?.respuestaPayload).toBe('{"result":"PENDING"}');
+    expect(repository.record?.aceptadoAt).toBeNull();
+
+    await service.processInitial(15);
+
+    expect(client.calls).toBe(1);
+    expect(repository.record?.estado).toBe('pendiente_remoto');
   });
 
   it('persiste un rechazo y no vuelve a enviarlo automáticamente', async (): Promise<void> => {
@@ -101,7 +107,6 @@ describe('VentasTicketBaiService', (): void => {
     );
 
     expect(repository.record?.estado).toBe('rechazada');
-
     expect(client.calls).toBe(1);
 
     client.error = null;
@@ -123,7 +128,6 @@ describe('VentasTicketBaiService', (): void => {
     );
 
     expect(repository.record?.estado).toBe('error_temporal');
-
     expect(client.calls).toBe(1);
 
     await service.processInitial(15).catch((): void => undefined);
@@ -166,7 +170,6 @@ describe('VentasTicketBaiService', (): void => {
     );
 
     expect(repository.record?.estado).toBe('enviando');
-
     expect(repository.record?.intentos).toBe(1);
   });
 });
@@ -213,12 +216,10 @@ class FakeVentasTicketsService {
 
 class FakeTicketBaiClient implements TicketBaiClient {
   calls: number = 0;
-
   lastConfiguration: TicketBaiClientConfiguration | null = null;
-
   lastRequest: TicketBaiCreateInvoiceRequest | null = null;
-
   error: Error | null = null;
+  status: TicketBaiCreateInvoiceResult['status'] = 'accepted';
 
   /**
    * Simula la creación remota de un TicketBAI.
@@ -230,7 +231,6 @@ class FakeTicketBaiClient implements TicketBaiClient {
     this.calls++;
 
     this.lastConfiguration = configuration;
-
     this.lastRequest = request;
 
     if (this.error !== null) {
@@ -238,10 +238,11 @@ class FakeTicketBaiClient implements TicketBaiClient {
     }
 
     return Promise.resolve({
+      status: this.status,
       huella: 'HUELLA-TBAI',
       qr: 'QR-TBAI',
       url: 'https://example.test/tbai',
-      responsePayload: '{"result":"OK"}',
+      responsePayload: this.status === 'pending' ? '{"result":"PENDING"}' : '{"result":"OK"}',
     });
   }
 }
@@ -313,6 +314,29 @@ class FakeVentasTicketBaiRepository implements VentasTicketBaiRepository {
    */
   beginManualAttempt(): Promise<VentaTicketBaiRecord | null> {
     return Promise.resolve(null);
+  }
+
+  /**
+   * Persiste un resultado remoto pendiente simulado.
+   */
+  markRemotePending(
+    command: MarkVentaTicketBaiRemotePendingRecordCommand,
+  ): Promise<VentaTicketBaiRecord> {
+    if (this.record === null) {
+      return Promise.reject(new Error('No existe estado TicketBAI.'));
+    }
+
+    this.record = {
+      ...this.record,
+      estado: 'pendiente_remoto',
+      huella: command.huella,
+      qr: command.qr,
+      url: command.url,
+      respuestaPayload: command.respuestaPayload,
+      ultimoError: null,
+    };
+
+    return Promise.resolve(this.record);
   }
 
   /**

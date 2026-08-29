@@ -48,18 +48,15 @@ describe('TicketBaiWsTicketBaiClient', (): void => {
       createRequest(),
     );
 
+    expect(result.status).toBe('accepted');
     expect(result.huella).toBe('TBAI-HUELLA');
-
     expect(result.qr).toBe('QR-BASE64');
-
     expect(result.url).toBe('https://example.test/tbai');
-
     expect(getInputUrl(capturedInput)).toContain('api-test.ticketbaiws.eus/tbai/');
 
     const headers: Headers = new Headers(capturedInit?.headers);
 
     expect(headers.get('Token')).toBe('test-token');
-
     expect(headers.get('Nif')).toBe('B12345678');
 
     const body: unknown = JSON.parse(String(capturedInit?.body));
@@ -86,6 +83,40 @@ describe('TicketBaiWsTicketBaiClient', (): void => {
 
       total_factura: 12.1,
     });
+  });
+
+  it('normaliza PENDING conservando el artefacto fiscal', async (): Promise<void> => {
+    const fetchImplementation: typeof globalThis.fetch = async (): Promise<Response> => {
+      return new Response(
+        JSON.stringify({
+          result: 'PENDING',
+          return: {
+            huella_tbai: 'TBAI-HUELLA-PENDING',
+            qr: 'QR-BASE64-PENDING',
+            url: 'https://example.test/tbai/pending',
+          },
+          msg: null,
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+    };
+
+    const client = new TicketBaiWsTicketBaiClient(fetchImplementation);
+
+    const result: TicketBaiCreateInvoiceResult = await client.createInvoice(
+      createConfiguration(),
+      createRequest(),
+    );
+
+    expect(result.status).toBe('pending');
+    expect(result.huella).toBe('TBAI-HUELLA-PENDING');
+    expect(result.qr).toBe('QR-BASE64-PENDING');
+    expect(result.url).toBe('https://example.test/tbai/pending');
   });
 
   it('clasifica un rechazo del API como rejected', async (): Promise<void> => {

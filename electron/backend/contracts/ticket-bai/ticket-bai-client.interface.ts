@@ -27,7 +27,10 @@ export interface TicketBaiCreateInvoiceRequest {
   readonly totalFactura: number;
 }
 
+export type TicketBaiCreateInvoiceStatus = 'accepted' | 'pending';
+
 export interface TicketBaiCreateInvoiceResult {
+  readonly status: TicketBaiCreateInvoiceStatus;
   readonly huella: string;
   readonly qr: string;
   readonly url: string;
