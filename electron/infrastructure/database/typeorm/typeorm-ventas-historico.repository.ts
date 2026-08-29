@@ -7,9 +7,11 @@ import type {
   VentaHistoricoPagoRecord,
   VentaHistoricoPagoResumenRecord,
   VentaHistoricoResumenRecord,
+  VentaHistoricoTicketBaiEstadoRecord,
   VentaHistoricoTotalTipoPagoRecord,
   VentasHistoricoResultadoRecord,
 } from '@backend/domain/ventas/venta-historico-record.interface';
+import type { VentaTicketBaiEstado } from '@backend/domain/ventas/venta-ticket-bai-record.interface';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import type { DataSource } from 'typeorm';
 
@@ -23,6 +25,7 @@ interface VentaHistoricoResumenDatabaseRow {
   readonly fecha: string;
   readonly total_cents: number;
   readonly cliente_nombre: string | null;
+  readonly ticketbai_estado: VentaTicketBaiEstado | null;
 }
 
 interface VentaHistoricoPagoResumenDatabaseRow {
@@ -57,6 +60,7 @@ interface VentaHistoricoDetalleDatabaseRow {
   readonly caja_abierta: number;
   readonly facturada: number;
   readonly tiene_lineas_positivas: number;
+  readonly ticketbai_estado: VentaTicketBaiEstado | null;
 }
 
 interface VentaHistoricoPagoDatabaseRow {
@@ -108,17 +112,24 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
       this.groupPagosPorVenta(pagoRows);
 
     const ventas: readonly VentaHistoricoResumenRecord[] = ventaRows.map(
-      (row: VentaHistoricoResumenDatabaseRow): VentaHistoricoResumenRecord => ({
-        id: row.id,
-        publicId: row.public_id,
-        serie: row.serie,
-        numero: row.numero,
-        fecha: row.fecha,
-        totalCents: row.total_cents,
-        clienteNombre: row.cliente_nombre,
-        pagos: pagosPorVenta.get(row.id) ?? [],
-        tieneIncidenciaTicketBai: false,
-      }),
+      (row: VentaHistoricoResumenDatabaseRow): VentaHistoricoResumenRecord => {
+        const ticketBaiEstado: VentaHistoricoTicketBaiEstadoRecord = this.mapTicketBaiEstado(
+          row.ticketbai_estado,
+        );
+
+        return {
+          id: row.id,
+          publicId: row.public_id,
+          serie: row.serie,
+          numero: row.numero,
+          fecha: row.fecha,
+          totalCents: row.total_cents,
+          clienteNombre: row.cliente_nombre,
+          pagos: pagosPorVenta.get(row.id) ?? [],
+          ticketBaiEstado,
+          tieneIncidenciaTicketBai: ticketBaiEstado === 'incidencia',
+        };
+      },
     );
 
     const resumen: ResumenHistoricoRecord = await this.buildResumen(
@@ -179,7 +190,8 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
                 AND lv.unidades > 0
             ) THEN 1
             ELSE 0
-          END AS tiene_lineas_positivas
+          END AS tiene_lineas_positivas,
+          vtb.estado AS ticketbai_estado
         FROM venta v
 
         INNER JOIN empleado e
@@ -188,8 +200,11 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
         INNER JOIN caja ca
           ON ca.id = v.id_caja
 
-        LEFT JOIN cliente c
+         LEFT JOIN cliente c
           ON c.id = v.id_cliente
+
+        LEFT JOIN venta_ticketbai vtb
+          ON vtb.id_venta = v.id
 
         WHERE
           v.id = ?
@@ -225,6 +240,10 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
       idVenta,
     );
 
+    const ticketBaiEstado: VentaHistoricoTicketBaiEstadoRecord = this.mapTicketBaiEstado(
+      row.ticketbai_estado,
+    );
+
     return {
       id: row.id,
       publicId: row.public_id,
@@ -240,7 +259,8 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
       cajaAbierta: row.caja_abierta === 1,
       facturada: row.facturada === 1,
       tieneLineasPositivas: row.tiene_lineas_positivas === 1,
-      tieneIncidenciaTicketBai: false,
+      ticketBaiEstado,
+      tieneIncidenciaTicketBai: ticketBaiEstado === 'incidencia',
     };
   }
 
@@ -261,11 +281,14 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
           v.numero,
           v.created_at AS fecha,
           v.total_cents,
-          c.nombre_apellidos AS cliente_nombre
+          c.nombre_apellidos AS cliente_nombre,
+          vtb.estado AS ticketbai_estado
         FROM venta v
-
         LEFT JOIN cliente c
           ON c.id = v.id_cliente
+
+        LEFT JOIN venta_ticketbai vtb
+          ON vtb.id_venta = v.id
 
         WHERE
           v.created_at >= ?
@@ -550,6 +573,28 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
       importeMicros: row.importe_micros,
       regalo: row.regalo === 1,
     }));
+  }
+
+  /**
+   * Reduce el estado fiscal persistido al estado
+   * operativo que necesita el Histórico.
+   */
+  private mapTicketBaiEstado(
+    estado: VentaTicketBaiEstado | null,
+  ): VentaHistoricoTicketBaiEstadoRecord {
+    if (estado === null || estado === 'no_aplica') {
+      return 'no_aplica';
+    }
+
+    if (estado === 'aceptada' || estado === 'legacy' || estado === 'anulada') {
+      return 'correcto';
+    }
+
+    if (estado === 'pendiente' || estado === 'pendiente_remoto') {
+      return 'pendiente';
+    }
+
+    return 'incidencia';
   }
 
   /**

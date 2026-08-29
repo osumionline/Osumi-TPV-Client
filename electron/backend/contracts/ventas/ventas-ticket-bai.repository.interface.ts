@@ -2,6 +2,7 @@ import type {
   InitializeVentaTicketBaiPendingRecordCommand,
   MarkVentaTicketBaiAcceptedRecordCommand,
   MarkVentaTicketBaiFailureRecordCommand,
+  MarkVentaTicketBaiReconciledRejectedRecordCommand,
   MarkVentaTicketBaiRemotePendingRecordCommand,
 } from '@backend/contracts/ventas/venta-ticket-bai-record-command.interface';
 import type { VentaTicketBaiRecord } from '@backend/domain/ventas/venta-ticket-bai-record.interface';
@@ -46,6 +47,14 @@ export default interface VentasTicketBaiRepository {
    */
   markRemotePending(
     command: MarkVentaTicketBaiRemotePendingRecordCommand,
+  ): Promise<VentaTicketBaiRecord>;
+
+  /**
+   * Persiste un ERROR observado durante una
+   * reconciliación remota de TicketBAI.
+   */
+  markReconciledRejected(
+    command: MarkVentaTicketBaiReconciledRejectedRecordCommand,
   ): Promise<VentaTicketBaiRecord>;
 
   /**

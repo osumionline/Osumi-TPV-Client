@@ -37,6 +37,21 @@ export interface TicketBaiCreateInvoiceResult {
   readonly responsePayload: string;
 }
 
+export interface TicketBaiInvoiceReference {
+  readonly serie: string;
+  readonly numero: string;
+}
+
+export type TicketBaiGetInvoiceStatus = 'accepted' | 'pending' | 'rejected';
+
+export interface TicketBaiGetInvoiceResult {
+  readonly status: TicketBaiGetInvoiceStatus;
+  readonly huella: string;
+  readonly qr: string;
+  readonly url: string;
+  readonly responsePayload: string;
+}
+
 export interface TicketBaiClient {
   /**
    * Crea una factura simplificada mediante
@@ -46,4 +61,13 @@ export interface TicketBaiClient {
     configuration: TicketBaiClientConfiguration,
     request: TicketBaiCreateInvoiceRequest,
   ): Promise<TicketBaiCreateInvoiceResult>;
+
+  /**
+   * Consulta el estado remoto actual de una
+   * factura TicketBAI ya identificada.
+   */
+  getInvoice(
+    configuration: TicketBaiClientConfiguration,
+    reference: TicketBaiInvoiceReference,
+  ): Promise<TicketBaiGetInvoiceResult>;
 }

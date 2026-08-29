@@ -4,12 +4,12 @@ import completeDatabaseSchema from '@infrastructure/database/schema/complete-dat
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import TypeOrmVentasTicketBaiRepository from '@infrastructure/database/typeorm/typeorm-ventas-ticket-bai.repository';
+import TypeOrmVentasTicketsRepository from '@infrastructure/database/typeorm/typeorm-ventas-tickets.repository';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DataSource } from 'typeorm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import TypeOrmVentasTicketsRepository from '@infrastructure/database/typeorm/typeorm-ventas-tickets.repository';
 
 interface VentaRevisionRow {
   readonly ticket_revision: number;
@@ -319,6 +319,148 @@ describe('TypeOrmVentasTicketBaiRepository', (): void => {
 
     expect(await readVentaRevision()).toEqual({
       ticket_revision: 3,
+      ticket_pdf_revision: 0,
+    });
+  });
+
+  it('reconcilia un error temporal como PENDING e invalida la revisión documental', async (): Promise<void> => {
+    const currentRepository = requireRepository();
+
+    await currentRepository.initializePending(createPendingCommand());
+    await currentRepository.beginInitialAttempt(1);
+    await currentRepository.markFailure({
+      idVenta: 1,
+      estado: 'error_temporal',
+      ultimoError: 'No se ha podido confirmar el envío.',
+      respuestaPayload: null,
+    });
+
+    expect(await readVentaRevision()).toEqual({
+      ticket_revision: 1,
+      ticket_pdf_revision: 0,
+    });
+
+    const remotePending: VentaTicketBaiRecord = await currentRepository.markRemotePending({
+      idVenta: 1,
+      huella: 'HUELLA-RECONCILIADA',
+      qr: 'QR-RECONCILIADO',
+      url: 'https://example.test/tbai/reconciliada',
+      respuestaPayload: '{"result":"OK","return":{"status":"PENDING"}}',
+    });
+
+    expect(remotePending.estado).toBe('pendiente_remoto');
+    expect(remotePending.huella).toBe('HUELLA-RECONCILIADA');
+    expect(remotePending.qr).toBe('QR-RECONCILIADO');
+    expect(remotePending.url).toBe('https://example.test/tbai/reconciliada');
+    expect(remotePending.ultimoError).toBeNull();
+
+    expect(await readVentaRevision()).toEqual({
+      ticket_revision: 2,
+      ticket_pdf_revision: 0,
+    });
+  });
+
+  it('reconcilia un error temporal como aceptada e invalida la revisión documental', async (): Promise<void> => {
+    const currentRepository = requireRepository();
+
+    await currentRepository.initializePending(createPendingCommand());
+    await currentRepository.beginInitialAttempt(1);
+    await currentRepository.markFailure({
+      idVenta: 1,
+      estado: 'error_temporal',
+      ultimoError: 'No se ha podido confirmar el envío.',
+      respuestaPayload: null,
+    });
+
+    const accepted: VentaTicketBaiRecord = await currentRepository.markAccepted({
+      idVenta: 1,
+      huella: 'HUELLA-RECONCILIADA',
+      qr: 'QR-RECONCILIADO',
+      url: 'https://example.test/tbai/reconciliada',
+      respuestaPayload: '{"result":"OK","return":{"status":"OK"}}',
+    });
+
+    expect(accepted.estado).toBe('aceptada');
+    expect(accepted.huella).toBe('HUELLA-RECONCILIADA');
+    expect(accepted.qr).toBe('QR-RECONCILIADO');
+    expect(accepted.url).toBe('https://example.test/tbai/reconciliada');
+    expect(accepted.ultimoError).toBeNull();
+    expect(accepted.aceptadoAt).not.toBeNull();
+
+    expect(await readVentaRevision()).toEqual({
+      ticket_revision: 2,
+      ticket_pdf_revision: 0,
+    });
+  });
+
+  it('invalida el documento fiscal cuando un PENDING se reconcilia como ERROR', async (): Promise<void> => {
+    const currentRepository = requireRepository();
+
+    await currentRepository.initializePending(createPendingCommand());
+    await currentRepository.beginInitialAttempt(1);
+    await currentRepository.markRemotePending({
+      idVenta: 1,
+      huella: 'HUELLA-PENDING',
+      qr: 'QR-PENDING',
+      url: 'https://example.test/tbai/pending',
+      respuestaPayload: '{"result":"PENDING"}',
+    });
+
+    expect(await readVentaRevision()).toEqual({
+      ticket_revision: 2,
+      ticket_pdf_revision: 0,
+    });
+
+    const rejected: VentaTicketBaiRecord = await currentRepository.markReconciledRejected({
+      idVenta: 1,
+      huella: 'HUELLA-PENDING',
+      qr: 'QR-PENDING',
+      url: 'https://example.test/tbai/pending',
+      ultimoError: 'TicketBaiWS informa que la factura se encuentra en estado ERROR.',
+      respuestaPayload: '{"result":"OK","return":{"status":"ERROR"}}',
+    });
+
+    expect(rejected.estado).toBe('rechazada');
+    expect(rejected.ultimoError).toBe(
+      'TicketBaiWS informa que la factura se encuentra en estado ERROR.',
+    );
+
+    expect(await readVentaRevision()).toEqual({
+      ticket_revision: 3,
+      ticket_pdf_revision: 0,
+    });
+
+    const ticketsRepository = new TypeOrmVentasTicketsRepository(requireDatabase());
+    const ticket = await ticketsRepository.findByVentaId(1);
+
+    expect(ticket?.ticketBai).toBeNull();
+  });
+
+  it('no invalida la revisión al reconciliar como ERROR una venta sin artefacto fiscal previo', async (): Promise<void> => {
+    const currentRepository = requireRepository();
+
+    await currentRepository.initializePending(createPendingCommand());
+    await currentRepository.beginInitialAttempt(1);
+    await currentRepository.markFailure({
+      idVenta: 1,
+      estado: 'error_temporal',
+      ultimoError: 'No se ha podido confirmar el envío.',
+      respuestaPayload: null,
+    });
+
+    const rejected: VentaTicketBaiRecord = await currentRepository.markReconciledRejected({
+      idVenta: 1,
+      huella: 'HUELLA-ERROR',
+      qr: 'QR-ERROR',
+      url: 'https://example.test/tbai/error',
+      ultimoError: 'TicketBaiWS informa que la factura se encuentra en estado ERROR.',
+      respuestaPayload: '{"result":"OK","return":{"status":"ERROR"}}',
+    });
+
+    expect(rejected.estado).toBe('rechazada');
+
+    expect(await readVentaRevision()).toEqual({
+      ticket_revision: 1,
       ticket_pdf_revision: 0,
     });
   });

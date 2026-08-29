@@ -81,6 +81,7 @@ export default class VentasHistoricoService {
             importeCents: pago.importeCents,
           }),
         ),
+        ticketBaiEstado: venta.ticketBaiEstado,
         tieneIncidenciaTicketBai: venta.tieneIncidenciaTicketBai,
       }),
     );
@@ -185,12 +186,13 @@ export default class VentasHistoricoService {
       lineas,
       totalUnidades,
       totalDescuentoMicros,
+      ticketBaiEstado: record.ticketBaiEstado,
       capacidades: {
         puedeCambiarCliente: !record.facturada,
         puedeCambiarTipoPago:
           record.totalCents !== 0 && record.numeroPagos === 1 && record.cajaAbierta,
         puedeImprimirTicketRegalo: record.tieneLineasPositivas,
-        puedeReintentarTicketBai: record.tieneIncidenciaTicketBai,
+        puedeReintentarTicketBai: record.ticketBaiEstado === 'incidencia',
       },
     };
   }

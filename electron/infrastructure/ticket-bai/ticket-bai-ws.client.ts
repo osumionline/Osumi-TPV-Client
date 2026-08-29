@@ -7,7 +7,9 @@ import type {
   TicketBaiClientConfiguration,
   TicketBaiCreateInvoiceRequest,
   TicketBaiCreateInvoiceResult,
+  TicketBaiGetInvoiceResult,
   TicketBaiInvoiceLine,
+  TicketBaiInvoiceReference,
 } from '@backend/contracts/ticket-bai/ticket-bai-client.interface';
 import {
   TicketBaiWsApiError,
@@ -37,19 +39,7 @@ export default class TicketBaiWsTicketBaiClient implements TicketBaiClient {
     request: TicketBaiCreateInvoiceRequest,
   ): Promise<TicketBaiCreateInvoiceResult> {
     try {
-      const options: TicketBaiWsClientOptions = {
-        token: configuration.token,
-        issuerNif: configuration.issuerNif,
-        environment: configuration.environment,
-        ...(this.fetchImplementation === undefined
-          ? {}
-          : {
-              fetch: this.fetchImplementation,
-            }),
-      };
-
-      const client: TicketBaiWsClient = new TicketBaiWsClient(options);
-
+      const client: TicketBaiWsClient = this.createClient(configuration);
       const sdkRequest: TicketBaiWsCreateInvoiceRequest = this.createSdkRequest(request);
 
       const response = await client.invoices.create(sdkRequest);
@@ -78,6 +68,73 @@ export default class TicketBaiWsTicketBaiClient implements TicketBaiClient {
 
       throw this.mapError(error);
     }
+  }
+
+  /**
+   * Consulta el estado remoto de una factura TicketBAI
+   * sin recrearla ni modificar sus datos fiscales.
+   */
+  async getInvoice(
+    configuration: TicketBaiClientConfiguration,
+    reference: TicketBaiInvoiceReference,
+  ): Promise<TicketBaiGetInvoiceResult> {
+    try {
+      const client: TicketBaiWsClient = this.createClient(configuration);
+      const response = await client.invoices.get({
+        serie: reference.serie,
+        numero: reference.numero,
+      });
+
+      const responsePayload: string = this.serializePayload(response);
+
+      if (!('huella_tbai' in response.return)) {
+        throw new TicketBaiClientError(
+          'permanent',
+          ['TicketBaiWS ha devuelto una respuesta', 'que no corresponde a TicketBAI.'].join(' '),
+          responsePayload,
+        );
+      }
+
+      const status: TicketBaiGetInvoiceResult['status'] =
+        response.return.status === 'OK'
+          ? 'accepted'
+          : response.return.status === 'PENDING'
+            ? 'pending'
+            : 'rejected';
+
+      return {
+        status,
+        huella: response.return.huella_tbai,
+        qr: response.return.qr,
+        url: response.return.url,
+        responsePayload,
+      };
+    } catch (error: unknown) {
+      if (error instanceof TicketBaiClientError) {
+        throw error;
+      }
+
+      throw this.mapError(error);
+    }
+  }
+
+  /**
+   * Construye el cliente SDK usando exclusivamente
+   * la configuración operacional recibida.
+   */
+  private createClient(configuration: TicketBaiClientConfiguration): TicketBaiWsClient {
+    const options: TicketBaiWsClientOptions = {
+      token: configuration.token,
+      issuerNif: configuration.issuerNif,
+      environment: configuration.environment,
+      ...(this.fetchImplementation === undefined
+        ? {}
+        : {
+            fetch: this.fetchImplementation,
+          }),
+    };
+
+    return new TicketBaiWsClient(options);
   }
 
   /**

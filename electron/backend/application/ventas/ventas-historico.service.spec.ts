@@ -54,6 +54,54 @@ describe('VentasHistoricoService', (): void => {
     });
   });
 
+  it('propaga el estado TicketBAI de las ventas del histórico', async (): Promise<void> => {
+    repository.periodResult = {
+      ventas: [
+        {
+          id: 1,
+          publicId: 'venta-correcta',
+          serie: '',
+          numero: 1,
+          fecha: '2026-08-25T10:00:00.000Z',
+          totalCents: 1_000,
+          clienteNombre: null,
+          pagos: [],
+          ticketBaiEstado: 'correcto',
+          tieneIncidenciaTicketBai: false,
+        },
+        {
+          id: 2,
+          publicId: 'venta-pendiente',
+          serie: '',
+          numero: 2,
+          fecha: '2026-08-25T11:00:00.000Z',
+          totalCents: 2_000,
+          clienteNombre: null,
+          pagos: [],
+          ticketBaiEstado: 'pendiente',
+          tieneIncidenciaTicketBai: false,
+        },
+      ],
+      resumen: {
+        numeroVentas: 2,
+        totalCents: 3_000,
+        ticketMedioCents: 1_500,
+        beneficioCents: 0,
+        totalesPorTipoPago: [],
+      },
+    };
+
+    const result: VentasHistoricoResultado = await service.findByPeriod({
+      desde: '2026-08-25',
+      hasta: '2026-08-25',
+    });
+
+    expect(result.ventas[0]?.ticketBaiEstado).toBe('correcto');
+    expect(result.ventas[0]?.tieneIncidenciaTicketBai).toBe(false);
+    expect(result.ventas[1]?.ticketBaiEstado).toBe('pendiente');
+    expect(result.ventas[1]?.tieneIncidenciaTicketBai).toBe(false);
+  });
+
   it('respeta un día de 23 horas durante el cambio al horario de verano', async (): Promise<void> => {
     await service.findByPeriod({
       desde: '2026-03-29',
@@ -135,6 +183,7 @@ describe('VentasHistoricoService', (): void => {
       cajaAbierta: true,
       facturada: false,
       tieneLineasPositivas: true,
+      ticketBaiEstado: 'incidencia',
       tieneIncidenciaTicketBai: true,
     };
 
@@ -192,6 +241,7 @@ describe('VentasHistoricoService', (): void => {
       ],
       totalUnidades: 2,
       totalDescuentoMicros: 3_000_000,
+      ticketBaiEstado: 'incidencia',
       capacidades: {
         puedeCambiarCliente: true,
         puedeCambiarTipoPago: true,
@@ -245,11 +295,13 @@ describe('VentasHistoricoService', (): void => {
       cajaAbierta: false,
       facturada: true,
       tieneLineasPositivas: false,
+      ticketBaiEstado: 'no_aplica',
       tieneIncidenciaTicketBai: false,
     };
 
     const detalle: VentaHistoricoDetalle | null = await service.findDetalleByVentaId(20);
 
+    expect(detalle?.ticketBaiEstado).toBe('no_aplica');
     expect(detalle?.capacidades).toEqual({
       puedeCambiarCliente: false,
       puedeCambiarTipoPago: false,

@@ -2,6 +2,7 @@ import type {
   InitializeVentaTicketBaiPendingRecordCommand,
   MarkVentaTicketBaiAcceptedRecordCommand,
   MarkVentaTicketBaiFailureRecordCommand,
+  MarkVentaTicketBaiReconciledRejectedRecordCommand,
   MarkVentaTicketBaiRemotePendingRecordCommand,
 } from '@backend/contracts/ventas/venta-ticket-bai-record-command.interface';
 import type VentasTicketBaiRepository from '@backend/contracts/ventas/ventas-ticket-bai.repository.interface';
@@ -295,8 +296,8 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
    * Persiste un PENDING remoto que ya contiene
    * huella, QR y URL fiscales.
    *
-   * La primera aparición del artefacto fiscal hace
-   * obsoleta la revisión documental anterior.
+   * La revisión documental solo cambia cuando
+   * aparece o cambia el artefacto fiscal.
    */
   async markRemotePending(
     command: MarkVentaTicketBaiRemotePendingRecordCommand,
@@ -307,6 +308,25 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
       dataSource,
       async (queryRunner: QueryRunner): Promise<VentaTicketBaiRecord> => {
         const timestamp: string = new Date().toISOString();
+        const current: VentaTicketBaiRecord = await this.requireByVentaId(
+          queryRunner,
+          command.idVenta,
+        );
+
+        if (
+          current.estado !== 'enviando' &&
+          current.estado !== 'pendiente_remoto' &&
+          current.estado !== 'error_temporal'
+        ) {
+          throw new Error(
+            [
+              'La venta no se encuentra en un estado',
+              'válido para registrar TicketBAI pendiente.',
+            ].join(' '),
+          );
+        }
+
+        const fiscalArtifactChanged: boolean = !this.hasSameFiscalArtifact(current, command);
 
         await queryRunner.query(
           `
@@ -321,7 +341,11 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
           updated_at = ?
         WHERE
           id_venta = ?
-          AND estado = 'enviando'
+          AND estado IN (
+            'enviando',
+            'pendiente_remoto',
+            'error_temporal'
+          )
         `,
           [
             command.huella,
@@ -333,22 +357,7 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
           ],
         );
 
-        const updatedRows: number = await this.getChanges(queryRunner);
-
-        if (updatedRows === 0) {
-          const current: VentaTicketBaiRecord = await this.requireByVentaId(
-            queryRunner,
-            command.idVenta,
-          );
-
-          if (
-            current.estado === 'pendiente_remoto' &&
-            this.hasSameFiscalArtifact(current, command) &&
-            current.respuestaPayload === command.respuestaPayload
-          ) {
-            return current;
-          }
-
+        if ((await this.getChanges(queryRunner)) !== 1) {
           throw new Error(
             [
               'La venta no se encuentra en un estado',
@@ -357,7 +366,9 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
           );
         }
 
-        await this.incrementTicketRevision(queryRunner, command.idVenta, timestamp);
+        if (fiscalArtifactChanged) {
+          await this.incrementTicketRevision(queryRunner, command.idVenta, timestamp);
+        }
 
         return this.requireByVentaId(queryRunner, command.idVenta);
       },
@@ -386,7 +397,11 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
           return current;
         }
 
-        if (current.estado !== 'enviando' && current.estado !== 'pendiente_remoto') {
+        if (
+          current.estado !== 'enviando' &&
+          current.estado !== 'pendiente_remoto' &&
+          current.estado !== 'error_temporal'
+        ) {
           throw new Error(
             ['La venta no se encuentra en un estado', 'válido para aceptar TicketBAI.'].join(' '),
           );
@@ -410,7 +425,8 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
           id_venta = ?
           AND estado IN (
             'enviando',
-            'pendiente_remoto'
+            'pendiente_remoto',
+            'error_temporal'
           )
         `,
           [
@@ -442,6 +458,87 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
         }
 
         if (fiscalArtifactChanged) {
+          await this.incrementTicketRevision(queryRunner, command.idVenta, timestamp);
+        }
+
+        return this.requireByVentaId(queryRunner, command.idVenta);
+      },
+    );
+  }
+
+  /**
+   * Persiste un rechazo descubierto al reconciliar
+   * una factura previamente pendiente o ambigua.
+   */
+  async markReconciledRejected(
+    command: MarkVentaTicketBaiReconciledRejectedRecordCommand,
+  ): Promise<VentaTicketBaiRecord> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<VentaTicketBaiRecord> => {
+        const timestamp: string = new Date().toISOString();
+        const current: VentaTicketBaiRecord = await this.requireByVentaId(
+          queryRunner,
+          command.idVenta,
+        );
+
+        if (
+          current.estado !== 'enviando' &&
+          current.estado !== 'pendiente_remoto' &&
+          current.estado !== 'error_temporal'
+        ) {
+          throw new Error(
+            [
+              'La venta no se encuentra en un estado',
+              'válido para reconciliar un rechazo TicketBAI.',
+            ].join(' '),
+          );
+        }
+
+        const invalidatesFiscalDocument: boolean = current.estado === 'pendiente_remoto';
+
+        await queryRunner.query(
+          `
+        UPDATE venta_ticketbai
+        SET
+          estado = 'rechazada',
+          huella = ?,
+          qr = ?,
+          url = ?,
+          ultimo_error = ?,
+          respuesta_payload = ?,
+          updated_at = ?
+        WHERE
+          id_venta = ?
+          AND estado IN (
+            'enviando',
+            'pendiente_remoto',
+            'error_temporal'
+          )
+        `,
+          [
+            command.huella,
+            command.qr,
+            command.url,
+            command.ultimoError,
+            command.respuestaPayload,
+            timestamp,
+            command.idVenta,
+          ],
+        );
+
+        if ((await this.getChanges(queryRunner)) !== 1) {
+          throw new Error(
+            [
+              'La venta no se encuentra en un estado',
+              'válido para reconciliar un rechazo TicketBAI.',
+            ].join(' '),
+          );
+        }
+
+        if (invalidatesFiscalDocument) {
           await this.incrementTicketRevision(queryRunner, command.idVenta, timestamp);
         }
 

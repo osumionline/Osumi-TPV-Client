@@ -3,6 +3,7 @@ import type {
   TicketBaiClientConfiguration,
   TicketBaiCreateInvoiceRequest,
   TicketBaiCreateInvoiceResult,
+  TicketBaiGetInvoiceResult,
 } from '@backend/contracts/ticket-bai/ticket-bai-client.interface';
 import TicketBaiWsTicketBaiClient from '@infrastructure/ticket-bai/ticket-bai-ws.client';
 import { describe, expect, it } from 'vitest';
@@ -117,6 +118,122 @@ describe('TicketBaiWsTicketBaiClient', (): void => {
     expect(result.huella).toBe('TBAI-HUELLA-PENDING');
     expect(result.qr).toBe('QR-BASE64-PENDING');
     expect(result.url).toBe('https://example.test/tbai/pending');
+  });
+
+  it('consulta una factura pendiente sin perder su artefacto fiscal', async (): Promise<void> => {
+    let capturedInput: FetchInput | null = null;
+
+    const fetchImplementation: typeof globalThis.fetch = async (
+      input: FetchInput,
+    ): Promise<Response> => {
+      capturedInput = input;
+
+      return new Response(
+        JSON.stringify({
+          result: 'OK',
+          return: {
+            status: 'PENDING',
+            huella_tbai: 'TBAI-HUELLA-PENDING',
+            qr: 'QR-BASE64-PENDING',
+            url: 'https://example.test/tbai/pending',
+          },
+          msg: null,
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+    };
+
+    const client = new TicketBaiWsTicketBaiClient(fetchImplementation);
+
+    const result: TicketBaiGetInvoiceResult = await client.getInvoice(createConfiguration(), {
+      serie: 'TPV01',
+      numero: '000123',
+    });
+
+    expect(result.status).toBe('pending');
+    expect(result.huella).toBe('TBAI-HUELLA-PENDING');
+    expect(result.qr).toBe('QR-BASE64-PENDING');
+    expect(result.url).toBe('https://example.test/tbai/pending');
+
+    const url: string = getInputUrl(capturedInput);
+
+    expect(url).toContain('serie=TPV01');
+    expect(url).toContain('numero=000123');
+  });
+
+  it('normaliza como accepted una factura remota ya procesada', async (): Promise<void> => {
+    const fetchImplementation: typeof globalThis.fetch = async (): Promise<Response> => {
+      return new Response(
+        JSON.stringify({
+          result: 'OK',
+          return: {
+            status: 'OK',
+            huella_tbai: 'TBAI-HUELLA-OK',
+            qr: 'QR-BASE64-OK',
+            url: 'https://example.test/tbai/ok',
+          },
+          msg: null,
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+    };
+
+    const client = new TicketBaiWsTicketBaiClient(fetchImplementation);
+
+    const result: TicketBaiGetInvoiceResult = await client.getInvoice(createConfiguration(), {
+      serie: 'TPV01',
+      numero: '000123',
+    });
+
+    expect(result.status).toBe('accepted');
+    expect(result.huella).toBe('TBAI-HUELLA-OK');
+    expect(result.qr).toBe('QR-BASE64-OK');
+    expect(result.url).toBe('https://example.test/tbai/ok');
+  });
+
+  it('normaliza como rejected una factura cuyo estado remoto es ERROR', async (): Promise<void> => {
+    const fetchImplementation: typeof globalThis.fetch = async (): Promise<Response> => {
+      return new Response(
+        JSON.stringify({
+          result: 'OK',
+          return: {
+            status: 'ERROR',
+            huella_tbai: 'TBAI-HUELLA-ERROR',
+            qr: 'QR-BASE64-ERROR',
+            url: 'https://example.test/tbai/error',
+          },
+          msg: null,
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+    };
+
+    const client = new TicketBaiWsTicketBaiClient(fetchImplementation);
+
+    const result: TicketBaiGetInvoiceResult = await client.getInvoice(createConfiguration(), {
+      serie: 'TPV01',
+      numero: '000123',
+    });
+
+    expect(result.status).toBe('rejected');
+    expect(result.huella).toBe('TBAI-HUELLA-ERROR');
+    expect(result.qr).toBe('QR-BASE64-ERROR');
+    expect(result.url).toBe('https://example.test/tbai/error');
   });
 
   it('clasifica un rechazo del API como rejected', async (): Promise<void> => {

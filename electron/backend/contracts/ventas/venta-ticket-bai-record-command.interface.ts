@@ -18,6 +18,15 @@ export interface MarkVentaTicketBaiRemotePendingRecordCommand {
   readonly respuestaPayload: string;
 }
 
+export interface MarkVentaTicketBaiReconciledRejectedRecordCommand {
+  readonly idVenta: number;
+  readonly huella: string;
+  readonly qr: string;
+  readonly url: string;
+  readonly ultimoError: string;
+  readonly respuestaPayload: string;
+}
+
 export interface MarkVentaTicketBaiAcceptedRecordCommand {
   readonly idVenta: number;
   readonly huella: string;

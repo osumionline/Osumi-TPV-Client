@@ -10,6 +10,8 @@ export interface VentaHistoricoConsulta {
   readonly hasta: string;
 }
 
+export type VentaHistoricoTicketBaiEstado = 'no_aplica' | 'correcto' | 'pendiente' | 'incidencia';
+
 export interface VentaHistoricoPagoResumen {
   readonly tipoPagoPublicId: string;
   readonly nombre: string;
@@ -25,6 +27,7 @@ export interface VentaHistoricoResumen {
   readonly totalCents: number;
   readonly clienteNombre: string | null;
   readonly pagos: readonly VentaHistoricoPagoResumen[];
+  readonly ticketBaiEstado: VentaHistoricoTicketBaiEstado;
   readonly tieneIncidenciaTicketBai: boolean;
 }
 
@@ -94,5 +97,6 @@ export interface VentaHistoricoDetalle {
   readonly lineas: readonly VentaHistoricoLinea[];
   readonly totalUnidades: number;
   readonly totalDescuentoMicros: number;
+  readonly ticketBaiEstado: VentaHistoricoTicketBaiEstado;
   readonly capacidades: VentaHistoricoCapacidades;
 }

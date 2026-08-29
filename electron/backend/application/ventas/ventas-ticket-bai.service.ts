@@ -8,8 +8,10 @@ import {
 } from '@backend/contracts/ticket-bai/ticket-bai-client.error';
 import type {
   TicketBaiClient,
+  TicketBaiClientConfiguration,
   TicketBaiCreateInvoiceRequest,
   TicketBaiCreateInvoiceResult,
+  TicketBaiGetInvoiceResult,
 } from '@backend/contracts/ticket-bai/ticket-bai-client.interface';
 import type VentasTicketBaiRepository from '@backend/contracts/ventas/ventas-ticket-bai.repository.interface';
 import type {
@@ -185,6 +187,111 @@ export default class VentasTicketBaiService {
       url: result.url,
       respuestaPayload: result.responsePayload,
     });
+  }
+
+  /**
+   * Consulta el estado remoto de una venta cuyo
+   * resultado anterior quedó pendiente o ambiguo.
+   */
+  async reconcile(idVenta: number): Promise<void> {
+    this.validateVentaId(idVenta);
+
+    const record: VentaTicketBaiRecord | null = await this.repository.findByVentaId(idVenta);
+
+    if (record === null) {
+      throw new Error('La venta no tiene estado TicketBAI para reconciliar.');
+    }
+
+    if (
+      record.estado !== 'pendiente_remoto' &&
+      record.estado !== 'enviando' &&
+      record.estado !== 'error_temporal'
+    ) {
+      return;
+    }
+
+    const configuration: TicketBaiClientConfiguration = {
+      token: await this.requireToken(),
+      issuerNif: this.requireFrozenText(
+        record.nifEmisor,
+        'El NIF emisor TicketBAI de la venta no está disponible.',
+      ),
+      environment: this.requireFrozenEnvironment(record),
+    };
+    const serie: string = this.requireFrozenText(
+      record.serie,
+      'La serie TicketBAI de la venta no está disponible.',
+    );
+    const numero: string = this.requireFrozenText(
+      record.numero,
+      'El número TicketBAI de la venta no está disponible.',
+    );
+
+    const result: TicketBaiGetInvoiceResult = await this.client.getInvoice(configuration, {
+      serie,
+      numero,
+    });
+
+    if (result.status === 'pending') {
+      await this.repository.markRemotePending({
+        idVenta,
+        huella: result.huella,
+        qr: result.qr,
+        url: result.url,
+        respuestaPayload: result.responsePayload,
+      });
+
+      return;
+    }
+
+    if (result.status === 'accepted') {
+      await this.repository.markAccepted({
+        idVenta,
+        huella: result.huella,
+        qr: result.qr,
+        url: result.url,
+        respuestaPayload: result.responsePayload,
+      });
+
+      return;
+    }
+
+    await this.repository.markReconciledRejected({
+      idVenta,
+      huella: result.huella,
+      qr: result.qr,
+      url: result.url,
+      ultimoError: 'TicketBaiWS informa que la factura se encuentra en estado ERROR.',
+      respuestaPayload: result.responsePayload,
+    });
+  }
+
+  /**
+   * Recupera un dato obligatorio de la identidad
+   * fiscal congelada de la venta.
+   */
+  private requireFrozenText(value: string | null, errorMessage: string): string {
+    const normalized: string = value?.trim() ?? '';
+
+    if (normalized.length === 0) {
+      throw new Error(errorMessage);
+    }
+
+    return normalized;
+  }
+
+  /**
+   * Recupera el entorno fiscal congelado
+   * utilizado originalmente por la venta.
+   */
+  private requireFrozenEnvironment(
+    record: VentaTicketBaiRecord,
+  ): TicketBaiClientConfiguration['environment'] {
+    if (record.entorno === null) {
+      throw new Error('El entorno TicketBAI de la venta no está disponible.');
+    }
+
+    return record.entorno;
   }
 
   /**

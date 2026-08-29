@@ -1,3 +1,6 @@
+export type VentaHistoricoTicketBaiEstadoRecord =
+  'no_aplica' | 'correcto' | 'pendiente' | 'incidencia';
+
 export interface VentaHistoricoPagoResumenRecord {
   readonly tipoPagoPublicId: string;
   readonly nombre: string;
@@ -13,6 +16,7 @@ export interface VentaHistoricoResumenRecord {
   readonly totalCents: number;
   readonly clienteNombre: string | null;
   readonly pagos: readonly VentaHistoricoPagoResumenRecord[];
+  readonly ticketBaiEstado: VentaHistoricoTicketBaiEstadoRecord;
   readonly tieneIncidenciaTicketBai: boolean;
 }
 
@@ -81,5 +85,6 @@ export interface VentaHistoricoDetalleRecord {
   readonly cajaAbierta: boolean;
   readonly facturada: boolean;
   readonly tieneLineasPositivas: boolean;
+  readonly ticketBaiEstado: VentaHistoricoTicketBaiEstadoRecord;
   readonly tieneIncidenciaTicketBai: boolean;
 }

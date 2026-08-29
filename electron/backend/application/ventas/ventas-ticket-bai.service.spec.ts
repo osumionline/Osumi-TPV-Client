@@ -6,11 +6,14 @@ import type {
   TicketBaiClientConfiguration,
   TicketBaiCreateInvoiceRequest,
   TicketBaiCreateInvoiceResult,
+  TicketBaiGetInvoiceResult,
+  TicketBaiInvoiceReference,
 } from '@backend/contracts/ticket-bai/ticket-bai-client.interface';
 import type {
   InitializeVentaTicketBaiPendingRecordCommand,
   MarkVentaTicketBaiAcceptedRecordCommand,
   MarkVentaTicketBaiFailureRecordCommand,
+  MarkVentaTicketBaiReconciledRejectedRecordCommand,
   MarkVentaTicketBaiRemotePendingRecordCommand,
 } from '@backend/contracts/ventas/venta-ticket-bai-record-command.interface';
 import type VentasTicketBaiRepository from '@backend/contracts/ventas/ventas-ticket-bai.repository.interface';
@@ -172,6 +175,101 @@ describe('VentasTicketBaiService', (): void => {
     expect(repository.record?.estado).toBe('enviando');
     expect(repository.record?.intentos).toBe(1);
   });
+
+  it('reconcilia un PENDING usando la identidad fiscal congelada', async (): Promise<void> => {
+    repository.record = createReconcilableRecord();
+
+    configurationService.appData = {
+      ...createAppData(),
+      ticketBai: {
+        nif: 'B11111111',
+        environment: 'production',
+      },
+    };
+
+    client.getStatus = 'pending';
+
+    await service.reconcile(15);
+
+    expect(client.getCalls).toBe(1);
+    expect(client.lastGetConfiguration).toEqual({
+      token: 'ticketbai-token',
+      issuerNif: 'B87654321',
+      environment: 'test',
+    });
+    expect(client.lastReference).toEqual({
+      serie: 'TPV01',
+      numero: '000015',
+    });
+    expect(repository.record?.estado).toBe('pendiente_remoto');
+    expect(repository.record?.huella).toBe('HUELLA-GET');
+    expect(repository.record?.qr).toBe('QR-GET');
+    expect(repository.record?.url).toBe('https://example.test/tbai/get');
+  });
+
+  it('reconcilia como aceptada una factura remota procesada correctamente', async (): Promise<void> => {
+    repository.record = createReconcilableRecord();
+    client.getStatus = 'accepted';
+
+    await service.reconcile(15);
+
+    expect(client.getCalls).toBe(1);
+    expect(repository.record?.estado).toBe('aceptada');
+    expect(repository.record?.huella).toBe('HUELLA-GET');
+    expect(repository.record?.qr).toBe('QR-GET');
+    expect(repository.record?.url).toBe('https://example.test/tbai/get');
+    expect(repository.record?.aceptadoAt).not.toBeNull();
+  });
+
+  it('reconcilia como rechazada una factura cuyo estado remoto es ERROR', async (): Promise<void> => {
+    repository.record = createReconcilableRecord();
+    client.getStatus = 'rejected';
+
+    await service.reconcile(15);
+
+    expect(client.getCalls).toBe(1);
+    expect(repository.record?.estado).toBe('rechazada');
+    expect(repository.record?.huella).toBe('HUELLA-GET');
+    expect(repository.record?.qr).toBe('QR-GET');
+    expect(repository.record?.url).toBe('https://example.test/tbai/get');
+    expect(repository.record?.ultimoError).toBe(
+      'TicketBaiWS informa que la factura se encuentra en estado ERROR.',
+    );
+  });
+
+  it('mantiene intacto el estado local cuando falla la consulta remota', async (): Promise<void> => {
+    repository.record = createReconcilableRecord();
+
+    const initialRecord: VentaTicketBaiRecord = {
+      ...repository.record,
+    };
+
+    client.getError = new Error('No se ha podido consultar TicketBaiWS.');
+
+    await expect(service.reconcile(15)).rejects.toThrow('No se ha podido consultar TicketBaiWS.');
+
+    expect(client.getCalls).toBe(1);
+    expect(repository.record).toEqual(initialRecord);
+  });
+
+  it('reconcilia un error temporal antes de realizar cualquier nuevo envío', async (): Promise<void> => {
+    repository.record = createReconcilableRecord('error_temporal');
+    client.getStatus = 'accepted';
+
+    await service.reconcile(15);
+
+    expect(client.getCalls).toBe(1);
+    expect(repository.record?.estado).toBe('aceptada');
+  });
+
+  it('no consulta TicketBaiWS cuando el estado fiscal ya es definitivo', async (): Promise<void> => {
+    repository.record = createReconcilableRecord('aceptada');
+
+    await service.reconcile(15);
+
+    expect(client.getCalls).toBe(0);
+    expect(repository.record?.estado).toBe('aceptada');
+  });
 });
 
 class FakeConfigurationService {
@@ -220,6 +318,11 @@ class FakeTicketBaiClient implements TicketBaiClient {
   lastRequest: TicketBaiCreateInvoiceRequest | null = null;
   error: Error | null = null;
   status: TicketBaiCreateInvoiceResult['status'] = 'accepted';
+  getCalls: number = 0;
+  lastGetConfiguration: TicketBaiClientConfiguration | null = null;
+  lastReference: TicketBaiInvoiceReference | null = null;
+  getError: Error | null = null;
+  getStatus: TicketBaiGetInvoiceResult['status'] = 'pending';
 
   /**
    * Simula la creación remota de un TicketBAI.
@@ -243,6 +346,30 @@ class FakeTicketBaiClient implements TicketBaiClient {
       qr: 'QR-TBAI',
       url: 'https://example.test/tbai',
       responsePayload: this.status === 'pending' ? '{"result":"PENDING"}' : '{"result":"OK"}',
+    });
+  }
+
+  /**
+   * Simula la consulta remota de una factura TicketBAI.
+   */
+  getInvoice(
+    configuration: TicketBaiClientConfiguration,
+    reference: TicketBaiInvoiceReference,
+  ): Promise<TicketBaiGetInvoiceResult> {
+    this.getCalls++;
+    this.lastGetConfiguration = configuration;
+    this.lastReference = reference;
+
+    if (this.getError !== null) {
+      return Promise.reject(this.getError);
+    }
+
+    return Promise.resolve({
+      status: this.getStatus,
+      huella: 'HUELLA-GET',
+      qr: 'QR-GET',
+      url: 'https://example.test/tbai/get',
+      responsePayload: `{"result":"OK","return":{"status":"${this.getStatus}"}}`,
     });
   }
 }
@@ -334,6 +461,29 @@ class FakeVentasTicketBaiRepository implements VentasTicketBaiRepository {
       url: command.url,
       respuestaPayload: command.respuestaPayload,
       ultimoError: null,
+    };
+
+    return Promise.resolve(this.record);
+  }
+
+  /**
+   * Persiste un rechazo reconciliado simulado.
+   */
+  markReconciledRejected(
+    command: MarkVentaTicketBaiReconciledRejectedRecordCommand,
+  ): Promise<VentaTicketBaiRecord> {
+    if (this.record === null) {
+      return Promise.reject(new Error('No existe estado TicketBAI.'));
+    }
+
+    this.record = {
+      ...this.record,
+      estado: 'rechazada',
+      huella: command.huella,
+      qr: command.qr,
+      url: command.url,
+      ultimoError: command.ultimoError,
+      respuestaPayload: command.respuestaPayload,
     };
 
     return Promise.resolve(this.record);
@@ -477,6 +627,26 @@ function createTicket(): VentaTicketInterface {
         regalo: false,
       },
     ],
+  };
+}
+
+/**
+ * Construye un estado fiscal con identidad congelada
+ * apto para las pruebas de reconciliación.
+ */
+function createReconcilableRecord(
+  estado: VentaTicketBaiRecord['estado'] = 'pendiente_remoto',
+): VentaTicketBaiRecord {
+  return {
+    ...createTicketBaiRecord(15, estado),
+    entorno: 'test',
+    nifEmisor: 'B87654321',
+    serie: 'TPV01',
+    numero: '000015',
+    huella: estado === 'pendiente_remoto' ? 'HUELLA-INICIAL' : null,
+    qr: estado === 'pendiente_remoto' ? 'QR-INICIAL' : null,
+    url: estado === 'pendiente_remoto' ? 'https://example.test/tbai/inicial' : null,
+    respuestaPayload: estado === 'pendiente_remoto' ? '{"result":"PENDING"}' : null,
   };
 }
 

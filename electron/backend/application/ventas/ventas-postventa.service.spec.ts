@@ -274,6 +274,7 @@ function createDetalleRecord(
     cajaAbierta: true,
     facturada: false,
     tieneLineasPositivas: true,
+    ticketBaiEstado: 'no_aplica',
     tieneIncidenciaTicketBai: false,
   };
 }
