@@ -171,6 +171,15 @@ export default function registerVentasIpc(
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.ventasReconcileTicketBai,
+    async (event, idVenta: number): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await ventasTicketBaiService.reconcile(idVenta);
+    },
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.ventasSave,
     async (event, command: GuardarVentaCommand): Promise<GuardarVentaResult> => {
       assertTrustedSender(event, getMainWindow);

@@ -66,5 +66,11 @@ export default interface VentasApi {
    */
   processTicketBai(idVenta: number): Promise<void>;
 
+  /**
+   * Consulta y reconcilia el estado remoto
+   * TicketBAI de una venta ya enviada.
+   */
+  reconcileTicketBai(idVenta: number): Promise<void>;
+
   save(command: GuardarVentaCommand): Promise<GuardarVentaResult>;
 }
