@@ -27,6 +27,13 @@ class FakeArticulosRepository implements ArticulosRepository {
 
     return Promise.resolve(this.resolvedId);
   }
+
+  /**
+   * Simula la creación de un artículo.
+   */
+  create(): Promise<number> {
+    return Promise.resolve(25);
+  }
 }
 
 class FakeAssetUrlBuilder implements AssetUrlBuilder {

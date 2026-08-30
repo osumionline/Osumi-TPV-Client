@@ -4,8 +4,16 @@ import type {
   ArticuloFotoRecord,
   ArticuloRecord,
 } from '@backend/domain/articulos/articulo-record.interface';
+import type { ArticuloSaveRecord } from '@backend/domain/articulos/articulo-save-record.interface';
+import { generateArticuloLocalizador } from '@backend/utils/articulo-localizador.utils';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
-import type { DataSource } from 'typeorm';
+import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
+import { randomUUID } from 'node:crypto';
+import type { DataSource, QueryRunner } from 'typeorm';
+
+interface DatabaseIdRow {
+  readonly id: number;
+}
 
 interface ArticuloDatabaseRow {
   readonly id: number;
@@ -148,6 +156,141 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
         : await this.resolveNumericCode(dataSource, codigo, codigoNumerico);
 
     return rows[0]?.id ?? null;
+  }
+
+  /**
+   * Crea un artículo completo dentro de una única transacción.
+   */
+  async create(command: ArticuloSaveRecord): Promise<number> {
+    if (command.id !== null) {
+      throw new Error('No se puede crear un artículo que ya tiene identificador.');
+    }
+
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<number> => {
+        await this.requireActiveReference(
+          queryRunner,
+          'marca',
+          command.idMarca,
+          'La marca seleccionada no existe.',
+        );
+
+        if (command.idProveedor !== null) {
+          await this.requireActiveReference(
+            queryRunner,
+            'proveedor',
+            command.idProveedor,
+            'El proveedor seleccionado no existe.',
+          );
+        }
+
+        for (const idCategoria of new Set<number>(command.idsCategorias)) {
+          await this.requireActiveReference(
+            queryRunner,
+            'categoria',
+            idCategoria,
+            'Una de las categorías seleccionadas no existe.',
+          );
+        }
+
+        await this.requireAvailableName(queryRunner, command.nombre);
+
+        const localizador: number = await generateArticuloLocalizador(
+          async (candidate: number): Promise<boolean> =>
+            this.isCommercialNumericCodeOccupied(queryRunner, candidate, command.accesoDirecto),
+        );
+
+        await this.validateAdditionalBarcodes(queryRunner, command, localizador);
+
+        const timestamp: string = new Date().toISOString();
+        const slug: string = this.createSlug(command.nombre, localizador);
+
+        await queryRunner.query(
+          `
+          INSERT INTO articulo (
+            public_id,
+            localizador,
+            nombre,
+            slug,
+            id_marca,
+            id_proveedor,
+            referencia,
+            palb_micros,
+            puc_micros,
+            pvp_cents,
+            pvp_descuento_cents,
+            iva_bps,
+            re_bps,
+            margen_microporcentaje,
+            margen_descuento_microporcentaje,
+            stock,
+            stock_min,
+            stock_max,
+            lote_optimo,
+            venta_online,
+            mostrar_en_web,
+            descripcion_corta,
+            descripcion,
+            observaciones,
+            mostrar_observaciones_pedidos,
+            mostrar_observaciones_ventas,
+            acceso_directo,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?, ?
+          )
+        `,
+          [
+            randomUUID(),
+            localizador,
+            command.nombre,
+            slug,
+            command.idMarca,
+            command.idProveedor,
+            command.referencia,
+            command.precioAlbaranMicros,
+            command.pucMicros,
+            command.pvpCents,
+            command.pvpDescuentoCents,
+            command.ivaBps,
+            command.reBps,
+            command.margenMicroporcentaje,
+            command.margenDescuentoMicroporcentaje,
+            command.stock,
+            command.stockMin,
+            command.stockMax,
+            command.loteOptimo,
+            command.ventaOnline ? 1 : 0,
+            command.mostrarEnWeb ? 1 : 0,
+            command.descripcionCorta,
+            command.descripcionLarga,
+            command.observaciones,
+            command.mostrarObservacionesPedidos ? 1 : 0,
+            command.mostrarObservacionesVentas ? 1 : 0,
+            command.accesoDirecto,
+            timestamp,
+            timestamp,
+          ],
+        );
+
+        const idArticulo: number = await this.readLastInsertedId(queryRunner);
+
+        await this.insertCategories(queryRunner, idArticulo, command.idsCategorias, timestamp);
+
+        await this.insertDefaultBarcode(queryRunner, idArticulo, localizador, timestamp);
+
+        await this.insertAdditionalBarcodes(queryRunner, idArticulo, command, timestamp);
+
+        return idArticulo;
+      },
+    );
   }
 
   /**
@@ -320,6 +463,275 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
       `,
       [codigo],
     )) as readonly ArticuloIdDatabaseRow[];
+  }
+
+  /**
+   * Comprueba que una referencia seleccionada exista y esté activa.
+   */
+  private async requireActiveReference(
+    queryRunner: QueryRunner,
+    tableName: 'marca' | 'proveedor' | 'categoria',
+    id: number,
+    errorMessage: string,
+  ): Promise<void> {
+    const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+      SELECT id
+      FROM ${tableName}
+      WHERE
+        id = ?
+        AND deleted_at IS NULL
+      LIMIT 1
+    `,
+      [id],
+    )) as readonly DatabaseIdRow[];
+
+    if (rows.length === 0) {
+      throw new Error(errorMessage);
+    }
+  }
+
+  /**
+   * Comprueba que el nombre no pertenezca ya a otro artículo activo.
+   */
+  private async requireAvailableName(queryRunner: QueryRunner, nombre: string): Promise<void> {
+    const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+      SELECT id
+      FROM articulo
+      WHERE
+        nombre = ? COLLATE NOCASE
+        AND deleted_at IS NULL
+      LIMIT 1
+    `,
+      [nombre],
+    )) as readonly DatabaseIdRow[];
+
+    if (rows.length > 0) {
+      throw new Error('Ya existe un artículo activo con ese nombre.');
+    }
+  }
+
+  /**
+   * Comprueba si un número ya pertenece al espacio de códigos
+   * comerciales de algún artículo activo.
+   */
+  private async isCommercialNumericCodeOccupied(
+    queryRunner: QueryRunner,
+    codigo: number,
+    reservedAccessCode: number | null,
+  ): Promise<boolean> {
+    if (reservedAccessCode === codigo) {
+      return true;
+    }
+
+    const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+      SELECT a.id
+      FROM articulo a
+      WHERE
+        a.deleted_at IS NULL
+        AND (
+          a.localizador = ?
+          OR a.acceso_directo = ?
+        )
+
+      UNION ALL
+
+      SELECT cb.id
+      FROM codigo_barras cb
+      WHERE
+        cb.deleted_at IS NULL
+        AND cb.codigo NOT GLOB '*[^0-9]*'
+        AND CAST(cb.codigo AS INTEGER) = ?
+
+      LIMIT 1
+    `,
+      [codigo, codigo, codigo],
+    )) as readonly DatabaseIdRow[];
+
+    return rows.length > 0;
+  }
+
+  /**
+   * Valida que los códigos adicionales no generen
+   * identificadores ambiguos en la aplicación.
+   */
+  private async validateAdditionalBarcodes(
+    queryRunner: QueryRunner,
+    command: ArticuloSaveRecord,
+    localizador: number,
+  ): Promise<void> {
+    const codes: Set<string> = new Set<string>();
+
+    for (const barcode of command.codigosBarrasAdicionales) {
+      if (barcode.id !== null) {
+        throw new Error('Un artículo nuevo no puede reutilizar códigos de barras persistidos.');
+      }
+
+      const code: string = barcode.codigo.trim();
+
+      if (code.length === 0) {
+        throw new Error('Los códigos de barras no pueden estar vacíos.');
+      }
+
+      if (codes.has(code)) {
+        throw new Error('Hay códigos de barras repetidos en el artículo.');
+      }
+
+      codes.add(code);
+
+      const numericCode: number | null =
+        /^\d+$/.test(code) && Number.isSafeInteger(Number(code)) ? Number(code) : null;
+
+      if (numericCode === localizador || numericCode === command.accesoDirecto) {
+        throw new Error(
+          'Un código de barras no puede coincidir con el localizador o acceso directo.',
+        );
+      }
+
+      const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
+        `
+        SELECT cb.id
+        FROM codigo_barras cb
+        WHERE
+          cb.codigo = ?
+          AND cb.deleted_at IS NULL
+
+        UNION ALL
+
+        SELECT a.id
+        FROM articulo a
+        WHERE
+          a.deleted_at IS NULL
+          AND ? IS NOT NULL
+          AND (
+            a.localizador = ?
+            OR a.acceso_directo = ?
+          )
+
+        LIMIT 1
+      `,
+        [code, numericCode, numericCode, numericCode],
+      )) as readonly DatabaseIdRow[];
+
+      if (rows.length > 0) {
+        throw new Error(`El código "${code}" ya está siendo utilizado.`);
+      }
+    }
+  }
+
+  /**
+   * Inserta las categorías seleccionadas del artículo.
+   */
+  private async insertCategories(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    idsCategorias: readonly number[],
+    timestamp: string,
+  ): Promise<void> {
+    for (const idCategoria of new Set<number>(idsCategorias)) {
+      await queryRunner.query(
+        `
+        INSERT INTO articulo_categoria (
+          id_articulo,
+          id_categoria,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?)
+      `,
+        [idArticulo, idCategoria, timestamp, timestamp],
+      );
+    }
+  }
+
+  /**
+   * Crea el código obligatorio derivado del localizador.
+   */
+  private async insertDefaultBarcode(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    localizador: number,
+    timestamp: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+      INSERT INTO codigo_barras (
+        public_id,
+        id_articulo,
+        codigo,
+        por_defecto,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, 1, ?, ?)
+    `,
+      [randomUUID(), idArticulo, String(localizador), timestamp, timestamp],
+    );
+  }
+
+  /**
+   * Inserta los códigos adicionales de un artículo nuevo.
+   */
+  private async insertAdditionalBarcodes(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    command: ArticuloSaveRecord,
+    timestamp: string,
+  ): Promise<void> {
+    for (const barcode of command.codigosBarrasAdicionales) {
+      await queryRunner.query(
+        `
+        INSERT INTO codigo_barras (
+          public_id,
+          id_articulo,
+          codigo,
+          por_defecto,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, 0, ?, ?)
+      `,
+        [randomUUID(), idArticulo, barcode.codigo.trim(), timestamp, timestamp],
+      );
+    }
+  }
+
+  /**
+   * Obtiene el id autoincremental insertado en la conexión actual.
+   */
+  private async readLastInsertedId(queryRunner: QueryRunner): Promise<number> {
+    const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+      SELECT last_insert_rowid() AS id
+    `,
+    )) as readonly DatabaseIdRow[];
+
+    const id: number | undefined = rows[0]?.id;
+
+    if (id === undefined) {
+      throw new Error('No se ha podido obtener el id del nuevo artículo.');
+    }
+
+    return id;
+  }
+
+  /**
+   * Genera el slug interno del artículo.
+   */
+  private createSlug(nombre: string, localizador: number): string {
+    const normalizedName: string = nombre
+      .normalize('NFKD')
+      .replace(/\p{M}/gu, '')
+      .toLocaleLowerCase('es-ES')
+      .replace(/[^\p{L}\p{N}]+/gu, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 190);
+
+    const baseSlug: string = normalizedName.length > 0 ? normalizedName : 'articulo';
+
+    return `${baseSlug}-${localizador}`;
   }
 
   /**

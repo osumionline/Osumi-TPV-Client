@@ -1,4 +1,5 @@
 import type { ArticuloRecord } from '@backend/domain/articulos/articulo-record.interface';
+import type { ArticuloSaveRecord } from '@backend/domain/articulos/articulo-save-record.interface';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import TypeOrmArticulosRepository from '@infrastructure/database/typeorm/typeorm-articulos.repository';
@@ -109,6 +110,80 @@ describe('TypeOrmArticulosRepository', (): void => {
 
     expect(await requireRepository().findById(1)).toBeNull();
     expect(await requireRepository().resolveIdByCode('261234', 261234)).toBeNull();
+  });
+
+  it('crea un artículo con localizador, categorías y código por defecto', async (): Promise<void> => {
+    const currentRepository = requireRepository();
+
+    const command: ArticuloSaveRecord = {
+      id: null,
+      nombre: 'Nuevo artículo',
+      idMarca: 1,
+      idProveedor: 1,
+      idsCategorias: [1, 2],
+      referencia: 'NEW-001',
+      precioAlbaranMicros: 590000,
+      pucMicros: 744580,
+      pvpCents: 100,
+      pvpDescuentoCents: null,
+      ivaBps: 2100,
+      reBps: 520,
+      margenMicroporcentaje: 255420,
+      margenDescuentoMicroporcentaje: null,
+      stock: 5,
+      stockMin: 2,
+      stockMax: 20,
+      loteOptimo: 5,
+      ventaOnline: true,
+      mostrarEnWeb: false,
+      descripcionCorta: 'Descripción corta',
+      descripcionLarga: 'Descripción larga',
+      observaciones: null,
+      mostrarObservacionesPedidos: false,
+      mostrarObservacionesVentas: false,
+      accesoDirecto: 99,
+      codigosBarrasAdicionales: [
+        {
+          id: null,
+          codigo: 'EAN-NUEVO-001',
+        },
+      ],
+    };
+
+    const idArticulo: number = await currentRepository.create(command);
+    const articulo: ArticuloRecord | null = await currentRepository.findById(idArticulo);
+
+    expect(articulo).not.toBeNull();
+    expect(articulo?.nombre).toBe('Nuevo artículo');
+    expect(articulo?.idsCategorias).toEqual([1, 2]);
+
+    expect(String(articulo?.localizador)).toMatch(/^26\d{4}$/);
+
+    expect(articulo?.codigosBarras).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          codigo: String(articulo?.localizador),
+          porDefecto: true,
+        }),
+        expect.objectContaining({
+          codigo: 'EAN-NUEVO-001',
+          porDefecto: false,
+        }),
+      ]),
+    );
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const historyRows: readonly unknown[] = await dataSource.query(
+      `
+      SELECT id
+      FROM historico_articulo
+      WHERE id_articulo = ?
+    `,
+      [idArticulo],
+    );
+
+    expect(historyRows).toHaveLength(0);
   });
 });
 

@@ -1,4 +1,5 @@
 import type { ArticuloRecord } from '@backend/domain/articulos/articulo-record.interface';
+import type { ArticuloSaveRecord } from '@backend/domain/articulos/articulo-save-record.interface';
 
 export default interface ArticulosRepository {
   /**
@@ -11,4 +12,9 @@ export default interface ArticulosRepository {
    * y devuelve el identificador del artículo activo.
    */
   resolveIdByCode(codigo: string, codigoNumerico: number | null): Promise<number | null>;
+
+  /**
+   * Crea un nuevo artículo y devuelve su identificador interno.
+   */
+  create(command: ArticuloSaveRecord): Promise<number>;
 }
