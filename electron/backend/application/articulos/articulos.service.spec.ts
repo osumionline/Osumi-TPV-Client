@@ -10,6 +10,7 @@ class FakeArticulosRepository implements ArticulosRepository {
   resolvedId: number | null = 25;
   lastCode: string | null = null;
   lastNumericCode: number | null = null;
+  deactivatedId: number | null = null;
 
   /**
    * Devuelve el artículo configurado para el test.
@@ -39,6 +40,15 @@ class FakeArticulosRepository implements ArticulosRepository {
    * Simula la actualización de un artículo.
    */
   update(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  /**
+   * Simula la baja lógica de un artículo.
+   */
+  deactivate(idArticulo: number): Promise<void> {
+    this.deactivatedId = idArticulo;
+
     return Promise.resolve();
   }
 }
@@ -100,6 +110,26 @@ describe('ArticulosService', (): void => {
 
     expect(articulo).toBeNull();
     expect(repository.lastCode).toBeNull();
+  });
+
+  it('delega la baja de un artículo válido en el repository', async (): Promise<void> => {
+    const repository = new FakeArticulosRepository();
+    const service = new ArticulosService(repository, new FakeAssetUrlBuilder());
+
+    await service.deactivate(25);
+
+    expect(repository.deactivatedId).toBe(25);
+  });
+
+  it('rechaza un identificador inválido al dar de baja', async (): Promise<void> => {
+    const repository = new FakeArticulosRepository();
+    const service = new ArticulosService(repository, new FakeAssetUrlBuilder());
+
+    await expect(service.deactivate(0)).rejects.toThrow(
+      'El identificador del artículo no es válido.',
+    );
+
+    expect(repository.deactivatedId).toBeNull();
   });
 });
 

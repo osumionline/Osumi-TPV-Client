@@ -12,7 +12,7 @@ import type {
 } from '@desktop-contracts/articulos/articulo.interface';
 
 /**
- * Expone los casos de uso de lectura del módulo Artículos.
+ * Expone los casos de uso del módulo Artículos.
  */
 export default class ArticulosService {
   /**
@@ -53,6 +53,17 @@ export default class ArticulosService {
     );
 
     return idArticulo === null ? null : this.getById(idArticulo);
+  }
+
+  /**
+   * Da de baja lógicamente un artículo activo.
+   */
+  async deactivate(idArticulo: number): Promise<void> {
+    if (!Number.isSafeInteger(idArticulo) || idArticulo <= 0) {
+      throw new Error('El identificador del artículo no es válido.');
+    }
+
+    await this.articulosRepository.deactivate(idArticulo);
   }
 
   /**

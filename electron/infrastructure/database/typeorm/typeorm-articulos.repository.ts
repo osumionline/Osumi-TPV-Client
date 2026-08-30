@@ -441,6 +441,46 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
   }
 
   /**
+   * Da de baja un artículo y sus códigos comerciales
+   * dentro de una única transacción.
+   */
+  async deactivate(idArticulo: number): Promise<void> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    await runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
+      await this.requireActiveArticleForUpdate(queryRunner, idArticulo);
+
+      const timestamp: string = new Date().toISOString();
+
+      await queryRunner.query(
+        `
+          UPDATE codigo_barras
+          SET
+            deleted_at = ?,
+            updated_at = ?
+          WHERE
+            id_articulo = ?
+            AND deleted_at IS NULL
+        `,
+        [timestamp, timestamp, idArticulo],
+      );
+
+      await queryRunner.query(
+        `
+          UPDATE articulo
+          SET
+            deleted_at = ?,
+            updated_at = ?
+          WHERE
+            id = ?
+            AND deleted_at IS NULL
+        `,
+        [timestamp, timestamp, idArticulo],
+      );
+    });
+  }
+
+  /**
    * Obtiene los datos necesarios para editar un artículo activo.
    */
   private async requireActiveArticleForUpdate(

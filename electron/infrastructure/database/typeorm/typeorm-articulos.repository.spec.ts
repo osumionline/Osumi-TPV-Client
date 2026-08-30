@@ -301,6 +301,94 @@ describe('TypeOrmArticulosRepository', (): void => {
       ),
     ).rejects.toThrow('El artículo que se intenta actualizar no existe.');
   });
+
+  it('da de baja el artículo y sus códigos sin eliminar sus relaciones históricas', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+      INSERT INTO historico_articulo (
+        public_id,
+        id_articulo,
+        tipo,
+        stock_previo,
+        diferencia,
+        stock_final,
+        puc_micros,
+        pvp_micros
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+      ['history-before-deactivate', 1, 4, 8, 2, 10, 744580, 1000000],
+    );
+
+    await requireRepository().deactivate(1);
+
+    expect(await requireRepository().findById(1)).toBeNull();
+    expect(await requireRepository().resolveIdByCode('261234', 261234)).toBeNull();
+
+    expect(await requireRepository().resolveIdByCode('ABC-123', null)).toBeNull();
+
+    const articleRows: readonly {
+      readonly deleted_at: string | null;
+    }[] = await dataSource.query(
+      `
+      SELECT deleted_at
+      FROM articulo
+      WHERE id = 1
+    `,
+    );
+
+    expect(articleRows[0]?.deleted_at).not.toBeNull();
+
+    const barcodeRows: readonly {
+      readonly deleted_at: string | null;
+    }[] = await dataSource.query(
+      `
+      SELECT deleted_at
+      FROM codigo_barras
+      WHERE id_articulo = 1
+      ORDER BY id
+    `,
+    );
+
+    expect(barcodeRows).toHaveLength(2);
+    expect(barcodeRows.every((row): boolean => row.deleted_at !== null)).toBe(true);
+
+    const categoryRows: readonly {
+      readonly total: number;
+    }[] = await dataSource.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM articulo_categoria
+      WHERE id_articulo = 1
+    `,
+    );
+
+    expect(categoryRows[0]?.total).toBe(2);
+
+    const historyRows: readonly {
+      readonly total: number;
+    }[] = await dataSource.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM historico_articulo
+      WHERE id_articulo = 1
+    `,
+    );
+
+    expect(historyRows[0]?.total).toBe(1);
+  });
+
+  it('no permite dar de baja un artículo que no está activo', async (): Promise<void> => {
+    const currentRepository = requireRepository();
+
+    await currentRepository.deactivate(1);
+
+    await expect(currentRepository.deactivate(1)).rejects.toThrow(
+      'El artículo que se intenta actualizar no existe.',
+    );
+  });
 });
 
 /**

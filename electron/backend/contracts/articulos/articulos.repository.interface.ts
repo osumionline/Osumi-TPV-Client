@@ -22,4 +22,9 @@ export default interface ArticulosRepository {
    * Actualiza un artículo existente.
    */
   update(command: ArticuloSaveRecord): Promise<void>;
+
+  /**
+   * Da de baja lógicamente un artículo activo.
+   */
+  deactivate(idArticulo: number): Promise<void>;
 }
