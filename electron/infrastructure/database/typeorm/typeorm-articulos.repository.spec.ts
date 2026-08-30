@@ -185,7 +185,164 @@ describe('TypeOrmArticulosRepository', (): void => {
 
     expect(historyRows).toHaveLength(0);
   });
+
+  it('actualiza el artículo sin generar histórico cuando el stock no cambia', async (): Promise<void> => {
+    await requireRepository().update(
+      createUpdateCommand({
+        nombre: 'Artículo actualizado',
+        idsCategorias: [2],
+        referencia: 'REF-ACTUALIZADA',
+        descripcionCorta: 'Nueva descripción',
+        codigosBarrasAdicionales: [
+          {
+            id: 2,
+            codigo: 'ABC-456',
+          },
+          {
+            id: null,
+            codigo: 'NUEVO-CODIGO',
+          },
+        ],
+      }),
+    );
+
+    const articulo: ArticuloRecord | null = await requireRepository().findById(1);
+
+    expect(articulo).toMatchObject({
+      id: 1,
+      localizador: 261234,
+      nombre: 'Artículo actualizado',
+      idsCategorias: [2],
+      referencia: 'REF-ACTUALIZADA',
+      descripcionCorta: 'Nueva descripción',
+      stock: 8,
+    });
+
+    expect(articulo?.codigosBarras).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          codigo: '261234',
+          porDefecto: true,
+        }),
+        expect.objectContaining({
+          codigo: 'ABC-456',
+          porDefecto: false,
+        }),
+        expect.objectContaining({
+          codigo: 'NUEVO-CODIGO',
+          porDefecto: false,
+        }),
+      ]),
+    );
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const historyRows: readonly unknown[] = await dataSource.query(
+      `
+      SELECT id
+      FROM historico_articulo
+      WHERE id_articulo = 1
+    `,
+    );
+
+    expect(historyRows).toHaveLength(0);
+  });
+
+  it('registra histórico cuando cambia manualmente el stock', async (): Promise<void> => {
+    await requireRepository().update(
+      createUpdateCommand({
+        stock: 13,
+        pucMicros: 800000,
+        pvpCents: 125,
+      }),
+    );
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const rows: readonly {
+      tipo: number;
+      stock_previo: number;
+      diferencia: number;
+      stock_final: number;
+      puc_micros: number;
+      pvp_micros: number;
+    }[] = await dataSource.query(
+      `
+      SELECT
+        tipo,
+        stock_previo,
+        diferencia,
+        stock_final,
+        puc_micros,
+        pvp_micros
+      FROM historico_articulo
+      WHERE id_articulo = 1
+    `,
+    );
+
+    expect(rows).toEqual([
+      {
+        tipo: 4,
+        stock_previo: 8,
+        diferencia: 5,
+        stock_final: 13,
+        puc_micros: 800000,
+        pvp_micros: 1250000,
+      },
+    ]);
+  });
+
+  it('no permite editar un artículo inexistente', async (): Promise<void> => {
+    await expect(
+      requireRepository().update(
+        createUpdateCommand({
+          id: 999,
+        }),
+      ),
+    ).rejects.toThrow('El artículo que se intenta actualizar no existe.');
+  });
 });
+
+/**
+ * Crea un comando de edición a partir del artículo del fixture.
+ */
+function createUpdateCommand(overrides: Partial<ArticuloSaveRecord> = {}): ArticuloSaveRecord {
+  return {
+    id: 1,
+    nombre: 'Artículo de prueba',
+    idMarca: 1,
+    idProveedor: 1,
+    idsCategorias: [1, 2],
+    referencia: 'REF-1',
+    precioAlbaranMicros: 590000,
+    pucMicros: 744580,
+    pvpCents: 100,
+    pvpDescuentoCents: 90,
+    ivaBps: 2100,
+    reBps: 520,
+    margenMicroporcentaje: 255420,
+    margenDescuentoMicroporcentaje: 172689,
+    stock: 8,
+    stockMin: 2,
+    stockMax: 20,
+    loteOptimo: 5,
+    ventaOnline: true,
+    mostrarEnWeb: false,
+    descripcionCorta: 'Descripción corta',
+    descripcionLarga: 'Descripción larga',
+    observaciones: 'Observaciones',
+    mostrarObservacionesPedidos: true,
+    mostrarObservacionesVentas: false,
+    accesoDirecto: 12,
+    codigosBarrasAdicionales: [
+      {
+        id: 2,
+        codigo: 'ABC-123',
+      },
+    ],
+    ...overrides,
+  };
+}
 
 /**
  * Crea todas las tablas de la aplicación en la SQLite temporal.

@@ -17,4 +17,9 @@ export default interface ArticulosRepository {
    * Crea un nuevo artículo y devuelve su identificador interno.
    */
   create(command: ArticuloSaveRecord): Promise<number>;
+
+  /**
+   * Actualiza un artículo existente.
+   */
+  update(command: ArticuloSaveRecord): Promise<void>;
 }

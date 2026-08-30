@@ -5,11 +5,24 @@ import type {
   ArticuloRecord,
 } from '@backend/domain/articulos/articulo-record.interface';
 import type { ArticuloSaveRecord } from '@backend/domain/articulos/articulo-save-record.interface';
+import { HISTORICO_ARTICULO_TIPO_ARTICULO } from '@backend/domain/articulos/historico-articulo.constants';
+import { MONEY_SCALE, UNIT_PRICE_SCALE } from '@backend/domain/database/database-schema.constants';
 import { generateArticuloLocalizador } from '@backend/utils/articulo-localizador.utils';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
 import { randomUUID } from 'node:crypto';
 import type { DataSource, QueryRunner } from 'typeorm';
+
+interface ArticuloUpdateDatabaseRow {
+  readonly id: number;
+  readonly localizador: number;
+  readonly stock: number;
+}
+
+interface ArticuloAdditionalBarcodeDatabaseRow {
+  readonly id: number;
+  readonly codigo: string;
+}
 
 interface DatabaseIdRow {
   readonly id: number;
@@ -290,6 +303,578 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
 
         return idArticulo;
       },
+    );
+  }
+
+  /**
+   * Actualiza un artículo completo dentro de una única transacción.
+   */
+  async update(command: ArticuloSaveRecord): Promise<void> {
+    if (command.id === null) {
+      throw new Error('No se puede actualizar un artículo sin identificador.');
+    }
+
+    const idArticulo: number = command.id;
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    await runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
+      const current: ArticuloUpdateDatabaseRow = await this.requireActiveArticleForUpdate(
+        queryRunner,
+        idArticulo,
+      );
+
+      await this.requireActiveReference(
+        queryRunner,
+        'marca',
+        command.idMarca,
+        'La marca seleccionada no existe.',
+      );
+
+      if (command.idProveedor !== null) {
+        await this.requireActiveReference(
+          queryRunner,
+          'proveedor',
+          command.idProveedor,
+          'El proveedor seleccionado no existe.',
+        );
+      }
+
+      for (const idCategoria of new Set<number>(command.idsCategorias)) {
+        await this.requireActiveReference(
+          queryRunner,
+          'categoria',
+          idCategoria,
+          'Una de las categorías seleccionadas no existe.',
+        );
+      }
+
+      await this.requireAvailableNameForUpdate(queryRunner, idArticulo, command.nombre);
+
+      await this.validateAdditionalBarcodesForUpdate(queryRunner, command, current.localizador);
+
+      const timestamp: string = new Date().toISOString();
+
+      await this.syncCategories(queryRunner, idArticulo, command.idsCategorias, timestamp);
+
+      await this.syncAdditionalBarcodes(
+        queryRunner,
+        idArticulo,
+        command.codigosBarrasAdicionales,
+        timestamp,
+      );
+
+      await this.requireAvailableAccessCode(queryRunner, idArticulo, command.accesoDirecto);
+
+      const slug: string = this.createSlug(command.nombre, current.localizador);
+
+      await queryRunner.query(
+        `
+          UPDATE articulo
+          SET
+            nombre = ?,
+            slug = ?,
+            id_marca = ?,
+            id_proveedor = ?,
+            referencia = ?,
+            palb_micros = ?,
+            puc_micros = ?,
+            pvp_cents = ?,
+            pvp_descuento_cents = ?,
+            iva_bps = ?,
+            re_bps = ?,
+            margen_microporcentaje = ?,
+            margen_descuento_microporcentaje = ?,
+            stock = ?,
+            stock_min = ?,
+            stock_max = ?,
+            lote_optimo = ?,
+            venta_online = ?,
+            mostrar_en_web = ?,
+            descripcion_corta = ?,
+            descripcion = ?,
+            observaciones = ?,
+            mostrar_observaciones_pedidos = ?,
+            mostrar_observaciones_ventas = ?,
+            acceso_directo = ?,
+            updated_at = ?
+          WHERE
+            id = ?
+            AND deleted_at IS NULL
+        `,
+        [
+          command.nombre,
+          slug,
+          command.idMarca,
+          command.idProveedor,
+          command.referencia,
+          command.precioAlbaranMicros,
+          command.pucMicros,
+          command.pvpCents,
+          command.pvpDescuentoCents,
+          command.ivaBps,
+          command.reBps,
+          command.margenMicroporcentaje,
+          command.margenDescuentoMicroporcentaje,
+          command.stock,
+          command.stockMin,
+          command.stockMax,
+          command.loteOptimo,
+          command.ventaOnline ? 1 : 0,
+          command.mostrarEnWeb ? 1 : 0,
+          command.descripcionCorta,
+          command.descripcionLarga,
+          command.observaciones,
+          command.mostrarObservacionesPedidos ? 1 : 0,
+          command.mostrarObservacionesVentas ? 1 : 0,
+          command.accesoDirecto,
+          timestamp,
+          command.id,
+        ],
+      );
+
+      await this.ensureDefaultBarcode(queryRunner, idArticulo, current.localizador, timestamp);
+
+      if (current.stock !== command.stock) {
+        await this.insertManualStockHistory(queryRunner, command, current.stock, timestamp);
+      }
+    });
+  }
+
+  /**
+   * Obtiene los datos necesarios para editar un artículo activo.
+   */
+  private async requireActiveArticleForUpdate(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+  ): Promise<ArticuloUpdateDatabaseRow> {
+    const rows: readonly ArticuloUpdateDatabaseRow[] = (await queryRunner.query(
+      `
+      SELECT
+        id,
+        localizador,
+        stock
+      FROM articulo
+      WHERE
+        id = ?
+        AND deleted_at IS NULL
+      LIMIT 1
+    `,
+      [idArticulo],
+    )) as readonly ArticuloUpdateDatabaseRow[];
+
+    const article: ArticuloUpdateDatabaseRow | undefined = rows[0];
+
+    if (article === undefined) {
+      throw new Error('El artículo que se intenta actualizar no existe.');
+    }
+
+    return article;
+  }
+
+  /**
+   * Comprueba que el nombre no pertenezca a otro artículo activo.
+   */
+  private async requireAvailableNameForUpdate(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    nombre: string,
+  ): Promise<void> {
+    const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+      SELECT id
+      FROM articulo
+      WHERE
+        id <> ?
+        AND nombre = ? COLLATE NOCASE
+        AND deleted_at IS NULL
+      LIMIT 1
+    `,
+      [idArticulo, nombre],
+    )) as readonly DatabaseIdRow[];
+
+    if (rows.length > 0) {
+      throw new Error('Ya existe otro artículo activo con ese nombre.');
+    }
+  }
+
+  /**
+   * Sincroniza las categorías manteniendo intactas
+   * las relaciones que continúan seleccionadas.
+   */
+  private async syncCategories(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    idsCategorias: readonly number[],
+    timestamp: string,
+  ): Promise<void> {
+    const currentRows: readonly ArticuloCategoriaDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT id_categoria
+        FROM articulo_categoria
+        WHERE id_articulo = ?
+      `,
+      [idArticulo],
+    )) as readonly ArticuloCategoriaDatabaseRow[];
+
+    const currentIds: Set<number> = new Set<number>(
+      currentRows.map((row: ArticuloCategoriaDatabaseRow): number => row.id_categoria),
+    );
+
+    const nextIds: Set<number> = new Set<number>(idsCategorias);
+
+    for (const idCategoria of currentIds) {
+      if (!nextIds.has(idCategoria)) {
+        await queryRunner.query(
+          `
+          DELETE FROM articulo_categoria
+          WHERE
+            id_articulo = ?
+            AND id_categoria = ?
+        `,
+          [idArticulo, idCategoria],
+        );
+      }
+    }
+
+    for (const idCategoria of nextIds) {
+      if (!currentIds.has(idCategoria)) {
+        await queryRunner.query(
+          `
+          INSERT INTO articulo_categoria (
+            id_articulo,
+            id_categoria,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?)
+        `,
+          [idArticulo, idCategoria, timestamp, timestamp],
+        );
+      }
+    }
+  }
+
+  /**
+   * Valida los códigos adicionales enviados al editar
+   * y evita cualquier ambigüedad comercial.
+   */
+  private async validateAdditionalBarcodesForUpdate(
+    queryRunner: QueryRunner,
+    command: ArticuloSaveRecord,
+    localizador: number,
+  ): Promise<void> {
+    if (command.id === null) {
+      throw new Error('No se pueden validar códigos de una edición sin artículo.');
+    }
+
+    const codes: Set<string> = new Set<string>();
+    const ids: Set<number> = new Set<number>();
+
+    for (const barcode of command.codigosBarrasAdicionales) {
+      const code: string = barcode.codigo.trim();
+
+      if (code.length === 0) {
+        throw new Error('Los códigos de barras no pueden estar vacíos.');
+      }
+
+      if (codes.has(code)) {
+        throw new Error('Hay códigos de barras repetidos en el artículo.');
+      }
+
+      codes.add(code);
+
+      if (barcode.id !== null) {
+        if (ids.has(barcode.id)) {
+          throw new Error('Hay códigos de barras repetidos en el artículo.');
+        }
+
+        ids.add(barcode.id);
+
+        await this.requireOwnedAdditionalBarcode(queryRunner, command.id, barcode.id);
+      }
+
+      const numericCode: number | null =
+        /^\d+$/.test(code) && Number.isSafeInteger(Number(code)) ? Number(code) : null;
+
+      if (numericCode === localizador || numericCode === command.accesoDirecto) {
+        throw new Error(
+          'Un código de barras no puede coincidir con el localizador o acceso directo.',
+        );
+      }
+
+      const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
+        `
+        SELECT cb.id
+        FROM codigo_barras cb
+        WHERE
+          cb.codigo = ?
+          AND cb.deleted_at IS NULL
+          AND (
+            ? IS NULL
+            OR cb.id <> ?
+          )
+
+        UNION ALL
+
+        SELECT a.id
+        FROM articulo a
+        WHERE
+          a.deleted_at IS NULL
+          AND a.id <> ?
+          AND ? IS NOT NULL
+          AND (
+            a.localizador = ?
+            OR a.acceso_directo = ?
+          )
+
+        LIMIT 1
+      `,
+        [code, barcode.id, barcode.id, command.id, numericCode, numericCode, numericCode],
+      )) as readonly DatabaseIdRow[];
+
+      if (rows.length > 0) {
+        throw new Error(`El código "${code}" ya está siendo utilizado.`);
+      }
+    }
+  }
+
+  /**
+   * Comprueba que un código persistido sea un código
+   * adicional activo del artículo editado.
+   */
+  private async requireOwnedAdditionalBarcode(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    idBarcode: number,
+  ): Promise<void> {
+    const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+      SELECT id
+      FROM codigo_barras
+      WHERE
+        id = ?
+        AND id_articulo = ?
+        AND por_defecto = 0
+        AND deleted_at IS NULL
+      LIMIT 1
+    `,
+      [idBarcode, idArticulo],
+    )) as readonly DatabaseIdRow[];
+
+    if (rows.length === 0) {
+      throw new Error('Uno de los códigos de barras no pertenece al artículo editado.');
+    }
+  }
+
+  /**
+   * Sincroniza códigos adicionales manteniendo los registros
+   * existentes y dando de baja lógicamente los eliminados.
+   */
+  private async syncAdditionalBarcodes(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    barcodes: ArticuloSaveRecord['codigosBarrasAdicionales'],
+    timestamp: string,
+  ): Promise<void> {
+    const currentRows: readonly ArticuloAdditionalBarcodeDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT
+          id,
+          codigo
+        FROM codigo_barras
+        WHERE
+          id_articulo = ?
+          AND por_defecto = 0
+          AND deleted_at IS NULL
+      `,
+      [idArticulo],
+    )) as readonly ArticuloAdditionalBarcodeDatabaseRow[];
+
+    const retainedIds: Set<number> = new Set<number>(
+      barcodes.flatMap((barcode): readonly number[] => (barcode.id === null ? [] : [barcode.id])),
+    );
+
+    for (const current of currentRows) {
+      if (!retainedIds.has(current.id)) {
+        await queryRunner.query(
+          `
+          UPDATE codigo_barras
+          SET
+            deleted_at = ?,
+            updated_at = ?
+          WHERE id = ?
+        `,
+          [timestamp, timestamp, current.id],
+        );
+      }
+    }
+
+    for (const barcode of barcodes) {
+      const code: string = barcode.codigo.trim();
+
+      if (barcode.id === null) {
+        await queryRunner.query(
+          `
+          INSERT INTO codigo_barras (
+            public_id,
+            id_articulo,
+            codigo,
+            por_defecto,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, 0, ?, ?)
+        `,
+          [randomUUID(), idArticulo, code, timestamp, timestamp],
+        );
+
+        continue;
+      }
+
+      await queryRunner.query(
+        `
+        UPDATE codigo_barras
+        SET
+          codigo = ?,
+          updated_at = ?
+        WHERE id = ?
+      `,
+        [code, timestamp, barcode.id],
+      );
+    }
+  }
+
+  /**
+   * Comprueba que el acceso directo no entre en conflicto
+   * con códigos comerciales que seguirán activos.
+   */
+  private async requireAvailableAccessCode(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    accesoDirecto: number | null,
+  ): Promise<void> {
+    if (accesoDirecto === null) {
+      return;
+    }
+
+    const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+      SELECT a.id
+      FROM articulo a
+      WHERE
+        a.id <> ?
+        AND a.deleted_at IS NULL
+        AND (
+          a.localizador = ?
+          OR a.acceso_directo = ?
+        )
+
+      UNION ALL
+
+      SELECT cb.id
+      FROM codigo_barras cb
+      WHERE
+        cb.deleted_at IS NULL
+        AND cb.codigo NOT GLOB '*[^0-9]*'
+        AND CAST(cb.codigo AS INTEGER) = ?
+
+      LIMIT 1
+    `,
+      [idArticulo, accesoDirecto, accesoDirecto, accesoDirecto],
+    )) as readonly DatabaseIdRow[];
+
+    if (rows.length > 0) {
+      throw new Error('El acceso directo ya está siendo utilizado como código de otro artículo.');
+    }
+  }
+
+  /**
+   * Garantiza que exista un único código por defecto activo
+   * y que siga correspondiendo al localizador del artículo.
+   */
+  private async ensureDefaultBarcode(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    localizador: number,
+    timestamp: string,
+  ): Promise<void> {
+    const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+      SELECT id
+      FROM codigo_barras
+      WHERE
+        id_articulo = ?
+        AND por_defecto = 1
+        AND deleted_at IS NULL
+      LIMIT 1
+    `,
+      [idArticulo],
+    )) as readonly DatabaseIdRow[];
+
+    const existingId: number | undefined = rows[0]?.id;
+
+    if (existingId === undefined) {
+      await this.insertDefaultBarcode(queryRunner, idArticulo, localizador, timestamp);
+
+      return;
+    }
+
+    await queryRunner.query(
+      `
+      UPDATE codigo_barras
+      SET
+        codigo = ?,
+        updated_at = ?
+      WHERE id = ?
+    `,
+      [String(localizador), timestamp, existingId],
+    );
+  }
+
+  /**
+   * Registra en el histórico una modificación manual
+   * del stock realizada desde la ficha de Artículos.
+   */
+  private async insertManualStockHistory(
+    queryRunner: QueryRunner,
+    command: ArticuloSaveRecord,
+    previousStock: number,
+    timestamp: string,
+  ): Promise<void> {
+    if (command.id === null) {
+      throw new Error('No se puede registrar stock de un artículo sin id.');
+    }
+
+    const pvpMicros: number = (command.pvpCents * UNIT_PRICE_SCALE) / MONEY_SCALE;
+
+    await queryRunner.query(
+      `
+      INSERT INTO historico_articulo (
+        public_id,
+        id_articulo,
+        tipo,
+        stock_previo,
+        diferencia,
+        stock_final,
+        puc_micros,
+        pvp_micros,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+      [
+        randomUUID(),
+        command.id,
+        HISTORICO_ARTICULO_TIPO_ARTICULO,
+        previousStock,
+        command.stock - previousStock,
+        command.stock,
+        command.pucMicros,
+        pvpMicros,
+        timestamp,
+        timestamp,
+      ],
     );
   }
 
