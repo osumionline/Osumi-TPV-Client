@@ -81,6 +81,8 @@ export interface VentaHistoricoCapacidades {
   readonly puedeCambiarCliente: boolean;
   readonly puedeCambiarTipoPago: boolean;
   readonly puedeImprimirTicketRegalo: boolean;
+  readonly puedeProcesarTicketBai: boolean;
+  readonly puedeComprobarTicketBai: boolean;
   readonly puedeReintentarTicketBai: boolean;
 }
 

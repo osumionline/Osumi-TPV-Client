@@ -276,5 +276,8 @@ function createDetalleRecord(
     tieneLineasPositivas: true,
     ticketBaiEstado: 'no_aplica',
     tieneIncidenciaTicketBai: false,
+    puedeProcesarTicketBai: false,
+    puedeComprobarTicketBai: false,
+    puedeReintentarTicketBai: false,
   };
 }

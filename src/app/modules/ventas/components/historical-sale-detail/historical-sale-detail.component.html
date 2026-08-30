@@ -1,13 +1,40 @@
 <section class="historical-sale-detail">
     <header class="historical-sale-detail__header">
-        <div class="historical-sale-detail__sale-reference">
-            <strong>
-                Venta {{ getReferencia() }}
-            </strong>
+        <div class="historical-sale-detail__heading">
+            <div class="historical-sale-detail__sale-reference">
+                <strong>
+                    Venta {{ getReferencia() }}
+                </strong>
 
-            <span>
-                {{ detalle().fecha | date:'dd/MM/yyyy HH:mm' }}
-            </span>
+                <span>
+                    {{ detalle().fecha | date:'dd/MM/yyyy HH:mm' }}
+                </span>
+            </div>
+
+            @switch (detalle().ticketBaiEstado) {
+            @case ('pendiente') {
+            <div class="historical-sale-detail__ticketbai-status historical-sale-detail__ticketbai-status--pending">
+                <mat-icon aria-hidden="true">
+                    schedule
+                </mat-icon>
+
+                <span>
+                    TicketBAI pendiente
+                </span>
+            </div>
+            }
+            @case ('incidencia') {
+            <div class="historical-sale-detail__ticketbai-status historical-sale-detail__ticketbai-status--error">
+                <mat-icon aria-hidden="true">
+                    error
+                </mat-icon>
+
+                <span>
+                    Incidencia TicketBAI
+                </span>
+            </div>
+            }
+            }
         </div>
 
         <strong class="historical-sale-detail__total">
@@ -334,16 +361,55 @@
                 </div>
             </button>
 
-            <div class="historical-sale-detail__capability"
-                 [class.historical-sale-detail__capability--available]="
-                    detalle().capacidades.puedeReintentarTicketBai
-                 ">
+            @if (detalle().capacidades.puedeProcesarTicketBai) {
+            <button class="historical-sale-detail__capability historical-sale-detail__capability--action historical-sale-detail__capability--available"
+                    type="button"
+                    [disabled]="saving()"
+                    (click)="requestProcessTicketBai()">
                 <mat-icon aria-hidden="true">
-                    {{
-                        detalle().capacidades.puedeReintentarTicketBai
-                            ? 'check_circle'
-                            : 'block'
-                    }}
+                    upload
+                </mat-icon>
+
+                <div>
+                    <strong>
+                        Procesar TicketBAI
+                    </strong>
+
+                    <small>
+                        Enviar factura pendiente
+                    </small>
+                </div>
+            </button>
+            }
+
+            @if (detalle().capacidades.puedeComprobarTicketBai) {
+            <button class="historical-sale-detail__capability historical-sale-detail__capability--action historical-sale-detail__capability--available"
+                    type="button"
+                    [disabled]="saving()"
+                    (click)="requestReconcileTicketBai()">
+                <mat-icon aria-hidden="true">
+                    sync
+                </mat-icon>
+
+                <div>
+                    <strong>
+                        Comprobar TicketBAI
+                    </strong>
+
+                    <small>
+                        Consultar estado remoto
+                    </small>
+                </div>
+            </button>
+            }
+
+            @if (detalle().capacidades.puedeReintentarTicketBai) {
+            <button class="historical-sale-detail__capability historical-sale-detail__capability--action historical-sale-detail__capability--available"
+                    type="button"
+                    [disabled]="saving()"
+                    (click)="requestRetryTicketBai()">
+                <mat-icon aria-hidden="true">
+                    refresh
                 </mat-icon>
 
                 <div>
@@ -352,14 +418,11 @@
                     </strong>
 
                     <small>
-                        {{
-                            detalle().capacidades.puedeReintentarTicketBai
-                                ? 'Disponible'
-                                : 'No disponible'
-                        }}
+                        Solicitar reenvío
                     </small>
                 </div>
-            </div>
+            </button>
+            }
         </div>
 
         @if (selectingTipoPago()) {

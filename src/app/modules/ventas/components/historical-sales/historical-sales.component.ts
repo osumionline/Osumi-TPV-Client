@@ -29,6 +29,7 @@ import HistoricalSaleDetailComponent from '@modules/ventas/components/historical
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import ClienteProteccionDatosPrintService from '@services/cliente-proteccion-datos-print.service';
 import ClientesService from '@services/clientes.service';
+import VentaTicketBaiService from '@services/venta-ticket-bai.service';
 import VentaTicketDocumentService from '@services/venta-ticket-document.service';
 import VentaTicketEmailService from '@services/venta-ticket-email.service';
 import VentasContextService from '@services/ventas-context.service';
@@ -67,6 +68,7 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
   private readonly clienteProteccionDatosPrintService: ClienteProteccionDatosPrintService = inject(
     ClienteProteccionDatosPrintService,
   );
+  private readonly ventaTicketBaiService: VentaTicketBaiService = inject(VentaTicketBaiService);
   private readonly ventaTicketDocumentService: VentaTicketDocumentService = inject(
     VentaTicketDocumentService,
   );
@@ -452,6 +454,113 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
   }
 
   /**
+   * Continúa el procesamiento inicial de una venta
+   * TicketBAI que quedó pendiente antes del envío.
+   */
+  async processTicketBai(): Promise<void> {
+    const detalle: VentaHistoricoDetalle | null = this.detalle();
+
+    if (detalle === null || this.postventaSaving() || !detalle.capacidades.puedeProcesarTicketBai) {
+      return;
+    }
+
+    this.postventaSaving.set(true);
+    this.postventaError.set(null);
+    this.postventaWarning.set(null);
+    this.postventaInfo.set(null);
+
+    try {
+      await this.ventaTicketBaiService.processInitial(detalle.id);
+      this.postventaInfo.set('La solicitud TicketBAI se ha procesado correctamente.');
+    } catch (error: unknown) {
+      this.postventaError.set(getErrorMessage(error, 'No se ha podido procesar TicketBAI.'));
+    } finally {
+      await this.refreshTicketBaiAfterAction(detalle.id);
+      this.postventaSaving.set(false);
+    }
+  }
+
+  /**
+   * Consulta el estado remoto TicketBAI y actualiza
+   * el estado fiscal persistido de la venta.
+   */
+  async reconcileTicketBai(): Promise<void> {
+    const detalle: VentaHistoricoDetalle | null = this.detalle();
+
+    if (
+      detalle === null ||
+      this.postventaSaving() ||
+      !detalle.capacidades.puedeComprobarTicketBai
+    ) {
+      return;
+    }
+
+    this.postventaSaving.set(true);
+    this.postventaError.set(null);
+    this.postventaWarning.set(null);
+    this.postventaInfo.set(null);
+
+    try {
+      await this.ventaTicketBaiService.reconcile(detalle.id);
+      this.postventaInfo.set('Se ha comprobado el estado TicketBAI de la venta.');
+    } catch (error: unknown) {
+      this.postventaError.set(
+        getErrorMessage(error, 'No se ha podido comprobar el estado TicketBAI.'),
+      );
+    } finally {
+      await this.refreshTicketBaiAfterAction(detalle.id);
+      this.postventaSaving.set(false);
+    }
+  }
+
+  /**
+   * Solicita el reenvío manual de una factura
+   * TicketBAI previamente rechazada.
+   */
+  async retryTicketBai(): Promise<void> {
+    const detalle: VentaHistoricoDetalle | null = this.detalle();
+
+    if (
+      detalle === null ||
+      this.postventaSaving() ||
+      !detalle.capacidades.puedeReintentarTicketBai
+    ) {
+      return;
+    }
+
+    this.postventaSaving.set(true);
+    this.postventaError.set(null);
+    this.postventaWarning.set(null);
+    this.postventaInfo.set(null);
+
+    try {
+      await this.ventaTicketBaiService.retry(detalle.id);
+      this.postventaInfo.set(
+        'El reenvío TicketBAI se ha solicitado correctamente. Comprueba su estado para conocer el resultado.',
+      );
+    } catch (error: unknown) {
+      this.postventaError.set(getErrorMessage(error, 'No se ha podido reintentar TicketBAI.'));
+    } finally {
+      await this.refreshTicketBaiAfterAction(detalle.id);
+      this.postventaSaving.set(false);
+    }
+  }
+
+  /**
+   * Sincroniza documento, detalle y listado después de una
+   * operación fiscal que puede haber cambiado de estado.
+   */
+  private async refreshTicketBaiAfterAction(idVenta: number): Promise<void> {
+    await this.regenerateTicketAfterPostventa(idVenta);
+
+    if (this.selectedVentaId() === idVenta) {
+      await this.loadDetalle(idVenta);
+    }
+
+    await this.refreshHistoricoAfterPostventa();
+  }
+
+  /**
    * Solicita cerrar el modal de Histórico.
    */
   close(): void {
@@ -825,7 +934,7 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
    */
   private async regenerateTicketAfterPostventa(idVenta: number): Promise<void> {
     try {
-      await this.ventaTicketDocumentService.generateAndSavePdf(idVenta);
+      await this.ventaTicketDocumentService.ensureCurrentPdf(idVenta);
     } catch (error: unknown) {
       this.appendPostventaWarning(
         `La venta se ha actualizado, pero su ticket PDF está pendiente de regeneración. ${getErrorMessage(

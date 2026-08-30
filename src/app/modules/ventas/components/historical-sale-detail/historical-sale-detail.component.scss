@@ -15,6 +15,37 @@
     gap: 16px;
 }
 
+.historical-sale-detail__heading {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.historical-sale-detail__ticketbai-status {
+    display: flex;
+    width: fit-content;
+    align-items: center;
+    gap: 4px;
+    color: var(--disabled-color);
+    font-size: 0.78rem;
+    font-weight: 500;
+
+    mat-icon {
+        width: 17px;
+        height: 17px;
+        font-size: 17px;
+    }
+
+    &.historical-sale-detail__ticketbai-status--pending {
+        color: #9a6700;
+    }
+
+    &.historical-sale-detail__ticketbai-status--error {
+        color: #b3261e;
+    }
+}
+
 .historical-sale-detail__sale-reference {
     display: flex;
     min-width: 0;

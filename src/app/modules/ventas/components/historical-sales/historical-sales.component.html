@@ -294,7 +294,10 @@
                                                      (changeTipoPagoEvent)="changeTipoPago($event)"
                                                      (reprintTicketEvent)="reprintTicket()"
                                                      (printGiftTicketEvent)="printGiftTicket()"
-                                                     (sendTicketEmailEvent)="sendTicketEmail($event)" />
+                                                     (sendTicketEmailEvent)="sendTicketEmail($event)"
+                                                     (processTicketBaiEvent)="processTicketBai()"
+                                                     (reconcileTicketBaiEvent)="reconcileTicketBai()"
+                                                     (retryTicketBaiEvent)="retryTicketBai()" />
                         }
                         @else {
                         <div class="historical-sales__detail-state">

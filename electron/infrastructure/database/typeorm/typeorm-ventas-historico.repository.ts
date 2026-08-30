@@ -243,6 +243,12 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
     const ticketBaiEstado: VentaHistoricoTicketBaiEstadoRecord = this.mapTicketBaiEstado(
       row.ticketbai_estado,
     );
+    const puedeProcesarTicketBai: boolean = row.ticketbai_estado === 'pendiente';
+    const puedeComprobarTicketBai: boolean =
+      row.ticketbai_estado === 'pendiente_remoto' ||
+      row.ticketbai_estado === 'enviando' ||
+      row.ticketbai_estado === 'error_temporal';
+    const puedeReintentarTicketBai: boolean = row.ticketbai_estado === 'rechazada';
 
     return {
       id: row.id,
@@ -261,6 +267,9 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
       tieneLineasPositivas: row.tiene_lineas_positivas === 1,
       ticketBaiEstado,
       tieneIncidenciaTicketBai: ticketBaiEstado === 'incidencia',
+      puedeProcesarTicketBai,
+      puedeComprobarTicketBai,
+      puedeReintentarTicketBai,
     };
   }
 

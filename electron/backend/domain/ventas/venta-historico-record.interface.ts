@@ -87,4 +87,7 @@ export interface VentaHistoricoDetalleRecord {
   readonly tieneLineasPositivas: boolean;
   readonly ticketBaiEstado: VentaHistoricoTicketBaiEstadoRecord;
   readonly tieneIncidenciaTicketBai: boolean;
+  readonly puedeProcesarTicketBai: boolean;
+  readonly puedeComprobarTicketBai: boolean;
+  readonly puedeReintentarTicketBai: boolean;
 }

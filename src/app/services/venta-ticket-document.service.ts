@@ -38,6 +38,20 @@ export default class VentaTicketDocumentService {
   }
 
   /**
+   * Garantiza que exista un PDF correspondiente
+   * a la revisión documental actualmente vigente.
+   */
+  async ensureCurrentPdf(idVenta: number): Promise<void> {
+    const currentPdf: Uint8Array | null = await this.ventasTicketsService.getCurrentPdf(idVenta);
+
+    if (currentPdf !== null) {
+      return;
+    }
+
+    await this.generateAndSavePdf(idVenta);
+  }
+
+  /**
    * Imprime silenciosamente el snapshot vigente recuperado
    * en el instante de iniciar la impresión.
    */

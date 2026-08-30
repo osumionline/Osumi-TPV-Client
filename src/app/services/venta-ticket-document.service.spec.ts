@@ -110,11 +110,8 @@ describe('VentaTicketDocumentService', (): void => {
     const documentHtml: string = await service.buildHtml(123);
 
     expect(ticketsService.requestedVentaIds).toEqual([123]);
-
     expect(documentHtml).toContain('F. simplificada A-456');
-
     expect(documentHtml).toContain('data-qr-content="-123"');
-
     expect(documentHtml).toContain('Artículo de prueba');
   });
 
@@ -124,15 +121,35 @@ describe('VentaTicketDocumentService', (): void => {
     await service.generateAndSavePdf(123);
 
     expect(renderPdfCalls).toHaveLength(1);
-
     expect(renderPdfCalls[0]).toContain('data-qr-content="-123"');
-
     expect(ticketsService.savedPdfs).toHaveLength(1);
-
     expect(ticketsService.savedPdfs[0]?.idVenta).toBe(123);
-
     expect(ticketsService.savedPdfs[0]?.pdf).toBe(renderedPdf);
+    expect(ticketsService.savedPdfs[0]?.ticketRevision).toBe(1);
+  });
 
+  it('no regenera el PDF cuando ya existe la revisión documental vigente', async (): Promise<void> => {
+    const service: VentaTicketDocumentService = TestBed.inject(VentaTicketDocumentService);
+
+    await service.ensureCurrentPdf(123);
+
+    expect(ticketsService.currentPdfRequests).toEqual([123]);
+    expect(renderPdfCalls).toEqual([]);
+    expect(ticketsService.requestedVentaIds).toEqual([]);
+    expect(ticketsService.savedPdfs).toEqual([]);
+  });
+
+  it('regenera el PDF cuando no existe una revisión documental vigente', async (): Promise<void> => {
+    ticketsService.currentPdf = null;
+
+    const service: VentaTicketDocumentService = TestBed.inject(VentaTicketDocumentService);
+
+    await service.ensureCurrentPdf(123);
+
+    expect(ticketsService.currentPdfRequests).toEqual([123]);
+    expect(renderPdfCalls).toHaveLength(1);
+    expect(ticketsService.requestedVentaIds).toEqual([123]);
+    expect(ticketsService.savedPdfs).toHaveLength(1);
     expect(ticketsService.savedPdfs[0]?.ticketRevision).toBe(1);
   });
 
@@ -166,11 +183,8 @@ describe('VentaTicketDocumentService', (): void => {
     await service.print(123);
 
     expect(printTicketCalls).toHaveLength(1);
-
     expect(printTicketCalls[0]).toContain('F. simplificada A-456');
-
     expect(printTicketCalls[0]).toContain('data-qr-content="-123"');
-
     expect(renderPdfCalls).toEqual([]);
     expect(ticketsService.savedPdfs).toEqual([]);
   });
@@ -204,13 +218,9 @@ describe('VentaTicketDocumentService', (): void => {
     await service.printGift(123);
 
     expect(printTicketCalls).toHaveLength(1);
-
     expect(printTicketCalls[0]).toContain('TICKET REGALO');
-
     expect(printTicketCalls[0]).toContain('Artículo de prueba');
-
     expect(printTicketCalls[0]).not.toContain('Cliente de prueba');
-
     expect(renderPdfCalls).toEqual([]);
     expect(ticketsService.savedPdfs).toEqual([]);
   });
@@ -257,9 +267,7 @@ describe('VentaTicketDocumentService', (): void => {
     await service.reprint(123);
 
     expect(ticketsService.currentPdfRequests).toEqual([123]);
-
     expect(printPdfCalls).toEqual([currentPdf]);
-
     expect(renderPdfCalls).toEqual([]);
     expect(ticketsService.requestedVentaIds).toEqual([]);
     expect(ticketsService.savedPdfs).toEqual([]);
@@ -273,10 +281,8 @@ describe('VentaTicketDocumentService', (): void => {
     await service.reprint(123);
 
     expect(ticketsService.currentPdfRequests).toEqual([123, 123]);
-
     expect(renderPdfCalls).toHaveLength(1);
     expect(ticketsService.savedPdfs).toHaveLength(1);
-
     expect(printPdfCalls).toEqual([renderedPdf]);
   });
 

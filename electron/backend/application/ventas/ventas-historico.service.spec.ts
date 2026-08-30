@@ -185,6 +185,9 @@ describe('VentasHistoricoService', (): void => {
       tieneLineasPositivas: true,
       ticketBaiEstado: 'incidencia',
       tieneIncidenciaTicketBai: true,
+      puedeProcesarTicketBai: false,
+      puedeComprobarTicketBai: false,
+      puedeReintentarTicketBai: true,
     };
 
     const detalle: VentaHistoricoDetalle | null = await service.findDetalleByVentaId(15);
@@ -246,6 +249,8 @@ describe('VentasHistoricoService', (): void => {
         puedeCambiarCliente: true,
         puedeCambiarTipoPago: true,
         puedeImprimirTicketRegalo: true,
+        puedeProcesarTicketBai: false,
+        puedeComprobarTicketBai: false,
         puedeReintentarTicketBai: true,
       },
     });
@@ -297,6 +302,9 @@ describe('VentasHistoricoService', (): void => {
       tieneLineasPositivas: false,
       ticketBaiEstado: 'no_aplica',
       tieneIncidenciaTicketBai: false,
+      puedeProcesarTicketBai: false,
+      puedeComprobarTicketBai: false,
+      puedeReintentarTicketBai: false,
     };
 
     const detalle: VentaHistoricoDetalle | null = await service.findDetalleByVentaId(20);
@@ -306,6 +314,8 @@ describe('VentasHistoricoService', (): void => {
       puedeCambiarCliente: false,
       puedeCambiarTipoPago: false,
       puedeImprimirTicketRegalo: false,
+      puedeProcesarTicketBai: false,
+      puedeComprobarTicketBai: false,
       puedeReintentarTicketBai: false,
     });
   });

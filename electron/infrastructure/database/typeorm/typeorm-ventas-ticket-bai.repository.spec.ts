@@ -1,8 +1,10 @@
 import type { InitializeVentaTicketBaiPendingRecordCommand } from '@backend/contracts/ventas/venta-ticket-bai-record-command.interface';
+import type { VentaHistoricoDetalleRecord } from '@backend/domain/ventas/venta-historico-record.interface';
 import type { VentaTicketBaiRecord } from '@backend/domain/ventas/venta-ticket-bai-record.interface';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
+import TypeOrmVentasHistoricoRepository from '@infrastructure/database/typeorm/typeorm-ventas-historico.repository';
 import TypeOrmVentasTicketBaiRepository from '@infrastructure/database/typeorm/typeorm-ventas-ticket-bai.repository';
 import TypeOrmVentasTicketsRepository from '@infrastructure/database/typeorm/typeorm-ventas-tickets.repository';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -221,6 +223,105 @@ describe('TypeOrmVentasTicketBaiRepository', (): void => {
       ticket_revision: 1,
       ticket_pdf_revision: 0,
     });
+  });
+
+  it('expone procesar TicketBAI únicamente para una venta pendiente local', async (): Promise<void> => {
+    const currentRepository = requireRepository();
+
+    await currentRepository.initializePending(createPendingCommand());
+
+    const detalle: VentaHistoricoDetalleRecord = await requireHistoricoDetalle();
+
+    expect(detalle.ticketBaiEstado).toBe('pendiente');
+    expect(detalle.tieneIncidenciaTicketBai).toBe(false);
+    expect(detalle.puedeProcesarTicketBai).toBe(true);
+    expect(detalle.puedeComprobarTicketBai).toBe(false);
+    expect(detalle.puedeReintentarTicketBai).toBe(false);
+  });
+
+  it('expone comprobar TicketBAI para una factura pendiente en remoto', async (): Promise<void> => {
+    const currentRepository = requireRepository();
+
+    await currentRepository.initializePending(createPendingCommand());
+    await currentRepository.beginInitialAttempt(1);
+    await currentRepository.markRemotePending({
+      idVenta: 1,
+      huella: 'HUELLA-PENDING',
+      qr: 'QR-PENDING',
+      url: 'https://example.test/tbai/pending',
+      respuestaPayload: '{"result":"PENDING"}',
+    });
+
+    const detalle: VentaHistoricoDetalleRecord = await requireHistoricoDetalle();
+
+    expect(detalle.ticketBaiEstado).toBe('pendiente');
+    expect(detalle.tieneIncidenciaTicketBai).toBe(false);
+    expect(detalle.puedeProcesarTicketBai).toBe(false);
+    expect(detalle.puedeComprobarTicketBai).toBe(true);
+    expect(detalle.puedeReintentarTicketBai).toBe(false);
+  });
+
+  it('expone comprobar TicketBAI para un error temporal ambiguo', async (): Promise<void> => {
+    const currentRepository = requireRepository();
+
+    await currentRepository.initializePending(createPendingCommand());
+    await currentRepository.beginInitialAttempt(1);
+    await currentRepository.markFailure({
+      idVenta: 1,
+      estado: 'error_temporal',
+      ultimoError: 'No se ha podido confirmar el envío.',
+      respuestaPayload: null,
+    });
+
+    const detalle: VentaHistoricoDetalleRecord = await requireHistoricoDetalle();
+
+    expect(detalle.ticketBaiEstado).toBe('incidencia');
+    expect(detalle.tieneIncidenciaTicketBai).toBe(true);
+    expect(detalle.puedeProcesarTicketBai).toBe(false);
+    expect(detalle.puedeComprobarTicketBai).toBe(true);
+    expect(detalle.puedeReintentarTicketBai).toBe(false);
+  });
+
+  it('expone reintentar TicketBAI únicamente para una factura rechazada', async (): Promise<void> => {
+    const currentRepository = requireRepository();
+
+    await currentRepository.initializePending(createPendingCommand());
+    await currentRepository.beginInitialAttempt(1);
+    await currentRepository.markFailure({
+      idVenta: 1,
+      estado: 'rechazada',
+      ultimoError: 'TicketBAI ha rechazado la factura.',
+      respuestaPayload: '{"result":"ERROR"}',
+    });
+
+    const detalle: VentaHistoricoDetalleRecord = await requireHistoricoDetalle();
+
+    expect(detalle.ticketBaiEstado).toBe('incidencia');
+    expect(detalle.tieneIncidenciaTicketBai).toBe(true);
+    expect(detalle.puedeProcesarTicketBai).toBe(false);
+    expect(detalle.puedeComprobarTicketBai).toBe(false);
+    expect(detalle.puedeReintentarTicketBai).toBe(true);
+  });
+
+  it('no ofrece una acción fiscal automática ante un error permanente', async (): Promise<void> => {
+    const currentRepository = requireRepository();
+
+    await currentRepository.initializePending(createPendingCommand());
+    await currentRepository.beginInitialAttempt(1);
+    await currentRepository.markFailure({
+      idVenta: 1,
+      estado: 'error_permanente',
+      ultimoError: 'La configuración TicketBAI no es válida.',
+      respuestaPayload: null,
+    });
+
+    const detalle: VentaHistoricoDetalleRecord = await requireHistoricoDetalle();
+
+    expect(detalle.ticketBaiEstado).toBe('incidencia');
+    expect(detalle.tieneIncidenciaTicketBai).toBe(true);
+    expect(detalle.puedeProcesarTicketBai).toBe(false);
+    expect(detalle.puedeComprobarTicketBai).toBe(false);
+    expect(detalle.puedeReintentarTicketBai).toBe(false);
   });
 
   it('acepta TicketBAI e invalida exactamente una vez la revisión documental', async (): Promise<void> => {
@@ -570,6 +671,22 @@ function requireDatabase(): TypeOrmApplicationDatabase {
   }
 
   return applicationDatabase;
+}
+
+/**
+ * Recupera el detalle histórico de la venta
+ * utilizada por las pruebas TicketBAI.
+ */
+async function requireHistoricoDetalle(): Promise<VentaHistoricoDetalleRecord> {
+  const historicoRepository = new TypeOrmVentasHistoricoRepository(requireDatabase());
+  const detalle: VentaHistoricoDetalleRecord | null =
+    await historicoRepository.findDetalleByVentaId(1);
+
+  if (detalle === null) {
+    throw new Error('No se encuentra el detalle histórico de la venta del test.');
+  }
+
+  return detalle;
 }
 
 /**

@@ -192,7 +192,9 @@ export default class VentasHistoricoService {
         puedeCambiarTipoPago:
           record.totalCents !== 0 && record.numeroPagos === 1 && record.cajaAbierta,
         puedeImprimirTicketRegalo: record.tieneLineasPositivas,
-        puedeReintentarTicketBai: record.ticketBaiEstado === 'incidencia',
+        puedeProcesarTicketBai: record.puedeProcesarTicketBai,
+        puedeComprobarTicketBai: record.puedeComprobarTicketBai,
+        puedeReintentarTicketBai: record.puedeReintentarTicketBai,
       },
     };
   }

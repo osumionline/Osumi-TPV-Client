@@ -49,6 +49,9 @@ export default class HistoricalSaleDetailComponent {
   readonly printGiftTicketEvent: OutputEmitterRef<void> = output<void>();
   readonly reprintTicketEvent: OutputEmitterRef<void> = output<void>();
   readonly sendTicketEmailEvent: OutputEmitterRef<string> = output<string>();
+  readonly processTicketBaiEvent: OutputEmitterRef<void> = output<void>();
+  readonly reconcileTicketBaiEvent: OutputEmitterRef<void> = output<void>();
+  readonly retryTicketBaiEvent: OutputEmitterRef<void> = output<void>();
   readonly selectingEmail: WritableSignal<boolean> = signal<boolean>(false);
 
   readonly selectingTipoPago: WritableSignal<boolean> = signal<boolean>(false);
@@ -167,6 +170,48 @@ export default class HistoricalSaleDetailComponent {
     this.selectingTipoPago.set(false);
 
     this.reprintTicketEvent.emit();
+  }
+
+  /**
+   * Solicita continuar el procesamiento TicketBAI
+   * inicial de una venta pendiente local.
+   */
+  requestProcessTicketBai(): void {
+    if (this.saving() || !this.detalle().capacidades.puedeProcesarTicketBai) {
+      return;
+    }
+
+    this.selectingEmail.set(false);
+    this.selectingTipoPago.set(false);
+    this.processTicketBaiEvent.emit();
+  }
+
+  /**
+   * Solicita comprobar remotamente el estado
+   * TicketBAI de la venta.
+   */
+  requestReconcileTicketBai(): void {
+    if (this.saving() || !this.detalle().capacidades.puedeComprobarTicketBai) {
+      return;
+    }
+
+    this.selectingEmail.set(false);
+    this.selectingTipoPago.set(false);
+    this.reconcileTicketBaiEvent.emit();
+  }
+
+  /**
+   * Solicita reintentar una factura TicketBAI
+   * que ha sido rechazada.
+   */
+  requestRetryTicketBai(): void {
+    if (this.saving() || !this.detalle().capacidades.puedeReintentarTicketBai) {
+      return;
+    }
+
+    this.selectingEmail.set(false);
+    this.selectingTipoPago.set(false);
+    this.retryTicketBaiEvent.emit();
   }
 
   /**
