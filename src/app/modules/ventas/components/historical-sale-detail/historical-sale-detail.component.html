@@ -29,9 +29,17 @@
                     error
                 </mat-icon>
 
-                <span>
-                    Incidencia TicketBAI
-                </span>
+                <div class="historical-sale-detail__ticketbai-status-text">
+                    <span>
+                        Incidencia TicketBAI
+                    </span>
+
+                    @if (detalle().ticketBaiUltimoError !== null) {
+                    <small>
+                        {{ detalle().ticketBaiUltimoError }}
+                    </small>
+                    }
+                </div>
             </div>
             }
             }

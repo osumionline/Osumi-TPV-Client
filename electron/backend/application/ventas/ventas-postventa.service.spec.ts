@@ -275,6 +275,7 @@ function createDetalleRecord(
     facturada: false,
     tieneLineasPositivas: true,
     ticketBaiEstado: 'no_aplica',
+    ticketBaiUltimoError: null,
     tieneIncidenciaTicketBai: false,
     puedeProcesarTicketBai: false,
     puedeComprobarTicketBai: false,

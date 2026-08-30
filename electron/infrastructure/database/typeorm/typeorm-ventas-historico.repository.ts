@@ -61,6 +61,7 @@ interface VentaHistoricoDetalleDatabaseRow {
   readonly facturada: number;
   readonly tiene_lineas_positivas: number;
   readonly ticketbai_estado: VentaTicketBaiEstado | null;
+  readonly ticketbai_ultimo_error: string | null;
 }
 
 interface VentaHistoricoPagoDatabaseRow {
@@ -191,7 +192,8 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
             ) THEN 1
             ELSE 0
           END AS tiene_lineas_positivas,
-          vtb.estado AS ticketbai_estado
+          vtb.estado AS ticketbai_estado,
+          vtb.ultimo_error AS ticketbai_ultimo_error
         FROM venta v
 
         INNER JOIN empleado e
@@ -266,6 +268,7 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
       facturada: row.facturada === 1,
       tieneLineasPositivas: row.tiene_lineas_positivas === 1,
       ticketBaiEstado,
+      ticketBaiUltimoError: row.ticketbai_ultimo_error,
       tieneIncidenciaTicketBai: ticketBaiEstado === 'incidencia',
       puedeProcesarTicketBai,
       puedeComprobarTicketBai,

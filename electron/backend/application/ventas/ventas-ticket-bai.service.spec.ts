@@ -80,6 +80,37 @@ describe('VentasTicketBaiService', (): void => {
     expect(repository.record?.huella).toBe('HUELLA-TBAI');
   });
 
+  it('continúa un pendiente local usando la identidad fiscal congelada', async (): Promise<void> => {
+    const request: TicketBaiCreateInvoiceRequest = new VentaTicketBaiMapper().map(createTicket());
+
+    repository.record = {
+      ...createTicketBaiRecord(15, 'pendiente'),
+      entorno: 'test',
+      nifEmisor: 'B87654321',
+      serie: 'TPV01',
+      numero: '000015',
+      solicitudPayload: JSON.stringify(request),
+    };
+
+    /*
+     * Simulamos que desde que se congeló la venta
+     * la configuración general ya no está disponible.
+     */
+    configurationService.appData = null;
+
+    await service.processInitial(15);
+
+    expect(client.calls).toBe(1);
+    expect(client.lastConfiguration).toEqual({
+      token: 'ticketbai-token',
+      issuerNif: 'B87654321',
+      environment: 'test',
+    });
+    expect(client.lastRequest).toEqual(request);
+    expect(repository.record?.estado).toBe('aceptada');
+    expect(repository.record?.intentos).toBe(1);
+  });
+
   it('persiste un PENDING remoto y no vuelve a enviarlo automáticamente', async (): Promise<void> => {
     client.status = 'pending';
 

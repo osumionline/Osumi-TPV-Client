@@ -649,6 +649,118 @@ describe('TypeOrmVentasTicketBaiRepository', (): void => {
       ticket_pdf_revision: 0,
     });
   });
+
+  it('invalida el documento cuando un artefacto rechazado vuelve a ser visible al aceptar', async (): Promise<void> => {
+    const currentRepository = requireRepository();
+
+    await currentRepository.initializePending(createPendingCommand());
+    await currentRepository.beginInitialAttempt(1);
+    await currentRepository.markRemotePending({
+      idVenta: 1,
+      huella: 'HUELLA-RECUPERADA',
+      qr: 'QR-RECUPERADO',
+      url: 'https://example.test/tbai/recuperada',
+      respuestaPayload: '{"result":"PENDING"}',
+    });
+
+    expect(await readVentaRevision()).toEqual({
+      ticket_revision: 2,
+      ticket_pdf_revision: 0,
+    });
+
+    await currentRepository.markReconciledRejected({
+      idVenta: 1,
+      huella: 'HUELLA-RECUPERADA',
+      qr: 'QR-RECUPERADO',
+      url: 'https://example.test/tbai/recuperada',
+      ultimoError: 'TicketBaiWS informa que la factura se encuentra en estado ERROR.',
+      respuestaPayload: '{"result":"OK","return":{"status":"ERROR"}}',
+    });
+
+    expect(await readVentaRevision()).toEqual({
+      ticket_revision: 3,
+      ticket_pdf_revision: 0,
+    });
+
+    const attempt: VentaTicketBaiRecord | null = await currentRepository.beginManualAttempt(1);
+
+    expect(attempt?.estado).toBe('enviando');
+
+    await currentRepository.markAttemptAcknowledged({
+      idVenta: 1,
+      respuestaPayload: '{"result":"OK","return":{}}',
+    });
+
+    const accepted: VentaTicketBaiRecord = await currentRepository.markAccepted({
+      idVenta: 1,
+      huella: 'HUELLA-RECUPERADA',
+      qr: 'QR-RECUPERADO',
+      url: 'https://example.test/tbai/recuperada',
+      respuestaPayload: '{"result":"OK","return":{"status":"OK"}}',
+    });
+
+    expect(accepted.estado).toBe('aceptada');
+
+    expect(await readVentaRevision()).toEqual({
+      ticket_revision: 4,
+      ticket_pdf_revision: 0,
+    });
+
+    const ticketsRepository = new TypeOrmVentasTicketsRepository(requireDatabase());
+    const ticket = await ticketsRepository.findByVentaId(1);
+
+    expect(ticket?.ticketBai).not.toBeNull();
+  });
+
+  it('invalida el documento cuando un artefacto rechazado vuelve a ser visible como PENDING', async (): Promise<void> => {
+    const currentRepository = requireRepository();
+
+    await currentRepository.initializePending(createPendingCommand());
+    await currentRepository.beginInitialAttempt(1);
+    await currentRepository.markRemotePending({
+      idVenta: 1,
+      huella: 'HUELLA-RECUPERADA',
+      qr: 'QR-RECUPERADO',
+      url: 'https://example.test/tbai/recuperada',
+      respuestaPayload: '{"result":"PENDING"}',
+    });
+
+    await currentRepository.markReconciledRejected({
+      idVenta: 1,
+      huella: 'HUELLA-RECUPERADA',
+      qr: 'QR-RECUPERADO',
+      url: 'https://example.test/tbai/recuperada',
+      ultimoError: 'TicketBaiWS informa que la factura se encuentra en estado ERROR.',
+      respuestaPayload: '{"result":"OK","return":{"status":"ERROR"}}',
+    });
+
+    expect(await readVentaRevision()).toEqual({
+      ticket_revision: 3,
+      ticket_pdf_revision: 0,
+    });
+
+    await currentRepository.beginManualAttempt(1);
+
+    const pending: VentaTicketBaiRecord = await currentRepository.markRemotePending({
+      idVenta: 1,
+      huella: 'HUELLA-RECUPERADA',
+      qr: 'QR-RECUPERADO',
+      url: 'https://example.test/tbai/recuperada',
+      respuestaPayload: '{"result":"OK","return":{"status":"PENDING"}}',
+    });
+
+    expect(pending.estado).toBe('pendiente_remoto');
+
+    expect(await readVentaRevision()).toEqual({
+      ticket_revision: 4,
+      ticket_pdf_revision: 0,
+    });
+
+    const ticketsRepository = new TypeOrmVentasTicketsRepository(requireDatabase());
+    const ticket = await ticketsRepository.findByVentaId(1);
+
+    expect(ticket?.ticketBai).not.toBeNull();
+  });
 });
 
 /**

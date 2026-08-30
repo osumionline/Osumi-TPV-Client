@@ -348,8 +348,8 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
    * Persiste un PENDING remoto que ya contiene
    * huella, QR y URL fiscales.
    *
-   * La revisión documental solo cambia cuando
-   * aparece o cambia el artefacto fiscal.
+   * La revisión documental cambia cuando el bloque
+   * fiscal aparece o cuando cambia su artefacto.
    */
   async markRemotePending(
     command: MarkVentaTicketBaiRemotePendingRecordCommand,
@@ -378,7 +378,8 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
           );
         }
 
-        const fiscalArtifactChanged: boolean = !this.hasSameFiscalArtifact(current, command);
+        const fiscalDocumentChanged: boolean =
+          current.estado !== 'pendiente_remoto' || !this.hasSameFiscalArtifact(current, command);
 
         await queryRunner.query(
           `
@@ -418,7 +419,7 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
           );
         }
 
-        if (fiscalArtifactChanged) {
+        if (fiscalDocumentChanged) {
           await this.incrementTicketRevision(queryRunner, command.idVenta, timestamp);
         }
 
@@ -429,7 +430,7 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
 
   /**
    * Confirma una aceptación remota y actualiza la
-   * revisión documental solo si cambia el artefacto fiscal.
+   * revisión si aparece o cambia el bloque fiscal.
    */
   async markAccepted(
     command: MarkVentaTicketBaiAcceptedRecordCommand,
@@ -459,7 +460,8 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
           );
         }
 
-        const fiscalArtifactChanged: boolean = !this.hasSameFiscalArtifact(current, command);
+        const fiscalDocumentChanged: boolean =
+          current.estado !== 'pendiente_remoto' || !this.hasSameFiscalArtifact(current, command);
 
         await queryRunner.query(
           `
@@ -509,7 +511,7 @@ export default class TypeOrmVentasTicketBaiRepository implements VentasTicketBai
           );
         }
 
-        if (fiscalArtifactChanged) {
+        if (fiscalDocumentChanged) {
           await this.incrementTicketRevision(queryRunner, command.idVenta, timestamp);
         }
 

@@ -184,6 +184,7 @@ describe('VentasHistoricoService', (): void => {
       facturada: false,
       tieneLineasPositivas: true,
       ticketBaiEstado: 'incidencia',
+      ticketBaiUltimoError: 'TicketBAI ha rechazado la factura.',
       tieneIncidenciaTicketBai: true,
       puedeProcesarTicketBai: false,
       puedeComprobarTicketBai: false,
@@ -245,6 +246,7 @@ describe('VentasHistoricoService', (): void => {
       totalUnidades: 2,
       totalDescuentoMicros: 3_000_000,
       ticketBaiEstado: 'incidencia',
+      ticketBaiUltimoError: 'TicketBAI ha rechazado la factura.',
       capacidades: {
         puedeCambiarCliente: true,
         puedeCambiarTipoPago: true,
@@ -301,6 +303,7 @@ describe('VentasHistoricoService', (): void => {
       facturada: true,
       tieneLineasPositivas: false,
       ticketBaiEstado: 'no_aplica',
+      ticketBaiUltimoError: null,
       tieneIncidenciaTicketBai: false,
       puedeProcesarTicketBai: false,
       puedeComprobarTicketBai: false,

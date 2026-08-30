@@ -46,6 +46,19 @@
     }
 }
 
+.historical-sale-detail__ticketbai-status-text {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+
+    small {
+        max-width: 520px;
+        font-weight: 400;
+        line-height: 1.25;
+    }
+}
+
 .historical-sale-detail__sale-reference {
     display: flex;
     min-width: 0;

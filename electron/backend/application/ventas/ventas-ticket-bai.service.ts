@@ -64,30 +64,32 @@ export default class VentasTicketBaiService {
       return;
     }
 
-    const appData: AppData | null = await this.configurationService.load();
+    let issuerNif: string;
+    let environment: TicketBaiClientConfiguration['environment'];
 
-    if (appData === null) {
-      throw new Error('No se ha podido obtener la configuración para TicketBAI.');
-    }
+    if (existing === null) {
+      const appData: AppData | null = await this.configurationService.load();
 
-    const ticketBaiConfig: TicketBaiConfig | null = appData.ticketBai;
-
-    if (ticketBaiConfig === null) {
-      if (existing !== null) {
-        throw new Error(
-          [
-            'La venta tiene un envío TicketBAI pendiente,',
-            'pero TicketBAI ya no está configurado.',
-          ].join(' '),
-        );
+      if (appData === null) {
+        throw new Error('No se ha podido obtener la configuración para TicketBAI.');
       }
 
-      await this.repository.initializeNoAplica(idVenta);
+      const ticketBaiConfig: TicketBaiConfig | null = appData.ticketBai;
 
-      return;
+      if (ticketBaiConfig === null) {
+        await this.repository.initializeNoAplica(idVenta);
+        return;
+      }
+
+      issuerNif = this.requireIssuerNif(ticketBaiConfig);
+      environment = ticketBaiConfig.environment;
+    } else {
+      issuerNif = this.requireFrozenText(
+        existing.nifEmisor,
+        'El NIF emisor TicketBAI de la venta no está disponible.',
+      );
+      environment = this.requireFrozenEnvironment(existing);
     }
-
-    const issuerNif: string = this.requireIssuerNif(ticketBaiConfig);
 
     const token: string = await this.requireToken();
 
@@ -109,7 +111,7 @@ export default class VentasTicketBaiService {
 
     const pending: VentaTicketBaiRecord = await this.repository.initializePending({
       idVenta,
-      entorno: ticketBaiConfig.environment,
+      entorno: environment,
       nifEmisor: issuerNif,
       serie: request.serie,
       numero: request.numero,
@@ -138,7 +140,7 @@ export default class VentasTicketBaiService {
         {
           token,
           issuerNif,
-          environment: ticketBaiConfig.environment,
+          environment,
         },
         request,
       );

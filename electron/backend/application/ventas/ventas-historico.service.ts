@@ -187,6 +187,7 @@ export default class VentasHistoricoService {
       totalUnidades,
       totalDescuentoMicros,
       ticketBaiEstado: record.ticketBaiEstado,
+      ticketBaiUltimoError: record.ticketBaiUltimoError,
       capacidades: {
         puedeCambiarCliente: !record.facturada,
         puedeCambiarTipoPago:

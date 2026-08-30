@@ -100,5 +100,6 @@ export interface VentaHistoricoDetalle {
   readonly totalUnidades: number;
   readonly totalDescuentoMicros: number;
   readonly ticketBaiEstado: VentaHistoricoTicketBaiEstado;
+  readonly ticketBaiUltimoError: string | null;
   readonly capacidades: VentaHistoricoCapacidades;
 }
