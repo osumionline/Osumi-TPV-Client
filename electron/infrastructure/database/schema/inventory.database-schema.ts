@@ -36,8 +36,6 @@ const statements: readonly string[] = [
             BETWEEN 1 AND 200
         ),
 
-      id_categoria INTEGER,
-
       /*
        * Todos los artículos deben tener una marca.
        * Cuando no proceda se utilizará una marca
@@ -226,16 +224,6 @@ const statements: readonly string[] = [
         OR stock_max >= stock_min
       ),
 
-      CONSTRAINT fk_articulo_categoria
-        FOREIGN KEY (
-          id_categoria
-        )
-        REFERENCES categoria (
-          id
-        )
-        ON DELETE SET NULL
-        ON UPDATE CASCADE,
-
       CONSTRAINT fk_articulo_marca
         FOREIGN KEY (
           id_marca
@@ -393,13 +381,6 @@ const statements: readonly string[] = [
   `,
 
   `
-    CREATE INDEX idx_articulo_categoria
-    ON articulo (
-      id_categoria
-    )
-  `,
-
-  `
     CREATE INDEX idx_articulo_marca
     ON articulo (
       id_marca
@@ -437,6 +418,51 @@ const statements: readonly string[] = [
     WHERE
       fecha_caducidad IS NOT NULL
       AND deleted_at IS NULL
+  `,
+
+  `
+    CREATE TABLE articulo_categoria (
+      id_articulo INTEGER NOT NULL,
+      id_categoria INTEGER NOT NULL,
+
+      created_at TEXT NOT NULL
+        DEFAULT (${SQLITE_TIMESTAMP_DEFAULT}),
+
+      updated_at TEXT NOT NULL
+        DEFAULT (${SQLITE_TIMESTAMP_DEFAULT}),
+
+      PRIMARY KEY (
+        id_articulo,
+        id_categoria
+      ),
+
+      CONSTRAINT fk_articulo_categoria_articulo
+        FOREIGN KEY (
+          id_articulo
+        )
+        REFERENCES articulo (
+          id
+        )
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+
+      CONSTRAINT fk_articulo_categoria_categoria
+        FOREIGN KEY (
+          id_categoria
+        )
+        REFERENCES categoria (
+          id
+        )
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+    ) STRICT
+  `,
+
+  `
+    CREATE INDEX idx_articulo_categoria_categoria
+    ON articulo_categoria (
+      id_categoria
+    )
   `,
 
   `

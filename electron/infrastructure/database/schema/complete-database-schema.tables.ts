@@ -19,8 +19,8 @@ const completeDatabaseSchemaTables: readonly string[] = [
   'proveedor',
   'comercial',
   'proveedor_marca',
-
   'articulo',
+  'articulo_categoria',
   'codigo_barras',
   'etiqueta',
   'articulo_etiqueta',

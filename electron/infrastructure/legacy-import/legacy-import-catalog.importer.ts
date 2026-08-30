@@ -67,9 +67,7 @@ export default class LegacyImportCatalogImporter implements LegacyImportPhaseImp
 
     try {
       const categoryIds: ReadonlySet<number> = await this.readIdSet(queryRunner, 'categoria');
-
       const brandIds: Set<number> = await this.readIdSet(queryRunner, 'marca');
-
       const providerIds: ReadonlySet<number> = await this.readIdSet(queryRunner, 'proveedor');
 
       const fallbackBrandId: number | null = await this.resolveFallbackBrandId(
@@ -115,6 +113,7 @@ export default class LegacyImportCatalogImporter implements LegacyImportPhaseImp
       );
 
       await this.insertArticles(queryRunner, normalizedCatalog.articles);
+      await this.insertArticleCategories(queryRunner, normalizedCatalog.articles);
 
       this.reportProgress(
         command,
@@ -189,7 +188,6 @@ export default class LegacyImportCatalogImporter implements LegacyImportPhaseImp
             localizador,
             nombre,
             slug,
-            id_categoria,
             id_marca,
             id_proveedor,
             referencia,
@@ -250,7 +248,6 @@ export default class LegacyImportCatalogImporter implements LegacyImportPhaseImp
             ?,
             ?,
             ?,
-            ?,
             ?
           )
         `,
@@ -260,7 +257,6 @@ export default class LegacyImportCatalogImporter implements LegacyImportPhaseImp
           article.locator,
           article.name,
           article.slug,
-          article.categoryId,
           article.brandId,
           article.providerId,
           article.reference,
@@ -289,6 +285,39 @@ export default class LegacyImportCatalogImporter implements LegacyImportPhaseImp
           article.updatedAt,
           article.deletedAt,
         ],
+      );
+    }
+  }
+
+  /**
+   * Convierte la categoría única del artículo legacy
+   * en una relación del nuevo modelo N:M.
+   */
+  private async insertArticleCategories(
+    queryRunner: QueryRunner,
+    articles: readonly LegacyImportNormalizedArticle[],
+  ): Promise<void> {
+    for (const article of articles) {
+      if (article.categoryId === null) {
+        continue;
+      }
+
+      await queryRunner.query(
+        `
+          INSERT INTO articulo_categoria (
+            id_articulo,
+            id_categoria,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            ?,
+            ?,
+            ?,
+            ?
+          )
+        `,
+        [article.id, article.categoryId, article.createdAt, article.updatedAt],
       );
     }
   }
