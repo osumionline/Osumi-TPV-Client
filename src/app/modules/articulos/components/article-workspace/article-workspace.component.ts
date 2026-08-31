@@ -1,7 +1,11 @@
 import { Component, input, output, type InputSignal, type OutputEmitterRef } from '@angular/core';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
+import type { ArticuloDraftPatch } from '@model/articulos/articulo-draft.interface';
+import type ArticuloWorkspaceSection from '@model/articulos/articulo-workspace-section.type';
 import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.interface';
+import ArticleGeneralComponent from '@modules/articulos/components/article-general/article-general.component';
+import ArticleSectionTabsComponent from '@modules/articulos/components/article-section-tabs/article-section-tabs.component';
 
 /**
  * Muestra la cabecera operativa de una ficha de artículo.
@@ -10,19 +14,27 @@ import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.i
   selector: 'otpv-article-workspace',
   templateUrl: './article-workspace.component.html',
   styleUrl: './article-workspace.component.scss',
-  imports: [MatIcon, MatTooltip],
+  imports: [ArticleGeneralComponent, ArticleSectionTabsComponent, MatIcon, MatTooltip],
 })
 export default class ArticleWorkspaceComponent {
   readonly tab: InputSignal<ArticuloWorkspaceTab> = input.required<ArticuloWorkspaceTab>();
   readonly searching: InputSignal<boolean> = input<boolean>(false);
+
   readonly resolveCodeEvent: OutputEmitterRef<string> = output<string>();
   readonly searchEvent: OutputEmitterRef<string> = output<string>();
-  readonly nameChangeEvent: OutputEmitterRef<{
+  readonly draftChangeEvent: OutputEmitterRef<{
     readonly idTemporal: string;
-    readonly nombre: string;
+    readonly patch: ArticuloDraftPatch;
   }> = output<{
     readonly idTemporal: string;
-    readonly nombre: string;
+    readonly patch: ArticuloDraftPatch;
+  }>();
+  readonly sectionChangeEvent: OutputEmitterRef<{
+    readonly idTemporal: string;
+    readonly section: ArticuloWorkspaceSection;
+  }> = output<{
+    readonly idTemporal: string;
+    readonly section: ArticuloWorkspaceSection;
   }>();
 
   /**
@@ -85,9 +97,28 @@ export default class ArticleWorkspaceComponent {
   onNameInput(event: Event): void {
     const inputElement: HTMLInputElement = event.target as HTMLInputElement;
 
-    this.nameChangeEvent.emit({
-      idTemporal: this.tab().idTemporal,
+    this.emitDraftChange({
       nombre: inputElement.value,
+    });
+  }
+
+  /**
+   * Propaga una modificación del draft a la página propietaria del workspace.
+   */
+  emitDraftChange(patch: ArticuloDraftPatch): void {
+    this.draftChangeEvent.emit({
+      idTemporal: this.tab().idTemporal,
+      patch,
+    });
+  }
+
+  /**
+   * Propaga un cambio de sección interna.
+   */
+  selectSection(section: ArticuloWorkspaceSection): void {
+    this.sectionChangeEvent.emit({
+      idTemporal: this.tab().idTemporal,
+      section,
     });
   }
 

@@ -38,6 +38,27 @@
         </label>
     </header>
 
+    <otpv-article-section-tabs [tab]="tab()"
+                               (selectSectionEvent)="selectSection($event)" />
+
     <div class="article-workspace__body">
+        @switch (tab().activeSection) {
+        @case ('general') {
+        <otpv-article-general [tab]="tab()"
+                              (draftChangeEvent)="emitDraftChange($event)" />
+        }
+
+        @case ('web') {
+        <div class="article-workspace__pending">
+            Configuración WEB pendiente.
+        </div>
+        }
+
+        @default {
+        <div class="article-workspace__pending">
+            Este apartado se implementará en su siguiente bloque.
+        </div>
+        }
+        }
     </div>
 </section>

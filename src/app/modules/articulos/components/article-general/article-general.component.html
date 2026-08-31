@@ -1,0 +1,180 @@
+<section class="general">
+    @if (loading()) {
+    <div class="general__state">
+        Cargando datos generales…
+    </div>
+    } @else if (loadError() !== null) {
+    <div class="general__state general__state--error">
+        <p>
+            {{ loadError() }}
+        </p>
+
+        <button mat-stroked-button
+                type="button"
+                (click)="retry()">
+            Reintentar
+        </button>
+    </div>
+    } @else {
+    <div class="general__grid">
+        <label class="general__field">
+            <span>
+                Marca *
+            </span>
+
+            <select (change)="onMarcaChange($event)">
+                <option value=""
+                        [selected]="tab().draft.idMarca === null">
+                    Selecciona una marca
+                </option>
+
+                @for (marca of marcasService.marcas(); track marca.id) {
+                @if (marca.id !== null) {
+                <option [value]="marca.id"
+                        [selected]="marca.id === tab().draft.idMarca">
+                    {{ marca.nombre }}
+                </option>
+                }
+                }
+            </select>
+        </label>
+
+        <label class="general__field">
+            <span>
+                Proveedor
+            </span>
+
+            <select (change)="onProveedorChange($event)">
+                <option value=""
+                        [selected]="tab().draft.idProveedor === null">
+                    Sin proveedor
+                </option>
+
+                @for (proveedor of proveedoresService.proveedores(); track proveedor.id) {
+                @if (proveedor.id !== null) {
+                <option [value]="proveedor.id"
+                        [selected]="proveedor.id === tab().draft.idProveedor">
+                    {{ proveedor.nombre }}
+                </option>
+                }
+                }
+            </select>
+        </label>
+
+        <label class="general__field">
+            <span>
+                Referencia
+            </span>
+
+            <input type="text"
+                   autocomplete="off"
+                   [value]="tab().draft.referencia"
+                   (input)="onReferenciaInput($event)">
+        </label>
+
+        <label class="general__field">
+            <span>
+                Acceso directo
+            </span>
+
+            <input type="number"
+                   min="1"
+                   step="1"
+                   [value]="tab().draft.accesoDirecto ?? ''"
+                   (change)="onAccesoDirectoChange($event)">
+        </label>
+
+        <div class="general__field general__field--categories">
+            <span>
+                Categorías
+            </span>
+
+            <div class="general__categories">
+                @for (categoria of categoriasService.categoriasPlain(); track categoria.id) {
+                @if (categoria.id !== null) {
+                <label class="general__category"
+                       [style.padding-left.px]="getCategoriaIndent(categoria)">
+                    <input type="checkbox"
+                           [checked]="isCategoriaSelected(categoria)"
+                           (change)="onCategoriaChange($event, categoria.id)">
+
+                    <span>
+                        {{ categoria.nombre }}
+                    </span>
+                </label>
+                }
+                } @empty {
+                <span class="general__empty">
+                    No hay categorías disponibles.
+                </span>
+                }
+            </div>
+        </div>
+
+        <label class="general__toggle">
+            <input type="checkbox"
+                   [checked]="tab().draft.ventaOnline"
+                   (change)="onVentaOnlineChange($event)">
+
+            <span>
+                Venta online
+            </span>
+        </label>
+    </div>
+
+    <section class="general__stock">
+        <h3>
+            Stock y planificación
+        </h3>
+
+        <div class="general__stock-grid">
+            <label class="general__field">
+                <span>
+                    Stock
+                </span>
+
+                <input type="number"
+                       step="1"
+                       [value]="tab().draft.stock"
+                       (change)="onIntegerChange($event, 'stock', false)">
+            </label>
+
+            <label class="general__field">
+                <span>
+                    Stock mínimo
+                </span>
+
+                <input type="number"
+                       min="0"
+                       step="1"
+                       [value]="tab().draft.stockMin"
+                       (change)="onIntegerChange($event, 'stockMin', true)">
+            </label>
+
+            <label class="general__field">
+                <span>
+                    Stock máximo
+                </span>
+
+                <input type="number"
+                       min="0"
+                       step="1"
+                       [value]="tab().draft.stockMax"
+                       (change)="onIntegerChange($event, 'stockMax', true)">
+            </label>
+
+            <label class="general__field">
+                <span>
+                    Lote óptimo
+                </span>
+
+                <input type="number"
+                       min="0"
+                       step="1"
+                       [value]="tab().draft.loteOptimo"
+                       (change)="onIntegerChange($event, 'loteOptimo', true)">
+            </label>
+        </div>
+    </section>
+    }
+</section>

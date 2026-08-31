@@ -8,6 +8,8 @@ import {
 } from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import HeaderComponent from '@app/components/header/header.component';
+import type { ArticuloDraftPatch } from '@model/articulos/articulo-draft.interface';
+import type ArticuloWorkspaceSection from '@model/articulos/articulo-workspace-section.type';
 import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.interface';
 import type ArticuloVenta from '@model/ventas/articulo-venta.model';
 import ArticleWorkspaceComponent from '@modules/articulos/components/article-workspace/article-workspace.component';
@@ -61,12 +63,23 @@ export default class ArticlesComponent {
   }
 
   /**
-   * Actualiza el nombre editable de una ficha.
+   * Aplica una modificación al draft de una ficha abierta.
    */
-  updateArticleName(change: { readonly idTemporal: string; readonly nombre: string }): void {
-    this.articulosService.actualizarDraft(change.idTemporal, {
-      nombre: change.nombre,
-    });
+  updateArticleDraft(change: {
+    readonly idTemporal: string;
+    readonly patch: ArticuloDraftPatch;
+  }): void {
+    this.articulosService.actualizarDraft(change.idTemporal, change.patch);
+  }
+
+  /**
+   * Cambia la sección interna de una ficha.
+   */
+  selectArticleSection(change: {
+    readonly idTemporal: string;
+    readonly section: ArticuloWorkspaceSection;
+  }): void {
+    this.articulosService.seleccionarSeccion(change.idTemporal, change.section);
   }
 
   /**

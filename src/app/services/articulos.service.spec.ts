@@ -146,6 +146,44 @@ describe('ArticulosService', (): void => {
     expect(reopened.idTemporal).toBe(tab.idTemporal);
     expect(service.tabs()).toHaveLength(1);
   });
+
+  it('keeps an independent active section for each article tab', (): void => {
+    const first: ArticuloWorkspaceTab = service.crearBorrador();
+    const second: ArticuloWorkspaceTab = service.crearBorrador();
+
+    service.seleccionarSeccion(first.idTemporal, 'history');
+    service.seleccionarSeccion(second.idTemporal, 'notes');
+
+    expect(
+      service
+        .tabs()
+        .find((tab: ArticuloWorkspaceTab): boolean => tab.idTemporal === first.idTemporal)
+        ?.activeSection,
+    ).toBe('history');
+    expect(
+      service
+        .tabs()
+        .find((tab: ArticuloWorkspaceTab): boolean => tab.idTemporal === second.idTemporal)
+        ?.activeSection,
+    ).toBe('notes');
+  });
+
+  it('returns to general when online sale is disabled while WEB is active', (): void => {
+    const tab: ArticuloWorkspaceTab = service.abrirArticulo(
+      createArticulo({
+        ventaOnline: true,
+      }),
+    );
+
+    service.seleccionarSeccion(tab.idTemporal, 'web');
+
+    const updated: ArticuloWorkspaceTab = service.actualizarDraft(tab.idTemporal, {
+      ventaOnline: false,
+    });
+
+    expect(updated.activeSection).toBe('general');
+    expect(updated.draft.ventaOnline).toBe(false);
+  });
 });
 
 function createArticulo(overrides: Partial<ArticuloInterface> = {}): ArticuloInterface {

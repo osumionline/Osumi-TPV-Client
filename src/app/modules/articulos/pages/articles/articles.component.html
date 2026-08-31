@@ -14,7 +14,8 @@
                                 [searching]="searching()"
                                 (resolveCodeEvent)="resolveArticleCode($event)"
                                 (searchEvent)="openSearch($event)"
-                                (nameChangeEvent)="updateArticleName($event)" />
+                                (draftChangeEvent)="updateArticleDraft($event)"
+                                (sectionChangeEvent)="selectArticleSection($event)" />
     </section>
     } @else {
     <section class="articles__state">

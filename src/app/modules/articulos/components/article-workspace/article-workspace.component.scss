@@ -81,5 +81,14 @@
     .article-workspace__body {
         min-height: 0;
         flex: 1;
+        overflow-y: auto;
+    }
+
+    .article-workspace__pending {
+        display: grid;
+        height: 100%;
+        min-height: 180px;
+        place-items: center;
+        opacity: 0.6;
     }
 }

@@ -8,6 +8,7 @@ import {
   createArticuloDraftFromInterface,
   createEmptyArticuloDraft,
 } from '@model/articulos/articulo-draft.utils';
+import type ArticuloWorkspaceSection from '@model/articulos/articulo-workspace-section.type';
 import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.interface';
 
 /**
@@ -45,6 +46,7 @@ export default class ArticulosService {
       draft,
       baseSnapshot: cloneArticuloDraft(draft),
       dirty: false,
+      activeSection: 'general',
     };
 
     this.tabsSignal.update(
@@ -112,6 +114,7 @@ export default class ArticulosService {
       draft,
       baseSnapshot: cloneArticuloDraft(draft),
       dirty: false,
+      activeSection: 'general',
     };
 
     this.tabsSignal.update(
@@ -131,6 +134,26 @@ export default class ArticulosService {
     }
 
     this.activeTabIdSignal.set(idTemporal);
+  }
+
+  /**
+   * Cambia la sección interna activa de una ficha.
+   */
+  seleccionarSeccion(idTemporal: string, section: ArticuloWorkspaceSection): ArticuloWorkspaceTab {
+    const tab: ArticuloWorkspaceTab = this.requireTab(idTemporal);
+
+    if (section === 'web' && !tab.draft.ventaOnline) {
+      throw new Error('La sección WEB solo está disponible para artículos con venta online.');
+    }
+
+    const updatedTab: ArticuloWorkspaceTab = {
+      ...tab,
+      activeSection: section,
+    };
+
+    this.replaceTab(updatedTab);
+
+    return updatedTab;
   }
 
   /**
@@ -176,6 +199,8 @@ export default class ArticulosService {
       ...tab,
       draft,
       dirty: !areArticuloDraftsEqual(draft, tab.baseSnapshot),
+      activeSection:
+        tab.activeSection === 'web' && !draft.ventaOnline ? 'general' : tab.activeSection,
     };
 
     this.replaceTab(updatedTab);
@@ -188,10 +213,13 @@ export default class ArticulosService {
    */
   cancelarCambios(idTemporal: string): ArticuloWorkspaceTab {
     const tab: ArticuloWorkspaceTab = this.requireTab(idTemporal);
+    const draft: ArticuloDraft = cloneArticuloDraft(tab.baseSnapshot);
     const updatedTab: ArticuloWorkspaceTab = {
       ...tab,
-      draft: cloneArticuloDraft(tab.baseSnapshot),
+      draft,
       dirty: false,
+      activeSection:
+        tab.activeSection === 'web' && !draft.ventaOnline ? 'general' : tab.activeSection,
     };
 
     this.replaceTab(updatedTab);
@@ -217,6 +245,8 @@ export default class ArticulosService {
       draft,
       baseSnapshot: cloneArticuloDraft(draft),
       dirty: false,
+      activeSection:
+        tab.activeSection === 'web' && !draft.ventaOnline ? 'general' : tab.activeSection,
     };
 
     this.replaceTab(updatedTab);
