@@ -43,6 +43,7 @@ import type ReservasRepository from '@backend/contracts/reservas/reservas.reposi
 import type PasswordHasher from '@backend/contracts/security/password-hasher.interface';
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
+import type { ImageProcessor } from '@backend/contracts/system/image-processor.interface';
 import type { TicketBaiClient } from '@backend/contracts/ticket-bai/ticket-bai-client.interface';
 import type VentaTicketPdfStorage from '@backend/contracts/ventas/venta-ticket-pdf-storage.interface';
 import type VentasArticulosRepository from '@backend/contracts/ventas/ventas-articulos.repository.interface';
@@ -89,6 +90,7 @@ import FileInstallationStaging from '@infrastructure/filesystem/file-installatio
 import FileVentaTicketPdfStorage from '@infrastructure/filesystem/file-venta-ticket-pdf.storage';
 import JsonAppDataRepository from '@infrastructure/filesystem/json-app-data.repository';
 import JsonPrintingSettingsRepository from '@infrastructure/filesystem/json-printing-settings.repository';
+import SharpImageProcessor from '@infrastructure/filesystem/sharp-image.processor';
 import InMemoryLegacyImportSelectionStore from '@infrastructure/legacy-import/in-memory-legacy-import-selection.store';
 import MariaDbInsertParser from '@infrastructure/legacy-import/maria-db-insert.parser';
 import NodeLegacyImportRunner from '@infrastructure/legacy-import/node-legacy-import.runner';
@@ -142,7 +144,11 @@ export default function createApplicationComposition(
     applicationPaths.stagingAppDataFile,
   );
 
-  const stagingLogoStorage: LogoStorage = new ElectronLogoStorage(applicationPaths.stagingLogoFile);
+  const imageProcessor: ImageProcessor = new SharpImageProcessor();
+  const stagingLogoStorage: LogoStorage = new ElectronLogoStorage(
+    applicationPaths.stagingLogoFile,
+    imageProcessor,
+  );
 
   const stagingSecretStorage: SecretStorage = new ElectronSafeStorageSecretStorage(
     applicationPaths.stagingSecretsFile,
