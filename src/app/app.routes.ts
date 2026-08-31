@@ -27,6 +27,11 @@ const routes: Routes = [
     loadComponent: () => import('@modules/ventas/pages/sales/sales.component'),
   },
   {
+    path: 'articulos',
+    canActivate: [readyApplicationGuard],
+    loadComponent: () => import('@modules/articulos/pages/articles/articles.component'),
+  },
+  {
     path: '',
     pathMatch: 'full',
     redirectTo: 'startup',

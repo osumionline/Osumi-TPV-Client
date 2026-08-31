@@ -1,0 +1,34 @@
+<div class="tabs">
+    <div class="tabs__articles">
+        @for (tab of tabs(); track tab.idTemporal) {
+        <button class="tabs__article"
+                type="button"
+                [class.tabs__article--selected]="selectedId() === tab.idTemporal"
+                (click)="selectTab(tab.idTemporal)">
+            <span class="tabs__label">
+                {{ getTabLabel(tab) }}
+            </span>
+
+            @if (tab.dirty) {
+            <span class="tabs__dirty"
+                  matTooltip="Cambios sin guardar">
+                ●
+            </span>
+            }
+
+            <mat-icon class="tabs__close"
+                      matTooltip="Cerrar artículo"
+                      (click)="closeTab($event, tab.idTemporal)">
+                close
+            </mat-icon>
+        </button>
+        }
+
+        <button class="tabs__new"
+                type="button"
+                matTooltip="Nuevo artículo"
+                (click)="newTab()">
+            <mat-icon>add</mat-icon>
+        </button>
+    </div>
+</div>

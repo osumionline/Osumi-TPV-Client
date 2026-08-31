@@ -1,0 +1,52 @@
+<otpv-header selectedOption="articulos"
+             [appName]="appName()" />
+
+<main class="articles">
+    <otpv-articles-tabs [tabs]="articulosService.tabs()"
+                        [selectedId]="articulosService.activeTabId()"
+                        (selectTabEvent)="selectArticle($event)"
+                        (closeTabEvent)="closeArticle($event)"
+                        (newTabEvent)="newArticle()" />
+
+    @if (articulosService.activeTab(); as tab) {
+    <section class="articles__workspace">
+        <div class="articles__workspace-placeholder">
+            @if (tab.draft.id === null) {
+            <h2>
+                Artículo nuevo
+            </h2>
+
+            <p>
+                Nueva ficha todavía sin guardar.
+            </p>
+            } @else {
+            <h2>
+                {{ tab.draft.nombre || 'Artículo' }}
+            </h2>
+
+            @if (tab.draft.localizador !== null) {
+            <p>
+                Localizador {{ tab.draft.localizador }}
+            </p>
+            }
+            }
+        </div>
+    </section>
+    } @else {
+    <section class="articles__state">
+        <h2>
+            No hay ningún artículo abierto
+        </h2>
+
+        <p>
+            Abre un artículo existente o crea una nueva ficha.
+        </p>
+
+        <button mat-flat-button
+                type="button"
+                (click)="newArticle()">
+            Nuevo artículo
+        </button>
+    </section>
+    }
+</main>

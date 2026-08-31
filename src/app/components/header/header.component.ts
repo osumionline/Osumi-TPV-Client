@@ -39,7 +39,7 @@ export default class HeaderComponent {
       id: 'articulos',
       label: 'Artículos',
       icon: 'inventory_2',
-      route: null,
+      route: '/articulos',
     },
     {
       id: 'compras',
