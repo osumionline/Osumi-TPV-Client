@@ -10,6 +10,8 @@ const LOGO_PATH: string = '/logo';
 
 const FILES_PATH_PREFIX: string = '/files/';
 
+const STAGING_FILES_PATH_PREFIX: string = '/staging/';
+
 const APPLICATION_ASSETS_PATH_PREFIX: string = '/app/';
 
 export default function registerAssetsProtocol(
@@ -60,6 +62,13 @@ async function resolveAssetFilePath(
 
   if (decodedPath.startsWith(FILES_PATH_PREFIX)) {
     return resolveSafeFilePath(paths.filesDirectory, decodedPath.slice(FILES_PATH_PREFIX.length));
+  }
+
+  if (decodedPath.startsWith(STAGING_FILES_PATH_PREFIX)) {
+    return resolveSafeFilePath(
+      paths.stagingFilesDirectory,
+      decodedPath.slice(STAGING_FILES_PATH_PREFIX.length),
+    );
   }
 
   if (decodedPath.startsWith(APPLICATION_ASSETS_PATH_PREFIX)) {

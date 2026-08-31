@@ -1,6 +1,6 @@
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
 
-const FILES_PATH_PREFIX: string = 'files/';
+const ALLOWED_PATH_PREFIXES: readonly string[] = ['files/', 'staging/'];
 
 const ASSET_URL_PREFIX: string = 'osumi://assets/';
 
@@ -12,9 +12,16 @@ export default class ElectronAssetUrlBuilder implements AssetUrlBuilder {
 
     const normalizedPath: string = relativePath.replaceAll('\\', '/').replace(/^\/+/, '');
 
-    if (!normalizedPath.startsWith(FILES_PATH_PREFIX)) {
+    const allowed: boolean = ALLOWED_PATH_PREFIXES.some((prefix: string): boolean =>
+      normalizedPath.startsWith(prefix),
+    );
+
+    if (!allowed) {
       throw new Error(
-        ['La ruta del archivo no pertenece', `al directorio de assets: ${relativePath}.`].join(' '),
+        [
+          'La ruta del archivo no pertenece',
+          `al almacenamiento administrado: ${relativePath}.`,
+        ].join(' '),
       );
     }
 
