@@ -3,6 +3,13 @@ export interface ArticuloCodigoBarrasSaveInterface {
   readonly codigo: string;
 }
 
+export interface ArticuloFotoSaveInterface {
+  readonly id: number | null;
+  readonly stagingId: string | null;
+  readonly orden: number;
+  readonly principal: boolean;
+}
+
 export interface ArticuloSaveInterface {
   readonly id: number | null;
   readonly nombre: string;
@@ -31,4 +38,5 @@ export interface ArticuloSaveInterface {
   readonly mostrarObservacionesVentas: boolean;
   readonly accesoDirecto: number | null;
   readonly codigosBarrasAdicionales: readonly ArticuloCodigoBarrasSaveInterface[];
+  readonly fotos: readonly ArticuloFotoSaveInterface[];
 }

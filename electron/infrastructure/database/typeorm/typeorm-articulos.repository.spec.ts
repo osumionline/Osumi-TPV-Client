@@ -115,40 +115,7 @@ describe('TypeOrmArticulosRepository', (): void => {
   it('crea un artículo con localizador, categorías y código por defecto', async (): Promise<void> => {
     const currentRepository = requireRepository();
 
-    const command: ArticuloSaveRecord = {
-      id: null,
-      nombre: 'Nuevo artículo',
-      idMarca: 1,
-      idProveedor: 1,
-      idsCategorias: [1, 2],
-      referencia: 'NEW-001',
-      precioAlbaranMicros: 590000,
-      pucMicros: 744580,
-      pvpCents: 100,
-      pvpDescuentoCents: null,
-      ivaBps: 2100,
-      reBps: 520,
-      margenMicroporcentaje: 255420,
-      margenDescuentoMicroporcentaje: null,
-      stock: 5,
-      stockMin: 2,
-      stockMax: 20,
-      loteOptimo: 5,
-      ventaOnline: true,
-      mostrarEnWeb: false,
-      descripcionCorta: 'Descripción corta',
-      descripcionLarga: 'Descripción larga',
-      observaciones: null,
-      mostrarObservacionesPedidos: false,
-      mostrarObservacionesVentas: false,
-      accesoDirecto: 99,
-      codigosBarrasAdicionales: [
-        {
-          id: null,
-          codigo: 'EAN-NUEVO-001',
-        },
-      ],
-    };
+    const command: ArticuloSaveRecord = createNewArticleCommand();
 
     const idArticulo: number = await currentRepository.create(command);
     const articulo: ArticuloRecord | null = await currentRepository.findById(idArticulo);
@@ -389,7 +356,168 @@ describe('TypeOrmArticulosRepository', (): void => {
       'El artículo que se intenta actualizar no existe.',
     );
   });
+
+  it('crea un artículo y sus fotos dentro de la misma persistencia', async (): Promise<void> => {
+    const command: ArticuloSaveRecord = createNewArticleCommand({
+      fotos: [
+        {
+          idArchivo: null,
+          nuevoArchivo: {
+            publicId: 'new-photo-public-id',
+            purpose: 'article_image',
+            originalName: 'original.jpg',
+            internalName: 'new-photo-public-id.webp',
+            relativePath: 'files/articles/new-photo-public-id.webp',
+            mimeType: 'image/webp',
+            sizeBytes: 1234,
+            sha256: 'b'.repeat(64),
+            width: 1200,
+            height: 800,
+          },
+          orden: 0,
+          principal: true,
+        },
+      ],
+    });
+
+    const idArticulo: number = await requireRepository().create(command);
+
+    const articulo: ArticuloRecord | null = await requireRepository().findById(idArticulo);
+
+    expect(articulo?.fotos).toHaveLength(1);
+    expect(articulo?.fotos[0]).toMatchObject({
+      publicId: 'new-photo-public-id',
+      relativePath: 'files/articles/new-photo-public-id.webp',
+      mimeType: 'image/webp',
+      orden: 0,
+      principal: true,
+    });
+  });
+
+  it('sincroniza fotos existentes y nuevas al editar un artículo', async (): Promise<void> => {
+    await requireRepository().update(
+      createUpdateCommand({
+        fotos: [
+          {
+            idArchivo: 1,
+            nuevoArchivo: null,
+            orden: 1,
+            principal: false,
+          },
+          {
+            idArchivo: null,
+            nuevoArchivo: {
+              publicId: 'second-photo-public-id',
+              purpose: 'article_image',
+              originalName: 'second.png',
+              internalName: 'second-photo-public-id.webp',
+              relativePath: 'files/articles/second-photo-public-id.webp',
+              mimeType: 'image/webp',
+              sizeBytes: 2222,
+              sha256: 'c'.repeat(64),
+              width: 900,
+              height: 600,
+            },
+            orden: 0,
+            principal: true,
+          },
+        ],
+      }),
+    );
+
+    const articulo: ArticuloRecord | null = await requireRepository().findById(1);
+
+    expect(articulo?.fotos).toHaveLength(2);
+
+    expect(articulo?.fotos[0]).toMatchObject({
+      publicId: 'second-photo-public-id',
+      orden: 0,
+      principal: true,
+    });
+
+    expect(articulo?.fotos[1]).toMatchObject({
+      id: 1,
+      orden: 1,
+      principal: false,
+    });
+  });
+
+  it('rechaza más de una foto principal', async (): Promise<void> => {
+    await expect(
+      requireRepository().update(
+        createUpdateCommand({
+          fotos: [
+            {
+              idArchivo: 1,
+              nuevoArchivo: null,
+              orden: 0,
+              principal: true,
+            },
+            {
+              idArchivo: null,
+              nuevoArchivo: {
+                publicId: 'another-photo',
+                purpose: 'article_image',
+                originalName: 'another.jpg',
+                internalName: 'another-photo.webp',
+                relativePath: 'files/articles/another-photo.webp',
+                mimeType: 'image/webp',
+                sizeBytes: 100,
+                sha256: 'd'.repeat(64),
+                width: 100,
+                height: 100,
+              },
+              orden: 1,
+              principal: true,
+            },
+          ],
+        }),
+      ),
+    ).rejects.toThrow('Un artículo no puede tener más de una foto principal.');
+  });
 });
+
+/**
+ * Crea un comando de alta de artículo para los tests.
+ */
+function createNewArticleCommand(overrides: Partial<ArticuloSaveRecord> = {}): ArticuloSaveRecord {
+  return {
+    id: null,
+    nombre: 'Nuevo artículo',
+    idMarca: 1,
+    idProveedor: 1,
+    idsCategorias: [1, 2],
+    referencia: 'NEW-001',
+    precioAlbaranMicros: 590000,
+    pucMicros: 744580,
+    pvpCents: 100,
+    pvpDescuentoCents: null,
+    ivaBps: 2100,
+    reBps: 520,
+    margenMicroporcentaje: 255420,
+    margenDescuentoMicroporcentaje: null,
+    stock: 5,
+    stockMin: 2,
+    stockMax: 20,
+    loteOptimo: 5,
+    ventaOnline: true,
+    mostrarEnWeb: false,
+    descripcionCorta: 'Descripción corta',
+    descripcionLarga: 'Descripción larga',
+    observaciones: null,
+    mostrarObservacionesPedidos: false,
+    mostrarObservacionesVentas: false,
+    accesoDirecto: 99,
+    codigosBarrasAdicionales: [
+      {
+        id: null,
+        codigo: 'EAN-NUEVO-001',
+      },
+    ],
+    fotos: [],
+    ...overrides,
+  };
+}
 
 /**
  * Crea un comando de edición a partir del artículo del fixture.
@@ -428,6 +556,7 @@ function createUpdateCommand(overrides: Partial<ArticuloSaveRecord> = {}): Artic
         codigo: 'ABC-123',
       },
     ],
+    fotos: [],
     ...overrides,
   };
 }

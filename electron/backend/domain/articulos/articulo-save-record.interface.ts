@@ -1,6 +1,15 @@
+import type { ArchivoCreateRecord } from '@backend/domain/files/archivo-record.interface';
+
 export interface ArticuloCodigoBarrasSaveRecord {
   readonly id: number | null;
   readonly codigo: string;
+}
+
+export interface ArticuloFotoSaveRecord {
+  readonly idArchivo: number | null;
+  readonly nuevoArchivo: ArchivoCreateRecord | null;
+  readonly orden: number;
+  readonly principal: boolean;
 }
 
 export interface ArticuloSaveRecord {
@@ -31,4 +40,5 @@ export interface ArticuloSaveRecord {
   readonly mostrarObservacionesVentas: boolean;
   readonly accesoDirecto: number | null;
   readonly codigosBarrasAdicionales: readonly ArticuloCodigoBarrasSaveRecord[];
+  readonly fotos: readonly ArticuloFotoSaveRecord[];
 }

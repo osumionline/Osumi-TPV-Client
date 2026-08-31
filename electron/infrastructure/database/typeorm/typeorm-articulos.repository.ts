@@ -4,7 +4,10 @@ import type {
   ArticuloFotoRecord,
   ArticuloRecord,
 } from '@backend/domain/articulos/articulo-record.interface';
-import type { ArticuloSaveRecord } from '@backend/domain/articulos/articulo-save-record.interface';
+import type {
+  ArticuloFotoSaveRecord,
+  ArticuloSaveRecord,
+} from '@backend/domain/articulos/articulo-save-record.interface';
 import HISTORICO_ARTICULO_TIPO from '@backend/domain/articulos/historico-articulo.constants';
 import { MONEY_SCALE, UNIT_PRICE_SCALE } from '@backend/domain/database/database-schema.constants';
 import { generateArticuloLocalizador } from '@backend/utils/articulo-localizador.utils';
@@ -12,6 +15,12 @@ import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm
 import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
 import { randomUUID } from 'node:crypto';
 import type { DataSource, QueryRunner } from 'typeorm';
+import insertArchivo from '@infrastructure/database/typeorm/typeorm-archivo.utils';
+import type { ArchivoCreateRecord } from '@backend/domain/files/archivo-record.interface';
+
+interface ArticuloArchivoDatabaseRow {
+  readonly id_archivo: number;
+}
 
 interface ArticuloUpdateDatabaseRow {
   readonly id: number;
@@ -217,6 +226,7 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
         );
 
         await this.validateAdditionalBarcodes(queryRunner, command, localizador);
+        this.validatePhotosForCreate(command.fotos);
 
         const timestamp: string = new Date().toISOString();
         const slug: string = this.createSlug(command.nombre, localizador);
@@ -301,6 +311,8 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
 
         await this.insertAdditionalBarcodes(queryRunner, idArticulo, command, timestamp);
 
+        await this.insertPhotos(queryRunner, idArticulo, command.fotos, timestamp);
+
         return idArticulo;
       },
     );
@@ -352,6 +364,8 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
 
       await this.validateAdditionalBarcodesForUpdate(queryRunner, command, current.localizador);
 
+      await this.validatePhotosForUpdate(queryRunner, idArticulo, command.fotos);
+
       const timestamp: string = new Date().toISOString();
 
       await this.syncCategories(queryRunner, idArticulo, command.idsCategorias, timestamp);
@@ -362,6 +376,8 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
         command.codigosBarrasAdicionales,
         timestamp,
       );
+
+      await this.syncPhotos(queryRunner, idArticulo, command.fotos, timestamp);
 
       await this.requireAvailableAccessCode(queryRunner, idArticulo, command.accesoDirecto);
 
@@ -478,6 +494,330 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
         [timestamp, timestamp, idArticulo],
       );
     });
+  }
+
+  /**
+   * Valida las fotos recibidas al crear un artículo.
+   */
+  private validatePhotosForCreate(fotos: readonly ArticuloFotoSaveRecord[]): void {
+    this.validatePhotoCollection(fotos);
+
+    for (const foto of fotos) {
+      if (foto.idArchivo !== null || foto.nuevoArchivo === null) {
+        throw new Error(
+          'Un artículo nuevo solo puede guardar fotos nuevas preparadas desde staging.',
+        );
+      }
+
+      this.validateNewArticleImage(foto.nuevoArchivo);
+    }
+  }
+
+  /**
+   * Valida orden, principal y estructura de una colección de fotos.
+   */
+  private validatePhotoCollection(fotos: readonly ArticuloFotoSaveRecord[]): void {
+    let principalCount: number = 0;
+
+    for (const foto of fotos) {
+      if (!Number.isSafeInteger(foto.orden) || foto.orden < 0) {
+        throw new Error('El orden de una foto no es válido.');
+      }
+
+      const hasPersistedFile: boolean = foto.idArchivo !== null;
+      const hasNewFile: boolean = foto.nuevoArchivo !== null;
+
+      if (hasPersistedFile === hasNewFile) {
+        throw new Error(
+          'Cada foto debe referenciar un archivo persistido o un archivo nuevo, pero no ambos.',
+        );
+      }
+
+      if (foto.principal) {
+        principalCount++;
+      }
+    }
+
+    if (principalCount > 1) {
+      throw new Error('Un artículo no puede tener más de una foto principal.');
+    }
+  }
+
+  /**
+   * Comprueba que un archivo nuevo sea una imagen WebP
+   * preparada para el almacenamiento de Artículos.
+   */
+  private validateNewArticleImage(archivo: ArchivoCreateRecord): void {
+    if (
+      archivo.purpose !== 'article_image' ||
+      archivo.mimeType !== 'image/webp' ||
+      !archivo.relativePath.startsWith('files/articles/')
+    ) {
+      throw new Error('La foto nueva no pertenece al almacenamiento de imágenes de Artículos.');
+    }
+  }
+
+  /**
+   * Inserta los archivos y relaciones de las fotos
+   * pertenecientes a un artículo nuevo.
+   */
+  private async insertPhotos(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    fotos: readonly ArticuloFotoSaveRecord[],
+    timestamp: string,
+  ): Promise<void> {
+    let principalId: number | null = null;
+
+    for (const foto of fotos) {
+      if (foto.nuevoArchivo === null) {
+        throw new Error('Una foto nueva no contiene los datos de su archivo.');
+      }
+
+      const idArchivo: number = await insertArchivo(queryRunner, foto.nuevoArchivo);
+
+      await this.insertArticleImageRelation(
+        queryRunner,
+        idArticulo,
+        idArchivo,
+        foto.orden,
+        timestamp,
+      );
+
+      if (foto.principal) {
+        principalId = idArchivo;
+      }
+    }
+
+    if (principalId !== null) {
+      await this.setPrincipalPhoto(queryRunner, idArticulo, principalId, timestamp);
+    }
+  }
+
+  /**
+   * Relaciona una imagen persistida con un artículo.
+   */
+  private async insertArticleImageRelation(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    idArchivo: number,
+    orden: number,
+    timestamp: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+      INSERT INTO articulo_archivo (
+        id_articulo,
+        id_archivo,
+        tipo,
+        orden,
+        principal,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, 'imagen', ?, 0, ?, ?)
+    `,
+      [idArticulo, idArchivo, orden, timestamp, timestamp],
+    );
+  }
+
+  /**
+   * Marca una foto como principal del artículo.
+   */
+  private async setPrincipalPhoto(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    idArchivo: number,
+    timestamp: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+      UPDATE articulo_archivo
+      SET
+        principal = 1,
+        updated_at = ?
+      WHERE
+        id_articulo = ?
+        AND id_archivo = ?
+        AND tipo = 'imagen'
+    `,
+      [timestamp, idArticulo, idArchivo],
+    );
+  }
+
+  /**
+   * Valida las fotos de un artículo existente
+   * y comprueba la propiedad de las persistidas.
+   */
+  private async validatePhotosForUpdate(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    fotos: readonly ArticuloFotoSaveRecord[],
+  ): Promise<void> {
+    this.validatePhotoCollection(fotos);
+
+    const idsArchivo: Set<number> = new Set<number>();
+
+    const publicIds: Set<string> = new Set<string>();
+
+    for (const foto of fotos) {
+      if (foto.idArchivo !== null) {
+        if (idsArchivo.has(foto.idArchivo)) {
+          throw new Error('Hay fotos persistidas repetidas en el artículo.');
+        }
+
+        idsArchivo.add(foto.idArchivo);
+
+        await this.requireOwnedArticlePhoto(queryRunner, idArticulo, foto.idArchivo);
+
+        continue;
+      }
+
+      if (foto.nuevoArchivo === null) {
+        throw new Error('Una foto nueva no contiene los datos de su archivo.');
+      }
+
+      this.validateNewArticleImage(foto.nuevoArchivo);
+
+      if (publicIds.has(foto.nuevoArchivo.publicId)) {
+        throw new Error('Hay fotos nuevas repetidas en el artículo.');
+      }
+
+      publicIds.add(foto.nuevoArchivo.publicId);
+    }
+  }
+
+  /**
+   * Comprueba que una foto persistida pertenezca
+   * actualmente al artículo editado.
+   */
+  private async requireOwnedArticlePhoto(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    idArchivo: number,
+  ): Promise<void> {
+    const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+        SELECT ar.id
+        FROM articulo_archivo aa
+        INNER JOIN archivo ar
+          ON ar.id = aa.id_archivo
+        WHERE
+          aa.id_articulo = ?
+          AND aa.id_archivo = ?
+          AND aa.tipo = 'imagen'
+          AND ar.purpose = 'article_image'
+          AND ar.deleted_at IS NULL
+        LIMIT 1
+      `,
+      [idArticulo, idArchivo],
+    )) as readonly DatabaseIdRow[];
+
+    if (rows.length === 0) {
+      throw new Error('Una de las fotos no pertenece al artículo editado.');
+    }
+  }
+
+  /**
+   * Sincroniza las fotos persistidas y nuevas
+   * manteniendo orden y foto principal.
+   */
+  private async syncPhotos(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    fotos: readonly ArticuloFotoSaveRecord[],
+    timestamp: string,
+  ): Promise<void> {
+    const currentRows: readonly ArticuloArchivoDatabaseRow[] = (await queryRunner.query(
+      `
+          SELECT id_archivo
+          FROM articulo_archivo
+          WHERE
+            id_articulo = ?
+            AND tipo = 'imagen'
+        `,
+      [idArticulo],
+    )) as readonly ArticuloArchivoDatabaseRow[];
+
+    const retainedIds: Set<number> = new Set<number>(
+      fotos.flatMap((foto: ArticuloFotoSaveRecord): readonly number[] =>
+        foto.idArchivo === null ? [] : [foto.idArchivo],
+      ),
+    );
+
+    for (const current of currentRows) {
+      if (!retainedIds.has(current.id_archivo)) {
+        await queryRunner.query(
+          `
+          DELETE FROM articulo_archivo
+          WHERE
+            id_articulo = ?
+            AND id_archivo = ?
+            AND tipo = 'imagen'
+        `,
+          [idArticulo, current.id_archivo],
+        );
+      }
+    }
+
+    await queryRunner.query(
+      `
+      UPDATE articulo_archivo
+      SET
+        principal = 0,
+        updated_at = ?
+      WHERE
+        id_articulo = ?
+        AND tipo = 'imagen'
+    `,
+      [timestamp, idArticulo],
+    );
+
+    let principalId: number | null = null;
+
+    for (const foto of fotos) {
+      let idArchivo: number;
+
+      if (foto.idArchivo !== null) {
+        idArchivo = foto.idArchivo;
+
+        await queryRunner.query(
+          `
+          UPDATE articulo_archivo
+          SET
+            orden = ?,
+            updated_at = ?
+          WHERE
+            id_articulo = ?
+            AND id_archivo = ?
+            AND tipo = 'imagen'
+        `,
+          [foto.orden, timestamp, idArticulo, idArchivo],
+        );
+      } else {
+        if (foto.nuevoArchivo === null) {
+          throw new Error('Una foto nueva no contiene los datos de su archivo.');
+        }
+
+        idArchivo = await insertArchivo(queryRunner, foto.nuevoArchivo);
+
+        await this.insertArticleImageRelation(
+          queryRunner,
+          idArticulo,
+          idArchivo,
+          foto.orden,
+          timestamp,
+        );
+      }
+
+      if (foto.principal) {
+        principalId = idArchivo;
+      }
+    }
+
+    if (principalId !== null) {
+      await this.setPrincipalPhoto(queryRunner, idArticulo, principalId, timestamp);
+    }
   }
 
   /**
