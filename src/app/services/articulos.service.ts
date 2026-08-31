@@ -1,0 +1,230 @@
+import type { Signal, WritableSignal } from '@angular/core';
+import { computed, Service, signal } from '@angular/core';
+import type { ArticuloInterface } from '@desktop-contracts/articulos/articulo.interface';
+import type { ArticuloDraft, ArticuloDraftPatch } from '@model/articulos/articulo-draft.interface';
+import {
+  areArticuloDraftsEqual,
+  cloneArticuloDraft,
+  createArticuloDraftFromInterface,
+  createEmptyArticuloDraft,
+} from '@model/articulos/articulo-draft.utils';
+import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.interface';
+
+/**
+ * Mantiene las fichas de Artículos abiertas durante toda la sesión de la aplicación.
+ */
+@Service()
+export default class ArticulosService {
+  private readonly tabsSignal: WritableSignal<readonly ArticuloWorkspaceTab[]> = signal<
+    readonly ArticuloWorkspaceTab[]
+  >([]);
+  private readonly activeTabIdSignal: WritableSignal<string | null> = signal<string | null>(null);
+
+  readonly tabs: Signal<readonly ArticuloWorkspaceTab[]> = this.tabsSignal.asReadonly();
+  readonly activeTabId: Signal<string | null> = this.activeTabIdSignal.asReadonly();
+  readonly hasTabs: Signal<boolean> = computed((): boolean => this.tabs().length > 0);
+  readonly activeTab: Signal<ArticuloWorkspaceTab | null> = computed(
+    (): ArticuloWorkspaceTab | null => {
+      const activeTabId: string | null = this.activeTabId();
+
+      if (activeTabId === null) {
+        return null;
+      }
+
+      return this.findByTemporalId(activeTabId);
+    },
+  );
+
+  /**
+   * Crea una nueva ficha temporal y la convierte en la pestaña activa.
+   */
+  crearBorrador(): ArticuloWorkspaceTab {
+    const draft: ArticuloDraft = createEmptyArticuloDraft();
+    const tab: ArticuloWorkspaceTab = {
+      idTemporal: crypto.randomUUID(),
+      draft,
+      baseSnapshot: cloneArticuloDraft(draft),
+      dirty: false,
+    };
+
+    this.tabsSignal.update(
+      (tabs: readonly ArticuloWorkspaceTab[]): readonly ArticuloWorkspaceTab[] => [...tabs, tab],
+    );
+    this.activeTabIdSignal.set(tab.idTemporal);
+
+    return tab;
+  }
+
+  /**
+   * Abre un artículo persistido o activa su pestaña si ya estaba abierta.
+   */
+  abrirArticulo(articulo: ArticuloInterface): ArticuloWorkspaceTab {
+    const existingTab: ArticuloWorkspaceTab | null = this.findByArticuloId(articulo.id);
+
+    if (existingTab !== null) {
+      this.activeTabIdSignal.set(existingTab.idTemporal);
+      return existingTab;
+    }
+
+    const draft: ArticuloDraft = createArticuloDraftFromInterface(articulo);
+    const tab: ArticuloWorkspaceTab = {
+      idTemporal: crypto.randomUUID(),
+      draft,
+      baseSnapshot: cloneArticuloDraft(draft),
+      dirty: false,
+    };
+
+    this.tabsSignal.update(
+      (tabs: readonly ArticuloWorkspaceTab[]): readonly ArticuloWorkspaceTab[] => [...tabs, tab],
+    );
+    this.activeTabIdSignal.set(tab.idTemporal);
+
+    return tab;
+  }
+
+  /**
+   * Selecciona una pestaña existente.
+   */
+  seleccionarTab(idTemporal: string): void {
+    if (this.findByTemporalId(idTemporal) === null) {
+      throw new Error('No se puede seleccionar una pestaña de artículo que no está abierta.');
+    }
+
+    this.activeTabIdSignal.set(idTemporal);
+  }
+
+  /**
+   * Cierra una pestaña y selecciona la pestaña contigua cuando era la activa.
+   *
+   * La confirmación de cambios pendientes pertenece a la capa de UI.
+   */
+  cerrarTab(idTemporal: string): void {
+    const currentTabs: readonly ArticuloWorkspaceTab[] = this.tabs();
+    const index: number = currentTabs.findIndex(
+      (tab: ArticuloWorkspaceTab): boolean => tab.idTemporal === idTemporal,
+    );
+
+    if (index === -1) {
+      return;
+    }
+
+    const tabs: readonly ArticuloWorkspaceTab[] = currentTabs.filter(
+      (tab: ArticuloWorkspaceTab): boolean => tab.idTemporal !== idTemporal,
+    );
+
+    this.tabsSignal.set(tabs);
+
+    if (this.activeTabId() !== idTemporal) {
+      return;
+    }
+
+    const nextTab: ArticuloWorkspaceTab | undefined = tabs[index] ?? tabs[index - 1];
+
+    this.activeTabIdSignal.set(nextTab?.idTemporal ?? null);
+  }
+
+  /**
+   * Actualiza los campos editables de una ficha y recalcula su estado dirty.
+   */
+  actualizarDraft(idTemporal: string, patch: ArticuloDraftPatch): ArticuloWorkspaceTab {
+    const tab: ArticuloWorkspaceTab = this.requireTab(idTemporal);
+    const draft: ArticuloDraft = cloneArticuloDraft({
+      ...tab.draft,
+      ...patch,
+    });
+    const updatedTab: ArticuloWorkspaceTab = {
+      ...tab,
+      draft,
+      dirty: !areArticuloDraftsEqual(draft, tab.baseSnapshot),
+    };
+
+    this.replaceTab(updatedTab);
+
+    return updatedTab;
+  }
+
+  /**
+   * Descarta las modificaciones de una ficha y restaura su snapshot base.
+   */
+  cancelarCambios(idTemporal: string): ArticuloWorkspaceTab {
+    const tab: ArticuloWorkspaceTab = this.requireTab(idTemporal);
+    const updatedTab: ArticuloWorkspaceTab = {
+      ...tab,
+      draft: cloneArticuloDraft(tab.baseSnapshot),
+      dirty: false,
+    };
+
+    this.replaceTab(updatedTab);
+
+    return updatedTab;
+  }
+
+  /**
+   * Sustituye el contenido de una pestaña por el artículo fresco devuelto
+   * después de una persistencia correcta y establece un nuevo snapshot base.
+   */
+  reemplazarTrasGuardado(idTemporal: string, articulo: ArticuloInterface): ArticuloWorkspaceTab {
+    const tab: ArticuloWorkspaceTab = this.requireTab(idTemporal);
+    const duplicateTab: ArticuloWorkspaceTab | null = this.findByArticuloId(articulo.id);
+
+    if (duplicateTab !== null && duplicateTab.idTemporal !== idTemporal) {
+      throw new Error('El artículo guardado ya está abierto en otra pestaña.');
+    }
+
+    const draft: ArticuloDraft = createArticuloDraftFromInterface(articulo);
+    const updatedTab: ArticuloWorkspaceTab = {
+      ...tab,
+      draft,
+      baseSnapshot: cloneArticuloDraft(draft),
+      dirty: false,
+    };
+
+    this.replaceTab(updatedTab);
+
+    return updatedTab;
+  }
+
+  /**
+   * Busca la pestaña correspondiente a un artículo persistido.
+   */
+  findByArticuloId(idArticulo: number): ArticuloWorkspaceTab | null {
+    return (
+      this.tabs().find((tab: ArticuloWorkspaceTab): boolean => tab.draft.id === idArticulo) ?? null
+    );
+  }
+
+  /**
+   * Busca una pestaña mediante su identidad temporal.
+   */
+  private findByTemporalId(idTemporal: string): ArticuloWorkspaceTab | null {
+    return (
+      this.tabs().find((tab: ArticuloWorkspaceTab): boolean => tab.idTemporal === idTemporal) ??
+      null
+    );
+  }
+
+  /**
+   * Obtiene una pestaña abierta o lanza un error si no existe.
+   */
+  private requireTab(idTemporal: string): ArticuloWorkspaceTab {
+    const tab: ArticuloWorkspaceTab | null = this.findByTemporalId(idTemporal);
+
+    if (tab === null) {
+      throw new Error('La pestaña de artículo indicada no está abierta.');
+    }
+
+    return tab;
+  }
+
+  /**
+   * Sustituye una pestaña conservando su posición dentro del workspace.
+   */
+  private replaceTab(updatedTab: ArticuloWorkspaceTab): void {
+    this.tabsSignal.update(
+      (tabs: readonly ArticuloWorkspaceTab[]): readonly ArticuloWorkspaceTab[] =>
+        tabs.map((tab: ArticuloWorkspaceTab): ArticuloWorkspaceTab =>
+          tab.idTemporal === updatedTab.idTemporal ? updatedTab : tab,
+        ),
+    );
+  }
+}
