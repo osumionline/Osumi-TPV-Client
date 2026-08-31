@@ -64,6 +64,20 @@ describe('FilesystemImageStagingStorage', (): void => {
       'La ruta no pertenece al staging de imágenes.',
     );
   });
+
+  it('lee un WebP previamente guardado en staging', async (): Promise<void> => {
+    tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-staging-'));
+
+    const storage = new FilesystemImageStagingStorage(tempDirectory);
+
+    const image: ProcessedImage = createProcessedImage();
+
+    const stored: StoredImageFile = await storage.save('staging-id', image);
+
+    const result: Buffer = await storage.read(stored.relativePath);
+
+    expect(result).toEqual(image.buffer);
+  });
 });
 
 /**

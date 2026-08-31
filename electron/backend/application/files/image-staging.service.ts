@@ -1,4 +1,5 @@
 import type StageImageCommand from '@backend/application/files/stage-image-command.interface';
+import type StagedImageRegistry from '@backend/contracts/files/staged-image-registry.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
 import type {
   ImageProcessor,
@@ -13,7 +14,7 @@ import { randomUUID } from 'node:crypto';
  * Gestiona las imágenes temporales de drafts
  * durante la ejecución actual de la aplicación.
  */
-export default class ImageStagingService {
+export default class ImageStagingService implements StagedImageRegistry {
   private readonly records: Map<string, StagedImageRecord> = new Map<string, StagedImageRecord>();
 
   /**

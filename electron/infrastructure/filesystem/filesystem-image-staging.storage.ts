@@ -1,7 +1,7 @@
 import type { ProcessedImage } from '@backend/contracts/system/image-processor.interface';
 import type ImageStagingStorage from '@backend/contracts/system/image-staging-storage.interface';
 import type { StoredImageFile } from '@backend/domain/files/image-asset.interface';
-import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
 const DRAFT_IMAGES_DIRECTORY: string = 'draft-images';
@@ -52,6 +52,15 @@ export default class FilesystemImageStagingStorage implements ImageStagingStorag
       internalName,
       relativePath: ['staging', DRAFT_IMAGES_DIRECTORY, internalName].join('/'),
     };
+  }
+
+  /**
+   * Lee una imagen perteneciente al staging de drafts.
+   */
+  async read(relativePath: string): Promise<Buffer> {
+    const absolutePath: string = this.resolveManagedPath(relativePath);
+
+    return readFile(absolutePath);
   }
 
   /**

@@ -43,6 +43,13 @@ class FakeImageStagingStorage implements ImageStagingStorage {
   }
 
   /**
+   * Simula la lectura de una imagen temporal.
+   */
+  read(): Promise<Buffer> {
+    return Promise.resolve(Buffer.from('processed'));
+  }
+
+  /**
    * Registra el archivo temporal eliminado.
    */
   delete(relativePath: string): Promise<void> {
