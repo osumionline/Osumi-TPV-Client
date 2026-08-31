@@ -112,6 +112,14 @@ import registerProveedoresIpc from '@ipc/register-proveedores-ipc';
 import registerReservasIpc from '@ipc/register-reservas-ipc';
 import { registerSystemIpc } from '@ipc/register-system-ipc';
 import registerVentasIpc from '@ipc/register-ventas-ipc';
+import ArticulosService from '@backend/application/articulos/articulos.service';
+import ImageAssetPromotionService from '@backend/application/files/image-asset-promotion.service';
+import ImageStagingService from '@backend/application/files/image-staging.service';
+import TypeOrmArticulosRepository from '@infrastructure/database/typeorm/typeorm-articulos.repository';
+import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
+import FilesystemImageFileStorage from '@infrastructure/filesystem/filesystem-image-file.storage';
+import FilesystemImageStagingStorage from '@infrastructure/filesystem/filesystem-image-staging.storage';
+import registerArticulosIpc from '@ipc/register-articulos-ipc';
 
 /**
  * Construye el grafo de dependencias de la aplicación,
@@ -195,6 +203,45 @@ export default function createApplicationComposition(
    * Servicios operativos.
    */
   const assetUrlBuilder: AssetUrlBuilder = new ElectronAssetUrlBuilder();
+  
+  /*
+   * Infraestructura operacional de imágenes.
+   */
+
+  const imageFileStorage: FilesystemImageFileStorage = new FilesystemImageFileStorage(
+    applicationPaths.filesDirectory,
+  );
+
+  const imageStagingStorage: FilesystemImageStagingStorage = new FilesystemImageStagingStorage(
+    applicationPaths.stagingFilesDirectory,
+  );
+
+  const imageStagingService: ImageStagingService = new ImageStagingService(
+    imageProcessor,
+    imageStagingStorage,
+    assetUrlBuilder,
+  );
+
+  const imageAssetPromotionService: ImageAssetPromotionService = new ImageAssetPromotionService(
+    imageStagingService,
+    imageStagingStorage,
+    imageFileStorage,
+  );
+
+  /*
+   * Artículos.
+   */
+
+  const articulosRepository: ArticulosRepository = new TypeOrmArticulosRepository(
+    operationalDatabase,
+  );
+
+  const articulosService: ArticulosService = new ArticulosService(
+    articulosRepository,
+    assetUrlBuilder,
+    imageAssetPromotionService,
+    imageStagingService,
+  );
 
   const marcaRepository: MarcaRepository = new TypeOrmMarcaRepository(operationalDatabase);
   const marcasService: MarcasService = new MarcasService(marcaRepository, assetUrlBuilder);
@@ -404,7 +451,7 @@ export default function createApplicationComposition(
    * Canales IPC.
    */
   registerApplicationIpc(applicationStateService);
-
+  registerArticulosIpc(getMainWindow, articulosService);
   registerMarcasIpc(getMainWindow, marcasService);
   registerProveedoresIpc(getMainWindow, proveedoresService);
   registerEmpleadosIpc(getMainWindow, empleadosService);

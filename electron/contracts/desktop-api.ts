@@ -11,6 +11,7 @@ import type ProveedoresApi from '@desktop-contracts/proveedores/proveedores-api.
 import type ReservasApi from '@desktop-contracts/reservas/reservas-api.interface';
 import type SystemApi from '@desktop-contracts/system/system-api.interface';
 import type VentasApi from '@desktop-contracts/ventas/ventas-api.interface';
+import type ArticulosApi from '@desktop-contracts/articulos/articulos-api.interface';
 
 export default interface OsumiDesktopApi {
   readonly isElectron: true;
@@ -23,6 +24,7 @@ export default interface OsumiDesktopApi {
   readonly proveedores: ProveedoresApi;
   readonly empleados: EmpleadosApi;
   readonly categorias: CategoriasApi;
+  readonly articulos: ArticulosApi;
   readonly clientes: ClientesApi;
   readonly caja: CajaApi;
   readonly reservas: ReservasApi;

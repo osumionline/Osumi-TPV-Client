@@ -42,6 +42,7 @@ import type VentasContextInterface from '@desktop-contracts/ventas/ventas-contex
 import IPC_CHANNELS from '@ipc/channels';
 import type { IpcRendererEvent } from 'electron';
 import { contextBridge, ipcRenderer } from 'electron';
+import type { ArticuloInterface } from '@desktop-contracts/articulos/articulo.interface';
 
 const desktopApi: OsumiDesktopApi = Object.freeze({
   isElectron: true,
@@ -156,6 +157,20 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
   categorias: Object.freeze({
     getAll: (): Promise<readonly CategoriaInterface[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.categoriasGetAll) as Promise<readonly CategoriaInterface[]>,
+  }),
+
+  articulos: Object.freeze({
+    getById: (idArticulo: number): Promise<ArticuloInterface | null> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.articulosGetById,
+        idArticulo,
+      ) as Promise<ArticuloInterface | null>,
+
+    resolveByCode: (codigo: string): Promise<ArticuloInterface | null> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.articulosResolveByCode,
+        codigo,
+      ) as Promise<ArticuloInterface | null>,
   }),
 
   clientes: Object.freeze({

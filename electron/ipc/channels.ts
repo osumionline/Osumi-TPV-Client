@@ -30,6 +30,9 @@ const IPC_CHANNELS = {
 
   categoriasGetAll: 'categorias:get-all',
 
+  articulosGetById: 'articulos:get-by-id',
+  articulosResolveByCode: 'articulos:resolve-by-code',
+
   cajaOpen: 'caja:open',
 
   reservasCreate: 'reservas:create',
