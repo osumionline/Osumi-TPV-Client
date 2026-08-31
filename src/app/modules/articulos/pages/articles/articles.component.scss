@@ -14,7 +14,6 @@
         min-height: 0;
     }
 
-    .articles__workspace-placeholder,
     .articles__state {
         display: flex;
         height: 100%;
@@ -29,5 +28,10 @@
         p {
             color: var(--disabled-color);
         }
+    }
+
+    .articles__state-actions {
+        display: flex;
+        gap: 12px;
     }
 }

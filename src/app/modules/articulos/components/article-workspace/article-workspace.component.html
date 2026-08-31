@@ -1,0 +1,43 @@
+<section class="article-workspace">
+    <header class="article-workspace__header">
+        <label class="article-workspace__field article-workspace__field--locator">
+            <span class="article-workspace__label">
+                Localizador
+            </span>
+
+            <div class="article-workspace__locator">
+                <input type="text"
+                       autocomplete="off"
+                       [disabled]="searching()"
+                       [value]="tab().draft.localizador ?? ''"
+                       [placeholder]="
+                         tab().draft.localizador === null
+                           ? 'Automático al guardar'
+                           : ''
+                       "
+                       (focus)="onLocalizadorFocus($event)"
+                       (keydown)="onLocalizadorKeydown($event)">
+
+                <button type="button"
+                        matTooltip="Buscar artículo"
+                        (click)="openSearch()">
+                    <mat-icon>search</mat-icon>
+                </button>
+            </div>
+        </label>
+
+        <label class="article-workspace__field article-workspace__field--name">
+            <span class="article-workspace__label">
+                Nombre
+            </span>
+
+            <input type="text"
+                   autocomplete="off"
+                   [value]="tab().draft.nombre"
+                   (input)="onNameInput($event)">
+        </label>
+    </header>
+
+    <div class="article-workspace__body">
+    </div>
+</section>

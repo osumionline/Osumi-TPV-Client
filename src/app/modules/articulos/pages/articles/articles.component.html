@@ -10,27 +10,11 @@
 
     @if (articulosService.activeTab(); as tab) {
     <section class="articles__workspace">
-        <div class="articles__workspace-placeholder">
-            @if (tab.draft.id === null) {
-            <h2>
-                Artículo nuevo
-            </h2>
-
-            <p>
-                Nueva ficha todavía sin guardar.
-            </p>
-            } @else {
-            <h2>
-                {{ tab.draft.nombre || 'Artículo' }}
-            </h2>
-
-            @if (tab.draft.localizador !== null) {
-            <p>
-                Localizador {{ tab.draft.localizador }}
-            </p>
-            }
-            }
-        </div>
+        <otpv-article-workspace [tab]="tab"
+                                [searching]="searching()"
+                                (resolveCodeEvent)="resolveArticleCode($event)"
+                                (searchEvent)="openSearch($event)"
+                                (nameChangeEvent)="updateArticleName($event)" />
     </section>
     } @else {
     <section class="articles__state">
@@ -42,11 +26,26 @@
             Abre un artículo existente o crea una nueva ficha.
         </p>
 
-        <button mat-flat-button
-                type="button"
-                (click)="newArticle()">
-            Nuevo artículo
-        </button>
+        <div class="articles__state-actions">
+            <button mat-stroked-button
+                    type="button"
+                    (click)="openSearch()">
+                Buscar artículo
+            </button>
+
+            <button mat-flat-button
+                    type="button"
+                    (click)="newArticle()">
+                Nuevo artículo
+            </button>
+        </div>
     </section>
     }
 </main>
+
+@if (searchOpen()) {
+<otpv-article-search context="articulos"
+                     [initialQuery]="searchInitialQuery()"
+                     (selectEvent)="openSearchSelection($event)"
+                     (closeEvent)="closeSearch()" />
+}

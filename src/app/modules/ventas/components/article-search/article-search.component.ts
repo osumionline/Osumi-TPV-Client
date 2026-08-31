@@ -41,6 +41,7 @@ export default class ArticleSearchComponent implements OnInit, OnDestroy {
     viewChild.required<ElementRef<HTMLInputElement>>('searchInput');
 
   readonly initialQuery: InputSignal<string> = input<string>('');
+  readonly context: InputSignal<'ventas' | 'articulos'> = input<'ventas' | 'articulos'>('ventas');
 
   readonly selectEvent: OutputEmitterRef<readonly ArticuloVenta[]> =
     output<readonly ArticuloVenta[]>();
@@ -48,15 +49,11 @@ export default class ArticleSearchComponent implements OnInit, OnDestroy {
   readonly closeEvent: OutputEmitterRef<void> = output<void>();
 
   readonly query: WritableSignal<string> = signal<string>('');
-
   readonly results: WritableSignal<readonly ArticuloVenta[]> = signal<readonly ArticuloVenta[]>([]);
-
   readonly selectedPublicIds: WritableSignal<ReadonlySet<string>> = signal<ReadonlySet<string>>(
     new Set<string>(),
   );
-
   readonly loading: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly error: WritableSignal<string | null> = signal<string | null>(null);
 
   constructor() {

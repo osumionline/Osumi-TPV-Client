@@ -56,6 +56,46 @@ export default class ArticulosService {
   }
 
   /**
+   * Carga un artículo por su identificador o activa su pestaña
+   * cuando ya se encuentra abierto.
+   */
+  async cargarPorId(idArticulo: number): Promise<ArticuloWorkspaceTab | null> {
+    if (!Number.isSafeInteger(idArticulo) || idArticulo <= 0) {
+      return null;
+    }
+
+    const existingTab: ArticuloWorkspaceTab | null = this.findByArticuloId(idArticulo);
+
+    if (existingTab !== null) {
+      this.activeTabIdSignal.set(existingTab.idTemporal);
+
+      return existingTab;
+    }
+
+    const articulo: ArticuloInterface | null =
+      await window.osumiDesktop.articulos.getById(idArticulo);
+
+    return articulo === null ? null : this.abrirArticulo(articulo);
+  }
+
+  /**
+   * Resuelve un localizador, acceso directo o código de barras
+   * y abre la ficha correspondiente.
+   */
+  async resolverPorCodigo(codigo: string): Promise<ArticuloWorkspaceTab | null> {
+    const normalizedCode: string = codigo.trim();
+
+    if (normalizedCode.length === 0) {
+      return null;
+    }
+
+    const articulo: ArticuloInterface | null =
+      await window.osumiDesktop.articulos.resolveByCode(normalizedCode);
+
+    return articulo === null ? null : this.abrirArticulo(articulo);
+  }
+
+  /**
    * Abre un artículo persistido o activa su pestaña si ya estaba abierta.
    */
   abrirArticulo(articulo: ArticuloInterface): ArticuloWorkspaceTab {
