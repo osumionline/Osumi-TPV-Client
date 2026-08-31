@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.18  
+**Versión:** 2.19  
 **Fecha:** 31 de agosto de 2026  
-**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos** está ya en implementación backend: análisis funcional/técnico cerrado, categorías N:M, lectura, resolución, alta, edición, histórico de stock y baja lógica completados. En curso: infraestructura común de imágenes con conversión obligatoria a WebP.
+**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos** continúa en backend: lectura, resolución, alta, edición, histórico, baja lógica e infraestructura común de imágenes avanzadas. Ya están cerrados el procesado WebP, storage definitivo, staging, persistencia SQLite de fotos y preparación/promoción de imágenes staged. El siguiente punto exacto es `13B.6D2B — ArticulosService.save()`.
 
 > **Regla crítica de entorno TicketBAI:** el producto usa `production` por defecto. Durante desarrollo/pruebas manuales se usa `app_data.json → ticketBai.environment = "test"` junto con el token TEST correspondiente. No añadir selector de entorno a la UI.
 
@@ -33,13 +33,6 @@ Ventas 12 — Postventa                             🟦
 
 13 Artículos                                      🟦
   13A Análisis funcional y diseño                 ✅
-    13A.1 Workspace/pestañas                      ✅
-    13A.2 Modelo funcional                        ✅
-    13A.3 Reglas de precios                       ✅
-    13A.4 Categorías múltiples                    ✅
-    13A.5 Persistencia de estado UI               ✅
-    13A.6 Marca/proveedor desde Artículos         ✅
-    13A.7 Diseño técnico/contratos                ✅
   13B Infraestructura backend                     🟦
     13B.1 Categorías N:M + import legacy          ✅
     13B.2 Dominio/contratos Artículos             ✅
@@ -50,9 +43,13 @@ Ventas 12 — Postventa                             🟦
     13B.5 Baja lógica                             ✅
     13B.6 Infraestructura común imágenes/WebP     🟦
       13B.6A Procesador común WebP                ✅
-      13B.6B Storage común + tabla archivo        🟦 EN CURSO
-      13B.6C Staging de imágenes                  ⬜
-      13B.6D Fotos de Artículos                   ⬜
+      13B.6B Storage común + tabla archivo        ✅
+      13B.6C Staging de imágenes                  ✅
+      13B.6D Fotos de Artículos                   🟦
+        13B.6D1 Persistencia transaccional fotos  ✅
+        13B.6D2 Promoción + ArticulosService      🟦
+          13B.6D2A Promoción staging → files      ✅
+          13B.6D2B ArticulosService.save()        🟦 SIGUIENTE
       13B.6E Adaptación import legacy             ⬜
   13C Workspace y carga de artículos              ⬜
   13D General                                     ⬜
@@ -963,6 +960,7 @@ ArticulosRepository / TypeOrmArticulosRepository
 → código por defecto protegido
 → histórico manual de stock
 → baja lógica
+→ persistencia transaccional de fotos
 ```
 
 Decisiones ya cerradas:
@@ -979,6 +977,11 @@ Decisiones ya cerradas:
 - El alta con stock inicial **no genera** histórico: no existe stock previo persistido.
 - Baja de artículo = soft delete del artículo y de sus códigos activos.
 - La baja conserva categorías, relaciones de archivos, archivos físicos e histórico.
+- Fotos de Artículos reutilizan `archivo + articulo_archivo`; no crear tablas paralelas.
+- `articulo_archivo` conserva `orden` y `principal`.
+- Máximo una foto principal por artículo.
+- Las fotos nuevas se insertan en la misma transacción SQLite del alta/edición del artículo.
+- Las fotos eliminadas dejan de relacionarse con el artículo, pero su limpieza física/registro huérfano se coordina fuera del repository.
 
 ## Histórico manual de stock
 
@@ -1001,6 +1004,20 @@ pvp_micros
 
 El PVP histórico se almacena en microeuros.
 
+## Tipos de histórico
+
+`historico-articulo.constants.ts` usa ahora un único objeto semántico con `as const` y export default:
+
+```ts
+const HISTORICO_ARTICULO_TIPO = {
+  ARTICULO: 4,
+} as const;
+
+export default HISTORICO_ARTICULO_TIPO;
+```
+
+No añadir valores legacy no confirmados.
+
 ## Precisión monetaria
 
 Usar las escalas existentes del proyecto:
@@ -1011,10 +1028,6 @@ UNIT_PRICE_SCALE  = 1_000_000
 ```
 
 Evitar floats encadenados.
-
-## Nota de modelado del tipo de histórico
-
-Actualmente existe una constante para el valor `4`. Antes de ampliar los tipos de movimientos conviene sustituirla por una representación semántica única del conjunto completo de tipos (preferentemente objeto `as const` o enum según la convención final del proyecto), en vez de acumular constantes sueltas.
 
 No copiar directamente modelos mutables ni lógica legacy.
 ---
@@ -1034,17 +1047,17 @@ Proveedores
 futuros módulos con fotografías
 ```
 
-No implementar conversiones aisladas por módulo: toda carga debe pasar por una infraestructura común.
+No implementar conversiones aisladas por módulo: toda carga debe pasar por infraestructura común.
 
 ## 28.1 Procesador común WebP — ✅
 
-Dependencia elegida:
+Dependencia:
 
 ```text
 sharp ^0.35.3
 ```
 
-Se externaliza en el build Electron por ser una dependencia nativa.
+`sharp` se externaliza en el build Electron.
 
 Contrato:
 
@@ -1053,7 +1066,7 @@ ImageProcessor
 ProcessedImage
 ```
 
-Convención de export corregida:
+Regla de exports aplicada:
 
 ```text
 image-processor.interface.ts
@@ -1069,51 +1082,81 @@ image-processor.interface.ts
 - calidad WebP: 85;
 - effort: 4;
 - aplica orientación EXIF mediante `rotate()`;
-- conserva dimensiones originales: **no redimensiona** todavía;
-- rechaza imágenes vacías;
+- conserva dimensiones originales, sin resize;
+- rechaza input vacío;
 - limita input a 50 MB;
 - limita input a 100.000.000 píxeles;
-- rechaza animaciones/multipágina;
-- devuelve:
-  - `Buffer` WebP final;
-  - MIME `image/webp`;
-  - extensión `.webp`;
-  - tamaño final;
-  - SHA-256 del WebP final;
-  - ancho y alto finales.
+- rechaza imágenes animadas/multipágina;
+- devuelve Buffer WebP, MIME, extensión `.webp`, tamaño, SHA-256, ancho y alto.
 
-Los tests generan su PNG válido mediante `sharp`; se descartó el fixture Base64 inicial porque `libpng` lo rechazaba durante la decodificación completa.
+Los tests generan PNG válido mediante `sharp`; el fixture Base64 inicial se descartó por incompatibilidad de decodificación completa con libpng.
 
-## 28.2 Directorios
+## 28.2 Storage definitivo — ✅
 
-`ApplicationDirectoriesService` prepara también:
+Infraestructura cerrada:
 
 ```text
-assets/files/
-staging/files/
+ProcessedImage
+↓
+FilesystemImageFileStorage
+↓
+assets/files/<purpose>/<uuid>.webp
 ```
 
-Las carpetas específicas (`articles`, `brands`, `providers`, etc.) se crean bajo demanda.
-
-## 28.3 Storage común + tabla archivo — 🟦 EN CURSO
-
-Diseño acordado:
+Purposes actuales:
 
 ```text
-Buffer original
-↓
-ImageProcessor
-↓
-ProcessedImage WebP
-↓
-storage físico común
-↓
-assets/files/<purpose>/<public-id>.webp
-↓
-tabla archivo
+article_image
+brand_image
+provider_image
+payment_type_icon
 ```
 
-`archivo` ya sirve como catálogo genérico y conserva:
+Mapeo:
+
+```text
+article_image      → files/articles/
+brand_image        → files/brands/
+provider_image     → files/providers/
+payment_type_icon  → files/payment-types/
+```
+
+`FilesystemImageFileStorage`:
+
+- escribe primero `<archivo>.tmp`;
+- usa escritura exclusiva;
+- hace `rename` final;
+- valida `publicId`;
+- protege contra path traversal;
+- expone `save()` y `delete()`.
+
+`ImageAssetsService` coordina:
+
+```text
+imagen original
+→ ImageProcessor
+→ storage definitivo
+→ TypeOrmArchivosRepository
+```
+
+Si falla SQLite después de escribir el fichero:
+
+```text
+borrar fichero definitivo
+```
+
+Si también falla esa limpieza:
+
+```text
+AggregateError
+→ conserva error SQLite
+→ conserva error de cleanup
+→ cleanupError como cause
+```
+
+## 28.3 Tabla `archivo` — ✅
+
+Se reutiliza la tabla existente, sin cambios de esquema:
 
 ```text
 purpose
@@ -1127,106 +1170,281 @@ width
 height
 ```
 
-No hace falta modificar el esquema.
-
-Purposes previstos/reutilizados:
+La inserción común se centraliza en:
 
 ```text
-article_image
-brand_image
-provider_image
-payment_type_icon
+typeorm-archivo.utils.ts
+→ insertArchivo(queryRunner, command)
 ```
 
-Mapeo físico:
+Esto permite reutilizar la inserción dentro de la propia transacción SQLite de Artículos.
+
+## 28.4 Staging — ✅
+
+Objetivo:
 
 ```text
-article_image      → files/articles/
-brand_image        → files/brands/
-provider_image     → files/providers/
-payment_type_icon  → files/payment-types/
-```
-
-Filesystem y SQLite no comparten una transacción ACID. La estrategia será compensatoria:
-
-```text
-guardar WebP ✅
-INSERT archivo ❌
-→ borrar WebP escrito
-→ propagar error
-```
-
-## 28.4 Staging — siguiente
-
-Necesario para poder añadir fotos a un artículo nuevo que todavía no tiene `id`:
-
-```text
-nuevo draft
+draft nuevo
 ↓
 seleccionar imagen
 ↓
 convertir inmediatamente a WebP
 ↓
-staging/files/
+staging/files/draft-images/<uuid>.webp
 ↓
-mantener mientras vive el draft
+registro en memoria
 ```
 
-Al guardar:
+`ImageStagingService` mantiene un `Map` en memoria con:
 
 ```text
-promover a assets/files/articles/
-→ INSERT archivo
-→ relacionar articulo_archivo
-```
-
-Al cancelar/cerrar el draft:
-
-```text
-eliminar staging
-```
-
-## 28.5 Fotos de Artículos
-
-El dominio de lectura ya incluye metadatos de fotos.
-
-Backend interno:
-
-```text
+stagingId
+purpose
+originalName
 relativePath
+mimeType
+sizeBytes
+sha256
+width
+height
 ```
 
-Renderer:
+El renderer nunca debe suministrar rutas físicas ni SHA-256 como fuente de verdad.
+
+Contrato público staged:
 
 ```text
-url segura mediante AssetUrlBuilder
+stagingId
+purpose
+originalName
+url
+mimeType
+sizeBytes
+width
+height
 ```
 
-No exponer rutas físicas al renderer.
+`FilesystemImageStagingStorage`:
 
-La relación existente `articulo_archivo` se reutiliza; no crear otra tabla de fotos.
+- guarda WebP en `staging/files/draft-images/`;
+- soporta `save`, `read`, `delete`;
+- protege rutas contra escapes.
 
-## 28.6 Import legacy
+`ElectronAssetUrlBuilder` y el protocolo `osumi://assets/` aceptan también staging:
 
-Más adelante el importador `.otpv` deberá usar la misma infraestructura de procesado para que JPEG/PNG legacy terminen también almacenados como WebP canónico.
+```text
+osumi://assets/staging/draft-images/<uuid>.webp
+```
 
+El startup actual limpia restos de staging de ejecuciones anteriores mediante `FileInstallationFinalizer.recover()`. No hace falta otro limpiador específico.
+
+## 28.5 Registro staged desacoplado — ✅
+
+Se creó:
+
+```text
+StagedImageRegistry
+```
+
+con una única responsabilidad:
+
+```ts
+getRecord(stagingId): StagedImageRecord | null
+```
+
+`ImageStagingService` implementa este contrato.
+
+Esto evita que servicios de promoción dependan de la clase concreta `ImageStagingService` y elimina casts forzados en tests.
+
+## 28.6 Promoción staging → storage definitivo — ✅
+
+Servicio:
+
+```text
+ImageAssetPromotionService
+```
+
+Flujo:
+
+```text
+stagingId
+↓
+StagedImageRegistry.getRecord()
+↓
+ImageStagingStorage.read()
+↓
+verificar tamaño + SHA-256
+↓
+copiar WebP ya procesado
+↓
+FilesystemImageFileStorage
+↓
+files/<purpose>/<nuevo-uuid>.webp
+↓
+PreparedImageAsset
+  ├─ stagingId
+  └─ ArchivoCreateRecord
+```
+
+**No se vuelve a ejecutar Sharp**: el WebP staged ya está procesado.
+
+La imagen original en staging se conserva mientras se prepara la copia definitiva.
+
+Motivo:
+
+```text
+SQLite COMMIT ✅
+→ consumir/borrar staging
+
+SQLite ROLLBACK ❌
+→ borrar copia definitiva
+→ conservar staging para reintentar
+```
+
+`ImageAssetPromotionService.rollback()` elimina la copia definitiva preparada.
+
+## 28.7 Fotos de Artículos — persistencia SQLite ✅
+
+`ArticuloSaveRecord` incorpora:
+
+```text
+fotos[]
+```
+
+Cada foto backend es:
+
+```text
+idArchivo
+nuevoArchivo
+orden
+principal
+```
+
+Semántica:
+
+```text
+persistida:
+  idArchivo != null
+  nuevoArchivo = null
+
+nueva:
+  idArchivo = null
+  nuevoArchivo = ArchivoCreateRecord
+```
+
+Nunca ambos ni ninguno.
+
+Contrato renderer:
+
+```text
+id
+stagingId
+orden
+principal
+```
+
+El renderer no maneja `ArchivoCreateRecord`.
+
+`TypeOrmArticulosRepository`:
+
+### CREATE
+
+```text
+INSERT articulo
+→ códigos/categorías
+→ INSERT archivo para fotos nuevas
+→ INSERT articulo_archivo
+→ principal final
+```
+
+Todo dentro de la misma transacción SQLite.
+
+### UPDATE
+
+```text
+validar fotos actuales
+→ quitar relaciones omitidas
+→ poner principal=0
+→ reordenar existentes
+→ insertar archivos nuevos
+→ insertar relaciones nuevas
+→ establecer principal final
+```
+
+Validaciones:
+
+- orden entero >= 0;
+- como máximo una foto principal;
+- una foto persistida debe pertenecer al artículo;
+- una foto nueva debe ser `article_image`;
+- MIME debe ser `image/webp`;
+- ruta nueva debe pertenecer a `files/articles/`;
+- evitar duplicados de ids persistidos/publicIds nuevos.
+
+Las fotos eliminadas dejan de relacionarse con el artículo, pero el borrado físico y la limpieza de `archivo` se coordinan en capa superior, no dentro del repository.
+
+## 28.8 Pendiente inmediato: ArticulosService.save()
+
+Siguiente flujo a implementar:
+
+```text
+ArticuloSaveInterface
+↓
+resolver cada foto:
+  existente → id
+  nueva     → stagingId
+↓
+ImageAssetPromotionService.prepare()
+↓
+construir ArticuloSaveRecord
+↓
+repository.create/update
+↓
+si SQLite falla:
+  rollback() de copias definitivas
+  staging permanece
+↓
+si SQLite hace commit:
+  discard() de staging consumido
+↓
+devolver ArticuloInterface fresco
+```
+
+También habrá que decidir/implementar la limpieza segura de archivos que queden huérfanos al eliminar fotos de un artículo.
+
+## 28.9 Import legacy — pendiente
+
+`13B.6E` deberá adaptar `.otpv` para que las imágenes legacy JPEG/PNG/WebP pasen por la misma infraestructura y terminen almacenadas como WebP canónico.
+
+---
 ---
 
 # 29. Próximo paso exacto
 
 ```text
-13B.6B — completar storage común + tabla archivo
+13B.6D2B — ArticulosService.save()
+```
+
+Objetivos:
+
+```text
+- recibir ArticuloSaveInterface
+- resolver fotos existentes vs stagingId
+- preparar copias definitivas con ImageAssetPromotionService
+- construir ArticuloSaveRecord
+- llamar create/update
+- rollback físico si SQLite falla
+- consumir staging solo después de commit
+- devolver ArticuloInterface fresco
 ```
 
 Después:
 
 ```text
-13B.6C — staging de imágenes
-13B.6D — fotos de Artículos
 13B.6E — adaptar import legacy a WebP
 ```
 
-Solo después se pasará a conectar Artículos con IPC/preload/Angular.
+Solo después se pasará a IPC/preload/Angular.
 ---
 
 # 30. Historial reciente
@@ -1237,7 +1455,8 @@ Solo después se pasará a conectar Artículos con IPC/preload/Angular.
 | 2.15 | 30/08/2026 | 12C.8E completo, retry, UI y regeneración documental |
 | 2.16 | 30/08/2026 | 12C.8 TicketBAI ordinario cerrado |
 | 2.17 | 30/08/2026 | Inicio Hito 13 Artículos y roadmap 13→16 |
-| **2.18** | **31/08/2026** | **13A cerrado; backend Artículos hasta baja lógica completado; categorías N:M; localizador; búsqueda; WEB; fotos; regla global WebP y procesador común con Sharp; storage común de imágenes en curso** |
+| 2.18 | 31/08/2026 | Backend Artículos hasta baja lógica; regla global WebP; Sharp; storage común en curso |
+| **2.19** | **31/08/2026** | **Storage definitivo ✅, staging ✅, persistencia SQLite de fotos ✅, promoción staging→files ✅, StagedImageRegistry ✅; siguiente: ArticulosService.save()** |
 ---
 
 # 31. Prompt de arranque recomendado
@@ -1246,7 +1465,7 @@ Solo después se pasará a conectar Artículos con IPC/preload/Angular.
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.18.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.19.
 
 Estado:
 - Ventas 12C.1–12C.8 ✅
@@ -1259,7 +1478,12 @@ Estado:
 - 13B.4 alta/edición transaccional + histórico ✅
 - 13B.5 baja lógica ✅
 - 13B.6A procesador común WebP ✅
-- 13B.6B storage común de imágenes 🟦 EN CURSO.
+- 13B.6B storage definitivo + archivo ✅
+- 13B.6C staging ✅
+- 13B.6D1 persistencia transaccional de fotos ✅
+- 13B.6D2A promoción staging→files ✅
+- 13B.6D2B ArticulosService.save() 🟦 SIGUIENTE
+- 13B.6E import legacy a WebP ⬜
 
 Roadmap:
 13 Artículos
@@ -1271,11 +1495,19 @@ Reglas críticas:
 - DATABASE_SCHEMA_VERSION debe permanecer en 1 durante todo el desarrollo previo al primer lanzamiento. No crear migraciones todavía; ante cambios incompatibles borrar BD y reimportar .otpv.
 - Si un archivo TS exporta un único elemento, usar export default. Si exporta varios elementos, todos son exports nombrados y ninguno default.
 - Toda fotografía cargada en Osumi TPV debe convertirse a WebP mediante infraestructura común, nunca con lógica específica por módulo.
-- Sharp es el procesador común actual: JPEG/PNG/WebP → WebP, calidad 85, orientación EXIF, sin resize por ahora.
-- Fotos: filesystem físico + metadatos en tabla archivo; Artículos reutiliza articulo_archivo.
-- Artículos nuevos necesitan staging para poder tener fotos antes de existir en BD.
+- Sharp: JPEG/PNG/WebP → WebP, calidad 85, effort 4, orientación EXIF, sin resize por ahora.
+- Storage definitivo: assets/files/<purpose>/<uuid>.webp.
+- Staging: staging/files/draft-images/<uuid>.webp, registro en memoria mediante ImageStagingService.
+- StagedImageRegistry desacopla consulta de staged records.
+- ImageAssetPromotionService copia staged→files, verifica tamaño/SHA-256 y NO vuelve a usar Sharp.
+- La imagen staged no se consume hasta que SQLite hace commit.
+- Si SQLite falla, borrar copias definitivas y conservar staging para reintento.
+- Fotos de Artículos reutilizan archivo + articulo_archivo.
+- CREATE/UPDATE de Artículos insertan archivo y articulo_archivo dentro de la misma transacción SQLite.
+- Como máximo una foto principal; orden >= 0.
+- Fotos quitadas del artículo pierden relación, pero la limpieza física/registro huérfano se coordina en capa superior.
 - El campo Localizador reutilizará la UX/buscador de nueva línea de Ventas.
-- Localizador nuevo lo genera backend: YY + 4 cifras, búsqueda iterativa de combinación libre, sin recursión.
+- Localizador nuevo: YY + 4 cifras, búsqueda iterativa de combinación libre, sin recursión.
 - Solo una pestaña por artículo persistido; drafts nuevos pueden ser múltiples.
 - Categorías 0..N, equivalentes, sin principal.
 - PUC = precio albarán + IVA + RE.
@@ -1296,10 +1528,10 @@ Convenciones:
 - Líneas en blanco solo estructurales.
 - Trabajar por lotes coherentes y no avanzar sin confirmación.
 
-Próximo paso:
-13B.6B — completar storage común + tabla archivo.
+Próximo paso exacto:
+13B.6D2B — ArticulosService.save().
 ```
 
 ---
 
-**Fin del documento de continuidad v2.18.**
+**Fin del documento de continuidad v2.19.**
