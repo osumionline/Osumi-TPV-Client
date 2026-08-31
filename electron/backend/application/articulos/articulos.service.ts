@@ -1,10 +1,21 @@
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
+import type ImageAssetPromoter from '@backend/contracts/files/image-asset-promoter.interface';
+import type StagedImageDiscarder from '@backend/contracts/files/staged-image-discarder.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
 import type {
   ArticuloCodigoBarrasRecord,
   ArticuloFotoRecord,
   ArticuloRecord,
 } from '@backend/domain/articulos/articulo-record.interface';
+import type {
+  ArticuloFotoSaveRecord,
+  ArticuloSaveRecord,
+} from '@backend/domain/articulos/articulo-save-record.interface';
+import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.interface';
+import type {
+  ArticuloFotoSaveInterface,
+  ArticuloSaveInterface,
+} from '@desktop-contracts/articulos/articulo-save.interface';
 import type {
   ArticuloCodigoBarrasInterface,
   ArticuloFotoInterface,
@@ -21,6 +32,8 @@ export default class ArticulosService {
   constructor(
     private readonly articulosRepository: ArticulosRepository,
     private readonly assetUrlBuilder: AssetUrlBuilder,
+    private readonly imageAssetPromoter: ImageAssetPromoter,
+    private readonly stagedImageDiscarder: StagedImageDiscarder,
   ) {}
 
   /**
@@ -56,6 +69,53 @@ export default class ArticulosService {
   }
 
   /**
+   * Crea o actualiza un artículo y devuelve
+   * su estado persistido definitivo.
+   */
+  async save(command: ArticuloSaveInterface): Promise<ArticuloInterface> {
+    this.validateSavePhotos(command.fotos);
+
+    const preparedAssets: PreparedImageAsset[] = [];
+    let persisted: boolean = false;
+
+    try {
+      const fotos: readonly ArticuloFotoSaveRecord[] = await this.preparePhotos(
+        command.fotos,
+        preparedAssets,
+      );
+
+      const saveRecord: ArticuloSaveRecord = this.mapSaveRecord(command, fotos);
+
+      let idArticulo: number;
+
+      if (saveRecord.id === null) {
+        idArticulo = await this.articulosRepository.create(saveRecord);
+      } else {
+        await this.articulosRepository.update(saveRecord);
+        idArticulo = saveRecord.id;
+      }
+
+      persisted = true;
+
+      await this.discardPreparedStaging(preparedAssets);
+
+      const articulo: ArticuloInterface | null = await this.getById(idArticulo);
+
+      if (articulo === null) {
+        throw new Error('No se ha podido cargar el artículo después de guardarlo.');
+      }
+
+      return articulo;
+    } catch (error: unknown) {
+      if (!persisted) {
+        await this.rollbackPreparedAssets(preparedAssets, error);
+      }
+
+      throw error;
+    }
+  }
+
+  /**
    * Da de baja lógicamente un artículo activo.
    */
   async deactivate(idArticulo: number): Promise<void> {
@@ -64,6 +124,197 @@ export default class ArticulosService {
     }
 
     await this.articulosRepository.deactivate(idArticulo);
+  }
+
+  /**
+   * Valida las referencias de fotos recibidas desde el renderer
+   * antes de preparar archivos definitivos.
+   */
+  private validateSavePhotos(fotos: readonly ArticuloFotoSaveInterface[]): void {
+    const ids: Set<number> = new Set<number>();
+    const stagingIds: Set<string> = new Set<string>();
+    let principalCount: number = 0;
+
+    for (const foto of fotos) {
+      if (!Number.isSafeInteger(foto.orden) || foto.orden < 0) {
+        throw new Error('El orden de una foto no es válido.');
+      }
+
+      const hasId: boolean = foto.id !== null;
+      const hasStaging: boolean = foto.stagingId !== null && foto.stagingId.trim().length > 0;
+
+      if (hasId === hasStaging) {
+        throw new Error(
+          'Cada foto debe indicar un archivo persistido o una imagen temporal, pero no ambos.',
+        );
+      }
+
+      if (foto.id !== null) {
+        if (!Number.isSafeInteger(foto.id) || foto.id <= 0) {
+          throw new Error('El identificador de una foto no es válido.');
+        }
+
+        if (ids.has(foto.id)) {
+          throw new Error('Hay fotos persistidas repetidas en el artículo.');
+        }
+
+        ids.add(foto.id);
+      }
+
+      if (foto.stagingId !== null) {
+        const stagingId: string = foto.stagingId.trim();
+
+        if (stagingId.length === 0) {
+          throw new Error('El identificador temporal de una foto no es válido.');
+        }
+
+        if (stagingIds.has(stagingId)) {
+          throw new Error('Hay imágenes temporales repetidas en el artículo.');
+        }
+
+        stagingIds.add(stagingId);
+      }
+
+      if (foto.principal) {
+        principalCount++;
+      }
+    }
+
+    if (principalCount > 1) {
+      throw new Error('Un artículo no puede tener más de una foto principal.');
+    }
+  }
+
+  /**
+   * Convierte las referencias públicas de fotos
+   * en records listos para el repository.
+   */
+  private async preparePhotos(
+    fotos: readonly ArticuloFotoSaveInterface[],
+    preparedAssets: PreparedImageAsset[],
+  ): Promise<readonly ArticuloFotoSaveRecord[]> {
+    const result: ArticuloFotoSaveRecord[] = [];
+
+    for (const foto of fotos) {
+      if (foto.id !== null) {
+        result.push({
+          idArchivo: foto.id,
+          nuevoArchivo: null,
+          orden: foto.orden,
+          principal: foto.principal,
+        });
+
+        continue;
+      }
+
+      if (foto.stagingId === null) {
+        throw new Error('Una foto nueva no contiene identificador temporal.');
+      }
+
+      const prepared: PreparedImageAsset = await this.imageAssetPromoter.prepare(
+        foto.stagingId.trim(),
+        'article_image',
+      );
+
+      preparedAssets.push(prepared);
+
+      result.push({
+        idArchivo: null,
+        nuevoArchivo: prepared.archivo,
+        orden: foto.orden,
+        principal: foto.principal,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Convierte el contrato público de guardado
+   * en el record interno utilizado por el repository.
+   */
+  private mapSaveRecord(
+    command: ArticuloSaveInterface,
+    fotos: readonly ArticuloFotoSaveRecord[],
+  ): ArticuloSaveRecord {
+    return {
+      id: command.id,
+      nombre: command.nombre,
+      idMarca: command.idMarca,
+      idProveedor: command.idProveedor,
+      idsCategorias: [...command.idsCategorias],
+      referencia: command.referencia,
+      precioAlbaranMicros: command.precioAlbaranMicros,
+      pucMicros: command.pucMicros,
+      pvpCents: command.pvpCents,
+      pvpDescuentoCents: command.pvpDescuentoCents,
+      ivaBps: command.ivaBps,
+      reBps: command.reBps,
+      margenMicroporcentaje: command.margenMicroporcentaje,
+      margenDescuentoMicroporcentaje: command.margenDescuentoMicroporcentaje,
+      stock: command.stock,
+      stockMin: command.stockMin,
+      stockMax: command.stockMax,
+      loteOptimo: command.loteOptimo,
+      ventaOnline: command.ventaOnline,
+      mostrarEnWeb: command.mostrarEnWeb,
+      descripcionCorta: command.descripcionCorta,
+      descripcionLarga: command.descripcionLarga,
+      observaciones: command.observaciones,
+      mostrarObservacionesPedidos: command.mostrarObservacionesPedidos,
+      mostrarObservacionesVentas: command.mostrarObservacionesVentas,
+      accesoDirecto: command.accesoDirecto,
+      codigosBarrasAdicionales: command.codigosBarrasAdicionales.map((codigo) => ({
+        id: codigo.id,
+        codigo: codigo.codigo.trim(),
+      })),
+      fotos,
+    };
+  }
+
+  /**
+   * Revierte todas las copias definitivas preparadas
+   * cuando la persistencia SQLite no se completa.
+   */
+  private async rollbackPreparedAssets(
+    preparedAssets: readonly PreparedImageAsset[],
+    originalError: unknown,
+  ): Promise<void> {
+    const rollbackErrors: unknown[] = [];
+
+    for (const prepared of preparedAssets) {
+      try {
+        await this.imageAssetPromoter.rollback(prepared);
+      } catch (rollbackError: unknown) {
+        rollbackErrors.push(rollbackError);
+      }
+    }
+
+    if (rollbackErrors.length > 0) {
+      throw new AggregateError(
+        [originalError, ...rollbackErrors],
+        'No se ha podido guardar el artículo ni limpiar todas las imágenes preparadas.',
+        {
+          cause: originalError,
+        },
+      );
+    }
+  }
+
+  /**
+   * Descarta las imágenes staged ya persistidas.
+   *
+   * Un fallo de limpieza no convierte en fallido
+   * un guardado que SQLite ya ha confirmado.
+   */
+  private async discardPreparedStaging(
+    preparedAssets: readonly PreparedImageAsset[],
+  ): Promise<void> {
+    await Promise.allSettled(
+      preparedAssets.map((prepared: PreparedImageAsset): Promise<void> =>
+        this.stagedImageDiscarder.discard(prepared.stagingId),
+      ),
+    );
   }
 
   /**

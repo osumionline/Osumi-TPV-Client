@@ -1,3 +1,4 @@
+import type ImageAssetPromoter from '@backend/contracts/files/image-asset-promoter.interface';
 import type StagedImageRegistry from '@backend/contracts/files/staged-image-registry.interface';
 import type ImageFileStorage from '@backend/contracts/system/image-file-storage.interface';
 import type { ProcessedImage } from '@backend/contracts/system/image-processor.interface';
@@ -15,7 +16,7 @@ import { createHash, randomUUID } from 'node:crypto';
  * Prepara imágenes de staging para su persistencia definitiva
  * sin modificar todavía SQLite ni consumir el staging original.
  */
-export default class ImageAssetPromotionService {
+export default class ImageAssetPromotionService implements ImageAssetPromoter {
   /**
    * Crea el servicio común de promoción de imágenes.
    */
