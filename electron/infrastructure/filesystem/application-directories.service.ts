@@ -10,11 +10,13 @@ export default class ApplicationDirectoriesService {
       this.paths.rootDirectory,
       this.paths.configDirectory,
       this.paths.assetsDirectory,
+      this.paths.filesDirectory,
       this.paths.databaseDirectory,
       this.paths.backupsDirectory,
       this.paths.logsDirectory,
       this.paths.secretsDirectory,
       this.paths.stagingDirectory,
+      this.paths.stagingFilesDirectory,
     ];
 
     await Promise.all(
