@@ -114,7 +114,7 @@
                type="file"
                name="logo-file"
                id="logo-file"
-               accept="image/png,image/jpeg"
+               accept="image/png,image/jpeg,image/webp"
                (change)="onLogoChange($event)">
         @if (installationForm.negocio.logoDataUrl().value() !== '') {
         <img [src]="installationForm.negocio.logoDataUrl().value()"

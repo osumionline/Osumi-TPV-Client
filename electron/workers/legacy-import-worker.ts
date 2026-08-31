@@ -1,4 +1,5 @@
 import type LegacyImportProgressListener from '@backend/contracts/legacy-import/legacy-import-progress-listener.type';
+import type { ImageProcessor } from '@backend/contracts/system/image-processor.interface';
 import DefaultLegacyImportCatalogNormalizer from '@backend/domain/legacy-import/default-legacy-import-catalog.normalizer';
 import DefaultLegacyImportCatalogValidator from '@backend/domain/legacy-import/default-legacy-import-catalog.validator';
 import type LegacyImportExecutionSummary from '@backend/domain/legacy-import/legacy-import-execution-summary.interface';
@@ -14,6 +15,7 @@ import completeDatabaseSchemaTables from '@infrastructure/database/schema/comple
 import DatabaseSchemaService from '@infrastructure/database/schema/database-schema.service';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import TypeOrmLegacyImportDatabase from '@infrastructure/database/typeorm/typeorm-legacy-import-database';
+import SharpImageProcessor from '@infrastructure/filesystem/sharp-image.processor';
 import DefaultLegacyImportCatalogReader from '@infrastructure/legacy-import/default-legacy-import-catalog.reader';
 import LegacyImportCashDataImporter from '@infrastructure/legacy-import/legacy-import-cash-data.importer';
 import LegacyImportCatalogImporter from '@infrastructure/legacy-import/legacy-import-catalog.importer';
@@ -79,6 +81,8 @@ async function run(): Promise<void> {
   const legacyImportPublicIdFactory: LegacyImportPublicIdFactory =
     new LegacyImportPublicIdFactory();
 
+  const imageProcessor: ImageProcessor = new SharpImageProcessor();
+
   const legacyImportMasterDataImporter: LegacyImportMasterDataImporter =
     new LegacyImportMasterDataImporter(
       legacyImportDumpReader,
@@ -112,6 +116,7 @@ async function run(): Promise<void> {
     data.stagingFilesDirectory,
     legacyImportCatalogReader,
     legacyImportPublicIdFactory,
+    imageProcessor,
   );
 
   const legacyImportCustomerDataImporter: LegacyImportCustomerDataImporter =

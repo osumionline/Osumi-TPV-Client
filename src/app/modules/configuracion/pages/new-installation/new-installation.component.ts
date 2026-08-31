@@ -60,7 +60,7 @@ export default class NewInstallationComponent {
   private readonly applicationStateService: ApplicationStateService =
     inject(ApplicationStateService);
 
-  private readonly acceptedLogoTypes: readonly string[] = ['image/jpeg', 'image/png'];
+  private readonly acceptedLogoTypes: readonly string[] = ['image/jpeg', 'image/png', 'image/webp'];
 
   private readonly logoInput: Signal<ElementRef<HTMLInputElement>> =
     viewChild.required<ElementRef<HTMLInputElement>>('logoInput');
@@ -100,7 +100,7 @@ export default class NewInstallationComponent {
     this.logoError.set('');
 
     if (!this.acceptedLogoTypes.includes(file.type)) {
-      this.logoError.set('El logo debe ser una imagen JPG o PNG.');
+      this.logoError.set('El logo debe ser una imagen JPG, PNG o WebP.');
       input.value = '';
       return;
     }

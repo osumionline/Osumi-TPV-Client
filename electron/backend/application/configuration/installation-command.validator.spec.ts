@@ -14,6 +14,23 @@ describe('validateInstallationCommand', (): void => {
     expect(errors).toEqual([]);
   });
 
+  it('acepta un logo WebP como entrada de la instalación', (): void => {
+    const command: InstallationCommand = createValidCommand();
+
+    const webpCommand: InstallationCommand = {
+      ...command,
+      logo: {
+        fileName: 'logo.webp',
+        mimeType: 'image/webp',
+        dataUrl: 'data:image/webp;base64,AA==',
+      },
+    };
+
+    const errors: InstallationValidationError[] = validateInstallationCommand(webpCommand);
+
+    expect(errors).toEqual([]);
+  });
+
   it('rechaza variables de plantilla no soportadas', (): void => {
     const command: InstallationCommand = createValidCommand();
 

@@ -1,18 +1,22 @@
 import type LegacyImportCatalogReader from '@backend/contracts/legacy-import/legacy-import-catalog-reader.interface';
 import type LegacyImportPhaseImporter from '@backend/contracts/legacy-import/legacy-import-phase-importer.interface';
 import type LegacyImportProgressListener from '@backend/contracts/legacy-import/legacy-import-progress-listener.type';
+import type {
+  ImageProcessor,
+  ProcessedImage,
+} from '@backend/contracts/system/image-processor.interface';
+import IMAGE_ASSET_DIRECTORY_BY_PURPOSE from '@backend/domain/files/image-asset.constants';
+import type { ImageAssetPurpose } from '@backend/domain/files/image-asset.interface';
 import type LegacyImportCatalogSnapshot from '@backend/domain/legacy-import/legacy-import-catalog-snapshot';
 import type LegacyImportExecutionCommand from '@backend/domain/legacy-import/legacy-import-execution-command.interface';
 import type LegacyImportFileInventoryItem from '@backend/domain/legacy-import/legacy-import-file-inventory-item.interface';
 import type LegacyImportPhaseResult from '@backend/domain/legacy-import/legacy-import-phase-result.interface';
 import LegacyImportPublicIdFactory from '@infrastructure/legacy-import/legacy-import-public-id.factory';
 import { createHash } from 'node:crypto';
-import { createReadStream, createWriteStream } from 'node:fs';
-import { mkdir, rename, rm } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import type { Readable } from 'node:stream';
-import { Transform } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
 import type { QueryRunner } from 'typeorm';
 import type { Entry, Options, ZipFile } from 'yauzl';
 import { open } from 'yauzl';
@@ -20,34 +24,23 @@ import { open } from 'yauzl';
 type SupportedFileCategory = 'foto' | 'marca' | 'proveedor' | 'tipo_pago';
 
 interface FileCategoryDefinition {
-  readonly purpose: string;
-
-  readonly directory: string;
-
+  readonly purpose: ImageAssetPurpose;
   readonly sourceTable: string;
 }
 
 interface ExtractedLegacyFile {
   readonly id: number;
-
   readonly publicId: string;
-
   readonly inventoryItem: LegacyImportFileInventoryItem;
-
-  readonly purpose: string;
-
+  readonly purpose: ImageAssetPurpose;
   readonly internalName: string;
-
   readonly relativePath: string;
-
   readonly size: number;
-
-  readonly mimeType: string;
-
+  readonly mimeType: 'image/webp';
   readonly sha256: string;
-
+  readonly width: number;
+  readonly height: number;
   readonly createdAt: string;
-
   readonly updatedAt: string;
 }
 
@@ -61,9 +54,7 @@ interface IdRow {
 
 interface MutableCounters {
   importedRows: number;
-
   skippedRows: number;
-
   warningCount: number;
 }
 
@@ -72,33 +63,21 @@ const MAXIMUM_IMAGE_SIZE: number = 50 * 1024 * 1024;
 const CATEGORY_DEFINITIONS: Readonly<Record<SupportedFileCategory, FileCategoryDefinition>> = {
   foto: {
     purpose: 'article_image',
-
-    directory: 'articles',
-
     sourceTable: 'foto',
   },
 
   marca: {
     purpose: 'brand_image',
-
-    directory: 'brands',
-
     sourceTable: 'marca',
   },
 
   proveedor: {
     purpose: 'provider_image',
-
-    directory: 'providers',
-
     sourceTable: 'proveedor',
   },
 
   tipo_pago: {
     purpose: 'payment_type_icon',
-
-    directory: 'payment-types',
-
     sourceTable: 'tipo_pago',
   },
 };
@@ -108,6 +87,7 @@ export default class LegacyImportFilesImporter implements LegacyImportPhaseImpor
     private readonly stagingFilesDirectory: string,
     private readonly catalogReader: LegacyImportCatalogReader,
     private readonly publicIdFactory: LegacyImportPublicIdFactory,
+    private readonly imageProcessor: ImageProcessor,
   ) {}
 
   async import(
@@ -184,7 +164,6 @@ export default class LegacyImportFilesImporter implements LegacyImportPhaseImpor
         );
 
         await this.linkArticleFiles(queryRunner, catalog, extractedFiles, counters);
-
         await this.linkEntityFiles(queryRunner, extractedFiles);
 
         await queryRunner.commitTransaction();
@@ -302,20 +281,15 @@ export default class LegacyImportFilesImporter implements LegacyImportPhaseImpor
 
       for (const item of sortedItems) {
         const category: SupportedFileCategory = this.getSupportedCategory(item.logicalCategory);
-
         const definition: FileCategoryDefinition = CATEGORY_DEFINITIONS[category];
-
         const packagePath: string = this.getRequiredPackagePath(item);
-
         const entry: Entry | undefined = entries.get(packagePath);
 
         if (entry === undefined) {
           throw new Error(`No se encuentra ${packagePath} dentro del paquete.`);
         }
 
-        const mimeType: string = this.getRequiredMimeType(item);
-
-        const extension: string = this.getImageExtension(mimeType);
+        this.assertSupportedSourceMimeType(this.getRequiredMimeType(item));
 
         const publicId: string = this.publicIdFactory.create(
           command.sourceHash,
@@ -323,21 +297,20 @@ export default class LegacyImportFilesImporter implements LegacyImportPhaseImpor
           packagePath,
         );
 
-        const internalName: string = `${publicId}${extension}`;
+        const directory: string = IMAGE_ASSET_DIRECTORY_BY_PURPOSE[definition.purpose];
 
-        const relativePath: string = ['files', definition.directory, internalName].join('/');
+        const internalName: string = `${publicId}.webp`;
 
-        const destinationPath: string = join(
-          this.stagingFilesDirectory,
-          definition.directory,
-          internalName,
-        );
+        const relativePath: string = ['files', directory, internalName].join('/');
 
-        const extractedMetadata: {
-          readonly size: number;
+        const destinationPath: string = join(this.stagingFilesDirectory, directory, internalName);
 
-          readonly sha256: string;
-        } = await this.extractEntry(zipFile, entry, destinationPath, item);
+        const originalBuffer: Buffer = await this.extractAndVerifyEntry(zipFile, entry, item);
+
+        const processedImage: ProcessedImage =
+          await this.imageProcessor.convertToWebp(originalBuffer);
+
+        await this.writeProcessedImage(destinationPath, processedImage);
 
         const legacyId: number = this.getRequiredLegacyId(item);
 
@@ -355,9 +328,11 @@ export default class LegacyImportFilesImporter implements LegacyImportPhaseImpor
           purpose: definition.purpose,
           internalName,
           relativePath,
-          size: extractedMetadata.size,
-          mimeType,
-          sha256: extractedMetadata.sha256,
+          size: processedImage.sizeBytes,
+          mimeType: processedImage.mimeType,
+          sha256: processedImage.sha256,
+          width: processedImage.width,
+          height: processedImage.height,
           createdAt: photoDate?.createdAt ?? command.startedAt,
           updatedAt: photoDate?.updatedAt ?? command.startedAt,
         });
@@ -405,8 +380,8 @@ export default class LegacyImportFilesImporter implements LegacyImportPhaseImpor
             ?,
             ?,
             ?,
-            NULL,
-            NULL,
+            ?,
+            ?,
             ?,
             ?,
             NULL
@@ -422,6 +397,8 @@ export default class LegacyImportFilesImporter implements LegacyImportPhaseImpor
           file.mimeType,
           file.size,
           file.sha256,
+          file.width,
+          file.height,
           file.createdAt,
           file.updatedAt,
         ],
@@ -551,7 +528,6 @@ export default class LegacyImportFilesImporter implements LegacyImportPhaseImpor
       }
 
       const legacyId: number = this.getRequiredLegacyId(file.inventoryItem);
-
       const entityKey: string = `${category}:${legacyId}`;
 
       if (linkedEntityKeys.has(entityKey)) {
@@ -614,70 +590,72 @@ export default class LegacyImportFilesImporter implements LegacyImportPhaseImpor
     }
   }
 
-  private async extractEntry(
+  /**
+   * Extrae una imagen del paquete y valida sus bytes originales
+   * contra el inventario antes de cualquier transformación.
+   */
+  private async extractAndVerifyEntry(
     zipFile: ZipFile,
     entry: Entry,
-    destinationPath: string,
     item: LegacyImportFileInventoryItem,
-  ): Promise<{
-    readonly size: number;
-    readonly sha256: string;
-  }> {
+  ): Promise<Buffer> {
     const expectedSize: number = this.getRequiredSize(item);
 
     if (expectedSize > MAXIMUM_IMAGE_SIZE) {
       throw new Error(`El archivo ${entry.fileName} supera los 50 MB permitidos.`);
     }
 
+    const readStream: Readable = await this.openEntryStream(zipFile, entry);
+
+    const hash: ReturnType<typeof createHash> = createHash('sha256');
+
+    const chunks: Buffer[] = [];
+    let actualSize: number = 0;
+
+    for await (const chunk of readStream) {
+      const buffer: Buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+
+      actualSize += buffer.length;
+
+      if (actualSize > MAXIMUM_IMAGE_SIZE) {
+        throw new Error(`El archivo ${entry.fileName} supera los 50 MB permitidos.`);
+      }
+
+      hash.update(buffer);
+      chunks.push(buffer);
+    }
+
+    const actualSha256: string = hash.digest('hex');
+
+    if (actualSize !== expectedSize) {
+      throw new Error(`El tamaño extraído de ${entry.fileName} no coincide con el inventario.`);
+    }
+
+    if (actualSha256 !== this.getRequiredSha256(item)) {
+      throw new Error(`El hash extraído de ${entry.fileName} no coincide con el inventario.`);
+    }
+
+    return Buffer.concat(chunks, actualSize);
+  }
+
+  /**
+   * Escribe de forma atómica el WebP definitivo
+   * generado durante la importación legacy.
+   */
+  private async writeProcessedImage(destinationPath: string, image: ProcessedImage): Promise<void> {
     await mkdir(dirname(destinationPath), {
       recursive: true,
     });
 
     const temporaryPath: string = `${destinationPath}.tmp`;
 
-    const readStream: Readable = await this.openEntryStream(zipFile, entry);
-
-    const hash: ReturnType<typeof createHash> = createHash('sha256');
-
-    let actualSize: number = 0;
-
-    const verifier: Transform = new Transform({
-      transform(
-        chunk: Buffer,
-        _encoding: BufferEncoding,
-        callback: (error: Error | null, data?: Buffer) => void,
-      ): void {
-        actualSize += chunk.length;
-        hash.update(chunk);
-        callback(null, chunk);
-      },
-    });
-
     try {
-      await pipeline(
-        readStream,
-        verifier,
-        createWriteStream(temporaryPath, {
-          mode: 0o600,
-        }),
-      );
-
-      const actualSha256: string = hash.digest('hex');
-
-      if (actualSize !== expectedSize) {
-        throw new Error(`El tamaño extraído de ${entry.fileName} no coincide con el inventario.`);
-      }
-
-      if (actualSha256 !== this.getRequiredSha256(item)) {
-        throw new Error(`El hash extraído de ${entry.fileName} no coincide con el inventario.`);
-      }
+      await writeFile(temporaryPath, image.buffer, {
+        mode: 0o600,
+        flag: 'wx',
+      });
 
       await rename(temporaryPath, destinationPath);
-
-      return {
-        size: actualSize,
-        sha256: actualSha256,
-      };
     } catch (error: unknown) {
       await rm(temporaryPath, {
         force: true,
@@ -708,7 +686,6 @@ export default class LegacyImportFilesImporter implements LegacyImportPhaseImpor
 
   private async assertPackageHash(packagePath: string, expectedHash: string): Promise<void> {
     const hash: ReturnType<typeof createHash> = createHash('sha256');
-
     const stream: ReturnType<typeof createReadStream> = createReadStream(packagePath);
 
     for await (const chunk of stream) {
@@ -826,20 +803,20 @@ export default class LegacyImportFilesImporter implements LegacyImportPhaseImpor
     });
   }
 
-  private getImageExtension(mimeType: string): string {
-    switch (mimeType.toLowerCase()) {
-      case 'image/webp':
-        return '.webp';
+  /**
+   * Comprueba que el MIME declarado por el inventario
+   * corresponda a uno de los formatos de entrada admitidos.
+   */
+  private assertSupportedSourceMimeType(mimeType: string): void {
+    const normalizedMimeType: string = mimeType.toLowerCase();
 
-      case 'image/png':
-        return '.png';
-
-      case 'image/jpeg':
-      case 'image/jpg':
-        return '.jpg';
-
-      default:
-        throw new Error(`Tipo de imagen no admitido: ${mimeType}.`);
+    if (
+      normalizedMimeType !== 'image/webp' &&
+      normalizedMimeType !== 'image/png' &&
+      normalizedMimeType !== 'image/jpeg' &&
+      normalizedMimeType !== 'image/jpg'
+    ) {
+      throw new Error(`Tipo de imagen no admitido: ${mimeType}.`);
     }
   }
 

@@ -327,7 +327,7 @@ export function validateInstallationCommand(
     );
   }
 
-  const acceptedLogoTypes: readonly string[] = ['image/jpeg', 'image/png'];
+  const acceptedLogoTypes: readonly string[] = ['image/jpeg', 'image/png', 'image/webp'];
 
   if (!acceptedLogoTypes.includes(command.logo.mimeType)) {
     addError('logo.mimeType', 'El formato del logo no está permitido.');
