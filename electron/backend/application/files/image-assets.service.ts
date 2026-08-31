@@ -1,22 +1,16 @@
+import type CreateImageAssetCommand from '@backend/application/files/create-image-asset-command.interface';
 import type ArchivosRepository from '@backend/contracts/files/archivos.repository.interface';
 import type ImageFileStorage from '@backend/contracts/system/image-file-storage.interface';
-import type { ProcessedImage } from '@backend/contracts/system/image-processor.interface';
-import { type ImageProcessor } from '@backend/contracts/system/image-processor.interface';
+import type {
+  ImageProcessor,
+  ProcessedImage,
+} from '@backend/contracts/system/image-processor.interface';
 import type {
   ArchivoCreateRecord,
   ArchivoRecord,
 } from '@backend/domain/files/archivo-record.interface';
-import type {
-  ImageAssetPurpose,
-  StoredImageFile,
-} from '@backend/domain/files/image-asset.interface';
+import type { StoredImageFile } from '@backend/domain/files/image-asset.interface';
 import { randomUUID } from 'node:crypto';
-
-export interface CreateImageAssetCommand {
-  readonly purpose: ImageAssetPurpose;
-  readonly originalName: string | null;
-  readonly buffer: Buffer;
-}
 
 /**
  * Coordina procesamiento, almacenamiento físico
@@ -38,9 +32,7 @@ export default class ImageAssetsService {
    */
   async create(command: CreateImageAssetCommand): Promise<ArchivoRecord> {
     const processedImage: ProcessedImage = await this.imageProcessor.convertToWebp(command.buffer);
-
     const publicId: string = randomUUID();
-
     const storedFile: StoredImageFile = await this.imageFileStorage.save(
       command.purpose,
       publicId,
@@ -63,21 +55,25 @@ export default class ImageAssetsService {
     try {
       return await this.archivosRepository.create(archivoCommand);
     } catch (error: unknown) {
-      await this.cleanStoredFile(storedFile.relativePath);
-
+      await this.rollbackStoredFile(storedFile.relativePath, error);
       throw error;
     }
   }
 
   /**
-   * Intenta eliminar un fichero escrito cuando
-   * su registro SQLite no ha podido crearse.
+   * Compensa el fichero escrito cuando falla el registro SQLite.
    */
-  private async cleanStoredFile(relativePath: string): Promise<void> {
+  private async rollbackStoredFile(relativePath: string, originalError: unknown): Promise<void> {
     try {
       await this.imageFileStorage.delete(relativePath);
-    } catch (error: unknown) {
-      console.error('No se ha podido limpiar una imagen huérfana:', error);
+    } catch (cleanupError: unknown) {
+      throw new AggregateError(
+        [originalError, cleanupError],
+        'No se ha podido registrar la imagen ni limpiar el archivo físico.',
+        {
+          cause: cleanupError,
+        },
+      );
     }
   }
 }

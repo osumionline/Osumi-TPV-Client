@@ -84,19 +84,19 @@ describe('TypeOrmArchivosRepository', (): void => {
       readonly height: number | null;
     }[] = await dataSource.query(
       `
-            SELECT
-              purpose,
-              original_name,
-              internal_name,
-              relative_path,
-              mime_type,
-              size_bytes,
-              sha256,
-              width,
-              height
-            FROM archivo
-            WHERE id = ?
-          `,
+        SELECT
+          purpose,
+          original_name,
+          internal_name,
+          relative_path,
+          mime_type,
+          size_bytes,
+          sha256,
+          width,
+          height
+        FROM archivo
+        WHERE id = ?
+      `,
       [result.id],
     );
 

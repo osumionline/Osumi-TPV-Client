@@ -5,8 +5,7 @@ import type {
 
 export default interface ArchivosRepository {
   /**
-   * Registra un archivo persistente y devuelve
-   * el registro creado.
+   * Registra un archivo persistente y devuelve el registro creado.
    */
   create(command: ArchivoCreateRecord): Promise<ArchivoRecord>;
 }

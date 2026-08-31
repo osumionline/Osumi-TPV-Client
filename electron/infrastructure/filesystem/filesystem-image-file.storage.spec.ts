@@ -24,7 +24,6 @@ describe('FilesystemImageFileStorage', (): void => {
     tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-images-'));
 
     const storage = new FilesystemImageFileStorage(tempDirectory);
-
     const image: ProcessedImage = createProcessedImage();
 
     const result: StoredImageFile = await storage.save('article_image', 'test-public-id', image);
@@ -55,6 +54,16 @@ describe('FilesystemImageFileStorage', (): void => {
     await storage.delete(result.relativePath);
 
     await expect(readFile(join(tempDirectory, 'brands', 'brand-public-id.webp'))).rejects.toThrow();
+  });
+
+  it('rechaza rutas que intentan escapar del storage', async (): Promise<void> => {
+    tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-images-'));
+
+    const storage = new FilesystemImageFileStorage(tempDirectory);
+
+    await expect(storage.delete('files/../outside.webp')).rejects.toThrow(
+      'La ruta del archivo no es válida.',
+    );
   });
 });
 

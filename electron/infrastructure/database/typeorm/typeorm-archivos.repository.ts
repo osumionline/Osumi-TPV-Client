@@ -13,7 +13,7 @@ interface DatabaseIdRow {
 
 /**
  * Persiste los metadatos de archivos gestionados
- * dentro de la base de datos principal.
+ * en la base de datos principal.
  */
 export default class TypeOrmArchivosRepository implements ArchivosRepository {
   /**
@@ -44,9 +44,7 @@ export default class TypeOrmArchivosRepository implements ArchivosRepository {
               width,
               height
             )
-            VALUES (
-              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `,
           [
             command.publicId,
@@ -73,14 +71,13 @@ export default class TypeOrmArchivosRepository implements ArchivosRepository {
   }
 
   /**
-   * Obtiene el identificador autoincremental
-   * insertado en la conexión actual.
+   * Obtiene el identificador autoincremental insertado.
    */
   private async readLastInsertedId(queryRunner: QueryRunner): Promise<number> {
     const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
       `
-          SELECT last_insert_rowid() AS id
-        `,
+        SELECT last_insert_rowid() AS id
+      `,
     )) as readonly DatabaseIdRow[];
 
     const id: number | undefined = rows[0]?.id;

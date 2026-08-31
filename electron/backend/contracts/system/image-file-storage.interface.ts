@@ -6,8 +6,7 @@ import type {
 
 export default interface ImageFileStorage {
   /**
-   * Guarda físicamente una imagen procesada
-   * en el almacenamiento definitivo.
+   * Guarda una imagen procesada en el almacenamiento definitivo.
    */
   save(
     purpose: ImageAssetPurpose,
@@ -16,7 +15,7 @@ export default interface ImageFileStorage {
   ): Promise<StoredImageFile>;
 
   /**
-   * Elimina físicamente un archivo previamente almacenado.
+   * Elimina un archivo previamente almacenado.
    */
   delete(relativePath: string): Promise<void>;
 }

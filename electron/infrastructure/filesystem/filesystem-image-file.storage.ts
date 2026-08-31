@@ -1,6 +1,6 @@
 import type ImageFileStorage from '@backend/contracts/system/image-file-storage.interface';
 import type { ProcessedImage } from '@backend/contracts/system/image-processor.interface';
-import { IMAGE_ASSET_DIRECTORY_BY_PURPOSE } from '@backend/domain/files/image-asset.constants';
+import IMAGE_ASSET_DIRECTORY_BY_PURPOSE from '@backend/domain/files/image-asset.constants';
 import type {
   ImageAssetPurpose,
   StoredImageFile,
@@ -12,7 +12,7 @@ const FILES_RELATIVE_PREFIX: string = 'files/';
 
 /**
  * Gestiona las imágenes definitivas almacenadas
- * dentro del directorio de assets de la aplicación.
+ * dentro del directorio de archivos de la aplicación.
  */
 export default class FilesystemImageFileStorage implements ImageFileStorage {
   /**
@@ -21,8 +21,7 @@ export default class FilesystemImageFileStorage implements ImageFileStorage {
   constructor(private readonly filesDirectory: string) {}
 
   /**
-   * Guarda atómicamente un WebP procesado
-   * dentro de la carpeta correspondiente a su purpose.
+   * Guarda atómicamente un WebP en la carpeta de su purpose.
    */
   async save(
     purpose: ImageAssetPurpose,
@@ -64,8 +63,7 @@ export default class FilesystemImageFileStorage implements ImageFileStorage {
   }
 
   /**
-   * Elimina un archivo comprobando previamente
-   * que permanezca dentro de filesDirectory.
+   * Elimina un archivo comprobando que pertenezca al storage.
    */
   async delete(relativePath: string): Promise<void> {
     const absolutePath: string = this.resolveManagedPath(relativePath);
@@ -76,8 +74,7 @@ export default class FilesystemImageFileStorage implements ImageFileStorage {
   }
 
   /**
-   * Evita que un identificador pueda introducir
-   * componentes arbitrarios en una ruta.
+   * Evita utilizar un publicId como componente arbitrario de ruta.
    */
   private assertSafePublicId(publicId: string): void {
     if (publicId.length === 0 || !/^[A-Za-z0-9_-]+$/.test(publicId)) {
@@ -86,8 +83,7 @@ export default class FilesystemImageFileStorage implements ImageFileStorage {
   }
 
   /**
-   * Resuelve una ruta relativa y evita escapes
-   * fuera del directorio administrado.
+   * Resuelve una ruta relativa evitando escapes fuera del storage.
    */
   private resolveManagedPath(relativePath: string): string {
     const normalizedPath: string = relativePath.replaceAll('\\', '/').replace(/^\/+/, '');
@@ -97,7 +93,6 @@ export default class FilesystemImageFileStorage implements ImageFileStorage {
     }
 
     const managedRelativePath: string = normalizedPath.slice(FILES_RELATIVE_PREFIX.length);
-
     const rootPath: string = resolve(this.filesDirectory);
     const absolutePath: string = resolve(rootPath, managedRelativePath);
     const relativeToRoot: string = relative(rootPath, absolutePath);

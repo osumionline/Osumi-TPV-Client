@@ -41,26 +41,21 @@ class FakeImageFileStorage implements ImageFileStorage {
    * Simula el guardado físico de una imagen.
    */
   save(purpose: ImageAssetPurpose, publicId: string): Promise<StoredImageFile> {
+    const directory: string = purpose === 'article_image' ? 'articles' : 'other';
+
     return Promise.resolve({
       internalName: `${publicId}.webp`,
-      relativePath: `files/${this.getDirectory(purpose)}/${publicId}.webp`,
+      relativePath: `files/${directory}/${publicId}.webp`,
     });
   }
 
   /**
-   * Registra qué fichero se ha eliminado.
+   * Registra el archivo eliminado.
    */
   delete(relativePath: string): Promise<void> {
     this.deletedPath = relativePath;
 
     return Promise.resolve();
-  }
-
-  /**
-   * Traduce el purpose usado por cada test.
-   */
-  private getDirectory(purpose: ImageAssetPurpose): string {
-    return purpose === 'article_image' ? 'articles' : 'other';
   }
 }
 
@@ -89,7 +84,6 @@ describe('ImageAssetsService', (): void => {
   it('procesa, almacena y registra una imagen', async (): Promise<void> => {
     const repository = new FakeArchivosRepository();
     const storage = new FakeImageFileStorage();
-
     const service = new ImageAssetsService(new FakeImageProcessor(), storage, repository);
 
     const result: ArchivoRecord = await service.create({
@@ -102,17 +96,14 @@ describe('ImageAssetsService', (): void => {
     expect(result.mimeType).toBe('image/webp');
     expect(result.originalName).toBe('foto.jpg');
     expect(result.relativePath).toMatch(/^files\/articles\/.+\.webp$/);
-
     expect(storage.deletedPath).toBeNull();
   });
 
   it('elimina el fichero si falla el registro SQLite', async (): Promise<void> => {
     const repository = new FakeArchivosRepository();
-
     repository.shouldFail = true;
 
     const storage = new FakeImageFileStorage();
-
     const service = new ImageAssetsService(new FakeImageProcessor(), storage, repository);
 
     await expect(

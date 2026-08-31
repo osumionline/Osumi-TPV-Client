@@ -5,7 +5,7 @@ import type {
   ArticuloRecord,
 } from '@backend/domain/articulos/articulo-record.interface';
 import type { ArticuloSaveRecord } from '@backend/domain/articulos/articulo-save-record.interface';
-import { HISTORICO_ARTICULO_TIPO_ARTICULO } from '@backend/domain/articulos/historico-articulo.constants';
+import HISTORICO_ARTICULO_TIPO from '@backend/domain/articulos/historico-articulo.constants';
 import { MONEY_SCALE, UNIT_PRICE_SCALE } from '@backend/domain/database/database-schema.constants';
 import { generateArticuloLocalizador } from '@backend/utils/articulo-localizador.utils';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
@@ -906,7 +906,7 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
       [
         randomUUID(),
         command.id,
-        HISTORICO_ARTICULO_TIPO_ARTICULO,
+        HISTORICO_ARTICULO_TIPO.ARTICULO,
         previousStock,
         command.stock - previousStock,
         command.stock,
