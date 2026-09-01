@@ -1,5 +1,4 @@
-export type ImageAssetPurpose =
-  'article_image' | 'brand_image' | 'provider_image' | 'payment_type_icon';
+export type { default as ImageAssetPurpose } from '@desktop-contracts/files/image-asset-purpose.type';
 
 export interface StoredImageFile {
   readonly internalName: string;

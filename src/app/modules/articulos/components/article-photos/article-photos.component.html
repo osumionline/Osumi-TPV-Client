@@ -1,0 +1,127 @@
+<section class="article-photos">
+    <header class="article-photos__header">
+        <div>
+            <strong>
+                Fotos
+            </strong>
+
+            <p>
+                Añade y ordena las imágenes del artículo.
+            </p>
+        </div>
+
+        <button mat-stroked-button
+                type="button"
+                [disabled]="uploading()"
+                (click)="openFilePicker(fileInput)">
+            <mat-icon>add_photo_alternate</mat-icon>
+            Añadir
+        </button>
+
+        <input #fileInput
+               class="article-photos__file-input"
+               type="file"
+               accept="image/*"
+               multiple
+               (change)="onFileSelection($event)">
+    </header>
+
+    <div class="article-photos__drop"
+         [class.article-photos__drop--active]="dragging()"
+         (dragover)="onDragOver($event)"
+         (dragleave)="onDragLeave($event)"
+         (drop)="onDrop($event)">
+        @if (uploading()) {
+        <mat-icon>hourglass_top</mat-icon>
+        <span>
+            Preparando imágenes…
+        </span>
+        } @else {
+        <mat-icon>cloud_upload</mat-icon>
+        <span>
+            También puedes arrastrar imágenes aquí
+        </span>
+        }
+    </div>
+
+    @if (error() !== null) {
+    <p class="article-photos__error">
+        {{ error() }}
+    </p>
+    }
+
+    <div class="article-photos__gallery">
+        @for (foto of fotos(); track foto.id ?? foto.stagingId; let index = $index) {
+        <article class="article-photos__item"
+                 [class.article-photos__item--principal]="foto.principal">
+            <div class="article-photos__preview">
+                <img [src]="foto.url"
+                     [alt]="foto.originalName ?? 'Foto del artículo'">
+
+                @if (foto.principal) {
+                <span class="article-photos__principal">
+                    Principal
+                </span>
+                }
+            </div>
+
+            <div class="article-photos__meta">
+                <span>
+                    {{ foto.originalName ?? 'Imagen' }}
+                </span>
+
+                <small>
+                    @if (foto.width !== null && foto.height !== null) {
+                    {{ foto.width }}×{{ foto.height }} ·
+                    }
+                    {{ formatSize(foto.sizeBytes) }}
+                </small>
+            </div>
+
+            <div class="article-photos__actions">
+                <button mat-icon-button
+                        type="button"
+                        matTooltip="Foto principal"
+                        [disabled]="foto.principal"
+                        (click)="setPrincipal(index)">
+                    <mat-icon>
+                        {{ foto.principal ? 'star' : 'star_border' }}
+                    </mat-icon>
+                </button>
+
+                <button mat-icon-button
+                        type="button"
+                        matTooltip="Mover antes"
+                        [disabled]="index === 0"
+                        (click)="moveUp(index)">
+                    <mat-icon>arrow_back</mat-icon>
+                </button>
+
+                <button mat-icon-button
+                        type="button"
+                        matTooltip="Mover después"
+                        [disabled]="index === fotos().length - 1"
+                        (click)="moveDown(index)">
+                    <mat-icon>arrow_forward</mat-icon>
+                </button>
+
+                <button mat-icon-button
+                        type="button"
+                        matTooltip="Eliminar"
+                        [disabled]="uploading()"
+                        (click)="remove(index)">
+                    <mat-icon>delete</mat-icon>
+                </button>
+            </div>
+        </article>
+        } @empty {
+        <div class="article-photos__empty">
+            <mat-icon>photo_library</mat-icon>
+
+            <span>
+                Este artículo todavía no tiene fotos.
+            </span>
+        </div>
+        }
+    </div>
+</section>

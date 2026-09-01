@@ -1,4 +1,4 @@
-import type { ImageAssetPurpose } from '@backend/domain/files/image-asset.interface';
+import type ImageAssetPurpose from '@desktop-contracts/files/image-asset-purpose.type';
 
 export default interface StagedImageInterface {
   readonly stagingId: string;

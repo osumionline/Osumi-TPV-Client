@@ -13,6 +13,8 @@ import type { InstallationCommand } from '@desktop-contracts/configuration/insta
 import type { InstallationResult } from '@desktop-contracts/configuration/installation-result.interface';
 import OsumiDesktopApi from '@desktop-contracts/desktop-api';
 import type EmpleadoInterface from '@desktop-contracts/empleados/empleado.interface';
+import type StageImageRequest from '@desktop-contracts/files/stage-image-request.interface';
+import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
 import type LegacyImportAnalysisReport from '@desktop-contracts/legacy-import/legacy-import-analysis-report.interface';
 import type LegacyImportPackageSelectionResult from '@desktop-contracts/legacy-import/legacy-import-package-selection-result.type';
 import type LegacyImportPreparationResult from '@desktop-contracts/legacy-import/legacy-import-preparation-result.interface';
@@ -122,6 +124,17 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
 
     install: (command: InstallationCommand): Promise<InstallationResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.configurationInstall, command) as Promise<InstallationResult>,
+  }),
+
+  files: Object.freeze({
+    stageArticleImage: (request: StageImageRequest): Promise<StagedImageInterface> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.filesStageArticleImage,
+        request,
+      ) as Promise<StagedImageInterface>,
+
+    discardStagedImage: (stagingId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.filesDiscardStagedImage, stagingId) as Promise<void>,
   }),
 
   printing: Object.freeze({

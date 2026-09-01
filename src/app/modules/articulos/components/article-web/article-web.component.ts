@@ -1,7 +1,11 @@
 import { Component, input, output, type InputSignal, type OutputEmitterRef } from '@angular/core';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
-import type { ArticuloDraftPatch } from '@model/articulos/articulo-draft.interface';
+import type {
+  ArticuloDraftPatch,
+  ArticuloFotoDraft,
+} from '@model/articulos/articulo-draft.interface';
 import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.interface';
+import ArticlePhotosComponent from '@modules/articulos/components/article-photos/article-photos.component';
 
 /**
  * Edita los datos específicos de publicación web
@@ -11,7 +15,7 @@ import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.i
   selector: 'otpv-article-web',
   templateUrl: './article-web.component.html',
   styleUrl: './article-web.component.scss',
-  imports: [MatSlideToggle],
+  imports: [ArticlePhotosComponent, MatSlideToggle],
 })
 export default class ArticleWebComponent {
   readonly tab: InputSignal<ArticuloWorkspaceTab> = input.required<ArticuloWorkspaceTab>();
@@ -45,6 +49,15 @@ export default class ArticleWebComponent {
 
     this.draftChangeEvent.emit({
       descripcionLarga: inputElement.value,
+    });
+  }
+
+  /**
+   * Actualiza conjuntamente la colección editable de fotos.
+   */
+  onFotosChange(fotos: readonly ArticuloFotoDraft[]): void {
+    this.draftChangeEvent.emit({
+      fotos,
     });
   }
 }

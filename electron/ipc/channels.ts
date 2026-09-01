@@ -38,6 +38,9 @@ const IPC_CHANNELS = {
   articulosGetAccesosDirectos: 'articulos:get-accesos-directos',
   articulosSetAccesoDirecto: 'articulos:set-acceso-directo',
 
+  filesStageArticleImage: 'files:stage-article-image',
+  filesDiscardStagedImage: 'files:discard-staged-image',
+
   cajaOpen: 'caja:open',
 
   reservasCreate: 'reservas:create',

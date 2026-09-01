@@ -1,12 +1,15 @@
 import { join } from 'node:path';
 
 import ApplicationStateService from '@backend/application/application/application-state.service';
+import ArticulosService from '@backend/application/articulos/articulos.service';
 import CajaService from '@backend/application/caja/caja.service';
 import CategoriasService from '@backend/application/categorias/categorias.service';
 import ClientesService from '@backend/application/clientes/clientes.service';
 import ConfigurationService from '@backend/application/configuration/configuration.service';
 import InstallationService from '@backend/application/configuration/installation.service';
 import EmpleadosService from '@backend/application/empleados/empleados.service';
+import ImageAssetPromotionService from '@backend/application/files/image-asset-promotion.service';
+import ImageStagingService from '@backend/application/files/image-staging.service';
 import LegacyImportService from '@backend/application/legacy-import/legacy-import.service';
 import MarcasService from '@backend/application/marcas/marcas.service';
 import PrintingService from '@backend/application/printing/printing.service';
@@ -23,6 +26,7 @@ import VentasPostventaService from '@backend/application/ventas/ventas-postventa
 import VentasTicketBaiService from '@backend/application/ventas/ventas-ticket-bai.service';
 import VentasTicketEmailService from '@backend/application/ventas/ventas-ticket-email.service';
 import VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
+import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';
 import type ClienteRepository from '@backend/contracts/clientes/cliente.repository.interface';
@@ -60,6 +64,7 @@ import completeDatabaseSchema from '@infrastructure/database/schema/complete-dat
 import completeDatabaseSchemaTables from '@infrastructure/database/schema/complete-database-schema.tables';
 import DatabaseSchemaService from '@infrastructure/database/schema/database-schema.service';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
+import TypeOrmArticulosRepository from '@infrastructure/database/typeorm/typeorm-articulos.repository';
 import TypeOrmCajaRepository from '@infrastructure/database/typeorm/typeorm-caja.repository';
 import TypeOrmCategoriaRepository from '@infrastructure/database/typeorm/typeorm-categoria.repository';
 import TypeOrmClienteRepository from '@infrastructure/database/typeorm/typeorm-cliente.repository';
@@ -88,6 +93,8 @@ import { getMainWindow } from '@infrastructure/electron/main-window';
 import NodemailerEmailSender from '@infrastructure/email/nodemailer-email.sender';
 import FileInstallationStaging from '@infrastructure/filesystem/file-installation-staging';
 import FileVentaTicketPdfStorage from '@infrastructure/filesystem/file-venta-ticket-pdf.storage';
+import FilesystemImageFileStorage from '@infrastructure/filesystem/filesystem-image-file.storage';
+import FilesystemImageStagingStorage from '@infrastructure/filesystem/filesystem-image-staging.storage';
 import JsonAppDataRepository from '@infrastructure/filesystem/json-app-data.repository';
 import JsonPrintingSettingsRepository from '@infrastructure/filesystem/json-printing-settings.repository';
 import SharpImageProcessor from '@infrastructure/filesystem/sharp-image.processor';
@@ -100,11 +107,13 @@ import YauzlLegacyImportPackageInspector from '@infrastructure/legacy-import/yau
 import NodeScryptPasswordHasher from '@infrastructure/security/node-scrypt-password-hasher';
 import TicketBaiWsTicketBaiClient from '@infrastructure/ticket-bai/ticket-bai-ws.client';
 import registerApplicationIpc from '@ipc/register-application-ipc';
+import registerArticulosIpc from '@ipc/register-articulos-ipc';
 import registerCajaIpc from '@ipc/register-caja-ipc';
 import registerCategoriasIpc from '@ipc/register-categorias-ipc';
 import registerClientesIpc from '@ipc/register-clientes-ipc';
 import registerConfigurationIpc from '@ipc/register-configuration-ipc';
 import registerEmpleadosIpc from '@ipc/register-empleados-ipc';
+import registerFilesIpc from '@ipc/register-files-ipc';
 import registerLegacyImportIpc from '@ipc/register-legacy-import-ipc';
 import registerMarcasIpc from '@ipc/register-marcas-ipc';
 import registerPrintingIpc from '@ipc/register-printing-ipc';
@@ -112,14 +121,6 @@ import registerProveedoresIpc from '@ipc/register-proveedores-ipc';
 import registerReservasIpc from '@ipc/register-reservas-ipc';
 import { registerSystemIpc } from '@ipc/register-system-ipc';
 import registerVentasIpc from '@ipc/register-ventas-ipc';
-import ArticulosService from '@backend/application/articulos/articulos.service';
-import ImageAssetPromotionService from '@backend/application/files/image-asset-promotion.service';
-import ImageStagingService from '@backend/application/files/image-staging.service';
-import TypeOrmArticulosRepository from '@infrastructure/database/typeorm/typeorm-articulos.repository';
-import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
-import FilesystemImageFileStorage from '@infrastructure/filesystem/filesystem-image-file.storage';
-import FilesystemImageStagingStorage from '@infrastructure/filesystem/filesystem-image-staging.storage';
-import registerArticulosIpc from '@ipc/register-articulos-ipc';
 
 /**
  * Construye el grafo de dependencias de la aplicación,
@@ -203,7 +204,7 @@ export default function createApplicationComposition(
    * Servicios operativos.
    */
   const assetUrlBuilder: AssetUrlBuilder = new ElectronAssetUrlBuilder();
-  
+
   /*
    * Infraestructura operacional de imágenes.
    */
@@ -452,6 +453,7 @@ export default function createApplicationComposition(
    */
   registerApplicationIpc(applicationStateService);
   registerArticulosIpc(getMainWindow, articulosService);
+  registerFilesIpc(getMainWindow, imageStagingService);
   registerMarcasIpc(getMainWindow, marcasService);
   registerProveedoresIpc(getMainWindow, proveedoresService);
   registerEmpleadosIpc(getMainWindow, empleadosService);
