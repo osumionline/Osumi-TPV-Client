@@ -3,7 +3,7 @@
 }
 
 .general {
-    padding: 24px;
+    padding: 16px 20px;
 
     .general__state {
         display: flex;
@@ -18,30 +18,34 @@
         text-align: center;
     }
 
-    .general__grid {
+    .general__top-grid {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 20px 24px;
+        grid-template-columns: 250px 150px 150px 200px;
+        grid-template-areas:
+            "brand iva re online"
+            "provider categories reference .";
+        align-items: end;
+        gap: 12px 28px;
     }
 
     .general__field {
         display: flex;
         min-width: 0;
         flex-direction: column;
-        gap: 6px;
+        gap: 4px;
 
         >span,
         >label {
             font-size: 13px;
-            font-weight: 500;
+            font-weight: 600;
         }
 
         >input,
         >select,
         .general__select-action>select {
             width: 100%;
-            height: 40px;
-            padding: 0 12px;
+            height: 36px;
+            padding: 0 10px;
             border: 1px solid var(--color-dark-grey);
             border-radius: 4px;
             box-sizing: border-box;
@@ -61,11 +65,35 @@
         }
     }
 
+    .general__field--brand {
+        grid-area: brand;
+    }
+
+    .general__field--provider {
+        grid-area: provider;
+    }
+
+    .general__field--iva {
+        grid-area: iva;
+    }
+
+    .general__field--re {
+        grid-area: re;
+    }
+
+    .general__field--categories {
+        grid-area: categories;
+    }
+
+    .general__field--reference {
+        grid-area: reference;
+    }
+
     .general__select-action {
         display: flex;
         min-width: 0;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
 
         >select {
             min-width: 0;
@@ -73,73 +101,109 @@
         }
 
         >button {
-            flex: 0 0 auto;
+            width: 36px;
+            min-width: 36px;
+            height: 36px;
+            flex: 0 0 36px;
         }
     }
 
-    .general__field--categories {
-        grid-column: 1 / -1;
-    }
-
-    .general__categories {
+    .general__categories-select {
         display: flex;
-        max-height: 180px;
-        flex-direction: column;
-        gap: 4px;
-        padding: 8px;
-        overflow-y: auto;
+        width: 100%;
+        height: 36px;
+        align-items: center;
+        padding: 0 10px;
         border: 1px solid var(--color-dark-grey);
         border-radius: 4px;
+        box-sizing: border-box;
+        background-color: var(--color-white);
+        font: inherit;
     }
 
-    .general__category {
+    .general__online {
         display: flex;
-        min-height: 30px;
-        align-items: center;
-        gap: 8px;
-        cursor: pointer;
+        grid-area: online;
+        flex-direction: column;
+        gap: 4px;
+        align-self: end;
+        min-height: 56px;
+        justify-content: flex-end;
     }
 
-    .general__empty {
-        padding: 8px;
-        opacity: 0.65;
+    .general__control-label {
+        font-size: 13px;
+        font-weight: 600;
     }
 
-    .general__toggle {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        cursor: pointer;
-    }
-
-    .general__prices {
-        margin-top: 28px;
-        padding-top: 24px;
-        border-top: 1px solid var(--separator-color);
-
-        h3 {
-            margin: 0 0 16px;
-        }
-    }
-
-    .general__prices-grid {
+    .general__bottom-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 20px 24px;
+        grid-template-columns: max-content max-content max-content;
+        align-items: start;
+        gap: 44px;
+        margin-top: 20px;
+    }
+
+    .general__numeric-group,
+    .general__discount-group {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .general__inline-field {
+        display: grid;
+        grid-template-columns: 130px 112px;
+        align-items: center;
+        gap: 10px;
+
+        >span {
+            font-size: 13px;
+            font-weight: 600;
+            text-align: right;
+        }
+
+        >input {
+            width: 112px;
+            height: 36px;
+            padding: 0 10px;
+            border: 1px solid var(--color-dark-grey);
+            border-radius: 4px;
+            box-sizing: border-box;
+            background-color: var(--color-white);
+            font: inherit;
+            text-align: right;
+            outline: 0;
+
+            &:focus {
+                border-color: var(--main-color);
+            }
+
+            &:disabled {
+                background-color: var(--color-very-light-grey);
+                cursor: not-allowed;
+                opacity: 0.7;
+            }
+        }
     }
 
     .general__discount-toggle {
-        margin-top: 20px;
-    }
-
-    .general__discount-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 20px 24px;
-        margin-top: 20px;
-        padding: 20px;
-        border: 1px solid var(--separator-color);
-        border-radius: 4px;
+        grid-template-columns: 130px auto;
+        min-height: 36px;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+
+        >span {
+            font-size: 13px;
+            font-weight: 600;
+            text-align: right;
+        }
+
+        >input {
+            justify-self: start;
+        }
     }
 
     .general__calculation-error {
@@ -147,20 +211,45 @@
         color: var(--color-error);
         font-size: 13px;
     }
+}
 
-    .general__stock {
-        margin-top: 28px;
-        padding-top: 24px;
-        border-top: 1px solid var(--separator-color);
+@media (max-width: 900px) {
+    .general {
+        .general__top-grid {
+            grid-template-columns: 250px 200px;
+            grid-template-areas:
+                "brand iva"
+                "provider re"
+                "categories reference"
+                "online online";
+        }
 
-        h3 {
-            margin: 0 0 16px;
+        .general__bottom-grid {
+            grid-template-columns: max-content max-content;
+            gap: 24px 40px;
         }
     }
+}
 
-    .general__stock-grid {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 20px;
+@media (max-width: 600px) {
+    .general {
+        padding: 14px;
+
+        .general__top-grid {
+            grid-template-columns: minmax(0, 1fr);
+            grid-template-areas:
+                "brand"
+                "provider"
+                "iva"
+                "re"
+                "categories"
+                "reference"
+                "online";
+        }
+
+        .general__bottom-grid {
+            grid-template-columns: max-content;
+            gap: 20px;
+        }
     }
 }

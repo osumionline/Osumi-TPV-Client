@@ -1,5 +1,6 @@
 import {
   formatScaledDecimal,
+  isTransientScaledDecimalInput,
   numberToScaledInteger,
   parseScaledDecimal,
 } from '@model/articulos/articulo-scaled-decimal.utils';
@@ -39,6 +40,15 @@ describe('articulo-scaled-decimal.utils', (): void => {
 
   it('formats micropercentages without unnecessary zeros', (): void => {
     expect(formatScaledDecimal(26_000_000, 6)).toBe('26');
+  });
+
+  it('detects transient decimal input while the user is typing', (): void => {
+    expect(isTransientScaledDecimalInput('')).toBe(true);
+    expect(isTransientScaledDecimalInput('-')).toBe(true);
+    expect(isTransientScaledDecimalInput('12,')).toBe(true);
+    expect(isTransientScaledDecimalInput('12.')).toBe(true);
+    expect(isTransientScaledDecimalInput('12,5')).toBe(false);
+    expect(isTransientScaledDecimalInput('12.5')).toBe(false);
   });
 
   it('rejects invalid decimal input', (): void => {

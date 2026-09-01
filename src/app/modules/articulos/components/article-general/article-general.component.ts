@@ -12,13 +12,17 @@ import {
   type WritableSignal,
 } from '@angular/core';
 import { MatButton, MatIconButton } from '@angular/material/button';
+import { MatOption } from '@angular/material/core';
 import { MatIcon } from '@angular/material/icon';
+import { MatSelect, type MatSelectChange } from '@angular/material/select';
+import { MatSlideToggle } from '@angular/material/slide-toggle';
 import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
 import type { ArticuloDraftPatch } from '@model/articulos/articulo-draft.interface';
 import ArticuloPriceCalculator from '@model/articulos/articulo-price-calculator';
 import {
   formatScaledDecimal,
+  isTransientScaledDecimalInput,
   numberToScaledInteger,
   parseScaledDecimal,
 } from '@model/articulos/articulo-scaled-decimal.utils';
@@ -40,6 +44,8 @@ type ArticleIntegerField = 'stock' | 'stockMin' | 'stockMax' | 'loteOptimo';
 type ArticlePriceField =
   'precioAlbaran' | 'puc' | 'margen' | 'pvp' | 'margenDescuento' | 'pvpDescuento';
 
+type ArticleDecimalField = ArticlePriceField | 'descuento';
+
 interface ArticleFiscalOption {
   readonly key: string;
   readonly ivaBps: number;
@@ -58,6 +64,9 @@ interface ArticleFiscalOption {
     MatButton,
     MatIconButton,
     MatIcon,
+    MatOption,
+    MatSelect,
+    MatSlideToggle,
     ProviderQuickCreateComponent,
   ],
 })
@@ -73,6 +82,9 @@ export default class ArticleGeneralComponent implements OnInit {
 
   readonly loading: WritableSignal<boolean> = signal<boolean>(true);
   readonly loadError: WritableSignal<string | null> = signal<string | null>(null);
+  readonly editingDecimalField: WritableSignal<ArticleDecimalField | null> =
+    signal<ArticleDecimalField | null>(null);
+  readonly editingDecimalValue: WritableSignal<string> = signal<string>('');
   readonly calculationError: WritableSignal<string | null> = signal<string | null>(null);
   readonly marcaModalOpen: WritableSignal<boolean> = signal<boolean>(false);
   readonly proveedorModalOpen: WritableSignal<boolean> = signal<boolean>(false);
@@ -299,33 +311,6 @@ export default class ArticleGeneralComponent implements OnInit {
   }
 
   /**
-   * Cambia el porcentaje de descuento.
-   */
-  onDiscountPercentageChange(event: Event): void {
-    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
-    const value: number | null = parseScaledDecimal(inputElement.value, 6);
-
-    if (value === null) {
-      this.calculationError.set('El valor de Descuento no es válido.');
-      this.restoreDiscountInput(inputElement);
-      return;
-    }
-
-    try {
-      const patch: ArticuloDraftPatch = ArticuloPriceCalculator.actualizarDescuento(
-        this.tab().draft,
-        value,
-      );
-
-      this.calculationError.set(null);
-      this.draftChangeEvent.emit(patch);
-    } catch (error: unknown) {
-      this.calculationError.set(getErrorMessage(error, 'No se ha podido actualizar el descuento.'));
-      this.restoreDiscountInput(inputElement);
-    }
-  }
-
-  /**
    * Indica si el artículo tiene descuento activo.
    */
   hasDescuento(): boolean {
@@ -340,32 +325,71 @@ export default class ArticleGeneralComponent implements OnInit {
   }
 
   /**
-   * Procesa la modificación de un campo de precio o margen.
+   * Inicia la edición directa de un decimal conservando
+   * literalmente el texto introducido por el usuario.
    */
-  onPriceChange(event: Event, field: ArticlePriceField): void {
-    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
-    const value: number | null = parseScaledDecimal(
-      inputElement.value,
-      this.getPriceScaleDigits(field),
-    );
+  onDecimalFocus(event: FocusEvent, field: ArticleDecimalField): void {
+    const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
 
-    if (value === null) {
-      this.calculationError.set(`El valor de ${this.getPriceFieldLabel(field)} no es válido.`);
-      this.restorePriceInput(inputElement, field);
+    this.editingDecimalField.set(field);
+    this.editingDecimalValue.set(inputElement.value);
+  }
+
+  /**
+   * Recalcula precios mientras el usuario escribe siempre
+   * que el decimal ya represente un valor completo.
+   */
+  onDecimalInput(event: Event, field: ArticleDecimalField): void {
+    const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
+    const rawValue: string = inputElement.value;
+
+    this.editingDecimalField.set(field);
+    this.editingDecimalValue.set(rawValue);
+
+    if (isTransientScaledDecimalInput(rawValue)) {
+      this.calculationError.set(null);
       return;
     }
 
-    try {
-      const patch: ArticuloDraftPatch = this.calculatePricePatch(field, value);
+    const value: number | null = parseScaledDecimal(rawValue, this.getDecimalScaleDigits(field));
 
-      this.calculationError.set(null);
-      this.draftChangeEvent.emit(patch);
-    } catch (error: unknown) {
-      this.calculationError.set(
-        getErrorMessage(error, `No se ha podido actualizar ${this.getPriceFieldLabel(field)}.`),
-      );
-      this.restorePriceInput(inputElement, field);
+    if (value === null) {
+      return;
     }
+
+    this.applyDecimalChange(field, value);
+  }
+
+  /**
+   * Finaliza la edición decimal, valida el valor pendiente
+   * y devuelve el campo a su representación formateada.
+   */
+  onDecimalBlur(event: FocusEvent, field: ArticleDecimalField): void {
+    const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
+    const value: number | null = parseScaledDecimal(
+      inputElement.value,
+      this.getDecimalScaleDigits(field),
+    );
+
+    if (value === null) {
+      this.calculationError.set(`El valor de ${this.getDecimalFieldLabel(field)} no es válido.`);
+    } else {
+      this.applyDecimalChange(field, value);
+    }
+
+    this.editingDecimalField.set(null);
+    this.editingDecimalValue.set('');
+  }
+
+  /**
+   * Obtiene el texto que debe mostrar un campo decimal.
+   */
+  getDecimalInputValue(field: ArticleDecimalField): string {
+    if (this.editingDecimalField() === field) {
+      return this.editingDecimalValue();
+    }
+
+    return this.formatDecimalField(field);
   }
 
   /**
@@ -397,24 +421,6 @@ export default class ArticleGeneralComponent implements OnInit {
   }
 
   /**
-   * Añade o elimina una categoría del artículo.
-   */
-  onCategoriaChange(event: Event, idCategoria: number): void {
-    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
-    const idsCategorias: Set<number> = new Set<number>(this.tab().draft.idsCategorias);
-
-    if (inputElement.checked) {
-      idsCategorias.add(idCategoria);
-    } else {
-      idsCategorias.delete(idCategoria);
-    }
-
-    this.draftChangeEvent.emit({
-      idsCategorias: [...idsCategorias],
-    });
-  }
-
-  /**
    * Actualiza la referencia.
    */
   onReferenciaInput(event: Event): void {
@@ -428,11 +434,9 @@ export default class ArticleGeneralComponent implements OnInit {
   /**
    * Activa o desactiva la preparación del artículo para venta online.
    */
-  onVentaOnlineChange(event: Event): void {
-    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
-
+  onVentaOnlineChange(checked: boolean): void {
     this.draftChangeEvent.emit({
-      ventaOnline: inputElement.checked,
+      ventaOnline: checked,
     });
   }
 
@@ -477,10 +481,23 @@ export default class ArticleGeneralComponent implements OnInit {
   }
 
   /**
-   * Indica si una categoría pertenece al artículo.
+   * Actualiza conjuntamente las categorías seleccionadas.
    */
-  isCategoriaSelected(categoria: Categoria): boolean {
-    return categoria.id !== null && this.tab().draft.idsCategorias.includes(categoria.id);
+  onCategoriasChange(event: MatSelectChange): void {
+    const rawValue: unknown = event.value;
+
+    if (!Array.isArray(rawValue)) {
+      return;
+    }
+
+    const idsCategorias: number[] = rawValue.filter(
+      (value: unknown): value is number =>
+        typeof value === 'number' && Number.isSafeInteger(value) && value > 0,
+    );
+
+    this.draftChangeEvent.emit({
+      idsCategorias: [...new Set<number>(idsCategorias)],
+    });
   }
 
   /**
@@ -625,6 +642,71 @@ export default class ArticleGeneralComponent implements OnInit {
   }
 
   /**
+   * Aplica un decimal ya validado al motor correspondiente.
+   */
+  private applyDecimalChange(field: ArticleDecimalField, value: number): void {
+    try {
+      const patch: ArticuloDraftPatch =
+        field === 'descuento'
+          ? ArticuloPriceCalculator.actualizarDescuento(this.tab().draft, value)
+          : this.calculatePricePatch(field, value);
+
+      this.calculationError.set(null);
+      this.draftChangeEvent.emit(patch);
+    } catch (error: unknown) {
+      this.calculationError.set(
+        getErrorMessage(error, `No se ha podido actualizar ${this.getDecimalFieldLabel(field)}.`),
+      );
+    }
+  }
+
+  /**
+   * Obtiene la escala decimal correspondiente a un campo editable.
+   */
+  private getDecimalScaleDigits(field: ArticleDecimalField): number {
+    return field === 'descuento' ? 6 : this.getPriceScaleDigits(field);
+  }
+
+  /**
+   * Obtiene el valor formateado actualmente almacenado.
+   */
+  private formatDecimalField(field: ArticleDecimalField): string {
+    switch (field) {
+      case 'precioAlbaran':
+        return this.formatMicros(this.tab().draft.precioAlbaranMicros);
+
+      case 'puc':
+        return this.formatMicros(this.tab().draft.pucMicros);
+
+      case 'margen':
+        return this.formatMargin(this.tab().draft.margenMicroporcentaje);
+
+      case 'pvp':
+        return this.formatCents(this.tab().draft.pvpCents);
+
+      case 'descuento':
+        return this.formatMargin(this.getDescuentoMicroporcentaje());
+
+      case 'margenDescuento':
+        return this.formatMargin(this.tab().draft.margenDescuentoMicroporcentaje ?? 0);
+
+      case 'pvpDescuento':
+        return this.formatCents(this.tab().draft.pvpDescuentoCents ?? 0);
+    }
+  }
+
+  /**
+   * Obtiene el nombre legible de un decimal editable.
+   */
+  private getDecimalFieldLabel(field: ArticleDecimalField): string {
+    if (field === 'descuento') {
+      return 'Descuento';
+    }
+
+    return this.getPriceFieldLabel(field);
+  }
+
+  /**
    * Calcula el patch correspondiente a una edición monetaria.
    */
   private calculatePricePatch(field: ArticlePriceField, value: number): ArticuloDraftPatch {
@@ -679,47 +761,6 @@ export default class ArticleGeneralComponent implements OnInit {
       case 'pvpDescuento':
         return 'PVP con descuento';
     }
-  }
-
-  /**
-   * Restaura visualmente el valor persistente del campo
-   * cuando una entrada no ha podido aplicarse.
-   */
-  private restorePriceInput(inputElement: HTMLInputElement, field: ArticlePriceField): void {
-    switch (field) {
-      case 'precioAlbaran':
-        inputElement.value = this.formatMicros(this.tab().draft.precioAlbaranMicros);
-        return;
-
-      case 'puc':
-        inputElement.value = this.formatMicros(this.tab().draft.pucMicros);
-        return;
-
-      case 'margen':
-        inputElement.value = this.formatMargin(this.tab().draft.margenMicroporcentaje);
-        return;
-
-      case 'pvp':
-        inputElement.value = this.formatCents(this.tab().draft.pvpCents);
-        return;
-
-      case 'margenDescuento':
-        inputElement.value = this.formatMargin(
-          this.tab().draft.margenDescuentoMicroporcentaje ?? 0,
-        );
-        return;
-
-      case 'pvpDescuento':
-        inputElement.value = this.formatCents(this.tab().draft.pvpDescuentoCents ?? 0);
-        return;
-    }
-  }
-
-  /**
-   * Restaura el descuento efectivo de la ficha.
-   */
-  private restoreDiscountInput(inputElement: HTMLInputElement): void {
-    inputElement.value = this.formatMargin(this.getDescuentoMicroporcentaje());
   }
 
   /**

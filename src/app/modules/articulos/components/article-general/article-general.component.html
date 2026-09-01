@@ -16,8 +16,8 @@
         </button>
     </div>
     } @else {
-    <div class="general__grid">
-        <div class="general__field">
+    <div class="general__top-grid">
+        <div class="general__field general__field--brand">
             <label for="article-brand">
                 Marca *
             </label>
@@ -49,7 +49,75 @@
             </div>
         </div>
 
-        <div class="general__field">
+        <div class="general__field general__field--iva">
+            <label for="article-iva">
+                IVA *
+            </label>
+
+            <select id="article-iva"
+                    (change)="onFiscalOptionChange($event)">
+                <option value=""
+                        disabled
+                        [selected]="tab().draft.ivaBps === null">
+                    Selecciona
+                </option>
+
+                @for (option of fiscalOptions(); track option.key) {
+                <option [value]="option.key"
+                        [selected]="isFiscalOptionSelected(option)">
+                    {{ formatBps(option.ivaBps) }} %
+                </option>
+                }
+            </select>
+        </div>
+
+        <div class="general__field general__field--re">
+            <label for="article-re">
+                RE *
+            </label>
+
+            @if (usesRecargoEquivalencia()) {
+            <select id="article-re"
+                    (change)="onFiscalOptionChange($event)">
+                <option value=""
+                        disabled
+                        [selected]="tab().draft.reBps === null">
+                    Selecciona
+                </option>
+
+                @for (option of fiscalOptions(); track option.key) {
+                <option [value]="option.key"
+                        [selected]="isFiscalOptionSelected(option)">
+                    {{ formatBps(option.reBps) }} %
+                </option>
+                }
+            </select>
+            } @else {
+            <select id="article-re"
+                    disabled>
+                <option selected>
+                    @if (tab().draft.ivaBps === null) {
+                    —
+                    } @else {
+                    0 %
+                    }
+                </option>
+            </select>
+            }
+        </div>
+
+        <div class="general__online">
+            <span class="general__control-label">
+                Venta online
+            </span>
+
+            <mat-slide-toggle [checked]="tab().draft.ventaOnline"
+                              (change)="onVentaOnlineChange($event.checked)">
+                {{ tab().draft.ventaOnline ? 'Activado' : 'Desactivado' }}
+            </mat-slide-toggle>
+        </div>
+
+        <div class="general__field general__field--provider">
             <label for="article-provider">
                 Proveedor
             </label>
@@ -81,7 +149,30 @@
             </div>
         </div>
 
-        <label class="general__field">
+        <div class="general__field general__field--categories">
+            <span>
+                Categorías
+            </span>
+
+            <mat-select class="general__categories-select"
+                        aria-label="Categorías"
+                        multiple
+                        placeholder="Sin categorías"
+                        [value]="tab().draft.idsCategorias"
+                        (selectionChange)="onCategoriasChange($event)">
+                @for (categoria of categoriasService.categoriasPlain(); track categoria.id) {
+                @if (categoria.id !== null) {
+                <mat-option [value]="categoria.id">
+                    <span [style.padding-left.px]="getCategoriaIndent(categoria)">
+                        {{ categoria.nombre }}
+                    </span>
+                </mat-option>
+                }
+                }
+            </mat-select>
+        </div>
+
+        <label class="general__field general__field--reference">
             <span>
                 Referencia
             </span>
@@ -91,109 +182,11 @@
                    [value]="tab().draft.referencia"
                    (input)="onReferenciaInput($event)">
         </label>
-
-        <div class="general__field general__field--categories">
-            <span>
-                Categorías
-            </span>
-
-            <div class="general__categories">
-                @for (categoria of categoriasService.categoriasPlain(); track categoria.id) {
-                @if (categoria.id !== null) {
-                <label class="general__category"
-                       [style.padding-left.px]="getCategoriaIndent(categoria)">
-                    <input type="checkbox"
-                           [checked]="isCategoriaSelected(categoria)"
-                           (change)="onCategoriaChange($event, categoria.id)">
-
-                    <span>
-                        {{ categoria.nombre }}
-                    </span>
-                </label>
-                }
-                } @empty {
-                <span class="general__empty">
-                    No hay categorías disponibles.
-                </span>
-                }
-            </div>
-        </div>
-
-        <label class="general__toggle">
-            <input type="checkbox"
-                   [checked]="tab().draft.ventaOnline"
-                   (change)="onVentaOnlineChange($event)">
-
-            <span>
-                Venta online
-            </span>
-        </label>
     </div>
 
-    <section class="general__prices">
-        <h3>
-            Fiscalidad y precios
-        </h3>
-
-        <div class="general__prices-grid">
-            <div class="general__field">
-                <label for="article-iva">
-                    IVA *
-                </label>
-
-                <select id="article-iva"
-                        (change)="onFiscalOptionChange($event)">
-                    <option value=""
-                            disabled
-                            [selected]="tab().draft.ivaBps === null">
-                        Selecciona un IVA
-                    </option>
-
-                    @for (option of fiscalOptions(); track option.key) {
-                    <option [value]="option.key"
-                            [selected]="isFiscalOptionSelected(option)">
-                        {{ formatBps(option.ivaBps) }} %
-                    </option>
-                    }
-                </select>
-            </div>
-
-            <div class="general__field">
-                <label for="article-re">
-                    RE *
-                </label>
-
-                @if (usesRecargoEquivalencia()) {
-                <select id="article-re"
-                        (change)="onFiscalOptionChange($event)">
-                    <option value=""
-                            disabled
-                            [selected]="tab().draft.reBps === null">
-                        Selecciona un RE
-                    </option>
-
-                    @for (option of fiscalOptions(); track option.key) {
-                    <option [value]="option.key"
-                            [selected]="isFiscalOptionSelected(option)">
-                        {{ formatBps(option.reBps) }} %
-                    </option>
-                    }
-                </select>
-                } @else {
-                <select id="article-re"
-                        disabled>
-                    <option selected>
-                        @if (tab().draft.ivaBps === null) {
-                        —
-                        } @else {
-                        0 %
-                        }
-                    </option>
-                </select>
-                }
-            </div>
-
-            <label class="general__field">
+    <div class="general__bottom-grid">
+        <div class="general__numeric-group">
+            <label class="general__inline-field">
                 <span>
                     Precio albarán (€)
                 </span>
@@ -202,11 +195,13 @@
                        inputmode="decimal"
                        autocomplete="off"
                        [disabled]="!hasFiscalidad()"
-                       [value]="formatMicros(tab().draft.precioAlbaranMicros)"
-                       (change)="onPriceChange($event, 'precioAlbaran')">
+                       [value]="getDecimalInputValue('precioAlbaran')"
+                       (focus)="onDecimalFocus($event, 'precioAlbaran')"
+                       (input)="onDecimalInput($event, 'precioAlbaran')"
+                       (blur)="onDecimalBlur($event, 'precioAlbaran')">
             </label>
 
-            <label class="general__field">
+            <label class="general__inline-field">
                 <span>
                     PUC (€)
                 </span>
@@ -215,11 +210,13 @@
                        inputmode="decimal"
                        autocomplete="off"
                        [disabled]="!hasFiscalidad()"
-                       [value]="formatMicros(tab().draft.pucMicros)"
-                       (change)="onPriceChange($event, 'puc')">
+                       [value]="getDecimalInputValue('puc')"
+                       (focus)="onDecimalFocus($event, 'puc')"
+                       (input)="onDecimalInput($event, 'puc')"
+                       (blur)="onDecimalBlur($event, 'puc')">
             </label>
 
-            <label class="general__field">
+            <label class="general__inline-field">
                 <span>
                     Margen (%)
                 </span>
@@ -229,8 +226,10 @@
                        autocomplete="off"
                        list="article-margin-options"
                        [disabled]="!hasFiscalidad()"
-                       [value]="formatMargin(tab().draft.margenMicroporcentaje)"
-                       (change)="onPriceChange($event, 'margen')">
+                       [value]="getDecimalInputValue('margen')"
+                       (focus)="onDecimalFocus($event, 'margen')"
+                       (input)="onDecimalInput($event, 'margen')"
+                       (blur)="onDecimalBlur($event, 'margen')">
 
                 <datalist id="article-margin-options">
                     @for (margin of marginOptions(); track margin) {
@@ -240,7 +239,7 @@
                 </datalist>
             </label>
 
-            <label class="general__field">
+            <label class="general__inline-field">
                 <span>
                     PVP (€)
                 </span>
@@ -249,24 +248,26 @@
                        inputmode="decimal"
                        autocomplete="off"
                        [disabled]="!hasFiscalidad()"
-                       [value]="formatCents(tab().draft.pvpCents)"
-                       (change)="onPriceChange($event, 'pvp')">
+                       [value]="getDecimalInputValue('pvp')"
+                       (focus)="onDecimalFocus($event, 'pvp')"
+                       (input)="onDecimalInput($event, 'pvp')"
+                       (blur)="onDecimalBlur($event, 'pvp')">
             </label>
         </div>
 
-        <label class="general__toggle general__discount-toggle">
-            <input type="checkbox"
-                   [checked]="hasDescuento()"
-                   (change)="onDescuentoChange($event)">
+        <div class="general__discount-group">
+            <label class="general__discount-toggle">
+                <span>
+                    Descuento
+                </span>
 
-            <span>
-                Aplicar descuento
-            </span>
-        </label>
+                <input type="checkbox"
+                       [checked]="hasDescuento()"
+                       (change)="onDescuentoChange($event)">
+            </label>
 
-        @if (hasDescuento()) {
-        <div class="general__discount-grid">
-            <label class="general__field">
+            @if (hasDescuento()) {
+            <label class="general__inline-field">
                 <span>
                     Descuento (%)
                 </span>
@@ -274,59 +275,45 @@
                 <input type="text"
                        inputmode="decimal"
                        autocomplete="off"
-                       [value]="formatMargin(getDescuentoMicroporcentaje())"
-                       (change)="onDiscountPercentageChange($event)">
+                       [value]="getDecimalInputValue('descuento')"
+                       (focus)="onDecimalFocus($event, 'descuento')"
+                       (input)="onDecimalInput($event, 'descuento')"
+                       (blur)="onDecimalBlur($event, 'descuento')">
             </label>
 
-            <label class="general__field">
+            <label class="general__inline-field">
                 <span>
-                    Margen (dto) (%)
+                    Margen dto. (%)
                 </span>
 
                 <input type="text"
                        inputmode="decimal"
                        autocomplete="off"
                        list="article-margin-options"
-                       [value]="
-                                         formatMargin(
-                                           tab().draft.margenDescuentoMicroporcentaje ?? 0
-                                         )
-                                       "
-                       (change)="onPriceChange($event, 'margenDescuento')">
+                       [value]="getDecimalInputValue('margenDescuento')"
+                       (focus)="onDecimalFocus($event, 'margenDescuento')"
+                       (input)="onDecimalInput($event, 'margenDescuento')"
+                       (blur)="onDecimalBlur($event, 'margenDescuento')">
             </label>
 
-            <label class="general__field">
+            <label class="general__inline-field">
                 <span>
-                    PVP (dto) (€)
+                    PVP dto. (€)
                 </span>
 
                 <input type="text"
                        inputmode="decimal"
                        autocomplete="off"
-                       [value]="
-                                         formatCents(
-                                           tab().draft.pvpDescuentoCents ?? 0
-                                         )
-                                       "
-                       (change)="onPriceChange($event, 'pvpDescuento')">
+                       [value]="getDecimalInputValue('pvpDescuento')"
+                       (focus)="onDecimalFocus($event, 'pvpDescuento')"
+                       (input)="onDecimalInput($event, 'pvpDescuento')"
+                       (blur)="onDecimalBlur($event, 'pvpDescuento')">
             </label>
+            }
         </div>
-        }
 
-        @if (calculationError() !== null) {
-        <p class="general__calculation-error">
-            {{ calculationError() }}
-        </p>
-        }
-    </section>
-
-    <section class="general__stock">
-        <h3>
-            Stock y planificación
-        </h3>
-
-        <div class="general__stock-grid">
-            <label class="general__field">
+        <div class="general__numeric-group">
+            <label class="general__inline-field">
                 <span>
                     Stock
                 </span>
@@ -337,7 +324,7 @@
                        (change)="onIntegerChange($event, 'stock', false)">
             </label>
 
-            <label class="general__field">
+            <label class="general__inline-field">
                 <span>
                     Stock mínimo
                 </span>
@@ -349,7 +336,7 @@
                        (change)="onIntegerChange($event, 'stockMin', true)">
             </label>
 
-            <label class="general__field">
+            <label class="general__inline-field">
                 <span>
                     Stock máximo
                 </span>
@@ -361,7 +348,7 @@
                        (change)="onIntegerChange($event, 'stockMax', true)">
             </label>
 
-            <label class="general__field">
+            <label class="general__inline-field">
                 <span>
                     Lote óptimo
                 </span>
@@ -373,7 +360,13 @@
                        (change)="onIntegerChange($event, 'loteOptimo', true)">
             </label>
         </div>
-    </section>
+    </div>
+
+    @if (calculationError() !== null) {
+    <p class="general__calculation-error">
+        {{ calculationError() }}
+    </p>
+    }
     }
 </section>
 

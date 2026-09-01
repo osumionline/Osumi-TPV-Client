@@ -36,6 +36,22 @@ export function parseScaledDecimal(value: string, scaleDigits: number): number |
 }
 
 /**
+ * Indica si un decimal se encuentra todavía en un estado
+ * intermedio válido mientras el usuario está escribiendo.
+ */
+export function isTransientScaledDecimalInput(value: string): boolean {
+  const normalizedValue: string = value.trim();
+
+  return (
+    normalizedValue === '' ||
+    normalizedValue === '+' ||
+    normalizedValue === '-' ||
+    normalizedValue.endsWith(',') ||
+    normalizedValue.endsWith('.')
+  );
+}
+
+/**
  * Convierte un número de configuración a un entero escalado
  * utilizando su representación decimal.
  */
