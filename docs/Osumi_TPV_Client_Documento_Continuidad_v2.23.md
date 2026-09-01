@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.22  
+**Versión:** 2.23  
 **Fecha:** 1 de septiembre de 2026  
-**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos** continúa en frontend. Todo `13B — Infraestructura backend` está cerrado, incluido `13B.6E — unificación total de imágenes en WebP`. `13C — Workspace y carga de artículos` está cerrado y probado. **`13D — General` queda completamente cerrado ✅, incluidos sus retoques finales `13D.R`: gestión global de accesos directos, layout compacto, toggles Material, categorías multiselección, edición reactiva de precios a dos decimales y modal de sugerencias de margen.** El siguiente apartado de Artículos es `13E — Códigos de barras`.
+**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos** continúa en frontend. Todo `13B — Infraestructura backend` está cerrado, incluido `13B.6E — unificación total de imágenes en WebP`. `13C — Workspace y carga de artículos` está cerrado y probado. **`13D — General` queda completamente cerrado ✅, incluidos sus retoques finales `13D.R`: gestión global de accesos directos, layout compacto, toggles Material, categorías multiselección, edición reactiva de precios a dos decimales y modal de sugerencias de margen.** El siguiente apartado de Artículos es **`13E — WEB`**, recuperado en el roadmap como mini-hito propio antes de Códigos de barras.
 
 > **Regla crítica de entorno TicketBAI:** el producto usa `production` por defecto. Durante desarrollo/pruebas manuales se usa `app_data.json → ticketBai.environment = "test"` junto con el token TEST correspondiente. No añadir selector de entorno a la UI.
 
@@ -69,12 +69,16 @@ Ventas 12 — Postventa                             🟦
   13D.R Retoques diseño/funcionalidad General     ✅
     13D.R1 Accesos directos                       ✅
     13D.R2 General compacto                       ✅
-  13E Códigos de barras                           🟦 SIGUIENTE
-  13F Observaciones                               ⬜
-  13G Histórico                                   ⬜
-  13H Baja / duplicado / acciones                 ⬜
-  13I Estadísticas                                ⏸️ diseño posterior
-  13J Integración con Ventas                      ⬜
+  13E WEB                                         🟦 SIGUIENTE
+    13E.1 Contenido WEB                            ⬜
+    13E.2 Fotos 0..N                               ⬜
+    13E.3 Guardado/validación WEB                  ⬜
+  13F Códigos de barras                           ⬜
+  13G Observaciones                               ⬜
+  13H Histórico                                   ⬜
+  13I Baja / duplicado / acciones                 ⬜
+  13J Estadísticas                                ⏸️ diseño posterior
+  13K Integración con Ventas                      ⬜
 
 14 Clientes                                       ⬜
 15 Almacén                                        ⬜
@@ -753,7 +757,7 @@ El apartado existía visualmente, pero nunca llegó a implementarse.
 Por tanto:
 
 ```text
-13I Estadísticas ⏸️
+13J Estadísticas ⏸️
 ```
 
 Se diseñará al final del módulo.
@@ -900,7 +904,7 @@ Guardar
 Se implementará en:
 
 ```text
-13J Integración con Ventas
+13K Integración con Ventas
 ```
 
 Desde una línea de venta:
@@ -2063,7 +2067,29 @@ PVP                 PVP dto.                        Lote óptimo
 # 29. Próximo paso exacto
 
 ```text
-13E — Códigos de barras
+13E — WEB
+```
+
+La pestaña WEB ya existe dinámicamente en el workspace cuando `Venta online = true`; falta implementar su contenido y flujos.
+
+Alcance previsto:
+
+```text
+13E.1 Contenido WEB
+  - Mostrar en web
+  - Descripción corta
+  - Descripción larga
+
+13E.2 Fotos 0..N
+  - selección/crop
+  - staging
+  - WebP obligatorio
+  - orden y eliminación
+
+13E.3 Guardado/validación WEB
+  - integrar con ArticulosService.save()
+  - conservar datos al ocultar WEB
+  - promoción/rollback de fotos según infraestructura 13B.6D
 ```
 
 Estado de General al cierre definitivo:
@@ -2102,8 +2128,9 @@ Estado de General al cierre definitivo:
 | 2.18 | 31/08/2026 | Backend Artículos hasta baja lógica; regla WebP; Sharp |
 | 2.19 | 31/08/2026 | Storage, staging, persistencia fotos y promoción staged |
 | **2.20** | **31/08/2026** | **ArticulosService.save() ✅; 13B.6D completo ✅; nueva regla global: TODAS las imágenes, incluido logo desde .otpv y Configuración, deben persistirse en WebP; 13B.6E pasa a unificación total de imágenes** |
-| **2.21** | **01/09/2026** | **13B completo ✅; 13C Workspace/carga ✅; 13D General ✅ mini-hito cerrado: fiscalidad, motor entero de precios, descuento y creación rápida transaccional de Marca/Proveedor; siguiente paso: retoques de General antes de 13E** |
-| **2.22** | **01/09/2026** | **13D General cerrado definitivamente ✅: accesos directos globales junto a Localizador, persistencia inmediata y sincronización de tabs, General compacto, toggles Material, categorías multiselect, UI a 2 decimales con precisión interna preservada, recálculo en escritura, selección al foco, modal de márgenes y reutilización de pestaña nueva al buscar/resolver; siguiente: 13E Códigos de barras** |
+| **2.21** | **01/09/2026** | **13B completo ✅; 13C Workspace/carga ✅; 13D General ✅ mini-hito cerrado: fiscalidad, motor entero de precios, descuento y creación rápida transaccional de Marca/Proveedor; siguiente paso: retoques de General antes del siguiente apartado de Artículos** |
+| **2.22** | **01/09/2026** | **13D General cerrado definitivamente ✅: accesos directos globales junto a Localizador, persistencia inmediata y sincronización de tabs, General compacto, toggles Material, categorías multiselect, UI a 2 decimales con precisión interna preservada, recálculo en escritura, selección al foco, modal de márgenes y reutilización de pestaña nueva al buscar/resolver; siguiente en aquella versión: Códigos de barras (posteriormente desplazado a 13F al reincorporar WEB)** |
+| **2.23** | **01/09/2026** | **Se reincorpora la pestaña WEB al roadmap como `13E` y pasa a ser el siguiente mini-hito; Códigos de barras y apartados posteriores se desplazan a `13F`–`13K`. WEB mantiene Mostrar en web, descripciones y fotos 0..N, conservando datos al desactivar Venta online.** |
 ---
 
 # 31. Prompt de arranque recomendado
@@ -2112,7 +2139,7 @@ Estado de General al cierre definitivo:
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.22.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.23.
 
 Estado:
 - Ventas 12C.1–12C.8 ✅
@@ -2145,12 +2172,16 @@ Estado:
   - recálculo mientras se escribe ✅
   - modal de sugerencias de margen ✅
   - búsqueda desde borrador reutiliza su pestaña ✅
-- 13E Códigos de barras 🟦 SIGUIENTE
-- 13F Observaciones ⬜
-- 13G Histórico ⬜
-- 13H Baja / duplicado / acciones ⬜
-- 13I Estadísticas ⏸️ diseño posterior
-- 13J Integración con Ventas ⬜
+- 13E WEB 🟦 SIGUIENTE
+  - 13E.1 Contenido WEB ⬜
+  - 13E.2 Fotos 0..N ⬜
+  - 13E.3 Guardado/validación WEB ⬜
+- 13F Códigos de barras ⬜
+- 13G Observaciones ⬜
+- 13H Histórico ⬜
+- 13I Baja / duplicado / acciones ⬜
+- 13J Estadísticas ⏸️ diseño posterior
+- 13K Integración con Ventas ⬜
 
 Roadmap posterior:
 14 Clientes
@@ -2193,6 +2224,7 @@ Reglas críticas:
 - Alta con stock inicial no genera histórico.
 - Baja = soft delete artículo + códigos; conservar histórico/relaciones/fotos.
 - Venta online muestra WEB; desactivarla oculta pero no borra datos. Venta online y Descuento usan MatSlideToggle.
+- La pestaña WEB es un mini-hito propio (`13E`) y se implementa antes de Códigos de barras; su contenido es Mostrar en web + descripción corta + descripción larga + fotos 0..N.
 - Categorías se editan mediante mat-select multiple con panel suficientemente ancho para nombres largos.
 - Estadísticas se diseñarán al final.
 
@@ -2206,9 +2238,9 @@ Convenciones:
 - Trabajar por lotes coherentes y no avanzar sin confirmación.
 
 Próximo paso exacto:
-13E — Códigos de barras.
+13E — WEB.
 ```
 
 ---
 
-**Fin del documento de continuidad v2.22.**
+**Fin del documento de continuidad v2.23.**
