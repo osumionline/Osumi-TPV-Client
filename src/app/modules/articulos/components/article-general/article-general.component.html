@@ -122,6 +122,137 @@
         </label>
     </div>
 
+    <section class="general__prices">
+        <h3>
+            Fiscalidad y precios
+        </h3>
+
+        <div class="general__prices-grid">
+            <div class="general__field">
+                <label for="article-iva">
+                    IVA *
+                </label>
+
+                <select id="article-iva"
+                        (change)="onFiscalOptionChange($event)">
+                    <option value=""
+                            disabled
+                            [selected]="tab().draft.ivaBps === null">
+                        Selecciona un IVA
+                    </option>
+
+                    @for (option of fiscalOptions(); track option.key) {
+                    <option [value]="option.key"
+                            [selected]="isFiscalOptionSelected(option)">
+                        {{ formatBps(option.ivaBps) }} %
+                    </option>
+                    }
+                </select>
+            </div>
+
+            <div class="general__field">
+                <label for="article-re">
+                    RE *
+                </label>
+
+                @if (usesRecargoEquivalencia()) {
+                <select id="article-re"
+                        (change)="onFiscalOptionChange($event)">
+                    <option value=""
+                            disabled
+                            [selected]="tab().draft.reBps === null">
+                        Selecciona un RE
+                    </option>
+
+                    @for (option of fiscalOptions(); track option.key) {
+                    <option [value]="option.key"
+                            [selected]="isFiscalOptionSelected(option)">
+                        {{ formatBps(option.reBps) }} %
+                    </option>
+                    }
+                </select>
+                } @else {
+                <select id="article-re"
+                        disabled>
+                    <option selected>
+                        @if (tab().draft.ivaBps === null) {
+                        —
+                        } @else {
+                        0 %
+                        }
+                    </option>
+                </select>
+                }
+            </div>
+
+            <label class="general__field">
+                <span>
+                    Precio albarán (€)
+                </span>
+
+                <input type="text"
+                       inputmode="decimal"
+                       autocomplete="off"
+                       [disabled]="!hasFiscalidad()"
+                       [value]="formatMicros(tab().draft.precioAlbaranMicros)"
+                       (change)="onPriceChange($event, 'precioAlbaran')">
+            </label>
+
+            <label class="general__field">
+                <span>
+                    PUC (€)
+                </span>
+
+                <input type="text"
+                       inputmode="decimal"
+                       autocomplete="off"
+                       [disabled]="!hasFiscalidad()"
+                       [value]="formatMicros(tab().draft.pucMicros)"
+                       (change)="onPriceChange($event, 'puc')">
+            </label>
+
+            <label class="general__field">
+                <span>
+                    Margen (%)
+                </span>
+
+                <input type="text"
+                       inputmode="decimal"
+                       autocomplete="off"
+                       list="article-margin-options"
+                       [disabled]="!hasFiscalidad()"
+                       [value]="formatMargin(tab().draft.margenMicroporcentaje)"
+                       (change)="onPriceChange($event, 'margen')">
+
+                <datalist id="article-margin-options">
+                    @for (margin of marginOptions(); track margin) {
+                    <option [value]="formatMargin(margin)">
+                    </option>
+                    }
+                </datalist>
+            </label>
+
+            <label class="general__field">
+                <span>
+                    PVP (€)
+                </span>
+
+                <input type="text"
+                       inputmode="decimal"
+                       autocomplete="off"
+                       [disabled]="!hasFiscalidad()"
+                       [value]="formatCents(tab().draft.pvpCents)"
+                       (change)="onPriceChange($event, 'pvp')">
+            </label>
+        </div>
+
+        @if (calculationError() !== null) {
+        <p class="general__calculation-error">
+            {{ calculationError() }}
+        </p>
+        }
+    </section>
+
     <section class="general__stock">
         <h3>
             Stock y planificación

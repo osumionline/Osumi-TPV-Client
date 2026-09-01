@@ -1,5 +1,6 @@
 import {
   Component,
+  computed,
   inject,
   input,
   OnInit,
@@ -7,18 +8,34 @@ import {
   signal,
   type InputSignal,
   type OutputEmitterRef,
+  type Signal,
   type WritableSignal,
 } from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import type { ArticuloDraftPatch } from '@model/articulos/articulo-draft.interface';
+import ArticuloPriceCalculator from '@model/articulos/articulo-price-calculator';
+import {
+  formatScaledDecimal,
+  numberToScaledInteger,
+  parseScaledDecimal,
+} from '@model/articulos/articulo-scaled-decimal.utils';
 import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.interface';
 import type Categoria from '@model/categorias/categoria.model';
+import AppDataService from '@services/app-data.service';
 import CategoriasService from '@services/categorias.service';
 import MarcasService from '@services/marcas.service';
 import ProveedoresService from '@services/proveedores.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 type ArticleIntegerField = 'stock' | 'stockMin' | 'stockMax' | 'loteOptimo';
+
+type ArticlePriceField = 'precioAlbaran' | 'puc' | 'margen' | 'pvp';
+
+interface ArticleFiscalOption {
+  readonly key: string;
+  readonly ivaBps: number;
+  readonly reBps: number;
+}
 
 /**
  * Edita los datos generales de una ficha de artículo.
@@ -30,15 +47,23 @@ type ArticleIntegerField = 'stock' | 'stockMin' | 'stockMax' | 'loteOptimo';
   imports: [MatButton],
 })
 export default class ArticleGeneralComponent implements OnInit {
-  readonly tab: InputSignal<ArticuloWorkspaceTab> = input.required<ArticuloWorkspaceTab>();
-  readonly draftChangeEvent: OutputEmitterRef<ArticuloDraftPatch> = output<ArticuloDraftPatch>();
-
+  readonly appDataService: AppDataService = inject(AppDataService);
   readonly marcasService: MarcasService = inject(MarcasService);
   readonly proveedoresService: ProveedoresService = inject(ProveedoresService);
   readonly categoriasService: CategoriasService = inject(CategoriasService);
 
+  readonly tab: InputSignal<ArticuloWorkspaceTab> = input.required<ArticuloWorkspaceTab>();
+  readonly draftChangeEvent: OutputEmitterRef<ArticuloDraftPatch> = output<ArticuloDraftPatch>();
+
   readonly loading: WritableSignal<boolean> = signal<boolean>(true);
   readonly loadError: WritableSignal<string | null> = signal<string | null>(null);
+  readonly calculationError: WritableSignal<string | null> = signal<string | null>(null);
+  readonly fiscalOptions: Signal<readonly ArticleFiscalOption[]> = computed(
+    (): readonly ArticleFiscalOption[] => this.buildFiscalOptions(),
+  );
+  readonly marginOptions: Signal<readonly number[]> = computed((): readonly number[] =>
+    this.buildMarginOptions(),
+  );
 
   /**
    * Carga los datos maestros necesarios para General.
@@ -67,6 +92,116 @@ export default class ArticleGeneralComponent implements OnInit {
     this.draftChangeEvent.emit({
       idProveedor: this.parseSelectedId(selectElement.value),
     });
+  }
+
+  /**
+   * Cambia el par IVA/RE seleccionado y recalcula
+   * los precios dependientes.
+   */
+  onFiscalOptionChange(event: Event): void {
+    const selectElement: HTMLSelectElement = event.target as HTMLSelectElement;
+    const option: ArticleFiscalOption | undefined = this.fiscalOptions().find(
+      (item: ArticleFiscalOption): boolean => item.key === selectElement.value,
+    );
+
+    if (option === undefined) {
+      this.restoreFiscalSelection(selectElement);
+      return;
+    }
+
+    try {
+      const patch: ArticuloDraftPatch = ArticuloPriceCalculator.actualizarFiscalidad(
+        this.tab().draft,
+        option.ivaBps,
+        option.reBps,
+      );
+
+      this.calculationError.set(null);
+      this.draftChangeEvent.emit(patch);
+    } catch (error: unknown) {
+      this.calculationError.set(
+        getErrorMessage(error, 'No se ha podido actualizar la fiscalidad.'),
+      );
+      this.restoreFiscalSelection(selectElement);
+    }
+  }
+
+  /**
+   * Indica si una opción fiscal corresponde al artículo actual.
+   */
+  isFiscalOptionSelected(option: ArticleFiscalOption): boolean {
+    return option.ivaBps === this.tab().draft.ivaBps && option.reBps === this.tab().draft.reBps;
+  }
+
+  /**
+   * Indica si la instalación utiliza recargo de equivalencia.
+   */
+  usesRecargoEquivalencia(): boolean {
+    return this.appDataService.appData()?.tipoIva === 're';
+  }
+
+  /**
+   * Indica si ya existe fiscalidad suficiente para editar precios.
+   */
+  hasFiscalidad(): boolean {
+    return this.tab().draft.ivaBps !== null && this.tab().draft.reBps !== null;
+  }
+
+  /**
+   * Procesa la modificación de un campo de precio o margen.
+   */
+  onPriceChange(event: Event, field: ArticlePriceField): void {
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+    const value: number | null = parseScaledDecimal(
+      inputElement.value,
+      this.getPriceScaleDigits(field),
+    );
+
+    if (value === null) {
+      this.calculationError.set(`El valor de ${this.getPriceFieldLabel(field)} no es válido.`);
+      this.restorePriceInput(inputElement, field);
+      return;
+    }
+
+    try {
+      const patch: ArticuloDraftPatch = this.calculatePricePatch(field, value);
+
+      this.calculationError.set(null);
+      this.draftChangeEvent.emit(patch);
+    } catch (error: unknown) {
+      this.calculationError.set(
+        getErrorMessage(error, `No se ha podido actualizar ${this.getPriceFieldLabel(field)}.`),
+      );
+      this.restorePriceInput(inputElement, field);
+    }
+  }
+
+  /**
+   * Formatea un precio almacenado en microeuros.
+   */
+  formatMicros(value: number): string {
+    return formatScaledDecimal(value, 6, 2);
+  }
+
+  /**
+   * Formatea un precio almacenado en céntimos.
+   */
+  formatCents(value: number): string {
+    return formatScaledDecimal(value, 2, 2);
+  }
+
+  /**
+   * Formatea un margen almacenado en microporcentaje.
+   */
+  formatMargin(value: number): string {
+    return formatScaledDecimal(value, 6);
+  }
+
+  /**
+   * Formatea un tipo fiscal almacenado en basis points.
+   */
+  formatBps(value: number): string {
+    return formatScaledDecimal(value, 2);
   }
 
   /**
@@ -196,7 +331,7 @@ export default class ArticleGeneralComponent implements OnInit {
   }
 
   /**
-   * Carga Marca, Proveedor y Categorías en paralelo.
+   * Carga configuración y datos maestros de General en paralelo.
    */
   private async loadMasterData(): Promise<void> {
     this.loading.set(true);
@@ -204,6 +339,7 @@ export default class ArticleGeneralComponent implements OnInit {
 
     try {
       await Promise.all([
+        this.appDataService.load(),
         this.marcasService.load(),
         this.proveedoresService.load(),
         this.categoriasService.load(),
@@ -214,6 +350,179 @@ export default class ArticleGeneralComponent implements OnInit {
       );
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  /**
+   * Construye los pares fiscales disponibles para la instalación
+   * y conserva como opción una fiscalidad histórica que ya no
+   * figure en la configuración actual.
+   */
+  private buildFiscalOptions(): readonly ArticleFiscalOption[] {
+    const appData = this.appDataService.appData();
+    const options: ArticleFiscalOption[] = [];
+
+    if (appData !== null) {
+      for (let index: number = 0; index < appData.ivaList.length; index++) {
+        const ivaBps: number | null = numberToScaledInteger(appData.ivaList[index], 2);
+        const reValue: number | undefined = appData.tipoIva === 're' ? appData.reList[index] : 0;
+        const reBps: number | null =
+          reValue === undefined ? null : numberToScaledInteger(reValue, 2);
+
+        if (ivaBps === null || reBps === null || ivaBps < 0 || reBps < 0) {
+          continue;
+        }
+
+        const option: ArticleFiscalOption = {
+          key: this.createFiscalKey(ivaBps, reBps),
+          ivaBps,
+          reBps,
+        };
+
+        if (!options.some((current: ArticleFiscalOption): boolean => current.key === option.key)) {
+          options.push(option);
+        }
+      }
+    }
+
+    const currentIva: number | null = this.tab().draft.ivaBps;
+    const currentRe: number | null = this.tab().draft.reBps;
+
+    if (currentIva !== null && currentRe !== null) {
+      const key: string = this.createFiscalKey(currentIva, currentRe);
+
+      if (!options.some((option: ArticleFiscalOption): boolean => option.key === key)) {
+        options.push({
+          key,
+          ivaBps: currentIva,
+          reBps: currentRe,
+        });
+      }
+    }
+
+    return options;
+  }
+
+  /**
+   * Construye las sugerencias de margen configuradas.
+   */
+  private buildMarginOptions(): readonly number[] {
+    const appData = this.appDataService.appData();
+
+    if (appData === null) {
+      return [];
+    }
+
+    const result: number[] = [];
+
+    for (const margin of appData.marginList) {
+      const scaledMargin: number | null = numberToScaledInteger(margin, 6);
+
+      if (scaledMargin === null || scaledMargin >= 100_000_000 || result.includes(scaledMargin)) {
+        continue;
+      }
+
+      result.push(scaledMargin);
+    }
+
+    return result.sort((left: number, right: number): number => left - right);
+  }
+
+  /**
+   * Genera la identidad estable de un par IVA/RE.
+   */
+  private createFiscalKey(ivaBps: number, reBps: number): string {
+    return `${ivaBps}:${reBps}`;
+  }
+
+  /**
+   * Obtiene la identidad fiscal actual del draft.
+   */
+  private getCurrentFiscalKey(): string {
+    const ivaBps: number | null = this.tab().draft.ivaBps;
+    const reBps: number | null = this.tab().draft.reBps;
+
+    if (ivaBps === null || reBps === null) {
+      return '';
+    }
+
+    return this.createFiscalKey(ivaBps, reBps);
+  }
+
+  /**
+   * Restaura visualmente un selector fiscal cuando
+   * el nuevo valor no ha podido aplicarse.
+   */
+  private restoreFiscalSelection(selectElement: HTMLSelectElement): void {
+    selectElement.value = this.getCurrentFiscalKey();
+  }
+
+  /**
+   * Calcula el patch correspondiente a una edición monetaria.
+   */
+  private calculatePricePatch(field: ArticlePriceField, value: number): ArticuloDraftPatch {
+    switch (field) {
+      case 'precioAlbaran':
+        return ArticuloPriceCalculator.actualizarPrecioAlbaran(this.tab().draft, value);
+
+      case 'puc':
+        return ArticuloPriceCalculator.actualizarPuc(this.tab().draft, value);
+
+      case 'margen':
+        return ArticuloPriceCalculator.actualizarMargen(this.tab().draft, value);
+
+      case 'pvp':
+        return ArticuloPriceCalculator.actualizarPvp(this.tab().draft, value);
+    }
+  }
+
+  /**
+   * Obtiene la precisión de almacenamiento de un campo.
+   */
+  private getPriceScaleDigits(field: ArticlePriceField): number {
+    return field === 'pvp' ? 2 : 6;
+  }
+
+  /**
+   * Obtiene el nombre legible de un campo monetario.
+   */
+  private getPriceFieldLabel(field: ArticlePriceField): string {
+    switch (field) {
+      case 'precioAlbaran':
+        return 'Precio albarán';
+
+      case 'puc':
+        return 'PUC';
+
+      case 'margen':
+        return 'Margen';
+
+      case 'pvp':
+        return 'PVP';
+    }
+  }
+
+  /**
+   * Restaura visualmente el valor persistente del campo
+   * cuando una entrada no ha podido aplicarse.
+   */
+  private restorePriceInput(inputElement: HTMLInputElement, field: ArticlePriceField): void {
+    switch (field) {
+      case 'precioAlbaran':
+        inputElement.value = this.formatMicros(this.tab().draft.precioAlbaranMicros);
+        return;
+
+      case 'puc':
+        inputElement.value = this.formatMicros(this.tab().draft.pucMicros);
+        return;
+
+      case 'margen':
+        inputElement.value = this.formatMargin(this.tab().draft.margenMicroporcentaje);
+        return;
+
+      case 'pvp':
+        inputElement.value = this.formatCents(this.tab().draft.pvpCents);
+        return;
     }
   }
 
