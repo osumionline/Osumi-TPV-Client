@@ -1,0 +1,47 @@
+<section class="article-web">
+    <div class="article-web__visibility">
+        <div>
+            <strong>
+                Mostrar en web
+            </strong>
+
+            <p>
+                Controla si el artículo debe mostrarse públicamente
+                en los canales web asociados.
+            </p>
+        </div>
+
+        <mat-slide-toggle [checked]="tab().draft.mostrarEnWeb"
+                          (change)="onMostrarEnWebChange($event.checked)">
+            {{ tab().draft.mostrarEnWeb ? 'Activado' : 'Desactivado' }}
+        </mat-slide-toggle>
+    </div>
+
+    <div class="article-web__content">
+        <label class="article-web__field">
+            <span>
+                Descripción corta
+            </span>
+
+            <textarea rows="3"
+                      autocomplete="off"
+                      placeholder="Descripción breve del artículo"
+                      [value]="tab().draft.descripcionCorta"
+                      (input)="onDescripcionCortaInput($event)">
+            </textarea>
+        </label>
+
+        <label class="article-web__field article-web__field--long">
+            <span>
+                Descripción larga
+            </span>
+
+            <textarea rows="10"
+                      autocomplete="off"
+                      placeholder="Descripción completa del artículo"
+                      [value]="tab().draft.descripcionLarga"
+                      (input)="onDescripcionLargaInput($event)">
+            </textarea>
+        </label>
+    </div>
+</section>

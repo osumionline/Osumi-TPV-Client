@@ -58,9 +58,8 @@
         }
 
         @case ('web') {
-        <div class="article-workspace__pending">
-            Configuración WEB pendiente.
-        </div>
+        <otpv-article-web [tab]="tab()"
+                          (draftChangeEvent)="emitDraftChange($event)" />
         }
 
         @default {

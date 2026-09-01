@@ -15,6 +15,7 @@ import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.i
 import ArticleDirectAccessesComponent from '@modules/articulos/components/article-direct-accesses/article-direct-accesses.component';
 import ArticleGeneralComponent from '@modules/articulos/components/article-general/article-general.component';
 import ArticleSectionTabsComponent from '@modules/articulos/components/article-section-tabs/article-section-tabs.component';
+import ArticleWebComponent from '@modules/articulos/components/article-web/article-web.component';
 
 /**
  * Muestra la cabecera operativa de una ficha de artículo.
@@ -27,6 +28,7 @@ import ArticleSectionTabsComponent from '@modules/articulos/components/article-s
     ArticleDirectAccessesComponent,
     ArticleGeneralComponent,
     ArticleSectionTabsComponent,
+    ArticleWebComponent,
     MatIcon,
     MatTooltip,
   ],
