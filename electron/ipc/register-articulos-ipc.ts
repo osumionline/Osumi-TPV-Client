@@ -1,4 +1,6 @@
 import type ArticulosService from '@backend/application/articulos/articulos.service';
+import type ArticuloAccesoDirectoCommand from '@desktop-contracts/articulos/articulo-acceso-directo-command.interface';
+import type ArticuloAccesoDirectoInterface from '@desktop-contracts/articulos/articulo-acceso-directo.interface';
 import type { ArticuloInterface } from '@desktop-contracts/articulos/articulo.interface';
 import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
 import { assertTrustedSender } from '@ipc/assert-trusted-sender';
@@ -27,6 +29,24 @@ export default function registerArticulosIpc(
       assertTrustedSender(event, getMainWindow);
 
       return articulosService.resolveByCode(codigo);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.articulosGetAccesosDirectos,
+    async (event): Promise<readonly ArticuloAccesoDirectoInterface[]> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return articulosService.getAccesosDirectos();
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.articulosSetAccesoDirecto,
+    async (event, command: ArticuloAccesoDirectoCommand): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await articulosService.setAccesoDirecto(command);
     },
   );
 }

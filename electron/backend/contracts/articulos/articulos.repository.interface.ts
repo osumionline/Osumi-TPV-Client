@@ -1,4 +1,7 @@
-import type { ArticuloRecord } from '@backend/domain/articulos/articulo-record.interface';
+import type {
+  ArticuloAccesoDirectoRecord,
+  ArticuloRecord,
+} from '@backend/domain/articulos/articulo-record.interface';
 import type { ArticuloSaveRecord } from '@backend/domain/articulos/articulo-save-record.interface';
 
 export default interface ArticulosRepository {
@@ -12,6 +15,16 @@ export default interface ArticulosRepository {
    * y devuelve el identificador del artículo activo.
    */
   resolveIdByCode(codigo: string, codigoNumerico: number | null): Promise<number | null>;
+
+  /**
+   * Obtiene los accesos directos asignados a artículos activos.
+   */
+  findAccesosDirectos(): Promise<readonly ArticuloAccesoDirectoRecord[]>;
+
+  /**
+   * Asigna, modifica o elimina el acceso directo de un artículo.
+   */
+  setAccesoDirecto(idArticulo: number, accesoDirecto: number | null): Promise<void>;
 
   /**
    * Crea un nuevo artículo y devuelve su identificador interno.

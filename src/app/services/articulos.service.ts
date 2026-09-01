@@ -1,5 +1,6 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { computed, Service, signal } from '@angular/core';
+import type ArticuloAccesoDirectoInterface from '@desktop-contracts/articulos/articulo-acceso-directo.interface';
 import type { ArticuloInterface } from '@desktop-contracts/articulos/articulo.interface';
 import type { ArticuloDraft, ArticuloDraftPatch } from '@model/articulos/articulo-draft.interface';
 import {
@@ -95,6 +96,26 @@ export default class ArticulosService {
       await window.osumiDesktop.articulos.resolveByCode(normalizedCode);
 
     return articulo === null ? null : this.abrirArticulo(articulo);
+  }
+
+  /**
+   * Obtiene la lista global de accesos directos.
+   */
+  getAccesosDirectos(): Promise<readonly ArticuloAccesoDirectoInterface[]> {
+    return window.osumiDesktop.articulos.getAccesosDirectos();
+  }
+
+  /**
+   * Persiste un acceso directo y sincroniza cualquier ficha
+   * abierta del artículo afectado.
+   */
+  async setAccesoDirecto(idArticulo: number, accesoDirecto: number | null): Promise<void> {
+    await window.osumiDesktop.articulos.setAccesoDirecto({
+      idArticulo,
+      accesoDirecto,
+    });
+
+    this.syncPersistedAccesoDirecto(idArticulo, accesoDirecto);
   }
 
   /**
@@ -261,6 +282,35 @@ export default class ArticulosService {
     return (
       this.tabs().find((tab: ArticuloWorkspaceTab): boolean => tab.draft.id === idArticulo) ?? null
     );
+  }
+
+  /**
+   * Aplica un acceso directo ya persistido tanto al draft
+   * como al snapshot base, preservando otros cambios locales.
+   */
+  private syncPersistedAccesoDirecto(idArticulo: number, accesoDirecto: number | null): void {
+    const tab: ArticuloWorkspaceTab | null = this.findByArticuloId(idArticulo);
+
+    if (tab === null) {
+      return;
+    }
+
+    const draft: ArticuloDraft = cloneArticuloDraft({
+      ...tab.draft,
+      accesoDirecto,
+    });
+    const baseSnapshot: ArticuloDraft = cloneArticuloDraft({
+      ...tab.baseSnapshot,
+      accesoDirecto,
+    });
+    const updatedTab: ArticuloWorkspaceTab = {
+      ...tab,
+      draft,
+      baseSnapshot,
+      dirty: !areArticuloDraftsEqual(draft, baseSnapshot),
+    };
+
+    this.replaceTab(updatedTab);
   }
 
   /**

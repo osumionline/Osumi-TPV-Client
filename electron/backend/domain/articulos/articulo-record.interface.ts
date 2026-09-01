@@ -18,6 +18,13 @@ export interface ArticuloFotoRecord {
   readonly principal: boolean;
 }
 
+export interface ArticuloAccesoDirectoRecord {
+  readonly id: number;
+  readonly publicId: string;
+  readonly accesoDirecto: number;
+  readonly nombre: string;
+}
+
 export interface ArticuloRecord {
   readonly id: number;
   readonly publicId: string;

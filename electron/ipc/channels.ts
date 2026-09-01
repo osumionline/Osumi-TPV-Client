@@ -35,6 +35,8 @@ const IPC_CHANNELS = {
 
   articulosGetById: 'articulos:get-by-id',
   articulosResolveByCode: 'articulos:resolve-by-code',
+  articulosGetAccesosDirectos: 'articulos:get-accesos-directos',
+  articulosSetAccesoDirecto: 'articulos:set-acceso-directo',
 
   cajaOpen: 'caja:open',
 

@@ -1,5 +1,6 @@
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
 import type {
+  ArticuloAccesoDirectoRecord,
   ArticuloCodigoBarrasRecord,
   ArticuloFotoRecord,
   ArticuloRecord,
@@ -10,13 +11,20 @@ import type {
 } from '@backend/domain/articulos/articulo-save-record.interface';
 import HISTORICO_ARTICULO_TIPO from '@backend/domain/articulos/historico-articulo.constants';
 import { MONEY_SCALE, UNIT_PRICE_SCALE } from '@backend/domain/database/database-schema.constants';
+import type { ArchivoCreateRecord } from '@backend/domain/files/archivo-record.interface';
 import { generateArticuloLocalizador } from '@backend/utils/articulo-localizador.utils';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
+import insertArchivo from '@infrastructure/database/typeorm/typeorm-archivo.utils';
 import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
 import { randomUUID } from 'node:crypto';
 import type { DataSource, QueryRunner } from 'typeorm';
-import insertArchivo from '@infrastructure/database/typeorm/typeorm-archivo.utils';
-import type { ArchivoCreateRecord } from '@backend/domain/files/archivo-record.interface';
+
+interface ArticuloAccesoDirectoDatabaseRow {
+  readonly id: number;
+  readonly public_id: string;
+  readonly acceso_directo: number;
+  readonly nombre: string;
+}
 
 interface ArticuloArchivoDatabaseRow {
   readonly id_archivo: number;
@@ -178,6 +186,63 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
         : await this.resolveNumericCode(dataSource, codigo, codigoNumerico);
 
     return rows[0]?.id ?? null;
+  }
+
+  /**
+   * Obtiene todos los accesos directos de artículos activos.
+   */
+  async findAccesosDirectos(): Promise<readonly ArticuloAccesoDirectoRecord[]> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+    const rows: readonly ArticuloAccesoDirectoDatabaseRow[] = (await dataSource.query(
+      `
+          SELECT
+            id,
+            public_id,
+            acceso_directo,
+            nombre
+          FROM articulo
+          WHERE
+            deleted_at IS NULL
+            AND acceso_directo IS NOT NULL
+          ORDER BY
+            acceso_directo,
+            nombre COLLATE NOCASE,
+            id
+        `,
+    )) as readonly ArticuloAccesoDirectoDatabaseRow[];
+
+    return rows.map((row: ArticuloAccesoDirectoDatabaseRow): ArticuloAccesoDirectoRecord => ({
+      id: row.id,
+      publicId: row.public_id,
+      accesoDirecto: row.acceso_directo,
+      nombre: row.nombre,
+    }));
+  }
+
+  /**
+   * Asigna o elimina el acceso directo de un artículo activo.
+   */
+  async setAccesoDirecto(idArticulo: number, accesoDirecto: number | null): Promise<void> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    await runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
+      await this.requireActiveArticleForUpdate(queryRunner, idArticulo);
+
+      await this.requireAvailableAccessCode(queryRunner, idArticulo, accesoDirecto);
+
+      await queryRunner.query(
+        `
+            UPDATE articulo
+            SET
+              acceso_directo = ?,
+              updated_at = ?
+            WHERE
+              id = ?
+              AND deleted_at IS NULL
+          `,
+        [accesoDirecto, new Date().toISOString(), idArticulo],
+      );
+    });
   }
 
   /**

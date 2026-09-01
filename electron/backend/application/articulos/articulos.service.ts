@@ -3,6 +3,7 @@ import type ImageAssetPromoter from '@backend/contracts/files/image-asset-promot
 import type StagedImageDiscarder from '@backend/contracts/files/staged-image-discarder.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
 import type {
+  ArticuloAccesoDirectoRecord,
   ArticuloCodigoBarrasRecord,
   ArticuloFotoRecord,
   ArticuloRecord,
@@ -12,6 +13,8 @@ import type {
   ArticuloSaveRecord,
 } from '@backend/domain/articulos/articulo-save-record.interface';
 import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.interface';
+import type ArticuloAccesoDirectoCommand from '@desktop-contracts/articulos/articulo-acceso-directo-command.interface';
+import type ArticuloAccesoDirectoInterface from '@desktop-contracts/articulos/articulo-acceso-directo.interface';
 import type {
   ArticuloFotoSaveInterface,
   ArticuloSaveInterface,
@@ -66,6 +69,39 @@ export default class ArticulosService {
     );
 
     return idArticulo === null ? null : this.getById(idArticulo);
+  }
+
+  /**
+   * Obtiene los accesos directos asignados actualmente.
+   */
+  async getAccesosDirectos(): Promise<readonly ArticuloAccesoDirectoInterface[]> {
+    const accesos: readonly ArticuloAccesoDirectoRecord[] =
+      await this.articulosRepository.findAccesosDirectos();
+
+    return accesos.map((acceso: ArticuloAccesoDirectoRecord): ArticuloAccesoDirectoInterface => ({
+      id: acceso.id,
+      publicId: acceso.publicId,
+      accesoDirecto: acceso.accesoDirecto,
+      nombre: acceso.nombre,
+    }));
+  }
+
+  /**
+   * Asigna, modifica o elimina el acceso directo de un artículo.
+   */
+  async setAccesoDirecto(command: ArticuloAccesoDirectoCommand): Promise<void> {
+    if (!Number.isSafeInteger(command.idArticulo) || command.idArticulo <= 0) {
+      throw new Error('El identificador del artículo no es válido.');
+    }
+
+    if (
+      command.accesoDirecto !== null &&
+      (!Number.isSafeInteger(command.accesoDirecto) || command.accesoDirecto <= 0)
+    ) {
+      throw new Error('El acceso directo debe ser un entero positivo.');
+    }
+
+    await this.articulosRepository.setAccesoDirecto(command.idArticulo, command.accesoDirecto);
   }
 
   /**

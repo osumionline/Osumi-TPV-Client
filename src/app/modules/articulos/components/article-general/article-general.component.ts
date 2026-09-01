@@ -426,31 +426,6 @@ export default class ArticleGeneralComponent implements OnInit {
   }
 
   /**
-   * Actualiza el acceso directo opcional.
-   */
-  onAccesoDirectoChange(event: Event): void {
-    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
-
-    if (inputElement.value.trim() === '') {
-      this.draftChangeEvent.emit({
-        accesoDirecto: null,
-      });
-
-      return;
-    }
-
-    const value: number = inputElement.valueAsNumber;
-
-    if (!Number.isSafeInteger(value) || value <= 0) {
-      return;
-    }
-
-    this.draftChangeEvent.emit({
-      accesoDirecto: value,
-    });
-  }
-
-  /**
    * Activa o desactiva la preparación del artículo para venta online.
    */
   onVentaOnlineChange(event: Event): void {

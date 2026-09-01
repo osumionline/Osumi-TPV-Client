@@ -1,0 +1,108 @@
+<div class="overlay overlay--dimmed direct-access-overlay">
+    <section class="direct-access overlay__panel"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="direct-access-title">
+        <header class="direct-access__header">
+            <h2 id="direct-access-title">
+                Accesos directos
+            </h2>
+
+            <button type="button"
+                    class="direct-access__close"
+                    aria-label="Cerrar"
+                    [disabled]="saving()"
+                    (click)="close()">
+                <mat-icon>close</mat-icon>
+            </button>
+        </header>
+
+        <div class="direct-access__body">
+            @if (loading()) {
+            <div class="direct-access__state">
+                Cargando accesos directos…
+            </div>
+            } @else {
+            <p>
+                Estos son los accesos directos a artículos que has definido:
+            </p>
+
+            <div class="direct-access__table">
+                <div class="direct-access__row direct-access__row--header">
+                    <span>
+                        Acceso
+                    </span>
+
+                    <span>
+                        Artículo
+                    </span>
+
+                    <span>
+                        Borrar
+                    </span>
+                </div>
+
+                @for (acceso of accesos(); track acceso.id) {
+                <div class="direct-access__row">
+                    <strong>
+                        {{ acceso.accesoDirecto }}
+                    </strong>
+
+                    <span>
+                        {{ acceso.nombre }}
+                    </span>
+
+                    <button type="button"
+                            aria-label="Borrar acceso directo"
+                            [disabled]="saving()"
+                            (click)="remove(acceso.id)">
+                        <mat-icon>delete</mat-icon>
+                    </button>
+                </div>
+                } @empty {
+                <div class="direct-access__empty">
+                    No hay accesos directos asignados.
+                </div>
+                }
+            </div>
+
+            @if (tab().draft.id !== null) {
+            <form class="direct-access__assignment"
+                  (submit)="assign(accessInput.value); $event.preventDefault()">
+                <p>
+                    Asignar acceso directo al artículo:
+                </p>
+
+                <div class="direct-access__assignment-row">
+                    <label for="article-direct-access">
+                        Acceso directo
+                    </label>
+
+                    <input #accessInput
+                           id="article-direct-access"
+                           type="number"
+                           min="1"
+                           step="1"
+                           required
+                           autocomplete="off"
+                           [disabled]="saving()"
+                           [value]="tab().draft.accesoDirecto ?? ''">
+
+                    <button mat-flat-button
+                            type="submit"
+                            [disabled]="saving()">
+                        Asignar
+                    </button>
+                </div>
+            </form>
+            }
+
+            @if (error() !== null) {
+            <p class="direct-access__error">
+                {{ error() }}
+            </p>
+            }
+            }
+        </div>
+    </section>
+</div>

@@ -24,7 +24,7 @@
         gap: 6px;
 
         >input,
-        .article-workspace__locator>input {
+        .article-workspace__lookup>input {
             width: 100%;
             height: 40px;
             padding: 0 12px;
@@ -53,6 +53,14 @@
     .article-workspace__locator {
         display: flex;
         min-width: 0;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .article-workspace__lookup {
+        display: flex;
+        min-width: 0;
+        flex: 1;
 
         >input {
             min-width: 0;
@@ -69,12 +77,40 @@
             border: 1px solid var(--color-dark-grey);
             border-left: 0;
             border-radius: 0 4px 4px 0;
+            box-sizing: border-box;
             background-color: var(--color-white);
             cursor: pointer;
 
-            &:hover {
+            &:hover:not(:disabled) {
                 background-color: var(--color-very-light-grey);
             }
+
+            &:disabled {
+                cursor: not-allowed;
+                opacity: 0.5;
+            }
+        }
+    }
+
+    .article-workspace__direct-access {
+        display: grid;
+        width: 40px;
+        min-width: 40px;
+        height: 40px;
+        place-items: center;
+        border: 1px solid var(--color-dark-grey);
+        border-radius: 4px;
+        box-sizing: border-box;
+        background-color: var(--color-white);
+        cursor: pointer;
+
+        &:hover:not(:disabled) {
+            background-color: var(--color-very-light-grey);
+        }
+
+        &:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
         }
     }
 

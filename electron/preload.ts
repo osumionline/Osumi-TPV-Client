@@ -1,4 +1,6 @@
 import type ApplicationStateResult from '@desktop-contracts/application/application-state-result.interface';
+import type ArticuloAccesoDirectoCommand from '@desktop-contracts/articulos/articulo-acceso-directo-command.interface';
+import type ArticuloAccesoDirectoInterface from '@desktop-contracts/articulos/articulo-acceso-directo.interface';
 import type { ArticuloInterface } from '@desktop-contracts/articulos/articulo.interface';
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
@@ -183,6 +185,14 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         IPC_CHANNELS.articulosResolveByCode,
         codigo,
       ) as Promise<ArticuloInterface | null>,
+
+    getAccesosDirectos: (): Promise<readonly ArticuloAccesoDirectoInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.articulosGetAccesosDirectos) as Promise<
+        readonly ArticuloAccesoDirectoInterface[]
+      >,
+
+    setAccesoDirecto: (command: ArticuloAccesoDirectoCommand): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.articulosSetAccesoDirecto, command) as Promise<void>,
   }),
 
   clientes: Object.freeze({

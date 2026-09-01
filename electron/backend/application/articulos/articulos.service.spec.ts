@@ -3,7 +3,10 @@ import type ArticulosRepository from '@backend/contracts/articulos/articulos.rep
 import type ImageAssetPromoter from '@backend/contracts/files/image-asset-promoter.interface';
 import type StagedImageDiscarder from '@backend/contracts/files/staged-image-discarder.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
-import type { ArticuloRecord } from '@backend/domain/articulos/articulo-record.interface';
+import type {
+  ArticuloAccesoDirectoRecord,
+  ArticuloRecord,
+} from '@backend/domain/articulos/articulo-record.interface';
 import type { ArticuloSaveRecord } from '@backend/domain/articulos/articulo-save-record.interface';
 import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.interface';
 import { ArticuloSaveInterface } from '@desktop-contracts/articulos/articulo-save.interface';
@@ -20,6 +23,16 @@ class FakeArticulosRepository implements ArticulosRepository {
   updatedCommand: ArticuloSaveRecord | null = null;
   createError: Error | null = null;
   updateError: Error | null = null;
+  accesosDirectos: readonly ArticuloAccesoDirectoRecord[] = [
+    {
+      id: 25,
+      publicId: 'article-public-id',
+      accesoDirecto: 12,
+      nombre: 'Artículo de prueba',
+    },
+  ];
+  lastAccesoDirectoIdArticulo: number | null = null;
+  lastAccesoDirecto: number | null = null;
 
   /**
    * Devuelve el artículo configurado para el test.
@@ -36,6 +49,23 @@ class FakeArticulosRepository implements ArticulosRepository {
     this.lastNumericCode = codigoNumerico;
 
     return Promise.resolve(this.resolvedId);
+  }
+
+  /**
+   * Devuelve los accesos directos configurados para el test.
+   */
+  findAccesosDirectos(): Promise<readonly ArticuloAccesoDirectoRecord[]> {
+    return Promise.resolve(this.accesosDirectos);
+  }
+
+  /**
+   * Registra la modificación de un acceso directo.
+   */
+  setAccesoDirecto(idArticulo: number, accesoDirecto: number | null): Promise<void> {
+    this.lastAccesoDirectoIdArticulo = idArticulo;
+    this.lastAccesoDirecto = accesoDirecto;
+
+    return Promise.resolve();
   }
 
   /**
@@ -301,6 +331,62 @@ describe('ArticulosService', (): void => {
     expect(promoter.rolledBackIds).toEqual(['staged-photo']);
 
     expect(discarder.discardedIds).toHaveLength(0);
+  });
+
+  it('obtiene los accesos directos asignados', async (): Promise<void> => {
+    const repository = new FakeArticulosRepository();
+    const service = createService(repository);
+
+    const accesos = await service.getAccesosDirectos();
+
+    expect(accesos).toEqual([
+      {
+        id: 25,
+        publicId: 'article-public-id',
+        accesoDirecto: 12,
+        nombre: 'Artículo de prueba',
+      },
+    ]);
+  });
+
+  it('delega la asignación de un acceso directo válido en el repository', async (): Promise<void> => {
+    const repository = new FakeArticulosRepository();
+    const service = createService(repository);
+
+    await service.setAccesoDirecto({
+      idArticulo: 25,
+      accesoDirecto: 7,
+    });
+
+    expect(repository.lastAccesoDirectoIdArticulo).toBe(25);
+    expect(repository.lastAccesoDirecto).toBe(7);
+  });
+
+  it('permite eliminar un acceso directo', async (): Promise<void> => {
+    const repository = new FakeArticulosRepository();
+    const service = createService(repository);
+
+    await service.setAccesoDirecto({
+      idArticulo: 25,
+      accesoDirecto: null,
+    });
+
+    expect(repository.lastAccesoDirectoIdArticulo).toBe(25);
+    expect(repository.lastAccesoDirecto).toBeNull();
+  });
+
+  it('rechaza un acceso directo no válido', async (): Promise<void> => {
+    const repository = new FakeArticulosRepository();
+    const service = createService(repository);
+
+    await expect(
+      service.setAccesoDirecto({
+        idArticulo: 25,
+        accesoDirecto: 0,
+      }),
+    ).rejects.toThrow('El acceso directo debe ser un entero positivo.');
+
+    expect(repository.lastAccesoDirectoIdArticulo).toBeNull();
   });
 });
 

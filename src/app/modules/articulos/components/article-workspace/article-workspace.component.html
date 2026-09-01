@@ -6,22 +6,31 @@
             </span>
 
             <div class="article-workspace__locator">
-                <input type="text"
-                       autocomplete="off"
-                       [disabled]="searching()"
-                       [value]="tab().draft.localizador ?? ''"
-                       [placeholder]="
-                         tab().draft.localizador === null
-                           ? 'Automático al guardar'
-                           : ''
-                       "
-                       (focus)="onLocalizadorFocus($event)"
-                       (keydown)="onLocalizadorKeydown($event)">
+                <div class="article-workspace__lookup">
+                    <input type="text"
+                           autocomplete="off"
+                           [disabled]="searching()"
+                           [value]="tab().draft.localizador ?? ''"
+                           [placeholder]="
+                             tab().draft.localizador === null
+                               ? 'Automático al guardar'
+                               : ''
+                           "
+                           (focus)="onLocalizadorFocus($event)"
+                           (keydown)="onLocalizadorKeydown($event)">
+
+                    <button type="button"
+                            matTooltip="Buscar artículo"
+                            (click)="openSearch()">
+                        <mat-icon>search</mat-icon>
+                    </button>
+                </div>
 
                 <button type="button"
-                        matTooltip="Buscar artículo"
-                        (click)="openSearch()">
-                    <mat-icon>search</mat-icon>
+                        class="article-workspace__direct-access"
+                        matTooltip="Gestionar accesos directos"
+                        (click)="openDirectAccesses()">
+                    <mat-icon>dialpad</mat-icon>
                 </button>
             </div>
         </label>
@@ -62,3 +71,8 @@
         }
     </div>
 </section>
+
+@if (directAccessOpen()) {
+<otpv-article-direct-accesses [tab]="tab()"
+                              (closeEvent)="closeDirectAccesses()" />
+}
