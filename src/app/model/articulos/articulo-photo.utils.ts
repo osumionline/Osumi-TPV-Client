@@ -100,3 +100,26 @@ function normalizeArticuloFotos(fotos: readonly ArticuloFotoDraft[]): readonly A
     principal: index === principalIndex,
   }));
 }
+
+/**
+ * Obtiene los stagingId que pertenecen únicamente
+ * al estado editable y no al snapshot base.
+ */
+export function getPendingArticuloStagingIds(
+  fotos: readonly ArticuloFotoDraft[],
+  baseFotos: readonly ArticuloFotoDraft[],
+): readonly string[] {
+  const baseStagingIds: Set<string> = new Set<string>(
+    baseFotos.flatMap((foto: ArticuloFotoDraft): readonly string[] =>
+      foto.stagingId === null ? [] : [foto.stagingId],
+    ),
+  );
+
+  return [
+    ...new Set<string>(
+      fotos.flatMap((foto: ArticuloFotoDraft): readonly string[] =>
+        foto.stagingId !== null && !baseStagingIds.has(foto.stagingId) ? [foto.stagingId] : [],
+      ),
+    ),
+  ];
+}

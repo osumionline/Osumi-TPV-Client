@@ -125,3 +125,10 @@
         }
     </div>
 </section>
+
+@if (cropFile(); as file) {
+<otpv-article-photo-crop [file]="file"
+                         [processing]="uploading()"
+                         (confirmEvent)="confirmCrop($event)"
+                         (cancelEvent)="cancelCrop()" />
+}

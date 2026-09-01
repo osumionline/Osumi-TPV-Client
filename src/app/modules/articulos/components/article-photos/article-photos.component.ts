@@ -1,5 +1,6 @@
 import {
   Component,
+  DestroyRef,
   inject,
   input,
   output,
@@ -19,6 +20,7 @@ import {
   removeArticuloFoto,
   setArticuloFotoPrincipal,
 } from '@model/articulos/articulo-photo.utils';
+import ArticlePhotoCropComponent from '@modules/articulos/components/article-photo-crop/article-photo-crop.component';
 import FilesService from '@services/files.service';
 import { getErrorMessage } from '@utils/error.utils';
 
@@ -29,10 +31,16 @@ import { getErrorMessage } from '@utils/error.utils';
   selector: 'otpv-article-photos',
   templateUrl: './article-photos.component.html',
   styleUrl: './article-photos.component.scss',
-  imports: [MatButton, MatIcon, MatIconButton, MatTooltip],
+  imports: [ArticlePhotoCropComponent, MatButton, MatIcon, MatIconButton, MatTooltip],
 })
 export default class ArticlePhotosComponent {
   private readonly filesService: FilesService = inject(FilesService);
+  private readonly destroyRef: DestroyRef = inject(DestroyRef);
+
+  private cropFiles: readonly File[] = [];
+  private cropIndex: number = 0;
+  private croppedFiles: File[] = [];
+  private destroyed: boolean = false;
 
   readonly fotos: InputSignal<readonly ArticuloFotoDraft[]> =
     input.required<readonly ArticuloFotoDraft[]>();
@@ -42,12 +50,13 @@ export default class ArticlePhotosComponent {
   readonly uploading: WritableSignal<boolean> = signal<boolean>(false);
   readonly dragging: WritableSignal<boolean> = signal<boolean>(false);
   readonly error: WritableSignal<string | null> = signal<string | null>(null);
+  readonly cropFile: WritableSignal<File | null> = signal<File | null>(null);
 
   /**
    * Abre el selector nativo de imágenes.
    */
   openFilePicker(inputElement: HTMLInputElement): void {
-    if (!this.uploading()) {
+    if (!this.uploading() && this.cropFile() === null) {
       inputElement.click();
     }
   }
@@ -55,13 +64,13 @@ export default class ArticlePhotosComponent {
   /**
    * Procesa las imágenes elegidas en el selector.
    */
-  async onFileSelection(event: Event): Promise<void> {
+  onFileSelection(event: Event): void {
     const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
     const files: readonly File[] = Array.from(inputElement.files ?? []);
 
     inputElement.value = '';
 
-    await this.stageFiles(files);
+    this.startCropBatch(files);
   }
 
   /**
@@ -86,15 +95,15 @@ export default class ArticlePhotosComponent {
   /**
    * Procesa las imágenes soltadas por el usuario.
    */
-  async onDrop(event: DragEvent): Promise<void> {
+  onDrop(event: DragEvent): void {
     event.preventDefault();
     this.dragging.set(false);
 
-    if (this.uploading()) {
+    if (this.uploading() || this.cropFile() !== null) {
       return;
     }
 
-    await this.stageFiles(Array.from(event.dataTransfer?.files ?? []));
+    this.startCropBatch(Array.from(event.dataTransfer?.files ?? []));
   }
 
   /**
@@ -165,6 +174,75 @@ export default class ArticlePhotosComponent {
   }
 
   /**
+   * Inicia el recorte secuencial de un conjunto de imágenes.
+   */
+  private startCropBatch(files: readonly File[]): void {
+    if (files.length === 0 || this.uploading() || this.cropFile() !== null) {
+      return;
+    }
+
+    const invalidFile: File | undefined = files.find(
+      (file: File): boolean => !file.type.startsWith('image/'),
+    );
+
+    if (invalidFile !== undefined) {
+      this.error.set('Solo se pueden añadir archivos de imagen.');
+      return;
+    }
+
+    this.error.set(null);
+    this.cropFiles = [...files];
+    this.cropIndex = 0;
+    this.croppedFiles = [];
+    this.cropFile.set(this.cropFiles[0] ?? null);
+  }
+
+  /**
+   * Conserva el recorte actual y continúa con
+   * la siguiente imagen del lote.
+   */
+  async confirmCrop(croppedFile: File): Promise<void> {
+    if (this.cropFile() === null) {
+      return;
+    }
+
+    this.croppedFiles.push(croppedFile);
+    this.cropIndex += 1;
+
+    const nextFile: File | undefined = this.cropFiles[this.cropIndex];
+
+    if (nextFile !== undefined) {
+      this.cropFile.set(nextFile);
+      return;
+    }
+
+    const croppedFiles: readonly File[] = [...this.croppedFiles];
+
+    this.clearCropBatch();
+
+    await this.stageFiles(croppedFiles);
+  }
+
+  /**
+   * Cancela el lote completo de imágenes pendiente.
+   */
+  cancelCrop(): void {
+    if (!this.uploading()) {
+      this.clearCropBatch();
+    }
+  }
+
+  /**
+   * Limpia el estado temporal del selector de crop.
+   */
+  private clearCropBatch(): void {
+    this.cropFiles = [];
+    this.cropIndex = 0;
+    this.croppedFiles = [];
+    this.cropFile.set(null);
+  }
+
+  /**
    * Convierte y añade un conjunto de imágenes al staging
    * de forma atómica desde el punto de vista del draft.
    */
@@ -181,6 +259,26 @@ export default class ArticlePhotosComponent {
     try {
       for (const file of files) {
         stagedImages.push(await this.filesService.stageArticleImage(file));
+
+        if (this.destroyed) {
+          await Promise.allSettled(
+            stagedImages.map((stagedImage: StagedImageInterface): Promise<void> =>
+              this.filesService.discardStagedImage(stagedImage.stagingId),
+            ),
+          );
+
+          return;
+        }
+      }
+
+      if (this.destroyed) {
+        await Promise.allSettled(
+          stagedImages.map((stagedImage: StagedImageInterface): Promise<void> =>
+            this.filesService.discardStagedImage(stagedImage.stagingId),
+          ),
+        );
+
+        return;
       }
 
       this.photosChangeEvent.emit(appendStagedArticuloFotos(this.fotos(), stagedImages));

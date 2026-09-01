@@ -9,6 +9,7 @@ import {
   createArticuloDraftFromInterface,
   createEmptyArticuloDraft,
 } from '@model/articulos/articulo-draft.utils';
+import { getPendingArticuloStagingIds } from '@model/articulos/articulo-photo.utils';
 import type ArticuloWorkspaceSection from '@model/articulos/articulo-workspace-section.type';
 import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.interface';
 
@@ -75,6 +76,7 @@ export default class ArticulosService {
     const existingTab: ArticuloWorkspaceTab | null = this.findByArticuloId(idArticulo);
 
     if (existingTab !== null) {
+      await this.discardSourceDraftStaging(sourceTabId);
       this.closeSourceDraftIfNeeded(sourceTabId, existingTab.idTemporal);
       this.activeTabIdSignal.set(existingTab.idTemporal);
 
@@ -84,7 +86,13 @@ export default class ArticulosService {
     const articulo: ArticuloInterface | null =
       await window.osumiDesktop.articulos.getById(idArticulo);
 
-    return articulo === null ? null : this.abrirArticulo(articulo, sourceTabId);
+    if (articulo === null) {
+      return null;
+    }
+
+    await this.discardSourceDraftStaging(sourceTabId);
+
+    return this.abrirArticulo(articulo, sourceTabId);
   }
 
   /**
@@ -106,7 +114,13 @@ export default class ArticulosService {
     const articulo: ArticuloInterface | null =
       await window.osumiDesktop.articulos.resolveByCode(normalizedCode);
 
-    return articulo === null ? null : this.abrirArticulo(articulo, sourceTabId);
+    if (articulo === null) {
+      return null;
+    }
+
+    await this.discardSourceDraftStaging(sourceTabId);
+
+    return this.abrirArticulo(articulo, sourceTabId);
   }
 
   /**
@@ -242,6 +256,17 @@ export default class ArticulosService {
   }
 
   /**
+   * Elimina los temporales pertenecientes a cambios
+   * descartados antes de cerrar una ficha.
+   */
+  async cerrarTabDescartandoCambios(idTemporal: string): Promise<void> {
+    const tab: ArticuloWorkspaceTab = this.requireTab(idTemporal);
+
+    await this.discardPendingStaging(tab);
+    this.cerrarTab(idTemporal);
+  }
+
+  /**
    * Actualiza los campos editables de una ficha y recalcula su estado dirty.
    */
   actualizarDraft(idTemporal: string, patch: ArticuloDraftPatch): ArticuloWorkspaceTab {
@@ -283,6 +308,18 @@ export default class ArticulosService {
   }
 
   /**
+   * Descarta las imágenes temporales y después
+   * restaura el snapshot base de la ficha.
+   */
+  async descartarCambios(idTemporal: string): Promise<ArticuloWorkspaceTab> {
+    const tab: ArticuloWorkspaceTab = this.requireTab(idTemporal);
+
+    await this.discardPendingStaging(tab);
+
+    return this.cancelarCambios(idTemporal);
+  }
+
+  /**
    * Sustituye el contenido de una pestaña por el artículo fresco devuelto
    * después de una persistencia correcta y establece un nuevo snapshot base.
    */
@@ -315,6 +352,41 @@ export default class ArticulosService {
   findByArticuloId(idArticulo: number): ArticuloWorkspaceTab | null {
     return (
       this.tabs().find((tab: ArticuloWorkspaceTab): boolean => tab.draft.id === idArticulo) ?? null
+    );
+  }
+
+  /**
+   * Elimina los temporales de una ficha nueva que
+   * va a ser sustituida por un artículo existente.
+   */
+  private async discardSourceDraftStaging(sourceTabId: string | null): Promise<void> {
+    if (sourceTabId === null) {
+      return;
+    }
+
+    const sourceTab: ArticuloWorkspaceTab | null = this.findByTemporalId(sourceTabId);
+
+    if (sourceTab === null || sourceTab.draft.id !== null) {
+      return;
+    }
+
+    await this.discardPendingStaging(sourceTab);
+  }
+
+  /**
+   * Descarta todas las imágenes staged que pertenecen
+   * únicamente a los cambios pendientes de una ficha.
+   */
+  private async discardPendingStaging(tab: ArticuloWorkspaceTab): Promise<void> {
+    const stagingIds: readonly string[] = getPendingArticuloStagingIds(
+      tab.draft.fotos,
+      tab.baseSnapshot.fotos,
+    );
+
+    await Promise.all(
+      stagingIds.map((stagingId: string): Promise<void> =>
+        window.osumiDesktop.files.discardStagedImage(stagingId),
+      ),
     );
   }
 

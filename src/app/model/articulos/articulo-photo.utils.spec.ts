@@ -2,6 +2,7 @@ import type StagedImageInterface from '@desktop-contracts/files/staged-image.int
 import type { ArticuloFotoDraft } from '@model/articulos/articulo-draft.interface';
 import {
   appendStagedArticuloFotos,
+  getPendingArticuloStagingIds,
   moveArticuloFoto,
   removeArticuloFoto,
   setArticuloFotoPrincipal,
@@ -81,6 +82,37 @@ describe('articulo-photo.utils', (): void => {
     expect(result[0].principal).toBe(false);
     expect(result[1].principal).toBe(true);
     expect(result.map((foto: ArticuloFotoDraft): number => foto.orden)).toEqual([0, 1]);
+  });
+
+  it('returns only staging images that are not part of the base snapshot', (): void => {
+    const baseFoto: ArticuloFotoDraft = {
+      id: 10,
+      stagingId: null,
+      originalName: 'persisted.webp',
+      url: 'asset://persisted',
+      mimeType: 'image/webp',
+      sizeBytes: 1000,
+      width: 800,
+      height: 600,
+      orden: 0,
+      principal: true,
+    };
+    const stagedFoto: ArticuloFotoDraft = {
+      id: null,
+      stagingId: 'staging-new',
+      originalName: 'new.jpg',
+      url: 'asset://staging-new',
+      mimeType: 'image/webp',
+      sizeBytes: 1200,
+      width: 900,
+      height: 700,
+      orden: 1,
+      principal: false,
+    };
+
+    expect(getPendingArticuloStagingIds([baseFoto, stagedFoto], [baseFoto])).toEqual([
+      'staging-new',
+    ]);
   });
 });
 

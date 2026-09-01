@@ -1,0 +1,62 @@
+<div class="overlay overlay--dimmed photo-crop-overlay">
+    <section class="photo-crop overlay__panel"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="photo-crop-title">
+        <header class="photo-crop__header">
+            <div>
+                <h2 id="photo-crop-title">
+                    Recortar imagen
+                </h2>
+
+                <span>
+                    {{ file().name }}
+                </span>
+            </div>
+
+            <button type="button"
+                    class="photo-crop__close"
+                    aria-label="Cerrar"
+                    [disabled]="cropping() || processing()"
+                    (click)="cancel()">
+                <mat-icon>close</mat-icon>
+            </button>
+        </header>
+
+        <div class="photo-crop__body">
+            <image-cropper [imageFile]="file()"
+                           [maintainAspectRatio]="false"
+                           [autoCrop]="false"
+                           format="png"
+                           output="blob"
+                           (imageLoaded)="onImageLoaded()"
+                           (loadImageFailed)="onLoadImageFailed()" />
+
+            @if (error() !== null) {
+            <p class="photo-crop__error">
+                {{ error() }}
+            </p>
+            }
+        </div>
+
+        <footer class="photo-crop__actions">
+            <button mat-stroked-button
+                    type="button"
+                    [disabled]="cropping() || processing()"
+                    (click)="cancel()">
+                Cancelar
+            </button>
+
+            <button mat-flat-button
+                    type="button"
+                    [disabled]="!ready() || cropping() || processing()"
+                    (click)="confirm()">
+                @if (processing()) {
+                Preparando…
+                } @else {
+                Usar recorte
+                }
+            </button>
+        </footer>
+    </section>
+</div>

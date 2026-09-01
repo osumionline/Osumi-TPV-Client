@@ -215,8 +215,28 @@ export default class ArticlesComponent implements OnInit {
           return;
         }
 
-        this.articulosService.cerrarTab(idTemporal);
+        void this.closeArticleDiscardingChanges(idTemporal);
       });
+  }
+
+  /**
+   * Descarta temporales y cierra una ficha cuyos
+   * cambios ya han sido confirmados como descartables.
+   */
+  private async closeArticleDiscardingChanges(idTemporal: string): Promise<void> {
+    try {
+      await this.articulosService.cerrarTabDescartandoCambios(idTemporal);
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(
+            error,
+            'No se han podido limpiar los archivos temporales de la ficha.',
+          ),
+        })
+        .subscribe();
+    }
   }
 
   /**

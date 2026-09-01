@@ -1,0 +1,80 @@
+.photo-crop-overlay {
+    z-index: 130;
+}
+
+.photo-crop {
+    display: flex;
+    width: min(940px, calc(100vw - 32px));
+    max-height: calc(100vh - 48px);
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.photo-crop__header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--separator-color);
+
+    >div {
+        min-width: 0;
+        flex: 1;
+    }
+
+    h2 {
+        margin: 0;
+    }
+
+    span {
+        display: block;
+        margin-top: 3px;
+        overflow: hidden;
+        font-size: 12px;
+        opacity: 0.65;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+.photo-crop__close {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    background-color: transparent;
+    cursor: pointer;
+
+    &:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+}
+
+.photo-crop__body {
+    min-height: 0;
+    flex: 1;
+    padding: 18px;
+    overflow: auto;
+
+    image-cropper {
+        display: block;
+        height: min(600px, calc(100vh - 220px));
+    }
+}
+
+.photo-crop__error {
+    margin: 12px 0 0;
+    color: var(--color-error);
+    font-size: 13px;
+}
+
+.photo-crop__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 14px 18px;
+    border-top: 1px solid var(--separator-color);
+}
