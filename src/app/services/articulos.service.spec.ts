@@ -202,7 +202,7 @@ function createArticulo(overrides: Partial<ArticuloInterface> = {}): ArticuloInt
     pvpDescuentoCents: null,
     ivaBps: 2100,
     reBps: 520,
-    margenMicroporcentaje: 369_000,
+    margenMicroporcentaje: 36_900_000,
     margenDescuentoMicroporcentaje: null,
     stock: 10,
     stockMin: 2,
