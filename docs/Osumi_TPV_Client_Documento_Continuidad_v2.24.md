@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.23  
+**Versión:** 2.24  
 **Fecha:** 1 de septiembre de 2026  
-**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos** continúa en frontend. Todo `13B — Infraestructura backend` está cerrado, incluido `13B.6E — unificación total de imágenes en WebP`. `13C — Workspace y carga de artículos` está cerrado y probado. **`13D — General` queda completamente cerrado ✅, incluidos sus retoques finales `13D.R`: gestión global de accesos directos, layout compacto, toggles Material, categorías multiselección, edición reactiva de precios a dos decimales y modal de sugerencias de margen.** El siguiente apartado de Artículos es **`13E — WEB`**, recuperado en el roadmap como mini-hito propio antes de Códigos de barras.
+**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos** continúa en frontend. Todo `13B — Infraestructura backend` está cerrado, incluido `13B.6E — unificación total de imágenes en WebP`. `13C — Workspace y carga de artículos` está cerrado y probado. **`13D — General` está completamente cerrado ✅. `13E — WEB` queda también cerrado como mini-hito ✅: contenido web, galería de fotos 0..N, staging WebP, crop, orden/principal, eliminación y ciclo de vida de temporales están implementados y validados.** WEB forma parte del mismo `ArticuloDraft` y **no tiene guardado independiente**: se persistirá con las acciones globales del artículo. El siguiente apartado es **`13F — Códigos de barras`**.
 
 > **Regla crítica de entorno TicketBAI:** el producto usa `production` por defecto. Durante desarrollo/pruebas manuales se usa `app_data.json → ticketBai.environment = "test"` junto con el token TEST correspondiente. No añadir selector de entorno a la UI.
 
@@ -69,11 +69,12 @@ Ventas 12 — Postventa                             🟦
   13D.R Retoques diseño/funcionalidad General     ✅
     13D.R1 Accesos directos                       ✅
     13D.R2 General compacto                       ✅
-  13E WEB                                         🟦 SIGUIENTE
-    13E.1 Contenido WEB                            ⬜
-    13E.2 Fotos 0..N                               ⬜
-    13E.3 Guardado/validación WEB                  ⬜
-  13F Códigos de barras                           ⬜
+  13E WEB                                         ✅ MINI-HITO CERRADO
+    13E.1 Contenido WEB                            ✅
+    13E.2 Fotos 0..N                               ✅
+      13E.2A Staging + galería 0..N               ✅
+      13E.2B Crop + ciclo de vida staging         ✅
+  13F Códigos de barras                           🟦 SIGUIENTE
   13G Observaciones                               ⬜
   13H Histórico                                   ⬜
   13I Baja / duplicado / acciones                 ⬜
@@ -514,10 +515,22 @@ de modo que el producto pueda prepararse completamente antes de publicarse.
 
 - pueden existir `0..N`;
 - deben persistirse como archivos físicos y relacionarse en SQLite;
+- la primera foto añadida pasa a ser principal si todavía no existe una principal;
+- puede cambiarse la foto principal sin alterar el orden;
+- las fotos pueden reordenarse y el draft mantiene `orden` normalizado;
+- las imágenes nuevas pasan por crop libre antes de entrar en staging;
+- después del crop, el staging común convierte siempre a WebP canónico mediante Sharp;
+- eliminar una foto staged elimina también su temporal;
+- eliminar una foto persistida la elimina del draft y la relación se resolverá en el guardado global del artículo;
+- cerrar/cancelar una ficha descartando cambios limpia los staged nuevos;
+- sustituir un borrador por un artículo localizado también limpia sus staged pendientes;
+- navegar a otro módulo sin descartar la ficha **no** elimina sus staged: el workspace debe conservar el estado;
 - desactivar `Venta online` **oculta WEB pero no borra sus datos**;
 - al reactivar `Venta online`, deben recuperarse descripciones, configuración y fotos.
 
 La base actual ya contiene los campos web y las relaciones de archivos necesarias; no crear modelos paralelos innecesarios.
+
+**Regla de guardado:** WEB no dispone de un botón ni de un flujo de guardado propio. `mostrarEnWeb`, descripciones y `fotos` forman parte del mismo `ArticuloDraft` que GENERAL y el resto de apartados; las acciones inferiores globales (`Guardar`, `Cancelar`, `Duplicar`, etc.) operan sobre el artículo completo.
 
 ---
 
@@ -1491,9 +1504,9 @@ discard staging mediante Promise.allSettled()
 
 Esto evita que un fallo posterior al commit induzca al usuario a repetir una operación ya persistida.
 
-## 28.9 Limpieza de fotos quitadas — pendiente
+## 28.9 Limpieza física de fotos persistidas huérfanas — pendiente
 
-Al eliminar una foto de un artículo:
+Al eliminar una **foto ya persistida** de un artículo y guardar globalmente la ficha:
 
 ```text
 DELETE relación articulo_archivo
@@ -1506,7 +1519,7 @@ fila archivo
 fichero físico
 ```
 
-La limpieza segura de huérfanos debe coordinarse fuera del repository para no mezclar filesystem y transacciones SQLite de forma insegura.
+La limpieza segura de esos huérfanos definitivos debe coordinarse fuera del repository para no mezclar filesystem y transacciones SQLite de forma insegura. Esta deuda es distinta del staging temporal de `13E.2B`, cuyo ciclo de vida sí está cerrado.
 
 ## 28.10 Logo de empresa — NUEVA REGLA OBLIGATORIA
 
@@ -1538,7 +1551,7 @@ El almacenamiento, URL/protocolo y contratos del logo deben actualizarse para de
 
 No conservar una excepción PNG para el logo.
 
-## 28.11 Import legacy y resto de imágenes — siguiente
+## 28.11 Import legacy y resto de imágenes — ✅ cerrado en 13B.6E
 
 `13B.6E` ya no significa únicamente “convertir fotos legacy de `archivo`”.
 
@@ -2064,56 +2077,215 @@ PVP                 PVP dto.                        Lote óptimo
 
 ---
 
+# 28D. 13E — WEB ✅ MINI-HITO COMPLETAMENTE CERRADO
+
+`13E` queda cerrado y validado funcionalmente por el usuario.
+
+La pestaña `WEB` sigue siendo una sección del mismo workspace de Artículos; **no representa una entidad ni un formulario independiente**.
+
+Regla conceptual cerrada:
+
+```text
+ArticuloWorkspaceTab
+  └─ ArticuloDraft único
+       ├─ GENERAL
+       ├─ WEB
+       ├─ CÓDIGOS DE BARRAS
+       ├─ OBSERVACIONES
+       └─ resto de apartados
+
+Guardar / Cancelar / Duplicar / Guardar y cerrar
+→ operan sobre el artículo completo
+→ NO existe "guardar WEB"
+```
+
+## 28D.1 13E.1 — Contenido WEB ✅
+
+Cuando `ventaOnline = true`, aparece dinámicamente la sección `WEB`.
+
+Campos implementados:
+
+```text
+Mostrar en web
+Descripción corta
+Descripción larga
+```
+
+Reglas cerradas:
+
+- `Mostrar en web` usa `MatSlideToggle`;
+- las descripciones actualizan directamente el `ArticuloDraft` mediante `ArticuloDraftPatch`;
+- cualquier cambio participa en el `dirty` global de la ficha;
+- desactivar `Venta online` oculta WEB y devuelve la sección activa a GENERAL si era necesario;
+- ocultar WEB **no borra** `mostrarEnWeb`, descripciones ni fotos;
+- al reactivar `Venta online`, el contenido reaparece intacto;
+- varias fichas abiertas conservan su contenido WEB de forma independiente durante la sesión.
+
+## 28D.2 13E.2A — Staging + galería 0..N ✅
+
+WEB se organiza en dos columnas en pantallas amplias:
+
+```text
+izquierda → Mostrar en web + descripciones
+derecha   → Fotos
+```
+
+La galería soporta:
+
+- selección múltiple desde file picker;
+- drag & drop;
+- `0..N` fotos;
+- preview de persistidas y staged;
+- primera foto principal automática cuando no existe otra;
+- elección explícita de principal;
+- reordenación;
+- eliminación;
+- visualización de nombre, dimensiones y tamaño;
+- draft actualizado de forma atómica por colección de fotos.
+
+El renderer dispone de una API específica de archivos temporales:
+
+```text
+files.stageArticleImage()
+files.discardStagedImage()
+```
+
+El renderer no decide el `purpose`; el proceso principal fuerza:
+
+```text
+article_image
+```
+
+La imagen entra por `ImageStagingService`, que aplica el procesador común Sharp y deja el staging en WebP canónico.
+
+Regla global que sigue vigente:
+
+```text
+TODAS las imágenes persistidas por Osumi TPV → WebP
+```
+
+## 28D.3 13E.2B — Crop ✅
+
+Antes de crear staging, cada imagen pasa por un modal de recorte.
+
+Flujo:
+
+```text
+seleccionar/arrastrar imágenes
+→ crop secuencial por imagen
+→ confirmar todos los crops
+→ staging
+→ Sharp → WebP canónico
+→ incorporar lote al draft
+```
+
+Decisiones:
+
+- crop libre, sin proporción obligatoria;
+- el resultado temporal del crop puede ser PNG/blob en memoria;
+- ese formato intermedio **no se persiste**;
+- la salida sigue pasando por `stageArticleImage()` y Sharp;
+- un lote de varias fotos solo se incorpora al draft cuando ha terminado correctamente;
+- cancelar durante el crop cancela el lote y, como todavía no existe staging, no hay temporales que limpiar;
+- si el staging falla a mitad de un lote, se descartan los staged ya creados y no se incorpora parcialmente el lote al draft.
+
+## 28D.4 Ciclo de vida del staging ✅
+
+Se cerró también el ciclo de vida de las imágenes temporales.
+
+Reglas:
+
+```text
+eliminar foto staged del draft
+→ discardStagedImage()
+→ eliminar del draft
+```
+
+```text
+Cancelar cambios globales
+→ identificar stagingId presentes en draft pero no en baseSnapshot
+→ descartar temporales
+→ restaurar snapshot
+```
+
+```text
+Cerrar pestaña confirmando descarte
+→ limpiar staged pendientes
+→ cerrar pestaña
+```
+
+```text
+Artículo nuevo con fotos staged
+→ buscar/resolver otro artículo desde Localizador
+→ limpiar staged del borrador
+→ reutilizar/cerrar pestaña origen según regla del workspace
+```
+
+```text
+navegar Ventas ↔ Artículos
+→ NO descartar staging
+→ la ficha sigue viva en el workspace
+```
+
+Durante un staging asíncrono, si el componente desaparece antes de incorporar el resultado al draft, las imágenes staged creadas se descartan para evitar temporales huérfanos.
+
+## 28D.5 Guardado global de WEB/Fotos
+
+No existe un `13E.3 Guardado/validación WEB` independiente.
+
+El backend ya soporta las fotos dentro del guardado transaccional global de Artículos:
+
+```text
+ArticuloDraft completo
+→ ArticuloSaveInterface
+→ ArticulosService.save()
+→ prepare staged → storage definitivo
+→ transacción SQLite del artículo + relaciones/fotos
+→ commit
+→ descartar staging consumido
+→ getById() fresco
+```
+
+Si SQLite falla después de preparar copias definitivas:
+
+```text
+rollback de copias definitivas
+→ staging se conserva
+→ el usuario puede reintentar el guardado global
+```
+
+Si SQLite confirma commit y falla una limpieza temporal posterior, el guardado **sigue considerándose correcto**.
+
+Por tanto, la persistencia definitiva de WEB se integra con las acciones inferiores globales del artículo que se implementarán/completarán en su bloque correspondiente; no debe aparecer ningún botón Guardar dentro de WEB.
+
+**`13E — WEB` queda cerrado ✅.**
+
+---
+
 # 29. Próximo paso exacto
 
 ```text
-13E — WEB
+13F — Códigos de barras
 ```
 
-La pestaña WEB ya existe dinámicamente en el workspace cuando `Venta online = true`; falta implementar su contenido y flujos.
-
-Alcance previsto:
+Estado previo cerrado:
 
 ```text
-13E.1 Contenido WEB
-  - Mostrar en web
-  - Descripción corta
-  - Descripción larga
-
-13E.2 Fotos 0..N
-  - selección/crop
-  - staging
-  - WebP obligatorio
-  - orden y eliminación
-
-13E.3 Guardado/validación WEB
-  - integrar con ArticulosService.save()
-  - conservar datos al ocultar WEB
-  - promoción/rollback de fotos según infraestructura 13B.6D
+13D — General ✅
+13E — WEB ✅
 ```
 
-Estado de General al cierre definitivo:
+`13F` debe continuar sobre el mismo `ArticuloDraft` y el mismo sistema de pestañas/dirty. No crear un guardado independiente para Códigos de barras: igual que WEB, será otro apartado del único artículo y participará en las acciones inferiores globales.
+
+Alcance ya definido para Códigos de barras:
 
 ```text
-- Workspace/secciones internas ✅
-- Marca obligatoria + creación rápida ✅
-- Proveedor opcional + creación rápida ✅
-- Categorías 0..N mediante multiselect ✅
-- Referencia ✅
-- Venta online mediante MatSlideToggle ✅
-- Accesos directos mediante modal global junto al Localizador ✅
-- Stock / mínimo / máximo / lote óptimo ✅
-- IVA/RE desde AppData ✅
-- Precio albarán ↔ PUC ↔ Margen ↔ PVP ✅
-- UI monetaria/porcentual a 2 decimales con precisión interna preservada ✅
-- Recálculo reactivo mientras se escribe ✅
-- Modal de sugerencias de margen ✅
-- Descuento mediante MatSlideToggle ✅
-- Descuento / margen dto. / PVP dto. ✅
-- Reutilización de pestaña nueva al localizar/buscar desde ella ✅
+- código obligatorio por localizador = fila real codigo_barras
+- códigos adicionales 0..N
+- alta/edición/eliminación en el draft
+- impedir duplicados y colisiones según reglas backend
+- mantener por_defecto únicamente para el código basado en localizador
 ```
-
-**General queda cerrado. No realizar más trabajo de `13D` antes de avanzar, salvo que aparezca una regresión.**
 
 ---
 
@@ -2131,6 +2303,7 @@ Estado de General al cierre definitivo:
 | **2.21** | **01/09/2026** | **13B completo ✅; 13C Workspace/carga ✅; 13D General ✅ mini-hito cerrado: fiscalidad, motor entero de precios, descuento y creación rápida transaccional de Marca/Proveedor; siguiente paso: retoques de General antes del siguiente apartado de Artículos** |
 | **2.22** | **01/09/2026** | **13D General cerrado definitivamente ✅: accesos directos globales junto a Localizador, persistencia inmediata y sincronización de tabs, General compacto, toggles Material, categorías multiselect, UI a 2 decimales con precisión interna preservada, recálculo en escritura, selección al foco, modal de márgenes y reutilización de pestaña nueva al buscar/resolver; siguiente en aquella versión: Códigos de barras (posteriormente desplazado a 13F al reincorporar WEB)** |
 | **2.23** | **01/09/2026** | **Se reincorpora la pestaña WEB al roadmap como `13E` y pasa a ser el siguiente mini-hito; Códigos de barras y apartados posteriores se desplazan a `13F`–`13K`. WEB mantiene Mostrar en web, descripciones y fotos 0..N, conservando datos al desactivar Venta online.** |
+| **2.24** | **01/09/2026** | **13E WEB ✅ mini-hito cerrado: contenido WEB, galería 0..N en columna derecha, file picker/drag&drop, principal y orden, staging común WebP, crop libre secuencial, rollback de lotes y ciclo de vida completo de temporales al eliminar/cancelar/cerrar/reutilizar borrador. Se elimina el concepto de “guardado WEB”: WEB forma parte del ArticuloDraft único y se guarda/cancela con las acciones globales del artículo. Siguiente: 13F Códigos de barras.** |
 ---
 
 # 31. Prompt de arranque recomendado
@@ -2139,7 +2312,7 @@ Estado de General al cierre definitivo:
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.23.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.24.
 
 Estado:
 - Ventas 12C.1–12C.8 ✅
@@ -2172,11 +2345,12 @@ Estado:
   - recálculo mientras se escribe ✅
   - modal de sugerencias de margen ✅
   - búsqueda desde borrador reutiliza su pestaña ✅
-- 13E WEB 🟦 SIGUIENTE
-  - 13E.1 Contenido WEB ⬜
-  - 13E.2 Fotos 0..N ⬜
-  - 13E.3 Guardado/validación WEB ⬜
-- 13F Códigos de barras ⬜
+- 13E WEB ✅ CERRADO
+  - 13E.1 Contenido WEB ✅
+  - 13E.2 Fotos 0..N ✅
+    - 13E.2A staging + galería 0..N ✅
+    - 13E.2B crop + ciclo de vida staging ✅
+- 13F Códigos de barras 🟦 SIGUIENTE
 - 13G Observaciones ⬜
 - 13H Histórico ⬜
 - 13I Baja / duplicado / acciones ⬜
@@ -2224,7 +2398,10 @@ Reglas críticas:
 - Alta con stock inicial no genera histórico.
 - Baja = soft delete artículo + códigos; conservar histórico/relaciones/fotos.
 - Venta online muestra WEB; desactivarla oculta pero no borra datos. Venta online y Descuento usan MatSlideToggle.
-- La pestaña WEB es un mini-hito propio (`13E`) y se implementa antes de Códigos de barras; su contenido es Mostrar en web + descripción corta + descripción larga + fotos 0..N.
+- La pestaña WEB es un mini-hito propio (`13E`) y está cerrada ✅ antes de Códigos de barras; contiene Mostrar en web + descripción corta + descripción larga + fotos 0..N.
+- WEB NO tiene guardado propio: comparte el único ArticuloDraft y las acciones inferiores globales del artículo.
+- Fotos WEB: crop libre → staging → Sharp/WebP; la galería mantiene orden y una única principal.
+- Staged nuevos se limpian al eliminar, cancelar cambios, cerrar descartando o sustituir un borrador por un artículo localizado; navegar entre módulos no los descarta.
 - Categorías se editan mediante mat-select multiple con panel suficientemente ancho para nombres largos.
 - Estadísticas se diseñarán al final.
 
@@ -2238,9 +2415,9 @@ Convenciones:
 - Trabajar por lotes coherentes y no avanzar sin confirmación.
 
 Próximo paso exacto:
-13E — WEB.
+13F — Códigos de barras.
 ```
 
 ---
 
-**Fin del documento de continuidad v2.23.**
+**Fin del documento de continuidad v2.24.**
