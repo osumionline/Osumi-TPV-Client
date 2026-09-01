@@ -29,7 +29,8 @@ import { getErrorMessage } from '@utils/error.utils';
 
 type ArticleIntegerField = 'stock' | 'stockMin' | 'stockMax' | 'loteOptimo';
 
-type ArticlePriceField = 'precioAlbaran' | 'puc' | 'margen' | 'pvp';
+type ArticlePriceField =
+  'precioAlbaran' | 'puc' | 'margen' | 'pvp' | 'margenDescuento' | 'pvpDescuento';
 
 interface ArticleFiscalOption {
   readonly key: string;
@@ -145,6 +146,66 @@ export default class ArticleGeneralComponent implements OnInit {
    */
   hasFiscalidad(): boolean {
     return this.tab().draft.ivaBps !== null && this.tab().draft.reBps !== null;
+  }
+
+  /**
+   * Activa o desactiva el sistema de descuento.
+   */
+  onDescuentoChange(event: Event): void {
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
+    try {
+      const patch: ArticuloDraftPatch = inputElement.checked
+        ? ArticuloPriceCalculator.activarDescuento(this.tab().draft)
+        : ArticuloPriceCalculator.desactivarDescuento();
+
+      this.calculationError.set(null);
+      this.draftChangeEvent.emit(patch);
+    } catch (error: unknown) {
+      this.calculationError.set(getErrorMessage(error, 'No se ha podido modificar el descuento.'));
+      inputElement.checked = this.hasDescuento();
+    }
+  }
+
+  /**
+   * Cambia el porcentaje de descuento.
+   */
+  onDiscountPercentageChange(event: Event): void {
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+    const value: number | null = parseScaledDecimal(inputElement.value, 6);
+
+    if (value === null) {
+      this.calculationError.set('El valor de Descuento no es válido.');
+      this.restoreDiscountInput(inputElement);
+      return;
+    }
+
+    try {
+      const patch: ArticuloDraftPatch = ArticuloPriceCalculator.actualizarDescuento(
+        this.tab().draft,
+        value,
+      );
+
+      this.calculationError.set(null);
+      this.draftChangeEvent.emit(patch);
+    } catch (error: unknown) {
+      this.calculationError.set(getErrorMessage(error, 'No se ha podido actualizar el descuento.'));
+      this.restoreDiscountInput(inputElement);
+    }
+  }
+
+  /**
+   * Indica si el artículo tiene descuento activo.
+   */
+  hasDescuento(): boolean {
+    return ArticuloPriceCalculator.tieneDescuento(this.tab().draft);
+  }
+
+  /**
+   * Obtiene el porcentaje efectivo de descuento.
+   */
+  getDescuentoMicroporcentaje(): number {
+    return ArticuloPriceCalculator.obtenerDescuentoMicroporcentaje(this.tab().draft) ?? 0;
   }
 
   /**
@@ -473,6 +534,12 @@ export default class ArticleGeneralComponent implements OnInit {
 
       case 'pvp':
         return ArticuloPriceCalculator.actualizarPvp(this.tab().draft, value);
+
+      case 'margenDescuento':
+        return ArticuloPriceCalculator.actualizarMargenDescuento(this.tab().draft, value);
+
+      case 'pvpDescuento':
+        return ArticuloPriceCalculator.actualizarPvpDescuento(this.tab().draft, value);
     }
   }
 
@@ -480,7 +547,7 @@ export default class ArticleGeneralComponent implements OnInit {
    * Obtiene la precisión de almacenamiento de un campo.
    */
   private getPriceScaleDigits(field: ArticlePriceField): number {
-    return field === 'pvp' ? 2 : 6;
+    return field === 'pvp' || field === 'pvpDescuento' ? 2 : 6;
   }
 
   /**
@@ -499,6 +566,12 @@ export default class ArticleGeneralComponent implements OnInit {
 
       case 'pvp':
         return 'PVP';
+
+      case 'margenDescuento':
+        return 'Margen con descuento';
+
+      case 'pvpDescuento':
+        return 'PVP con descuento';
     }
   }
 
@@ -523,7 +596,24 @@ export default class ArticleGeneralComponent implements OnInit {
       case 'pvp':
         inputElement.value = this.formatCents(this.tab().draft.pvpCents);
         return;
+
+      case 'margenDescuento':
+        inputElement.value = this.formatMargin(
+          this.tab().draft.margenDescuentoMicroporcentaje ?? 0,
+        );
+        return;
+
+      case 'pvpDescuento':
+        inputElement.value = this.formatCents(this.tab().draft.pvpDescuentoCents ?? 0);
+        return;
     }
+  }
+
+  /**
+   * Restaura el descuento efectivo de la ficha.
+   */
+  private restoreDiscountInput(inputElement: HTMLInputElement): void {
+    inputElement.value = this.formatMargin(this.getDescuentoMicroporcentaje());
   }
 
   /**

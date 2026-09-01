@@ -111,6 +111,20 @@
         gap: 20px 24px;
     }
 
+    .general__discount-toggle {
+        margin-top: 20px;
+    }
+
+    .general__discount-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 20px 24px;
+        margin-top: 20px;
+        padding: 20px;
+        border: 1px solid var(--separator-color);
+        border-radius: 4px;
+    }
+
     .general__calculation-error {
         margin: 14px 0 0;
         color: var(--color-error);

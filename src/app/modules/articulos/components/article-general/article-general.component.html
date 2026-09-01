@@ -246,6 +246,65 @@
             </label>
         </div>
 
+        <label class="general__toggle general__discount-toggle">
+            <input type="checkbox"
+                   [checked]="hasDescuento()"
+                   (change)="onDescuentoChange($event)">
+
+            <span>
+                Aplicar descuento
+            </span>
+        </label>
+
+        @if (hasDescuento()) {
+        <div class="general__discount-grid">
+            <label class="general__field">
+                <span>
+                    Descuento (%)
+                </span>
+
+                <input type="text"
+                       inputmode="decimal"
+                       autocomplete="off"
+                       [value]="formatMargin(getDescuentoMicroporcentaje())"
+                       (change)="onDiscountPercentageChange($event)">
+            </label>
+
+            <label class="general__field">
+                <span>
+                    Margen (dto) (%)
+                </span>
+
+                <input type="text"
+                       inputmode="decimal"
+                       autocomplete="off"
+                       list="article-margin-options"
+                       [value]="
+                                         formatMargin(
+                                           tab().draft.margenDescuentoMicroporcentaje ?? 0
+                                         )
+                                       "
+                       (change)="onPriceChange($event, 'margenDescuento')">
+            </label>
+
+            <label class="general__field">
+                <span>
+                    PVP (dto) (€)
+                </span>
+
+                <input type="text"
+                       inputmode="decimal"
+                       autocomplete="off"
+                       [value]="
+                                         formatCents(
+                                           tab().draft.pvpDescuentoCents ?? 0
+                                         )
+                                       "
+                       (change)="onPriceChange($event, 'pvpDescuento')">
+            </label>
+        </div>
+        }
+
         @if (calculationError() !== null) {
         <p class="general__calculation-error">
             {{ calculationError() }}

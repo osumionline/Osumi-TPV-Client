@@ -123,6 +123,118 @@ describe('ArticuloPriceCalculator', (): void => {
       ArticuloPriceCalculator.actualizarMargen(draft, 100_000_000),
     ).toThrow('El margen debe ser inferior al 100 % para calcular el PVP.');
   });
+
+  it('activates discount initially at zero percent', (): void => {
+    const draft: ArticuloDraft = createDraft({
+      pvpCents: 100,
+      margenMicroporcentaje: 26_000_000,
+    });
+
+    expect(ArticuloPriceCalculator.activarDescuento(draft)).toEqual({
+      pvpDescuentoCents: 100,
+      margenDescuentoMicroporcentaje: 26_000_000,
+    });
+  });
+
+  it('disables discount using null persisted values', (): void => {
+    expect(ArticuloPriceCalculator.desactivarDescuento()).toEqual({
+      pvpDescuentoCents: null,
+      margenDescuentoMicroporcentaje: null,
+    });
+  });
+
+  it('applies discount and recalculates discounted margin', (): void => {
+    const draft: ArticuloDraft = createDraft({
+      pucMicros: 740_000,
+      pvpCents: 100,
+      pvpDescuentoCents: 100,
+      margenDescuentoMicroporcentaje: 26_000_000,
+    });
+
+    expect(ArticuloPriceCalculator.actualizarDescuento(draft, 10_000_000)).toEqual({
+      pvpDescuentoCents: 90,
+      margenDescuentoMicroporcentaje: 17_777_778,
+    });
+  });
+
+  it('derives effective discount from normal and discounted PVP', (): void => {
+    const draft: ArticuloDraft = createDraft({
+      pvpCents: 100,
+      pvpDescuentoCents: 80,
+      margenDescuentoMicroporcentaje: 7_500_000,
+    });
+
+    expect(ArticuloPriceCalculator.obtenerDescuentoMicroporcentaje(draft)).toBe(20_000_000);
+  });
+
+  it('preserves effective discount when normal PVP changes', (): void => {
+    const draft: ArticuloDraft = createDraft({
+      pucMicros: 740_000,
+      pvpCents: 100,
+      pvpDescuentoCents: 90,
+      margenDescuentoMicroporcentaje: 17_777_778,
+    });
+
+    expect(ArticuloPriceCalculator.actualizarPvp(draft, 200)).toEqual({
+      pvpCents: 200,
+      margenMicroporcentaje: 63_000_000,
+      pvpDescuentoCents: 180,
+      margenDescuentoMicroporcentaje: 58_888_889,
+    });
+  });
+
+  it('recalculates discount when discounted PVP is edited', (): void => {
+    const draft: ArticuloDraft = createDraft({
+      pucMicros: 740_000,
+      pvpCents: 100,
+      pvpDescuentoCents: 90,
+      margenDescuentoMicroporcentaje: 17_777_778,
+    });
+
+    const patch: ArticuloDraftPatch = ArticuloPriceCalculator.actualizarPvpDescuento(draft, 80);
+
+    expect(patch).toEqual({
+      pvpDescuentoCents: 80,
+      margenDescuentoMicroporcentaje: 7_500_000,
+    });
+  });
+
+  it('calculates discounted PVP from discounted margin', (): void => {
+    const draft: ArticuloDraft = createDraft({
+      pucMicros: 740_000,
+      pvpCents: 100,
+      pvpDescuentoCents: 90,
+      margenDescuentoMicroporcentaje: 17_777_778,
+    });
+
+    expect(ArticuloPriceCalculator.actualizarMargenDescuento(draft, 7_500_000)).toEqual({
+      pvpDescuentoCents: 80,
+      margenDescuentoMicroporcentaje: 7_500_000,
+    });
+  });
+
+  it('rejects a discount greater than one hundred percent', (): void => {
+    const draft: ArticuloDraft = createDraft({
+      pvpDescuentoCents: 100,
+      margenDescuentoMicroporcentaje: 26_000_000,
+    });
+
+    expect((): ArticuloDraftPatch =>
+      ArticuloPriceCalculator.actualizarDescuento(draft, 100_000_001),
+    ).toThrow('El descuento debe estar entre 0 % y 100 %.');
+  });
+
+  it('rejects discounted PVP greater than normal PVP', (): void => {
+    const draft: ArticuloDraft = createDraft({
+      pvpCents: 100,
+      pvpDescuentoCents: 90,
+      margenDescuentoMicroporcentaje: 17_777_778,
+    });
+
+    expect((): ArticuloDraftPatch =>
+      ArticuloPriceCalculator.actualizarPvpDescuento(draft, 101),
+    ).toThrow('El PVP con descuento no puede ser superior al PVP.');
+  });
 });
 
 /**

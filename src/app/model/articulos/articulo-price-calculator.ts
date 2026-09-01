@@ -23,12 +23,17 @@ export default class ArticuloPriceCalculator {
     const pucMicros: number = this.calcularPuc(draft.precioAlbaranMicros, ivaBps, reBps);
     const pvpCents: number = this.calcularPvpDesdeMargen(pucMicros, draft.margenMicroporcentaje);
 
-    return {
-      ivaBps,
-      reBps,
+    return this.recalculateDiscount(
+      draft,
+      {
+        ivaBps,
+        reBps,
+        pucMicros,
+        pvpCents,
+      },
       pucMicros,
       pvpCents,
-    };
+    );
   }
 
   /**
@@ -49,11 +54,16 @@ export default class ArticuloPriceCalculator {
     );
     const pvpCents: number = this.calcularPvpDesdeMargen(pucMicros, draft.margenMicroporcentaje);
 
-    return {
-      precioAlbaranMicros,
+    return this.recalculateDiscount(
+      draft,
+      {
+        precioAlbaranMicros,
+        pucMicros,
+        pvpCents,
+      },
       pucMicros,
       pvpCents,
-    };
+    );
   }
 
   /**
@@ -71,11 +81,16 @@ export default class ArticuloPriceCalculator {
     );
     const pvpCents: number = this.calcularPvpDesdeMargen(pucMicros, draft.margenMicroporcentaje);
 
-    return {
-      precioAlbaranMicros,
+    return this.recalculateDiscount(
+      draft,
+      {
+        precioAlbaranMicros,
+        pucMicros,
+        pvpCents,
+      },
       pucMicros,
       pvpCents,
-    };
+    );
   }
 
   /**
@@ -84,10 +99,15 @@ export default class ArticuloPriceCalculator {
   static actualizarPvp(draft: ArticuloDraft, pvpCents: number): ArticuloDraftPatch {
     this.assertNonNegativeSafeInteger(pvpCents, 'PVP');
 
-    return {
+    return this.recalculateDiscount(
+      draft,
+      {
+        pvpCents,
+        margenMicroporcentaje: this.calcularMargen(draft.pucMicros, pvpCents),
+      },
+      draft.pucMicros,
       pvpCents,
-      margenMicroporcentaje: this.calcularMargen(draft.pucMicros, pvpCents),
-    };
+    );
   }
 
   /**
@@ -96,9 +116,137 @@ export default class ArticuloPriceCalculator {
   static actualizarMargen(draft: ArticuloDraft, margenMicroporcentaje: number): ArticuloDraftPatch {
     this.assertSafeInteger(margenMicroporcentaje, 'Margen');
 
+    const pvpCents: number = this.calcularPvpDesdeMargen(draft.pucMicros, margenMicroporcentaje);
+
+    return this.recalculateDiscount(
+      draft,
+      {
+        margenMicroporcentaje,
+        pvpCents,
+      },
+      draft.pucMicros,
+      pvpCents,
+    );
+  }
+
+  /**
+   * Activa el descuento inicialmente al 0 %.
+   */
+  static activarDescuento(draft: ArticuloDraft): ArticuloDraftPatch {
     return {
-      margenMicroporcentaje,
-      pvpCents: this.calcularPvpDesdeMargen(draft.pucMicros, margenMicroporcentaje),
+      pvpDescuentoCents: draft.pvpCents,
+      margenDescuentoMicroporcentaje: draft.margenMicroporcentaje,
+    };
+  }
+
+  /**
+   * Desactiva el descuento del artículo.
+   */
+  static desactivarDescuento(): ArticuloDraftPatch {
+    return {
+      pvpDescuentoCents: null,
+      margenDescuentoMicroporcentaje: null,
+    };
+  }
+
+  /**
+   * Indica si el artículo tiene correctamente activado
+   * el sistema de descuento.
+   */
+  static tieneDescuento(draft: ArticuloDraft): boolean {
+    const hasPvp: boolean = draft.pvpDescuentoCents !== null;
+    const hasMargen: boolean = draft.margenDescuentoMicroporcentaje !== null;
+
+    if (hasPvp !== hasMargen) {
+      throw new Error('Los datos de descuento del artículo son inconsistentes.');
+    }
+
+    return hasPvp;
+  }
+
+  /**
+   * Obtiene el descuento efectivo aplicado sobre el PVP.
+   */
+  static obtenerDescuentoMicroporcentaje(draft: ArticuloDraft): number | null {
+    if (!this.tieneDescuento(draft)) {
+      return null;
+    }
+
+    const pvpDescuentoCents: number = this.requirePvpDescuento(draft);
+
+    return this.calcularDescuento(draft.pvpCents, pvpDescuentoCents);
+  }
+
+  /**
+   * Cambia el porcentaje de descuento y recalcula
+   * PVP dto. y Margen dto.
+   */
+  static actualizarDescuento(
+    draft: ArticuloDraft,
+    descuentoMicroporcentaje: number,
+  ): ArticuloDraftPatch {
+    this.requireDescuentoActivo(draft);
+    this.assertSafeInteger(descuentoMicroporcentaje, 'Descuento');
+
+    if (descuentoMicroporcentaje < 0 || descuentoMicroporcentaje > MICRO_PERCENTAGE_100_PERCENT) {
+      throw new Error('El descuento debe estar entre 0 % y 100 %.');
+    }
+
+    const pvpDescuentoCents: number = this.calcularPvpConDescuento(
+      draft.pvpCents,
+      descuentoMicroporcentaje,
+    );
+
+    return {
+      pvpDescuentoCents,
+      margenDescuentoMicroporcentaje: this.calcularMargen(draft.pucMicros, pvpDescuentoCents),
+    };
+  }
+
+  /**
+   * Cambia directamente el PVP con descuento
+   * y recalcula su margen.
+   */
+  static actualizarPvpDescuento(
+    draft: ArticuloDraft,
+    pvpDescuentoCents: number,
+  ): ArticuloDraftPatch {
+    this.requireDescuentoActivo(draft);
+    this.assertNonNegativeSafeInteger(pvpDescuentoCents, 'PVP con descuento');
+
+    if (pvpDescuentoCents > draft.pvpCents) {
+      throw new Error('El PVP con descuento no puede ser superior al PVP.');
+    }
+
+    return {
+      pvpDescuentoCents,
+      margenDescuentoMicroporcentaje: this.calcularMargen(draft.pucMicros, pvpDescuentoCents),
+    };
+  }
+
+  /**
+   * Cambia el margen con descuento y obtiene
+   * el PVP con descuento correspondiente.
+   */
+  static actualizarMargenDescuento(
+    draft: ArticuloDraft,
+    margenDescuentoMicroporcentaje: number,
+  ): ArticuloDraftPatch {
+    this.requireDescuentoActivo(draft);
+    this.assertSafeInteger(margenDescuentoMicroporcentaje, 'Margen con descuento');
+
+    const pvpDescuentoCents: number = this.calcularPvpDesdeMargen(
+      draft.pucMicros,
+      margenDescuentoMicroporcentaje,
+    );
+
+    if (pvpDescuentoCents > draft.pvpCents) {
+      throw new Error('El margen con descuento no puede producir un PVP superior al PVP normal.');
+    }
+
+    return {
+      pvpDescuentoCents,
+      margenDescuentoMicroporcentaje,
     };
   }
 
@@ -168,6 +316,98 @@ export default class ArticuloPriceCalculator {
     );
 
     return this.toSafeNumber(result, 'PVP');
+  }
+
+  /**
+   * Recalcula los valores promocionales manteniendo
+   * el descuento efectivo actual.
+   */
+  private static recalculateDiscount(
+    draft: ArticuloDraft,
+    patch: ArticuloDraftPatch,
+    pucMicros: number,
+    pvpCents: number,
+  ): ArticuloDraftPatch {
+    const descuentoMicroporcentaje: number | null = this.obtenerDescuentoMicroporcentaje(draft);
+
+    if (descuentoMicroporcentaje === null) {
+      return patch;
+    }
+
+    const pvpDescuentoCents: number = this.calcularPvpConDescuento(
+      pvpCents,
+      descuentoMicroporcentaje,
+    );
+
+    return {
+      ...patch,
+      pvpDescuentoCents,
+      margenDescuentoMicroporcentaje: this.calcularMargen(pucMicros, pvpDescuentoCents),
+    };
+  }
+
+  /**
+   * Calcula el PVP resultante de aplicar un descuento.
+   */
+  private static calcularPvpConDescuento(
+    pvpCents: number,
+    descuentoMicroporcentaje: number,
+  ): number {
+    this.assertNonNegativeSafeInteger(pvpCents, 'PVP');
+
+    const factor: bigint = MICRO_PERCENTAGE_100_PERCENT - BigInt(descuentoMicroporcentaje);
+
+    const result: bigint = this.roundDivide(
+      BigInt(pvpCents) * factor,
+      MICRO_PERCENTAGE_100_PERCENT,
+    );
+
+    return this.toSafeNumber(result, 'PVP con descuento');
+  }
+
+  /**
+   * Calcula el porcentaje efectivo de descuento
+   * a partir de ambos PVP.
+   */
+  private static calcularDescuento(pvpCents: number, pvpDescuentoCents: number): number {
+    this.assertNonNegativeSafeInteger(pvpCents, 'PVP');
+    this.assertNonNegativeSafeInteger(pvpDescuentoCents, 'PVP con descuento');
+
+    if (pvpDescuentoCents > pvpCents) {
+      throw new Error('El PVP con descuento no puede ser superior al PVP.');
+    }
+
+    if (pvpCents === 0) {
+      return 0;
+    }
+
+    const result: bigint = this.roundDivide(
+      BigInt(pvpCents - pvpDescuentoCents) * MICRO_PERCENTAGE_100_PERCENT,
+      BigInt(pvpCents),
+    );
+
+    return this.toSafeNumber(result, 'Descuento');
+  }
+
+  /**
+   * Garantiza que el descuento está activo.
+   */
+  private static requireDescuentoActivo(draft: ArticuloDraft): void {
+    if (!this.tieneDescuento(draft)) {
+      throw new Error('El artículo no tiene activado el descuento.');
+    }
+  }
+
+  /**
+   * Obtiene el PVP con descuento de un artículo
+   * cuyo descuento ya ha sido validado.
+   */
+  private static requirePvpDescuento(draft: ArticuloDraft): number {
+    if (draft.pvpDescuentoCents === null) {
+      throw new Error('El artículo no tiene PVP con descuento.');
+    }
+
+    return draft.pvpDescuentoCents;
   }
 
   /**
