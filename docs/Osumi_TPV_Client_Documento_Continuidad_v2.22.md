@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.21  
+**Versión:** 2.22  
 **Fecha:** 1 de septiembre de 2026  
-**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos** continúa en frontend. Todo `13B — Infraestructura backend` está cerrado, incluido `13B.6E — unificación total de imágenes en WebP`. `13C — Workspace y carga de artículos` está cerrado y probado. `13D — General` queda cerrado como mini-hito funcional: estructura interna, datos generales, IVA/RE, motor entero de precios, descuento y creación rápida de Marca/Proveedor están implementados y validados. Antes de avanzar al siguiente apartado de Artículos se realizará una pasada específica de retoques de diseño y funcionalidad sobre General.
+**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos** continúa en frontend. Todo `13B — Infraestructura backend` está cerrado, incluido `13B.6E — unificación total de imágenes en WebP`. `13C — Workspace y carga de artículos` está cerrado y probado. **`13D — General` queda completamente cerrado ✅, incluidos sus retoques finales `13D.R`: gestión global de accesos directos, layout compacto, toggles Material, categorías multiselección, edición reactiva de precios a dos decimales y modal de sugerencias de margen.** El siguiente apartado de Artículos es `13E — Códigos de barras`.
 
 > **Regla crítica de entorno TicketBAI:** el producto usa `production` por defecto. Durante desarrollo/pruebas manuales se usa `app_data.json → ticketBai.environment = "test"` junto con el token TEST correspondiente. No añadir selector de entorno a la UI.
 
@@ -66,8 +66,10 @@ Ventas 12 — Postventa                             🟦
     13D.4 Creación rápida Marca/Proveedor         ✅
       13D.4A Backend/API/servicios                ✅
       13D.4B Modales + integración General        ✅
-  13D.R Retoques diseño/funcionalidad General     🟦 SIGUIENTE
-  13E Códigos de barras                           ⬜
+  13D.R Retoques diseño/funcionalidad General     ✅
+    13D.R1 Accesos directos                       ✅
+    13D.R2 General compacto                       ✅
+  13E Códigos de barras                           🟦 SIGUIENTE
   13F Observaciones                               ⬜
   13G Histórico                                   ⬜
   13H Baja / duplicado / acciones                 ⬜
@@ -574,6 +576,18 @@ PVP = 1,00 €
 margen = 26 %
 ```
 
+El margen continúa siendo editable en el nuevo cliente. Además, junto a su campo existe un botón que abre un modal de **sugerencias de margen**. El modal usa `AppData.marginList` y muestra para cada margen configurado el PVP que resultaría con el PUC actual. Al seleccionar una sugerencia:
+
+```text
+margen elegido
+→ ArticuloPriceCalculator
+→ recalcular PVP
+→ recalcular descuento si está activo
+→ cerrar modal
+```
+
+La UI monetaria y porcentual muestra y permite introducir **como máximo 2 decimales**, aunque Precio albarán, PUC y márgenes conservan internamente su precisión de microescala. No reducir la precisión persistida solo porque la presentación sea de dos decimales.
+
 ## Relaciones de edición
 
 Al cambiar **Precio albarán**:
@@ -612,7 +626,7 @@ Evitar floats encadenados arbitrariamente en Angular.
 
 # 17. Descuento
 
-Existe un toggle de descuento.
+Existe un `MatSlideToggle` de descuento, visualmente coherente con `Venta online`.
 
 Cuando está activado aparecen:
 
@@ -1671,13 +1685,33 @@ Enter con localizador/acceso directo/barcode
 
 El buscador de Ventas se reutiliza con contexto `articulos` y permite abrir uno o varios resultados.
 
+Regla de pestañas al buscar desde una ficha nueva:
+
+```text
+Artículo nuevo
+→ usar su campo Localizador para buscar/resolver
+→ el primer artículo encontrado REUTILIZA esa misma pestaña
+```
+
+Si el artículo localizado ya estaba abierto:
+
+```text
+borrador origen nuevo se cierra
+→ se activa la pestaña existente
+→ nunca se crea duplicado
+```
+
+Si desde el buscador se seleccionan varios artículos, el primero reutiliza la pestaña nueva de origen y los siguientes se abren mediante el comportamiento normal del workspace. Buscar desde una ficha ya persistida no sustituye esa ficha: abre o activa la pestaña del artículo localizado.
+
+Cuando todo el contenido del Localizador está seleccionado y se pulsa una letra, la consulta comienza por esa letra; no se concatena el localizador persistido con el texto de búsqueda.
+
 Un artículo ya abierto nunca genera una segunda pestaña.
 
 ---
 
-# 28C. 13D — General ✅ MINI-HITO CERRADO
+# 28C. 13D — General ✅ MINI-HITO COMPLETAMENTE CERRADO
 
-General queda funcionalmente cerrado antes de una pasada específica de retoques de diseño/UX.
+General queda completamente cerrado y validado, incluida la pasada final `13D.R` de diseño y funcionalidad. No reabrir este apartado salvo regresión o requisito nuevo.
 
 ## 28C.1 Secciones internas
 
@@ -1706,13 +1740,14 @@ Marca *
 Proveedor
 Categorías 0..N
 Referencia
-Acceso directo
 Venta online
 Stock
 Stock mínimo
 Stock máximo
 Lote óptimo
 ```
+
+**Acceso directo ya no se edita como campo de General.** Se gestiona desde un modal específico accesible mediante un icono junto al Localizador; ver `28C.9`.
 
 Marca es obligatoria a nivel funcional/backend. Proveedor sigue siendo opcional. Categorías son equivalentes y el orden no tiene significado.
 
@@ -1819,7 +1854,17 @@ Los cálculos intermedios usan enteros/`BigInt`; no encadenar floats monetarios.
 
 La UI convierte texto decimal con coma o punto directamente a enteros escalados mediante utilidades específicas.
 
-`marginList` se usa como sugerencia, no como restricción.
+Presentación/edición final:
+
+```text
+importes monetarios → máximo 2 decimales visibles/editables
+márgenes/porcentajes → máximo 2 decimales visibles/editables
+precisión interna PALB/PUC/márgenes → se conserva en microescala
+```
+
+La edición de precios y márgenes recalcula **mientras se escribe** cuando el texto ya representa un decimal completo. Estados transitorios como `12,`, `12.`, `-` o campo vacío no disparan cálculo hasta completarse o perder el foco. Al recibir foco, los campos decimales seleccionan todo su contenido una sola vez; un segundo click con el foco ya activo permite colocar el cursor normalmente. Los campos de Stock usan el mismo comportamiento de selección al foco.
+
+`marginList` se usa como sugerencia, no como restricción. Además existe un modal de Márgenes que muestra, para cada margen configurado, el PVP calculado con el PUC actual; seleccionar una opción aplica ese margen, actualiza PVP y cierra el modal.
 
 Una fiscalidad histórica de un artículo que ya no figure en la configuración actual debe seguir mostrándose como opción válida de esa ficha.
 
@@ -1944,39 +1989,105 @@ COMMIT ✅
 → usuario puede repetir una creación ya persistida
 ```
 
+
+## 28C.9 13D.R1 — Accesos directos ✅
+
+El campo `accesoDirecto` continúa formando parte del artículo persistido, pero **ya no aparece como input en General**.
+
+Junto al Localizador existe un icono de gestión de accesos directos que abre un modal global.
+
+El modal muestra:
+
+```text
+Acceso directo | Artículo | Borrar
+```
+
+Permite:
+
+- consultar todos los accesos directos asignados a artículos activos;
+- borrar cualquiera de ellos;
+- si la ficha actual corresponde a un artículo ya persistido, asignarle o cambiarle su acceso directo;
+- si la ficha actual es un artículo nuevo todavía no guardado, consultar la lista pero no asignar acceso todavía.
+
+Las modificaciones de acceso directo son **persistencia inmediata**, independientes del botón Guardar de la ficha. El backend reutiliza la validación central del espacio comercial para impedir colisiones con otros accesos, localizadores o códigos de barras.
+
+Si el artículo afectado está abierto en el workspace, `ArticulosService` sincroniza el nuevo acceso tanto en `draft` como en `baseSnapshot`, preservando cualquier otro cambio local dirty. Por tanto:
+
+```text
+Nombre modificado localmente → dirty
+cambiar acceso directo desde modal → COMMIT inmediato
+Cancelar cambios de ficha → restaura Nombre
+                           → NO restaura el acceso anterior
+```
+
+La lista se refresca después del cambio. Si el COMMIT ha funcionado pero falla la recarga posterior, la UI informa expresamente de que el cambio se guardó pero no se pudo refrescar la lista; no presenta falsamente la operación como fallida.
+
+## 28C.10 13D.R2 — General compacto ✅
+
+La maquetación final de GENERAL busca densidad operativa, inspirada funcionalmente en el TPV legacy pero manteniendo la estética del cliente nuevo.
+
+Decisiones cerradas:
+
+- controles superiores y numéricos de tamaño contenido, sin estirarse para ocupar toda la pantalla;
+- algo de aire entre grupos para que la pantalla se vea llena pero no abarrotada;
+- eliminación de títulos intermedios como `Fiscalidad y precios` y `Stock y planificación`;
+- grupos reconocibles por posición y etiquetas de los propios campos;
+- `Venta online` usa `MatSlideToggle`;
+- `Descuento` usa `MatSlideToggle`;
+- Categorías usa `mat-select multiple`;
+- el panel del multiselect no queda limitado al ancho estrecho del trigger y permite leer nombres largos;
+- se mantiene la representación jerárquica mediante sangría visual;
+- Precio albarán, PUC, Margen, PVP y campos de descuento muestran como máximo dos decimales;
+- la precisión interna del dominio no se reduce por esa presentación;
+- los campos decimales recalculan durante `(input)` salvo estados transitorios de escritura;
+- al obtener foco se selecciona el contenido de importes/márgenes y campos de stock, pero no se vuelve a seleccionar con clicks posteriores mientras conservan el foco;
+- junto al Margen existe un botón para abrir el modal de sugerencias de `marginList`;
+- el Margen permanece editable directamente además de poder elegirse desde el modal.
+
+La disposición final validada queda conceptualmente así:
+
+```text
+Marca              IVA             RE              Venta online
+Proveedor          Categorías      Referencia
+
+Precio albarán     Descuento                       Stock
+PUC                 Descuento %                     Stock mínimo
+Margen + sugerencias Margen dto.                    Stock máximo
+PVP                 PVP dto.                        Lote óptimo
+```
+
+`13D.R2` ha sido validado funcional y visualmente por el usuario y cierra definitivamente General.
+
 ---
 
 # 29. Próximo paso exacto
 
 ```text
-13D.R — retoques de diseño y funcionalidad de General
+13E — Códigos de barras
 ```
 
-Estado funcional de General antes de la pasada de retoques:
+Estado de General al cierre definitivo:
 
 ```text
-- Marca obligatoria y seleccionable ✅
-- Proveedor opcional ✅
-- Categorías 0..N ✅
+- Workspace/secciones internas ✅
+- Marca obligatoria + creación rápida ✅
+- Proveedor opcional + creación rápida ✅
+- Categorías 0..N mediante multiselect ✅
 - Referencia ✅
-- Acceso directo ✅
-- Venta online ✅
+- Venta online mediante MatSlideToggle ✅
+- Accesos directos mediante modal global junto al Localizador ✅
 - Stock / mínimo / máximo / lote óptimo ✅
 - IVA/RE desde AppData ✅
 - Precio albarán ↔ PUC ↔ Margen ↔ PVP ✅
+- UI monetaria/porcentual a 2 decimales con precisión interna preservada ✅
+- Recálculo reactivo mientras se escribe ✅
+- Modal de sugerencias de margen ✅
+- Descuento mediante MatSlideToggle ✅
 - Descuento / margen dto. / PVP dto. ✅
-- Creación rápida de Marca ✅
-- Creación opcional de Proveedor junto a Marca ✅
-- Creación rápida de Proveedor con 0..N marcas ✅
+- Reutilización de pestaña nueva al localizar/buscar desde ella ✅
 ```
 
-La pasada `13D.R` no pretende reabrir el dominio de General, sino ajustar la experiencia de uso y la presentación sobre una base funcional ya validada.
-
-Después de cerrar esos retoques:
-
-```text
-13E — Códigos de barras
-```
+**General queda cerrado. No realizar más trabajo de `13D` antes de avanzar, salvo que aparezca una regresión.**
 
 ---
 
@@ -1992,6 +2103,7 @@ Después de cerrar esos retoques:
 | 2.19 | 31/08/2026 | Storage, staging, persistencia fotos y promoción staged |
 | **2.20** | **31/08/2026** | **ArticulosService.save() ✅; 13B.6D completo ✅; nueva regla global: TODAS las imágenes, incluido logo desde .otpv y Configuración, deben persistirse en WebP; 13B.6E pasa a unificación total de imágenes** |
 | **2.21** | **01/09/2026** | **13B completo ✅; 13C Workspace/carga ✅; 13D General ✅ mini-hito cerrado: fiscalidad, motor entero de precios, descuento y creación rápida transaccional de Marca/Proveedor; siguiente paso: retoques de General antes de 13E** |
+| **2.22** | **01/09/2026** | **13D General cerrado definitivamente ✅: accesos directos globales junto a Localizador, persistencia inmediata y sincronización de tabs, General compacto, toggles Material, categorías multiselect, UI a 2 decimales con precisión interna preservada, recálculo en escritura, selección al foco, modal de márgenes y reutilización de pestaña nueva al buscar/resolver; siguiente: 13E Códigos de barras** |
 ---
 
 # 31. Prompt de arranque recomendado
@@ -2000,7 +2112,7 @@ Después de cerrar esos retoques:
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.21.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.22.
 
 Estado:
 - Ventas 12C.1–12C.8 ✅
@@ -2018,15 +2130,22 @@ Estado:
   - workspace Angular ✅
   - página + pestañas ✅
   - apertura/resolución + buscador compartido ✅
-- 13D General ✅ MINI-HITO CERRADO
+- 13D General ✅ CERRADO DEFINITIVAMENTE
   - estructura/secciones/datos básicos ✅
   - AppData común renderer ✅
   - IVA/RE desde configuración ✅
   - motor entero PALB/PUC/Margen/PVP ✅
   - descuento ✅
   - creación rápida Marca/Proveedor ✅
-- 13D.R retoques de diseño/funcionalidad General 🟦 SIGUIENTE
-- 13E Códigos de barras ⬜
+  - 13D.R1 accesos directos globales ✅
+  - 13D.R2 General compacto ✅
+  - MatSlideToggle Venta online/Descuento ✅
+  - Categorías multiselect ✅
+  - UI importes/márgenes a 2 decimales ✅
+  - recálculo mientras se escribe ✅
+  - modal de sugerencias de margen ✅
+  - búsqueda desde borrador reutiliza su pestaña ✅
+- 13E Códigos de barras 🟦 SIGUIENTE
 - 13F Observaciones ⬜
 - 13G Histórico ⬜
 - 13H Baja / duplicado / acciones ⬜
@@ -2049,6 +2168,8 @@ Reglas críticas:
 - El workspace Angular conserva tabs, activeTab, draft, baseSnapshot, dirty y activeSection durante la sesión.
 - Reabrir un artículo ya abierto activa su pestaña y NO recarga BD ni pierde cambios locales.
 - Campo Localizador reutiliza buscador de Ventas; Enter resuelve localizador/acceso directo/barcode.
+- Si búsqueda/resolución se inicia desde una pestaña de artículo nuevo, el primer artículo encontrado reutiliza esa misma pestaña; si ya estaba abierto, se cierra el borrador origen y se activa la existente.
+- Acceso directo ya no es un input de General: se gestiona desde un modal global junto al Localizador y se persiste inmediatamente.
 - Categorías 0..N equivalentes.
 - Marca obligatoria; Proveedor opcional.
 - AppData global en renderer mediante AppDataService; Artículos no depende de VentasContextService.
@@ -2057,6 +2178,10 @@ Reglas críticas:
 - Precio albarán y PUC en microeuros; PVP en céntimos; IVA/RE en bps; margen en microporcentaje.
 - 1 % = 1_000_000 microporcentaje.
 - Motor de precios usa enteros/BigInt; evitar floats encadenados.
+- UI de importes y porcentajes: máximo 2 decimales, sin reducir la precisión interna en microeuros/microporcentaje.
+- Los decimales recalculan durante escritura salvo estados transitorios como `12,`, `12.`, `-` o vacío.
+- Al recibir foco, importes/márgenes y stock seleccionan el contenido una vez; clicks posteriores con foco no reseleccionan.
+- `marginList` alimenta el modal de sugerencias de margen; Margen sigue siendo editable directamente.
 - PALB → PUC → mantener margen → PVP.
 - PUC → PALB → mantener margen → PVP.
 - PVP → margen. Margen → PVP.
@@ -2067,7 +2192,8 @@ Reglas críticas:
 - Cambio manual de stock crea historico_articulo tipo 4.
 - Alta con stock inicial no genera histórico.
 - Baja = soft delete artículo + códigos; conservar histórico/relaciones/fotos.
-- Venta online muestra WEB; desactivarla oculta pero no borra datos.
+- Venta online muestra WEB; desactivarla oculta pero no borra datos. Venta online y Descuento usan MatSlideToggle.
+- Categorías se editan mediante mat-select multiple con panel suficientemente ancho para nombres largos.
 - Estadísticas se diseñarán al final.
 
 Convenciones:
@@ -2080,9 +2206,9 @@ Convenciones:
 - Trabajar por lotes coherentes y no avanzar sin confirmación.
 
 Próximo paso exacto:
-13D.R — revisar y retocar diseño/funcionalidad de GENERAL sin abrir todavía 13E.
+13E — Códigos de barras.
 ```
 
 ---
 
-**Fin del documento de continuidad v2.21.**
+**Fin del documento de continuidad v2.22.**
