@@ -261,15 +261,16 @@
         </div>
 
         <div class="general__discount-group">
-            <label class="general__discount-toggle">
+            <div class="general__discount-toggle">
                 <span>
                     Descuento
                 </span>
 
-                <input type="checkbox"
-                       [checked]="hasDescuento()"
-                       (change)="onDescuentoChange($event)">
-            </label>
+                <mat-slide-toggle [checked]="hasDescuento()"
+                                  (change)="onDescuentoChange($event.checked)">
+                    {{ hasDescuento() ? 'Activado' : 'Desactivado' }}
+                </mat-slide-toggle>
+            </div>
 
             @if (hasDescuento()) {
             <label class="general__inline-field">

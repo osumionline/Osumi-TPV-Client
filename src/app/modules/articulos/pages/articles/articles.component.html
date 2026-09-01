@@ -12,8 +12,8 @@
     <section class="articles__workspace">
         <otpv-article-workspace [tab]="tab"
                                 [searching]="searching()"
-                                (resolveCodeEvent)="resolveArticleCode($event)"
-                                (searchEvent)="openSearch($event)"
+                                (resolveCodeEvent)="resolveArticleCode($event, tab.idTemporal)"
+                                (searchEvent)="openSearch($event, tab.idTemporal)"
                                 (draftChangeEvent)="updateArticleDraft($event)"
                                 (sectionChangeEvent)="selectArticleSection($event)" />
     </section>

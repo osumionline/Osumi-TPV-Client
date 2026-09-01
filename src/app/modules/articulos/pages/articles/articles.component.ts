@@ -49,6 +49,7 @@ export default class ArticlesComponent implements OnInit {
   readonly searching: WritableSignal<boolean> = signal<boolean>(false);
   readonly searchOpen: WritableSignal<boolean> = signal<boolean>(false);
   readonly searchInitialQuery: WritableSignal<string> = signal<string>('');
+  readonly searchSourceTabId: WritableSignal<string | null> = signal<string | null>(null);
 
   /**
    * Carga la configuración general utilizada por el módulo.
@@ -92,10 +93,12 @@ export default class ArticlesComponent implements OnInit {
   }
 
   /**
-   * Abre el buscador de artículos con el texto indicado.
+   * Abre el buscador recordando la ficha desde la que
+   * se ha iniciado la operación.
    */
-  openSearch(query: string = ''): void {
+  openSearch(query: string = '', sourceTabId: string | null = null): void {
     this.searchInitialQuery.set(query);
+    this.searchSourceTabId.set(sourceTabId);
     this.searchOpen.set(true);
   }
 
@@ -104,12 +107,13 @@ export default class ArticlesComponent implements OnInit {
    */
   closeSearch(): void {
     this.searchOpen.set(false);
+    this.searchSourceTabId.set(null);
   }
 
   /**
    * Resuelve un localizador, acceso directo o código de barras.
    */
-  async resolveArticleCode(codigo: string): Promise<void> {
+  async resolveArticleCode(codigo: string, sourceTabId: string): Promise<void> {
     if (this.searching()) {
       return;
     }
@@ -117,8 +121,10 @@ export default class ArticlesComponent implements OnInit {
     this.searching.set(true);
 
     try {
-      const tab: ArticuloWorkspaceTab | null =
-        await this.articulosService.resolverPorCodigo(codigo);
+      const tab: ArticuloWorkspaceTab | null = await this.articulosService.resolverPorCodigo(
+        codigo,
+        sourceTabId,
+      );
 
       if (tab !== null) {
         return;
@@ -146,7 +152,10 @@ export default class ArticlesComponent implements OnInit {
    * Abre las fichas seleccionadas desde el buscador.
    */
   async openSearchSelection(articulos: readonly ArticuloVenta[]): Promise<void> {
+    const sourceTabId: string | null = this.searchSourceTabId();
+
     this.searchOpen.set(false);
+    this.searchSourceTabId.set(null);
 
     if (this.searching()) {
       return;
@@ -155,9 +164,11 @@ export default class ArticlesComponent implements OnInit {
     this.searching.set(true);
 
     try {
-      for (const articulo of articulos) {
+      for (let index: number = 0; index < articulos.length; index++) {
+        const articulo: ArticuloVenta = articulos[index];
         const tab: ArticuloWorkspaceTab | null = await this.articulosService.cargarPorId(
           articulo.id,
+          index === 0 ? sourceTabId : null,
         );
 
         if (tab === null) {

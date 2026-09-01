@@ -300,11 +300,9 @@ export default class ArticleGeneralComponent implements OnInit {
   /**
    * Activa o desactiva el sistema de descuento.
    */
-  onDescuentoChange(event: Event): void {
-    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
-
+  onDescuentoChange(checked: boolean): void {
     try {
-      const patch: ArticuloDraftPatch = inputElement.checked
+      const patch: ArticuloDraftPatch = checked
         ? ArticuloPriceCalculator.activarDescuento(this.tab().draft)
         : ArticuloPriceCalculator.desactivarDescuento();
 
@@ -312,7 +310,6 @@ export default class ArticleGeneralComponent implements OnInit {
       this.draftChangeEvent.emit(patch);
     } catch (error: unknown) {
       this.calculationError.set(getErrorMessage(error, 'No se ha podido modificar el descuento.'));
-      inputElement.checked = this.hasDescuento();
     }
   }
 

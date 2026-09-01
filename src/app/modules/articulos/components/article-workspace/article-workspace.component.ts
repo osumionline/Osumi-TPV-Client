@@ -90,7 +90,10 @@ export default class ArticleWorkspaceComponent {
     if (/^\p{L}$/u.test(event.key) && !event.ctrlKey && !event.metaKey && !event.altKey) {
       event.preventDefault();
 
-      const query: string = `${inputElement.value}${event.key}`;
+      const allSelected: boolean =
+        inputElement.selectionStart === 0 &&
+        inputElement.selectionEnd === inputElement.value.length;
+      const query: string = allSelected ? event.key : `${inputElement.value}${event.key}`;
 
       this.restoreLocalizador(inputElement);
       this.searchEvent.emit(query);

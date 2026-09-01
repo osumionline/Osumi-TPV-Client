@@ -3,7 +3,7 @@
 }
 
 .general {
-    padding: 16px 20px;
+    padding: 22px 28px;
 
     .general__state {
         display: flex;
@@ -20,12 +20,12 @@
 
     .general__top-grid {
         display: grid;
-        grid-template-columns: 270px 170px 170px 220px;
+        grid-template-columns: 320px 200px 200px 250px;
         grid-template-areas:
             "brand iva re online"
             "provider categories reference .";
         align-items: end;
-        gap: 12px 28px;
+        gap: 16px 36px;
     }
 
     .general__field {
@@ -44,7 +44,7 @@
         >select,
         .general__select-action>select {
             width: 100%;
-            height: 38px;
+            height: 40px;
             padding: 0 10px;
             border: 1px solid var(--color-dark-grey);
             border-radius: 4px;
@@ -101,17 +101,17 @@
         }
 
         >button {
-            width: 38px;
-            min-width: 38px;
-            height: 38px;
-            flex: 0 0 38px;
+            width: 40px;
+            min-width: 40px;
+            height: 40px;
+            flex: 0 0 40px;
         }
     }
 
     .general__categories-select {
         display: flex;
         width: 100%;
-        height: 38px;
+        height: 40px;
         align-items: center;
         padding: 0 10px;
         border: 1px solid var(--color-dark-grey);
@@ -140,8 +140,8 @@
         display: grid;
         grid-template-columns: max-content max-content max-content;
         align-items: start;
-        gap: 52px;
-        margin-top: 24px;
+        gap: 68px;
+        margin-top: 28px;
     }
 
     .general__numeric-group,
@@ -153,7 +153,7 @@
 
     .general__inline-field {
         display: grid;
-        grid-template-columns: 138px auto;
+        grid-template-columns: 145px auto;
         align-items: center;
         gap: 12px;
 
@@ -166,8 +166,8 @@
 
         >input,
         .general__inline-control>input {
-            width: 124px;
-            height: 38px;
+            width: 140px;
+            height: 40px;
             padding: 0 10px;
             border: 1px solid var(--color-dark-grey);
             border-radius: 4px;
@@ -192,35 +192,30 @@
     .general__inline-control {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
 
         >input {
-            flex: 0 0 124px;
+            flex: 0 0 140px;
         }
 
         >button {
-            width: 38px;
-            min-width: 38px;
-            height: 38px;
+            width: 40px;
+            min-width: 40px;
+            height: 40px;
         }
     }
 
     .general__discount-toggle {
         display: grid;
-        grid-template-columns: 130px auto;
-        min-height: 38px;
+        grid-template-columns: 145px auto;
+        min-height: 40px;
         align-items: center;
-        gap: 10px;
-        cursor: pointer;
+        gap: 12px;
 
         >span {
             font-size: 13px;
             font-weight: 600;
             text-align: right;
-        }
-
-        >input {
-            justify-self: start;
         }
     }
 
@@ -231,10 +226,10 @@
     }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1180px) {
     .general {
         .general__top-grid {
-            grid-template-columns: 250px 200px;
+            grid-template-columns: 320px 220px;
             grid-template-areas:
                 "brand iva"
                 "provider re"
@@ -244,12 +239,12 @@
 
         .general__bottom-grid {
             grid-template-columns: max-content max-content;
-            gap: 24px 40px;
+            gap: 28px 56px;
         }
     }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 700px) {
     .general {
         padding: 14px;
 

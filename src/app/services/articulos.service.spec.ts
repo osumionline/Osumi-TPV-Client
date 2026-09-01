@@ -184,6 +184,35 @@ describe('ArticulosService', (): void => {
     expect(updated.activeSection).toBe('general');
     expect(updated.draft.ventaOnline).toBe(false);
   });
+
+  it('reuses a new draft when an existing article is opened from it', (): void => {
+    const draftTab: ArticuloWorkspaceTab = service.crearBorrador();
+    const articulo: ArticuloInterface = createArticulo({
+      id: 25,
+      publicId: 'article-public-id-25',
+      localizador: 260025,
+    });
+
+    const opened: ArticuloWorkspaceTab = service.abrirArticulo(articulo, draftTab.idTemporal);
+
+    expect(service.tabs()).toHaveLength(1);
+    expect(opened.idTemporal).toBe(draftTab.idTemporal);
+    expect(opened.draft.id).toBe(25);
+    expect(opened.draft.localizador).toBe(260025);
+    expect(opened.dirty).toBe(false);
+  });
+
+  it('closes a source draft when the located article is already open', (): void => {
+    const articulo: ArticuloInterface = createArticulo();
+    const existingTab: ArticuloWorkspaceTab = service.abrirArticulo(articulo);
+    const draftTab: ArticuloWorkspaceTab = service.crearBorrador();
+
+    const opened: ArticuloWorkspaceTab = service.abrirArticulo(articulo, draftTab.idTemporal);
+
+    expect(service.tabs()).toHaveLength(1);
+    expect(opened.idTemporal).toBe(existingTab.idTemporal);
+    expect(service.activeTabId()).toBe(existingTab.idTemporal);
+  });
 });
 
 function createArticulo(overrides: Partial<ArticuloInterface> = {}): ArticuloInterface {

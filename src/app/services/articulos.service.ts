@@ -59,10 +59,15 @@ export default class ArticulosService {
   }
 
   /**
-   * Carga un artículo por su identificador o activa su pestaña
-   * cuando ya se encuentra abierto.
+   * Carga un artículo por su identificador.
+   *
+   * Cuando la operación parte de una ficha nueva, esa ficha
+   * se reutiliza para mostrar el artículo encontrado.
    */
-  async cargarPorId(idArticulo: number): Promise<ArticuloWorkspaceTab | null> {
+  async cargarPorId(
+    idArticulo: number,
+    sourceTabId: string | null = null,
+  ): Promise<ArticuloWorkspaceTab | null> {
     if (!Number.isSafeInteger(idArticulo) || idArticulo <= 0) {
       return null;
     }
@@ -70,6 +75,7 @@ export default class ArticulosService {
     const existingTab: ArticuloWorkspaceTab | null = this.findByArticuloId(idArticulo);
 
     if (existingTab !== null) {
+      this.closeSourceDraftIfNeeded(sourceTabId, existingTab.idTemporal);
       this.activeTabIdSignal.set(existingTab.idTemporal);
 
       return existingTab;
@@ -78,14 +84,19 @@ export default class ArticulosService {
     const articulo: ArticuloInterface | null =
       await window.osumiDesktop.articulos.getById(idArticulo);
 
-    return articulo === null ? null : this.abrirArticulo(articulo);
+    return articulo === null ? null : this.abrirArticulo(articulo, sourceTabId);
   }
 
   /**
-   * Resuelve un localizador, acceso directo o código de barras
-   * y abre la ficha correspondiente.
+   * Resuelve un localizador, acceso directo o código de barras.
+   *
+   * Cuando la operación parte de una ficha nueva, reutiliza
+   * esa ficha para cargar el artículo encontrado.
    */
-  async resolverPorCodigo(codigo: string): Promise<ArticuloWorkspaceTab | null> {
+  async resolverPorCodigo(
+    codigo: string,
+    sourceTabId: string | null = null,
+  ): Promise<ArticuloWorkspaceTab | null> {
     const normalizedCode: string = codigo.trim();
 
     if (normalizedCode.length === 0) {
@@ -95,7 +106,7 @@ export default class ArticulosService {
     const articulo: ArticuloInterface | null =
       await window.osumiDesktop.articulos.resolveByCode(normalizedCode);
 
-    return articulo === null ? null : this.abrirArticulo(articulo);
+    return articulo === null ? null : this.abrirArticulo(articulo, sourceTabId);
   }
 
   /**
@@ -121,15 +132,38 @@ export default class ArticulosService {
   /**
    * Abre un artículo persistido o activa su pestaña si ya estaba abierta.
    */
-  abrirArticulo(articulo: ArticuloInterface): ArticuloWorkspaceTab {
+  abrirArticulo(
+    articulo: ArticuloInterface,
+    sourceTabId: string | null = null,
+  ): ArticuloWorkspaceTab {
     const existingTab: ArticuloWorkspaceTab | null = this.findByArticuloId(articulo.id);
 
     if (existingTab !== null) {
+      this.closeSourceDraftIfNeeded(sourceTabId, existingTab.idTemporal);
       this.activeTabIdSignal.set(existingTab.idTemporal);
+
       return existingTab;
     }
 
     const draft: ArticuloDraft = createArticuloDraftFromInterface(articulo);
+    const sourceTab: ArticuloWorkspaceTab | null =
+      sourceTabId === null ? null : this.findByTemporalId(sourceTabId);
+
+    if (sourceTab !== null && sourceTab.draft.id === null) {
+      const updatedTab: ArticuloWorkspaceTab = {
+        ...sourceTab,
+        draft,
+        baseSnapshot: cloneArticuloDraft(draft),
+        dirty: false,
+        activeSection: 'general',
+      };
+
+      this.replaceTab(updatedTab);
+      this.activeTabIdSignal.set(updatedTab.idTemporal);
+
+      return updatedTab;
+    }
+
     const tab: ArticuloWorkspaceTab = {
       idTemporal: crypto.randomUUID(),
       draft,
@@ -282,6 +316,24 @@ export default class ArticulosService {
     return (
       this.tabs().find((tab: ArticuloWorkspaceTab): boolean => tab.draft.id === idArticulo) ?? null
     );
+  }
+
+  /**
+   * Elimina la ficha origen cuando es un borrador nuevo
+   * que ha sido utilizado para localizar otro artículo.
+   */
+  private closeSourceDraftIfNeeded(sourceTabId: string | null, destinationTabId: string): void {
+    if (sourceTabId === null || sourceTabId === destinationTabId) {
+      return;
+    }
+
+    const sourceTab: ArticuloWorkspaceTab | null = this.findByTemporalId(sourceTabId);
+
+    if (sourceTab === null || sourceTab.draft.id !== null) {
+      return;
+    }
+
+    this.cerrarTab(sourceTabId);
   }
 
   /**
