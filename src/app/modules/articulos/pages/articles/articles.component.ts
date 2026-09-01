@@ -2,6 +2,7 @@ import {
   Component,
   computed,
   inject,
+  OnInit,
   signal,
   type Signal,
   type WritableSignal,
@@ -16,8 +17,8 @@ import ArticleWorkspaceComponent from '@modules/articulos/components/article-wor
 import ArticlesTabsComponent from '@modules/articulos/components/articles-tabs/articles-tabs.component';
 import ArticleSearchComponent from '@modules/ventas/components/article-search/article-search.component';
 import { DialogService } from '@osumi/angular-tools';
+import AppDataService from '@services/app-data.service';
 import ArticulosService from '@services/articulos.service';
-import VentasContextService from '@services/ventas-context.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 /**
@@ -35,18 +36,26 @@ import { getErrorMessage } from '@utils/error.utils';
     MatButton,
   ],
 })
-export default class ArticlesComponent {
+export default class ArticlesComponent implements OnInit {
   private readonly dialog: DialogService = inject(DialogService);
-  private readonly ventasContextService: VentasContextService = inject(VentasContextService);
+  readonly appDataService: AppDataService = inject(AppDataService);
   readonly articulosService: ArticulosService = inject(ArticulosService);
+
   readonly appName: Signal<string> = computed((): string => {
-    const appData = this.ventasContextService.appData();
+    const appData = this.appDataService.appData();
 
     return appData?.nombre || appData?.nombreComercial || 'Osumi TPV';
   });
   readonly searching: WritableSignal<boolean> = signal<boolean>(false);
   readonly searchOpen: WritableSignal<boolean> = signal<boolean>(false);
   readonly searchInitialQuery: WritableSignal<string> = signal<string>('');
+
+  /**
+   * Carga la configuración general utilizada por el módulo.
+   */
+  ngOnInit(): void {
+    void this.loadAppData();
+  }
 
   /**
    * Crea una nueva ficha temporal.
@@ -197,5 +206,24 @@ export default class ArticlesComponent {
 
         this.articulosService.cerrarTab(idTemporal);
       });
+  }
+
+  /**
+   * Precarga AppData para los consumidores del módulo de Artículos.
+   */
+  private async loadAppData(): Promise<void> {
+    try {
+      await this.appDataService.load();
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(
+            error,
+            'No se ha podido cargar la configuración de la aplicación.',
+          ),
+        })
+        .subscribe();
+    }
   }
 }

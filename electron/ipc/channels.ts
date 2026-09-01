@@ -7,6 +7,7 @@ const IPC_CHANNELS = {
   legacyImportStart: 'legacy-import:start',
   legacyImportProgress: 'legacy-import:progress',
 
+  configurationGetAppData: 'configuration:get-app-data',
   configurationInstall: 'configuration:install',
 
   printingGetPrinters: 'printing:get-printers',
