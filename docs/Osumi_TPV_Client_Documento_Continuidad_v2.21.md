@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.20  
-**Fecha:** 31 de agosto de 2026  
-**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos** continúa en backend. La infraestructura de fotos de Artículos queda cerrada: procesado WebP, storage definitivo, staging, persistencia SQLite, promoción staging→files y `ArticulosService.save()` están completados y probados. El siguiente bloque es `13B.6E`, cuyo alcance se amplía: **todas las imágenes de Osumi TPV deben almacenarse en WebP**, incluido el logo de empresa tanto al importar `.otpv` como al seleccionarlo desde Configuración.
+**Versión:** 2.21  
+**Fecha:** 1 de septiembre de 2026  
+**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos** continúa en frontend. Todo `13B — Infraestructura backend` está cerrado, incluido `13B.6E — unificación total de imágenes en WebP`. `13C — Workspace y carga de artículos` está cerrado y probado. `13D — General` queda cerrado como mini-hito funcional: estructura interna, datos generales, IVA/RE, motor entero de precios, descuento y creación rápida de Marca/Proveedor están implementados y validados. Antes de avanzar al siguiente apartado de Artículos se realizará una pasada específica de retoques de diseño y funcionalidad sobre General.
 
 > **Regla crítica de entorno TicketBAI:** el producto usa `production` por defecto. Durante desarrollo/pruebas manuales se usa `app_data.json → ticketBai.environment = "test"` junto con el token TEST correspondiente. No añadir selector de entorno a la UI.
 
@@ -33,7 +33,7 @@ Ventas 12 — Postventa                             🟦
 
 13 Artículos                                      🟦
   13A Análisis funcional y diseño                 ✅
-  13B Infraestructura backend                     🟦
+  13B Infraestructura backend                     ✅
     13B.1 Categorías N:M + import legacy          ✅
     13B.2 Dominio/contratos Artículos             ✅
     13B.3 Lectura y resolución                    ✅
@@ -41,7 +41,7 @@ Ventas 12 — Postventa                             🟦
       13B.4A Alta + localizador                   ✅
       13B.4B Edición + stock/histórico            ✅
     13B.5 Baja lógica                             ✅
-    13B.6 Infraestructura común imágenes/WebP     🟦
+    13B.6 Infraestructura común imágenes/WebP     ✅
       13B.6A Procesador común WebP                ✅
       13B.6B Storage común + tabla archivo        ✅
       13B.6C Staging de imágenes                  ✅
@@ -50,9 +50,23 @@ Ventas 12 — Postventa                             🟦
         13B.6D2 Promoción + ArticulosService      ✅
           13B.6D2A Promoción staging → files      ✅
           13B.6D2B ArticulosService.save()        ✅
-      13B.6E Todas las imágenes/import legacy     🟦 SIGUIENTE
-  13C Workspace y carga de artículos              ⬜
-  13D General                                     ⬜
+      13B.6E Unificación TOTAL imágenes WebP      ✅
+  13C Workspace y carga de artículos              ✅
+    13C.1 Puente operativo Electron               ✅
+    13C.2 Workspace Angular                       ✅
+    13C.3 Página + pestañas                       ✅
+    13C.4 Apertura/resolución                     ✅
+  13D General                                     ✅ MINI-HITO CERRADO
+    13D.1 Estructura + datos generales            ✅
+    13D.2 IVA/RE + motor de precios               ✅
+      13D.2A AppData común renderer               ✅
+      13D.2B Motor entero de precios              ✅
+      13D.2C UI fiscalidad/precios                ✅
+    13D.3 Descuento                               ✅
+    13D.4 Creación rápida Marca/Proveedor         ✅
+      13D.4A Backend/API/servicios                ✅
+      13D.4B Modales + integración General        ✅
+  13D.R Retoques diseño/funcionalidad General     🟦 SIGUIENTE
   13E Códigos de barras                           ⬜
   13F Observaciones                               ⬜
   13G Histórico                                   ⬜
@@ -1528,30 +1542,442 @@ Cualquier otra ruta de imagen encontrada durante la auditoría debe incorporarse
 ---
 ---
 
+# 28A. 13B.6E — unificación TOTAL de imágenes en WebP ✅
+
+`13B.6E` quedó finalmente cerrado.
+
+Regla global confirmada y aplicada:
+
+```text
+Toda imagen persistida por Osumi TPV
+→ WebP
+```
+
+Quedan cubiertos:
+
+```text
+- article_image legacy
+- brand_image legacy
+- provider_image legacy
+- payment_type_icon legacy
+- logo desde .otpv
+- logo seleccionado/cambiado desde Configuración
+```
+
+El logo deja de depender de `assets/logo.png` y se persiste como WebP pasando por el `ImageProcessor` común.
+
+La importación legacy:
+
+1. valida tamaño y SHA-256 de los bytes originales del `.otpv`;
+2. procesa después la imagen con `SharpImageProcessor`;
+3. guarda exclusivamente `.webp`;
+4. persiste en `archivo` MIME, tamaño, SHA-256 y dimensiones del WebP final.
+
+Incluso un WebP legacy vuelve a pasar por Sharp para que toda imagen persistida por el nuevo cliente atraviese el mismo pipeline canónico.
+
+Commit de cierre conocido:
+
+```text
+860e659a5171b99bc6b82b790b90743546276a34
+```
+
+---
+
+# 28B. 13C — Workspace y carga de Artículos ✅
+
+## 28B.1 Puente operativo Electron
+
+`ArticulosService` quedó conectado al grafo operativo:
+
+```text
+Angular
+↓
+window.osumiDesktop.articulos
+↓
+preload
+↓
+IPC
+↓
+ArticulosService
+↓
+TypeOrmArticulosRepository
+↓
+SQLite
+```
+
+Operaciones expuestas inicialmente:
+
+```text
+getById(idArticulo)
+resolveByCode(codigo)
+```
+
+`resolveByCode()` resuelve:
+
+```text
+localizador
+acceso directo
+código de barras
+```
+
+## 28B.2 Workspace Angular
+
+Existe un `ArticulosService` Angular singleton que mantiene durante la sesión:
+
+```text
+tabs[]
+activeTabId
+activeTab
+drafts
+baseSnapshot
+dirty
+activeSection
+```
+
+Reglas implementadas:
+
+- varias pestañas para artículos nuevos;
+- identidad temporal UUID para cada draft nuevo;
+- una sola pestaña por artículo persistido;
+- volver a abrir un artículo ya abierto activa la pestaña existente sin recargar BD ni perder cambios locales;
+- Cancelar restaura `baseSnapshot`;
+- tras Guardar, el artículo fresco sustituye draft/snapshot y `dirty = false`;
+- la pestaña/sección activa sobreviven a navegación Ventas ↔ Artículos mientras la app siga abierta.
+
+## 28B.3 Página y pestañas
+
+Ruta activa:
+
+```text
+/articulos
+```
+
+El Header ya navega a Artículos.
+
+La página incluye barra de pestañas persistentes, botón `+`, selección/cierre y confirmación cuando se intenta cerrar una ficha dirty.
+
+## 28B.4 Apertura y resolución
+
+El campo Localizador funciona también como entrada operacional:
+
+```text
+texto/letras
+→ buscador compartido con Ventas
+
+Enter con localizador/acceso directo/barcode
+→ resolveByCode()
+→ abrir/enfocar ficha
+```
+
+El buscador de Ventas se reutiliza con contexto `articulos` y permite abrir uno o varios resultados.
+
+Un artículo ya abierto nunca genera una segunda pestaña.
+
+---
+
+# 28C. 13D — General ✅ MINI-HITO CERRADO
+
+General queda funcionalmente cerrado antes de una pasada específica de retoques de diseño/UX.
+
+## 28C.1 Secciones internas
+
+Cada ficha conserva su sección activa de forma independiente:
+
+```text
+GENERAL
+WEB cuando Venta online = sí
+CÓDIGOS DE BARRAS
+ESTADÍSTICAS
+HISTÓRICO
+OBSERVACIONES
+BAJA
+```
+
+`activeSection` es estado de UI del workspace y no participa en `dirty`.
+
+Si una operación programática deja `ventaOnline = false` mientras `WEB` era la sección activa, el workspace vuelve a `general`.
+
+## 28C.2 Datos generales básicos
+
+Implementados en GENERAL:
+
+```text
+Marca *
+Proveedor
+Categorías 0..N
+Referencia
+Acceso directo
+Venta online
+Stock
+Stock mínimo
+Stock máximo
+Lote óptimo
+```
+
+Marca es obligatoria a nivel funcional/backend. Proveedor sigue siendo opcional. Categorías son equivalentes y el orden no tiene significado.
+
+Se corrigió un problema inicial de los `<select>` de Marca/Proveedor en la primera carga asíncrona: cada `<option>` declara explícitamente su `[selected]`, evitando que el valor se pierda cuando las opciones se insertan después de crear el select.
+
+## 28C.3 AppData común en renderer
+
+Configuración expone ahora:
+
+```text
+window.osumiDesktop.configuration.getAppData()
+```
+
+Existe `AppDataService` Angular cacheado, independiente de Ventas, que comparte una carga concurrente y mantiene:
+
+```text
+appData
+loaded
+```
+
+Artículos ya no depende de `VentasContextService` para leer nombre comercial/fiscalidad.
+
+Datos usados por General:
+
+```text
+tipoIva
+ivaList
+reList
+marginList
+```
+
+Reglas fiscales de instalación:
+
+```text
+tipoIva = iva
+→ reList vacía
+→ RE efectivo = 0
+
+tipoIva = re
+→ ivaList[i] + reList[i] forman un par fiscal
+```
+
+No hardcodear tipos fiscales globales en la UI.
+
+## 28C.4 Motor entero de precios
+
+Existe `ArticuloPriceCalculator`, puro y testeado.
+
+Escalas relevantes:
+
+```text
+Precio albarán / PUC = microeuros
+PVP                  = céntimos
+IVA / RE              = basis points
+Margen                 = microporcentaje
+```
+
+Importante:
+
+```text
+1 punto porcentual = 1_000_000 microporcentaje
+26 %               = 26_000_000
+36,9 %             = 36_900_000
+```
+
+Relaciones implementadas:
+
+```text
+PALB cambia
+→ recalcular PUC
+→ mantener margen
+→ recalcular PVP
+
+PUC cambia
+→ recalcular PALB
+→ mantener margen
+→ recalcular PVP
+
+PVP cambia
+→ recalcular margen
+
+Margen cambia
+→ recalcular PVP
+
+IVA/RE cambian
+→ mantener PALB
+→ recalcular PUC
+→ mantener margen
+→ recalcular PVP
+```
+
+PUC conserva precisión de microeuros.
+
+Ejemplo:
+
+```text
+PALB = 0,59 €
+IVA  = 21 %
+RE   = 5,2 %
+PUC  = 0,74458 €
+```
+
+Los cálculos intermedios usan enteros/`BigInt`; no encadenar floats monetarios.
+
+La UI convierte texto decimal con coma o punto directamente a enteros escalados mediante utilidades específicas.
+
+`marginList` se usa como sugerencia, no como restricción.
+
+Una fiscalidad histórica de un artículo que ya no figure en la configuración actual debe seguir mostrándose como opción válida de esa ficha.
+
+## 28C.5 Descuento
+
+No existe un campo persistido `descuento`.
+
+Estado real:
+
+```text
+pvpDescuentoCents = null
+margenDescuentoMicroporcentaje = null
+→ descuento OFF
+
+ambos con valor
+→ descuento ON
+```
+
+`Descuento %` es derivado/editable de UI.
+
+Relaciones implementadas:
+
+```text
+Descuento % cambia
+→ recalcular PVP dto.
+→ recalcular Margen dto.
+
+PVP dto. cambia
+→ recalcular descuento efectivo
+→ recalcular Margen dto.
+
+Margen dto. cambia
+→ recalcular PVP dto.
+→ recalcular descuento efectivo
+```
+
+Si cambia PALB, PUC, Margen o PVP normal con descuento activo:
+
+```text
+conservar descuento efectivo
+→ recalcular PVP dto.
+→ recalcular Margen dto.
+```
+
+Validaciones:
+
+```text
+0 % <= descuento <= 100 %
+PVP dto. <= PVP normal
+margen < 100 % cuando debe derivarse un PVP finito
+```
+
+## 28C.6 Creación rápida de Marca
+
+Desde General existe botón `+` junto a Marca.
+
+Modal:
+
+```text
+Nombre *
+Teléfono
+Email
+Dirección
+Web
+Observaciones
+Crear un proveedor para esta marca [checkbox]
+```
+
+Backend:
+
+```text
+BEGIN
+→ INSERT marca
+→ si crearProveedor:
+     INSERT proveedor con mismos datos
+     INSERT proveedor_marca
+→ COMMIT
+```
+
+La nueva Marca se incorpora directamente al signal Angular y queda seleccionada en la ficha sin una recarga post-commit obligatoria.
+
+Si también se crea proveedor, `ProveedoresService` se recarga para que quede disponible inmediatamente, pero no sustituye automáticamente el proveedor actual del artículo.
+
+## 28C.7 Creación rápida de Proveedor
+
+Desde General existe botón `+` junto a Proveedor.
+
+Modal:
+
+```text
+Nombre *
+Dirección
+Email
+Web
+Teléfono
+Observaciones
+Marcas del proveedor [0..N]
+```
+
+Backend:
+
+```text
+BEGIN
+→ validar marcas activas
+→ INSERT proveedor
+→ INSERT proveedor_marca 0..N
+→ COMMIT
+```
+
+El nuevo proveedor se incorpora directamente al signal Angular y queda seleccionado automáticamente en la ficha.
+
+## 28C.8 Regla post-commit en maestros
+
+Tras crear Marca o Proveedor, el renderer no depende de un `reload()` para considerar exitosa una creación ya confirmada por SQLite.
+
+El backend devuelve la entidad completa y el servicio Angular la incorpora al signal. Esto evita el patrón incorrecto:
+
+```text
+COMMIT ✅
+→ reload falla ❌
+→ UI aparenta fallo
+→ usuario puede repetir una creación ya persistida
+```
+
+---
+
 # 29. Próximo paso exacto
 
 ```text
-13B.6E — unificación total de imágenes en WebP
+13D.R — retoques de diseño y funcionalidad de General
 ```
 
-Objetivos:
+Estado funcional de General antes de la pasada de retoques:
 
 ```text
-1. auditar LegacyImportFilesImporter y todos los flujos de imágenes;
-2. convertir imágenes legacy a WebP mediante ImageProcessor;
-3. adaptar logo importado desde .otpv a WebP;
-4. adaptar cambio de logo desde Configuración a WebP;
-5. actualizar rutas/contratos/protocolo que todavía asuman logo.png;
-6. garantizar que no quede ningún camino de persistencia PNG/JPEG;
-7. mantener DATABASE_SCHEMA_VERSION = 1.
+- Marca obligatoria y seleccionable ✅
+- Proveedor opcional ✅
+- Categorías 0..N ✅
+- Referencia ✅
+- Acceso directo ✅
+- Venta online ✅
+- Stock / mínimo / máximo / lote óptimo ✅
+- IVA/RE desde AppData ✅
+- Precio albarán ↔ PUC ↔ Margen ↔ PVP ✅
+- Descuento / margen dto. / PVP dto. ✅
+- Creación rápida de Marca ✅
+- Creación opcional de Proveedor junto a Marca ✅
+- Creación rápida de Proveedor con 0..N marcas ✅
 ```
 
-Después de cerrar 13B.6E:
+La pasada `13D.R` no pretende reabrir el dominio de General, sino ajustar la experiencia de uso y la presentación sobre una base funcional ya validada.
+
+Después de cerrar esos retoques:
 
 ```text
-13B infraestructura backend de Artículos ✅
-→ 13C Workspace y carga de artículos
+13E — Códigos de barras
 ```
+
 ---
 
 # 30. Historial reciente
@@ -1565,6 +1991,7 @@ Después de cerrar 13B.6E:
 | 2.18 | 31/08/2026 | Backend Artículos hasta baja lógica; regla WebP; Sharp |
 | 2.19 | 31/08/2026 | Storage, staging, persistencia fotos y promoción staged |
 | **2.20** | **31/08/2026** | **ArticulosService.save() ✅; 13B.6D completo ✅; nueva regla global: TODAS las imágenes, incluido logo desde .otpv y Configuración, deben persistirse en WebP; 13B.6E pasa a unificación total de imágenes** |
+| **2.21** | **01/09/2026** | **13B completo ✅; 13C Workspace/carga ✅; 13D General ✅ mini-hito cerrado: fiscalidad, motor entero de precios, descuento y creación rápida transaccional de Marca/Proveedor; siguiente paso: retoques de General antes de 13E** |
 ---
 
 # 31. Prompt de arranque recomendado
@@ -1573,29 +2000,40 @@ Después de cerrar 13B.6E:
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.20.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.21.
 
 Estado:
 - Ventas 12C.1–12C.8 ✅
 - 12C.9 TicketBAI devoluciones/mixtas ⏸️ Berein
 - Hito 13 Artículos 🟦
 - 13A análisis/diseño ✅
-- 13B.1 categorías N:M ✅
-- 13B.2 dominio/contratos ✅
-- 13B.3 lectura/resolución ✅
-- 13B.4 alta/edición transaccional + histórico ✅
-- 13B.5 baja lógica ✅
-- 13B.6A procesador común WebP ✅
-- 13B.6B storage definitivo + archivo ✅
-- 13B.6C staging ✅
-- 13B.6D fotos de Artículos ✅
-  - D1 persistencia SQLite ✅
-  - D2A promoción staging→files ✅
-  - D2B ArticulosService.save() ✅
-- 13B.6E unificación TOTAL de imágenes en WebP 🟦 SIGUIENTE
+- 13B infraestructura backend completa ✅
+  - categorías N:M ✅
+  - lectura/resolución ✅
+  - alta/edición/histórico/baja ✅
+  - fotos/staging/storage/promoción ✅
+  - unificación TOTAL de imágenes WebP ✅
+- 13C Workspace y carga de artículos ✅
+  - puente Electron ✅
+  - workspace Angular ✅
+  - página + pestañas ✅
+  - apertura/resolución + buscador compartido ✅
+- 13D General ✅ MINI-HITO CERRADO
+  - estructura/secciones/datos básicos ✅
+  - AppData común renderer ✅
+  - IVA/RE desde configuración ✅
+  - motor entero PALB/PUC/Margen/PVP ✅
+  - descuento ✅
+  - creación rápida Marca/Proveedor ✅
+- 13D.R retoques de diseño/funcionalidad General 🟦 SIGUIENTE
+- 13E Códigos de barras ⬜
+- 13F Observaciones ⬜
+- 13G Histórico ⬜
+- 13H Baja / duplicado / acciones ⬜
+- 13I Estadísticas ⏸️ diseño posterior
+- 13J Integración con Ventas ⬜
 
-Roadmap:
-13 Artículos
+Roadmap posterior:
 14 Clientes
 15 Almacén
 16 Compras
@@ -1604,26 +2042,27 @@ Reglas críticas:
 - DATABASE_SCHEMA_VERSION debe permanecer en 1 durante todo el desarrollo previo al primer lanzamiento.
 - Si un archivo TS exporta un único elemento, usar export default. Si exporta varios elementos, todos nombrados y ninguno default.
 - TODAS las imágenes persistidas por Osumi TPV deben ser WebP. No hay excepciones.
-- Esto incluye Artículos, Marcas, Proveedores, iconos/tipos de pago, logo y futuros módulos.
-- También incluye imágenes importadas desde .otpv y seleccionadas/cambiadas desde la UI.
-- El logo actual basado en assets/logo.png debe migrarse a WebP.
-- Tanto el logo importado desde .otpv como el logo añadido desde Configuración deben pasar por ImageProcessor/Sharp.
+- El logo también es WebP desde .otpv y desde Configuración.
 - Sharp: JPEG/PNG/WebP → WebP, calidad 85, effort 4, orientación EXIF, sin resize.
-- Storage definitivo general: assets/files/<purpose>/<uuid>.webp.
-- Staging: staging/files/draft-images/<uuid>.webp.
-- StagedImageRegistry desacopla consulta de staging.
-- ImageAssetPromoter prepara staged→files y verifica tamaño/SHA-256.
-- La imagen staged se consume solo tras commit SQLite.
-- Si SQLite falla, borrar copias definitivas y conservar staging.
-- ArticulosService.save() ya implementa create/update, rollback físico y consumo de staging post-commit.
-- Fotos de Artículos reutilizan archivo + articulo_archivo.
-- Como máximo una foto principal; orden >= 0.
-- Fotos quitadas pierden relación; limpieza física de huérfanos queda pendiente de coordinar.
 - Localizador nuevo: YY + 4 cifras, iterativo y no editable.
-- Campo Localizador reutilizará UX/buscador de nueva línea de Ventas.
 - Solo una pestaña por artículo persistido; drafts nuevos múltiples.
+- El workspace Angular conserva tabs, activeTab, draft, baseSnapshot, dirty y activeSection durante la sesión.
+- Reabrir un artículo ya abierto activa su pestaña y NO recarga BD ni pierde cambios locales.
+- Campo Localizador reutiliza buscador de Ventas; Enter resuelve localizador/acceso directo/barcode.
 - Categorías 0..N equivalentes.
-- PUC = precio albarán + IVA + RE.
+- Marca obligatoria; Proveedor opcional.
+- AppData global en renderer mediante AppDataService; Artículos no depende de VentasContextService.
+- tipoIva=iva → RE efectivo 0. tipoIva=re → ivaList/reList son pares por índice.
+- No hardcodear IVA/RE si la configuración de instalación ya los define.
+- Precio albarán y PUC en microeuros; PVP en céntimos; IVA/RE en bps; margen en microporcentaje.
+- 1 % = 1_000_000 microporcentaje.
+- Motor de precios usa enteros/BigInt; evitar floats encadenados.
+- PALB → PUC → mantener margen → PVP.
+- PUC → PALB → mantener margen → PVP.
+- PVP → margen. Margen → PVP.
+- Descuento persistido mediante pvpDescuentoCents + margenDescuentoMicroporcentaje nullable; el porcentaje de descuento es derivado/editable de UI.
+- Creación Marca+Proveedor y Proveedor+marcas se hace transaccionalmente en backend.
+- Tras un COMMIT de creación no hacer depender el éxito de una recarga posterior innecesaria.
 - Código por defecto = fila real codigo_barras basada en localizador.
 - Cambio manual de stock crea historico_articulo tipo 4.
 - Alta con stock inicial no genera histórico.
@@ -1641,10 +2080,9 @@ Convenciones:
 - Trabajar por lotes coherentes y no avanzar sin confirmación.
 
 Próximo paso exacto:
-13B.6E — auditar y unificar TODOS los flujos de imágenes a WebP,
-incluido logo .otpv + Configuración.
+13D.R — revisar y retocar diseño/funcionalidad de GENERAL sin abrir todavía 13E.
 ```
 
 ---
 
-**Fin del documento de continuidad v2.20.**
+**Fin del documento de continuidad v2.21.**
