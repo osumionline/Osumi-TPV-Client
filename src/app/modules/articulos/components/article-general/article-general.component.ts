@@ -11,7 +11,10 @@ import {
   type Signal,
   type WritableSignal,
 } from '@angular/core';
-import { MatButton } from '@angular/material/button';
+import { MatButton, MatIconButton } from '@angular/material/button';
+import { MatIcon } from '@angular/material/icon';
+import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
+import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
 import type { ArticuloDraftPatch } from '@model/articulos/articulo-draft.interface';
 import ArticuloPriceCalculator from '@model/articulos/articulo-price-calculator';
 import {
@@ -21,6 +24,11 @@ import {
 } from '@model/articulos/articulo-scaled-decimal.utils';
 import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.interface';
 import type Categoria from '@model/categorias/categoria.model';
+import type Marca from '@model/marcas/marca.model';
+import type Proveedor from '@model/proveedores/proveedor.model';
+import BrandQuickCreateComponent from '@modules/articulos/components/brand-quick-create/brand-quick-create.component';
+import ProviderQuickCreateComponent from '@modules/articulos/components/provider-quick-create/provider-quick-create.component';
+import { DialogService } from '@osumi/angular-tools';
 import AppDataService from '@services/app-data.service';
 import CategoriasService from '@services/categorias.service';
 import MarcasService from '@services/marcas.service';
@@ -45,13 +53,20 @@ interface ArticleFiscalOption {
   selector: 'otpv-article-general',
   templateUrl: './article-general.component.html',
   styleUrl: './article-general.component.scss',
-  imports: [MatButton],
+  imports: [
+    BrandQuickCreateComponent,
+    MatButton,
+    MatIconButton,
+    MatIcon,
+    ProviderQuickCreateComponent,
+  ],
 })
 export default class ArticleGeneralComponent implements OnInit {
   readonly appDataService: AppDataService = inject(AppDataService);
   readonly marcasService: MarcasService = inject(MarcasService);
   readonly proveedoresService: ProveedoresService = inject(ProveedoresService);
   readonly categoriasService: CategoriasService = inject(CategoriasService);
+  private readonly dialog: DialogService = inject(DialogService);
 
   readonly tab: InputSignal<ArticuloWorkspaceTab> = input.required<ArticuloWorkspaceTab>();
   readonly draftChangeEvent: OutputEmitterRef<ArticuloDraftPatch> = output<ArticuloDraftPatch>();
@@ -59,6 +74,12 @@ export default class ArticleGeneralComponent implements OnInit {
   readonly loading: WritableSignal<boolean> = signal<boolean>(true);
   readonly loadError: WritableSignal<string | null> = signal<string | null>(null);
   readonly calculationError: WritableSignal<string | null> = signal<string | null>(null);
+  readonly marcaModalOpen: WritableSignal<boolean> = signal<boolean>(false);
+  readonly proveedorModalOpen: WritableSignal<boolean> = signal<boolean>(false);
+  readonly creatingMarca: WritableSignal<boolean> = signal<boolean>(false);
+  readonly creatingProveedor: WritableSignal<boolean> = signal<boolean>(false);
+  readonly marcaCreateError: WritableSignal<string | null> = signal<string | null>(null);
+  readonly proveedorCreateError: WritableSignal<string | null> = signal<string | null>(null);
   readonly fiscalOptions: Signal<readonly ArticleFiscalOption[]> = computed(
     (): readonly ArticleFiscalOption[] => this.buildFiscalOptions(),
   );
@@ -93,6 +114,116 @@ export default class ArticleGeneralComponent implements OnInit {
     this.draftChangeEvent.emit({
       idProveedor: this.parseSelectedId(selectElement.value),
     });
+  }
+
+  /**
+   * Abre el formulario de creación rápida de Marca.
+   */
+  openMarcaModal(): void {
+    this.marcaCreateError.set(null);
+    this.marcaModalOpen.set(true);
+  }
+
+  /**
+   * Cierra el formulario de Marca si no hay una creación en curso.
+   */
+  closeMarcaModal(): void {
+    if (!this.creatingMarca()) {
+      this.marcaModalOpen.set(false);
+      this.marcaCreateError.set(null);
+    }
+  }
+
+  /**
+   * Crea una marca y la selecciona inmediatamente en la ficha.
+   */
+  async createMarca(command: CrearMarcaCommand): Promise<void> {
+    if (this.creatingMarca()) {
+      return;
+    }
+
+    this.creatingMarca.set(true);
+    this.marcaCreateError.set(null);
+
+    try {
+      const marca: Marca = await this.marcasService.create(command);
+
+      if (marca.id === null) {
+        throw new Error('La marca creada no dispone de identificador.');
+      }
+
+      this.draftChangeEvent.emit({
+        idMarca: marca.id,
+      });
+      this.marcaModalOpen.set(false);
+
+      if (command.crearProveedor) {
+        try {
+          await this.proveedoresService.reload();
+        } catch (error: unknown) {
+          this.dialog
+            .alert({
+              title: 'Atención',
+              content: getErrorMessage(
+                error,
+                'La marca y su proveedor se han creado, pero no se ha podido actualizar la lista de proveedores.',
+              ),
+            })
+            .subscribe();
+        }
+      }
+    } catch (error: unknown) {
+      this.marcaCreateError.set(getErrorMessage(error, 'No se ha podido crear la marca.'));
+    } finally {
+      this.creatingMarca.set(false);
+    }
+  }
+
+  /**
+   * Abre el formulario de creación rápida de Proveedor.
+   */
+  openProveedorModal(): void {
+    this.proveedorCreateError.set(null);
+    this.proveedorModalOpen.set(true);
+  }
+
+  /**
+   * Cierra el formulario de Proveedor si no hay una creación en curso.
+   */
+  closeProveedorModal(): void {
+    if (!this.creatingProveedor()) {
+      this.proveedorModalOpen.set(false);
+      this.proveedorCreateError.set(null);
+    }
+  }
+
+  /**
+   * Crea un proveedor y lo selecciona inmediatamente en la ficha.
+   */
+  async createProveedor(command: CrearProveedorCommand): Promise<void> {
+    if (this.creatingProveedor()) {
+      return;
+    }
+
+    this.creatingProveedor.set(true);
+    this.proveedorCreateError.set(null);
+
+    try {
+      const proveedor: Proveedor = await this.proveedoresService.create(command);
+
+      if (proveedor.id === null) {
+        throw new Error('El proveedor creado no dispone de identificador.');
+      }
+
+      this.draftChangeEvent.emit({
+        idProveedor: proveedor.id,
+      });
+      this.proveedorModalOpen.set(false);
+    } catch (error: unknown) {
+      this.proveedorCreateError.set(getErrorMessage(error, 'No se ha podido crear el proveedor.'));
+    } finally {
+      this.creatingProveedor.set(false);
+    }
   }
 
   /**

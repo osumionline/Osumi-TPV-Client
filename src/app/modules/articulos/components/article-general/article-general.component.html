@@ -17,49 +17,69 @@
     </div>
     } @else {
     <div class="general__grid">
-        <label class="general__field">
-            <span>
+        <div class="general__field">
+            <label for="article-brand">
                 Marca *
-            </span>
+            </label>
 
-            <select (change)="onMarcaChange($event)">
-                <option value=""
-                        [selected]="tab().draft.idMarca === null">
-                    Selecciona una marca
-                </option>
+            <div class="general__select-action">
+                <select id="article-brand"
+                        (change)="onMarcaChange($event)">
+                    <option value=""
+                            [selected]="tab().draft.idMarca === null">
+                        Selecciona una marca
+                    </option>
 
-                @for (marca of marcasService.marcas(); track marca.id) {
-                @if (marca.id !== null) {
-                <option [value]="marca.id"
-                        [selected]="marca.id === tab().draft.idMarca">
-                    {{ marca.nombre }}
-                </option>
-                }
-                }
-            </select>
-        </label>
+                    @for (marca of marcasService.marcas(); track marca.id) {
+                    @if (marca.id !== null) {
+                    <option [value]="marca.id"
+                            [selected]="marca.id === tab().draft.idMarca">
+                        {{ marca.nombre }}
+                    </option>
+                    }
+                    }
+                </select>
 
-        <label class="general__field">
-            <span>
+                <button mat-icon-button
+                        type="button"
+                        aria-label="Crear nueva marca"
+                        (click)="openMarcaModal()">
+                    <mat-icon>add</mat-icon>
+                </button>
+            </div>
+        </div>
+
+        <div class="general__field">
+            <label for="article-provider">
                 Proveedor
-            </span>
+            </label>
 
-            <select (change)="onProveedorChange($event)">
-                <option value=""
-                        [selected]="tab().draft.idProveedor === null">
-                    Sin proveedor
-                </option>
+            <div class="general__select-action">
+                <select id="article-provider"
+                        (change)="onProveedorChange($event)">
+                    <option value=""
+                            [selected]="tab().draft.idProveedor === null">
+                        Sin proveedor
+                    </option>
 
-                @for (proveedor of proveedoresService.proveedores(); track proveedor.id) {
-                @if (proveedor.id !== null) {
-                <option [value]="proveedor.id"
-                        [selected]="proveedor.id === tab().draft.idProveedor">
-                    {{ proveedor.nombre }}
-                </option>
-                }
-                }
-            </select>
-        </label>
+                    @for (proveedor of proveedoresService.proveedores(); track proveedor.id) {
+                    @if (proveedor.id !== null) {
+                    <option [value]="proveedor.id"
+                            [selected]="proveedor.id === tab().draft.idProveedor">
+                        {{ proveedor.nombre }}
+                    </option>
+                    }
+                    }
+                </select>
+
+                <button mat-icon-button
+                        type="button"
+                        aria-label="Crear nuevo proveedor"
+                        (click)="openProveedorModal()">
+                    <mat-icon>add</mat-icon>
+                </button>
+            </div>
+        </div>
 
         <label class="general__field">
             <span>
@@ -368,3 +388,18 @@
     </section>
     }
 </section>
+
+@if (marcaModalOpen()) {
+<otpv-brand-quick-create [saving]="creatingMarca()"
+                         [error]="marcaCreateError()"
+                         (createEvent)="createMarca($event)"
+                         (closeEvent)="closeMarcaModal()" />
+}
+
+@if (proveedorModalOpen()) {
+<otpv-provider-quick-create [marcas]="marcasService.marcas()"
+                            [saving]="creatingProveedor()"
+                            [error]="proveedorCreateError()"
+                            (createEvent)="createProveedor($event)"
+                            (closeEvent)="closeProveedorModal()" />
+}

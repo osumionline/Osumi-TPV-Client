@@ -37,15 +37,19 @@ export default class MarcasService {
       await this.pendingRequest;
     }
 
-    await this.reload();
+    const marca: Marca = new Marca().fromInterface(createdMarca);
 
-    const marca: Marca | null = this.findByPublicId(createdMarca.publicId);
-
-    if (marca === null) {
-      throw new Error(
-        'La marca se ha creado, pero no se ha podido recuperar después de actualizar la lista.',
-      );
-    }
+    this.marcasSignal.update((marcas: readonly Marca[]): readonly Marca[] =>
+      [
+        ...marcas.filter((item: Marca): boolean => item.publicId !== createdMarca.publicId),
+        marca,
+      ].sort((left: Marca, right: Marca): number =>
+        left.nombre.localeCompare(right.nombre, 'es', {
+          sensitivity: 'base',
+        }),
+      ),
+    );
+    this.loadedSignal.set(true);
 
     return marca;
   }

@@ -1,0 +1,134 @@
+<div class="overlay overlay--dimmed quick-create-overlay">
+    <section class="quick-create overlay__panel"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="brand-create-title">
+        <header class="quick-create__header">
+            <h2 id="brand-create-title">
+                Nueva marca
+            </h2>
+
+            <button type="button"
+                    class="quick-create__close"
+                    aria-label="Cerrar"
+                    [disabled]="saving()"
+                    (click)="close()">
+                <mat-icon>close</mat-icon>
+            </button>
+        </header>
+
+        <form class="quick-create__form"
+              (submit)="submit($event)">
+            <div class="quick-create__body">
+                <div class="quick-create__grid">
+                    <label class="quick-create__field">
+                        <span>
+                            Nombre *
+                        </span>
+
+                        <input #nameInput
+                               type="text"
+                               autocomplete="off"
+                               maxlength="100"
+                               required
+                               [value]="nombre()"
+                               [disabled]="saving()"
+                               (input)="updateText($event, 'nombre')">
+                    </label>
+
+                    <label class="quick-create__field">
+                        <span>
+                            Teléfono
+                        </span>
+
+                        <input type="text"
+                               autocomplete="off"
+                               [value]="telefono()"
+                               [disabled]="saving()"
+                               (input)="updateText($event, 'telefono')">
+                    </label>
+
+                    <label class="quick-create__field">
+                        <span>
+                            Email
+                        </span>
+
+                        <input type="email"
+                               autocomplete="off"
+                               [value]="email()"
+                               [disabled]="saving()"
+                               (input)="updateText($event, 'email')">
+                    </label>
+
+                    <label class="quick-create__field">
+                        <span>
+                            Dirección
+                        </span>
+
+                        <input type="text"
+                               autocomplete="off"
+                               [value]="direccion()"
+                               [disabled]="saving()"
+                               (input)="updateText($event, 'direccion')">
+                    </label>
+
+                    <label class="quick-create__field quick-create__field--full">
+                        <span>
+                            Web
+                        </span>
+
+                        <input type="text"
+                               autocomplete="off"
+                               [value]="web()"
+                               [disabled]="saving()"
+                               (input)="updateText($event, 'web')">
+                    </label>
+
+                    <label class="quick-create__field quick-create__field--full">
+                        <span>
+                            Observaciones
+                        </span>
+
+                        <textarea rows="4"
+                                  [value]="observaciones()"
+                                  [disabled]="saving()"
+                                  (input)="updateText($event, 'observaciones')">
+                        </textarea>
+                    </label>
+                </div>
+
+                <label class="quick-create__toggle">
+                    <input type="checkbox"
+                           [checked]="crearProveedor()"
+                           [disabled]="saving()"
+                           (change)="updateCrearProveedor($event)">
+
+                    <span>
+                        Crear un proveedor para esta marca
+                    </span>
+                </label>
+
+                @if (error() !== null) {
+                <p class="quick-create__error">
+                    {{ error() }}
+                </p>
+                }
+            </div>
+
+            <footer class="quick-create__actions">
+                <button mat-stroked-button
+                        type="button"
+                        [disabled]="saving()"
+                        (click)="close()">
+                    Cancelar
+                </button>
+
+                <button mat-flat-button
+                        type="submit"
+                        [disabled]="saving() || nombre().trim() === ''">
+                    {{ saving() ? 'Creando…' : 'Crear marca' }}
+                </button>
+            </footer>
+        </form>
+    </section>
+</div>

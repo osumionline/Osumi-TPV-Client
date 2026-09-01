@@ -28,3 +28,154 @@
   background-color: var(--color-white);
   box-shadow: 0 8px 32px rgb(0 0 0 / 35%);
 }
+
+.quick-create-overlay {
+  z-index: 120;
+}
+
+.quick-create {
+  display: flex;
+  width: min(760px, 100%);
+  max-height: 90vh;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.quick-create__header {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--separator-color);
+
+  h2 {
+    min-width: 0;
+    flex: 1;
+  }
+}
+
+.quick-create__close {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background-color: transparent;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background-color: var(--color-very-light-grey);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+.quick-create__form {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.quick-create__body {
+  min-height: 0;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.quick-create__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 20px;
+}
+
+.quick-create__field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+
+  >span {
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  >input,
+  >textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--color-dark-grey);
+    border-radius: 4px;
+    background-color: var(--color-white);
+    font: inherit;
+    outline: 0;
+
+    &:focus {
+      border-color: var(--main-color);
+    }
+
+    &:disabled {
+      background-color: var(--color-very-light-grey);
+    }
+  }
+
+  >input {
+    height: 40px;
+  }
+
+  >textarea {
+    resize: vertical;
+  }
+}
+
+.quick-create__field--full {
+  grid-column: 1 / -1;
+}
+
+.quick-create__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  cursor: pointer;
+}
+
+.quick-create__choices {
+  display: flex;
+  max-height: 180px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  overflow-y: auto;
+  border: 1px solid var(--color-dark-grey);
+  border-radius: 4px;
+}
+
+.quick-create__choice {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.quick-create__empty {
+  padding: 8px;
+  color: var(--disabled-color);
+}
+
+.quick-create__error {
+  margin: 16px 0 0;
+  color: var(--color-red);
+}
+
+.quick-create__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--separator-color);
+}

@@ -40,15 +40,21 @@ export default class ProveedoresService {
       await this.pendingRequest;
     }
 
-    await this.reload();
+    const proveedor: Proveedor = new Proveedor().fromInterface(createdProveedor);
 
-    const proveedor: Proveedor | null = this.findByPublicId(createdProveedor.publicId);
-
-    if (proveedor === null) {
-      throw new Error(
-        'El proveedor se ha creado, pero no se ha podido recuperar después de actualizar la lista.',
-      );
-    }
+    this.proveedoresSignal.update((proveedores: readonly Proveedor[]): readonly Proveedor[] =>
+      [
+        ...proveedores.filter(
+          (item: Proveedor): boolean => item.publicId !== createdProveedor.publicId,
+        ),
+        proveedor,
+      ].sort((left: Proveedor, right: Proveedor): number =>
+        left.nombre.localeCompare(right.nombre, 'es', {
+          sensitivity: 'base',
+        }),
+      ),
+    );
+    this.loadedSignal.set(true);
 
     return proveedor;
   }
