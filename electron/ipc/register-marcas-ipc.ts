@@ -1,4 +1,5 @@
 import type MarcasService from '@backend/application/marcas/marcas.service';
+import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
 import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
 import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
 import { assertTrustedSender } from '@ipc/assert-trusted-sender';
@@ -15,6 +16,15 @@ export default function registerMarcasIpc(
     async (event): Promise<readonly MarcaInterface[]> => {
       assertTrustedSender(event, getMainWindow);
       return marcasService.getAll();
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.marcasCreate,
+    async (event, command: CrearMarcaCommand): Promise<MarcaInterface> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return marcasService.create(command);
     },
   );
 }

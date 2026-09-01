@@ -20,8 +20,10 @@ const IPC_CHANNELS = {
   applicationGetState: 'application:get-state',
 
   marcasGetAll: 'marcas:get-all',
+  marcasCreate: 'marcas:create',
 
   proveedoresGetAll: 'proveedores:get-all',
+  proveedoresCreate: 'proveedores:create',
 
   empleadosGetAll: 'empleados:get-all',
 

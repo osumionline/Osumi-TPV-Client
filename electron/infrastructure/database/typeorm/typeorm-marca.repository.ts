@@ -1,25 +1,21 @@
+import type CrearMarcaRecordCommand from '@backend/contracts/marcas/crear-marca-record-command.interface';
 import type MarcaRepository from '@backend/contracts/marcas/marca.repository.interface';
 import type MarcaRecord from '@backend/domain/marcas/marca-record.interface';
+import { getLastInsertId } from '@infrastructure/database/typeorm/sqlite.utils';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
-import type { DataSource } from 'typeorm';
+import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
+import { randomUUID } from 'node:crypto';
+import type { DataSource, QueryRunner } from 'typeorm';
 
 interface MarcaDatabaseRow {
   readonly id: number;
-
   readonly public_id: string;
-
   readonly nombre: string;
-
   readonly direccion: string | null;
-
   readonly telefono: string | null;
-
   readonly email: string | null;
-
   readonly web: string | null;
-
   readonly observaciones: string | null;
-
   readonly foto_relative_path: string | null;
 }
 
@@ -65,5 +61,126 @@ export default class TypeOrmMarcaRepository implements MarcaRepository {
       web: row.web,
       observaciones: row.observaciones,
     }));
+  }
+
+  /**
+   * Crea una marca y, opcionalmente, un proveedor con
+   * los mismos datos dentro de una única transacción.
+   */
+  async create(command: CrearMarcaRecordCommand): Promise<MarcaRecord> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+    const publicId: string = randomUUID();
+    const timestamp: string = new Date().toISOString();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<MarcaRecord> => {
+        await queryRunner.query(
+          `
+            INSERT INTO marca (
+              public_id,
+              nombre,
+              direccion,
+              telefono,
+              email,
+              web,
+              observaciones,
+              created_at,
+              updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+          [
+            publicId,
+            command.nombre,
+            command.direccion,
+            command.telefono,
+            command.email,
+            command.web,
+            command.observaciones,
+            timestamp,
+            timestamp,
+          ],
+        );
+
+        const idMarca: number = await getLastInsertId(
+          queryRunner,
+          'No se ha podido obtener el identificador de la marca creada.',
+        );
+
+        if (command.crearProveedor) {
+          await this.createProveedorForMarca(queryRunner, idMarca, command, timestamp);
+        }
+
+        return {
+          id: idMarca,
+          publicId,
+          nombre: command.nombre,
+          direccion: command.direccion,
+          fotoRelativePath: null,
+          telefono: command.telefono,
+          email: command.email,
+          web: command.web,
+          observaciones: command.observaciones,
+        };
+      },
+    );
+  }
+
+  /**
+   * Crea el proveedor asociado a una nueva marca
+   * y establece su relación N:M.
+   */
+  private async createProveedorForMarca(
+    queryRunner: QueryRunner,
+    idMarca: number,
+    command: CrearMarcaRecordCommand,
+    timestamp: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+        INSERT INTO proveedor (
+          public_id,
+          nombre,
+          direccion,
+          telefono,
+          email,
+          web,
+          observaciones,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        randomUUID(),
+        command.nombre,
+        command.direccion,
+        command.telefono,
+        command.email,
+        command.web,
+        command.observaciones,
+        timestamp,
+        timestamp,
+      ],
+    );
+
+    const idProveedor: number = await getLastInsertId(
+      queryRunner,
+      'No se ha podido obtener el identificador del proveedor creado.',
+    );
+
+    await queryRunner.query(
+      `
+        INSERT INTO proveedor_marca (
+          id_proveedor,
+          id_marca,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?)
+      `,
+      [idProveedor, idMarca, timestamp, timestamp],
+    );
   }
 }
