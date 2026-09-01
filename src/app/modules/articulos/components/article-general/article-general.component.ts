@@ -16,6 +16,7 @@ import { MatOption } from '@angular/material/core';
 import { MatIcon } from '@angular/material/icon';
 import { MatSelect, type MatSelectChange } from '@angular/material/select';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
+import { MatTooltip } from '@angular/material/tooltip';
 import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
 import type { ArticuloDraftPatch } from '@model/articulos/articulo-draft.interface';
@@ -25,11 +26,13 @@ import {
   isTransientScaledDecimalInput,
   numberToScaledInteger,
   parseScaledDecimal,
+  rescaleScaledInteger,
 } from '@model/articulos/articulo-scaled-decimal.utils';
 import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.interface';
 import type Categoria from '@model/categorias/categoria.model';
 import type Marca from '@model/marcas/marca.model';
 import type Proveedor from '@model/proveedores/proveedor.model';
+import ArticleMarginSuggestionsComponent from '@modules/articulos/components/article-margin-suggestions/article-margin-suggestions.component';
 import BrandQuickCreateComponent from '@modules/articulos/components/brand-quick-create/brand-quick-create.component';
 import ProviderQuickCreateComponent from '@modules/articulos/components/provider-quick-create/provider-quick-create.component';
 import { DialogService } from '@osumi/angular-tools';
@@ -60,6 +63,7 @@ interface ArticleFiscalOption {
   templateUrl: './article-general.component.html',
   styleUrl: './article-general.component.scss',
   imports: [
+    ArticleMarginSuggestionsComponent,
     BrandQuickCreateComponent,
     MatButton,
     MatIconButton,
@@ -67,6 +71,7 @@ interface ArticleFiscalOption {
     MatOption,
     MatSelect,
     MatSlideToggle,
+    MatTooltip,
     ProviderQuickCreateComponent,
   ],
 })
@@ -98,6 +103,7 @@ export default class ArticleGeneralComponent implements OnInit {
   readonly marginOptions: Signal<readonly number[]> = computed((): readonly number[] =>
     this.buildMarginOptions(),
   );
+  readonly marginModalOpen: WritableSignal<boolean> = signal<boolean>(false);
 
   /**
    * Carga los datos maestros necesarios para General.
@@ -325,23 +331,28 @@ export default class ArticleGeneralComponent implements OnInit {
   }
 
   /**
-   * Inicia la edición directa de un decimal conservando
-   * literalmente el texto introducido por el usuario.
+   * Inicia la edición directa de un decimal y selecciona
+   * su contenido al recibir el foco.
    */
   onDecimalFocus(event: FocusEvent, field: ArticleDecimalField): void {
     const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
 
     this.editingDecimalField.set(field);
     this.editingDecimalValue.set(inputElement.value);
+    inputElement.select();
   }
 
   /**
-   * Recalcula precios mientras el usuario escribe siempre
-   * que el decimal ya represente un valor completo.
+   * Recalcula precios mientras el usuario escribe,
+   * limitando la entrada visual a dos decimales.
    */
   onDecimalInput(event: Event, field: ArticleDecimalField): void {
     const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
-    const rawValue: string = inputElement.value;
+    const rawValue: string = this.limitDecimalFraction(inputElement.value, 2);
+
+    if (rawValue !== inputElement.value) {
+      inputElement.value = rawValue;
+    }
 
     this.editingDecimalField.set(field);
     this.editingDecimalValue.set(rawValue);
@@ -351,7 +362,7 @@ export default class ArticleGeneralComponent implements OnInit {
       return;
     }
 
-    const value: number | null = parseScaledDecimal(rawValue, this.getDecimalScaleDigits(field));
+    const value: number | null = this.parseDecimalFieldValue(field, rawValue);
 
     if (value === null) {
       return;
@@ -361,15 +372,13 @@ export default class ArticleGeneralComponent implements OnInit {
   }
 
   /**
-   * Finaliza la edición decimal, valida el valor pendiente
-   * y devuelve el campo a su representación formateada.
+   * Finaliza la edición decimal y devuelve el campo
+   * a su representación normalizada.
    */
   onDecimalBlur(event: FocusEvent, field: ArticleDecimalField): void {
     const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
-    const value: number | null = parseScaledDecimal(
-      inputElement.value,
-      this.getDecimalScaleDigits(field),
-    );
+    const rawValue: string = this.limitDecimalFraction(inputElement.value, 2);
+    const value: number | null = this.parseDecimalFieldValue(field, rawValue);
 
     if (value === null) {
       this.calculationError.set(`El valor de ${this.getDecimalFieldLabel(field)} no es válido.`);
@@ -393,24 +402,24 @@ export default class ArticleGeneralComponent implements OnInit {
   }
 
   /**
-   * Formatea un precio almacenado en microeuros.
+   * Formatea microeuros como un importe de dos decimales.
    */
   formatMicros(value: number): string {
-    return formatScaledDecimal(value, 6, 2);
+    return formatScaledDecimal(rescaleScaledInteger(value, 6, 2), 2, 2);
   }
 
   /**
-   * Formatea un precio almacenado en céntimos.
+   * Formatea céntimos como un importe de dos decimales.
    */
   formatCents(value: number): string {
     return formatScaledDecimal(value, 2, 2);
   }
 
   /**
-   * Formatea un margen almacenado en microporcentaje.
+   * Formatea un margen con un máximo de dos decimales.
    */
   formatMargin(value: number): string {
-    return formatScaledDecimal(value, 6);
+    return formatScaledDecimal(rescaleScaledInteger(value, 6, 2), 2);
   }
 
   /**
@@ -438,6 +447,16 @@ export default class ArticleGeneralComponent implements OnInit {
     this.draftChangeEvent.emit({
       ventaOnline: checked,
     });
+  }
+
+  /**
+   * Selecciona el contenido de un campo numérico
+   * cuando recibe el foco.
+   */
+  selectInputContent(event: FocusEvent): void {
+    const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
+
+    inputElement.select();
   }
 
   /**
@@ -613,6 +632,30 @@ export default class ArticleGeneralComponent implements OnInit {
   }
 
   /**
+   * Abre las sugerencias de margen configuradas.
+   */
+  openMarginModal(): void {
+    this.marginModalOpen.set(true);
+  }
+
+  /**
+   * Cierra las sugerencias de margen.
+   */
+  closeMarginModal(): void {
+    this.marginModalOpen.set(false);
+  }
+
+  /**
+   * Aplica un margen sugerido y cierra el modal
+   * cuando el cálculo se completa correctamente.
+   */
+  selectMarginSuggestion(margenMicroporcentaje: number): void {
+    if (this.applyDecimalChange('margen', margenMicroporcentaje)) {
+      this.marginModalOpen.set(false);
+    }
+  }
+
+  /**
    * Genera la identidad estable de un par IVA/RE.
    */
   private createFiscalKey(ivaBps: number, reBps: number): string {
@@ -644,7 +687,7 @@ export default class ArticleGeneralComponent implements OnInit {
   /**
    * Aplica un decimal ya validado al motor correspondiente.
    */
-  private applyDecimalChange(field: ArticleDecimalField, value: number): void {
+  private applyDecimalChange(field: ArticleDecimalField, value: number): boolean {
     try {
       const patch: ArticuloDraftPatch =
         field === 'descuento'
@@ -653,18 +696,52 @@ export default class ArticleGeneralComponent implements OnInit {
 
       this.calculationError.set(null);
       this.draftChangeEvent.emit(patch);
+      return true;
     } catch (error: unknown) {
       this.calculationError.set(
         getErrorMessage(error, `No se ha podido actualizar ${this.getDecimalFieldLabel(field)}.`),
       );
+      return false;
     }
   }
 
   /**
-   * Obtiene la escala decimal correspondiente a un campo editable.
+   * Convierte el decimal visible de dos posiciones
+   * a la escala utilizada internamente por cada campo.
    */
-  private getDecimalScaleDigits(field: ArticleDecimalField): number {
-    return field === 'descuento' ? 6 : this.getPriceScaleDigits(field);
+  private parseDecimalFieldValue(field: ArticleDecimalField, value: string): number | null {
+    const scaledValue: number | null = parseScaledDecimal(value, 2);
+
+    if (scaledValue === null) {
+      return null;
+    }
+
+    switch (field) {
+      case 'pvp':
+      case 'pvpDescuento':
+        return scaledValue;
+
+      case 'precioAlbaran':
+      case 'puc':
+      case 'margen':
+      case 'descuento':
+      case 'margenDescuento':
+        return rescaleScaledInteger(scaledValue, 2, 6);
+    }
+  }
+
+  /**
+   * Limita la parte decimal del texto sin interferir
+   * con estados intermedios como "12,".
+   */
+  private limitDecimalFraction(value: string, maxFractionDigits: number): string {
+    const match: RegExpMatchArray | null = value.match(/^([+-]?\d*)([.,])(\d*)$/);
+
+    if (match === null || match[3].length <= maxFractionDigits) {
+      return value;
+    }
+
+    return `${match[1]}${match[2]}${match[3].slice(0, maxFractionDigits)}`;
   }
 
   /**
@@ -729,13 +806,6 @@ export default class ArticleGeneralComponent implements OnInit {
       case 'pvpDescuento':
         return ArticuloPriceCalculator.actualizarPvpDescuento(this.tab().draft, value);
     }
-  }
-
-  /**
-   * Obtiene la precisión de almacenamiento de un campo.
-   */
-  private getPriceScaleDigits(field: ArticlePriceField): number {
-    return field === 'pvp' || field === 'pvpDescuento' ? 2 : 6;
   }
 
   /**

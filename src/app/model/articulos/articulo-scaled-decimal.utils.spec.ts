@@ -3,6 +3,7 @@ import {
   isTransientScaledDecimalInput,
   numberToScaledInteger,
   parseScaledDecimal,
+  rescaleScaledInteger,
 } from '@model/articulos/articulo-scaled-decimal.utils';
 import { describe, expect, it } from 'vitest';
 
@@ -54,5 +55,17 @@ describe('articulo-scaled-decimal.utils', (): void => {
   it('rejects invalid decimal input', (): void => {
     expect(parseScaledDecimal('abc', 6)).toBeNull();
     expect(parseScaledDecimal('1,2,3', 6)).toBeNull();
+  });
+
+  it('reduces microeuros to cents using integer rounding', (): void => {
+    expect(rescaleScaledInteger(46_416_360, 6, 2)).toBe(4642);
+  });
+
+  it('reduces micropercentages to two decimal percentage precision', (): void => {
+    expect(rescaleScaledInteger(15_606_618, 6, 2)).toBe(1561);
+  });
+
+  it('expands cents to microeuros without losing precision', (): void => {
+    expect(rescaleScaledInteger(3678, 2, 6)).toBe(36_780_000);
   });
 });

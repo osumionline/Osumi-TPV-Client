@@ -52,6 +52,48 @@ export function isTransientScaledDecimalInput(value: string): boolean {
 }
 
 /**
+ * Convierte un entero entre dos escalas decimales aplicando
+ * redondeo al entero más próximo cuando se reduce precisión.
+ */
+export function rescaleScaledInteger(
+  value: number,
+  sourceScaleDigits: number,
+  targetScaleDigits: number,
+): number {
+  assertScaleDigits(sourceScaleDigits);
+  assertScaleDigits(targetScaleDigits);
+
+  if (!Number.isSafeInteger(value)) {
+    throw new Error('El valor a reescalar debe ser un entero seguro.');
+  }
+
+  if (sourceScaleDigits === targetScaleDigits) {
+    return value;
+  }
+
+  const sourceValue: bigint = BigInt(value);
+  let result: bigint;
+
+  if (targetScaleDigits > sourceScaleDigits) {
+    const multiplier: bigint = 10n ** BigInt(targetScaleDigits - sourceScaleDigits);
+
+    result = sourceValue * multiplier;
+  } else {
+    const divisor: bigint = 10n ** BigInt(sourceScaleDigits - targetScaleDigits);
+
+    result = roundScaledDivision(sourceValue, divisor);
+  }
+
+  const numericResult: number = Number(result);
+
+  if (!Number.isSafeInteger(numericResult)) {
+    throw new Error('El valor reescalado supera el rango seguro de enteros.');
+  }
+
+  return numericResult;
+}
+
+/**
  * Convierte un número de configuración a un entero escalado
  * utilizando su representación decimal.
  */
@@ -61,6 +103,18 @@ export function numberToScaledInteger(value: number, scaleDigits: number): numbe
   }
 
   return parseScaledDecimal(String(value), scaleDigits);
+}
+
+/**
+ * Divide dos enteros aplicando redondeo simétrico
+ * al entero más próximo.
+ */
+function roundScaledDivision(numerator: bigint, denominator: bigint): bigint {
+  const negative: boolean = numerator < 0n;
+  const absoluteNumerator: bigint = negative ? -numerator : numerator;
+  const rounded: bigint = (absoluteNumerator + denominator / 2n) / denominator;
+
+  return negative ? -rounded : rounded;
 }
 
 /**

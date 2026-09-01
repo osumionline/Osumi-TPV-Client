@@ -1,0 +1,45 @@
+<div class="overlay overlay--dimmed margin-suggestions-overlay">
+    <section class="margin-suggestions overlay__panel"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="margin-suggestions-title">
+        <header class="margin-suggestions__header">
+            <h2 id="margin-suggestions-title">
+                Márgenes
+            </h2>
+
+            <button mat-icon-button
+                    type="button"
+                    aria-label="Cerrar"
+                    (click)="close()">
+                <mat-icon>close</mat-icon>
+            </button>
+        </header>
+
+        <div class="margin-suggestions__body">
+            <p>
+                Selecciona un margen para aplicar su PVP calculado:
+            </p>
+
+            <div class="margin-suggestions__grid">
+                @for (margin of margins(); track margin) {
+                <button type="button"
+                        class="margin-suggestions__option"
+                        (click)="selectMargin(margin)">
+                    <strong>
+                        {{ formatMargin(margin) }} %
+                    </strong>
+
+                    <span>
+                        {{ formatPvp(margin) }} €
+                    </span>
+                </button>
+                } @empty {
+                <div class="margin-suggestions__empty">
+                    No hay márgenes configurados.
+                </div>
+                }
+            </div>
+        </div>
+    </section>
+</div>

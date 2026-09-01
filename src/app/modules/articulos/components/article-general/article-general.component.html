@@ -158,6 +158,7 @@
                         aria-label="Categorías"
                         multiple
                         placeholder="Sin categorías"
+                        [panelWidth]="null"
                         [value]="tab().draft.idsCategorias"
                         (selectionChange)="onCategoriasChange($event)">
                 @for (categoria of categoriasService.categoriasPlain(); track categoria.id) {
@@ -216,28 +217,32 @@
                        (blur)="onDecimalBlur($event, 'puc')">
             </label>
 
-            <label class="general__inline-field">
-                <span>
+            <div class="general__inline-field">
+                <label for="article-margin">
                     Margen (%)
-                </span>
+                </label>
 
-                <input type="text"
-                       inputmode="decimal"
-                       autocomplete="off"
-                       list="article-margin-options"
-                       [disabled]="!hasFiscalidad()"
-                       [value]="getDecimalInputValue('margen')"
-                       (focus)="onDecimalFocus($event, 'margen')"
-                       (input)="onDecimalInput($event, 'margen')"
-                       (blur)="onDecimalBlur($event, 'margen')">
+                <div class="general__inline-control">
+                    <input id="article-margin"
+                           type="text"
+                           inputmode="decimal"
+                           autocomplete="off"
+                           [disabled]="!hasFiscalidad()"
+                           [value]="getDecimalInputValue('margen')"
+                           (focus)="onDecimalFocus($event, 'margen')"
+                           (input)="onDecimalInput($event, 'margen')"
+                           (blur)="onDecimalBlur($event, 'margen')">
 
-                <datalist id="article-margin-options">
-                    @for (margin of marginOptions(); track margin) {
-                    <option [value]="formatMargin(margin)">
-                    </option>
-                    }
-                </datalist>
-            </label>
+                    <button mat-icon-button
+                            type="button"
+                            matTooltip="Ver márgenes"
+                            aria-label="Ver márgenes"
+                            [disabled]="!hasFiscalidad()"
+                            (click)="openMarginModal()">
+                        <mat-icon>calculate</mat-icon>
+                    </button>
+                </div>
+            </div>
 
             <label class="general__inline-field">
                 <span>
@@ -289,7 +294,6 @@
                 <input type="text"
                        inputmode="decimal"
                        autocomplete="off"
-                       list="article-margin-options"
                        [value]="getDecimalInputValue('margenDescuento')"
                        (focus)="onDecimalFocus($event, 'margenDescuento')"
                        (input)="onDecimalInput($event, 'margenDescuento')"
@@ -321,6 +325,7 @@
                 <input type="number"
                        step="1"
                        [value]="tab().draft.stock"
+                       (focus)="selectInputContent($event)"
                        (change)="onIntegerChange($event, 'stock', false)">
             </label>
 
@@ -333,6 +338,7 @@
                        min="0"
                        step="1"
                        [value]="tab().draft.stockMin"
+                       (focus)="selectInputContent($event)"
                        (change)="onIntegerChange($event, 'stockMin', true)">
             </label>
 
@@ -345,6 +351,7 @@
                        min="0"
                        step="1"
                        [value]="tab().draft.stockMax"
+                       (focus)="selectInputContent($event)"
                        (change)="onIntegerChange($event, 'stockMax', true)">
             </label>
 
@@ -357,6 +364,7 @@
                        min="0"
                        step="1"
                        [value]="tab().draft.loteOptimo"
+                       (focus)="selectInputContent($event)"
                        (change)="onIntegerChange($event, 'loteOptimo', true)">
             </label>
         </div>
@@ -383,4 +391,11 @@
                             [error]="proveedorCreateError()"
                             (createEvent)="createProveedor($event)"
                             (closeEvent)="closeProveedorModal()" />
+}
+
+@if (marginModalOpen()) {
+<otpv-article-margin-suggestions [draft]="tab().draft"
+                                 [margins]="marginOptions()"
+                                 (selectEvent)="selectMarginSuggestion($event)"
+                                 (closeEvent)="closeMarginModal()" />
 }
