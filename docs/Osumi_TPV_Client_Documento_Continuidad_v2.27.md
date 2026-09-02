@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.26  
+**Versión:** 2.27  
 **Fecha:** 2 de septiembre de 2026  
-**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos** continúa en frontend. Todo `13B — Infraestructura backend` está cerrado, incluido `13B.6E — unificación total de imágenes en WebP`. `13C — Workspace y carga de artículos`, `13D — General`, `13E — WEB`, `13F — Códigos de barras`, `13G — Observaciones` y **`13H — Histórico` están cerrados y validados ✅**. `13I — Baja / duplicado / acciones` está en curso: **`13I.1 — Guardar / Cancelar global` ✅** y **`13I.2 — Duplicar` ✅** están completados, incluyendo feedback visual de guardado y reutilización segura de fotos persistidas. El siguiente paso exacto es **`13I.3 — Baja lógica`**.
+**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos** continúa en frontend. Todo `13B — Infraestructura backend` está cerrado, incluido `13B.6E — unificación total de imágenes en WebP`. `13C — Workspace y carga de artículos`, `13D — General`, `13E — WEB`, `13F — Códigos de barras`, `13G — Observaciones`, `13H — Histórico` y **`13I — Baja / duplicado / acciones` están cerrados y validados ✅**. `13J — Estadísticas` está en curso: **`13J.1 — Backend + consulta agregada` ✅** está completado y probado; el siguiente paso exacto es **`13J.2 — Gráfica + filtros`**, usando Apache ECharts mediante `ngx-echarts`, con ventas netas, filtros Tipo/Mes/Año y series temporales con huecos a cero.
 
 > **Regla crítica de entorno TicketBAI:** el producto usa `production` por defecto. Durante desarrollo/pruebas manuales se usa `app_data.json → ticketBai.environment = "test"` junto con el token TEST correspondiente. No añadir selector de entorno a la UI.
 
@@ -79,11 +79,13 @@ Ventas 12 — Postventa                             🟦
   13H Histórico                                   ✅ MINI-HITO CERRADO
     13H.1 Backend + API paginada                  ✅
     13H.2 Tabla + orden + paginación              ✅
-  13I Baja / duplicado / acciones                 🟦
+  13I Baja / duplicado / acciones                 ✅ MINI-HITO CERRADO
     13I.1 Guardar / Cancelar global               ✅
     13I.2 Duplicar                                ✅
-    13I.3 Baja lógica                             🟦 SIGUIENTE
-  13J Estadísticas                                ⏸️ diseño posterior
+    13I.3 Baja lógica                             ✅
+  13J Estadísticas                                🟦
+    13J.1 Backend + consulta agregada              ✅
+    13J.2 Gráfica + filtros                       🟦 SIGUIENTE
   13K Integración con Ventas                      ⬜
 
 14 Clientes                                       ⬜
@@ -795,15 +797,110 @@ La validación definitiva de colisiones globales sigue en backend durante el gua
 
 # 20. Estadísticas
 
-El apartado existía visualmente, pero nunca llegó a implementarse.
+`13J — Estadísticas` está **en curso 🟦**. El backend agregado está cerrado y probado; falta la representación visual.
 
-Por tanto:
+Objetivo funcional acordado para un artículo:
 
 ```text
-13J Estadísticas ⏸️
+                    gráfica de barras
+
+Tipo: [Unidades / Importe]
+Mes:  [mes concreto / Todos]
+Año:  [año concreto / Todos]
 ```
 
-Se diseñará al final del módulo.
+La gráfica debe actualizarse automáticamente al cambiar cualquiera de los tres selectores, sin botón Aplicar.
+
+Semántica definitiva de `Tipo`:
+
+```text
+Unidades → SUM(linea_venta.unidades)
+Importe  → SUM(linea_venta.importe_micros)
+```
+
+Las devoluciones se representan con unidades/importes negativos y **restan** en la agregación. Por tanto las estadísticas muestran **venta neta histórica**, no venta bruta.
+
+El importe se obtiene de la línea histórica de venta, no del PVP actual del artículo. Internamente continúa en microeuros y solo se formatea a euros en renderer.
+
+Combinaciones acordadas de Año/Mes:
+
+| Año | Mes | Resolución / barras |
+| --- | --- | --- |
+| año concreto | mes concreto | un punto por cada día de ese mes |
+| año concreto | Todos | enero…diciembre de ese año |
+| Todos | mes concreto | ese mes comparado entre años |
+| Todos | Todos | todos los meses cronológicos de todos los años |
+
+Ejemplos:
+
+```text
+2026 + Septiembre
+→ 1, 2, 3 ... 30 de septiembre de 2026
+
+2026 + Todos
+→ Ene ... Dic 2026
+
+Todos + Septiembre
+→ Sep 2024 | Sep 2025 | Sep 2026
+
+Todos + Todos
+→ Ene 2024 | Feb 2024 | ... | Dic 2026
+```
+
+Los huecos temporales deben existir explícitamente con valor `0`:
+
+- todos los días de un mes concreto;
+- los 12 meses de un año concreto;
+- años intermedios sin ventas cuando se compara un mes o toda la serie histórica.
+
+La serie se construye en backend; el renderer no descarga ventas individuales para reagruparlas.
+
+`13J.1 — Backend + consulta agregada` ✅ ya implementa:
+
+- contratos `ArticuloEstadisticasConsulta`, `ArticuloEstadisticasPoint`, `ArticuloEstadisticasResultado`;
+- `tipo = unidades | importe`;
+- `year` y `month` nullable para representar `Todos`;
+- `availableYears` con rango continuo entre primer y último año con ventas;
+- puntos con `year`, `month`, `day` nullable y `value`;
+- `value` = unidades o microeuros según tipo;
+- SQL agregado sobre `linea_venta` + `venta`;
+- exclusión de ventas con `venta.deleted_at IS NOT NULL`;
+- devolución neta mediante SUM de valores positivos/negativos;
+- relleno de períodos sin actividad con cero en `ArticulosService` mediante utilidad pura;
+- validación de id de artículo, tipo, año 1..9999 y mes 1..12;
+- API/IPC/preload/servicio Angular ya expuestos;
+- tests unitarios y de repository SQLite cerrados.
+
+Decisión de librería para `13J.2`:
+
+```text
+Apache ECharts + ngx-echarts
+```
+
+Motivos:
+
+- `ngx-echarts` dispone de línea compatible con Angular 22 y funcionamiento zoneless;
+- Apache ECharts usa licencia Apache 2.0;
+- se evita introducir la licencia comercial condicionada por ingresos de ApexCharts;
+- deja una base reutilizable para estadísticas generales futuras del TPV.
+
+`ng-apexcharts` no se usará para esta implementación.
+
+Diseño previsto para `13J.2`:
+
+- gráfica de barras;
+- tres `MatSelect`: Tipo, Mes y Año;
+- refresco inmediato al cambiar un filtro;
+- total visible sobre/junto a la gráfica (`N unidades` o importe formateado en euros);
+- tooltip adaptado a unidades/importe;
+- eje Y entero para unidades;
+- importes formateados en euros sin perder precisión interna;
+- protección frente a respuestas IPC fuera de orden si el usuario cambia filtros rápidamente;
+- estado vacío cuando no haya datos;
+- Estadísticas será de solo lectura, no forma parte del `ArticuloDraft` y nunca genera `dirty`;
+- la sección no debe ofrecerse a artículos nuevos todavía no persistidos.
+
+No se ha fijado todavía de forma explícita la selección inicial de Año/Mes/Tipo; decidirla al construir `13J.2` en lugar de asumirla silenciosamente.
 
 ---
 
@@ -894,33 +991,64 @@ Se usa el mismo texto de observaciones. Los toggles permanecen conceptualmente i
 
 # 23. Baja
 
+`13I.3 — Baja lógica` está **cerrado ✅**.
+
 Acción:
 
 ```text
 Dar de baja
 ```
 
-Debe pedir confirmación.
+Solo está disponible para artículos persistidos. La sección `BAJA` no se muestra en una ficha nueva.
 
-Es un borrado lógico:
+No se permite ejecutar la baja con cambios locales pendientes:
 
 ```text
-soft delete
+dirty = true
+→ Guardar o Cancelar primero
 ```
 
-El artículo deja de estar disponible para uso normal, pero no se eliminan históricos.
+La UI explica que el artículo dejará de estar disponible en el TPV pero sus datos históricos permanecerán, y solicita confirmación explícita antes de ejecutar la operación.
+
+Flujo implementado:
+
+```text
+BAJA
+→ confirmación
+→ ArticulosApi.deactivate(id)
+→ IPC / preload
+→ backend ArticulosService.deactivate()
+→ transacción SQLite
+→ cerrar pestaña solo tras éxito
+```
+
+Semántica persistente:
+
+```text
+soft delete articulo
++ soft delete codigos_barras activos
++ conservar historico_articulo
++ conservar categorías/relaciones históricas
++ conservar relaciones de fotos y assets archivo/WebP
+```
+
+El acceso directo no necesita ponerse físicamente a `null`: las resoluciones normales filtran artículos activos, por lo que deja de ser utilizable al quedar el artículo dado de baja.
+
+Tras una baja correcta la pestaña desaparece. No se muestra diálogo adicional de éxito porque el cierre de la ficha es la confirmación visual. Si backend falla, la pestaña permanece abierta y puede reintentarse.
+
+Un artículo dado de baja deja de resolverse/buscarse como activo mediante localizador, código adicional o acceso directo.
 
 ---
 
 # 24. Acciones inferiores
 
-Estado actual dentro de `13I`:
+`13I — Baja / duplicado / acciones` está **cerrado y validado ✅**.
 
 ```text
-Duplicar  ✅
-Cancelar  ✅
-Guardar   ✅
-Dar de baja 🟦 siguiente
+Duplicar     ✅
+Cancelar     ✅
+Guardar      ✅
+Dar de baja  ✅
 ```
 
 La barra inferior es global a toda la ficha y permanece fuera de las secciones internas.
@@ -982,6 +1110,18 @@ Artículo guardado correctamente
 ```
 
 El mensaje desaparece antes si la ficha vuelve a modificarse.
+
+## Dar de baja — ✅
+
+```text
+artículo persistido + limpio
+→ pestaña BAJA
+→ confirmación explícita
+→ deactivate transaccional
+→ cerrar pestaña tras éxito
+```
+
+La acción está bloqueada cuando `dirty=true` y no existe para artículos nuevos. La baja hace soft delete del artículo y de sus códigos activos, conservando histórico, categorías, relaciones de fotos y assets WebP.
 
 ## Guardar y cerrar
 
@@ -2636,14 +2776,14 @@ No se fuerza foco al abrir un artículo persistido desde búsqueda o resolución
 
 ---
 
-# 28I. 13I — Baja / duplicado / acciones 🟦 EN CURSO
+# 28I. 13I — Baja / duplicado / acciones ✅ MINI-HITO COMPLETAMENTE CERRADO
 
-`13I` todavía no está cerrado. Dos subbloques ya están completos y validados:
+`13I` queda cerrado y validado funcionalmente por el usuario:
 
 ```text
 13I.1 Guardar / Cancelar global ✅
 13I.2 Duplicar                  ✅
-13I.3 Baja lógica               🟦 SIGUIENTE
+13I.3 Baja lógica               ✅
 ```
 
 ## 28I.1 Guardar / Cancelar global — ✅
@@ -2915,12 +3055,231 @@ Duplicar           Artículo guardado correctamente │ Cancelar │ Guardar
 
 `Duplicar` solo aparece/está disponible para artículos persistidos limpios.
 
-**`13I.1` y `13I.2` están cerrados ✅. `13I` continúa abierto hasta completar `13I.3 — Baja lógica`.**
+## 28I.3 Baja lógica — ✅
+
+Se expuso el caso de uso backend ya existente hasta renderer:
+
+```text
+ArticulosApi.deactivate(idArticulo)
+→ IPC articulos:deactivate
+→ preload
+→ ArticulosService.darDeBaja(idTemporal)
+```
+
+Reglas cerradas:
+
+- solo artículo persistido;
+- ficha obligatoriamente limpia (`dirty=false`);
+- la sección `BAJA` se oculta en drafts nuevos;
+- mensaje explicativo antes de la acción;
+- confirmación explícita;
+- `processingTabId` bloquea dobles ejecuciones;
+- cerrar la pestaña únicamente después de respuesta correcta del backend;
+- ante error, mantener la pestaña abierta.
+
+Persistencia:
+
+```text
+articulo.deleted_at = timestamp
+codigo_barras activos.deleted_at = timestamp
+```
+
+Se conservan:
+
+```text
+historico_articulo
+articulo_categoria
+articulo_archivo
+archivo / WebP
+ventas y pedidos históricos
+```
+
+El acceso directo queda inutilizable automáticamente porque las resoluciones filtran `articulo.deleted_at IS NULL`.
+
+Tras éxito no se añadió un segundo diálogo: desaparecer la pestaña confirma visualmente la baja.
+
+**`13I — Baja / duplicado / acciones` queda cerrado ✅.**
+
+---
+
+# 28J. 13J — Estadísticas 🟦 EN CURSO
+
+La funcionalidad nunca llegó a completarse en el TPV legacy, por lo que para el cliente nuevo se ha definido desde cero manteniendo una UI sencilla.
+
+Roadmap:
+
+```text
+13J.1 Backend + consulta agregada ✅
+13J.2 Gráfica + filtros          🟦 SIGUIENTE
+```
+
+## 28J.1 Diseño funcional acordado
+
+La pestaña mostrará una gráfica de barras y tres selectores en su zona inferior:
+
+```text
+Tipo: Unidades | Importe
+Mes:  Enero..Diciembre | Todos
+Año:  <años disponibles> | Todos
+```
+
+Cambiar cualquiera de ellos debe actualizar la gráfica inmediatamente.
+
+Semántica temporal:
+
+| Año | Mes | Serie |
+| --- | --- | --- |
+| concreto | concreto | días 1..N del mes |
+| concreto | Todos | 12 meses del año |
+| Todos | concreto | mismo mes en cada año |
+| Todos | Todos | todos los meses de todos los años en orden cronológico |
+
+No agrupar todos los eneros/septiembres de años distintos en una única barra.
+
+Huecos sin ventas = `0`. Los años intermedios entre primera y última actividad también se conservan aunque no tengan ventas.
+
+## 28J.2 Métrica de negocio
+
+Estadísticas = **ventas netas**:
+
+```text
+Unidades → SUM(linea_venta.unidades)
+Importe  → SUM(linea_venta.importe_micros)
+```
+
+Las devoluciones usan valores negativos y restan. El importe es el histórico real de la línea de venta y no se recalcula con el PVP actual.
+
+Las ventas dadas de baja (`venta.deleted_at IS NOT NULL`) quedan excluidas.
+
+## 28J.3 13J.1 Backend + consulta agregada — ✅
+
+Contratos públicos añadidos:
+
+```text
+ArticuloEstadisticasTipo
+ArticuloEstadisticasConsulta
+ArticuloEstadisticasPoint
+ArticuloEstadisticasResultado
+```
+
+Consulta pública:
+
+```text
+idArticulo
+ tipo = unidades | importe
+ year = number | null
+ month = 1..12 | null
+```
+
+Resultado:
+
+```text
+tipo
+availableYears
+points[]
+  year
+  month
+  day | null
+  value
+total
+```
+
+`value` y `total` significan:
+
+```text
+unidades → entero de unidades
+importe  → microeuros
+```
+
+El repository recibe una query interna con `metric = units | amount` y ejecuta agregación SQLite sobre `linea_venta` + `venta` mediante `strftime()`.
+
+Resolución SQL:
+
+```text
+year != null && month != null
+→ GROUP BY año + mes + día
+
+cualquier otra combinación
+→ GROUP BY año + mes
+```
+
+La consulta de años disponibles se hace independientemente de los filtros actuales para conocer todo el rango histórico del artículo.
+
+La utilidad pura `createArticuloEstadisticasResult()` transforma los agregados existentes en una serie completa:
+
+- rellena días faltantes del mes;
+- rellena los 12 meses de un año;
+- crea años intermedios entre mínimo y máximo;
+- rellena períodos inexistentes con `0`;
+- calcula `total` a partir de la serie final.
+
+Se evita usar `Date` para calcular días de meses/años 0..99; se implementó cálculo gregoriano explícito de año bisiesto.
+
+Validación de aplicación:
+
+- id artículo entero positivo;
+- tipo válido;
+- año `null` o entero 1..9999;
+- mes `null` o entero 1..12.
+
+Cadena expuesta:
+
+```text
+ArticulosRepository.findEstadisticas()
+→ ArticulosService.getEstadisticas()
+→ ArticulosApi.getEstadisticas()
+→ IPC articulos:get-estadisticas
+→ preload
+→ servicio Angular getEstadisticas()
+```
+
+Tests cerrados:
+
+- mes bisiesto completo;
+- 12 meses de un año con ceros;
+- año intermedio sin ventas;
+- traducción `importe → amount`;
+- validación de mes inválido antes de SQLite;
+- agregación SQLite real de unidades/importes;
+- devoluciones negativas restan;
+- ventas soft-deleted quedan fuera.
+
+`13J.1` está cerrado ✅ y todavía no produce cambios visuales.
+
+## 28J.4 Librería y UI decididas para 13J.2
+
+Usar:
+
+```text
+Apache ECharts
++
+ngx-echarts (rama compatible con Angular 22)
+```
+
+No usar `ng-apexcharts` para esta implementación. Aunque técnicamente es viable, ApexCharts usa actualmente una licencia comercial condicionada por ingresos; ECharts usa Apache 2.0 y encaja mejor con un proyecto open source que puede incorporar módulos comerciales.
+
+La futura implementación debe incluir:
+
+- gráfica de barras;
+- total visible (`137 unidades` / `2.347,80 €`);
+- `MatSelect` Tipo/Mes/Año;
+- actualización automática al cambiar un selector;
+- tooltip específico para unidades o importe;
+- eje Y entero para Unidades;
+- formato monetario solo en presentación, manteniendo microeuros en datos;
+- protección frente a respuestas IPC fuera de orden;
+- estado vacío;
+- Estadísticas no genera `dirty` ni modifica `ArticuloDraft`;
+- ocultar/no ofrecer Estadísticas en artículos nuevos no persistidos.
+
+La selección inicial exacta de Tipo/Mes/Año **no se ha fijado todavía**; resolverla explícitamente al empezar `13J.2`.
+
+---
 
 # 29. Próximo paso exacto
 
 ```text
-13I.3 — Baja lógica
+13J.2 — Gráfica + filtros
 ```
 
 Estado previo cerrado:
@@ -2931,34 +3290,18 @@ Estado previo cerrado:
 13F — Códigos de barras ✅
 13G — Observaciones ✅
 13H — Histórico ✅
-13I.1 — Guardar / Cancelar global ✅
-13I.2 — Duplicar ✅
+13I — Baja / duplicado / acciones ✅
+13J.1 — Backend + consulta agregada ✅
 ```
 
-`13I.3` debe conectar la baja lógica backend ya existente con la UI global del artículo.
+Antes de implementar, revisar `main` actual. `13J.2` debe instalar ECharts/ngx-echarts y consumir exclusivamente `ArticulosService.getEstadisticas()`; no debe volver a consultar o reagrupar ventas en renderer.
 
-Semántica backend ya cerrada desde `13B.5`:
+Primeras decisiones a cerrar al implementar:
 
-```text
-baja = soft delete artículo
-     + soft delete códigos de barras activos
-     + conservar histórico
-     + conservar categorías/relaciones históricas
-     + conservar archivos/fotos
-```
-
-Antes de implementar, revisar `main` actual y el método `deactivate()` ya existente para exponerlo por API/IPC/preload si todavía no está accesible desde renderer.
-
-La UI deberá decidir de forma explícita:
-
-- acción disponible solo para artículos persistidos;
-- no permitir baja con cambios locales pendientes sin resolver;
-- confirmación clara al usuario;
-- qué ocurre con la pestaña después de una baja correcta;
-- refrescar búsquedas/listados para que el artículo inactivo no aparezca como activo;
-- no confundir baja lógica con cerrar pestaña ni con Cancelar cambios.
-
-Tras cerrar `13I.3`, revisar si `13I — Baja / duplicado / acciones` puede darse por completamente cerrado antes de pasar a `13J — Estadísticas`.
+- valores iniciales de Tipo/Mes/Año;
+- presentación exacta de las etiquetas del eje X según cada combinación;
+- comportamiento visual cuando `availableYears` esté vacío;
+- altura/responsividad de la gráfica dentro del workspace.
 
 ---
 
@@ -2979,6 +3322,7 @@ Tras cerrar `13I.3`, revisar si `13I — Baja / duplicado / acciones` puede dars
 | **2.24** | **01/09/2026** | **13E WEB ✅ mini-hito cerrado: contenido WEB, galería 0..N en columna derecha, file picker/drag&drop, principal y orden, staging común WebP, crop libre secuencial, rollback de lotes y ciclo de vida completo de temporales al eliminar/cancelar/cerrar/reutilizar borrador. Se elimina el concepto de “guardado WEB”: WEB forma parte del ArticuloDraft único y se guarda/cancela con las acciones globales del artículo. Siguiente: 13F Códigos de barras.** |
 | **2.25** | **02/09/2026** | **13F Códigos de barras ✅ y 13G Observaciones ✅ cerrados. Códigos recupera UX legacy con foco automático, lector/Enter, tarjetas QR 3 por fila mediante angularx-qrcode, principal diferenciado no borrable y adicionales add/remove solo en draft. Observaciones añade textarea + toggles Material Pedidos/Ventas sobre el mismo ArticuloDraft. Siguiente: 13H Histórico.** |
 | **2.26** | **02/09/2026** | **13H Histórico ✅ cerrado con API SQLite paginada/ordenada, MatTable/MatSort/MatPaginator remoto y MatPaginatorIntl global en castellano. Refinamiento UX: foco automático en Localizador al crear/activar drafts nuevos. 13I.1 Guardar/Cancelar global ✅ con mapper del draft, save IPC/preload, barra inferior, cleanup de staging y feedback “Artículo guardado correctamente” durante 4 s. 13I.2 Duplicar ✅: nueva pestaña dirty, identidades/stock/códigos/acceso/observaciones reseteados, configuración reutilizable conservada y fotos compartidas mediante nuevas relaciones al mismo asset `archivo`. Siguiente: 13I.3 Baja lógica.** |
+| **2.27** | **02/09/2026** | **13I.3 Baja lógica ✅ y 13I completo ✅: sección solo para persistidos, bloqueo con dirty, confirmación, deactivate vía API/IPC/preload, soft delete artículo+códigos y cierre de pestaña tras éxito preservando histórico/fotos/relaciones. 13J Estadísticas iniciado: diseño acordado con Tipo Unidades/Importe, Mes/Año concretos o Todos, ventas netas con devoluciones negativas, huecos a cero y cuatro resoluciones temporales. 13J.1 backend agregado ✅: SUM SQLite, availableYears continuo, series completas, validación, API/IPC/preload/servicio Angular y tests. Decisión para 13J.2: Apache ECharts + ngx-echarts; siguiente paso gráfica + filtros.** |
 ---
 
 # 31. Prompt de arranque recomendado
@@ -2987,7 +3331,7 @@ Tras cerrar `13I.3`, revisar si `13I — Baja / duplicado / acciones` puede dars
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.26.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.27.
 
 Estado:
 - Ventas 12C.1–12C.8 ✅
@@ -3009,16 +3353,18 @@ Estado:
 - 13F Códigos de barras ✅ CERRADO
 - 13G Observaciones ✅ CERRADO
 - 13H Histórico ✅ CERRADO
-  - 13H.1 backend + API paginada ✅
-  - 13H.2 tabla + orden + paginación ✅
+  - backend + API paginada ✅
+  - tabla + orden + paginación ✅
   - MatPaginator global en castellano ✅
 - refinamiento UX: drafts nuevos enfocan Localizador automáticamente ✅
-- 13I Baja / duplicado / acciones 🟦
+- 13I Baja / duplicado / acciones ✅ CERRADO
   - 13I.1 Guardar / Cancelar global ✅
   - feedback visual de guardado 4 s ✅
   - 13I.2 Duplicar ✅
-  - 13I.3 Baja lógica 🟦 SIGUIENTE
-- 13J Estadísticas ⏸️ diseño posterior
+  - 13I.3 Baja lógica ✅
+- 13J Estadísticas 🟦
+  - 13J.1 backend + consulta agregada ✅
+  - 13J.2 gráfica + filtros 🟦 SIGUIENTE
 - 13K Integración con Ventas ⬜
 
 Roadmap posterior:
@@ -3077,12 +3423,24 @@ Reglas críticas:
 - Duplicar resetea id/publicId/localizador, referencia, stock, acceso directo, códigos adicionales y observaciones; nombre pasa a “(copia)”.
 - Duplicar conserva marca/proveedor/categorías/precios/fiscalidad/márgenes/descuento/stock min-max/lote/WEB/descripciones/fotos/flags de observaciones.
 - Las fotos persistidas del duplicado reutilizan el mismo asset `archivo` y crean nuevas relaciones `articulo_archivo`; no se duplica físicamente el WebP.
-- Baja = soft delete artículo + códigos; conservar histórico/relaciones/fotos.
+- Baja solo aparece para artículos persistidos y exige dirty=false; confirma antes de ejecutar.
+- Baja = soft delete artículo + códigos activos; conserva histórico/categorías/relaciones/fotos/assets.
+- Tras baja correcta se cierra la pestaña; si falla backend, permanece abierta.
 - Venta online muestra WEB; desactivarla oculta pero no borra datos.
 - WEB NO tiene guardado propio: comparte el único ArticuloDraft y las acciones globales del artículo.
 - Fotos WEB: crop libre → staging → Sharp/WebP; la galería mantiene orden y una única principal.
 - Staged nuevos se limpian al eliminar, cancelar cambios, cerrar descartando o sustituir un borrador por un artículo localizado; navegar entre módulos no los descarta.
-- Estadísticas se diseñarán al final.
+- Estadísticas es lectura persistida y NO debe formar parte de ArticuloDraft ni generar dirty.
+- Estadísticas usa venta NETA: SUM(unidades) o SUM(importe_micros); devoluciones negativas restan y ventas soft-deleted se excluyen.
+- Filtros Estadísticas: Tipo Unidades/Importe, Mes concreto/Todos, Año concreto/Todos; cualquier cambio refresca automáticamente.
+- Año concreto + mes concreto → días; año concreto + Todos → 12 meses; Todos + mes → ese mes entre años; Todos + Todos → todos los meses cronológicos.
+- Períodos sin actividad se rellenan con 0; availableYears completa también años intermedios.
+- 13J.1 ya expone getEstadisticas() por repository/service/API/IPC/preload/Angular y devuelve series completas con value en unidades o microeuros.
+- Para 13J.2 usar Apache ECharts + ngx-echarts compatible con Angular 22. No usar ng-apexcharts para esta implementación.
+- ECharts debe limitarse a presentación: no reagrupar ventas ni recalcular estadísticas en renderer.
+- 13J.2 debe mostrar gráfica de barras, total, MatSelect Tipo/Mes/Año, tooltips y protección ante respuestas IPC fuera de orden.
+- Estadísticas no debe mostrarse en drafts nuevos sin id.
+- La selección inicial exacta Tipo/Mes/Año aún debe decidirse explícitamente al comenzar 13J.2.
 
 Convenciones:
 - Angular standalone/signals/inject/input/output.
@@ -3094,9 +3452,9 @@ Convenciones:
 - Trabajar por lotes coherentes y no avanzar sin confirmación.
 
 Próximo paso exacto:
-13I.3 — Baja lógica.
+13J.2 — Gráfica + filtros.
 ```
 
 ---
 
-**Fin del documento de continuidad v2.26.**
+**Fin del documento de continuidad v2.27.**
