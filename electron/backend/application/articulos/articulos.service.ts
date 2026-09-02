@@ -1,7 +1,12 @@
+import type ArticuloHistoricoRepositoryQuery from '@backend/contracts/articulos/articulo-historico-query.interface';
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
 import type ImageAssetPromoter from '@backend/contracts/files/image-asset-promoter.interface';
 import type StagedImageDiscarder from '@backend/contracts/files/staged-image-discarder.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
+import type {
+  ArticuloHistoricoPageRecord,
+  ArticuloHistoricoRecord,
+} from '@backend/domain/articulos/articulo-historico-record.interface';
 import type {
   ArticuloAccesoDirectoRecord,
   ArticuloCodigoBarrasRecord,
@@ -15,6 +20,13 @@ import type {
 import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.interface';
 import type ArticuloAccesoDirectoCommand from '@desktop-contracts/articulos/articulo-acceso-directo-command.interface';
 import type ArticuloAccesoDirectoInterface from '@desktop-contracts/articulos/articulo-acceso-directo.interface';
+import type {
+  ArticuloHistoricoConsulta,
+  ArticuloHistoricoItem,
+  ArticuloHistoricoResultado,
+  ArticuloHistoricoSortDirection,
+  ArticuloHistoricoSortField,
+} from '@desktop-contracts/articulos/articulo-historico.interface';
 import type {
   ArticuloFotoSaveInterface,
   ArticuloSaveInterface,
@@ -69,6 +81,69 @@ export default class ArticulosService {
     );
 
     return idArticulo === null ? null : this.getById(idArticulo);
+  }
+
+  /**
+   * Recupera una página validada del histórico de un artículo.
+   */
+  async getHistorico(consulta: ArticuloHistoricoConsulta): Promise<ArticuloHistoricoResultado> {
+    if (typeof consulta !== 'object' || consulta === null) {
+      throw new Error('La consulta del histórico no es válida.');
+    }
+
+    if (!Number.isSafeInteger(consulta.idArticulo) || consulta.idArticulo <= 0) {
+      throw new Error('El identificador del artículo no es válido.');
+    }
+
+    if (!Number.isSafeInteger(consulta.pagina) || consulta.pagina <= 0) {
+      throw new Error('La página del histórico no es válida.');
+    }
+
+    if (![20, 50, 100, 200].includes(consulta.num)) {
+      throw new Error('El tamaño de página del histórico no es válido.');
+    }
+
+    if (!this.isHistoricoSortField(consulta.orderBy)) {
+      throw new Error('El campo de orden del histórico no es válido.');
+    }
+
+    if (!this.isHistoricoSortDirection(consulta.orderDirection)) {
+      throw new Error('La dirección de orden del histórico no es válida.');
+    }
+
+    const offset: number = (consulta.pagina - 1) * consulta.num;
+
+    if (!Number.isSafeInteger(offset)) {
+      throw new Error('El desplazamiento del histórico supera el rango permitido.');
+    }
+
+    const repositoryQuery: ArticuloHistoricoRepositoryQuery = {
+      idArticulo: consulta.idArticulo,
+      offset,
+      limit: consulta.num,
+      orderBy: consulta.orderBy,
+      orderDirection: consulta.orderDirection,
+    };
+    const result: ArticuloHistoricoPageRecord =
+      await this.articulosRepository.findHistorico(repositoryQuery);
+
+    return {
+      total: result.total,
+      items: result.items.map((item: ArticuloHistoricoRecord): ArticuloHistoricoItem => ({
+        id: item.id,
+        publicId: item.publicId,
+        tipo: item.tipo,
+        stockPrevio: item.stockPrevio,
+        diferencia: item.diferencia,
+        stockFinal: item.stockFinal,
+        idVenta: item.idVenta,
+        idPedido: item.idPedido,
+        idMermaCaducidad: item.idMermaCaducidad,
+        pucMicros: item.pucMicros,
+        pvpMicros: item.pvpMicros,
+        createdAt: item.createdAt,
+      })),
+    };
   }
 
   /**
@@ -160,6 +235,35 @@ export default class ArticulosService {
     }
 
     await this.articulosRepository.deactivate(idArticulo);
+  }
+
+  /**
+   * Comprueba que un campo de orden pertenece
+   * al contrato público del histórico.
+   */
+  private isHistoricoSortField(value: unknown): value is ArticuloHistoricoSortField {
+    switch (value) {
+      case 'createdAt':
+      case 'tipo':
+      case 'stockPrevio':
+      case 'diferencia':
+      case 'stockFinal':
+      case 'pucMicros':
+      case 'pvpMicros':
+      case 'idVenta':
+      case 'idPedido':
+        return true;
+
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Comprueba la dirección de orden solicitada.
+   */
+  private isHistoricoSortDirection(value: unknown): value is ArticuloHistoricoSortDirection {
+    return value === 'asc' || value === 'desc';
   }
 
   /**

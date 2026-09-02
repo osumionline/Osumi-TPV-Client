@@ -1,3 +1,5 @@
+import type ArticuloHistoricoRepositoryQuery from '@backend/contracts/articulos/articulo-historico-query.interface';
+import type { ArticuloHistoricoPageRecord } from '@backend/domain/articulos/articulo-historico-record.interface';
 import type {
   ArticuloAccesoDirectoRecord,
   ArticuloRecord,
@@ -15,6 +17,11 @@ export default interface ArticulosRepository {
    * y devuelve el identificador del artículo activo.
    */
   resolveIdByCode(codigo: string, codigoNumerico: number | null): Promise<number | null>;
+
+  /**
+   * Recupera una página del histórico persistido de un artículo.
+   */
+  findHistorico(query: ArticuloHistoricoRepositoryQuery): Promise<ArticuloHistoricoPageRecord>;
 
   /**
    * Obtiene los accesos directos asignados a artículos activos.

@@ -1,4 +1,9 @@
+import type ArticuloHistoricoRepositoryQuery from '@backend/contracts/articulos/articulo-historico-query.interface';
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
+import type {
+  ArticuloHistoricoPageRecord,
+  ArticuloHistoricoRecord,
+} from '@backend/domain/articulos/articulo-historico-record.interface';
 import type {
   ArticuloAccesoDirectoRecord,
   ArticuloCodigoBarrasRecord,
@@ -18,6 +23,37 @@ import insertArchivo from '@infrastructure/database/typeorm/typeorm-archivo.util
 import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
 import { randomUUID } from 'node:crypto';
 import type { DataSource, QueryRunner } from 'typeorm';
+
+interface ArticuloHistoricoDatabaseRow {
+  readonly id: number;
+  readonly public_id: string;
+  readonly tipo: number;
+  readonly stock_previo: number;
+  readonly diferencia: number;
+  readonly stock_final: number;
+  readonly id_venta: number | null;
+  readonly id_pedido: number | null;
+  readonly id_merma_caducidad: number | null;
+  readonly puc_micros: number;
+  readonly pvp_micros: number;
+  readonly created_at: string;
+}
+
+interface CountDatabaseRow {
+  readonly total: number;
+}
+
+const HISTORICO_SORT_COLUMNS = {
+  createdAt: 'h.created_at',
+  tipo: 'h.tipo',
+  stockPrevio: 'h.stock_previo',
+  diferencia: 'h.diferencia',
+  stockFinal: 'h.stock_final',
+  pucMicros: 'h.puc_micros',
+  pvpMicros: 'h.pvp_micros',
+  idVenta: 'h.id_venta',
+  idPedido: 'h.id_pedido',
+} as const;
 
 interface ArticuloAccesoDirectoDatabaseRow {
   readonly id: number;
@@ -186,6 +222,69 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
         : await this.resolveNumericCode(dataSource, codigo, codigoNumerico);
 
     return rows[0]?.id ?? null;
+  }
+
+  /**
+   * Recupera una página ordenada del histórico de un artículo.
+   */
+  async findHistorico(
+    query: ArticuloHistoricoRepositoryQuery,
+  ): Promise<ArticuloHistoricoPageRecord> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+    const countRows: readonly CountDatabaseRow[] = (await dataSource.query(
+      `
+          SELECT COUNT(*) AS total
+          FROM historico_articulo
+          WHERE id_articulo = ?
+        `,
+      [query.idArticulo],
+    )) as readonly CountDatabaseRow[];
+    const total: number = countRows[0]?.total ?? 0;
+    const sortColumn: string = HISTORICO_SORT_COLUMNS[query.orderBy];
+    const sortDirection: string = query.orderDirection === 'asc' ? 'ASC' : 'DESC';
+    const rows: readonly ArticuloHistoricoDatabaseRow[] = (await dataSource.query(
+      `
+          SELECT
+            h.id,
+            h.public_id,
+            h.tipo,
+            h.stock_previo,
+            h.diferencia,
+            h.stock_final,
+            h.id_venta,
+            h.id_pedido,
+            h.id_merma_caducidad,
+            h.puc_micros,
+            h.pvp_micros,
+            h.created_at
+          FROM historico_articulo h
+          WHERE h.id_articulo = ?
+          ORDER BY
+            ${sortColumn} ${sortDirection},
+            h.id ${sortDirection}
+          LIMIT ?
+          OFFSET ?
+        `,
+      [query.idArticulo, query.limit, query.offset],
+    )) as readonly ArticuloHistoricoDatabaseRow[];
+
+    return {
+      total,
+      items: rows.map((row: ArticuloHistoricoDatabaseRow): ArticuloHistoricoRecord => ({
+        id: row.id,
+        publicId: row.public_id,
+        tipo: row.tipo,
+        stockPrevio: row.stock_previo,
+        diferencia: row.diferencia,
+        stockFinal: row.stock_final,
+        idVenta: row.id_venta,
+        idPedido: row.id_pedido,
+        idMermaCaducidad: row.id_merma_caducidad,
+        pucMicros: row.puc_micros,
+        pvpMicros: row.pvp_micros,
+        createdAt: row.created_at,
+      })),
+    };
   }
 
   /**

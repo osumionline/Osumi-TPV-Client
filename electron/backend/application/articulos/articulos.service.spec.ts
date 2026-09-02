@@ -1,8 +1,10 @@
 import ArticulosService from '@backend/application/articulos/articulos.service';
+import type ArticuloHistoricoRepositoryQuery from '@backend/contracts/articulos/articulo-historico-query.interface';
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
 import type ImageAssetPromoter from '@backend/contracts/files/image-asset-promoter.interface';
 import type StagedImageDiscarder from '@backend/contracts/files/staged-image-discarder.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
+import type { ArticuloHistoricoPageRecord } from '@backend/domain/articulos/articulo-historico-record.interface';
 import type {
   ArticuloAccesoDirectoRecord,
   ArticuloRecord,
@@ -33,6 +35,26 @@ class FakeArticulosRepository implements ArticulosRepository {
   ];
   lastAccesoDirectoIdArticulo: number | null = null;
   lastAccesoDirecto: number | null = null;
+  historicoResult: ArticuloHistoricoPageRecord = {
+    total: 1,
+    items: [
+      {
+        id: 300,
+        publicId: 'history-public-id',
+        tipo: 4,
+        stockPrevio: 5,
+        diferencia: 3,
+        stockFinal: 8,
+        idVenta: null,
+        idPedido: null,
+        idMermaCaducidad: null,
+        pucMicros: 744_580,
+        pvpMicros: 1_000_000,
+        createdAt: '2026-09-02T08:00:00.000Z',
+      },
+    ],
+  };
+  lastHistoricoQuery: ArticuloHistoricoRepositoryQuery | null = null;
 
   /**
    * Devuelve el artículo configurado para el test.
@@ -49,6 +71,15 @@ class FakeArticulosRepository implements ArticulosRepository {
     this.lastNumericCode = codigoNumerico;
 
     return Promise.resolve(this.resolvedId);
+  }
+
+  /**
+   * Devuelve la página histórica configurada para el test.
+   */
+  findHistorico(query: ArticuloHistoricoRepositoryQuery): Promise<ArticuloHistoricoPageRecord> {
+    this.lastHistoricoQuery = query;
+
+    return Promise.resolve(this.historicoResult);
   }
 
   /**
@@ -387,6 +418,51 @@ describe('ArticulosService', (): void => {
     ).rejects.toThrow('El acceso directo debe ser un entero positivo.');
 
     expect(repository.lastAccesoDirectoIdArticulo).toBeNull();
+  });
+
+  it('obtiene una página validada del histórico de un artículo', async (): Promise<void> => {
+    const repository = new FakeArticulosRepository();
+    const service = createService(repository);
+
+    const result = await service.getHistorico({
+      idArticulo: 25,
+      pagina: 2,
+      num: 20,
+      orderBy: 'createdAt',
+      orderDirection: 'desc',
+    });
+
+    expect(repository.lastHistoricoQuery).toEqual({
+      idArticulo: 25,
+      offset: 20,
+      limit: 20,
+      orderBy: 'createdAt',
+      orderDirection: 'desc',
+    });
+    expect(result.total).toBe(1);
+    expect(result.items[0]).toMatchObject({
+      tipo: 4,
+      stockPrevio: 5,
+      diferencia: 3,
+      stockFinal: 8,
+    });
+  });
+
+  it('rechaza tamaños de página arbitrarios en el histórico', async (): Promise<void> => {
+    const repository = new FakeArticulosRepository();
+    const service = createService(repository);
+
+    await expect(
+      service.getHistorico({
+        idArticulo: 25,
+        pagina: 1,
+        num: 10,
+        orderBy: 'createdAt',
+        orderDirection: 'desc',
+      }),
+    ).rejects.toThrow('El tamaño de página del histórico no es válido.');
+
+    expect(repository.lastHistoricoQuery).toBeNull();
   });
 });
 

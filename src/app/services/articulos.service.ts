@@ -1,6 +1,10 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { computed, Service, signal } from '@angular/core';
 import type ArticuloAccesoDirectoInterface from '@desktop-contracts/articulos/articulo-acceso-directo.interface';
+import type {
+  ArticuloHistoricoConsulta,
+  ArticuloHistoricoResultado,
+} from '@desktop-contracts/articulos/articulo-historico.interface';
 import type { ArticuloInterface } from '@desktop-contracts/articulos/articulo.interface';
 import type { ArticuloDraft, ArticuloDraftPatch } from '@model/articulos/articulo-draft.interface';
 import {
@@ -121,6 +125,13 @@ export default class ArticulosService {
     await this.discardSourceDraftStaging(sourceTabId);
 
     return this.abrirArticulo(articulo, sourceTabId);
+  }
+
+  /**
+   * Recupera una página del histórico persistido.
+   */
+  getHistorico(consulta: ArticuloHistoricoConsulta): Promise<ArticuloHistoricoResultado> {
+    return window.osumiDesktop.articulos.getHistorico(consulta);
   }
 
   /**
