@@ -67,6 +67,10 @@
                                (draftChangeEvent)="emitDraftChange($event)" />
         }
 
+        @case ('history') {
+        <otpv-article-history [tab]="tab()" />
+        }
+
         @case ('notes') {
         <otpv-article-notes [tab]="tab()"
                             (draftChangeEvent)="emitDraftChange($event)" />

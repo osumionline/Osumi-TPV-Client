@@ -18,6 +18,7 @@ import ArticleGeneralComponent from '@modules/articulos/components/article-gener
 import ArticleNotesComponent from '@modules/articulos/components/article-notes/article-notes.component';
 import ArticleSectionTabsComponent from '@modules/articulos/components/article-section-tabs/article-section-tabs.component';
 import ArticleWebComponent from '@modules/articulos/components/article-web/article-web.component';
+import ArticleHistoryComponent from '@modules/articulos/components/article-history/article-history.component';
 
 /**
  * Muestra la cabecera operativa de una ficha de artículo.
@@ -33,6 +34,7 @@ import ArticleWebComponent from '@modules/articulos/components/article-web/artic
     ArticleNotesComponent,
     ArticleSectionTabsComponent,
     ArticleWebComponent,
+    ArticleHistoryComponent,
     MatIcon,
     MatTooltip,
   ],

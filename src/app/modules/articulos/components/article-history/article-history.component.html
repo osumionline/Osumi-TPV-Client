@@ -1,0 +1,195 @@
+<section class="article-history">
+    @if (tab().draft.id === null) {
+    <div class="article-history__state">
+        <strong>
+            El artículo todavía no tiene histórico
+        </strong>
+
+        <span>
+            El histórico estará disponible cuando el artículo
+            se haya guardado por primera vez.
+        </span>
+    </div>
+    } @else {
+    @if (error() !== null) {
+    <div class="article-history__error">
+        {{ error() }}
+    </div>
+    }
+
+    <div class="article-history__table-container">
+        <table mat-table
+               [dataSource]="items()"
+               matSort
+               [matSortActive]="orderBy()"
+               [matSortDirection]="orderDirection()"
+               [matSortDisableClear]="true"
+               (matSortChange)="onSortChange($event)">
+            <ng-container matColumnDef="createdAt">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    mat-sort-header
+                    sortActionDescription="Ordenar por fecha">
+                    Fecha
+                </th>
+
+                <td mat-cell
+                    *matCellDef="let item">
+                    {{ item.createdAt | date:'dd/MM/yyyy HH:mm:ss' }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="tipo">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    mat-sort-header
+                    sortActionDescription="Ordenar por tipo">
+                    Tipo
+                </th>
+
+                <td mat-cell
+                    *matCellDef="let item">
+                    {{ formatTipo(item.tipo) }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="stockPrevio">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    mat-sort-header
+                    class="article-history__center"
+                    sortActionDescription="Ordenar por stock previo">
+                    Stock previo
+                </th>
+
+                <td mat-cell
+                    *matCellDef="let item"
+                    class="article-history__center">
+                    {{ item.stockPrevio }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="diferencia">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    mat-sort-header
+                    class="article-history__center"
+                    sortActionDescription="Ordenar por diferencia">
+                    Diferencia
+                </th>
+
+                <td mat-cell
+                    *matCellDef="let item"
+                    class="article-history__center">
+                    {{ item.diferencia }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="stockFinal">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    mat-sort-header
+                    class="article-history__center"
+                    sortActionDescription="Ordenar por stock final">
+                    Stock final
+                </th>
+
+                <td mat-cell
+                    *matCellDef="let item"
+                    class="article-history__center">
+                    {{ item.stockFinal }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="pucMicros">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    mat-sort-header
+                    class="article-history__right"
+                    sortActionDescription="Ordenar por PUC">
+                    PUC
+                </th>
+
+                <td mat-cell
+                    *matCellDef="let item"
+                    class="article-history__right">
+                    {{ formatMicros(item.pucMicros) }} €
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="pvpMicros">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    mat-sort-header
+                    class="article-history__right"
+                    sortActionDescription="Ordenar por PVP">
+                    PVP
+                </th>
+
+                <td mat-cell
+                    *matCellDef="let item"
+                    class="article-history__right">
+                    {{ formatMicros(item.pvpMicros) }} €
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="idVenta">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    mat-sort-header
+                    class="article-history__center"
+                    sortActionDescription="Ordenar por venta">
+                    Venta
+                </th>
+
+                <td mat-cell
+                    *matCellDef="let item"
+                    class="article-history__center">
+                    {{ item.idVenta ?? '—' }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="idPedido">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    mat-sort-header
+                    class="article-history__center"
+                    sortActionDescription="Ordenar por pedido">
+                    Pedido
+                </th>
+
+                <td mat-cell
+                    *matCellDef="let item"
+                    class="article-history__center">
+                    {{ item.idPedido ?? '—' }}
+                </td>
+            </ng-container>
+
+            <tr mat-header-row
+                *matHeaderRowDef="displayedColumns">
+            </tr>
+
+            <tr mat-row
+                *matRowDef="let row; columns: displayedColumns">
+            </tr>
+        </table>
+
+        @if (loading()) {
+        <div class="article-history__loading">
+            Cargando histórico…
+        </div>
+        } @else if (items().length === 0 && error() === null) {
+        <div class="article-history__empty">
+            Este artículo todavía no tiene movimientos registrados.
+        </div>
+        }
+    </div>
+
+    <mat-paginator [length]="total()"
+                   [pageIndex]="pagina() - 1"
+                   [pageSize]="num()"
+                   [pageSizeOptions]="pageSizeOptions"
+                   [showFirstLastButtons]="true"
+                   (page)="onPageChange($event)" />
+    }
+</section>

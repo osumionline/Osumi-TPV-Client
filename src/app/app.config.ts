@@ -12,6 +12,7 @@ import {
   MAT_FORM_FIELD_DEFAULT_OPTIONS,
   MatFormFieldDefaultOptions,
 } from '@angular/material/form-field';
+import { MatPaginatorIntl } from '@angular/material/paginator';
 import {
   InMemoryScrollingOptions,
   provideRouter,
@@ -22,6 +23,7 @@ import {
 import routes from '@app/app.routes';
 import type ApplicationStateResult from '@desktop-contracts/application/application-state-result.interface';
 import ApplicationStateService from '@services/application-state.service';
+import SpanishPaginatorIntlService from '@services/spanish-paginator-intl.service';
 
 registerLocaleData(localeEs);
 
@@ -41,6 +43,10 @@ const appConfig: ApplicationConfig = {
     { provide: LOCALE_ID, useValue: 'es-ES' },
     { provide: MAT_DATE_LOCALE, useValue: 'es-ES' },
     { provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: appearance },
+    {
+      provide: MatPaginatorIntl,
+      useClass: SpanishPaginatorIntlService,
+    },
     provideBrowserGlobalErrorListeners(),
     provideRouter(
       routes,
