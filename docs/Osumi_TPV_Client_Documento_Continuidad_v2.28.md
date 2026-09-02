@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.27  
+**Versión:** 2.28  
 **Fecha:** 2 de septiembre de 2026  
-**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos** continúa en frontend. Todo `13B — Infraestructura backend` está cerrado, incluido `13B.6E — unificación total de imágenes en WebP`. `13C — Workspace y carga de artículos`, `13D — General`, `13E — WEB`, `13F — Códigos de barras`, `13G — Observaciones`, `13H — Histórico` y **`13I — Baja / duplicado / acciones` están cerrados y validados ✅**. `13J — Estadísticas` está en curso: **`13J.1 — Backend + consulta agregada` ✅** está completado y probado; el siguiente paso exacto es **`13J.2 — Gráfica + filtros`**, usando Apache ECharts mediante `ngx-echarts`, con ventas netas, filtros Tipo/Mes/Año y series temporales con huecos a cero.
+**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**: infraestructura backend, workspace, General, WEB, Códigos de barras, Observaciones, Histórico, acciones, Estadísticas e integración con Ventas. `13J — Estadísticas` usa Apache ECharts mediante `ngx-echarts` sobre la consulta agregada de ventas netas; `13K — Integración con Ventas` permite abrir o activar la ficha desde una línea normal de venta preservando cualquier cambio local. El siguiente hito es **`14 — Clientes`**.
 
 > **Regla crítica de entorno TicketBAI:** el producto usa `production` por defecto. Durante desarrollo/pruebas manuales se usa `app_data.json → ticketBai.environment = "test"` junto con el token TEST correspondiente. No añadir selector de entorno a la UI.
 
@@ -31,7 +31,7 @@ Ventas 12 — Postventa                             🟦
     12C.9 TicketBAI devoluciones/mixtas           ⏸️ Berein
     12C.10 Regresión integral final               ⬜
 
-13 Artículos                                      🟦
+13 Artículos                                      ✅ HITO CERRADO
   13A Análisis funcional y diseño                 ✅
   13B Infraestructura backend                     ✅
     13B.1 Categorías N:M + import legacy          ✅
@@ -83,12 +83,12 @@ Ventas 12 — Postventa                             🟦
     13I.1 Guardar / Cancelar global               ✅
     13I.2 Duplicar                                ✅
     13I.3 Baja lógica                             ✅
-  13J Estadísticas                                🟦
+  13J Estadísticas                                ✅ MINI-HITO CERRADO
     13J.1 Backend + consulta agregada              ✅
-    13J.2 Gráfica + filtros                       🟦 SIGUIENTE
-  13K Integración con Ventas                      ⬜
+    13J.2 Gráfica + filtros                       ✅
+  13K Integración con Ventas                      ✅ MINI-HITO CERRADO
 
-14 Clientes                                       ⬜
+14 Clientes                                       🟦 SIGUIENTE
 15 Almacén                                        ⬜
 16 Compras                                        ⬜
 
@@ -223,11 +223,13 @@ Roadmap acordado:
 16 Compras
 ```
 
-**Clientes** se introduce entre Artículos y Almacén. Se espera que sea un módulo pequeño y permita cerrar rápidamente esa parte antes de entrar en Almacén.
+`13 — Artículos` está completamente cerrado. **Clientes** se introduce entre Artículos y Almacén; es el siguiente hito y se espera que sea un módulo pequeño que permita cerrar rápidamente esa parte antes de entrar en Almacén.
 
 ---
 
-# 6. Hito 13 — Artículos
+# 6. Hito 13 — Artículos ✅ COMPLETADO
+
+El hito completo está implementado, validado funcional y visualmente y subido al repositorio. No reabrirlo salvo regresión o requisito nuevo.
 
 ## 6.1 Objetivo general
 
@@ -797,19 +799,23 @@ La validación definitiva de colisiones globales sigue en backend durante el gua
 
 # 20. Estadísticas
 
-`13J — Estadísticas` está **en curso 🟦**. El backend agregado está cerrado y probado; falta la representación visual.
+`13J — Estadísticas` está **cerrado y validado ✅**.
 
-Objetivo funcional acordado para un artículo:
+La pestaña ofrece una lectura rápida de la evolución histórica de un artículo persistido mediante una gráfica de barras y tres filtros:
 
 ```text
-                    gráfica de barras
-
 Tipo: [Unidades / Importe]
 Mes:  [mes concreto / Todos]
 Año:  [año concreto / Todos]
 ```
 
-La gráfica debe actualizarse automáticamente al cambiar cualquiera de los tres selectores, sin botón Aplicar.
+La gráfica se actualiza automáticamente al cambiar cualquiera de los tres selectores, sin botón Aplicar. La selección inicial definitiva es:
+
+```text
+Tipo = Unidades
+Mes  = Todos
+Año  = año actual
+```
 
 Semántica definitiva de `Tipo`:
 
@@ -855,7 +861,7 @@ Los huecos temporales deben existir explícitamente con valor `0`:
 
 La serie se construye en backend; el renderer no descarga ventas individuales para reagruparlas.
 
-`13J.1 — Backend + consulta agregada` ✅ ya implementa:
+`13J.1 — Backend + consulta agregada` ✅ implementa:
 
 - contratos `ArticuloEstadisticasConsulta`, `ArticuloEstadisticasPoint`, `ArticuloEstadisticasResultado`;
 - `tipo = unidades | importe`;
@@ -871,36 +877,41 @@ La serie se construye en backend; el renderer no descarga ventas individuales pa
 - API/IPC/preload/servicio Angular ya expuestos;
 - tests unitarios y de repository SQLite cerrados.
 
-Decisión de librería para `13J.2`:
+`13J.2 — Gráfica + filtros` ✅ usa:
 
 ```text
-Apache ECharts + ngx-echarts
+echarts ^6.1.0
+ngx-echarts ^22.0.0
 ```
 
-Motivos:
+La integración es standalone y modular: registra únicamente barras, grid, tooltip y `CanvasRenderer` mediante `provideEchartsCore`. ECharts queda limitado a presentación; no consulta ventas individuales ni reagrupa datos en renderer.
 
-- `ngx-echarts` dispone de línea compatible con Angular 22 y funcionamiento zoneless;
-- Apache ECharts usa licencia Apache 2.0;
-- se evita introducir la licencia comercial condicionada por ingresos de ApexCharts;
-- deja una base reutilizable para estadísticas generales futuras del TPV.
-
-`ng-apexcharts` no se usará para esta implementación.
-
-Diseño previsto para `13J.2`:
+La UI definitiva incluye:
 
 - gráfica de barras;
-- tres `MatSelect`: Tipo, Mes y Año;
-- refresco inmediato al cambiar un filtro;
-- total visible sobre/junto a la gráfica (`N unidades` o importe formateado en euros);
-- tooltip adaptado a unidades/importe;
+- total visible en la cabecera como `N unidades` o importe formateado en euros;
+- `MatSelect` para Tipo, Mes y Año;
+- tooltips adaptados a unidades/importe;
 - eje Y entero para unidades;
-- importes formateados en euros sin perder precisión interna;
-- protección frente a respuestas IPC fuera de orden si el usuario cambia filtros rápidamente;
-- estado vacío cuando no haya datos;
-- Estadísticas será de solo lectura, no forma parte del `ArticuloDraft` y nunca genera `dirty`;
-- la sección no debe ofrecerse a artículos nuevos todavía no persistidos.
+- microeuros convertidos a euros únicamente en la frontera de presentación;
+- protección mediante secuencia de petición frente a respuestas IPC fuera de orden;
+- estado de carga, error con reintento y estado sin ventas netas;
+- etiquetas del eje X adaptadas a las cuatro combinaciones de Año/Mes;
+- resize automático de la gráfica.
 
-No se ha fijado todavía de forma explícita la selección inicial de Año/Mes/Tipo; decidirla al construir `13J.2` en lugar de asumirla silenciosamente.
+Diseño final validado:
+
+- bloque compacto para evitar scroll;
+- gráfica de `275px` de altura;
+- cabecera reducida a `Ventas del artículo` y el valor total;
+- eliminados el subtítulo `Evolución histórica según los filtros seleccionados` y la etiqueta `Total`;
+- filtros compactos en la zona inferior;
+- `month = null` y `year = null` mantienen la semántica de `Todos`;
+- los selectores Mes y Año usan `canSelectNullableOptions` para que Angular Material muestre `Todos` también con el panel cerrado.
+
+La pestaña es de solo lectura, no forma parte del `ArticuloDraft` y nunca genera `dirty`. Estadísticas e Histórico no se ofrecen en artículos nuevos sin persistir.
+
+La implementación y los retoques visuales fueron probados por el usuario y subidos al repositorio.
 
 ---
 
@@ -944,7 +955,7 @@ Tipos conocidos:
 otro → Tipo N
 ```
 
-El histórico conserva información aunque el artículo sea dado de baja. Para artículos nuevos todavía no persistidos no se realiza llamada IPC y se muestra un estado informativo.
+El histórico conserva información aunque el artículo sea dado de baja. La sección no se ofrece en artículos nuevos todavía no persistidos; el componente conserva además la protección defensiva de no realizar una llamada IPC si recibe un draft sin id.
 
 ---
 
@@ -1129,20 +1140,17 @@ No existe actualmente como acción implementada en el bloque `13I`; el flujo act
 
 ---
 
-# 25. Integración futura con Ventas
+# 25. Integración con Ventas
 
-Se implementará en:
-
-```text
-13K Integración con Ventas
-```
+`13K — Integración con Ventas` está **cerrado y validado ✅**.
 
 Desde una línea de venta:
 
 ```text
-click nombre artículo
-→ navegar a Artículos
-→ abrir/enfocar artículo
+click sobre el nombre de una línea normal de artículo
+→ ArticulosService.cargarPorId(idArticulo)
+→ cargar o activar la ficha
+→ navegar a /articulos
 ```
 
 Si ya está abierto:
@@ -1158,6 +1166,20 @@ cargar y abrir
 ```
 
 Nunca duplicar una pestaña de un artículo persistido.
+
+Reglas definitivas:
+
+- solo se aplica a líneas normales con `idArticulo`;
+- si la ficha ya está abierta, se activa sin recargarla y conserva `draft`, `dirty`, cambios locales y sección activa;
+- si no está abierta, se carga y abre una única pestaña;
+- una señal `openingArticle` evita dobles aperturas concurrentes;
+- si el artículo ya no está disponible, se muestra aviso y Ventas permanece activa;
+- antes de navegar se deja preparado el foco del Localizador para continuar el flujo al volver a Ventas;
+- el workspace de Ventas conserva durante la sesión la venta abierta y todas sus líneas;
+- las ramas especiales de Varios, Devolución y Reserva mantienen su comportamiento anterior;
+- el icono y tooltip de observaciones permanecen independientes de la acción de abrir la ficha.
+
+La integración fue probada, recibió un último retoque visual no funcional y todos los cambios fueron subidos al repositorio.
 
 ---
 
@@ -1199,7 +1221,7 @@ repositories
 SQLite
 ```
 
-Workspace Angular futuro:
+Workspace Angular implementado:
 
 ```text
 tabs
@@ -2715,8 +2737,8 @@ Artículo nuevo:
 
 ```text
 id = null
-→ no llamar a IPC
-→ mostrar estado “El histórico estará disponible cuando el artículo se haya guardado por primera vez”
+→ ocultar Histórico en las pestañas disponibles
+→ protección defensiva del componente: no llamar a IPC
 ```
 
 Artículo persistido sin movimientos:
@@ -3102,7 +3124,7 @@ Tras éxito no se añadió un segundo diálogo: desaparecer la pestaña confirma
 
 ---
 
-# 28J. 13J — Estadísticas 🟦 EN CURSO
+# 28J. 13J — Estadísticas ✅ MINI-HITO COMPLETAMENTE CERRADO
 
 La funcionalidad nunca llegó a completarse en el TPV legacy, por lo que para el cliente nuevo se ha definido desde cero manteniendo una UI sencilla.
 
@@ -3110,7 +3132,7 @@ Roadmap:
 
 ```text
 13J.1 Backend + consulta agregada ✅
-13J.2 Gráfica + filtros          🟦 SIGUIENTE
+13J.2 Gráfica + filtros          ✅
 ```
 
 ## 28J.1 Diseño funcional acordado
@@ -3244,64 +3266,166 @@ Tests cerrados:
 - devoluciones negativas restan;
 - ventas soft-deleted quedan fuera.
 
-`13J.1` está cerrado ✅ y todavía no produce cambios visuales.
+`13J.1` está cerrado ✅ y alimenta exclusivamente la representación visual de `13J.2`.
 
-## 28J.4 Librería y UI decididas para 13J.2
+## 28J.4 13J.2 — Gráfica + filtros — ✅
 
-Usar:
+Dependencias instaladas:
 
 ```text
-Apache ECharts
-+
-ngx-echarts (rama compatible con Angular 22)
+echarts ^6.1.0
+ngx-echarts ^22.0.0
 ```
 
-No usar `ng-apexcharts` para esta implementación. Aunque técnicamente es viable, ApexCharts usa actualmente una licencia comercial condicionada por ingresos; ECharts usa Apache 2.0 y encaja mejor con un proyecto open source que puede incorporar módulos comerciales.
+La integración usa la API modular de ECharts con `BarChart`, `GridComponent`, `TooltipComponent` y `CanvasRenderer`, registrada localmente mediante `provideEchartsCore`. No se usa `ng-apexcharts`: ECharts mantiene licencia Apache 2.0 y encaja con el carácter open source del proyecto y su posible ampliación comercial.
 
-La futura implementación debe incluir:
+Componente:
 
-- gráfica de barras;
-- total visible (`137 unidades` / `2.347,80 €`);
+```text
+ArticleStatisticsComponent
+```
+
+Selección inicial definitiva:
+
+```text
+Tipo  = unidades
+Mes   = null → Todos
+Año   = año actual
+```
+
+La lista de años combina `availableYears` con el año actualmente seleccionado, ordenada de forma descendente. Cambiar Tipo, Mes o Año solicita inmediatamente una nueva serie al backend.
+
+La UI implementa:
+
+- gráfica de barras responsive;
+- total formateado como unidades enteras o euros con dos decimales;
 - `MatSelect` Tipo/Mes/Año;
-- actualización automática al cambiar un selector;
-- tooltip específico para unidades o importe;
-- eje Y entero para Unidades;
-- formato monetario solo en presentación, manteniendo microeuros en datos;
-- protección frente a respuestas IPC fuera de orden;
-- estado vacío;
-- Estadísticas no genera `dirty` ni modifica `ArticuloDraft`;
-- ocultar/no ofrecer Estadísticas en artículos nuevos no persistidos.
+- tooltips específicos;
+- eje Y con `minInterval = 1` para unidades;
+- etiquetas del eje X según la resolución temporal;
+- overlay de carga;
+- error con acción Reintentar;
+- estado `No hay ventas netas para el período seleccionado`;
+- `requestSequence` para impedir que una respuesta antigua sobrescriba otra más reciente.
 
-La selección inicial exacta de Tipo/Mes/Año **no se ha fijado todavía**; resolverla explícitamente al empezar `13J.2`.
+Los importes permanecen en microeuros en el resultado. Solo `toChartValue()`/`microsToEuros()` los convierten a euros para ECharts y para su presentación.
+
+Regla de estado:
+
+```text
+Estadísticas
+→ solo lectura
+→ fuera de ArticuloDraft
+→ nunca dirty
+```
+
+Estadísticas e Histórico se ocultan para drafts nuevos sin id.
+
+## 28J.5 Ajuste visual definitivo — ✅
+
+Tras validar la primera versión se compactó el bloque para que la pantalla no necesite scroll en la resolución de trabajo.
+
+Diseño final:
+
+```text
+Ventas del artículo                            418,77 €
+
+                  gráfica
+
+        Tipo           Mes           Año
+```
+
+Cambios cerrados:
+
+- altura de gráfica: `275px`;
+- márgenes internos de ECharts reducidos;
+- cabecera y filtros compactos;
+- eliminado el subtítulo `Evolución histórica según los filtros seleccionados`;
+- eliminada la etiqueta `Total`, manteniendo visible el valor;
+- `month = null` y `year = null` continúan representando `Todos`;
+- Mes y Año usan `[canSelectNullableOptions]="true"` para que Material muestre `Todos` en el trigger cerrado.
+
+La batería automática y las pruebas funcionales/visuales fueron correctas. Todos los cambios están subidos al repositorio.
+
+**`13J — Estadísticas` queda cerrado ✅.**
+
+---
+
+# 28K. 13K — Integración con Ventas ✅ MINI-HITO COMPLETAMENTE CERRADO
+
+La integración permite abrir la ficha de un artículo directamente desde una línea normal del workspace de Ventas.
+
+Flujo definitivo:
+
+```text
+Ventas
+→ click nombre de artículo de una línea normal
+→ ArticulosService.cargarPorId(linea.idArticulo)
+→ abrir o activar una única pestaña
+→ Router.navigate(['/articulos'])
+```
+
+Se reutiliza el comportamiento ya cerrado del workspace:
+
+```text
+ficha abierta
+→ activar pestaña existente
+→ NO recargar desde SQLite
+→ preservar cambios locales dirty y sección activa
+
+ficha no abierta
+→ cargar artículo persistido
+→ crear una única pestaña
+```
+
+La implementación pertenece íntegramente al renderer; no necesita contratos, IPC ni backend nuevos.
+
+Reglas cerradas:
+
+- solo las líneas normales con `idArticulo` abren Artículos;
+- `openingArticle` bloquea dobles clicks/aperturas concurrentes;
+- primero se comprueba/carga la ficha y después se navega;
+- si el artículo ya no está disponible, se avisa al usuario sin abandonar Ventas;
+- el campo Localizador de Ventas queda preparado para recuperar el flujo al volver;
+- el workspace de Ventas conserva la venta abierta, líneas, cliente y demás estado de sesión;
+- Varios conserva su editor;
+- Devolución conserva su editor;
+- Reserva conserva su comportamiento;
+- el tooltip de observaciones sigue separado del tooltip/acción de abrir la ficha.
+
+El nombre de artículo se presenta como una acción clickable con feedback visual. Tras la implementación se aplicó un pequeño retoque final de diseño sin alterar la semántica descrita.
+
+Se validaron los casos de ficha ya abierta, ficha dirty, varias fichas, artículo no abierto, regreso a Ventas, líneas especiales, observaciones y artículo dado de baja. Todos los cambios fueron subidos al repositorio.
+
+**`13K — Integración con Ventas` queda cerrado ✅.**
+
+Con ello, **todo el Hito 13 — Artículos queda terminado y cerrado ✅**.
 
 ---
 
 # 29. Próximo paso exacto
 
 ```text
-13J.2 — Gráfica + filtros
+14 — Clientes
+→ primer paso: análisis funcional legacy y diseño técnico/UX
 ```
 
-Estado previo cerrado:
+Estado previo:
 
 ```text
-13D — General ✅
-13E — WEB ✅
-13F — Códigos de barras ✅
-13G — Observaciones ✅
-13H — Histórico ✅
-13I — Baja / duplicado / acciones ✅
-13J.1 — Backend + consulta agregada ✅
+12C.9 — TicketBAI devoluciones/mixtas ⏸️ Berein
+13 — Artículos ✅ HITO COMPLETAMENTE CERRADO
 ```
 
-Antes de implementar, revisar `main` actual. `13J.2` debe instalar ECharts/ngx-echarts y consumir exclusivamente `ArticulosService.getEstadisticas()`; no debe volver a consultar o reagrupar ventas en renderer.
+Antes de implementar Clientes:
 
-Primeras decisiones a cerrar al implementar:
+- revisar el `main` actual;
+- auditar el módulo Clientes del TPV legacy y el esquema/importación ya existente;
+- inventariar contratos, repositories, servicios y UI reutilizables del cliente nuevo;
+- acordar alcance funcional, workspace o navegación, búsquedas, edición, bajas y relaciones con Ventas/facturación;
+- dividir el Hito 14 en mini-hitos coherentes antes de escribir código.
 
-- valores iniciales de Tipo/Mes/Año;
-- presentación exacta de las etiquetas del eje X según cada combinación;
-- comportamiento visual cuando `availableYears` esté vacío;
-- altura/responsividad de la gráfica dentro del workspace.
+No asumir que Clientes replica exactamente Artículos ni comenzar la implementación sin cerrar primero el análisis funcional.
 
 ---
 
@@ -3323,6 +3447,7 @@ Primeras decisiones a cerrar al implementar:
 | **2.25** | **02/09/2026** | **13F Códigos de barras ✅ y 13G Observaciones ✅ cerrados. Códigos recupera UX legacy con foco automático, lector/Enter, tarjetas QR 3 por fila mediante angularx-qrcode, principal diferenciado no borrable y adicionales add/remove solo en draft. Observaciones añade textarea + toggles Material Pedidos/Ventas sobre el mismo ArticuloDraft. Siguiente: 13H Histórico.** |
 | **2.26** | **02/09/2026** | **13H Histórico ✅ cerrado con API SQLite paginada/ordenada, MatTable/MatSort/MatPaginator remoto y MatPaginatorIntl global en castellano. Refinamiento UX: foco automático en Localizador al crear/activar drafts nuevos. 13I.1 Guardar/Cancelar global ✅ con mapper del draft, save IPC/preload, barra inferior, cleanup de staging y feedback “Artículo guardado correctamente” durante 4 s. 13I.2 Duplicar ✅: nueva pestaña dirty, identidades/stock/códigos/acceso/observaciones reseteados, configuración reutilizable conservada y fotos compartidas mediante nuevas relaciones al mismo asset `archivo`. Siguiente: 13I.3 Baja lógica.** |
 | **2.27** | **02/09/2026** | **13I.3 Baja lógica ✅ y 13I completo ✅: sección solo para persistidos, bloqueo con dirty, confirmación, deactivate vía API/IPC/preload, soft delete artículo+códigos y cierre de pestaña tras éxito preservando histórico/fotos/relaciones. 13J Estadísticas iniciado: diseño acordado con Tipo Unidades/Importe, Mes/Año concretos o Todos, ventas netas con devoluciones negativas, huecos a cero y cuatro resoluciones temporales. 13J.1 backend agregado ✅: SUM SQLite, availableYears continuo, series completas, validación, API/IPC/preload/servicio Angular y tests. Decisión para 13J.2: Apache ECharts + ngx-echarts; siguiente paso gráfica + filtros.** |
+| **2.28** | **02/09/2026** | **Hito 13 Artículos completamente cerrado ✅. 13J.2 añade gráfica de barras con ECharts/ngx-echarts, filtros reactivos Tipo/Mes/Año, total, tooltips, estados, protección ante respuestas fuera de orden y diseño compacto definitivo de 275 px; `null` representa Todos mediante `canSelectNullableOptions`. 13K integra las líneas normales de Ventas con la ficha de Artículos, abriendo o activando una única pestaña y preservando cambios dirty y el workspace de Ventas. Todo validado y subido. Siguiente hito: 14 Clientes.** |
 ---
 
 # 31. Prompt de arranque recomendado
@@ -3331,12 +3456,12 @@ Primeras decisiones a cerrar al implementar:
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.27.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.28.
 
 Estado:
 - Ventas 12C.1–12C.8 ✅
 - 12C.9 TicketBAI devoluciones/mixtas ⏸️ Berein
-- Hito 13 Artículos 🟦
+- Hito 13 Artículos ✅ COMPLETAMENTE CERRADO
 - 13A análisis/diseño ✅
 - 13B infraestructura backend completa ✅
   - categorías N:M ✅
@@ -3362,13 +3487,16 @@ Estado:
   - feedback visual de guardado 4 s ✅
   - 13I.2 Duplicar ✅
   - 13I.3 Baja lógica ✅
-- 13J Estadísticas 🟦
+- 13J Estadísticas ✅ CERRADO
   - 13J.1 backend + consulta agregada ✅
-  - 13J.2 gráfica + filtros 🟦 SIGUIENTE
-- 13K Integración con Ventas ⬜
+  - 13J.2 gráfica + filtros ✅
+- 13K Integración con Ventas ✅ CERRADO
+- Todos los cambios del Hito 13 están validados y subidos al repositorio.
+
+Hito siguiente:
+14 Clientes 🟦
 
 Roadmap posterior:
-14 Clientes
 15 Almacén
 16 Compras
 
@@ -3436,11 +3564,18 @@ Reglas críticas:
 - Año concreto + mes concreto → días; año concreto + Todos → 12 meses; Todos + mes → ese mes entre años; Todos + Todos → todos los meses cronológicos.
 - Períodos sin actividad se rellenan con 0; availableYears completa también años intermedios.
 - 13J.1 ya expone getEstadisticas() por repository/service/API/IPC/preload/Angular y devuelve series completas con value en unidades o microeuros.
-- Para 13J.2 usar Apache ECharts + ngx-echarts compatible con Angular 22. No usar ng-apexcharts para esta implementación.
+- Estadísticas usa ECharts ^6.1.0 + ngx-echarts ^22.0.0 con integración modular y CanvasRenderer. No usar ng-apexcharts para esta implementación.
 - ECharts debe limitarse a presentación: no reagrupar ventas ni recalcular estadísticas en renderer.
-- 13J.2 debe mostrar gráfica de barras, total, MatSelect Tipo/Mes/Año, tooltips y protección ante respuestas IPC fuera de orden.
-- Estadísticas no debe mostrarse en drafts nuevos sin id.
-- La selección inicial exacta Tipo/Mes/Año aún debe decidirse explícitamente al comenzar 13J.2.
+- Estadísticas muestra gráfica de barras, total, MatSelect Tipo/Mes/Año, tooltips, estados y protección ante respuestas IPC fuera de orden.
+- Selección inicial Estadísticas: Unidades + Todos los meses + año actual.
+- Mes/Año `null` significa Todos; los MatSelect usan canSelectNullableOptions.
+- Gráfica definitiva de Estadísticas: 275 px, cabecera y filtros compactos, sin subtítulo ni etiqueta Total.
+- Estadísticas e Histórico no se muestran en drafts nuevos sin id.
+- Desde una línea normal de Ventas, click en el nombre llama a ArticulosService.cargarPorId(idArticulo) y navega a /articulos.
+- Abrir desde Ventas activa la ficha existente sin recargarla ni perder cambios dirty; si no existe, crea una única pestaña.
+- Varios, Devolución y Reserva mantienen sus acciones especiales y no abren la ficha normal de Artículos.
+- Si el artículo de una línea ya no está disponible, se avisa sin abandonar Ventas.
+- El workspace de Ventas permanece intacto al navegar a Artículos y volver.
 
 Convenciones:
 - Angular standalone/signals/inject/input/output.
@@ -3452,9 +3587,9 @@ Convenciones:
 - Trabajar por lotes coherentes y no avanzar sin confirmación.
 
 Próximo paso exacto:
-13J.2 — Gráfica + filtros.
+14 — Clientes: análisis funcional legacy y diseño técnico/UX antes de implementar.
 ```
 
 ---
 
-**Fin del documento de continuidad v2.27.**
+**Fin del documento de continuidad v2.28.**
