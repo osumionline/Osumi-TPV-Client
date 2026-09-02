@@ -7,7 +7,8 @@
 
             <div class="article-workspace__locator">
                 <div class="article-workspace__lookup">
-                    <input type="text"
+                    <input #localizadorInput
+                           type="text"
                            autocomplete="off"
                            [disabled]="searching()"
                            [value]="tab().draft.localizador ?? ''"

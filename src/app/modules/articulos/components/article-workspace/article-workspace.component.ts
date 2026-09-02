@@ -1,10 +1,15 @@
 import {
   Component,
+  computed,
+  effect,
+  ElementRef,
   input,
   output,
   signal,
+  viewChild,
   type InputSignal,
   type OutputEmitterRef,
+  type Signal,
   type WritableSignal,
 } from '@angular/core';
 import { MatIcon } from '@angular/material/icon';
@@ -15,10 +20,10 @@ import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.i
 import ArticleBarcodesComponent from '@modules/articulos/components/article-barcodes/article-barcodes.component';
 import ArticleDirectAccessesComponent from '@modules/articulos/components/article-direct-accesses/article-direct-accesses.component';
 import ArticleGeneralComponent from '@modules/articulos/components/article-general/article-general.component';
+import ArticleHistoryComponent from '@modules/articulos/components/article-history/article-history.component';
 import ArticleNotesComponent from '@modules/articulos/components/article-notes/article-notes.component';
 import ArticleSectionTabsComponent from '@modules/articulos/components/article-section-tabs/article-section-tabs.component';
 import ArticleWebComponent from '@modules/articulos/components/article-web/article-web.component';
-import ArticleHistoryComponent from '@modules/articulos/components/article-history/article-history.component';
 
 /**
  * Muestra la cabecera operativa de una ficha de artículo.
@@ -40,6 +45,12 @@ import ArticleHistoryComponent from '@modules/articulos/components/article-histo
   ],
 })
 export default class ArticleWorkspaceComponent {
+  private readonly localizadorInput: Signal<ElementRef<HTMLInputElement> | undefined> =
+    viewChild<ElementRef<HTMLInputElement>>('localizadorInput');
+  private readonly newDraftFocusTarget: Signal<string | null> = computed((): string | null =>
+    this.tab().draft.id === null ? this.tab().idTemporal : null,
+  );
+
   readonly tab: InputSignal<ArticuloWorkspaceTab> = input.required<ArticuloWorkspaceTab>();
   readonly searching: InputSignal<boolean> = input<boolean>(false);
 
@@ -61,6 +72,19 @@ export default class ArticleWorkspaceComponent {
   }>();
 
   readonly directAccessOpen: WritableSignal<boolean> = signal<boolean>(false);
+
+  constructor() {
+    effect((): void => {
+      const focusTarget: string | null = this.newDraftFocusTarget();
+      const inputElement: HTMLInputElement | undefined = this.localizadorInput()?.nativeElement;
+
+      if (focusTarget === null || inputElement === undefined) {
+        return;
+      }
+
+      inputElement.focus();
+    });
+  }
 
   /**
    * Abre la gestión global de accesos directos.
