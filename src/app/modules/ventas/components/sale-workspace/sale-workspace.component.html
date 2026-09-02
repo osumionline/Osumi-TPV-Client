@@ -90,15 +90,20 @@
                 </button>
                 }
                 @else {
-                <span>
-                    {{ linea.descripcion }}
+                <div class="sale__article-description-cell">
+                    <button class="sale__article-description"
+                            type="button"
+                            [disabled]="openingArticle()"
+                            (click)="openArticulo(linea)">
+                        {{ linea.descripcion }}
+                    </button>
 
                     @if (linea.observaciones !== null) {
                     <mat-icon [matTooltip]="linea.observaciones">
                         info_outline
                     </mat-icon>
                     }
-                </span>
+                </div>
                 }
             </div>
 

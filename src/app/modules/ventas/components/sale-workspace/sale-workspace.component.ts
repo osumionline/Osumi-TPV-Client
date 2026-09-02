@@ -19,6 +19,7 @@ import {
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
+import { Router } from '@angular/router';
 import { PERCENT_TOTAL } from '@constants/percentage.constants';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import permissionIds from '@desktop-contracts/permissions/permission-ids.constants';
@@ -47,6 +48,7 @@ import type {
 import ArticleSearchComponent from '@modules/ventas/components/article-search/article-search.component';
 import ClientStatisticsComponent from '@modules/ventas/components/client-statistics/client-statistics.component';
 import DirectAccessSelectorComponent from '@modules/ventas/components/direct-access-selector/direct-access-selector.component';
+import HistoricalSalesComponent from '@modules/ventas/components/historical-sales/historical-sales.component';
 import ReturnSelectorComponent from '@modules/ventas/components/return-selector/return-selector.component';
 import SaleFinalizationComponent from '@modules/ventas/components/sale-finalization/sale-finalization.component';
 import VariosEditorComponent from '@modules/ventas/components/varios-editor/varios-editor.component';
@@ -54,6 +56,7 @@ import { DialogService } from '@osumi/angular-tools';
 import BpsToPercentPipe from '@pipes/bps-to-percent.pipe';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
+import ArticulosService from '@services/articulos.service';
 import ReservaTicketPrintService from '@services/reserva-ticket-print.service';
 import ReservasService from '@services/reservas.service';
 import VentaPostCommitService from '@services/venta-post-commit.service';
@@ -65,7 +68,6 @@ import VentasService from '@services/ventas.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { eurosToMicros, microsToEuros } from '@utils/money.utils';
 import { bpsToPercent, percentToBps } from '@utils/percentage.utils';
-import HistoricalSalesComponent from '@modules/ventas/components/historical-sales/historical-sales.component';
 
 /**
  * Muestra y gestiona la estructura visual de una venta abierta.
@@ -95,6 +97,8 @@ import HistoricalSalesComponent from '@modules/ventas/components/historical-sale
 })
 export default class SaleWorkspaceComponent {
   private readonly dialog: DialogService = inject(DialogService);
+  private readonly router: Router = inject(Router);
+  private readonly articulosService: ArticulosService = inject(ArticulosService);
   private readonly ventasArticulosService: VentasArticulosService = inject(VentasArticulosService);
   readonly ventasService: VentasService = inject(VentasService);
   private readonly ventasContextService: VentasContextService = inject(VentasContextService);
@@ -138,29 +142,19 @@ export default class SaleWorkspaceComponent {
   readonly completedEvent: OutputEmitterRef<string> = output<string>();
 
   readonly localizador: WritableSignal<string> = signal<string>('');
-
   readonly searching: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly searchOpen: WritableSignal<boolean> = signal<boolean>(false);
-
+  readonly openingArticle: WritableSignal<boolean> = signal<boolean>(false);
   readonly searchInitialQuery: WritableSignal<string> = signal<string>('');
-
   readonly directAccessOpen: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly variosEditorState: WritableSignal<VentaVariosEditorState | null> =
     signal<VentaVariosEditorState | null>(null);
-
   readonly devolucionSelectorState: WritableSignal<VentaDevolucionSelectorState | null> =
     signal<VentaDevolucionSelectorState | null>(null);
-
   readonly finalizationOpen: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly historicalSalesOpen: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly tiposPago: Signal<readonly TipoPago[]> = this.ventasContextService.tiposPago;
-
   readonly ventaSaving: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly reservaSaving: WritableSignal<boolean> = signal<boolean>(false);
 
   /**
@@ -665,6 +659,50 @@ export default class SaleWorkspaceComponent {
     this.ventasService.alternarRegalo(this.venta().idTemporal, linea.idTemporal);
 
     this.focusLocalizador();
+  }
+
+  /**
+   * Abre en el módulo de Artículos la ficha asociada
+   * a una línea de venta real.
+   */
+  async openArticulo(linea: VentaLineaEnCurso): Promise<void> {
+    if (this.openingArticle() || linea.idArticulo === null) {
+      return;
+    }
+
+    this.openingArticle.set(true);
+
+    try {
+      const tab = await this.articulosService.cargarPorId(linea.idArticulo);
+
+      if (tab === null) {
+        this.dialog
+          .alert({
+            title: 'Atención',
+            content: 'El artículo asociado a esta línea ya no está disponible.',
+          })
+          .subscribe();
+
+        return;
+      }
+
+      this.focusLocalizador();
+
+      const navigated: boolean = await this.router.navigate(['/articulos']);
+
+      if (!navigated) {
+        throw new Error('No se ha podido abrir el módulo de Artículos.');
+      }
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido abrir la ficha del artículo.'),
+        })
+        .subscribe();
+    } finally {
+      this.openingArticle.set(false);
+    }
   }
 
   /**
