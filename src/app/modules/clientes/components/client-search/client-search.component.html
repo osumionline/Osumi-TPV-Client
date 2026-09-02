@@ -1,0 +1,108 @@
+<div class="overlay">
+    <button class="overlay__backdrop"
+            type="button"
+            aria-label="Cerrar buscador de clientes"
+            (click)="cancel()">
+    </button>
+
+    <section class="client-search overlay__panel"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="client-search-title"
+             (keydown.escape)="cancel()">
+        <header class="client-search__header">
+            <h2 id="client-search-title">
+                Seleccionar cliente
+            </h2>
+
+            <button mat-icon-button
+                    type="button"
+                    aria-label="Cerrar buscador de clientes"
+                    (click)="cancel()">
+                <mat-icon>
+                    close
+                </mat-icon>
+            </button>
+        </header>
+
+        <div class="client-search__body">
+            <label for="client-search-query">
+                Buscar cliente
+            </label>
+
+            <input #searchInput
+                   id="client-search-query"
+                   type="search"
+                   autocomplete="off"
+                   placeholder="Nombre, DNI/CIF, teléfono o email"
+                   [value]="query()"
+                   (input)="updateQuery($event)">
+
+            @if (normalizedQuery() === '') {
+            <div class="client-search__state">
+                Introduce algún dato del cliente que quieres buscar.
+            </div>
+            }
+            @else if (filteredClientes().length === 0) {
+            <div class="client-search__state">
+                No se han encontrado clientes.
+            </div>
+            }
+            @else {
+            <div class="client-search__results"
+                 aria-label="Clientes encontrados">
+                <div class="client-search__results-header"
+                     aria-hidden="true">
+                    <span>
+                        Nombre
+                    </span>
+
+                    <span>
+                        Teléfono
+                    </span>
+
+                    <span>
+                        Última venta
+                    </span>
+                </div>
+
+                <div class="client-search__results-body">
+                    @for (
+                    cliente of filteredClientes();
+                    track cliente.publicId
+                    ) {
+                    <button class="client-search__result"
+                            type="button"
+                            [class.client-search__result--selected]="
+                                selectedPublicId() !== null &&
+                                selectedPublicId() === cliente.publicId
+                            "
+                            [attr.aria-pressed]="
+                                selectedPublicId() !== null &&
+                                selectedPublicId() === cliente.publicId
+                            "
+                            (click)="select(cliente)">
+                        <strong>
+                            {{ cliente.nombreApellidos }}
+                        </strong>
+
+                        <span>
+                            {{ cliente.telefono ?? '-' }}
+                        </span>
+
+                        <span>
+                            @if (cliente.ultimaVenta !== null) {
+                            {{ cliente.ultimaVenta | date:'dd/MM/yyyy HH:mm' }}
+                            }
+                            @else {
+                            -
+                            }
+                        </span>
+                    </button>
+                    }
+                </div>
+            </div>
+            }
+        </div>
+    </section>
+</div>

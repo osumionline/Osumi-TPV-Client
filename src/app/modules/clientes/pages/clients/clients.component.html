@@ -30,9 +30,9 @@
 
                 <button mat-icon-button
                         type="button"
-                        disabled
                         matTooltip="Buscar cliente"
-                        aria-label="Buscar cliente">
+                        aria-label="Buscar cliente"
+                        (click)="openSearch()">
                     <mat-icon>
                         search
                     </mat-icon>
@@ -77,3 +77,10 @@
         }
     </section>
 </main>
+
+@if (searchOpen()) {
+<otpv-client-search [clientes]="clientesService.clientes()"
+                    [selectedPublicId]="clientesService.workspace()?.clientePublicId ?? null"
+                    (selectEvent)="selectCliente($event)"
+                    (cancelEvent)="closeSearch()" />
+}

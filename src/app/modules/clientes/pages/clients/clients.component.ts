@@ -1,9 +1,19 @@
-import { Component, computed, inject, type OnInit, type Signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  signal,
+  type OnInit,
+  type Signal,
+  type WritableSignal,
+} from '@angular/core';
 import { MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 import HeaderComponent from '@app/components/header/header.component';
 import type ClienteWorkspace from '@model/clientes/cliente-workspace.interface';
+import type Cliente from '@model/clientes/cliente.model';
+import ClientSearchComponent from '@modules/clientes/components/client-search/client-search.component';
 import { DialogService } from '@osumi/angular-tools';
 import AppDataService from '@services/app-data.service';
 import ClientesService from '@services/clientes.service';
@@ -16,12 +26,14 @@ import { getErrorMessage } from '@utils/error.utils';
   selector: 'otpv-clients',
   templateUrl: './clients.component.html',
   styleUrl: './clients.component.scss',
-  imports: [HeaderComponent, MatIconButton, MatIcon, MatTooltip],
+  imports: [ClientSearchComponent, HeaderComponent, MatIconButton, MatIcon, MatTooltip],
 })
 export default class ClientsComponent implements OnInit {
   private readonly dialog: DialogService = inject(DialogService);
   readonly appDataService: AppDataService = inject(AppDataService);
   readonly clientesService: ClientesService = inject(ClientesService);
+
+  readonly searchOpen: WritableSignal<boolean> = signal<boolean>(false);
   readonly appName: Signal<string> = computed((): string => {
     const appData = this.appDataService.appData();
 
@@ -33,6 +45,28 @@ export default class ClientsComponent implements OnInit {
    */
   ngOnInit(): void {
     void this.loadAppData();
+  }
+
+  /**
+   * Muestra el buscador de clientes cargados en memoria.
+   */
+  openSearch(): void {
+    this.searchOpen.set(true);
+  }
+
+  /**
+   * Cierra el buscador sin modificar la ficha activa.
+   */
+  closeSearch(): void {
+    this.searchOpen.set(false);
+  }
+
+  /**
+   * Abre la ficha limpia del cliente seleccionado.
+   */
+  selectCliente(cliente: Cliente): void {
+    this.clientesService.abrirFicha(cliente);
+    this.searchOpen.set(false);
   }
 
   /**
