@@ -1,9 +1,11 @@
 import type { Signal, WritableSignal } from '@angular/core';
-import { Service, signal } from '@angular/core';
+import { computed, Service, signal } from '@angular/core';
 import type { ClienteEstadisticasInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import type ClienteEstadisticasState from '@model/clientes/cliente-estadisticas-state.interface';
+import createClienteFormInitialValue from '@model/clientes/cliente-form.initial-value';
+import type ClienteWorkspace from '@model/clientes/cliente-workspace.interface';
 import Cliente from '@model/clientes/cliente.model';
 import { getErrorMessage } from '@utils/error.utils';
 
@@ -26,6 +28,8 @@ export default class ClientesService {
   > = signal<ReadonlyMap<string, ClienteEstadisticasState>>(
     new Map<string, ClienteEstadisticasState>(),
   );
+  private readonly workspaceSignal: WritableSignal<ClienteWorkspace | null> =
+    signal<ClienteWorkspace | null>(null);
 
   private pendingRequest: Promise<void> | null = null;
 
@@ -41,8 +45,9 @@ export default class ClientesService {
   private estadisticasGeneration: number = 0;
 
   readonly clientes: Signal<readonly Cliente[]> = this.clientesSignal.asReadonly();
-
   readonly loaded: Signal<boolean> = this.loadedSignal.asReadonly();
+  readonly workspace: Signal<ClienteWorkspace | null> = this.workspaceSignal.asReadonly();
+  readonly hasWorkspace: Signal<boolean> = computed((): boolean => this.workspace() !== null);
 
   load(): Promise<void> {
     if (this.loaded()) {
@@ -54,6 +59,39 @@ export default class ClientesService {
 
   reload(): Promise<void> {
     return this.loadData();
+  }
+
+  /**
+   * Abre una nueva ficha temporal de cliente.
+   *
+   * Solo existe un workspace, por lo que cualquier ficha
+   * limpia anterior queda sustituida por la nueva.
+   */
+  crearBorrador(): ClienteWorkspace {
+    const draft = createClienteFormInitialValue();
+    const workspace: ClienteWorkspace = {
+      clienteId: null,
+      clientePublicId: null,
+      draft,
+      baseSnapshot: {
+        ...draft,
+      },
+      dirty: false,
+      activeSection: 'data',
+    };
+
+    this.workspaceSignal.set(workspace);
+
+    return workspace;
+  }
+
+  /**
+   * Cierra la ficha actualmente abierta.
+   *
+   * La confirmación para descartar cambios pertenece a la página.
+   */
+  cerrarFicha(): void {
+    this.workspaceSignal.set(null);
   }
 
   /**
@@ -155,10 +193,9 @@ export default class ClientesService {
 
   clear(): void {
     this.clientesSignal.set([]);
-
     this.loadedSignal.set(false);
-
     this.estadisticasSignal.set(new Map<string, ClienteEstadisticasState>());
+    this.workspaceSignal.set(null);
 
     /*
      * Una petición antigua puede seguir físicamente en curso,

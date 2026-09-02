@@ -1,4 +1,5 @@
 import type { ClienteEstadisticasInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type ClienteWorkspace from '@model/clientes/cliente-workspace.interface';
 import ClientesService from '@services/clientes.service';
 
 describe('ClientesService', (): void => {
@@ -57,6 +58,43 @@ describe('ClientesService', (): void => {
     expect(service.getEstadisticasState('cliente-1').data?.ultimasVentas[0]?.nombre).toBe(
       'Artículo 2',
     );
+  });
+
+  it('mantiene una única ficha de cliente abierta', (): void => {
+    const service: ClientesService = new ClientesService();
+
+    const firstWorkspace: ClienteWorkspace = service.crearBorrador();
+    const secondWorkspace: ClienteWorkspace = service.crearBorrador();
+
+    expect(service.hasWorkspace()).toBe(true);
+    expect(service.workspace()).toBe(secondWorkspace);
+    expect(secondWorkspace).not.toBe(firstWorkspace);
+    expect(secondWorkspace.clienteId).toBeNull();
+    expect(secondWorkspace.clientePublicId).toBeNull();
+    expect(secondWorkspace.activeSection).toBe('data');
+    expect(secondWorkspace.dirty).toBe(false);
+    expect(secondWorkspace.draft).not.toBe(secondWorkspace.baseSnapshot);
+  });
+
+  it('cierra la ficha sin alterar la colección de clientes', (): void => {
+    const service: ClientesService = new ClientesService();
+
+    service.crearBorrador();
+    service.cerrarFicha();
+
+    expect(service.workspace()).toBeNull();
+    expect(service.hasWorkspace()).toBe(false);
+    expect(service.clientes()).toEqual([]);
+  });
+
+  it('limpia también el workspace al reiniciar el servicio', (): void => {
+    const service: ClientesService = new ClientesService();
+
+    service.crearBorrador();
+    service.clear();
+
+    expect(service.workspace()).toBeNull();
+    expect(service.hasWorkspace()).toBe(false);
   });
 });
 

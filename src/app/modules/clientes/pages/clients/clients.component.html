@@ -7,8 +7,64 @@
             <h1>
                 Clientes
             </h1>
+
+            <div class="clients__toolbar-actions">
+                @if (clientesService.workspace(); as workspace) {
+                <strong class="clients__name">
+                    {{
+                        workspace.draft.nombreApellidos ||
+                        'Nuevo cliente'
+                    }}
+                </strong>
+
+                <button mat-icon-button
+                        type="button"
+                        matTooltip="Cerrar ficha"
+                        aria-label="Cerrar ficha de cliente"
+                        (click)="closeCliente()">
+                    <mat-icon>
+                        close
+                    </mat-icon>
+                </button>
+                }
+
+                <button mat-icon-button
+                        type="button"
+                        disabled
+                        matTooltip="Buscar cliente"
+                        aria-label="Buscar cliente">
+                    <mat-icon>
+                        search
+                    </mat-icon>
+                </button>
+
+                <button mat-icon-button
+                        type="button"
+                        matTooltip="Nuevo cliente"
+                        aria-label="Crear un cliente nuevo"
+                        (click)="newCliente()">
+                    <mat-icon>
+                        person_add
+                    </mat-icon>
+                </button>
+            </div>
         </header>
 
+        @if (clientesService.workspace(); as workspace) {
+        <div class="clients__state">
+            <h2>
+                {{
+                    workspace.draft.nombreApellidos ||
+                    'Nueva ficha de cliente'
+                }}
+            </h2>
+
+            <p>
+                La ficha está preparada para incorporar sus datos y secciones.
+            </p>
+        </div>
+        }
+        @else {
         <div class="clients__state">
             <h2>
                 No hay ningún cliente seleccionado
@@ -18,5 +74,6 @@
                 Elige un cliente usando el buscador o crea una nueva ficha.
             </p>
         </div>
+        }
     </section>
 </main>
