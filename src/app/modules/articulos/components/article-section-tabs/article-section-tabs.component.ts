@@ -35,7 +35,7 @@ const ARTICLE_SECTIONS: readonly ArticleSectionDefinition[] = [
 ];
 
 const NEW_ARTICLE_HIDDEN_SECTIONS: ReadonlySet<ArticuloWorkspaceSection> =
-  new Set<ArticuloWorkspaceSection>(['deactivate']);
+  new Set<ArticuloWorkspaceSection>(['statistics', 'history', 'deactivate']);
 
 const WEB_SECTION: ArticleSectionDefinition = {
   id: 'web',

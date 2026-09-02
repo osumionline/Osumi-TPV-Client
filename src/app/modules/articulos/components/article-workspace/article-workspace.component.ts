@@ -25,6 +25,7 @@ import ArticleGeneralComponent from '@modules/articulos/components/article-gener
 import ArticleHistoryComponent from '@modules/articulos/components/article-history/article-history.component';
 import ArticleNotesComponent from '@modules/articulos/components/article-notes/article-notes.component';
 import ArticleSectionTabsComponent from '@modules/articulos/components/article-section-tabs/article-section-tabs.component';
+import ArticleStatisticsComponent from '@modules/articulos/components/article-statistics/article-statistics.component';
 import ArticleWebComponent from '@modules/articulos/components/article-web/article-web.component';
 
 /**
@@ -43,6 +44,7 @@ import ArticleWebComponent from '@modules/articulos/components/article-web/artic
     ArticleWebComponent,
     ArticleHistoryComponent,
     ArticleDeactivateComponent,
+    ArticleStatisticsComponent,
     MatIcon,
     MatTooltip,
     MatButton,

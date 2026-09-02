@@ -1,0 +1,106 @@
+<section class="article-statistics">
+    <div class="article-statistics__card">
+        <header class="article-statistics__header">
+            <strong>
+                Ventas del artículo
+            </strong>
+
+            <strong class="article-statistics__total">
+                {{ formatTotal() }}
+            </strong>
+        </header>
+
+        @if (error() !== null) {
+        <div class="article-statistics__error">
+            <p>
+                {{ error() }}
+            </p>
+
+            <button mat-stroked-button
+                    type="button"
+                    (click)="retry()">
+                Reintentar
+            </button>
+        </div>
+        } @else {
+        <div class="article-statistics__chart-container">
+            <div echarts
+                 class="article-statistics__chart"
+                 [options]="chartOptions()">
+            </div>
+
+            @if (loading()) {
+            <div class="article-statistics__loading">
+                Cargando estadísticas…
+            </div>
+            } @else if (noNetSales()) {
+            <div class="article-statistics__empty">
+                No hay ventas netas para el período seleccionado.
+            </div>
+            }
+        </div>
+        }
+
+        <footer class="article-statistics__filters">
+            <div class="article-statistics__field">
+                <label for="article-statistics-type">
+                    Tipo
+                </label>
+
+                <mat-select id="article-statistics-type"
+                            [value]="tipo()"
+                            (selectionChange)="onTipoChange($event)">
+                    <mat-option value="unidades">
+                        Unidades
+                    </mat-option>
+
+                    <mat-option value="importe">
+                        Importe
+                    </mat-option>
+                </mat-select>
+            </div>
+
+            <div class="article-statistics__field">
+                <label for="article-statistics-month">
+                    Mes
+                </label>
+
+                <mat-select id="article-statistics-month"
+                            [value]="month()"
+                            [canSelectNullableOptions]="true"
+                            (selectionChange)="onMonthChange($event)">
+                    <mat-option [value]="null">
+                        Todos
+                    </mat-option>
+
+                    @for (option of months; track option.value) {
+                    <mat-option [value]="option.value">
+                        {{ option.label }}
+                    </mat-option>
+                    }
+                </mat-select>
+            </div>
+
+            <div class="article-statistics__field">
+                <label for="article-statistics-year">
+                    Año
+                </label>
+
+                <mat-select id="article-statistics-year"
+                            [value]="year()"
+                            [canSelectNullableOptions]="true"
+                            (selectionChange)="onYearChange($event)">
+                    <mat-option [value]="null">
+                        Todos
+                    </mat-option>
+
+                    @for (option of yearOptions(); track option) {
+                    <mat-option [value]="option">
+                        {{ option }}
+                    </mat-option>
+                    }
+                </mat-select>
+            </div>
+        </footer>
+    </div>
+</section>

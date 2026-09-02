@@ -68,6 +68,10 @@
                                (draftChangeEvent)="emitDraftChange($event)" />
         }
 
+        @case ('statistics') {
+        <otpv-article-statistics [tab]="tab()" />
+        }
+
         @case ('history') {
         <otpv-article-history [tab]="tab()" />
         }

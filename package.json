@@ -35,6 +35,8 @@
     "@osumi/ticketbaiws": "^1.0.1",
     "angularx-qrcode": "^22.0.1",
     "better-sqlite3": "^12.11.1",
+    "echarts": "^6.1.0",
+    "ngx-echarts": "^22.0.0",
     "ngx-image-cropper": "^9.1.6",
     "nodemailer": "^9.1.0",
     "qrcode-generator": "^2.0.4",
