@@ -84,6 +84,34 @@
         }
         }
     </div>
+
+    <footer class="article-workspace__actions">
+        @if (saveSuccessful()) {
+        <span class="article-workspace__save-feedback"
+              role="status"
+              aria-live="polite">
+            Artículo guardado correctamente
+        </span>
+        }
+
+        <button mat-stroked-button
+                type="button"
+                [disabled]="!tab().dirty || processing()"
+                (click)="cancel()">
+            Cancelar
+        </button>
+
+        <button mat-flat-button
+                type="button"
+                [disabled]="!tab().dirty || processing()"
+                (click)="save()">
+            @if (processing()) {
+            Guardando…
+            } @else {
+            Guardar
+            }
+        </button>
+    </footer>
 </section>
 
 @if (directAccessOpen()) {

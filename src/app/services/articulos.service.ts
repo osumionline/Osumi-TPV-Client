@@ -14,6 +14,7 @@ import {
   createEmptyArticuloDraft,
 } from '@model/articulos/articulo-draft.utils';
 import { getPendingArticuloStagingIds } from '@model/articulos/articulo-photo.utils';
+import { createArticuloSaveCommand } from '@model/articulos/articulo-save.utils';
 import type ArticuloWorkspaceSection from '@model/articulos/articulo-workspace-section.type';
 import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.interface';
 
@@ -328,6 +329,19 @@ export default class ArticulosService {
     await this.discardPendingStaging(tab);
 
     return this.cancelarCambios(idTemporal);
+  }
+
+  /**
+   * Persiste una ficha y sustituye su estado por
+   * la versión definitiva devuelta por backend.
+   */
+  async guardar(idTemporal: string): Promise<ArticuloWorkspaceTab> {
+    const tab: ArticuloWorkspaceTab = this.requireTab(idTemporal);
+    const articulo: ArticuloInterface = await window.osumiDesktop.articulos.save(
+      createArticuloSaveCommand(tab.draft),
+    );
+
+    return this.reemplazarTrasGuardado(idTemporal, articulo);
   }
 
   /**

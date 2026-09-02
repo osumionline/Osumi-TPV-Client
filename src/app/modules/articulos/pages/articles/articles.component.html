@@ -12,10 +12,14 @@
     <section class="articles__workspace">
         <otpv-article-workspace [tab]="tab"
                                 [searching]="searching()"
+                                [processing]="isProcessing(tab.idTemporal)"
+                                [saveSuccessful]="savedTabId() === tab.idTemporal"
                                 (resolveCodeEvent)="resolveArticleCode($event, tab.idTemporal)"
                                 (searchEvent)="openSearch($event, tab.idTemporal)"
                                 (draftChangeEvent)="updateArticleDraft($event)"
-                                (sectionChangeEvent)="selectArticleSection($event)" />
+                                (sectionChangeEvent)="selectArticleSection($event)"
+                                (saveEvent)="saveArticle($event)"
+                                (cancelEvent)="cancelArticle($event)" />
     </section>
     } @else {
     <section class="articles__state">

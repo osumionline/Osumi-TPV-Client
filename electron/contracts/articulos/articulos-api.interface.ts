@@ -4,6 +4,7 @@ import type {
   ArticuloHistoricoConsulta,
   ArticuloHistoricoResultado,
 } from '@desktop-contracts/articulos/articulo-historico.interface';
+import type { ArticuloSaveInterface } from '@desktop-contracts/articulos/articulo-save.interface';
 import type { ArticuloInterface } from '@desktop-contracts/articulos/articulo.interface';
 
 export default interface ArticulosApi {
@@ -32,4 +33,9 @@ export default interface ArticulosApi {
    * Asigna o elimina el acceso directo de un artículo.
    */
   setAccesoDirecto(command: ArticuloAccesoDirectoCommand): Promise<void>;
+
+  /**
+   * Crea o actualiza un artículo completo.
+   */
+  save(command: ArticuloSaveInterface): Promise<ArticuloInterface>;
 }

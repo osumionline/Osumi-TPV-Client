@@ -12,6 +12,7 @@ import {
   type Signal,
   type WritableSignal,
 } from '@angular/core';
+import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 import type { ArticuloDraftPatch } from '@model/articulos/articulo-draft.interface';
@@ -42,6 +43,7 @@ import ArticleWebComponent from '@modules/articulos/components/article-web/artic
     ArticleHistoryComponent,
     MatIcon,
     MatTooltip,
+    MatButton,
   ],
 })
 export default class ArticleWorkspaceComponent {
@@ -53,6 +55,8 @@ export default class ArticleWorkspaceComponent {
 
   readonly tab: InputSignal<ArticuloWorkspaceTab> = input.required<ArticuloWorkspaceTab>();
   readonly searching: InputSignal<boolean> = input<boolean>(false);
+  readonly processing: InputSignal<boolean> = input<boolean>(false);
+  readonly saveSuccessful: InputSignal<boolean> = input<boolean>(false);
 
   readonly resolveCodeEvent: OutputEmitterRef<string> = output<string>();
   readonly searchEvent: OutputEmitterRef<string> = output<string>();
@@ -70,6 +74,8 @@ export default class ArticleWorkspaceComponent {
     readonly idTemporal: string;
     readonly section: ArticuloWorkspaceSection;
   }>();
+  readonly saveEvent: OutputEmitterRef<string> = output<string>();
+  readonly cancelEvent: OutputEmitterRef<string> = output<string>();
 
   readonly directAccessOpen: WritableSignal<boolean> = signal<boolean>(false);
 
@@ -186,6 +192,24 @@ export default class ArticleWorkspaceComponent {
       idTemporal: this.tab().idTemporal,
       section,
     });
+  }
+
+  /**
+   * Solicita guardar globalmente la ficha.
+   */
+  save(): void {
+    if (!this.processing() && this.tab().dirty) {
+      this.saveEvent.emit(this.tab().idTemporal);
+    }
+  }
+
+  /**
+   * Solicita descartar globalmente sus cambios.
+   */
+  cancel(): void {
+    if (!this.processing() && this.tab().dirty) {
+      this.cancelEvent.emit(this.tab().idTemporal);
+    }
   }
 
   /**

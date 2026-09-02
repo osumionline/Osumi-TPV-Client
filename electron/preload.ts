@@ -5,6 +5,7 @@ import type {
   ArticuloHistoricoConsulta,
   ArticuloHistoricoResultado,
 } from '@desktop-contracts/articulos/articulo-historico.interface';
+import type { ArticuloSaveInterface } from '@desktop-contracts/articulos/articulo-save.interface';
 import type { ArticuloInterface } from '@desktop-contracts/articulos/articulo.interface';
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
@@ -216,6 +217,9 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
 
     setAccesoDirecto: (command: ArticuloAccesoDirectoCommand): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.articulosSetAccesoDirecto, command) as Promise<void>,
+
+    save: (command: ArticuloSaveInterface): Promise<ArticuloInterface> =>
+      ipcRenderer.invoke(IPC_CHANNELS.articulosSave, command) as Promise<ArticuloInterface>,
   }),
 
   clientes: Object.freeze({

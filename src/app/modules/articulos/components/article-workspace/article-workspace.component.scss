@@ -120,6 +120,28 @@
         overflow-y: auto;
     }
 
+    .article-workspace__actions {
+        display: flex;
+        min-height: 60px;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 12px;
+        padding: 10px 24px;
+        border-top: 1px solid var(--separator-color);
+        box-sizing: border-box;
+        background-color: var(--color-white);
+    }
+
+    .article-workspace__save-feedback {
+        margin-right: 4px;
+        padding-right: 16px;
+        border-right: 1px solid var(--separator-color);
+        color: var(--color-dark-green);
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
     .article-workspace__pending {
         display: grid;
         height: 100%;

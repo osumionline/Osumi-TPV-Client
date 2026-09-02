@@ -5,6 +5,7 @@ import type {
   ArticuloHistoricoConsulta,
   ArticuloHistoricoResultado,
 } from '@desktop-contracts/articulos/articulo-historico.interface';
+import type { ArticuloSaveInterface } from '@desktop-contracts/articulos/articulo-save.interface';
 import type { ArticuloInterface } from '@desktop-contracts/articulos/articulo.interface';
 import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
 import { assertTrustedSender } from '@ipc/assert-trusted-sender';
@@ -60,6 +61,15 @@ export default function registerArticulosIpc(
       assertTrustedSender(event, getMainWindow);
 
       await articulosService.setAccesoDirecto(command);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.articulosSave,
+    async (event, command: ArticuloSaveInterface): Promise<ArticuloInterface> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return articulosService.save(command);
     },
   );
 }

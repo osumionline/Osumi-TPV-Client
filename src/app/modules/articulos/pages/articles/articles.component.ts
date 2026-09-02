@@ -50,6 +50,10 @@ export default class ArticlesComponent implements OnInit {
   readonly searchOpen: WritableSignal<boolean> = signal<boolean>(false);
   readonly searchInitialQuery: WritableSignal<string> = signal<string>('');
   readonly searchSourceTabId: WritableSignal<string | null> = signal<string | null>(null);
+  readonly processingTabId: WritableSignal<string | null> = signal<string | null>(null);
+  readonly savedTabId: WritableSignal<string | null> = signal<string | null>(null);
+
+  private saveFeedbackTimeoutId: number | null = null;
 
   /**
    * Carga la configuración general utilizada por el módulo.
@@ -79,6 +83,7 @@ export default class ArticlesComponent implements OnInit {
     readonly idTemporal: string;
     readonly patch: ArticuloDraftPatch;
   }): void {
+    this.clearSaveFeedback(change.idTemporal);
     this.articulosService.actualizarDraft(change.idTemporal, change.patch);
   }
 
@@ -217,6 +222,122 @@ export default class ArticlesComponent implements OnInit {
 
         void this.closeArticleDiscardingChanges(idTemporal);
       });
+  }
+
+  /**
+   * Indica si una ficha está ejecutando una acción persistente.
+   */
+  isProcessing(idTemporal: string): boolean {
+    return this.processingTabId() === idTemporal;
+  }
+
+  /**
+   * Guarda globalmente la ficha indicada.
+   */
+  async saveArticle(idTemporal: string): Promise<void> {
+    if (this.processingTabId() !== null) {
+      return;
+    }
+
+    this.clearSaveFeedback();
+    this.processingTabId.set(idTemporal);
+
+    try {
+      await this.articulosService.guardar(idTemporal);
+      this.showSaveFeedback(idTemporal);
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido guardar el artículo.'),
+        })
+        .subscribe();
+    } finally {
+      this.processingTabId.set(null);
+    }
+  }
+
+  /**
+   * Solicita confirmación antes de restaurar
+   * el snapshot persistido de una ficha.
+   */
+  cancelArticle(idTemporal: string): void {
+    if (this.processingTabId() !== null) {
+      return;
+    }
+
+    this.dialog
+      .confirm({
+        title: 'Confirmar',
+        content: '¿Quieres descartar todos los cambios realizados en esta ficha?',
+      })
+      .subscribe((result: boolean): void => {
+        if (!result) {
+          return;
+        }
+
+        void this.discardArticleChanges(idTemporal);
+      });
+  }
+
+  /**
+   * Muestra temporalmente la confirmación de guardado
+   * correspondiente a una ficha.
+   */
+  private showSaveFeedback(idTemporal: string): void {
+    this.clearSaveFeedback();
+    this.savedTabId.set(idTemporal);
+
+    this.saveFeedbackTimeoutId = window.setTimeout((): void => {
+      if (this.savedTabId() === idTemporal) {
+        this.savedTabId.set(null);
+      }
+
+      this.saveFeedbackTimeoutId = null;
+    }, 4_000);
+  }
+
+  /**
+   * Oculta la confirmación de guardado activa.
+   *
+   * Cuando se indica una ficha, solo la elimina si
+   * pertenece a esa misma ficha.
+   */
+  private clearSaveFeedback(idTemporal: string | null = null): void {
+    if (idTemporal !== null && this.savedTabId() !== idTemporal) {
+      return;
+    }
+
+    if (this.saveFeedbackTimeoutId !== null) {
+      window.clearTimeout(this.saveFeedbackTimeoutId);
+      this.saveFeedbackTimeoutId = null;
+    }
+
+    this.savedTabId.set(null);
+  }
+
+  /**
+   * Limpia imágenes temporales y restaura el snapshot.
+   */
+  private async discardArticleChanges(idTemporal: string): Promise<void> {
+    if (this.processingTabId() !== null) {
+      return;
+    }
+
+    this.processingTabId.set(idTemporal);
+
+    try {
+      await this.articulosService.descartarCambios(idTemporal);
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se han podido descartar los cambios del artículo.'),
+        })
+        .subscribe();
+    } finally {
+      this.processingTabId.set(null);
+    }
   }
 
   /**
