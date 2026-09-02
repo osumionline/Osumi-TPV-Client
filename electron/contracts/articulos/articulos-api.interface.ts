@@ -38,4 +38,9 @@ export default interface ArticulosApi {
    * Crea o actualiza un artículo completo.
    */
   save(command: ArticuloSaveInterface): Promise<ArticuloInterface>;
+
+  /**
+   * Da de baja lógicamente un artículo activo.
+   */
+  deactivate(idArticulo: number): Promise<void>;
 }

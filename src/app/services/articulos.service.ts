@@ -11,8 +11,8 @@ import {
   areArticuloDraftsEqual,
   cloneArticuloDraft,
   createArticuloDraftFromInterface,
-  createEmptyArticuloDraft,
   createDuplicatedArticuloDraft,
+  createEmptyArticuloDraft,
 } from '@model/articulos/articulo-draft.utils';
 import { getPendingArticuloStagingIds } from '@model/articulos/articulo-photo.utils';
 import { createArticuloSaveCommand } from '@model/articulos/articulo-save.utils';
@@ -376,6 +376,27 @@ export default class ArticulosService {
     );
 
     return this.reemplazarTrasGuardado(idTemporal, articulo);
+  }
+
+  /**
+   * Da de baja el artículo persistido y cierra su ficha
+   * cuando la operación termina correctamente.
+   */
+  async darDeBaja(idTemporal: string): Promise<void> {
+    const tab: ArticuloWorkspaceTab = this.requireTab(idTemporal);
+    const idArticulo: number | null = tab.draft.id;
+
+    if (idArticulo === null) {
+      throw new Error('Solo se puede dar de baja un artículo ya guardado.');
+    }
+
+    if (tab.dirty) {
+      throw new Error('Guarda o cancela los cambios antes de dar de baja el artículo.');
+    }
+
+    await window.osumiDesktop.articulos.deactivate(idArticulo);
+
+    this.cerrarTab(idTemporal);
   }
 
   /**

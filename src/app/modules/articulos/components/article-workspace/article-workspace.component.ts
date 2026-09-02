@@ -19,6 +19,7 @@ import type { ArticuloDraftPatch } from '@model/articulos/articulo-draft.interfa
 import type ArticuloWorkspaceSection from '@model/articulos/articulo-workspace-section.type';
 import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.interface';
 import ArticleBarcodesComponent from '@modules/articulos/components/article-barcodes/article-barcodes.component';
+import ArticleDeactivateComponent from '@modules/articulos/components/article-deactivate/article-deactivate.component';
 import ArticleDirectAccessesComponent from '@modules/articulos/components/article-direct-accesses/article-direct-accesses.component';
 import ArticleGeneralComponent from '@modules/articulos/components/article-general/article-general.component';
 import ArticleHistoryComponent from '@modules/articulos/components/article-history/article-history.component';
@@ -41,6 +42,7 @@ import ArticleWebComponent from '@modules/articulos/components/article-web/artic
     ArticleSectionTabsComponent,
     ArticleWebComponent,
     ArticleHistoryComponent,
+    ArticleDeactivateComponent,
     MatIcon,
     MatTooltip,
     MatButton,
@@ -77,6 +79,7 @@ export default class ArticleWorkspaceComponent {
   readonly saveEvent: OutputEmitterRef<string> = output<string>();
   readonly cancelEvent: OutputEmitterRef<string> = output<string>();
   readonly duplicateEvent: OutputEmitterRef<string> = output<string>();
+  readonly deactivateEvent: OutputEmitterRef<string> = output<string>();
 
   readonly directAccessOpen: WritableSignal<boolean> = signal<boolean>(false);
 
@@ -222,6 +225,13 @@ export default class ArticleWorkspaceComponent {
     }
 
     this.duplicateEvent.emit(this.tab().idTemporal);
+  }
+
+  /**
+   * Propaga la solicitud de baja del artículo actual.
+   */
+  deactivate(idTemporal: string): void {
+    this.deactivateEvent.emit(idTemporal);
   }
 
   /**

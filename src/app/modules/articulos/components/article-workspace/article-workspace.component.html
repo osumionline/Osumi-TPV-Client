@@ -77,6 +77,12 @@
                             (draftChangeEvent)="emitDraftChange($event)" />
         }
 
+        @case ('deactivate') {
+        <otpv-article-deactivate [tab]="tab()"
+                                 [processing]="processing()"
+                                 (deactivateEvent)="deactivate($event)" />
+        }
+
         @default {
         <div class="article-workspace__pending">
             Este apartado se implementará en su siguiente bloque.

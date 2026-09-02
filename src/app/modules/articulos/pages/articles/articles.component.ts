@@ -314,6 +314,77 @@ export default class ArticlesComponent implements OnInit {
   }
 
   /**
+   * Solicita confirmación antes de dar de baja
+   * definitivamente un artículo activo.
+   */
+  deactivateArticle(idTemporal: string): void {
+    if (this.processingTabId() !== null) {
+      return;
+    }
+
+    const tab: ArticuloWorkspaceTab | undefined = this.articulosService
+      .tabs()
+      .find((item: ArticuloWorkspaceTab): boolean => item.idTemporal === idTemporal);
+
+    if (tab === undefined || tab.draft.id === null) {
+      return;
+    }
+
+    if (tab.dirty) {
+      this.dialog
+        .alert({
+          title: 'Atención',
+          content: 'Guarda o cancela los cambios antes de dar de baja el artículo.',
+        })
+        .subscribe();
+
+      return;
+    }
+
+    this.dialog
+      .confirm({
+        title: 'Confirmar baja',
+        content:
+          `¿Estás seguro de querer dar de baja "${tab.draft.nombre}"? ` +
+          'El artículo dejará de estar disponible en el TPV, ' +
+          'pero sus datos históricos se conservarán.',
+      })
+      .subscribe((result: boolean): void => {
+        if (!result) {
+          return;
+        }
+
+        void this.confirmDeactivateArticle(idTemporal);
+      });
+  }
+
+  /**
+   * Ejecuta la baja confirmada y mantiene la ficha
+   * abierta cuando la operación falla.
+   */
+  private async confirmDeactivateArticle(idTemporal: string): Promise<void> {
+    if (this.processingTabId() !== null) {
+      return;
+    }
+
+    this.clearSaveFeedback();
+    this.processingTabId.set(idTemporal);
+
+    try {
+      await this.articulosService.darDeBaja(idTemporal);
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido dar de baja el artículo.'),
+        })
+        .subscribe();
+    } finally {
+      this.processingTabId.set(null);
+    }
+  }
+
+  /**
    * Muestra temporalmente la confirmación de guardado
    * correspondiente a una ficha.
    */

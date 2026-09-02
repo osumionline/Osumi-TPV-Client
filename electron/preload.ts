@@ -220,6 +220,9 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
 
     save: (command: ArticuloSaveInterface): Promise<ArticuloInterface> =>
       ipcRenderer.invoke(IPC_CHANNELS.articulosSave, command) as Promise<ArticuloInterface>,
+
+    deactivate: (idArticulo: number): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.articulosDeactivate, idArticulo) as Promise<void>,
   }),
 
   clientes: Object.freeze({

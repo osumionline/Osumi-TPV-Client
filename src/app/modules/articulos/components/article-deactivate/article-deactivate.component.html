@@ -1,0 +1,45 @@
+<section class="article-deactivate">
+    <div class="article-deactivate__card">
+        <h2>
+            Dar de baja artículo
+        </h2>
+
+        <p>
+            Al dar de baja este artículo dejará de estar
+            disponible para su uso en todo el TPV.
+        </p>
+
+        <p>
+            Las ventas, pedidos, movimientos de stock y demás
+            información histórica conservarán sus referencias
+            al artículo.
+        </p>
+
+        <p>
+            Sus códigos de barras también dejarán de estar
+            disponibles.
+        </p>
+
+        @if (tab().dirty) {
+        <div class="article-deactivate__pending">
+            Esta ficha contiene cambios sin guardar.
+            Guarda o cancela esos cambios antes de dar
+            de baja el artículo.
+        </div>
+        }
+
+        <div class="article-deactivate__actions">
+            <button mat-flat-button
+                    type="button"
+                    class="article-deactivate__button"
+                    [disabled]="tab().dirty || processing()"
+                    (click)="deactivate()">
+                @if (processing()) {
+                Dando de baja…
+                } @else {
+                Dar de baja
+                }
+            </button>
+        </div>
+    </div>
+</section>

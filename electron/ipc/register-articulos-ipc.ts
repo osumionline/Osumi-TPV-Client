@@ -72,4 +72,13 @@ export default function registerArticulosIpc(
       return articulosService.save(command);
     },
   );
+
+  ipcMain.handle(
+    IPC_CHANNELS.articulosDeactivate,
+    async (event, idArticulo: number): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await articulosService.deactivate(idArticulo);
+    },
+  );
 }

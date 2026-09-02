@@ -34,6 +34,9 @@ const ARTICLE_SECTIONS: readonly ArticleSectionDefinition[] = [
   },
 ];
 
+const NEW_ARTICLE_HIDDEN_SECTIONS: ReadonlySet<ArticuloWorkspaceSection> =
+  new Set<ArticuloWorkspaceSection>(['deactivate']);
+
 const WEB_SECTION: ArticleSectionDefinition = {
   id: 'web',
   label: 'WEB',
@@ -56,11 +59,19 @@ export default class ArticleSectionTabsComponent {
    * Obtiene las secciones visibles para la ficha actual.
    */
   getSections(): readonly ArticleSectionDefinition[] {
+    const sections: readonly ArticleSectionDefinition[] =
+      this.tab().draft.id === null
+        ? ARTICLE_SECTIONS.filter(
+            (section: ArticleSectionDefinition): boolean =>
+              !NEW_ARTICLE_HIDDEN_SECTIONS.has(section.id),
+          )
+        : ARTICLE_SECTIONS;
+
     if (!this.tab().draft.ventaOnline) {
-      return ARTICLE_SECTIONS;
+      return sections;
     }
 
-    return [ARTICLE_SECTIONS[0], WEB_SECTION, ...ARTICLE_SECTIONS.slice(1)];
+    return [sections[0], WEB_SECTION, ...sections.slice(1)];
   }
 
   /**
