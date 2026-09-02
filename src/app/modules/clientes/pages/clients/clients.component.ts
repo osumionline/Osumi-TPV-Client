@@ -62,11 +62,38 @@ export default class ClientsComponent implements OnInit {
   }
 
   /**
-   * Abre la ficha limpia del cliente seleccionado.
+   * Abre el cliente seleccionado protegiendo los cambios
+   * pendientes de la ficha actualmente activa.
    */
   selectCliente(cliente: Cliente): void {
-    this.clientesService.abrirFicha(cliente);
-    this.searchOpen.set(false);
+    const workspace: ClienteWorkspace | null = this.clientesService.workspace();
+
+    if (workspace?.clientePublicId === cliente.publicId) {
+      this.searchOpen.set(false);
+
+      return;
+    }
+
+    if (workspace === null || !workspace.dirty) {
+      this.openCliente(cliente);
+
+      return;
+    }
+
+    this.dialog
+      .confirm({
+        title: 'Confirmar',
+        content:
+          'La ficha actual contiene cambios sin guardar. ' +
+          `¿Quieres descartarlos y abrir el cliente "${cliente.nombreApellidos}"?`,
+      })
+      .subscribe((result: boolean): void => {
+        if (!result) {
+          return;
+        }
+
+        this.openCliente(cliente);
+      });
   }
 
   /**
@@ -123,6 +150,15 @@ export default class ClientsComponent implements OnInit {
           this.clientesService.cerrarFicha();
         }
       });
+  }
+
+  /**
+   * Sustituye el workspace actual por la ficha del cliente indicado
+   * y cierra el buscador.
+   */
+  private openCliente(cliente: Cliente): void {
+    this.clientesService.abrirFicha(cliente);
+    this.searchOpen.set(false);
   }
 
   /**
