@@ -1,4 +1,6 @@
+import type ArticuloEstadisticasRepositoryQuery from '@backend/contracts/articulos/articulo-estadisticas-query.interface';
 import type ArticuloHistoricoRepositoryQuery from '@backend/contracts/articulos/articulo-historico-query.interface';
+import type { ArticuloEstadisticasRepositoryResult } from '@backend/domain/articulos/articulo-estadisticas-record.interface';
 import type { ArticuloHistoricoPageRecord } from '@backend/domain/articulos/articulo-historico-record.interface';
 import type {
   ArticuloAccesoDirectoRecord,
@@ -22,6 +24,13 @@ export default interface ArticulosRepository {
    * Recupera una página del histórico persistido de un artículo.
    */
   findHistorico(query: ArticuloHistoricoRepositoryQuery): Promise<ArticuloHistoricoPageRecord>;
+
+  /**
+   * Recupera los agregados de ventas de un artículo.
+   */
+  findEstadisticas(
+    query: ArticuloEstadisticasRepositoryQuery,
+  ): Promise<ArticuloEstadisticasRepositoryResult>;
 
   /**
    * Obtiene los accesos directos asignados a artículos activos.

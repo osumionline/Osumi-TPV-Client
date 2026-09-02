@@ -38,6 +38,7 @@ const IPC_CHANNELS = {
   articulosGetAccesosDirectos: 'articulos:get-accesos-directos',
   articulosSetAccesoDirecto: 'articulos:set-acceso-directo',
   articulosGetHistorico: 'articulos:get-historico',
+  articulosGetEstadisticas: 'articulos:get-estadisticas',
   articulosSave: 'articulos:save',
   articulosDeactivate: 'articulos:deactivate',
 

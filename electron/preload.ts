@@ -2,6 +2,10 @@ import type ApplicationStateResult from '@desktop-contracts/application/applicat
 import type ArticuloAccesoDirectoCommand from '@desktop-contracts/articulos/articulo-acceso-directo-command.interface';
 import type ArticuloAccesoDirectoInterface from '@desktop-contracts/articulos/articulo-acceso-directo.interface';
 import type {
+  ArticuloEstadisticasConsulta,
+  ArticuloEstadisticasResultado,
+} from '@desktop-contracts/articulos/articulo-estadisticas.interface';
+import type {
   ArticuloHistoricoConsulta,
   ArticuloHistoricoResultado,
 } from '@desktop-contracts/articulos/articulo-historico.interface';
@@ -209,6 +213,14 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         IPC_CHANNELS.articulosGetHistorico,
         consulta,
       ) as Promise<ArticuloHistoricoResultado>,
+
+    getEstadisticas: (
+      consulta: ArticuloEstadisticasConsulta,
+    ): Promise<ArticuloEstadisticasResultado> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.articulosGetEstadisticas,
+        consulta,
+      ) as Promise<ArticuloEstadisticasResultado>,
 
     getAccesosDirectos: (): Promise<readonly ArticuloAccesoDirectoInterface[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.articulosGetAccesosDirectos) as Promise<

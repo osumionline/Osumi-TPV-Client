@@ -508,6 +508,57 @@ describe('TypeOrmArticulosRepository', (): void => {
       ),
     ).rejects.toThrow('Un artículo no puede tener más de una foto principal.');
   });
+
+  it('agrega estadísticas netas por día excluyendo ventas dadas de baja', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await seedArticuloSales(dataSource);
+
+    const unitsResult = await requireRepository().findEstadisticas({
+      idArticulo: 1,
+      metric: 'units',
+      year: 2026,
+      month: 9,
+    });
+
+    expect(unitsResult.years).toEqual([2025, 2026]);
+    expect(unitsResult.items).toEqual([
+      {
+        year: 2026,
+        month: 9,
+        day: 1,
+        value: 2,
+      },
+      {
+        year: 2026,
+        month: 9,
+        day: 2,
+        value: 1,
+      },
+    ]);
+
+    const amountResult = await requireRepository().findEstadisticas({
+      idArticulo: 1,
+      metric: 'amount',
+      year: 2026,
+      month: 9,
+    });
+
+    expect(amountResult.items).toEqual([
+      {
+        year: 2026,
+        month: 9,
+        day: 1,
+        value: 2_000_000,
+      },
+      {
+        year: 2026,
+        month: 9,
+        day: 2,
+        value: 500_000,
+      },
+    ]);
+  });
 });
 
 /**
@@ -786,6 +837,189 @@ async function seedArticulo(dataSource: DataSource): Promise<void> {
       0,
       1
     )
+  `);
+}
+
+/**
+ * Inserta ventas históricas suficientes para probar
+ * la agregación de estadísticas de Artículos.
+ */
+async function seedArticuloSales(dataSource: DataSource): Promise<void> {
+  await dataSource.query(`
+    INSERT INTO terminal (
+      id,
+      public_id,
+      nombre,
+      codigo
+    )
+    VALUES (
+      1,
+      'terminal-stats',
+      'Terminal estadísticas',
+      'STATS'
+    )
+  `);
+
+  await dataSource.query(`
+    INSERT INTO empleado (
+      id,
+      public_id,
+      nombre,
+      password_hash,
+      password_algorithm,
+      color,
+      admin
+    )
+    VALUES (
+      1,
+      'employee-stats',
+      'Empleado estadísticas',
+      'test-hash',
+      'scrypt',
+      '000000',
+      1
+    )
+  `);
+
+  await dataSource.query(`
+    INSERT INTO caja (
+      id,
+      public_id,
+      id_terminal,
+      id_empleado_apertura,
+      apertura
+    )
+    VALUES (
+      1,
+      'cash-stats',
+      1,
+      1,
+      '2025-01-01T00:00:00.000Z'
+    )
+  `);
+
+  await dataSource.query(`
+    INSERT INTO venta (
+      id,
+      public_id,
+      id_caja,
+      id_empleado,
+      numero,
+      total_cents,
+      created_at,
+      deleted_at
+    )
+    VALUES
+      (
+        1,
+        'sale-2025',
+        1,
+        1,
+        1,
+        400,
+        '2025-09-10T10:00:00.000Z',
+        NULL
+      ),
+      (
+        2,
+        'sale-2026-1',
+        1,
+        1,
+        2,
+        200,
+        '2026-09-01T10:00:00.000Z',
+        NULL
+      ),
+      (
+        3,
+        'sale-2026-2',
+        1,
+        1,
+        3,
+        50,
+        '2026-09-02T10:00:00.000Z',
+        NULL
+      ),
+      (
+        4,
+        'sale-deleted',
+        1,
+        1,
+        4,
+        9900,
+        '2026-09-03T10:00:00.000Z',
+        '2026-09-03T11:00:00.000Z'
+      )
+  `);
+
+  await dataSource.query(`
+    INSERT INTO linea_venta (
+      id,
+      public_id,
+      id_venta,
+      id_articulo,
+      localizador,
+      marca,
+      nombre_articulo,
+      importe_micros,
+      unidades
+    )
+    VALUES
+      (
+        1,
+        'line-2025',
+        1,
+        1,
+        261234,
+        'Marca de prueba',
+        'Artículo de prueba',
+        4000000,
+        4
+      ),
+      (
+        2,
+        'line-2026-positive',
+        2,
+        1,
+        261234,
+        'Marca de prueba',
+        'Artículo de prueba',
+        3000000,
+        3
+      ),
+      (
+        3,
+        'line-2026-return',
+        2,
+        1,
+        261234,
+        'Marca de prueba',
+        'Artículo de prueba',
+        -1000000,
+        -1
+      ),
+      (
+        4,
+        'line-2026-second-day',
+        3,
+        1,
+        261234,
+        'Marca de prueba',
+        'Artículo de prueba',
+        500000,
+        1
+      ),
+      (
+        5,
+        'line-deleted-sale',
+        4,
+        1,
+        261234,
+        'Marca de prueba',
+        'Artículo de prueba',
+        99000000,
+        99
+      )
   `);
 }
 

@@ -1,8 +1,11 @@
+import createArticuloEstadisticasResult from '@backend/application/articulos/articulo-estadisticas.utils';
+import type ArticuloEstadisticasRepositoryQuery from '@backend/contracts/articulos/articulo-estadisticas-query.interface';
 import type ArticuloHistoricoRepositoryQuery from '@backend/contracts/articulos/articulo-historico-query.interface';
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
 import type ImageAssetPromoter from '@backend/contracts/files/image-asset-promoter.interface';
 import type StagedImageDiscarder from '@backend/contracts/files/staged-image-discarder.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
+import type { ArticuloEstadisticasRepositoryResult } from '@backend/domain/articulos/articulo-estadisticas-record.interface';
 import type {
   ArticuloHistoricoPageRecord,
   ArticuloHistoricoRecord,
@@ -20,6 +23,11 @@ import type {
 import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.interface';
 import type ArticuloAccesoDirectoCommand from '@desktop-contracts/articulos/articulo-acceso-directo-command.interface';
 import type ArticuloAccesoDirectoInterface from '@desktop-contracts/articulos/articulo-acceso-directo.interface';
+import type {
+  ArticuloEstadisticasConsulta,
+  ArticuloEstadisticasResultado,
+  ArticuloEstadisticasTipo,
+} from '@desktop-contracts/articulos/articulo-estadisticas.interface';
 import type {
   ArticuloHistoricoConsulta,
   ArticuloHistoricoItem,
@@ -147,6 +155,51 @@ export default class ArticulosService {
   }
 
   /**
+   * Recupera las estadísticas agregadas de ventas
+   * correspondientes a los filtros solicitados.
+   */
+  async getEstadisticas(
+    consulta: ArticuloEstadisticasConsulta,
+  ): Promise<ArticuloEstadisticasResultado> {
+    if (typeof consulta !== 'object' || consulta === null) {
+      throw new Error('La consulta de estadísticas no es válida.');
+    }
+
+    if (!Number.isSafeInteger(consulta.idArticulo) || consulta.idArticulo <= 0) {
+      throw new Error('El identificador del artículo no es válido.');
+    }
+
+    if (!this.isEstadisticasTipo(consulta.tipo)) {
+      throw new Error('El tipo de estadísticas no es válido.');
+    }
+
+    if (
+      consulta.year !== null &&
+      (!Number.isSafeInteger(consulta.year) || consulta.year < 1 || consulta.year > 9999)
+    ) {
+      throw new Error('El año de las estadísticas no es válido.');
+    }
+
+    if (
+      consulta.month !== null &&
+      (!Number.isSafeInteger(consulta.month) || consulta.month < 1 || consulta.month > 12)
+    ) {
+      throw new Error('El mes de las estadísticas no es válido.');
+    }
+
+    const repositoryQuery: ArticuloEstadisticasRepositoryQuery = {
+      idArticulo: consulta.idArticulo,
+      metric: consulta.tipo === 'unidades' ? 'units' : 'amount',
+      year: consulta.year,
+      month: consulta.month,
+    };
+    const repositoryResult: ArticuloEstadisticasRepositoryResult =
+      await this.articulosRepository.findEstadisticas(repositoryQuery);
+
+    return createArticuloEstadisticasResult(consulta, repositoryResult);
+  }
+
+  /**
    * Obtiene los accesos directos asignados actualmente.
    */
   async getAccesosDirectos(): Promise<readonly ArticuloAccesoDirectoInterface[]> {
@@ -235,6 +288,13 @@ export default class ArticulosService {
     }
 
     await this.articulosRepository.deactivate(idArticulo);
+  }
+
+  /**
+   * Comprueba el tipo solicitado para las estadísticas.
+   */
+  private isEstadisticasTipo(value: unknown): value is ArticuloEstadisticasTipo {
+    return value === 'unidades' || value === 'importe';
   }
 
   /**

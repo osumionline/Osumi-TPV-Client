@@ -2,6 +2,10 @@ import type ArticulosService from '@backend/application/articulos/articulos.serv
 import type ArticuloAccesoDirectoCommand from '@desktop-contracts/articulos/articulo-acceso-directo-command.interface';
 import type ArticuloAccesoDirectoInterface from '@desktop-contracts/articulos/articulo-acceso-directo.interface';
 import type {
+  ArticuloEstadisticasConsulta,
+  ArticuloEstadisticasResultado,
+} from '@desktop-contracts/articulos/articulo-estadisticas.interface';
+import type {
   ArticuloHistoricoConsulta,
   ArticuloHistoricoResultado,
 } from '@desktop-contracts/articulos/articulo-historico.interface';
@@ -43,6 +47,18 @@ export default function registerArticulosIpc(
       assertTrustedSender(event, getMainWindow);
 
       return articulosService.getHistorico(consulta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.articulosGetEstadisticas,
+    async (
+      event,
+      consulta: ArticuloEstadisticasConsulta,
+    ): Promise<ArticuloEstadisticasResultado> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return articulosService.getEstadisticas(consulta);
     },
   );
 

@@ -1,9 +1,11 @@
 import ArticulosService from '@backend/application/articulos/articulos.service';
+import type ArticuloEstadisticasRepositoryQuery from '@backend/contracts/articulos/articulo-estadisticas-query.interface';
 import type ArticuloHistoricoRepositoryQuery from '@backend/contracts/articulos/articulo-historico-query.interface';
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
 import type ImageAssetPromoter from '@backend/contracts/files/image-asset-promoter.interface';
 import type StagedImageDiscarder from '@backend/contracts/files/staged-image-discarder.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
+import type { ArticuloEstadisticasRepositoryResult } from '@backend/domain/articulos/articulo-estadisticas-record.interface';
 import type { ArticuloHistoricoPageRecord } from '@backend/domain/articulos/articulo-historico-record.interface';
 import type {
   ArticuloAccesoDirectoRecord,
@@ -55,6 +57,18 @@ class FakeArticulosRepository implements ArticulosRepository {
     ],
   };
   lastHistoricoQuery: ArticuloHistoricoRepositoryQuery | null = null;
+  estadisticasResult: ArticuloEstadisticasRepositoryResult = {
+    years: [2025, 2026],
+    items: [
+      {
+        year: 2026,
+        month: 9,
+        day: null,
+        value: 2_500_000,
+      },
+    ],
+  };
+  lastEstadisticasQuery: ArticuloEstadisticasRepositoryQuery | null = null;
 
   /**
    * Devuelve el artículo configurado para el test.
@@ -80,6 +94,17 @@ class FakeArticulosRepository implements ArticulosRepository {
     this.lastHistoricoQuery = query;
 
     return Promise.resolve(this.historicoResult);
+  }
+
+  /**
+   * Devuelve los agregados estadísticos configurados.
+   */
+  findEstadisticas(
+    query: ArticuloEstadisticasRepositoryQuery,
+  ): Promise<ArticuloEstadisticasRepositoryResult> {
+    this.lastEstadisticasQuery = query;
+
+    return Promise.resolve(this.estadisticasResult);
   }
 
   /**
@@ -463,6 +488,44 @@ describe('ArticulosService', (): void => {
     ).rejects.toThrow('El tamaño de página del histórico no es válido.');
 
     expect(repository.lastHistoricoQuery).toBeNull();
+  });
+
+  it('obtiene estadísticas agregadas y traduce el tipo a la métrica interna', async (): Promise<void> => {
+    const repository = new FakeArticulosRepository();
+    const service = createService(repository);
+
+    const result = await service.getEstadisticas({
+      idArticulo: 25,
+      tipo: 'importe',
+      year: 2026,
+      month: null,
+    });
+
+    expect(repository.lastEstadisticasQuery).toEqual({
+      idArticulo: 25,
+      metric: 'amount',
+      year: 2026,
+      month: null,
+    });
+
+    expect(result.points).toHaveLength(12);
+    expect(result.points[8]?.value).toBe(2_500_000);
+  });
+
+  it('rechaza un mes inválido antes de consultar SQLite', async (): Promise<void> => {
+    const repository = new FakeArticulosRepository();
+    const service = createService(repository);
+
+    await expect(
+      service.getEstadisticas({
+        idArticulo: 25,
+        tipo: 'unidades',
+        year: 2026,
+        month: 13,
+      }),
+    ).rejects.toThrow('El mes de las estadísticas no es válido.');
+
+    expect(repository.lastEstadisticasQuery).toBeNull();
   });
 });
 

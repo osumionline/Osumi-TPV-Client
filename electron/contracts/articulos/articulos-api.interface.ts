@@ -1,6 +1,10 @@
 import type ArticuloAccesoDirectoCommand from '@desktop-contracts/articulos/articulo-acceso-directo-command.interface';
 import type ArticuloAccesoDirectoInterface from '@desktop-contracts/articulos/articulo-acceso-directo.interface';
 import type {
+  ArticuloEstadisticasConsulta,
+  ArticuloEstadisticasResultado,
+} from '@desktop-contracts/articulos/articulo-estadisticas.interface';
+import type {
   ArticuloHistoricoConsulta,
   ArticuloHistoricoResultado,
 } from '@desktop-contracts/articulos/articulo-historico.interface';
@@ -23,6 +27,11 @@ export default interface ArticulosApi {
    * Obtiene una página del histórico de un artículo.
    */
   getHistorico(consulta: ArticuloHistoricoConsulta): Promise<ArticuloHistoricoResultado>;
+
+  /**
+   * Obtiene las estadísticas de ventas de un artículo.
+   */
+  getEstadisticas(consulta: ArticuloEstadisticasConsulta): Promise<ArticuloEstadisticasResultado>;
 
   /**
    * Obtiene todos los accesos directos asignados.

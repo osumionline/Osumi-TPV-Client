@@ -1,5 +1,10 @@
+import type ArticuloEstadisticasRepositoryQuery from '@backend/contracts/articulos/articulo-estadisticas-query.interface';
 import type ArticuloHistoricoRepositoryQuery from '@backend/contracts/articulos/articulo-historico-query.interface';
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
+import type {
+  ArticuloEstadisticasAggregateRecord,
+  ArticuloEstadisticasRepositoryResult,
+} from '@backend/domain/articulos/articulo-estadisticas-record.interface';
 import type {
   ArticuloHistoricoPageRecord,
   ArticuloHistoricoRecord,
@@ -23,6 +28,17 @@ import insertArchivo from '@infrastructure/database/typeorm/typeorm-archivo.util
 import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
 import { randomUUID } from 'node:crypto';
 import type { DataSource, QueryRunner } from 'typeorm';
+
+interface ArticuloEstadisticasAggregateDatabaseRow {
+  readonly year: number;
+  readonly month: number;
+  readonly day: number | null;
+  readonly value: number;
+}
+
+interface ArticuloEstadisticasYearDatabaseRow {
+  readonly year: number;
+}
 
 interface ArticuloHistoricoDatabaseRow {
   readonly id: number;
@@ -284,6 +300,85 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
         pvpMicros: row.pvp_micros,
         createdAt: row.created_at,
       })),
+    };
+  }
+
+  /**
+   * Agrega unidades o importe vendido por período.
+   */
+  async findEstadisticas(
+    query: ArticuloEstadisticasRepositoryQuery,
+  ): Promise<ArticuloEstadisticasRepositoryResult> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+    const yearExpression: string = "CAST(strftime('%Y', v.created_at) AS INTEGER)";
+    const monthExpression: string = "CAST(strftime('%m', v.created_at) AS INTEGER)";
+    const daily: boolean = query.year !== null && query.month !== null;
+    const dayExpression: string = daily ? "CAST(strftime('%d', v.created_at) AS INTEGER)" : 'NULL';
+    const valueExpression: string =
+      query.metric === 'units' ? 'SUM(lv.unidades)' : 'SUM(lv.importe_micros)';
+    const conditions: string[] = ['lv.id_articulo = ?', 'v.deleted_at IS NULL'];
+    const parameters: number[] = [query.idArticulo];
+
+    if (query.year !== null) {
+      conditions.push(`${yearExpression} = ?`);
+      parameters.push(query.year);
+    }
+
+    if (query.month !== null) {
+      conditions.push(`${monthExpression} = ?`);
+      parameters.push(query.month);
+    }
+
+    const groupByExpression: string = daily
+      ? `${yearExpression}, ${monthExpression}, ${dayExpression}`
+      : `${yearExpression}, ${monthExpression}`;
+
+    const rows: readonly ArticuloEstadisticasAggregateDatabaseRow[] = (await dataSource.query(
+      `
+          SELECT
+            ${yearExpression} AS year,
+            ${monthExpression} AS month,
+            ${dayExpression} AS day,
+            ${valueExpression} AS value
+          FROM linea_venta lv
+          INNER JOIN venta v
+            ON v.id = lv.id_venta
+          WHERE
+            ${conditions.join('\n            AND ')}
+          GROUP BY
+            ${groupByExpression}
+          ORDER BY
+            ${groupByExpression}
+        `,
+      parameters,
+    )) as readonly ArticuloEstadisticasAggregateDatabaseRow[];
+
+    const yearRows: readonly ArticuloEstadisticasYearDatabaseRow[] = (await dataSource.query(
+      `
+          SELECT DISTINCT
+            ${yearExpression} AS year
+          FROM linea_venta lv
+          INNER JOIN venta v
+            ON v.id = lv.id_venta
+          WHERE
+            lv.id_articulo = ?
+            AND v.deleted_at IS NULL
+          ORDER BY
+            year
+        `,
+      [query.idArticulo],
+    )) as readonly ArticuloEstadisticasYearDatabaseRow[];
+
+    return {
+      years: yearRows.map((row: ArticuloEstadisticasYearDatabaseRow): number => row.year),
+      items: rows.map(
+        (row: ArticuloEstadisticasAggregateDatabaseRow): ArticuloEstadisticasAggregateRecord => ({
+          year: row.year,
+          month: row.month,
+          day: row.day,
+          value: row.value,
+        }),
+      ),
     };
   }
 

@@ -2,6 +2,10 @@ import type { Signal, WritableSignal } from '@angular/core';
 import { computed, Service, signal } from '@angular/core';
 import type ArticuloAccesoDirectoInterface from '@desktop-contracts/articulos/articulo-acceso-directo.interface';
 import type {
+  ArticuloEstadisticasConsulta,
+  ArticuloEstadisticasResultado,
+} from '@desktop-contracts/articulos/articulo-estadisticas.interface';
+import type {
   ArticuloHistoricoConsulta,
   ArticuloHistoricoResultado,
 } from '@desktop-contracts/articulos/articulo-historico.interface';
@@ -167,6 +171,14 @@ export default class ArticulosService {
    */
   getHistorico(consulta: ArticuloHistoricoConsulta): Promise<ArticuloHistoricoResultado> {
     return window.osumiDesktop.articulos.getHistorico(consulta);
+  }
+
+  /**
+   * Recupera las estadísticas persistidas de ventas
+   * para un artículo y período concretos.
+   */
+  getEstadisticas(consulta: ArticuloEstadisticasConsulta): Promise<ArticuloEstadisticasResultado> {
+    return window.osumiDesktop.articulos.getEstadisticas(consulta);
   }
 
   /**
