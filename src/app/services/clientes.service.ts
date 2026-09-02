@@ -6,6 +6,11 @@ import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-
 import type ClienteEstadisticasState from '@model/clientes/cliente-estadisticas-state.interface';
 import createClienteFormInitialValue from '@model/clientes/cliente-form.initial-value';
 import createClienteFormModel from '@model/clientes/cliente-form.mapper';
+import ClienteFormModel from '@model/clientes/cliente-form.model';
+import {
+  areClienteFormModelsEqual,
+  cloneClienteFormModel,
+} from '@model/clientes/cliente-form.utils';
 import type ClienteWorkspaceSection from '@model/clientes/cliente-workspace-section.type';
 import type ClienteWorkspace from '@model/clientes/cliente-workspace.interface';
 import Cliente from '@model/clientes/cliente.model';
@@ -80,9 +85,7 @@ export default class ClientesService {
       clienteId: null,
       clientePublicId: null,
       draft,
-      baseSnapshot: {
-        ...draft,
-      },
+      baseSnapshot: cloneClienteFormModel(draft),
       dirty: false,
       activeSection: 'data',
     };
@@ -106,9 +109,7 @@ export default class ClientesService {
       clienteId: cliente.id,
       clientePublicId: cliente.publicId,
       draft,
-      baseSnapshot: {
-        ...draft,
-      },
+      baseSnapshot: cloneClienteFormModel(draft),
       dirty: false,
       activeSection: 'data',
     };
@@ -139,6 +140,50 @@ export default class ClientesService {
     const updatedWorkspace: ClienteWorkspace = {
       ...workspace,
       activeSection: section,
+    };
+
+    this.workspaceSignal.set(updatedWorkspace);
+
+    return updatedWorkspace;
+  }
+
+  /**
+   * Actualiza el modelo editable y recalcula si difiere
+   * de la instantánea base de la ficha.
+   */
+  actualizarDraft(model: ClienteFormModel): ClienteWorkspace {
+    const workspace: ClienteWorkspace | null = this.workspace();
+
+    if (workspace === null) {
+      throw new Error('No hay ninguna ficha de cliente abierta.');
+    }
+
+    const draft: ClienteFormModel = cloneClienteFormModel(model);
+    const updatedWorkspace: ClienteWorkspace = {
+      ...workspace,
+      draft,
+      dirty: !areClienteFormModelsEqual(draft, workspace.baseSnapshot),
+    };
+
+    this.workspaceSignal.set(updatedWorkspace);
+
+    return updatedWorkspace;
+  }
+
+  /**
+   * Restaura la instantánea base de la ficha abierta.
+   */
+  cancelarCambios(): ClienteWorkspace {
+    const workspace: ClienteWorkspace | null = this.workspace();
+
+    if (workspace === null) {
+      throw new Error('No hay ninguna ficha de cliente abierta.');
+    }
+
+    const updatedWorkspace: ClienteWorkspace = {
+      ...workspace,
+      draft: cloneClienteFormModel(workspace.baseSnapshot),
+      dirty: false,
     };
 
     this.workspaceSignal.set(updatedWorkspace);

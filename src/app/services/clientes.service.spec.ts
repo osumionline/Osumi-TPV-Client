@@ -1,4 +1,5 @@
 import type { ClienteEstadisticasInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type ClienteFormModel from '@model/clientes/cliente-form.model';
 import type ClienteWorkspace from '@model/clientes/cliente-workspace.interface';
 import Cliente from '@model/clientes/cliente.model';
 import ClientesService from '@services/clientes.service';
@@ -144,6 +145,46 @@ describe('ClientesService', (): void => {
 
     expect(workspace.activeSection).toBe('statistics');
     expect(service.workspace()).toBe(workspace);
+  });
+
+  it('actualiza el draft y recalcula su estado dirty', (): void => {
+    const service: ClientesService = new ClientesService();
+    const initialWorkspace: ClienteWorkspace = service.crearBorrador();
+    const modifiedDraft: ClienteFormModel = {
+      ...initialWorkspace.draft,
+      nombreApellidos: 'Ada Lovelace',
+    };
+
+    const modifiedWorkspace: ClienteWorkspace = service.actualizarDraft(modifiedDraft);
+
+    expect(modifiedWorkspace.draft).toEqual(modifiedDraft);
+    expect(modifiedWorkspace.draft).not.toBe(modifiedDraft);
+    expect(modifiedWorkspace.dirty).toBe(true);
+
+    const restoredWorkspace: ClienteWorkspace = service.actualizarDraft(
+      initialWorkspace.baseSnapshot,
+    );
+
+    expect(restoredWorkspace.dirty).toBe(false);
+  });
+
+  it('cancela los cambios sin modificar la sección activa', (): void => {
+    const service: ClientesService = new ClientesService();
+    const initialWorkspace: ClienteWorkspace = service.crearBorrador();
+
+    service.seleccionarSeccion('billing');
+    service.actualizarDraft({
+      ...initialWorkspace.draft,
+      factIgual: false,
+      factNombreApellidos: 'Ada Lovelace Consulting',
+    });
+
+    const cancelledWorkspace: ClienteWorkspace = service.cancelarCambios();
+
+    expect(cancelledWorkspace.draft).toEqual(initialWorkspace.baseSnapshot);
+    expect(cancelledWorkspace.draft).not.toBe(initialWorkspace.baseSnapshot);
+    expect(cancelledWorkspace.dirty).toBe(false);
+    expect(cancelledWorkspace.activeSection).toBe('billing');
   });
 
   it('cierra la ficha sin alterar la colección de clientes', (): void => {

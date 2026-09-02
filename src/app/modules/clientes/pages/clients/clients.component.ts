@@ -7,13 +7,15 @@ import {
   type Signal,
   type WritableSignal,
 } from '@angular/core';
-import { MatIconButton } from '@angular/material/button';
+import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 import HeaderComponent from '@app/components/header/header.component';
+import type ClienteFormModel from '@model/clientes/cliente-form.model';
 import type ClienteWorkspaceSection from '@model/clientes/cliente-workspace-section.type';
 import type ClienteWorkspace from '@model/clientes/cliente-workspace.interface';
 import type Cliente from '@model/clientes/cliente.model';
+import ClientFormComponent from '@modules/clientes/components/client-form/client-form.component';
 import ClientSearchComponent from '@modules/clientes/components/client-search/client-search.component';
 import ClientSectionTabsComponent from '@modules/clientes/components/client-section-tabs/client-section-tabs.component';
 import { DialogService } from '@osumi/angular-tools';
@@ -29,9 +31,11 @@ import { getErrorMessage } from '@utils/error.utils';
   templateUrl: './clients.component.html',
   styleUrl: './clients.component.scss',
   imports: [
+    ClientFormComponent,
     ClientSearchComponent,
     ClientSectionTabsComponent,
     HeaderComponent,
+    MatButton,
     MatIconButton,
     MatIcon,
     MatTooltip,
@@ -75,6 +79,37 @@ export default class ClientsComponent implements OnInit {
    */
   selectSection(section: ClienteWorkspaceSection): void {
     this.clientesService.seleccionarSeccion(section);
+  }
+
+  /**
+   * Incorpora al workspace los cambios realizados en el formulario.
+   */
+  updateDraft(model: ClienteFormModel): void {
+    this.clientesService.actualizarDraft(model);
+  }
+
+  /**
+   * Solicita confirmación antes de restaurar la instantánea base.
+   */
+  cancelClienteChanges(): void {
+    const workspace: ClienteWorkspace | null = this.clientesService.workspace();
+
+    if (workspace === null || !workspace.dirty) {
+      return;
+    }
+
+    this.dialog
+      .confirm({
+        title: 'Confirmar',
+        content: '¿Quieres descartar todos los cambios realizados en esta ficha?',
+      })
+      .subscribe((result: boolean): void => {
+        if (!result) {
+          return;
+        }
+
+        this.clientesService.cancelarCambios();
+      });
   }
 
   /**

@@ -57,22 +57,20 @@
         <div class="clients__workspace">
             @switch (workspace.activeSection) {
             @case ('data') {
-            <div class="clients__section-state">
-                <h2>Datos del cliente</h2>
-
-                <p>
-                    El formulario de datos generales se incorporará en el siguiente paso.
-                </p>
+            <div class="clients__form">
+                <otpv-client-form section="data"
+                                  [initialValue]="workspace.draft"
+                                  [showActions]="false"
+                                  (modelChangeEvent)="updateDraft($event)" />
             </div>
             }
 
             @case ('billing') {
-            <div class="clients__section-state">
-                <h2>Datos de facturación</h2>
-
-                <p>
-                    Los datos de facturación se incorporarán en el siguiente paso.
-                </p>
+            <div class="clients__form">
+                <otpv-client-form section="billing"
+                                  [initialValue]="workspace.draft"
+                                  [showActions]="false"
+                                  (modelChangeEvent)="updateDraft($event)" />
             </div>
             }
 
@@ -107,6 +105,28 @@
             }
             }
         </div>
+        <footer class="clients__actions">
+            @if (workspace.dirty) {
+            <span class="clients__dirty-status">
+                Cambios sin guardar
+            </span>
+            }
+
+            <span class="clients__actions-spacer"></span>
+
+            <button mat-stroked-button
+                    type="button"
+                    [disabled]="!workspace.dirty"
+                    (click)="cancelClienteChanges()">
+                Cancelar
+            </button>
+
+            <button mat-flat-button
+                    type="button"
+                    disabled>
+                Guardar
+            </button>
+        </footer>
         }
         @else {
         <div class="clients__state">

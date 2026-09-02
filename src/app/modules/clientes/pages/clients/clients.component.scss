@@ -78,6 +78,31 @@
         overflow-y: auto;
     }
 
+    .clients__form {
+        min-height: 100%;
+        padding: 24px;
+    }
+
+    .clients__actions {
+        display: flex;
+        min-height: 60px;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 24px;
+        border-top: 1px solid var(--separator-color);
+        background-color: var(--color-white);
+    }
+
+    .clients__actions-spacer {
+        flex: 1;
+    }
+
+    .clients__dirty-status {
+        color: var(--color-dark-green);
+        font-size: 13px;
+        font-weight: 600;
+    }
+
     .clients__section-state {
         display: flex;
         height: 100%;
