@@ -12,6 +12,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import type { ArticuloDraftPatch } from '@model/articulos/articulo-draft.interface';
 import type ArticuloWorkspaceSection from '@model/articulos/articulo-workspace-section.type';
 import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.interface';
+import ArticleBarcodesComponent from '@modules/articulos/components/article-barcodes/article-barcodes.component';
 import ArticleDirectAccessesComponent from '@modules/articulos/components/article-direct-accesses/article-direct-accesses.component';
 import ArticleGeneralComponent from '@modules/articulos/components/article-general/article-general.component';
 import ArticleSectionTabsComponent from '@modules/articulos/components/article-section-tabs/article-section-tabs.component';
@@ -25,6 +26,7 @@ import ArticleWebComponent from '@modules/articulos/components/article-web/artic
   templateUrl: './article-workspace.component.html',
   styleUrl: './article-workspace.component.scss',
   imports: [
+    ArticleBarcodesComponent,
     ArticleDirectAccessesComponent,
     ArticleGeneralComponent,
     ArticleSectionTabsComponent,

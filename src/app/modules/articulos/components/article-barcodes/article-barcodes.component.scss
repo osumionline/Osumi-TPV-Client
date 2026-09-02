@@ -1,0 +1,145 @@
+:host {
+    display: block;
+    height: 100%;
+}
+
+.article-barcodes {
+    width: 100%;
+    padding: 16px 44px 28px;
+    box-sizing: border-box;
+}
+
+.article-barcodes__add {
+    display: flex;
+    width: min(520px, 100%);
+    gap: 10px;
+    margin: 0 auto;
+
+    >input {
+        min-width: 0;
+        height: 40px;
+        flex: 1;
+        padding: 0 12px;
+        border: 1px solid var(--color-dark-grey);
+        border-radius: 4px;
+        box-sizing: border-box;
+        background-color: var(--color-white);
+        font: inherit;
+        outline: 0;
+
+        &:focus {
+            border-color: var(--main-color);
+        }
+    }
+
+    >button {
+        min-width: 88px;
+    }
+}
+
+.article-barcodes__error {
+    width: min(520px, 100%);
+    margin: 8px auto 0;
+    color: var(--color-error);
+    font-size: 13px;
+}
+
+.article-barcodes__grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px 28px;
+    margin-top: 16px;
+}
+
+.barcode-card {
+    display: flex;
+    min-width: 0;
+    min-height: 210px;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--separator-color);
+    border-radius: 6px;
+    background-color: var(--color-white);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+}
+
+.barcode-card--default {
+    background-color: var(--color-very-light-grey);
+}
+
+.barcode-card__qr {
+    display: grid;
+    min-height: 166px;
+    flex: 1;
+    place-items: center;
+    padding: 12px;
+
+    qrcode {
+        display: block;
+        line-height: 0;
+    }
+}
+
+.barcode-card__pending {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 8px;
+    opacity: 0.55;
+
+    mat-icon {
+        width: 54px;
+        height: 54px;
+        font-size: 54px;
+    }
+
+    span {
+        font-size: 13px;
+    }
+}
+
+.barcode-card__footer {
+    display: flex;
+    min-height: 48px;
+    align-items: center;
+    gap: 10px;
+    padding: 0 10px;
+
+    >strong {
+        min-width: 0;
+        flex: 1;
+        overflow: hidden;
+        font-size: 17px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    >button {
+        flex: 0 0 auto;
+    }
+}
+
+.barcode-card--default {
+    .barcode-card__footer {
+        >strong {
+            padding-right: 40px;
+        }
+    }
+}
+
+@media (max-width: 1100px) {
+    .article-barcodes__grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 700px) {
+    .article-barcodes {
+        padding: 16px 20px 24px;
+    }
+
+    .article-barcodes__grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

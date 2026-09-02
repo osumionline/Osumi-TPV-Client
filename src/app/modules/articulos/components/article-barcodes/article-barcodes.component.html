@@ -1,0 +1,92 @@
+<section class="article-barcodes">
+    <form class="article-barcodes__add"
+          (submit)="addBarcode(); $event.preventDefault()">
+        <input #newBarcodeInput
+               id="article-new-barcode"
+               type="text"
+               autocomplete="off"
+               aria-label="Nuevo código de barras"
+               placeholder="Nuevo código de barras"
+               [value]="newBarcode()"
+               (input)="onNewBarcodeInput($event)"
+               (keydown)="onNewBarcodeKeydown($event)">
+
+        <button mat-flat-button
+                type="submit"
+                [disabled]="newBarcode().trim() === ''">
+            Añadir
+        </button>
+    </form>
+
+    @if (addError() !== null) {
+    <p class="article-barcodes__error">
+        {{ addError() }}
+    </p>
+    }
+
+    <div class="article-barcodes__grid">
+        <article class="barcode-card barcode-card--default">
+            <div class="barcode-card__qr">
+                @if (defaultBarcode(); as barcode) {
+                <qrcode [qrdata]="barcode"
+                        [width]="150"
+                        [margin]="1"
+                        elementType="svg"
+                        errorCorrectionLevel="M"
+                        ariaLabel="Código QR del código principal" />
+                } @else {
+                <div class="barcode-card__pending">
+                    <mat-icon>qr_code_2</mat-icon>
+
+                    <span>
+                        Se generará al guardar
+                    </span>
+                </div>
+                }
+            </div>
+
+            <footer class="barcode-card__footer">
+                <strong>
+                    @if (defaultBarcode(); as barcode) {
+                    {{ barcode }}
+                    } @else {
+                    Código principal
+                    }
+                </strong>
+            </footer>
+        </article>
+
+        @for (
+        codigo of tab().draft.codigosBarrasAdicionales;
+        track codigo.id ?? codigo.codigo;
+        let index = $index
+        ) {
+        <article class="barcode-card">
+            <div class="barcode-card__qr">
+                <qrcode [qrdata]="codigo.codigo"
+                        [width]="150"
+                        [margin]="1"
+                        elementType="svg"
+                        errorCorrectionLevel="M"
+                        [ariaLabel]="'Código QR ' + codigo.codigo" />
+            </div>
+
+            <footer class="barcode-card__footer">
+                <strong>
+                    {{ codigo.codigo }}
+                </strong>
+
+                <button mat-icon-button
+                        type="button"
+                        matTooltip="Eliminar código"
+                        [attr.aria-label]="
+                          'Eliminar código ' + codigo.codigo
+                        "
+                        (click)="removeBarcode(index)">
+                    <mat-icon>delete</mat-icon>
+                </button>
+            </footer>
+        </article>
+        }
+    </div>
+</section>
