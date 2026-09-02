@@ -1,11 +1,13 @@
 import {
   afterNextRender,
   Component,
+  effect,
   ElementRef,
   inject,
   input,
   output,
   signal,
+  untracked,
   viewChild,
   type InputSignal,
   type OutputEmitterRef,
@@ -20,7 +22,13 @@ import { MatInput } from '@angular/material/input';
 import createClienteFormInitialValue from '@model/clientes/cliente-form.initial-value';
 import type ClienteFormModel from '@model/clientes/cliente-form.model';
 import clienteFormSchema from '@model/clientes/cliente-form.schema';
+import {
+  areClienteFormModelsEqual,
+  cloneClienteFormModel,
+} from '@model/clientes/cliente-form.utils';
 import ProvinciasService from '@services/provincias.service';
+
+type ClientFormSection = 'all' | 'data' | 'billing';
 
 @Component({
   selector: 'otpv-client-form',
@@ -32,12 +40,16 @@ export default class ClientFormComponent {
   readonly provinciasService: ProvinciasService = inject(ProvinciasService);
 
   readonly saving: InputSignal<boolean> = input<boolean>(false);
-
   readonly submitLabel: InputSignal<string> = input<string>('Guardar');
+  readonly initialValue: InputSignal<ClienteFormModel> = input<ClienteFormModel>(
+    createClienteFormInitialValue(),
+  );
+  readonly section: InputSignal<ClientFormSection> = input<ClientFormSection>('all');
+  readonly showActions: InputSignal<boolean> = input<boolean>(true);
 
   readonly saveEvent: OutputEmitterRef<ClienteFormModel> = output<ClienteFormModel>();
-
   readonly cancelEvent: OutputEmitterRef<void> = output<void>();
+  readonly modelChangeEvent: OutputEmitterRef<ClienteFormModel> = output<ClienteFormModel>();
 
   readonly clienteModel: WritableSignal<ClienteFormModel> = signal<ClienteFormModel>(
     createClienteFormInitialValue(),
@@ -45,13 +57,31 @@ export default class ClientFormComponent {
 
   readonly clienteForm: FieldTree<ClienteFormModel> = form(this.clienteModel, clienteFormSchema);
 
-  private readonly nameInput: Signal<ElementRef<HTMLInputElement>> =
-    viewChild.required<ElementRef<HTMLInputElement>>('nameInput');
+  private readonly nameInput: Signal<ElementRef<HTMLInputElement> | undefined> =
+    viewChild<ElementRef<HTMLInputElement>>('nameInput');
 
   constructor() {
-    afterNextRender((): void => {
-      this.nameInput().nativeElement.focus();
+    effect((): void => {
+      const initialValue: ClienteFormModel = this.initialValue();
+      const currentValue: ClienteFormModel = untracked(this.clienteModel);
+
+      if (areClienteFormModelsEqual(initialValue, currentValue)) {
+        return;
+      }
+
+      this.clienteModel.set(cloneClienteFormModel(initialValue));
     });
+
+    afterNextRender((): void => {
+      this.nameInput()?.nativeElement.focus();
+    });
+  }
+
+  /**
+   * Comunica una modificación realizada por el usuario.
+   */
+  modelChanged(): void {
+    this.modelChangeEvent.emit(cloneClienteFormModel(this.clienteModel()));
   }
 
   /**
@@ -60,7 +90,7 @@ export default class ClientFormComponent {
   save(event: Event): void {
     event.preventDefault();
 
-    if (this.saving()) {
+    if (this.saving() || !this.showActions()) {
       return;
     }
 
@@ -68,7 +98,7 @@ export default class ClientFormComponent {
 
     if (this.clienteForm().invalid()) {
       if (this.clienteForm.nombreApellidos().invalid()) {
-        this.nameInput().nativeElement.focus();
+        this.nameInput()?.nativeElement.focus();
       }
 
       return;
@@ -83,7 +113,7 @@ export default class ClientFormComponent {
    * Cancela la edición sin guardar.
    */
   cancel(): void {
-    if (this.saving()) {
+    if (this.saving() || !this.showActions()) {
       return;
     }
 

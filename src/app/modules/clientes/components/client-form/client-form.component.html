@@ -1,6 +1,8 @@
 <form class="client-form"
       novalidate
+      (input)="modelChanged()"
       (submit)="save($event)">
+    @if (section() !== 'billing') {
     <section class="client-form__section">
         <h3>Datos del cliente</h3>
 
@@ -163,7 +165,9 @@
             </textarea>
         </mat-form-field>
     </section>
+    }
 
+    @if (section() !== 'data') {
     <section class="client-form__section">
         <mat-checkbox [formField]="clienteForm.factIgual">
             Mismos datos para la facturación
@@ -307,7 +311,9 @@
         </div>
         }
     </section>
+    }
 
+    @if (showActions()) {
     <div class="client-form__actions">
         <button mat-stroked-button
                 type="button"
@@ -322,4 +328,5 @@
             {{ saving() ? 'Guardando...' : submitLabel() }}
         </button>
     </div>
+    }
 </form>
