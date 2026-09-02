@@ -1,0 +1,39 @@
+<section class="article-notes">
+    <div class="article-notes__layout">
+        <label class="article-notes__field">
+            <span>
+                Observaciones
+            </span>
+
+            <textarea rows="14"
+                      autocomplete="off"
+                      placeholder="Observaciones del artículo"
+                      [value]="tab().draft.observaciones"
+                      (input)="onObservacionesInput($event)">
+            </textarea>
+        </label>
+
+        <aside class="article-notes__settings">
+            <div class="article-notes__settings-header">
+                <strong>
+                    Mostrar observaciones en
+                </strong>
+
+                <p>
+                    Indica en qué partes de la aplicación deben
+                    mostrarse estas observaciones.
+                </p>
+            </div>
+
+            <mat-slide-toggle [checked]="tab().draft.mostrarObservacionesPedidos"
+                              (change)="onMostrarPedidosChange($event.checked)">
+                Pedidos
+            </mat-slide-toggle>
+
+            <mat-slide-toggle [checked]="tab().draft.mostrarObservacionesVentas"
+                              (change)="onMostrarVentasChange($event.checked)">
+                Ventas
+            </mat-slide-toggle>
+        </aside>
+    </div>
+</section>

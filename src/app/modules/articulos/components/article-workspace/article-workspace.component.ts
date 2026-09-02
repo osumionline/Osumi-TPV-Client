@@ -15,6 +15,7 @@ import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.i
 import ArticleBarcodesComponent from '@modules/articulos/components/article-barcodes/article-barcodes.component';
 import ArticleDirectAccessesComponent from '@modules/articulos/components/article-direct-accesses/article-direct-accesses.component';
 import ArticleGeneralComponent from '@modules/articulos/components/article-general/article-general.component';
+import ArticleNotesComponent from '@modules/articulos/components/article-notes/article-notes.component';
 import ArticleSectionTabsComponent from '@modules/articulos/components/article-section-tabs/article-section-tabs.component';
 import ArticleWebComponent from '@modules/articulos/components/article-web/article-web.component';
 
@@ -29,6 +30,7 @@ import ArticleWebComponent from '@modules/articulos/components/article-web/artic
     ArticleBarcodesComponent,
     ArticleDirectAccessesComponent,
     ArticleGeneralComponent,
+    ArticleNotesComponent,
     ArticleSectionTabsComponent,
     ArticleWebComponent,
     MatIcon,

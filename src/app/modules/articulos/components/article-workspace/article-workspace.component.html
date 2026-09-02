@@ -67,6 +67,11 @@
                                (draftChangeEvent)="emitDraftChange($event)" />
         }
 
+        @case ('notes') {
+        <otpv-article-notes [tab]="tab()"
+                            (draftChangeEvent)="emitDraftChange($event)" />
+        }
+
         @default {
         <div class="article-workspace__pending">
             Este apartado se implementará en su siguiente bloque.
