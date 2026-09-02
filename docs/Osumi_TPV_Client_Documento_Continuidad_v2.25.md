@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.24  
-**Fecha:** 1 de septiembre de 2026  
-**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos** continúa en frontend. Todo `13B — Infraestructura backend` está cerrado, incluido `13B.6E — unificación total de imágenes en WebP`. `13C — Workspace y carga de artículos` está cerrado y probado. **`13D — General` está completamente cerrado ✅. `13E — WEB` queda también cerrado como mini-hito ✅: contenido web, galería de fotos 0..N, staging WebP, crop, orden/principal, eliminación y ciclo de vida de temporales están implementados y validados.** WEB forma parte del mismo `ArticuloDraft` y **no tiene guardado independiente**: se persistirá con las acciones globales del artículo. El siguiente apartado es **`13F — Códigos de barras`**.
+**Versión:** 2.25  
+**Fecha:** 2 de septiembre de 2026  
+**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos** continúa en frontend. Todo `13B — Infraestructura backend` está cerrado, incluido `13B.6E — unificación total de imágenes en WebP`. `13C — Workspace y carga de artículos` está cerrado y probado. **`13D — General`, `13E — WEB`, `13F — Códigos de barras` y `13G — Observaciones` están cerrados y validados ✅.** Todos son apartados del mismo `ArticuloDraft` y **ninguno tiene guardado independiente**: se persistirán con las acciones globales del artículo. El siguiente apartado es **`13H — Histórico`**.
 
 > **Regla crítica de entorno TicketBAI:** el producto usa `production` por defecto. Durante desarrollo/pruebas manuales se usa `app_data.json → ticketBai.environment = "test"` junto con el token TEST correspondiente. No añadir selector de entorno a la UI.
 
@@ -74,9 +74,9 @@ Ventas 12 — Postventa                             🟦
     13E.2 Fotos 0..N                               ✅
       13E.2A Staging + galería 0..N               ✅
       13E.2B Crop + ciclo de vida staging         ✅
-  13F Códigos de barras                           🟦 SIGUIENTE
-  13G Observaciones                               ⬜
-  13H Histórico                                   ⬜
+  13F Códigos de barras                           ✅ MINI-HITO CERRADO
+  13G Observaciones                               ✅ MINI-HITO CERRADO
+  13H Histórico                                   🟦 SIGUIENTE
   13I Baja / duplicado / acciones                 ⬜
   13J Estadísticas                                ⏸️ diseño posterior
   13K Integración con Ventas                      ⬜
@@ -730,19 +730,26 @@ No implementar automatización todavía.
 
 # 19. Códigos de barras
 
+`13F — Códigos de barras` está **cerrado ✅**.
+
+La pestaña edita el mismo `ArticuloDraft`; **añadir o borrar una tarjeta no persiste nada todavía**. La sincronización real con SQLite queda dentro del guardado global del artículo.
+
 ## Código obligatorio por localizador
 
 Siempre existe un código visual por defecto basado en el localizador.
 
-Se representa como QR.
+Se representa como QR mediante `angularx-qrcode`.
 
 Reglas:
 
 - obligatorio;
+- no editable;
 - no eliminable;
-- derivado del localizador.
+- derivado del localizador;
+- tarjeta visualmente diferenciada del resto;
+- no muestra icono de borrar.
 
-Para un artículo nuevo no existe QR definitivo hasta que el backend genere el localizador.
+Para un artículo nuevo no existe QR definitivo hasta que el backend genere el localizador. La tarjeta principal se mantiene visible e indica que el código se generará al guardar.
 
 La auditoría confirmó que el código por defecto **sí es una fila real de `codigo_barras`**:
 
@@ -759,7 +766,25 @@ El backend crea el artículo y su código por defecto dentro de la misma transac
 0..N
 ```
 
-Pueden añadirse o eliminarse libremente.
+UX definitiva:
+
+- al entrar en la pestaña, foco automático en `Nuevo código de barras`;
+- el input acepta escritura manual o lector USB;
+- `Enter` añade inmediatamente el código al draft;
+- después de añadir, el input queda vacío y recupera el foco;
+- los códigos se muestran en tarjetas, tres por fila en pantallas amplias;
+- cada tarjeta muestra QR + valor del código + icono de borrar;
+- los códigos existentes no se editan inline: se añaden o eliminan;
+- borrar una tarjeta solo modifica el draft, no SQLite.
+
+Validación local:
+
+- no permitir vacío;
+- no permitir duplicados dentro del mismo draft;
+- un código adicional no puede coincidir con el localizador actual;
+- un código adicional no puede coincidir con el acceso directo actual.
+
+La validación definitiva de colisiones globales sigue en backend durante el guardado, incluyendo otros códigos, localizadores y accesos directos activos.
 
 ---
 
@@ -810,13 +835,24 @@ Debe conservar información histórica aunque el artículo sea dado de baja.
 
 # 22. Observaciones
 
-Campos:
+`13G — Observaciones` está **cerrado ✅**.
+
+Campos implementados:
 
 ```text
 Observaciones
 Mostrar en Ventas
 Mostrar en Pedidos
 ```
+
+La pestaña usa:
+
+- un textarea amplio para el texto único de observaciones;
+- `MatSlideToggle` para `Mostrar en Ventas`;
+- `MatSlideToggle` para `Mostrar en Pedidos`;
+- disposición en dos columnas en pantallas amplias: texto a la izquierda y opciones de visibilidad a la derecha.
+
+Los tres campos modifican directamente el mismo `ArticuloDraft` mediante `ArticuloDraftPatch`, participan en el `dirty` global y **no tienen guardado independiente**.
 
 Si `Mostrar en Ventas` está activo:
 
@@ -834,7 +870,7 @@ línea de pedido
 → tooltip con observaciones
 ```
 
-Se usa el mismo texto de observaciones.
+Se usa el mismo texto de observaciones. Los toggles permanecen conceptualmente independientes de que el texto esté vacío o no.
 
 ---
 
@@ -2262,10 +2298,91 @@ Por tanto, la persistencia definitiva de WEB se integra con las acciones inferio
 
 ---
 
+# 28E. 13F — Códigos de barras ✅ MINI-HITO COMPLETAMENTE CERRADO
+
+`13F` queda cerrado y validado funcional y visualmente por el usuario.
+
+La pestaña forma parte del mismo `ArticuloDraft`; no existe guardado propio.
+
+UX definitiva:
+
+```text
+entrar en CÓDIGOS DE BARRAS
+→ foco automático en Nuevo código de barras
+→ escribir o escanear
+→ Enter / Añadir
+→ tarjeta aparece inmediatamente en el draft
+```
+
+Visualmente:
+
+- `angularx-qrcode` genera los QR;
+- tres tarjetas por fila en pantallas amplias;
+- código por defecto en tarjeta diferenciada, sin borrar;
+- códigos adicionales en tarjetas con QR, valor e icono de borrar;
+- no existe edición inline de códigos ya añadidos.
+
+Código por defecto:
+
+```text
+localizador
+→ fila real codigo_barras
+→ por_defecto = 1
+```
+
+Para un artículo nuevo, la tarjeta principal se muestra como pendiente hasta disponer del localizador generado por backend.
+
+Los adicionales son `0..N` y solo modifican `codigosBarrasAdicionales` del draft. Añadir/eliminar no escribe SQLite; el guardado global sincronizará altas y bajas lógicas.
+
+Validación local cerrada:
+
+- vacío no permitido;
+- duplicado dentro de la ficha no permitido;
+- no coincidir con localizador actual;
+- no coincidir con acceso directo actual.
+
+La validación global de colisiones permanece en backend.
+
+---
+
+# 28F. 13G — Observaciones ✅ MINI-HITO COMPLETAMENTE CERRADO
+
+`13G` queda cerrado y validado funcional y visualmente por el usuario.
+
+Contenido:
+
+```text
+Observaciones
+Mostrar en Pedidos
+Mostrar en Ventas
+```
+
+Implementación:
+
+- textarea amplio para el texto;
+- `MatSlideToggle` para Pedidos;
+- `MatSlideToggle` para Ventas;
+- diseño de dos columnas en pantallas amplias;
+- los cambios actualizan directamente el mismo `ArticuloDraft`;
+- participa en el `dirty` global;
+- no existe guardado/cancelación independiente de Observaciones.
+
+La intención funcional futura se mantiene:
+
+```text
+Mostrar en Ventas = true
+→ la línea de venta podrá mostrar icono/tooltip con observaciones
+
+Mostrar en Pedidos = true
+→ la línea de pedido podrá mostrar icono/tooltip con observaciones
+```
+
+---
+
 # 29. Próximo paso exacto
 
 ```text
-13F — Códigos de barras
+13H — Histórico
 ```
 
 Estado previo cerrado:
@@ -2273,19 +2390,27 @@ Estado previo cerrado:
 ```text
 13D — General ✅
 13E — WEB ✅
+13F — Códigos de barras ✅
+13G — Observaciones ✅
 ```
 
-`13F` debe continuar sobre el mismo `ArticuloDraft` y el mismo sistema de pestañas/dirty. No crear un guardado independiente para Códigos de barras: igual que WEB, será otro apartado del único artículo y participará en las acciones inferiores globales.
+`13H` es el siguiente apartado que **ya no se limita a editar el draft**: debe consultar movimientos históricos reales del artículo desde backend.
 
-Alcance ya definido para Códigos de barras:
+Alcance funcional ya definido para Histórico:
 
 ```text
-- código obligatorio por localizador = fila real codigo_barras
-- códigos adicionales 0..N
-- alta/edición/eliminación en el draft
-- impedir duplicados y colisiones según reglas backend
-- mantener por_defecto únicamente para el código basado en localizador
+- movimientos de stock
+- fecha
+- tipo
+- stock previo
+- diferencia
+- stock final
+- PUC
+- PVP
+- referencias a Venta/Pedido cuando correspondan
 ```
+
+Debe conservarse la información histórica aunque el artículo sea dado de baja. Antes de proponer UI, revisar `main`, esquema `historico_articulo`, import legacy y los servicios/repositorios existentes para reutilizar la semántica de tipos ya cerrada (incluido ajuste manual tipo 4).
 
 ---
 
@@ -2304,6 +2429,7 @@ Alcance ya definido para Códigos de barras:
 | **2.22** | **01/09/2026** | **13D General cerrado definitivamente ✅: accesos directos globales junto a Localizador, persistencia inmediata y sincronización de tabs, General compacto, toggles Material, categorías multiselect, UI a 2 decimales con precisión interna preservada, recálculo en escritura, selección al foco, modal de márgenes y reutilización de pestaña nueva al buscar/resolver; siguiente en aquella versión: Códigos de barras (posteriormente desplazado a 13F al reincorporar WEB)** |
 | **2.23** | **01/09/2026** | **Se reincorpora la pestaña WEB al roadmap como `13E` y pasa a ser el siguiente mini-hito; Códigos de barras y apartados posteriores se desplazan a `13F`–`13K`. WEB mantiene Mostrar en web, descripciones y fotos 0..N, conservando datos al desactivar Venta online.** |
 | **2.24** | **01/09/2026** | **13E WEB ✅ mini-hito cerrado: contenido WEB, galería 0..N en columna derecha, file picker/drag&drop, principal y orden, staging común WebP, crop libre secuencial, rollback de lotes y ciclo de vida completo de temporales al eliminar/cancelar/cerrar/reutilizar borrador. Se elimina el concepto de “guardado WEB”: WEB forma parte del ArticuloDraft único y se guarda/cancela con las acciones globales del artículo. Siguiente: 13F Códigos de barras.** |
+| **2.25** | **02/09/2026** | **13F Códigos de barras ✅ y 13G Observaciones ✅ cerrados. Códigos recupera UX legacy con foco automático, lector/Enter, tarjetas QR 3 por fila mediante angularx-qrcode, principal diferenciado no borrable y adicionales add/remove solo en draft. Observaciones añade textarea + toggles Material Pedidos/Ventas sobre el mismo ArticuloDraft. Siguiente: 13H Histórico.** |
 ---
 
 # 31. Prompt de arranque recomendado
@@ -2312,7 +2438,7 @@ Alcance ya definido para Códigos de barras:
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.24.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.25.
 
 Estado:
 - Ventas 12C.1–12C.8 ✅
@@ -2350,9 +2476,9 @@ Estado:
   - 13E.2 Fotos 0..N ✅
     - 13E.2A staging + galería 0..N ✅
     - 13E.2B crop + ciclo de vida staging ✅
-- 13F Códigos de barras 🟦 SIGUIENTE
-- 13G Observaciones ⬜
-- 13H Histórico ⬜
+- 13F Códigos de barras ✅ CERRADO
+- 13G Observaciones ✅ CERRADO
+- 13H Histórico 🟦 SIGUIENTE
 - 13I Baja / duplicado / acciones ⬜
 - 13J Estadísticas ⏸️ diseño posterior
 - 13K Integración con Ventas ⬜
@@ -2394,6 +2520,10 @@ Reglas críticas:
 - Creación Marca+Proveedor y Proveedor+marcas se hace transaccionalmente en backend.
 - Tras un COMMIT de creación no hacer depender el éxito de una recarga posterior innecesaria.
 - Código por defecto = fila real codigo_barras basada en localizador.
+- Códigos de barras adicionales: se añaden/eliminan solo en el draft; no hay edición inline ni guardado independiente.
+- La pestaña Códigos de barras enfoca automáticamente el input nuevo, acepta lector USB + Enter y muestra QR con angularx-qrcode en tarjetas 3 por fila.
+- La tarjeta del código por defecto se diferencia visualmente y nunca muestra acción de borrar.
+- Observaciones comparte el mismo texto para Ventas/Pedidos y usa MatSlideToggle independientes para ambas visibilidades.
 - Cambio manual de stock crea historico_articulo tipo 4.
 - Alta con stock inicial no genera histórico.
 - Baja = soft delete artículo + códigos; conservar histórico/relaciones/fotos.
@@ -2415,9 +2545,9 @@ Convenciones:
 - Trabajar por lotes coherentes y no avanzar sin confirmación.
 
 Próximo paso exacto:
-13F — Códigos de barras.
+13H — Histórico.
 ```
 
 ---
 
-**Fin del documento de continuidad v2.24.**
+**Fin del documento de continuidad v2.25.**
