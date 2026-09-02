@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.28  
+**Versión:** 2.29  
 **Fecha:** 2 de septiembre de 2026  
-**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**: infraestructura backend, workspace, General, WEB, Códigos de barras, Observaciones, Histórico, acciones, Estadísticas e integración con Ventas. `13J — Estadísticas` usa Apache ECharts mediante `ngx-echarts` sobre la consulta agregada de ventas netas; `13K — Integración con Ventas` permite abrir o activar la ficha desde una línea normal de venta preservando cualquier cambio local. El siguiente hito es **`14 — Clientes`**.
+**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**. El **Hito 14 — Clientes está en curso 🟦**: su análisis funcional y técnico está cerrado, el plan 14A–14K está acordado y `14A — Documento de continuidad` queda completado con esta versión. Clientes reutilizará la colección cargada en memoria, el histórico documental de ventas, las estadísticas rápidas y la infraestructura de facturas ya presentes. Las facturas de Clientes serán agrupaciones posteriores de ventas ya cobradas y enviadas a TicketBAI; no generarán cobros ni realizarán ninguna operación TicketBAI. El siguiente paso es **`14B — Base del apartado Clientes`**.
 
 > **Regla crítica de entorno TicketBAI:** el producto usa `production` por defecto. Durante desarrollo/pruebas manuales se usa `app_data.json → ticketBai.environment = "test"` junto con el token TEST correspondiente. No añadir selector de entorno a la UI.
 
@@ -88,7 +88,18 @@ Ventas 12 — Postventa                             🟦
     13J.2 Gráfica + filtros                       ✅
   13K Integración con Ventas                      ✅ MINI-HITO CERRADO
 
-14 Clientes                                       🟦 SIGUIENTE
+14 Clientes                                       🟦 EN CURSO
+  14A Documento de continuidad y plan             ✅
+  14B Base del apartado Clientes                  ⬜ SIGUIENTE
+  14C Búsqueda y selección                        ⬜
+  14D Workspace y formulario                     ⬜
+  14E Persistencia y mantenimiento                ⬜
+  14F Ventas del cliente                          ⬜
+  14G Estadísticas generales                      ⬜
+  14H Consumo mensual                             ⬜
+  14I Dominio y listado de facturas               ⬜
+  14J Editor de factura                           ⬜
+  14K Emisión y documentos                        ⬜
 15 Almacén                                        ⬜
 16 Compras                                        ⬜
 
@@ -223,7 +234,7 @@ Roadmap acordado:
 16 Compras
 ```
 
-`13 — Artículos` está completamente cerrado. **Clientes** se introduce entre Artículos y Almacén; es el siguiente hito y se espera que sea un módulo pequeño que permita cerrar rápidamente esa parte antes de entrar en Almacén.
+`13 — Artículos` está completamente cerrado. **Clientes** se introduce entre Artículos y Almacén y ya está en curso. Su análisis ha confirmado que la ficha básica es pequeña, pero Facturas requiere un bloque propio por su selección de ventas, estados, cierre transaccional y generación documental.
 
 ---
 
@@ -3403,33 +3414,485 @@ Con ello, **todo el Hito 13 — Artículos queda terminado y cerrado ✅**.
 
 ---
 
-# 29. Próximo paso exacto
+# 29. Hito 14 — Clientes 🟦 EN CURSO
+
+El análisis funcional y técnico está cerrado. El módulo conservará el modelo mental útil del TPV legacy, pero se implementará sobre la arquitectura actual y corregirá sus problemas de consultas, estado, precisión monetaria, integridad y documentación.
+
+## 29.1 Objetivo y alcance
+
+Clientes gestiona las fichas de los clientes registrados en el TPV.
+
+No se mostrará una lista permanente de todos los clientes. El flujo principal será:
 
 ```text
-14 — Clientes
-→ primer paso: análisis funcional legacy y diseño técnico/UX
+Clientes
+→ estado inicial casi vacío
+→ Buscar cliente o Nuevo cliente
+→ seleccionar/crear
+→ mostrar una única ficha de cliente
 ```
 
-Estado previo:
+Solo puede existir un cliente activo en el workspace de Clientes. No habrá pestañas independientes para varios clientes como en Artículos.
+
+El estado se conservará durante la ejecución de la aplicación:
+
+- cliente seleccionado;
+- cliente nuevo todavía no persistido;
+- sección activa;
+- draft y baseSnapshot;
+- estado dirty;
+- datos ya cargados de secciones de solo lectura cuando sigan vigentes.
+
+Navegar a otro módulo y volver no debe perder este estado. Intentar buscar otro cliente, crear uno nuevo, quitar la ficha o descartarla con cambios pendientes exige confirmación.
+
+## 29.2 Forma de trabajo acordada
+
+El desarrollo continuará manualmente y por mini-hitos:
+
+1. El asistente revisa el main y los archivos actuales antes de cada propuesta.
+2. Se acuerda el objetivo del mini-hito.
+3. Para archivos nuevos se entrega el contenido completo.
+4. Para archivos existentes se muestra un fragmento actual identificable y cómo debe quedar.
+5. El usuario aplica manualmente los cambios.
+6. El usuario ejecuta las comprobaciones, valida visual y funcionalmente y comunica cualquier ajuste propio.
+7. No se avanza al siguiente mini-hito hasta recibir su confirmación.
+
+El asistente no hará commits ni pull requests. Puede leer los repositorios legacy y actual para fundamentar las propuestas.
+
+Los tests, typecheck, lint y builds pertinentes se ejecutarán en cada mini-hito y no se acumularán para el cierre.
+
+## 29.3 Infraestructura actual reutilizable
+
+El repositorio nuevo ya dispone de:
+
+- carga completa de clientes durante ApplicationStartupService;
+- ClientesService Angular con colección reactiva en memoria;
+- búsqueda por id y publicId;
+- contrato ClienteInterface con todos los datos generales y de facturación;
+- formulario signal-based usado por la creación rápida desde Ventas;
+- validación y creación de clientes con solo nombre obligatorio;
+- unicidad de DNI/CIF entre clientes activos;
+- descuento persistido en puntos básicos;
+- búsqueda normalizada ya usada por ClientSelectorComponent;
+- estadísticas rápidas de últimas compras y top de artículos;
+- caché e invalidación de estadísticas después de guardar una venta;
+- documento de protección de datos y servicio de impresión;
+- histórico de ventas, detalle, PDF, reimpresión y envío de ticket por email;
+- tablas factura y factura_venta;
+- estados de factura borrador, emitida y anulada;
+- instantánea de datos de facturación;
+- unicidad de la relación de una venta con una factura;
+- importación legacy de facturas y de sus relaciones con ventas.
+
+Todavía faltan:
+
+- ruta y página completa de Clientes;
+- workspace específico de un único cliente;
+- actualización y baja lógica;
+- consulta de ventas filtrada por cliente;
+- sumas económicas y consumo gráfico;
+- contratos, repositorios, servicios e IPC operativos para facturas;
+- editor de borradores;
+- pipeline documental de facturas.
+
+## 29.4 Entrada, búsqueda y selección
+
+El estado inicial mostrará:
+
+- título Clientes;
+- acción Buscar cliente;
+- acción Nuevo cliente;
+- mensaje para elegir un cliente mediante el buscador.
+
+La búsqueda se hará exclusivamente en el renderer sobre ClientesService.clientes().
+
+Regla cerrada:
 
 ```text
-12C.9 — TicketBAI devoluciones/mixtas ⏸️ Berein
-13 — Artículos ✅ HITO COMPLETAMENTE CERRADO
+buscar cliente
+→ NO IPC
+→ NO backend
+→ NO SQLite
+→ filtrar colección ya cargada en memoria
 ```
 
-Antes de implementar Clientes:
+El texto se normalizará igual que en el selector de Ventas y buscará al menos en:
 
-- revisar el `main` actual;
-- auditar el módulo Clientes del TPV legacy y el esquema/importación ya existente;
-- inventariar contratos, repositories, servicios y UI reutilizables del cliente nuevo;
-- acordar alcance funcional, workspace o navegación, búsquedas, edición, bajas y relaciones con Ventas/facturación;
-- dividir el Hito 14 en mini-hitos coherentes antes de escribir código.
+- nombre y apellidos;
+- DNI/CIF;
+- teléfono;
+- email.
 
-No asumir que Clientes replica exactamente Artículos ni comenzar la implementación sin cerrar primero el análisis funcional.
+La lista podrá mostrar nombre, teléfono y fecha de última venta. Se implementarán foco inicial, navegación cómoda, estado sin resultados y selección inequívoca.
+
+Seleccionar un cliente cerrará el modal y mostrará su ficha. Nuevo cliente abrirá directamente una ficha vacía.
+
+## 29.5 Estructura de la ficha
+
+La ficha tendrá estas secciones:
+
+```text
+DATOS
+DATOS DE FACTURACIÓN
+FACTURAS
+VENTAS
+ESTADÍSTICAS
+```
+
+Para un cliente nuevo solo se mostrarán Datos y Datos de facturación. Facturas, Ventas y Estadísticas requieren un cliente persistido.
+
+Guardar y Cancelar serán acciones globales del draft de cliente, no acciones independientes por pestaña.
+
+La ficha básica reutilizará un único modelo y esquema de validación compartido con la creación rápida de cliente desde Ventas. No habrá dos reglas de negocio diferentes para crear el mismo cliente.
+
+## 29.6 Datos generales y facturación
+
+Datos generales:
+
+- nombre y apellidos;
+- DNI/CIF;
+- teléfono;
+- email;
+- descuento;
+- dirección;
+- código postal;
+- población;
+- provincia;
+- observaciones.
+
+Solo nombre y apellidos es obligatorio. Esto permite crear fichas rápidas.
+
+Datos de facturación incluye el selector Mismos datos para la facturación.
+
+Cuando está activo:
+
+- los datos efectivos de facturación se derivan de los datos generales;
+- los datos alternativos quedan ocultos;
+- los valores alternativos previamente introducidos se conservan para poder recuperarlos al desmarcar la opción.
+
+Cuando está desactivado se muestran nombre/razón social, DNI/CIF, teléfono, email, dirección, código postal, población y provincia específicos de facturación.
+
+Persistencia:
+
+- CREATE y UPDATE se validan también en backend;
+- después del COMMIT, el cliente devuelto se incorpora o reemplaza directamente en la colección en memoria;
+- el éxito no depende de una recarga posterior innecesaria;
+- draft y baseSnapshot se actualizan con la instancia canónica;
+- dirty pasa a false.
+
+Cancelar restaura baseSnapshot después de confirmar si hay cambios.
+
+Baja:
+
+- siempre lógica;
+- conserva las ventas del cliente;
+- conserva sus facturas y relaciones;
+- no desasocia documentos históricos;
+- lo elimina de la colección activa y del buscador;
+- se bloquea mientras el cliente tenga una factura en borrador;
+- si falla el backend, la ficha permanece abierta.
+
+La acción denominada Imprimir LOPD en el TPV antiguo se presentará como documento de protección de datos y reutilizará el generador ya implementado.
+
+## 29.7 Ventas del cliente
+
+La pestaña Ventas mostrará las ventas persistidas asociadas al cliente.
+
+Debe reutilizar el dominio ya cerrado del Histórico de Ventas:
+
+- consulta por periodo;
+- resumen de venta;
+- detalle y líneas históricas;
+- pagos;
+- regeneración/reimpresión del ticket;
+- envío por email.
+
+No se duplicarán pipelines de PDF, impresión o email.
+
+Los filtros temporales tendrán un significado explícito. No se repetirá el comportamiento legacy en el que Todos/Todos cargaba silenciosamente el mes actual.
+
+Cada botón actuará sobre la venta de su propia fila. No se reproducirá el bug legacy que usaba ventaSelected aunque se hubiese pulsado otra fila.
+
+Las ventas y devoluciones se mostrarán con sus importes firmados según el histórico real. Esta pestaña es de consulta y no forma parte del draft editable del cliente.
+
+## 29.8 Estadísticas
+
+Estadísticas tendrá cuatro bloques.
+
+### Últimos artículos comprados
+
+El contenido histórico llamado Últimas ventas son realmente líneas de venta. Se mostrará como Últimos artículos comprados, con un límite inicial de 20 registros.
+
+Campos previstos:
+
+- fecha;
+- localizador;
+- nombre;
+- unidades;
+- PVP;
+- importe real.
+
+### Artículos más comprados
+
+Top de artículos agregado por cliente.
+
+Orden cerrado:
+
+```text
+importe real DESC
+→ unidades DESC
+→ nombre
+```
+
+Se corrige el legacy, que ordenaba primero por unidades pese a mostrar el importe como dato principal.
+
+### Suma de ventas
+
+Acordeón agrupado por año y, al desplegar, por meses.
+
+Semántica económica acordada:
+
+- PUC = coste firmado;
+- PVP = importe real vendido después de descuentos;
+- Beneficio = PVP real − PUC;
+- Margen = Beneficio / PVP real;
+- si el denominador es cero, el margen se presenta de forma segura.
+
+Las devoluciones restan en las estadísticas. Las ventas soft-deleted se excluyen. Los agregados se calculan en SQLite con unidades monetarias enteras; Angular solo presenta los resultados.
+
+Los años se derivan de los datos disponibles, sin lista fija de cinco años.
+
+### Consumo mensual
+
+Se implementará la parte que quedó incompleta en el TPV antiguo.
+
+Usará el patrón funcional y visual de Estadísticas de Artículos:
+
+- gráfica de barras con ECharts/ngx-echarts;
+- métrica de importe real consumido;
+- filtro Mes concreto/Todos;
+- filtro Año concreto/Todos;
+- refresco al cambiar cualquier filtro;
+- protección ante respuestas fuera de orden;
+- períodos sin actividad rellenados con cero;
+- año actual y Todos los meses como selección inicial.
+
+Resoluciones:
+
+- año + mes → días del mes;
+- año + Todos → doce meses;
+- Todos + mes → ese mes entre años;
+- Todos + Todos → todos los meses cronológicos.
+
+Las estadísticas son de solo lectura, se cargan al entrar en la pestaña y nunca generan dirty.
+
+Las estadísticas rápidas ya usadas en Ventas se mantendrán ligeras. Las sumas y la gráfica completa no deben cargarse innecesariamente en el workspace de Ventas.
+
+## 29.9 Facturas: significado de dominio
+
+Las facturas de Clientes son agrupaciones posteriores de ventas ya realizadas.
+
+Reglas cerradas:
+
+- cada venta ya está cobrada;
+- cada venta ya ha seguido su flujo TicketBAI;
+- crear, editar, cerrar, imprimir o enviar una factura de Clientes no cobra nada;
+- Clientes no realiza ninguna llamada ni operación TicketBAI;
+- la factura sirve como justificante oficial de la tienda sobre las compras agrupadas;
+- cerrar una factura no modifica las ventas incluidas;
+- el importe se deriva de las ventas persistidas.
+
+Cardinalidad correcta:
+
+```text
+Factura → 1..N ventas
+Venta   → 0..1 factura
+```
+
+Por tanto:
+
+- una factura puede y debe agrupar una o varias ventas;
+- una misma venta no puede pertenecer a varias facturas;
+- el UNIQUE sobre factura_venta.id_venta expresa esta última restricción;
+- nunca debe interpretarse como una única venta por factura.
+
+Ventas elegibles:
+
+- pertenecen al cliente de la factura;
+- no están soft-deleted;
+- son ventas positivas ordinarias;
+- no son devoluciones;
+- no pertenecen a ninguna otra factura;
+- las operaciones mixtas con componente de devolución quedan fuera mientras su dominio permanezca pendiente;
+- al editar un borrador, sus ventas ya asociadas continúan seleccionables.
+
+Las devoluciones siguen apareciendo en Ventas y restando en Estadísticas, pero nunca pueden incorporarse a una factura.
+
+Estados:
+
+- borrador: editable;
+- emitida: cerrada e inmutable;
+- anulada: inmutable y conservada para trazabilidad.
+
+Borrador:
+
+- exige al menos una venta para guardarse;
+- permite añadir y quitar ventas disponibles;
+- muestra el detalle de la venta seleccionada;
+- puede previsualizarse;
+- puede eliminarse;
+- al eliminarlo, sus ventas quedan disponibles de nuevo.
+
+Emitir/cerrar debe realizar en una única transacción:
+
+1. validar cliente y borrador;
+2. validar que todas las ventas siguen siendo elegibles;
+3. recalcular el importe desde SQLite;
+4. obtener los datos efectivos de facturación;
+5. guardar la instantánea de facturación;
+6. asignar serie, número y fecha de emisión;
+7. cambiar el estado a emitida.
+
+Después del COMMIT, la factura es de solo consulta. Imprimir y enviar por email son acciones documentales posteriores e independientes. No cambian su estado, no cobran y no ejecutan TicketBAI.
+
+Las facturas anuladas conservan sus relaciones con ventas. Solo eliminar un borrador libera las ventas.
+
+La UI de factura mantendrá el patrón útil del legacy:
+
+- listado de ventas a la izquierda;
+- detalle de la venta seleccionada a la derecha;
+- selección múltiple en borradores;
+- consulta sin controles de edición en emitidas/anuladas.
+
+## 29.10 Correcciones respecto al TPV legacy
+
+No se portarán literalmente estos comportamientos:
+
+| Legacy | Nueva implementación |
+| --- | --- |
+| El buscador llamaba al backend aunque los clientes estaban cargados | Filtrado exclusivo en memoria |
+| Al seleccionar cliente se cargaba todo a la vez | Carga lazy por pestaña |
+| impresa representaba a la vez impresión y cierre | estado explícito; impresa no gobierna la mutabilidad |
+| Facturas actualizaba relaciones sin una transacción única | Guardado y emisión transaccionales |
+| Número de factura mediante MAX + 1 sin protección | Numeración transaccional por serie y restricción UNIQUE |
+| Totales y márgenes con floats y cálculo en renderer | Agregación SQLite y dinero entero |
+| Años limitados al actual y cuatro anteriores | Años reales disponibles |
+| Todos/Todos significaba mes actual | Filtros explícitos y coherentes |
+| Botón de ticket actuaba sobre ventaSelected | Acción vinculada a su fila |
+| Top ordenado principalmente por unidades | Top ordenado por importe real |
+| Consumo mensual vacío | Gráfica funcional completa |
+| Borrado de cliente con mensaje contradictorio | Soft delete que preserva asociaciones y documentos |
+
+## 29.11 Plan de implementación 14A–14K
+
+### 14A — Documento de continuidad y plan ✅
+
+Esta versión 2.29 deja cerrado el análisis funcional, las decisiones y la secuencia de trabajo.
+
+### 14B — Base del apartado Clientes
+
+- ruta;
+- activación en cabecera;
+- página principal;
+- estado inicial;
+- workspace de un único cliente;
+- persistencia de sesión y protección dirty.
+
+### 14C — Búsqueda y selección
+
+- modal;
+- búsqueda totalmente en memoria;
+- foco y estados;
+- seleccionar, quitar y nuevo cliente.
+
+### 14D — Workspace y formulario
+
+- pestañas;
+- draft/baseSnapshot;
+- Datos;
+- Datos de facturación;
+- modelo y validaciones compartidos con la creación rápida.
+
+### 14E — Persistencia y mantenimiento
+
+- CREATE y UPDATE;
+- sincronización post-COMMIT de la colección;
+- Cancelar;
+- baja lógica;
+- bloqueo por borradores;
+- documento de protección de datos.
+
+### 14F — Ventas del cliente
+
+- consulta filtrada;
+- listado y detalle;
+- reimpresión;
+- email;
+- reutilización del Histórico.
+
+### 14G — Estadísticas generales
+
+- últimos artículos;
+- top por importe;
+- sumas anuales/mensuales;
+- PUC/PVP real/beneficio/margen.
+
+### 14H — Consumo mensual
+
+- endpoint agregado;
+- series temporales completas;
+- gráfica ECharts;
+- filtros y estados.
+
+### 14I — Dominio y listado de facturas
+
+- contratos/repository/service/API/IPC/preload;
+- listado y estados;
+- ventas disponibles;
+- creación de borradores;
+- cero operaciones TicketBAI.
+
+### 14J — Editor de factura
+
+- selección de varias ventas;
+- exclusión de devoluciones y ventas ya facturadas;
+- detalle de venta;
+- guardar/eliminar borrador;
+- liberar relaciones al eliminar.
+
+### 14K — Emisión y documentos
+
+- validación y cierre transaccional;
+- número, fecha, instantánea e importe;
+- bloqueo de emitida/anulada;
+- previsualización;
+- documento estable;
+- impresión y email;
+- regresión integral y cierre del Hito 14.
 
 ---
 
-# 30. Historial reciente
+# 30. Próximo paso exacto
+
+```text
+14B — Base del apartado Clientes
+```
+
+Antes de proponer cambios:
+
+- actualizar y revisar el main actual;
+- inventariar rutas y HeaderComponent;
+- revisar el patrón de persistencia de workspace de Ventas y Artículos;
+- revisar el servicio y modelos actuales de Clientes;
+- diseñar el mínimo estado de workspace necesario para un único cliente;
+- presentar el primer lote con archivos completos o fragmentos actual → nuevo;
+- esperar confirmación del usuario antes de avanzar a 14C.
+
+No implementar todavía búsqueda, CRUD completo, Ventas, Estadísticas ni Facturas dentro de 14B salvo la infraestructura mínima que el shell necesite.
+
+---
+
+# 31. Historial reciente
 
 | Versión | Fecha | Hito |
 | --- | --- | --- |
@@ -3448,15 +3911,16 @@ No asumir que Clientes replica exactamente Artículos ni comenzar la implementac
 | **2.26** | **02/09/2026** | **13H Histórico ✅ cerrado con API SQLite paginada/ordenada, MatTable/MatSort/MatPaginator remoto y MatPaginatorIntl global en castellano. Refinamiento UX: foco automático en Localizador al crear/activar drafts nuevos. 13I.1 Guardar/Cancelar global ✅ con mapper del draft, save IPC/preload, barra inferior, cleanup de staging y feedback “Artículo guardado correctamente” durante 4 s. 13I.2 Duplicar ✅: nueva pestaña dirty, identidades/stock/códigos/acceso/observaciones reseteados, configuración reutilizable conservada y fotos compartidas mediante nuevas relaciones al mismo asset `archivo`. Siguiente: 13I.3 Baja lógica.** |
 | **2.27** | **02/09/2026** | **13I.3 Baja lógica ✅ y 13I completo ✅: sección solo para persistidos, bloqueo con dirty, confirmación, deactivate vía API/IPC/preload, soft delete artículo+códigos y cierre de pestaña tras éxito preservando histórico/fotos/relaciones. 13J Estadísticas iniciado: diseño acordado con Tipo Unidades/Importe, Mes/Año concretos o Todos, ventas netas con devoluciones negativas, huecos a cero y cuatro resoluciones temporales. 13J.1 backend agregado ✅: SUM SQLite, availableYears continuo, series completas, validación, API/IPC/preload/servicio Angular y tests. Decisión para 13J.2: Apache ECharts + ngx-echarts; siguiente paso gráfica + filtros.** |
 | **2.28** | **02/09/2026** | **Hito 13 Artículos completamente cerrado ✅. 13J.2 añade gráfica de barras con ECharts/ngx-echarts, filtros reactivos Tipo/Mes/Año, total, tooltips, estados, protección ante respuestas fuera de orden y diseño compacto definitivo de 275 px; `null` representa Todos mediante `canSelectNullableOptions`. 13K integra las líneas normales de Ventas con la ficha de Artículos, abriendo o activando una única pestaña y preservando cambios dirty y el workspace de Ventas. Todo validado y subido. Siguiente hito: 14 Clientes.** |
+| **2.29** | **02/09/2026** | **14A ✅. Análisis funcional y plan de Clientes cerrados. Se acuerdan workspace de un único cliente, búsqueda totalmente en memoria, CRUD con soft delete, Ventas reutilizando Histórico, estadísticas reales con gráfica y facturas como agrupaciones 1..N de ventas positivas ya cobradas. Cada venta pertenece como máximo a una factura; devoluciones y mixtas no son elegibles; Clientes no usa TicketBAI. Siguiente: 14B Base del apartado Clientes.** |
 ---
 
-# 31. Prompt de arranque recomendado
+# 32. Prompt de arranque recomendado
 
 ```text
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.28.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.29.
 
 Estado:
 - Ventas 12C.1–12C.8 ✅
@@ -3492,8 +3956,12 @@ Estado:
   - 13J.2 gráfica + filtros ✅
 - 13K Integración con Ventas ✅ CERRADO
 - Todos los cambios del Hito 13 están validados y subidos al repositorio.
+- Hito 14 Clientes 🟦 EN CURSO
+  - análisis funcional y técnico ✅
+  - 14A Documento de continuidad y plan ✅
+  - 14B Base del apartado Clientes ⬜ SIGUIENTE
 
-Hito siguiente:
+Hito actual:
 14 Clientes 🟦
 
 Roadmap posterior:
@@ -3576,6 +4044,37 @@ Reglas críticas:
 - Varios, Devolución y Reserva mantienen sus acciones especiales y no abren la ficha normal de Artículos.
 - Si el artículo de una línea ya no está disponible, se avisa sin abandonar Ventas.
 - El workspace de Ventas permanece intacto al navegar a Artículos y volver.
+- Clientes usa un workspace de un único cliente, no pestañas múltiples.
+- El workspace conserva cliente/draft/baseSnapshot/dirty/sección activa durante la sesión.
+- Cambiar, quitar o crear cliente con dirty exige confirmación.
+- Clientes se busca exclusivamente en la colección ya cargada en memoria; no añadir IPC/backend/SQLite para el buscador.
+- La búsqueda normaliza nombre, DNI/CIF, teléfono y email.
+- Solo nombre y apellidos es obligatorio para crear un cliente.
+- Cliente nuevo solo muestra Datos y Datos de facturación; el resto exige cliente persistido.
+- Datos y Datos de facturación comparten un único draft y Guardar/Cancelar global.
+- Mismos datos para facturación deriva los datos efectivos de los generales y conserva ocultos los alternativos.
+- CREATE/UPDATE actualiza la colección Angular con el resultado post-COMMIT; no hacer depender el éxito de reload().
+- Baja de cliente = soft delete; conserva ventas, facturas y relaciones y se bloquea si hay borradores.
+- La acción LOPD reutiliza el documento de protección de datos ya implementado.
+- Ventas de cliente reutiliza Histórico, detalle, PDF, impresión y email; no duplicar pipelines.
+- Cada acción de una fila opera sobre esa venta, no sobre una selección anterior.
+- Estadísticas muestra los últimos 20 artículos comprados y top ordenado por importe real.
+- Suma de ventas: PUC coste firmado; PVP importe real tras descuentos; beneficio PVP−PUC; margen beneficio/PVP.
+- Devoluciones restan en estadísticas, pero no son elegibles para facturas.
+- Consumo mensual reutiliza ECharts/ngx-echarts y las cuatro resoluciones Mes/Año de Artículos, usando importe real.
+- Las estadísticas completas se cargan lazy en Clientes; no sobrecargar las estadísticas rápidas de Ventas.
+- Factura de Clientes = agrupación posterior de 1..N ventas ya cobradas.
+- Venta = 0..1 factura; UNIQUE factura_venta.id_venta impide reutilizarla en otra factura.
+- Solo ventas positivas ordinarias del mismo cliente y no facturadas son elegibles.
+- Devoluciones y operaciones mixtas con componente de devolución no pueden incluirse.
+- Editar un borrador permite mantener seleccionadas sus propias ventas.
+- Eliminar un borrador libera sus ventas; emitidas y anuladas conservan relaciones.
+- Factura borrador editable; emitida/anulada inmutable.
+- Emitir valida y recalcula en SQLite y guarda número, fecha, snapshot e importe en una única transacción.
+- Clientes no cobra ni ejecuta TicketBAI al crear, editar, emitir, imprimir o enviar facturas.
+- Imprimir/email son acciones documentales posteriores al COMMIT y no gobiernan el estado de la factura.
+- Desarrollo manual: el asistente propone archivos/fragmentos y el usuario aplica, valida e informa cambios.
+- No hacer commits ni pull requests desde el asistente.
 
 Convenciones:
 - Angular standalone/signals/inject/input/output.
@@ -3587,9 +4086,9 @@ Convenciones:
 - Trabajar por lotes coherentes y no avanzar sin confirmación.
 
 Próximo paso exacto:
-14 — Clientes: análisis funcional legacy y diseño técnico/UX antes de implementar.
+14B — Base del apartado Clientes: ruta, cabecera, página y workspace mínimo de un único cliente.
 ```
 
 ---
 
-**Fin del documento de continuidad v2.28.**
+**Fin del documento de continuidad v2.29.**
