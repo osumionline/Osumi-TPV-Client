@@ -51,7 +51,7 @@ export default class HeaderComponent {
       id: 'clientes',
       label: 'Clientes',
       icon: 'groups',
-      route: null,
+      route: '/clientes',
     },
     {
       id: 'almacen',
