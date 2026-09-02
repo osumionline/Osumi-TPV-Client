@@ -5,6 +5,7 @@ import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import type ClienteEstadisticasState from '@model/clientes/cliente-estadisticas-state.interface';
 import createClienteFormInitialValue from '@model/clientes/cliente-form.initial-value';
+import createClienteFormModel from '@model/clientes/cliente-form.mapper';
 import type ClienteWorkspace from '@model/clientes/cliente-workspace.interface';
 import Cliente from '@model/clientes/cliente.model';
 import { getErrorMessage } from '@utils/error.utils';
@@ -72,6 +73,32 @@ export default class ClientesService {
     const workspace: ClienteWorkspace = {
       clienteId: null,
       clientePublicId: null,
+      draft,
+      baseSnapshot: {
+        ...draft,
+      },
+      dirty: false,
+      activeSection: 'data',
+    };
+
+    this.workspaceSignal.set(workspace);
+
+    return workspace;
+  }
+
+  /**
+   * Abre la ficha de un cliente persistido utilizando una copia
+   * editable de sus datos actuales.
+   */
+  abrirFicha(cliente: Cliente): ClienteWorkspace {
+    if (cliente.id === null || cliente.publicId === null) {
+      throw new Error('No se puede abrir la ficha de un cliente no persistido.');
+    }
+
+    const draft = createClienteFormModel(cliente);
+    const workspace: ClienteWorkspace = {
+      clienteId: cliente.id,
+      clientePublicId: cliente.publicId,
       draft,
       baseSnapshot: {
         ...draft,

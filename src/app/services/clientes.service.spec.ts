@@ -1,5 +1,6 @@
 import type { ClienteEstadisticasInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type ClienteWorkspace from '@model/clientes/cliente-workspace.interface';
+import Cliente from '@model/clientes/cliente.model';
 import ClientesService from '@services/clientes.service';
 
 describe('ClientesService', (): void => {
@@ -74,6 +75,48 @@ describe('ClientesService', (): void => {
     expect(secondWorkspace.activeSection).toBe('data');
     expect(secondWorkspace.dirty).toBe(false);
     expect(secondWorkspace.draft).not.toBe(secondWorkspace.baseSnapshot);
+  });
+
+  it('abre la ficha editable de un cliente persistido', (): void => {
+    const service: ClientesService = new ClientesService();
+    const cliente: Cliente = new Cliente();
+
+    cliente.id = 7;
+    cliente.publicId = 'cliente-7';
+    cliente.nombreApellidos = 'Ada Lovelace';
+    cliente.dniCif = '12345678A';
+    cliente.telefono = null;
+    cliente.provincia = 48;
+    cliente.factIgual = false;
+    cliente.factNombreApellidos = 'Ada Lovelace Consulting';
+    cliente.factProvincia = 28;
+    cliente.descuento = 5;
+
+    const workspace: ClienteWorkspace = service.abrirFicha(cliente);
+
+    expect(workspace.clienteId).toBe(7);
+    expect(workspace.clientePublicId).toBe('cliente-7');
+    expect(workspace.draft.nombreApellidos).toBe('Ada Lovelace');
+    expect(workspace.draft.dniCif).toBe('12345678A');
+    expect(workspace.draft.telefono).toBe('');
+    expect(workspace.draft.provincia).toBe('48');
+    expect(workspace.draft.factIgual).toBe(false);
+    expect(workspace.draft.factNombreApellidos).toBe('Ada Lovelace Consulting');
+    expect(workspace.draft.factProvincia).toBe('28');
+    expect(workspace.draft.descuento).toBe(5);
+    expect(workspace.baseSnapshot).toEqual(workspace.draft);
+    expect(workspace.baseSnapshot).not.toBe(workspace.draft);
+    expect(workspace.dirty).toBe(false);
+    expect(workspace.activeSection).toBe('data');
+    expect(service.workspace()).toBe(workspace);
+  });
+
+  it('rechaza abrir la ficha de un cliente no persistido', (): void => {
+    const service: ClientesService = new ClientesService();
+
+    expect((): void => {
+      service.abrirFicha(new Cliente());
+    }).toThrowError('No se puede abrir la ficha de un cliente no persistido.');
   });
 
   it('cierra la ficha sin alterar la colección de clientes', (): void => {
