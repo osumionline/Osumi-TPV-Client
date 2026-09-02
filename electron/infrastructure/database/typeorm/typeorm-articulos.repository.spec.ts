@@ -138,8 +138,41 @@ describe('TypeOrmArticulosRepository', (): void => {
         }),
       ]),
     );
+    expect(articulo?.fotos).toHaveLength(1);
+
+    expect(articulo?.fotos[0]).toMatchObject({
+      id: 1,
+      publicId: 'file-public-id',
+      principal: true,
+      orden: 0,
+    });
 
     const dataSource: DataSource = await requireDatabase().connect();
+
+    const photoRelations: readonly {
+      readonly id_articulo: number;
+      readonly id_archivo: number;
+    }[] = await dataSource.query(
+      `
+    SELECT
+      id_articulo,
+      id_archivo
+    FROM articulo_archivo
+    WHERE id_archivo = 1
+    ORDER BY id_articulo
+  `,
+    );
+
+    expect(photoRelations).toEqual([
+      {
+        id_articulo: 1,
+        id_archivo: 1,
+      },
+      {
+        id_articulo: idArticulo,
+        id_archivo: 1,
+      },
+    ]);
 
     const historyRows: readonly unknown[] = await dataSource.query(
       `
@@ -514,7 +547,14 @@ function createNewArticleCommand(overrides: Partial<ArticuloSaveRecord> = {}): A
         codigo: 'EAN-NUEVO-001',
       },
     ],
-    fotos: [],
+    fotos: [
+      {
+        idArchivo: 1,
+        nuevoArchivo: null,
+        orden: 0,
+        principal: true,
+      },
+    ],
     ...overrides,
   };
 }

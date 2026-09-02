@@ -76,6 +76,7 @@ export default class ArticleWorkspaceComponent {
   }>();
   readonly saveEvent: OutputEmitterRef<string> = output<string>();
   readonly cancelEvent: OutputEmitterRef<string> = output<string>();
+  readonly duplicateEvent: OutputEmitterRef<string> = output<string>();
 
   readonly directAccessOpen: WritableSignal<boolean> = signal<boolean>(false);
 
@@ -210,6 +211,17 @@ export default class ArticleWorkspaceComponent {
     if (!this.processing() && this.tab().dirty) {
       this.cancelEvent.emit(this.tab().idTemporal);
     }
+  }
+
+  /**
+   * Solicita duplicar la ficha persistida actual.
+   */
+  duplicate(): void {
+    if (this.processing() || this.tab().draft.id === null || this.tab().dirty) {
+      return;
+    }
+
+    this.duplicateEvent.emit(this.tab().idTemporal);
   }
 
   /**

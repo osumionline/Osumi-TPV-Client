@@ -281,6 +281,39 @@ export default class ArticlesComponent implements OnInit {
   }
 
   /**
+   * Solicita confirmación antes de crear una copia
+   * editable del artículo actual.
+   */
+  duplicateArticle(idTemporal: string): void {
+    if (this.processingTabId() !== null) {
+      return;
+    }
+
+    this.dialog
+      .confirm({
+        title: 'Confirmar',
+        content: '¿Quieres duplicar este artículo y crear uno nuevo?',
+      })
+      .subscribe((result: boolean): void => {
+        if (!result) {
+          return;
+        }
+
+        try {
+          this.clearSaveFeedback();
+          this.articulosService.duplicar(idTemporal);
+        } catch (error: unknown) {
+          this.dialog
+            .alert({
+              title: 'Error',
+              content: getErrorMessage(error, 'No se ha podido duplicar el artículo.'),
+            })
+            .subscribe();
+        }
+      });
+  }
+
+  /**
    * Muestra temporalmente la confirmación de guardado
    * correspondiente a una ficha.
    */

@@ -390,7 +390,7 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
         );
 
         await this.validateAdditionalBarcodes(queryRunner, command, localizador);
-        this.validatePhotosForCreate(command.fotos);
+        await this.validatePhotosForCreate(queryRunner, command.fotos);
 
         const timestamp: string = new Date().toISOString();
         const slug: string = this.createSlug(command.nombre, localizador);
@@ -661,19 +661,42 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
   }
 
   /**
-   * Valida las fotos recibidas al crear un artículo.
+   * Valida las fotos de un artículo nuevo permitiendo
+   * tanto archivos nuevos como imágenes ya persistidas.
    */
-  private validatePhotosForCreate(fotos: readonly ArticuloFotoSaveRecord[]): void {
+  private async validatePhotosForCreate(
+    queryRunner: QueryRunner,
+    fotos: readonly ArticuloFotoSaveRecord[],
+  ): Promise<void> {
     this.validatePhotoCollection(fotos);
 
+    const idsArchivo: Set<number> = new Set<number>();
+    const publicIds: Set<string> = new Set<string>();
+
     for (const foto of fotos) {
-      if (foto.idArchivo !== null || foto.nuevoArchivo === null) {
-        throw new Error(
-          'Un artículo nuevo solo puede guardar fotos nuevas preparadas desde staging.',
-        );
+      if (foto.idArchivo !== null) {
+        if (idsArchivo.has(foto.idArchivo)) {
+          throw new Error('Hay fotos persistidas repetidas en el artículo.');
+        }
+
+        idsArchivo.add(foto.idArchivo);
+
+        await this.requireReusableArticlePhoto(queryRunner, foto.idArchivo);
+
+        continue;
+      }
+
+      if (foto.nuevoArchivo === null) {
+        throw new Error('Una foto nueva no contiene los datos de su archivo.');
       }
 
       this.validateNewArticleImage(foto.nuevoArchivo);
+
+      if (publicIds.has(foto.nuevoArchivo.publicId)) {
+        throw new Error('Hay fotos nuevas repetidas en el artículo.');
+      }
+
+      publicIds.add(foto.nuevoArchivo.publicId);
     }
   }
 
@@ -722,6 +745,32 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
   }
 
   /**
+   * Comprueba que una imagen persistida pueda reutilizarse
+   * en otra ficha de artículo.
+   */
+  private async requireReusableArticlePhoto(
+    queryRunner: QueryRunner,
+    idArchivo: number,
+  ): Promise<void> {
+    const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+        SELECT id
+        FROM archivo
+        WHERE
+          id = ?
+          AND purpose = 'article_image'
+          AND deleted_at IS NULL
+        LIMIT 1
+      `,
+      [idArchivo],
+    )) as readonly DatabaseIdRow[];
+
+    if (rows.length === 0) {
+      throw new Error('Una de las fotos reutilizadas no existe.');
+    }
+  }
+
+  /**
    * Inserta los archivos y relaciones de las fotos
    * pertenecientes a un artículo nuevo.
    */
@@ -734,11 +783,17 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
     let principalId: number | null = null;
 
     for (const foto of fotos) {
-      if (foto.nuevoArchivo === null) {
-        throw new Error('Una foto nueva no contiene los datos de su archivo.');
-      }
+      let idArchivo: number;
 
-      const idArchivo: number = await insertArchivo(queryRunner, foto.nuevoArchivo);
+      if (foto.idArchivo !== null) {
+        idArchivo = foto.idArchivo;
+      } else {
+        if (foto.nuevoArchivo === null) {
+          throw new Error('Una foto nueva no contiene los datos de su archivo.');
+        }
+
+        idArchivo = await insertArchivo(queryRunner, foto.nuevoArchivo);
+      }
 
       await this.insertArticleImageRelation(
         queryRunner,

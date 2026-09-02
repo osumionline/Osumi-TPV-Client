@@ -86,6 +86,17 @@
     </div>
 
     <footer class="article-workspace__actions">
+        @if (tab().draft.id !== null) {
+        <button mat-button
+                type="button"
+                [disabled]="tab().dirty || processing()"
+                (click)="duplicate()">
+            Duplicar
+        </button>
+        }
+
+        <span class="article-workspace__actions-spacer"></span>
+
         @if (saveSuccessful()) {
         <span class="article-workspace__save-feedback"
               role="status"

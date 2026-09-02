@@ -12,6 +12,7 @@ import {
   cloneArticuloDraft,
   createArticuloDraftFromInterface,
   createEmptyArticuloDraft,
+  createDuplicatedArticuloDraft,
 } from '@model/articulos/articulo-draft.utils';
 import { getPendingArticuloStagingIds } from '@model/articulos/articulo-photo.utils';
 import { createArticuloSaveCommand } from '@model/articulos/articulo-save.utils';
@@ -53,6 +54,39 @@ export default class ArticulosService {
       draft,
       baseSnapshot: cloneArticuloDraft(draft),
       dirty: false,
+      activeSection: 'general',
+    };
+
+    this.tabsSignal.update(
+      (tabs: readonly ArticuloWorkspaceTab[]): readonly ArticuloWorkspaceTab[] => [...tabs, tab],
+    );
+    this.activeTabIdSignal.set(tab.idTemporal);
+
+    return tab;
+  }
+
+  /**
+   * Crea una ficha nueva copiando la configuración
+   * reutilizable de un artículo persistido.
+   */
+  duplicar(idTemporal: string): ArticuloWorkspaceTab {
+    const sourceTab: ArticuloWorkspaceTab = this.requireTab(idTemporal);
+
+    if (sourceTab.draft.id === null) {
+      throw new Error('Solo se puede duplicar un artículo ya guardado.');
+    }
+
+    if (sourceTab.dirty) {
+      throw new Error('Guarda o cancela los cambios antes de duplicar el artículo.');
+    }
+
+    const baseSnapshot: ArticuloDraft = createEmptyArticuloDraft();
+    const draft: ArticuloDraft = createDuplicatedArticuloDraft(sourceTab.draft);
+    const tab: ArticuloWorkspaceTab = {
+      idTemporal: crypto.randomUUID(),
+      draft,
+      baseSnapshot,
+      dirty: true,
       activeSection: 'general',
     };
 

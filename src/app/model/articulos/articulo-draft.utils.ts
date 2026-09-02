@@ -102,6 +102,33 @@ export function createArticuloDraftFromInterface(articulo: ArticuloInterface): A
 }
 
 /**
+ * Crea una nueva ficha a partir de un artículo persistido
+ * eliminando todas las identidades y datos no duplicables.
+ */
+export function createDuplicatedArticuloDraft(source: ArticuloDraft): ArticuloDraft {
+  if (source.id === null) {
+    throw new Error('Solo se puede duplicar un artículo ya guardado.');
+  }
+
+  if (source.fotos.some((foto: ArticuloFotoDraft): boolean => foto.stagingId !== null)) {
+    throw new Error('No se puede duplicar un artículo con imágenes temporales.');
+  }
+
+  return cloneArticuloDraft({
+    ...source,
+    id: null,
+    publicId: null,
+    localizador: null,
+    nombre: `${source.nombre.trim()} (copia)`,
+    referencia: '',
+    stock: 0,
+    accesoDirecto: null,
+    codigosBarrasAdicionales: [],
+    observaciones: '',
+  });
+}
+
+/**
  * Crea una copia independiente y normalizada de un draft.
  */
 export function cloneArticuloDraft(draft: ArticuloDraft): ArticuloDraft {

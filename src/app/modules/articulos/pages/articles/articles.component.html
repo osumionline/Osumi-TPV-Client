@@ -19,7 +19,8 @@
                                 (draftChangeEvent)="updateArticleDraft($event)"
                                 (sectionChangeEvent)="selectArticleSection($event)"
                                 (saveEvent)="saveArticle($event)"
-                                (cancelEvent)="cancelArticle($event)" />
+                                (cancelEvent)="cancelArticle($event)"
+                                (duplicateEvent)="duplicateArticle($event)" />
     </section>
     } @else {
     <section class="articles__state">

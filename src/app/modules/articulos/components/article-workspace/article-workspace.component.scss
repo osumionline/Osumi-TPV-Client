@@ -132,6 +132,10 @@
         background-color: var(--color-white);
     }
 
+    .article-workspace__actions-spacer {
+        flex: 1;
+    }
+
     .article-workspace__save-feedback {
         margin-right: 4px;
         padding-right: 16px;
