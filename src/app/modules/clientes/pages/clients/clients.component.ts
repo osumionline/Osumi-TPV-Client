@@ -11,9 +11,11 @@ import { MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 import HeaderComponent from '@app/components/header/header.component';
+import type ClienteWorkspaceSection from '@model/clientes/cliente-workspace-section.type';
 import type ClienteWorkspace from '@model/clientes/cliente-workspace.interface';
 import type Cliente from '@model/clientes/cliente.model';
 import ClientSearchComponent from '@modules/clientes/components/client-search/client-search.component';
+import ClientSectionTabsComponent from '@modules/clientes/components/client-section-tabs/client-section-tabs.component';
 import { DialogService } from '@osumi/angular-tools';
 import AppDataService from '@services/app-data.service';
 import ClientesService from '@services/clientes.service';
@@ -26,7 +28,14 @@ import { getErrorMessage } from '@utils/error.utils';
   selector: 'otpv-clients',
   templateUrl: './clients.component.html',
   styleUrl: './clients.component.scss',
-  imports: [ClientSearchComponent, HeaderComponent, MatIconButton, MatIcon, MatTooltip],
+  imports: [
+    ClientSearchComponent,
+    ClientSectionTabsComponent,
+    HeaderComponent,
+    MatIconButton,
+    MatIcon,
+    MatTooltip,
+  ],
 })
 export default class ClientsComponent implements OnInit {
   private readonly dialog: DialogService = inject(DialogService);
@@ -59,6 +68,13 @@ export default class ClientsComponent implements OnInit {
    */
   closeSearch(): void {
     this.searchOpen.set(false);
+  }
+
+  /**
+   * Cambia el apartado activo de la ficha abierta.
+   */
+  selectSection(section: ClienteWorkspaceSection): void {
+    this.clientesService.seleccionarSeccion(section);
   }
 
   /**

@@ -1,0 +1,35 @@
+:host {
+    display: block;
+}
+
+.sections {
+    display: flex;
+    min-height: 44px;
+    align-items: stretch;
+    padding: 0 24px;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--separator-color);
+    background-color: var(--color-white);
+
+    .sections__item {
+        min-width: max-content;
+        padding: 0 18px;
+        border: 0;
+        border-bottom: 3px solid transparent;
+        background-color: transparent;
+        cursor: pointer;
+        font: inherit;
+        font-size: 13px;
+        opacity: 0.65;
+
+        &:hover {
+            opacity: 1;
+        }
+    }
+
+    .sections__item--active {
+        border-bottom-color: var(--main-color);
+        font-weight: 600;
+        opacity: 1;
+    }
+}

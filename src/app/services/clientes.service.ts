@@ -6,6 +6,7 @@ import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-
 import type ClienteEstadisticasState from '@model/clientes/cliente-estadisticas-state.interface';
 import createClienteFormInitialValue from '@model/clientes/cliente-form.initial-value';
 import createClienteFormModel from '@model/clientes/cliente-form.mapper';
+import type ClienteWorkspaceSection from '@model/clientes/cliente-workspace-section.type';
 import type ClienteWorkspace from '@model/clientes/cliente-workspace.interface';
 import Cliente from '@model/clientes/cliente.model';
 import { getErrorMessage } from '@utils/error.utils';
@@ -15,6 +16,11 @@ const EMPTY_ESTADISTICAS_STATE: ClienteEstadisticasState = {
   loading: false,
   error: null,
 };
+
+const NEW_CLIENT_SECTIONS: ReadonlySet<ClienteWorkspaceSection> = new Set<ClienteWorkspaceSection>([
+  'data',
+  'billing',
+]);
 
 @Service()
 export default class ClientesService {
@@ -110,6 +116,34 @@ export default class ClientesService {
     this.workspaceSignal.set(workspace);
 
     return workspace;
+  }
+
+  /**
+   * Cambia la sección activa de la ficha abierta.
+   */
+  seleccionarSeccion(section: ClienteWorkspaceSection): ClienteWorkspace {
+    const workspace: ClienteWorkspace | null = this.workspace();
+
+    if (workspace === null) {
+      throw new Error('No hay ninguna ficha de cliente abierta.');
+    }
+
+    if (workspace.clienteId === null && !NEW_CLIENT_SECTIONS.has(section)) {
+      throw new Error('La sección indicada requiere un cliente persistido.');
+    }
+
+    if (workspace.activeSection === section) {
+      return workspace;
+    }
+
+    const updatedWorkspace: ClienteWorkspace = {
+      ...workspace,
+      activeSection: section,
+    };
+
+    this.workspaceSignal.set(updatedWorkspace);
+
+    return updatedWorkspace;
   }
 
   /**

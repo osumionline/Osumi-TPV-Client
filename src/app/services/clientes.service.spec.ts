@@ -119,6 +119,33 @@ describe('ClientesService', (): void => {
     }).toThrowError('No se puede abrir la ficha de un cliente no persistido.');
   });
 
+  it('limita las secciones disponibles de un cliente nuevo', (): void => {
+    const service: ClientesService = new ClientesService();
+
+    service.crearBorrador();
+
+    expect(service.seleccionarSeccion('billing').activeSection).toBe('billing');
+    expect((): void => {
+      service.seleccionarSeccion('invoices');
+    }).toThrowError('La sección indicada requiere un cliente persistido.');
+  });
+
+  it('conserva la sección elegida de un cliente persistido', (): void => {
+    const service: ClientesService = new ClientesService();
+    const cliente: Cliente = new Cliente();
+
+    cliente.id = 7;
+    cliente.publicId = 'cliente-7';
+    cliente.nombreApellidos = 'Ada Lovelace';
+
+    service.abrirFicha(cliente);
+
+    const workspace: ClienteWorkspace = service.seleccionarSeccion('statistics');
+
+    expect(workspace.activeSection).toBe('statistics');
+    expect(service.workspace()).toBe(workspace);
+  });
+
   it('cierra la ficha sin alterar la colección de clientes', (): void => {
     const service: ClientesService = new ClientesService();
 
