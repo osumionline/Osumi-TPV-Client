@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.25  
+**Versión:** 2.26  
 **Fecha:** 2 de septiembre de 2026  
-**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos** continúa en frontend. Todo `13B — Infraestructura backend` está cerrado, incluido `13B.6E — unificación total de imágenes en WebP`. `13C — Workspace y carga de artículos` está cerrado y probado. **`13D — General`, `13E — WEB`, `13F — Códigos de barras` y `13G — Observaciones` están cerrados y validados ✅.** Todos son apartados del mismo `ArticuloDraft` y **ninguno tiene guardado independiente**: se persistirán con las acciones globales del artículo. El siguiente apartado es **`13H — Histórico`**.
+**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos** continúa en frontend. Todo `13B — Infraestructura backend` está cerrado, incluido `13B.6E — unificación total de imágenes en WebP`. `13C — Workspace y carga de artículos`, `13D — General`, `13E — WEB`, `13F — Códigos de barras`, `13G — Observaciones` y **`13H — Histórico` están cerrados y validados ✅**. `13I — Baja / duplicado / acciones` está en curso: **`13I.1 — Guardar / Cancelar global` ✅** y **`13I.2 — Duplicar` ✅** están completados, incluyendo feedback visual de guardado y reutilización segura de fotos persistidas. El siguiente paso exacto es **`13I.3 — Baja lógica`**.
 
 > **Regla crítica de entorno TicketBAI:** el producto usa `production` por defecto. Durante desarrollo/pruebas manuales se usa `app_data.json → ticketBai.environment = "test"` junto con el token TEST correspondiente. No añadir selector de entorno a la UI.
 
@@ -76,8 +76,13 @@ Ventas 12 — Postventa                             🟦
       13E.2B Crop + ciclo de vida staging         ✅
   13F Códigos de barras                           ✅ MINI-HITO CERRADO
   13G Observaciones                               ✅ MINI-HITO CERRADO
-  13H Histórico                                   🟦 SIGUIENTE
-  13I Baja / duplicado / acciones                 ⬜
+  13H Histórico                                   ✅ MINI-HITO CERRADO
+    13H.1 Backend + API paginada                  ✅
+    13H.2 Tabla + orden + paginación              ✅
+  13I Baja / duplicado / acciones                 🟦
+    13I.1 Guardar / Cancelar global               ✅
+    13I.2 Duplicar                                ✅
+    13I.3 Baja lógica                             🟦 SIGUIENTE
   13J Estadísticas                                ⏸️ diseño posterior
   13K Integración con Ventas                      ⬜
 
@@ -804,18 +809,11 @@ Se diseñará al final del módulo.
 
 # 21. Histórico
 
-Debe mostrar movimientos de stock.
+`13H — Histórico` está **cerrado ✅**.
 
-Ejemplos:
+Es una sección de solo lectura sobre movimientos ya persistidos y **no forma parte del `ArticuloDraft` ni modifica `dirty`**.
 
-```text
-Venta
-Venta web
-Pedido
-Inventario / ajuste
-```
-
-Datos observados:
+Columnas definitivas:
 
 ```text
 Fecha
@@ -829,7 +827,27 @@ Venta
 Pedido
 ```
 
-Debe conservar información histórica aunque el artículo sea dado de baja.
+La consulta se pagina y ordena realmente en SQLite con tamaños:
+
+```text
+20 · 50 · 100 · 200
+```
+
+`MatTable` solo presenta la página actual; `MatSort` y `MatPaginator` solicitan nuevas páginas al backend.
+
+Tipos conocidos:
+
+```text
+1 → Venta
+2 → Venta (web)
+3 → Pedido
+4 → Manual
+5 → Inventario
+6 → Inventario (múltiple)
+otro → Tipo N
+```
+
+El histórico conserva información aunque el artículo sea dado de baja. Para artículos nuevos todavía no persistidos no se realiza llamada IPC y se muestra un estado informativo.
 
 ---
 
@@ -896,55 +914,78 @@ El artículo deja de estar disponible para uso normal, pero no se eliminan hist�
 
 # 24. Acciones inferiores
 
+Estado actual dentro de `13I`:
+
 ```text
-Duplicar
-Cancelar
-Guardar
-Guardar y cerrar
+Duplicar  ✅
+Cancelar  ✅
+Guardar   ✅
+Dar de baja 🟦 siguiente
 ```
 
-## Duplicar
+La barra inferior es global a toda la ficha y permanece fuera de las secciones internas.
+
+## Duplicar — ✅
 
 ```text
-Artículo persistido
-→ Duplicar
+Artículo persistido + limpio
+→ confirmación
 → nueva pestaña temporal
-→ copiar datos
-→ NO copiar localizador
+→ copiar configuración reutilizable
+→ resetear identidades/datos exclusivos
 → NO persistir
 ```
 
-Hasta Guardar:
+La copia nace con:
 
 ```text
 id = null
+publicId = null
 localizador = null
+stock = 0
+accesoDirecto = null
+códigos adicionales = []
+referencia = ''
+observaciones = ''
+dirty = true
 ```
 
-## Cancelar
+Las fotos persistidas se reutilizan mediante nuevas relaciones `articulo_archivo` al mismo asset `archivo`; no se duplica físicamente el WebP.
 
-Restaura el snapshot base.
+## Cancelar — ✅
 
-Después de Guardar, el estado persistido pasa a ser el nuevo snapshot base.
+```text
+confirmación
+→ limpiar staged nuevos
+→ restaurar baseSnapshot
+→ dirty = false
+```
 
-## Guardar
+Después de Guardar, el estado persistido devuelto por backend pasa a ser el nuevo snapshot base.
 
-Persiste modificaciones.
+## Guardar — ✅
 
-Si cambia stock:
+Persiste el `ArticuloDraft` completo mediante una única acción global.
+
+Si cambia stock en un artículo existente:
 
 ```text
 actualizar artículo
 +
-crear histórico de stock
+crear histórico de stock tipo 4
 ```
+
+Tras éxito se muestra durante 4 segundos:
+
+```text
+Artículo guardado correctamente
+```
+
+El mensaje desaparece antes si la ficha vuelve a modificarse.
 
 ## Guardar y cerrar
 
-```text
-Guardar
-→ cerrar pestaña
-```
+No existe actualmente como acción implementada en el bloque `13I`; el flujo actual separa Guardar de cerrar pestaña. No añadirlo salvo que se decida explícitamente más adelante.
 
 ---
 
@@ -2130,7 +2171,7 @@ ArticuloWorkspaceTab
        ├─ OBSERVACIONES
        └─ resto de apartados
 
-Guardar / Cancelar / Duplicar / Guardar y cerrar
+Guardar / Cancelar / Duplicar
 → operan sobre el artículo completo
 → NO existe "guardar WEB"
 ```
@@ -2292,7 +2333,7 @@ rollback de copias definitivas
 
 Si SQLite confirma commit y falla una limpieza temporal posterior, el guardado **sigue considerándose correcto**.
 
-Por tanto, la persistencia definitiva de WEB se integra con las acciones inferiores globales del artículo que se implementarán/completarán en su bloque correspondiente; no debe aparecer ningún botón Guardar dentro de WEB.
+Por tanto, la persistencia definitiva de WEB está integrada con las acciones inferiores globales del artículo ya implementadas en `13I.1`; no debe aparecer ningún botón Guardar dentro de WEB.
 
 **`13E — WEB` queda cerrado ✅.**
 
@@ -2379,10 +2420,507 @@ Mostrar en Pedidos = true
 
 ---
 
+# 28G. 13H — Histórico ✅ MINI-HITO COMPLETAMENTE CERRADO
+
+`13H` queda cerrado y validado funcional y visualmente por el usuario.
+
+A diferencia de General/WEB/Códigos/Observaciones, Histórico **no forma parte del `ArticuloDraft`** y nunca modifica el estado `dirty` de una ficha. Es una consulta de movimientos ya persistidos.
+
+## 28G.1 Backend + API paginada — ✅
+
+Se añadió un contrato público específico para Histórico con:
+
+```text
+ArticuloHistoricoConsulta
+ArticuloHistoricoItem
+ArticuloHistoricoResultado
+ArticuloHistoricoSortField
+ArticuloHistoricoSortDirection
+```
+
+La consulta incluye:
+
+```text
+idArticulo
+pagina
+num
+orderBy
+orderDirection
+```
+
+Tamaños permitidos, manteniendo la UX legacy:
+
+```text
+20 · 50 · 100 · 200
+```
+
+El repository ejecuta ordenación y paginación reales en SQLite:
+
+```text
+WHERE id_articulo = ?
+ORDER BY <columna permitida> ASC|DESC, id ASC|DESC
+LIMIT ?
+OFFSET ?
+```
+
+La columna SQL nunca procede directamente del renderer: existe un mapa cerrado de campos públicos → columnas SQL. La dirección se reduce explícitamente a `ASC` / `DESC`.
+
+Datos devueltos por movimiento:
+
+```text
+id
+publicId
+tipo
+stockPrevio
+diferencia
+stockFinal
+idVenta
+idPedido
+idMermaCaducidad
+pucMicros
+pvpMicros
+createdAt
+```
+
+Se conserva `idMermaCaducidad` en el contrato aunque la UI inicial no lo muestre, para no perder información histórica útil para futuros módulos.
+
+La API está expuesta por toda la cadena:
+
+```text
+TypeOrmArticulosRepository.findHistorico()
+→ ArticulosService.getHistorico()
+→ IPC articulos:get-historico
+→ preload
+→ ArticulosApi.getHistorico()
+→ ArticulosService Angular
+```
+
+Validaciones backend:
+
+- id de artículo entero positivo;
+- página >= 1;
+- tamaño solo 20/50/100/200;
+- campo de orden permitido;
+- dirección `asc` o `desc`;
+- offset dentro de rango seguro.
+
+El histórico legacy puede contener tipos no perfectamente normalizados. Regla cerrada:
+
+```text
+no reinterpretar ni corregir datos importados
+→ mostrar el valor persistido
+```
+
+## 28G.2 Tabla, orden y paginación — ✅
+
+Componente:
+
+```text
+ArticleHistoryComponent
+```
+
+UI definitiva:
+
+```text
+Fecha
+Tipo
+Stock previo
+Diferencia
+Stock final
+PUC
+PVP
+Venta
+Pedido
+```
+
+`MatTable` se limita a presentar la página recibida. `MatSort` y `MatPaginator` disparan nuevas consultas a SQLite; no se usa `MatTableDataSource` para ordenar otra vez en frontend.
+
+Orden inicial:
+
+```text
+createdAt DESC
+```
+
+Al cambiar el orden:
+
+```text
+volver a página 1
+→ solicitar página remota con nuevo orderBy/orderDirection
+```
+
+Al paginar:
+
+```text
+pageIndex + 1
+→ backend calcula offset
+```
+
+Se añadió protección frente a respuestas fuera de orden mediante un contador/secuencia de petición: una respuesta antigua no puede sobrescribir el resultado de una consulta posterior.
+
+Etiquetas de tipo:
+
+```text
+1 → Venta
+2 → Venta (web)
+3 → Pedido
+4 → Manual
+5 → Inventario
+6 → Inventario (múltiple)
+otro → Tipo N
+```
+
+El cambio manual de stock generado desde la ficha sigue creando histórico **tipo 4**.
+
+Artículo nuevo:
+
+```text
+id = null
+→ no llamar a IPC
+→ mostrar estado “El histórico estará disponible cuando el artículo se haya guardado por primera vez”
+```
+
+Artículo persistido sin movimientos:
+
+```text
+→ estado vacío específico
+```
+
+Entrar/salir de Histórico recrea el componente y refresca naturalmente la información persistida.
+
+## 28G.3 MatPaginator en castellano — ✅
+
+`LOCALE_ID = es-ES` no traduce por sí solo `MatPaginator`.
+
+Se añadió un `MatPaginatorIntl` global:
+
+```text
+SpanishPaginatorIntlService
+```
+
+Textos definitivos:
+
+```text
+Elementos por página:
+Primera página
+Página anterior
+Página siguiente
+Última página
+1 – 20 de N
+```
+
+Esto también corrigió el tooltip del botón de última página y deja cualquier paginador futuro de la aplicación traducido globalmente.
+
+**`13H — Histórico` queda cerrado ✅.**
+
+---
+
+# 28H. Refinamiento UX — foco automático en Localizador ✅
+
+Tras cerrar Histórico se añadió un refinamiento pequeño al workspace.
+
+Regla definitiva:
+
+```text
+Nuevo artículo desde pantalla vacía
+→ foco automático en Localizador
+
+pulsar + para crear otra pestaña nueva
+→ foco automático en Localizador
+```
+
+El foco se aplica cuando la pestaña activa pasa a ser un draft nuevo y se identifica por su `idTemporal`, evitando reenfocar el campo en cada modificación del draft.
+
+Al volver desde un artículo persistido a una pestaña nueva ya existente, Localizador vuelve a recibir foco, lo que mantiene preparado el flujo de teclado/lector.
+
+No se fuerza foco al abrir un artículo persistido desde búsqueda o resolución.
+
+---
+
+# 28I. 13I — Baja / duplicado / acciones 🟦 EN CURSO
+
+`13I` todavía no está cerrado. Dos subbloques ya están completos y validados:
+
+```text
+13I.1 Guardar / Cancelar global ✅
+13I.2 Duplicar                  ✅
+13I.3 Baja lógica               🟦 SIGUIENTE
+```
+
+## 28I.1 Guardar / Cancelar global — ✅
+
+Por primera vez toda la ficha de Artículos es persistible mediante una única acción global.
+
+Se añadió el mapper/validador:
+
+```text
+createArticuloSaveCommand(draft)
+```
+
+Responsabilidad:
+
+```text
+ArticuloDraft
+→ validación mínima de renderer
+→ ArticuloSaveInterface
+```
+
+Validaciones renderer cerradas:
+
+- nombre obligatorio;
+- marca obligatoria;
+- fiscalidad IVA/RE obligatoria.
+
+Los strings opcionales se normalizan:
+
+```text
+trim()
+vacío → null
+```
+
+El comando incluye conjuntamente:
+
+```text
+GENERAL
+WEB
+fotos
+códigos adicionales
+observaciones
+stock
+precios/fiscalidad
+categorías
+acceso directo
+```
+
+Se expuso `ArticulosService.save()` existente al renderer:
+
+```text
+ArticulosApi.save()
+→ IPC articulos:save
+→ preload
+→ servicio Angular
+```
+
+`ArticulosService.guardar(idTemporal)`:
+
+```text
+requireTab()
+→ createArticuloSaveCommand()
+→ window.osumiDesktop.articulos.save()
+→ backend transaccional existente
+→ reemplazarTrasGuardado()
+```
+
+Tras guardar:
+
+```text
+nuevo artículo
+→ backend genera localizador
+→ crea código por defecto = localizador
+→ promociona staging de fotos
+→ devuelve artículo fresco
+→ draft/baseSnapshot se reconstruyen
+→ dirty = false
+```
+
+Para un artículo existente:
+
+```text
+UPDATE transaccional
+→ getById() fresco
+→ nuevo baseSnapshot
+→ dirty = false
+```
+
+Si falla validación o backend:
+
+```text
+draft intacto
+staging intacto
+puede corregirse/reintentarse
+```
+
+### Barra global inferior
+
+Se añadió un footer común a toda la ficha, independiente de la sección activa:
+
+```text
+[acciones izquierda]                         [Cancelar] [Guardar]
+```
+
+`Guardar` y `Cancelar` trabajan sobre el artículo completo, nunca sobre una pestaña interna concreta.
+
+Durante una acción persistente:
+
+```text
+processingTabId
+→ bloquear acciones repetidas
+→ Guardando… mientras la operación está pendiente
+```
+
+`Cancelar`:
+
+```text
+confirmación
+→ descartar staging pendiente
+→ restaurar baseSnapshot
+→ dirty = false
+```
+
+Se reutiliza `descartarCambios()` de `13E.2B`, por lo que cancelar una ficha con fotos temporales no deja staged huérfanos.
+
+### Feedback de guardado — ✅
+
+Como el guardado suele ser muy rápido, se añadió confirmación visual no intrusiva:
+
+```text
+Artículo guardado correctamente │ Cancelar │ Guardar
+```
+
+Comportamiento:
+
+```text
+guardado OK
+→ mensaje durante 4 segundos
+→ desaparece automáticamente
+```
+
+Si el usuario vuelve a modificar esa ficha antes:
+
+```text
+→ el mensaje desaparece inmediatamente
+→ Guardar vuelve a habilitarse por dirty
+```
+
+El feedback pertenece a la pestaña concreta guardada; cambiar a otro artículo no muestra el mensaje en la ficha equivocada.
+
+## 28I.2 Duplicar — ✅
+
+Duplicar conserva la filosofía legacy: **no escribe nada en SQLite al pulsar el botón**. Crea una nueva pestaña editable/draft.
+
+Reglas de disponibilidad:
+
+```text
+solo artículo persistido
+solo ficha limpia (dirty = false)
+sin staging temporal pendiente
+```
+
+Si hay cambios, primero Guardar o Cancelar.
+
+Transformación definitiva del draft duplicado:
+
+```text
+id                       → null
+publicId                 → null
+localizador              → null
+nombre                   → "<original> (copia)"
+referencia               → ''
+stock                    → 0
+accesoDirecto            → null
+codigosBarrasAdicionales → []
+observaciones            → ''
+```
+
+Se conservan:
+
+```text
+marca
+proveedor
+categorías
+PALB / PUC / PVP
+IVA / RE
+márgenes
+descuento
+stockMin / stockMax / loteOptimo
+ventaOnline
+mostrarEnWeb
+descripciones WEB
+fotos
+flags de observaciones
+```
+
+El acceso directo **no se copia** aunque el legacy lo hiciera implícitamente, porque en el cliente nuevo es único y provocaría colisión.
+
+La nueva pestaña:
+
+```text
+activeSection = general
+baseSnapshot = createEmptyArticuloDraft()
+dirty = true
+```
+
+Por tanto:
+
+```text
+Duplicar
+→ nueva ficha editable sin persistir
+→ Guardar habilitado inmediatamente
+```
+
+Cancelar sobre la copia revierte conceptualmente la operación y deja la pestaña como un artículo nuevo vacío.
+
+### Reutilización segura de fotos persistidas
+
+El backend original de creación solo aceptaba fotos nuevas provenientes de staging. Para poder duplicar sin reescribir físicamente los WebP se amplió la creación de artículos para aceptar también fotos persistidas reutilizables.
+
+Regla de almacenamiento:
+
+```text
+NO copiar físicamente el WebP
+```
+
+`archivo` representa el asset inmutable y `articulo_archivo` la relación con cada artículo. Un duplicado puede crear otra relación al mismo `archivo`:
+
+```text
+Artículo original ─┐
+                   ├─ articulo_archivo → archivo → foto.webp
+Artículo copia ────┘
+```
+
+Orden y principal siguen siendo independientes porque viven en `articulo_archivo`.
+
+Validaciones añadidas al crear con foto persistida:
+
+- el archivo debe existir;
+- `deleted_at IS NULL`;
+- `purpose = article_image`;
+- no repetir el mismo id de archivo dentro de la colección;
+- las fotos nuevas siguen validándose como WebP de artículo.
+
+`insertPhotos()` soporta ahora ambos casos:
+
+```text
+idArchivo != null
+→ reutilizar asset persistido
+
+nuevoArchivo != null
+→ INSERT archivo nuevo
+```
+
+Consecuencia importante:
+
+```text
+eliminar una foto de la copia y guardar
+→ elimina solo su relación articulo_archivo
+→ la foto del original permanece intacta
+```
+
+### Footer tras Duplicar
+
+La disposición actual queda:
+
+```text
+Duplicar           Artículo guardado correctamente │ Cancelar │ Guardar
+```
+
+`Duplicar` solo aparece/está disponible para artículos persistidos limpios.
+
+**`13I.1` y `13I.2` están cerrados ✅. `13I` continúa abierto hasta completar `13I.3 — Baja lógica`.**
+
 # 29. Próximo paso exacto
 
 ```text
-13H — Histórico
+13I.3 — Baja lógica
 ```
 
 Estado previo cerrado:
@@ -2392,25 +2930,35 @@ Estado previo cerrado:
 13E — WEB ✅
 13F — Códigos de barras ✅
 13G — Observaciones ✅
+13H — Histórico ✅
+13I.1 — Guardar / Cancelar global ✅
+13I.2 — Duplicar ✅
 ```
 
-`13H` es el siguiente apartado que **ya no se limita a editar el draft**: debe consultar movimientos históricos reales del artículo desde backend.
+`13I.3` debe conectar la baja lógica backend ya existente con la UI global del artículo.
 
-Alcance funcional ya definido para Histórico:
+Semántica backend ya cerrada desde `13B.5`:
 
 ```text
-- movimientos de stock
-- fecha
-- tipo
-- stock previo
-- diferencia
-- stock final
-- PUC
-- PVP
-- referencias a Venta/Pedido cuando correspondan
+baja = soft delete artículo
+     + soft delete códigos de barras activos
+     + conservar histórico
+     + conservar categorías/relaciones históricas
+     + conservar archivos/fotos
 ```
 
-Debe conservarse la información histórica aunque el artículo sea dado de baja. Antes de proponer UI, revisar `main`, esquema `historico_articulo`, import legacy y los servicios/repositorios existentes para reutilizar la semántica de tipos ya cerrada (incluido ajuste manual tipo 4).
+Antes de implementar, revisar `main` actual y el método `deactivate()` ya existente para exponerlo por API/IPC/preload si todavía no está accesible desde renderer.
+
+La UI deberá decidir de forma explícita:
+
+- acción disponible solo para artículos persistidos;
+- no permitir baja con cambios locales pendientes sin resolver;
+- confirmación clara al usuario;
+- qué ocurre con la pestaña después de una baja correcta;
+- refrescar búsquedas/listados para que el artículo inactivo no aparezca como activo;
+- no confundir baja lógica con cerrar pestaña ni con Cancelar cambios.
+
+Tras cerrar `13I.3`, revisar si `13I — Baja / duplicado / acciones` puede darse por completamente cerrado antes de pasar a `13J — Estadísticas`.
 
 ---
 
@@ -2430,6 +2978,7 @@ Debe conservarse la información histórica aunque el artículo sea dado de baja
 | **2.23** | **01/09/2026** | **Se reincorpora la pestaña WEB al roadmap como `13E` y pasa a ser el siguiente mini-hito; Códigos de barras y apartados posteriores se desplazan a `13F`–`13K`. WEB mantiene Mostrar en web, descripciones y fotos 0..N, conservando datos al desactivar Venta online.** |
 | **2.24** | **01/09/2026** | **13E WEB ✅ mini-hito cerrado: contenido WEB, galería 0..N en columna derecha, file picker/drag&drop, principal y orden, staging común WebP, crop libre secuencial, rollback de lotes y ciclo de vida completo de temporales al eliminar/cancelar/cerrar/reutilizar borrador. Se elimina el concepto de “guardado WEB”: WEB forma parte del ArticuloDraft único y se guarda/cancela con las acciones globales del artículo. Siguiente: 13F Códigos de barras.** |
 | **2.25** | **02/09/2026** | **13F Códigos de barras ✅ y 13G Observaciones ✅ cerrados. Códigos recupera UX legacy con foco automático, lector/Enter, tarjetas QR 3 por fila mediante angularx-qrcode, principal diferenciado no borrable y adicionales add/remove solo en draft. Observaciones añade textarea + toggles Material Pedidos/Ventas sobre el mismo ArticuloDraft. Siguiente: 13H Histórico.** |
+| **2.26** | **02/09/2026** | **13H Histórico ✅ cerrado con API SQLite paginada/ordenada, MatTable/MatSort/MatPaginator remoto y MatPaginatorIntl global en castellano. Refinamiento UX: foco automático en Localizador al crear/activar drafts nuevos. 13I.1 Guardar/Cancelar global ✅ con mapper del draft, save IPC/preload, barra inferior, cleanup de staging y feedback “Artículo guardado correctamente” durante 4 s. 13I.2 Duplicar ✅: nueva pestaña dirty, identidades/stock/códigos/acceso/observaciones reseteados, configuración reutilizable conservada y fotos compartidas mediante nuevas relaciones al mismo asset `archivo`. Siguiente: 13I.3 Baja lógica.** |
 ---
 
 # 31. Prompt de arranque recomendado
@@ -2438,7 +2987,7 @@ Debe conservarse la información histórica aunque el artículo sea dado de baja
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.25.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.26.
 
 Estado:
 - Ventas 12C.1–12C.8 ✅
@@ -2452,34 +3001,23 @@ Estado:
   - fotos/staging/storage/promoción ✅
   - unificación TOTAL de imágenes WebP ✅
 - 13C Workspace y carga de artículos ✅
-  - puente Electron ✅
-  - workspace Angular ✅
-  - página + pestañas ✅
-  - apertura/resolución + buscador compartido ✅
 - 13D General ✅ CERRADO DEFINITIVAMENTE
-  - estructura/secciones/datos básicos ✅
-  - AppData común renderer ✅
-  - IVA/RE desde configuración ✅
-  - motor entero PALB/PUC/Margen/PVP ✅
-  - descuento ✅
-  - creación rápida Marca/Proveedor ✅
-  - 13D.R1 accesos directos globales ✅
-  - 13D.R2 General compacto ✅
-  - MatSlideToggle Venta online/Descuento ✅
-  - Categorías multiselect ✅
-  - UI importes/márgenes a 2 decimales ✅
-  - recálculo mientras se escribe ✅
-  - modal de sugerencias de margen ✅
-  - búsqueda desde borrador reutiliza su pestaña ✅
 - 13E WEB ✅ CERRADO
-  - 13E.1 Contenido WEB ✅
-  - 13E.2 Fotos 0..N ✅
-    - 13E.2A staging + galería 0..N ✅
-    - 13E.2B crop + ciclo de vida staging ✅
+  - contenido WEB ✅
+  - fotos 0..N ✅
+  - crop + staging + cleanup ✅
 - 13F Códigos de barras ✅ CERRADO
 - 13G Observaciones ✅ CERRADO
-- 13H Histórico 🟦 SIGUIENTE
-- 13I Baja / duplicado / acciones ⬜
+- 13H Histórico ✅ CERRADO
+  - 13H.1 backend + API paginada ✅
+  - 13H.2 tabla + orden + paginación ✅
+  - MatPaginator global en castellano ✅
+- refinamiento UX: drafts nuevos enfocan Localizador automáticamente ✅
+- 13I Baja / duplicado / acciones 🟦
+  - 13I.1 Guardar / Cancelar global ✅
+  - feedback visual de guardado 4 s ✅
+  - 13I.2 Duplicar ✅
+  - 13I.3 Baja lógica 🟦 SIGUIENTE
 - 13J Estadísticas ⏸️ diseño posterior
 - 13K Integración con Ventas ⬜
 
@@ -2498,9 +3036,10 @@ Reglas críticas:
 - Solo una pestaña por artículo persistido; drafts nuevos múltiples.
 - El workspace Angular conserva tabs, activeTab, draft, baseSnapshot, dirty y activeSection durante la sesión.
 - Reabrir un artículo ya abierto activa su pestaña y NO recarga BD ni pierde cambios locales.
+- Todo draft nuevo enfoca automáticamente el campo Localizador al crearse/activarse.
 - Campo Localizador reutiliza buscador de Ventas; Enter resuelve localizador/acceso directo/barcode.
 - Si búsqueda/resolución se inicia desde una pestaña de artículo nuevo, el primer artículo encontrado reutiliza esa misma pestaña; si ya estaba abierto, se cierra el borrador origen y se activa la existente.
-- Acceso directo ya no es un input de General: se gestiona desde un modal global junto al Localizador y se persiste inmediatamente.
+- Acceso directo se gestiona desde un modal global junto al Localizador y se persiste inmediatamente.
 - Categorías 0..N equivalentes.
 - Marca obligatoria; Proveedor opcional.
 - AppData global en renderer mediante AppDataService; Artículos no depende de VentasContextService.
@@ -2509,7 +3048,7 @@ Reglas críticas:
 - Precio albarán y PUC en microeuros; PVP en céntimos; IVA/RE en bps; margen en microporcentaje.
 - 1 % = 1_000_000 microporcentaje.
 - Motor de precios usa enteros/BigInt; evitar floats encadenados.
-- UI de importes y porcentajes: máximo 2 decimales, sin reducir la precisión interna en microeuros/microporcentaje.
+- UI de importes y porcentajes: máximo 2 decimales, sin reducir la precisión interna.
 - Los decimales recalculan durante escritura salvo estados transitorios como `12,`, `12.`, `-` o vacío.
 - Al recibir foco, importes/márgenes y stock seleccionan el contenido una vez; clicks posteriores con foco no reseleccionan.
 - `marginList` alimenta el modal de sugerencias de margen; Margen sigue siendo editable directamente.
@@ -2520,19 +3059,29 @@ Reglas críticas:
 - Creación Marca+Proveedor y Proveedor+marcas se hace transaccionalmente en backend.
 - Tras un COMMIT de creación no hacer depender el éxito de una recarga posterior innecesaria.
 - Código por defecto = fila real codigo_barras basada en localizador.
-- Códigos de barras adicionales: se añaden/eliminan solo en el draft; no hay edición inline ni guardado independiente.
-- La pestaña Códigos de barras enfoca automáticamente el input nuevo, acepta lector USB + Enter y muestra QR con angularx-qrcode en tarjetas 3 por fila.
-- La tarjeta del código por defecto se diferencia visualmente y nunca muestra acción de borrar.
-- Observaciones comparte el mismo texto para Ventas/Pedidos y usa MatSlideToggle independientes para ambas visibilidades.
+- Códigos adicionales se añaden/eliminan solo en draft; no hay edición inline ni guardado independiente.
+- La pestaña Códigos enfoca el input nuevo, acepta lector USB + Enter y muestra QR con angularx-qrcode en tarjetas 3 por fila.
+- Observaciones usa textarea + MatSlideToggle independientes para Pedidos/Ventas sobre el mismo draft.
+- Histórico NO forma parte del ArticuloDraft y nunca genera dirty.
+- Histórico se pagina/ordena en SQLite, no en MatTableDataSource. Páginas 20/50/100/200.
+- Tipos de histórico: 1 Venta, 2 Venta web, 3 Pedido, 4 Manual, 5 Inventario, 6 Inventario múltiple; desconocidos → `Tipo N`.
+- MatPaginator usa SpanishPaginatorIntlService global para textos/tooltips en castellano.
 - Cambio manual de stock crea historico_articulo tipo 4.
 - Alta con stock inicial no genera histórico.
+- Guardar/Cancelar son acciones globales de TODA la ficha, no de cada sección.
+- createArticuloSaveCommand valida nombre, marca y fiscalidad y normaliza strings opcionales antes de ArticulosApi.save().
+- Guardar llama al backend transaccional, reemplaza draft/baseSnapshot con el artículo fresco y deja dirty=false.
+- Cancelar confirma, limpia staged nuevos y restaura baseSnapshot.
+- Tras guardar correctamente se muestra “Artículo guardado correctamente” durante 4 segundos; desaparece antes si la ficha vuelve a cambiar.
+- Duplicar solo se permite sobre artículo persistido limpio; crea una nueva pestaña dirty sin escribir SQLite.
+- Duplicar resetea id/publicId/localizador, referencia, stock, acceso directo, códigos adicionales y observaciones; nombre pasa a “(copia)”.
+- Duplicar conserva marca/proveedor/categorías/precios/fiscalidad/márgenes/descuento/stock min-max/lote/WEB/descripciones/fotos/flags de observaciones.
+- Las fotos persistidas del duplicado reutilizan el mismo asset `archivo` y crean nuevas relaciones `articulo_archivo`; no se duplica físicamente el WebP.
 - Baja = soft delete artículo + códigos; conservar histórico/relaciones/fotos.
-- Venta online muestra WEB; desactivarla oculta pero no borra datos. Venta online y Descuento usan MatSlideToggle.
-- La pestaña WEB es un mini-hito propio (`13E`) y está cerrada ✅ antes de Códigos de barras; contiene Mostrar en web + descripción corta + descripción larga + fotos 0..N.
-- WEB NO tiene guardado propio: comparte el único ArticuloDraft y las acciones inferiores globales del artículo.
+- Venta online muestra WEB; desactivarla oculta pero no borra datos.
+- WEB NO tiene guardado propio: comparte el único ArticuloDraft y las acciones globales del artículo.
 - Fotos WEB: crop libre → staging → Sharp/WebP; la galería mantiene orden y una única principal.
 - Staged nuevos se limpian al eliminar, cancelar cambios, cerrar descartando o sustituir un borrador por un artículo localizado; navegar entre módulos no los descarta.
-- Categorías se editan mediante mat-select multiple con panel suficientemente ancho para nombres largos.
 - Estadísticas se diseñarán al final.
 
 Convenciones:
@@ -2545,9 +3094,9 @@ Convenciones:
 - Trabajar por lotes coherentes y no avanzar sin confirmación.
 
 Próximo paso exacto:
-13H — Histórico.
+13I.3 — Baja lógica.
 ```
 
 ---
 
-**Fin del documento de continuidad v2.25.**
+**Fin del documento de continuidad v2.26.**
