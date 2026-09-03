@@ -52,6 +52,12 @@ interface ClienteTopVentaDatabaseRow {
   readonly importe_micros: number;
 }
 
+interface ClienteUpdateTargetDatabaseRow {
+  readonly id: number;
+  readonly public_id: string;
+  readonly ultima_venta: string | null;
+}
+
 export default class TypeOrmClienteRepository implements ClienteRepository {
   constructor(private readonly applicationDatabase: TypeOrmApplicationDatabase) {}
 
@@ -133,19 +139,23 @@ export default class TypeOrmClienteRepository implements ClienteRepository {
   /**
    * Comprueba si existe un cliente activo con el DNI/CIF indicado.
    */
-  async existsActiveByDniCif(dniCif: string): Promise<boolean> {
+  async existsActiveByDniCif(dniCif: string, excludedPublicId: string | null): Promise<boolean> {
     const dataSource: DataSource = await this.applicationDatabase.connect();
 
     const rows: readonly { readonly total: number }[] = (await dataSource.query(
       `
-        SELECT
-          COUNT(*) AS total
-        FROM cliente
-        WHERE
-          dni_cif = ? COLLATE NOCASE
-          AND deleted_at IS NULL
-      `,
-      [dniCif],
+      SELECT
+        COUNT(*) AS total
+      FROM cliente
+      WHERE
+        dni_cif = ? COLLATE NOCASE
+        AND deleted_at IS NULL
+        AND (
+          ? IS NULL
+          OR public_id <> ?
+        )
+    `,
+      [dniCif, excludedPublicId, excludedPublicId],
     )) as readonly { readonly total: number }[];
 
     return (rows[0]?.total ?? 0) > 0;
@@ -250,6 +260,109 @@ export default class TypeOrmClienteRepository implements ClienteRepository {
           observaciones: command.observaciones,
           descuentoBps: command.descuentoBps,
           ultimaVenta: null,
+        };
+      },
+    );
+  }
+
+  /**
+   * Actualiza un cliente activo y devuelve su estado persistido.
+   */
+  async update(
+    publicId: string,
+    command: CrearClienteRecordCommand,
+  ): Promise<ClienteRecord | null> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+    const timestamp: string = new Date().toISOString();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<ClienteRecord | null> => {
+        const targets: readonly ClienteUpdateTargetDatabaseRow[] = (await queryRunner.query(
+          `
+          SELECT
+            c.id,
+            c.public_id,
+            MAX(v.created_at) AS ultima_venta
+          FROM cliente c
+          LEFT JOIN venta v
+            ON v.id_cliente = c.id
+            AND v.deleted_at IS NULL
+          WHERE
+            c.public_id = ?
+            AND c.deleted_at IS NULL
+          GROUP BY
+            c.id,
+            c.public_id
+          LIMIT 1
+        `,
+          [publicId],
+        )) as readonly ClienteUpdateTargetDatabaseRow[];
+
+        const target: ClienteUpdateTargetDatabaseRow | undefined = targets[0];
+
+        if (target === undefined) {
+          return null;
+        }
+
+        await queryRunner.query(
+          `
+          UPDATE cliente
+          SET
+            nombre_apellidos = ?,
+            dni_cif = ?,
+            telefono = ?,
+            email = ?,
+            direccion = ?,
+            codigo_postal = ?,
+            poblacion = ?,
+            id_provincia = ?,
+            datos_facturacion_iguales = ?,
+            fact_nombre_apellidos = ?,
+            fact_dni_cif = ?,
+            fact_telefono = ?,
+            fact_email = ?,
+            fact_direccion = ?,
+            fact_codigo_postal = ?,
+            fact_poblacion = ?,
+            fact_id_provincia = ?,
+            observaciones = ?,
+            descuento_bps = ?,
+            updated_at = ?
+          WHERE
+            id = ?
+            AND deleted_at IS NULL
+        `,
+          [
+            command.nombreApellidos,
+            command.dniCif,
+            command.telefono,
+            command.email,
+            command.direccion,
+            command.codigoPostal,
+            command.poblacion,
+            command.provincia,
+            command.factIgual ? 1 : 0,
+            command.factNombreApellidos,
+            command.factDniCif,
+            command.factTelefono,
+            command.factEmail,
+            command.factDireccion,
+            command.factCodigoPostal,
+            command.factPoblacion,
+            command.factProvincia,
+            command.observaciones,
+            command.descuentoBps,
+            timestamp,
+            target.id,
+          ],
+        );
+
+        return {
+          id: target.id,
+          publicId: target.public_id,
+          ...command,
+          ultimaVenta: target.ultima_venta,
         };
       },
     );

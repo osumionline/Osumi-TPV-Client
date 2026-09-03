@@ -8,9 +8,11 @@ import type ClienteRecord from '@backend/domain/clientes/cliente-record.interfac
 export default interface ClienteRepository {
   findAll(): Promise<readonly ClienteRecord[]>;
 
-  existsActiveByDniCif(dniCif: string): Promise<boolean>;
+  existsActiveByDniCif(dniCif: string, excludedPublicId: string | null): Promise<boolean>;
 
   create(command: CrearClienteRecordCommand): Promise<ClienteRecord>;
+
+  update(publicId: string, command: CrearClienteRecordCommand): Promise<ClienteRecord | null>;
 
   findUltimasVentas(publicId: string, limit: number): Promise<readonly ClienteUltimaVentaRecord[]>;
 

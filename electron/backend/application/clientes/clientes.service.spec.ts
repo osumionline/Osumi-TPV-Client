@@ -6,12 +6,19 @@ import type {
 import type ClienteRepository from '@backend/contracts/clientes/cliente.repository.interface';
 import type CrearClienteRecordCommand from '@backend/contracts/clientes/crear-cliente-record-command.interface';
 import type ClienteRecord from '@backend/domain/clientes/cliente-record.interface';
+import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import { describe, expect, it } from 'vitest';
 
 class FakeClienteRepository implements ClienteRepository {
   createdCommand: CrearClienteRecordCommand | null = null;
+  updatedPublicId: string | null = null;
+  updatedCommand: CrearClienteRecordCommand | null = null;
+  checkedDniCif: string | null = null;
+  excludedPublicId: string | null = null;
+  dniCifExists: boolean = false;
+  updateAvailable: boolean = true;
 
   /**
    * Devuelve una colección vacía para las pruebas del servicio.
@@ -21,10 +28,13 @@ class FakeClienteRepository implements ClienteRepository {
   }
 
   /**
-   * Simula que no existen clientes con el DNI/CIF consultado.
+   * Simula la comprobación de unicidad del DNI/CIF.
    */
-  existsActiveByDniCif(): Promise<boolean> {
-    return Promise.resolve(false);
+  existsActiveByDniCif(dniCif: string, excludedPublicId: string | null): Promise<boolean> {
+    this.checkedDniCif = dniCif;
+    this.excludedPublicId = excludedPublicId;
+
+    return Promise.resolve(this.dniCifExists);
   }
 
   /**
@@ -36,6 +46,25 @@ class FakeClienteRepository implements ClienteRepository {
     return Promise.resolve({
       id: 1,
       publicId: 'cliente-1',
+      ...command,
+      ultimaVenta: null,
+    });
+  }
+
+  /**
+   * Registra una actualización y devuelve el cliente persistido simulado.
+   */
+  update(publicId: string, command: CrearClienteRecordCommand): Promise<ClienteRecord | null> {
+    this.updatedPublicId = publicId;
+    this.updatedCommand = command;
+
+    if (!this.updateAvailable) {
+      return Promise.resolve(null);
+    }
+
+    return Promise.resolve({
+      id: 1,
+      publicId,
       ...command,
       ultimaVenta: null,
     });
@@ -130,6 +159,78 @@ describe('ClientesService', (): void => {
 
     expect(repository.createdCommand).toBeNull();
   });
+
+  it('actualiza un cliente sin considerar duplicado su propio DNI/CIF', async (): Promise<void> => {
+    const repository = new FakeClienteRepository();
+    const service = new ClientesService(repository);
+
+    const cliente: ClienteInterface = await service.update(
+      createUpdateCommand({
+        publicId: '  cliente-1  ',
+        nombreApellidos: '  Ada Byron  ',
+        dniCif: '  12345678A  ',
+        telefono: '  944000000  ',
+      }),
+    );
+
+    expect(repository.excludedPublicId).toBe('cliente-1');
+    expect(repository.checkedDniCif).toBe('12345678A');
+    expect(repository.updatedPublicId).toBe('cliente-1');
+    expect(repository.updatedCommand).toMatchObject({
+      nombreApellidos: 'Ada Byron',
+      dniCif: '12345678A',
+      telefono: '944000000',
+    });
+    expect(cliente).toMatchObject({
+      id: 1,
+      publicId: 'cliente-1',
+      nombreApellidos: 'Ada Byron',
+      dniCif: '12345678A',
+    });
+  });
+
+  it('rechaza actualizar con el DNI/CIF de otro cliente activo', async (): Promise<void> => {
+    const repository = new FakeClienteRepository();
+    const service = new ClientesService(repository);
+
+    repository.dniCifExists = true;
+
+    await expect(
+      service.update(
+        createUpdateCommand({
+          dniCif: '12345678A',
+        }),
+      ),
+    ).rejects.toThrow('Ya existe un cliente activo con ese DNI/CIF.');
+
+    expect(repository.updatedCommand).toBeNull();
+  });
+
+  it('rechaza actualizar un cliente inexistente o dado de baja', async (): Promise<void> => {
+    const repository = new FakeClienteRepository();
+    const service = new ClientesService(repository);
+
+    repository.updateAvailable = false;
+
+    await expect(service.update(createUpdateCommand())).rejects.toThrow(
+      'El cliente indicado no existe o ya no está activo.',
+    );
+  });
+
+  it('rechaza actualizar sin un publicId válido', async (): Promise<void> => {
+    const repository = new FakeClienteRepository();
+    const service = new ClientesService(repository);
+
+    await expect(
+      service.update(
+        createUpdateCommand({
+          publicId: '   ',
+        }),
+      ),
+    ).rejects.toThrow('El identificador del cliente no es válido.');
+
+    expect(repository.updatedCommand).toBeNull();
+  });
 });
 
 /**
@@ -156,6 +257,19 @@ function createCommand(overrides: Partial<CrearClienteCommand> = {}): CrearClien
     factProvincia: null,
     observaciones: null,
     descuento: 0,
+    ...overrides,
+  };
+}
+
+/**
+ * Crea un comando válido de actualización para las pruebas.
+ */
+function createUpdateCommand(
+  overrides: Partial<ActualizarClienteCommand> = {},
+): ActualizarClienteCommand {
+  return {
+    ...createCommand(overrides),
+    publicId: 'cliente-1',
     ...overrides,
   };
 }

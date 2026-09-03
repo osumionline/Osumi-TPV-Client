@@ -7,6 +7,7 @@ import type ClienteRepository from '@backend/contracts/clientes/cliente.reposito
 import type CrearClienteRecordCommand from '@backend/contracts/clientes/crear-cliente-record-command.interface';
 import type ClienteRecord from '@backend/domain/clientes/cliente-record.interface';
 import { bpsToPercent, percentToBps } from '@backend/utils/percentage.utils';
+import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type {
   ClienteEstadisticasInterface,
   ClienteTopVentaInterface,
@@ -75,6 +76,48 @@ export default class ClientesService {
    * Crea un nuevo cliente después de normalizar y validar sus datos.
    */
   async create(command: CrearClienteCommand): Promise<ClienteInterface> {
+    const recordCommand: CrearClienteRecordCommand = await this.normalizeRecordCommand(
+      command,
+      null,
+    );
+
+    const cliente: ClienteRecord = await this.clienteRepository.create(recordCommand);
+
+    return this.toInterface(cliente);
+  }
+
+  /**
+   * Actualiza un cliente activo después de normalizar y validar sus datos.
+   */
+  async update(command: ActualizarClienteCommand): Promise<ClienteInterface> {
+    const publicId: string = this.requirePublicId(command.publicId);
+    const recordCommand: CrearClienteRecordCommand = await this.normalizeRecordCommand(
+      command,
+      publicId,
+    );
+
+    const cliente: ClienteRecord | null = await this.clienteRepository.update(
+      publicId,
+      recordCommand,
+    );
+
+    if (cliente === null) {
+      throw new Error('El cliente indicado no existe o ya no está activo.');
+    }
+
+    return this.toInterface(cliente);
+  }
+
+  /**
+   * Normaliza los campos compartidos por el alta y la actualización.
+   *
+   * En una actualización, el publicId excluido permite conservar el
+   * DNI/CIF actual sin considerarlo un duplicado de sí mismo.
+   */
+  private async normalizeRecordCommand(
+    command: CrearClienteCommand,
+    excludedPublicId: string | null,
+  ): Promise<CrearClienteRecordCommand> {
     const nombreApellidos: string = this.requireText(
       command.nombreApellidos,
       'nombre y apellidos',
@@ -103,7 +146,10 @@ export default class ClientesService {
       throw new Error('El email indicado no tiene un formato válido.');
     }
 
-    if (dniCif !== null && (await this.clienteRepository.existsActiveByDniCif(dniCif))) {
+    if (
+      dniCif !== null &&
+      (await this.clienteRepository.existsActiveByDniCif(dniCif, excludedPublicId))
+    ) {
       throw new Error('Ya existe un cliente activo con ese DNI/CIF.');
     }
 
@@ -113,7 +159,7 @@ export default class ClientesService {
 
     const factIgual: boolean = command.factIgual === true;
 
-    const recordCommand: CrearClienteRecordCommand = {
+    return {
       nombreApellidos,
       dniCif,
       telefono,
@@ -153,10 +199,23 @@ export default class ClientesService {
       observaciones: this.normalizeOptionalText(command.observaciones),
       descuentoBps,
     };
+  }
 
-    const cliente: ClienteRecord = await this.clienteRepository.create(recordCommand);
+  /**
+   * Normaliza un identificador público requerido de cliente.
+   */
+  private requirePublicId(value: string): string {
+    if (typeof value !== 'string') {
+      throw new Error('El identificador del cliente no es válido.');
+    }
 
-    return this.toInterface(cliente);
+    const normalizedValue: string = value.trim();
+
+    if (normalizedValue.length === 0) {
+      throw new Error('El identificador del cliente no es válido.');
+    }
+
+    return normalizedValue;
   }
 
   private toInterface(cliente: ClienteRecord): ClienteInterface {
