@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.31  
+**Versión:** 2.32  
 **Fecha:** 3 de septiembre de 2026  
-**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**. El **Hito 14 — Clientes está en curso 🟦**: `14A–14E` están terminados, validados funcionalmente y subidos al repositorio. Ya están operativos la entrada y búsqueda local, el workspace persistente de una sola ficha, Datos y Datos de facturación, CREATE/UPDATE, guardado global, reconciliación post-COMMIT, baja lógica protegida por facturas en borrador y el documento de protección de datos basado en información canónica persistida. El siguiente paso exacto es **`14F — Ventas del cliente`**. Clientes no realiza ni realizará ninguna operación TicketBAI.
+**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**. El **Hito 14 — Clientes está en curso 🟦**: `14A–14F` están terminados, validados funcionalmente y subidos al repositorio. Además de la ficha completa y su mantenimiento, ya está operativa la pestaña Ventas con consulta por fechas filtrada en SQLite por cliente, listado de operaciones e importes firmados, detalle histórico de líneas y pagos, reimpresión y envío del ticket por email reutilizando íntegramente el pipeline postventa. El nombre mostrado en remitente y plantillas del email del ticket —incluido el asunto mediante `{nombreNegocio}`— procede de `AppData.nombre`; `nombreComercial` queda reservado para los documentos oficiales que lo necesiten. El siguiente paso exacto es **`14G — Estadísticas generales`**. Clientes no realiza ni realizará ninguna operación TicketBAI.
 
 > **Regla crítica de entorno TicketBAI:** el producto usa `production` por defecto. Durante desarrollo/pruebas manuales se usa `app_data.json → ticketBai.environment = "test"` junto con el token TEST correspondiente. No añadir selector de entorno a la UI.
 
@@ -111,8 +111,12 @@ Ventas 12 — Postventa                             🟦
       14E.5.2 Contrato + IPC + preload            ✅
       14E.5.3 Servicio Angular + UI               ✅
     14E.6 Documento protección datos + cierre     ✅
-  14F Ventas del cliente                          ⬜ SIGUIENTE
-  14G Estadísticas generales                      ⬜
+  14F Ventas del cliente                          ✅ CERRADO
+    14F.1 Consulta backend filtrada por cliente   ✅
+    14F.2 Filtros y listado                       ✅
+    14F.3 Selección y detalle documental          ✅
+    14F.4 Reimpresión, email y pulido final       ✅
+  14G Estadísticas generales                      ⬜ SIGUIENTE
   14H Consumo mensual                             ⬜
   14I Dominio y listado de facturas               ⬜
   14J Editor de factura                           ⬜
@@ -3444,7 +3448,7 @@ Con ello, **todo el Hito 13 — Artículos queda terminado y cerrado ✅**.
 
 El análisis funcional y técnico está cerrado. El módulo conservará el modelo mental útil del TPV legacy, pero se implementará sobre la arquitectura actual y corregirá sus problemas de consultas, estado, precisión monetaria, integridad y documentación.
 
-Esta versión se ha contrastado con `origin/main` en el commit `32b433b`, que contiene el cierre validado de `14E.6` y, con él, de todo `14E`.
+Esta versión se ha contrastado con `origin/main` en el commit `eea2a4a`, que contiene el cierre validado de `14F — Ventas del cliente` y la corrección final del nombre utilizado en las plantillas del email del ticket.
 
 ## 29.1 Objetivo y alcance
 
@@ -3519,14 +3523,18 @@ El repositorio nuevo dispone actualmente de:
 - datos alternativos de facturación conservados aunque `factIgual` esté activo;
 - estadísticas rápidas de últimas compras y top de artículos, con caché e invalidación tras guardar ventas;
 - documento de protección de datos integrado en la ficha usando `AppData`, el cliente canónico persistido y los nombres de provincia;
-- histórico de ventas, detalle, PDF, reimpresión y envío de ticket por email;
+- consulta del Histórico ampliada con filtro opcional `clientePublicId`, aplicado de forma coherente al listado, pagos y todos sus agregados;
+- pestaña Ventas completamente operativa con periodo explícito, listado firmado, selección accesible, detalle histórico de líneas y pagos, reimpresión y envío de ticket por email;
+- protección frente a respuestas antiguas tanto en la carga del listado como en la del detalle;
+- acciones documentales vinculadas siempre a la venta de su propia fila, independientemente de la selección del panel derecho;
+- nombre del email del ticket unificado: remitente y `{nombreNegocio}` usan `AppData.nombre`;
 - tablas `factura` y `factura_venta`, estados borrador/emitida/anulada, instantánea de facturación e importación legacy;
 - unicidad de `factura_venta.id_venta`, que garantiza que una venta pertenezca como máximo a una factura.
 
 Todavía faltan:
 
-- consulta de ventas filtrada por cliente y su UI documental;
-- sumas económicas y consumo gráfico;
+- estadísticas generales del cliente: últimos artículos, top y sumas económicas anuales/mensuales;
+- consumo mensual gráfico;
 - contratos, repositories, services e IPC operativos para facturas;
 - listado/editor de borradores, emisión y pipeline documental de facturas.
 
@@ -3597,7 +3605,7 @@ Estado implementado y validado:
 
 - las cinco secciones existen y la sección activa forma parte del workspace;
 - Datos y Datos de facturación están operativas;
-- Facturas, Ventas y Estadísticas conservan por ahora contenido placeholder;
+- Facturas y Estadísticas conservan por ahora contenido placeholder; Ventas está completamente operativa;
 - un borrador nuevo solo permite Datos y Datos de facturación;
 - tras el primer guardado, la misma ficha obtiene identidad persistida y habilita las cinco secciones;
 - el formulario se mantiene montado al alternar Datos/Facturación, evitando perder estado local;
@@ -3691,26 +3699,49 @@ Documento de protección de datos implementado y validado:
 
 La regresión funcional completa de Datos, Facturación, Crear, Actualizar, Cancelar, Buscar, Cerrar, Baja y Documento de protección de datos ha sido validada por el usuario. **`14E — Persistencia y mantenimiento` queda cerrado ✅.**
 
-## 29.7 Ventas del cliente
+## 29.7 Ventas del cliente ✅
 
-La pestaña Ventas mostrará las ventas persistidas asociadas al cliente.
+La pestaña Ventas está implementada, validada funcional y visualmente y subida al repositorio. Es una sección documental de solo lectura y no forma parte del draft editable del cliente, por lo que consultarla nunca genera dirty.
 
-Debe reutilizar el dominio ya cerrado del Histórico de Ventas:
+Backend y contrato:
 
-- consulta por periodo;
-- resumen de venta;
-- detalle y líneas históricas;
-- pagos;
-- regeneración/reimpresión del ticket;
-- envío por email.
+- `VentaHistoricoConsulta` acepta el filtro opcional `clientePublicId`;
+- omitirlo conserva sin cambios el Histórico global de Ventas;
+- backend normaliza y valida el identificador recibido;
+- `VentasHistoricoRepository.findByPeriod()` acepta el filtro nullable;
+- SQLite resuelve el id interno del cliente a partir de su `publicId`;
+- el filtro se aplica exactamente igual al listado, los pagos, el total, el ticket medio, el beneficio y los totales por tipo de pago;
+- las fechas continúan siendo intervalos civiles locales con extremo final exclusivo en SQLite;
+- las ventas soft-deleted permanecen excluidas;
+- no se ha creado un endpoint ni un pipeline paralelo específico de Clientes.
 
-No se duplicarán pipelines de PDF, impresión o email.
+Renderer y experiencia de uso:
 
-Los filtros temporales tendrán un significado explícito. No se repetirá el comportamiento legacy en el que Todos/Todos cargaba silenciosamente el mes actual.
+- `ClientSalesComponent` se monta exclusivamente para un cliente persistido;
+- el periodo inicial es el mes local actual, con Desde y Hasta explícitos;
+- la búsqueda exige ambas fechas y rechaza rangos invertidos;
+- cada nueva consulta limpia la selección y protege la UI frente a respuestas anteriores fuera de orden;
+- se muestran ventas y devoluciones con fecha/hora, referencia, importe firmado, tipos de pago y opciones;
+- las devoluciones se distinguen visualmente y conservan su importe negativo;
+- seleccionar una fila carga el snapshot histórico completo y permite consultar líneas y pagos mediante `HistoricalSaleDetailComponent` en modo `readonly`;
+- el listado y el detalle tienen estados de carga, vacío, error y reintento;
+- la fila puede seleccionarse también mediante teclado;
+- la distribución usa listado a la izquierda y detalle a la derecha, apilándose en ventanas estrechas;
+- las anchuras fijas de fecha, referencia, importe y opciones mantienen visibles los botones sin scroll horizontal; el tipo de pago ocupa el espacio restante.
 
-Cada botón actuará sobre la venta de su propia fila. No se reproducirá el bug legacy que usaba ventaSelected aunque se hubiese pulsado otra fila.
+Acciones documentales:
 
-Las ventas y devoluciones se mostrarán con sus importes firmados según el histórico real. Esta pestaña es de consulta y no forma parte del draft editable del cliente.
+- cada botón conserva y utiliza el id de la venta de su propia fila; nunca depende de `selectedVentaId`;
+- reimprimir reutiliza `VentaTicketDocumentService.reprint()` y el pipeline documental vigente;
+- enviar reutiliza `HistoricalSaleEmailFormComponent` y `VentaTicketEmailService.send()`;
+- el formulario de email se abre en el panel derecho y propone el email canónico persistido del cliente;
+- si SMTP no está configurado, la acción queda deshabilitada con información contextual;
+- durante impresión o envío se bloquean consultas, selección y demás acciones para evitar solapamientos;
+- éxito y error producen feedback específico sin modificar la ficha ni ejecutar operaciones TicketBAI;
+- remitente y variable `{nombreNegocio}` de las plantillas del ticket —incluido el asunto predeterminado— usan `AppData.nombre`;
+- `AppData.nombreComercial` no se utiliza en el email del ticket y queda reservado para documentos oficiales que lo requieran.
+
+Se reutilizaron y reforzaron los componentes del Histórico sin alterar sus usos existentes. Los tests backend, repository SQLite, renderer, build y lint, así como las pruebas funcionales de listado, detalle, impresión, email y diseño, fueron correctos. **`14F — Ventas del cliente` queda cerrado ✅.**
 
 ## 29.8 Estadísticas
 
@@ -3961,15 +3992,45 @@ La versión 2.29 cerró el análisis funcional, las decisiones y la secuencia de
 - errores de configuración, identidad o apertura de ventana controlados ✅;
 - regresión funcional integral y todos los tests/build/lint validados por el usuario ✅.
 
-### 14F — Ventas del cliente ⬜ SIGUIENTE
+### 14F — Ventas del cliente ✅ CERRADO
 
-- consulta filtrada;
-- listado y detalle;
-- reimpresión;
-- email;
-- reutilización del Histórico.
+#### 14F.1 — Contrato y consulta backend filtrada por cliente ✅
 
-### 14G — Estadísticas generales ⬜
+- filtro opcional `clientePublicId` incorporado al contrato existente;
+- validación y normalización en application service;
+- filtrado SQLite uniforme sobre ventas, pagos y agregados;
+- Histórico global preservado al omitir el filtro;
+- cobertura de service y repository SQLite validada.
+
+#### 14F.2 — Filtros y listado ✅
+
+- `ClientSalesComponent` standalone integrado en la ficha;
+- periodo explícito Desde/Hasta, inicializado al mes actual;
+- validación de rango, carga, vacío, error y protección frente a respuestas antiguas;
+- tabla con fecha, referencia, importe firmado y tipos de pago;
+- ventas y devoluciones visibles sin afectar al draft.
+
+#### 14F.3 — Selección y detalle documental ✅
+
+- selección por click y teclado;
+- carga lazy del snapshot histórico completo;
+- reutilización de `HistoricalSaleDetailComponent` en modo `readonly`;
+- estados de carga, ausencia, error y reintento;
+- paneles adaptables y detalle independiente de la edición del cliente.
+
+#### 14F.4 — Reimpresión, email y pulido final ✅
+
+- acciones vinculadas al id de su propia fila;
+- reimpresión mediante el pipeline documental existente;
+- email mediante formulario y servicio postventa ya cerrados;
+- destinatario inicial obtenido del cliente canónico;
+- bloqueo cuando SMTP no está configurado y durante operaciones activas;
+- feedback de éxito/error;
+- tabla compactada para mantener visibles las opciones sin scroll horizontal;
+- `AppData.nombre` unificado como nombre del remitente y valor de `{nombreNegocio}` en las plantillas del ticket;
+- todos los tests y pruebas funcionales validados y cambios subidos.
+
+### 14G — Estadísticas generales ⬜ SIGUIENTE
 
 - últimos artículos;
 - top por importe;
@@ -4070,30 +4131,65 @@ src/app/model/clientes/cliente-proteccion-datos-document.builder.ts
 src/app/services/cliente-proteccion-datos-print.service.ts
 ```
 
+Ventas del cliente y reutilización del Histórico:
+
+```text
+src/app/modules/clientes/components/client-sales/
+src/app/modules/ventas/components/historical-sale-detail/
+src/app/modules/ventas/components/historical-sale-email-form/
+src/app/services/ventas-historico.service.ts
+src/app/services/venta-ticket-document.service.ts
+src/app/services/venta-ticket-email.service.ts
+electron/contracts/ventas/venta-historico.interface.ts
+electron/backend/application/ventas/ventas-historico.service.ts
+electron/backend/application/ventas/ventas-ticket-email.service.ts
+electron/backend/contracts/ventas/ventas-historico.repository.interface.ts
+electron/infrastructure/database/typeorm/typeorm-ventas-historico.repository.ts
+```
+
+Estadísticas rápidas existentes que deben revisarse antes de `14G`:
+
+```text
+src/app/model/clientes/cliente-estadisticas-state.interface.ts
+src/app/services/clientes.service.ts
+electron/contracts/clientes/cliente-estadisticas.interface.ts
+electron/contracts/clientes/clientes-api.interface.ts
+electron/backend/contracts/clientes/cliente-estadisticas-record.interface.ts
+electron/backend/contracts/clientes/cliente.repository.interface.ts
+electron/backend/application/clientes/clientes.service.ts
+electron/infrastructure/database/typeorm/typeorm-cliente.repository.ts
+electron/ipc/register-clientes-ipc.ts
+electron/preload.ts
+```
+
 ---
 
 # 30. Próximo paso exacto
 
 ```text
-14F — Ventas del cliente
+14G — Estadísticas generales
 ```
 
 Antes de proponer cambios:
 
 - actualizar y revisar el main actual;
-- revisar el Histórico de Ventas ya cerrado, especialmente consulta, filtros, tabla, detalle y acciones documentales;
-- revisar el repository/service/API/IPC/preload actuales para decidir la ampliación mínima que permita filtrar por cliente;
-- reutilizar el detalle histórico, el pipeline PDF, la reimpresión y el envío por email; no duplicarlos dentro de Clientes;
-- definir filtros temporales explícitos, evitando que `Todos/Todos` se interprete silenciosamente como el mes actual;
-- asegurar que cada acción opera sobre la venta de su propia fila y no sobre una selección anterior;
-- mantener esta pestaña fuera del draft editable del cliente para que consultar ventas nunca genere dirty;
-- separar el trabajo en subbloques backend/contrato e integración renderer si el tamaño lo aconseja;
+- revisar las estadísticas rápidas de clientes ya existentes y su uso actual en Ventas, pero mantenerlas ligeras y no sobrecargarlas con toda la nueva pestaña;
+- revisar los cálculos y contratos históricos del TPV legacy para contrastar campos, agrupaciones y presentación, sin trasladar sus cálculos con floats al renderer;
+- definir una consulta backend específica y lazy para los tres bloques de `14G`: últimos artículos comprados, artículos más comprados y suma de ventas anual/mensual;
+- calcular en SQLite usando dinero entero: PUC como coste firmado, PVP como importe real tras descuentos, beneficio como PVP−PUC y margen como beneficio/PVP;
+- incluir devoluciones con signo negativo y excluir ventas soft-deleted;
+- derivar los años de los datos disponibles, sin limitarse al actual y cuatro anteriores;
+- devolver inicialmente un máximo de 20 líneas en Últimos artículos comprados;
+- ordenar el top por importe real descendente, después unidades descendentes y finalmente nombre;
+- mantener Estadísticas fuera del draft del cliente, con carga lazy al entrar en la pestaña, estados completos y protección frente a respuestas antiguas;
+- reservar la gráfica y sus filtros Mes/Año para `14H — Consumo mensual`;
+- separar el trabajo en subbloques de dominio/backend, contrato/IPC/preload y renderer si el tamaño lo aconseja;
 - presentar cada archivo nuevo completo y cada archivo existente como fragmento actual → nuevo;
 - al añadir imports, indicar únicamente los imports nuevos; Prettier se encargará de ordenarlos;
 - indicar las pruebas exactas pertinentes al subbloque;
 - esperar confirmación del usuario antes de avanzar.
 
-No integrar todavía Estadísticas completas ni la UI de Facturas dentro de `14F`. La pestaña Ventas será documental y reutilizará la infraestructura postventa existente, sin realizar ninguna operación TicketBAI nueva.
+No integrar todavía Consumo mensual ni la UI de Facturas dentro de `14G`. La gráfica queda reservada para `14H`, y las facturas comenzarán en `14I`. Las estadísticas son de solo lectura y no realizan ninguna operación TicketBAI.
 
 ---
 
@@ -4119,6 +4215,7 @@ No integrar todavía Estadísticas completas ni la UI de Facturas dentro de `14F
 | **2.29** | **02/09/2026** | **14A ✅. Análisis funcional y plan de Clientes cerrados. Se acuerdan workspace de un único cliente, búsqueda totalmente en memoria, CRUD con soft delete, Ventas reutilizando Histórico, estadísticas reales con gráfica y facturas como agrupaciones 1..N de ventas positivas ya cobradas. Cada venta pertenece como máximo a una factura; devoluciones y mixtas no son elegibles; Clientes no usa TicketBAI. Siguiente: 14B Base del apartado Clientes.** |
 | **2.30** | **03/09/2026** | **Clientes 14B–14D y 14E.1–14E.4 terminados, validados y subidos ✅. Ya están operativos ruta/página, workspace persistente de una ficha, búsqueda local, protección dirty, secciones, formulario compartido, datos generales/facturación, CREATE, UPDATE transaccional, reconciliación post-COMMIT, Guardar/Cancelar global, validación entre pestañas, feedback de cuatro segundos, foco en nuevos borradores y defensas durante guardado. Siguiente: 14E.5 baja lógica y bloqueo por facturas en borrador.** |
 | **2.31** | **03/09/2026** | **14E.5 y 14E.6 terminados, validados y subidos; `14E — Persistencia y mantenimiento` queda cerrado ✅. Baja lógica atómica con bloqueo por facturas en borrador, preservación completa del histórico, contrato/IPC/preload, reconciliación Angular post-COMMIT y UI confirmada. Documento de protección de datos integrado con cliente canónico, AppData y provincias. Nueva regla de trabajo: al añadir imports basta con indicar cuáles; Prettier decide su posición. Siguiente: 14F Ventas del cliente.** |
+| **2.32** | **03/09/2026** | **`14F — Ventas del cliente` terminado, validado y subido ✅. El Histórico admite filtro opcional por `clientePublicId` aplicado en SQLite al listado, pagos y agregados. La pestaña ofrece fechas explícitas, importes firmados, selección accesible, detalle readonly, reimpresión y email reutilizando los pipelines existentes, con protección ante respuestas antiguas y acciones ligadas a su propia fila. Ajuste responsive final sin scroll horizontal. Remitente y `{nombreNegocio}` de los emails de tickets usan `AppData.nombre`; `nombreComercial` queda fuera de estas comunicaciones. Siguiente: 14G Estadísticas generales.** |
 ---
 
 # 32. Prompt de arranque recomendado
@@ -4127,7 +4224,7 @@ No integrar todavía Estadísticas completas ni la UI de Facturas dentro de `14F
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.31.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.32.
 
 Estado:
 - Ventas 12C.1–12C.8 ✅
@@ -4179,7 +4276,12 @@ Estado:
       - 14E.5.2 contrato, IPC y preload ✅
       - 14E.5.3 servicio Angular y UI ✅
     - 14E.6 documento de protección de datos y cierre funcional ✅
-  - 14F Ventas del cliente ⬜ SIGUIENTE
+  - 14F Ventas del cliente ✅ CERRADO
+    - 14F.1 contrato y consulta backend filtrada por cliente ✅
+    - 14F.2 filtros y listado ✅
+    - 14F.3 selección y detalle documental ✅
+    - 14F.4 reimpresión, email y pulido final ✅
+  - 14G Estadísticas generales ⬜ SIGUIENTE
 
 Hito actual:
 14 Clientes 🟦
@@ -4284,8 +4386,15 @@ Reglas críticas:
 - Baja de cliente = soft delete transaccional con `NOT EXISTS`; conserva ventas, facturas y relaciones y se bloquea si hay facturas activas en borrador.
 - La baja solo se ejecuta sobre cliente persistido y limpio; tras éxito se retira de colección/caché y se cierra la ficha, mientras que un fallo conserva todo el estado.
 - La acción se llama Documento de protección de datos, solo usa el Cliente canónico persistido y reutiliza el builder/servicio de impresión ya implementados.
-- Ventas de cliente reutiliza Histórico, detalle, PDF, impresión y email; no duplicar pipelines.
+- Ventas de cliente reutiliza Histórico, detalle, PDF, impresión y email; no duplica pipelines.
+- `VentaHistoricoConsulta.clientePublicId` es opcional: con valor filtra todas las consultas/agregados por cliente; ausente conserva el Histórico global.
+- La pestaña Ventas comienza en el mes local actual, exige Desde/Hasta explícitos y muestra también devoluciones con importe firmado.
 - Cada acción de una fila opera sobre esa venta, no sobre una selección anterior.
+- El detalle de Ventas reutiliza `HistoricalSaleDetailComponent` en modo `readonly` y su carga no genera dirty.
+- Las cargas de listado y detalle están protegidas frente a respuestas antiguas fuera de orden.
+- Reimpresión y email bloquean acciones concurrentes y muestran feedback propio.
+- La tabla reserva anchuras para fecha, referencia, importe y opciones; el tipo de pago ocupa el espacio restante para evitar scroll horizontal innecesario.
+- En emails de tickets, remitente y variable `{nombreNegocio}` usan `AppData.nombre`; no usar `nombreComercial` en asunto, cuerpo ni remitente.
 - Estadísticas muestra los últimos 20 artículos comprados y top ordenado por importe real.
 - Suma de ventas: PUC coste firmado; PVP importe real tras descuentos; beneficio PVP−PUC; margen beneficio/PVP.
 - Devoluciones restan en estadísticas, pero no son elegibles para facturas.
@@ -4320,9 +4429,9 @@ Convenciones:
 - En cada bloque incluir un resumen breve: completado, punto actual y pendiente.
 
 Próximo paso exacto:
-14F — Ventas del cliente.
+14G — Estadísticas generales.
 ```
 
 ---
 
-**Fin del documento de continuidad v2.31.**
+**Fin del documento de continuidad v2.32.**
