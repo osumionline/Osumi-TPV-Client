@@ -13,3 +13,10 @@ export interface ClienteTopVentaRecord {
   readonly unidades: number;
   readonly importeMicros: number;
 }
+
+export interface ClienteSumaVentaRecord {
+  readonly year: number;
+  readonly month: number;
+  readonly pucMicros: number;
+  readonly pvpMicros: number;
+}

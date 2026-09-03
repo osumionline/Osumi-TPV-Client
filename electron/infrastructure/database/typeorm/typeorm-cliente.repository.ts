@@ -1,5 +1,6 @@
 import type ClienteDeactivateResult from '@backend/contracts/clientes/cliente-deactivate-result.type';
 import type {
+  ClienteSumaVentaRecord,
   ClienteTopVentaRecord,
   ClienteUltimaVentaRecord,
 } from '@backend/contracts/clientes/cliente-estadisticas-record.interface';
@@ -51,6 +52,13 @@ interface ClienteTopVentaDatabaseRow {
   readonly nombre: string;
   readonly unidades: number;
   readonly importe_micros: number;
+}
+
+interface ClienteSumaVentaDatabaseRow {
+  readonly year: number;
+  readonly month: number;
+  readonly puc_micros: number;
+  readonly pvp_micros: number;
 }
 
 interface ClienteUpdateTargetDatabaseRow {
@@ -533,8 +541,8 @@ export default class TypeOrmClienteRepository implements ClienteRepository {
             ELSE NULL
           END
         ORDER BY
-          unidades DESC,
           importe_micros DESC,
+          unidades DESC,
           nombre COLLATE NOCASE
         LIMIT ?
       `,
@@ -547,5 +555,82 @@ export default class TypeOrmClienteRepository implements ClienteRepository {
       unidades: row.unidades,
       importeMicros: row.importe_micros,
     }));
+  }
+
+  /**
+   * Agrega por año y mes el coste y el importe real
+   * de las ventas asociadas a un cliente.
+   *
+   * Las unidades negativas hacen que las devoluciones
+   * resten también del coste histórico.
+   */
+  async findSumaVentas(publicId: string): Promise<readonly ClienteSumaVentaRecord[]> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const rows: readonly ClienteSumaVentaDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT
+          CAST(
+            strftime('%Y', v.created_at)
+            AS INTEGER
+          ) AS year,
+          CAST(
+            strftime('%m', v.created_at)
+            AS INTEGER
+          ) AS month,
+          CAST(
+            SUM(lv.puc_micros * lv.unidades)
+            AS INTEGER
+          ) AS puc_micros,
+          CAST(
+            SUM(lv.importe_micros)
+            AS INTEGER
+          ) AS pvp_micros
+        FROM cliente c
+
+        INNER JOIN venta v
+          ON v.id_cliente = c.id
+
+        INNER JOIN linea_venta lv
+          ON lv.id_venta = v.id
+
+        WHERE
+          c.public_id = ?
+          AND c.deleted_at IS NULL
+          AND v.deleted_at IS NULL
+
+        GROUP BY
+          year,
+          month
+
+        ORDER BY
+          year,
+          month
+      `,
+      [publicId],
+    )) as readonly ClienteSumaVentaDatabaseRow[];
+
+    return rows.map((row: ClienteSumaVentaDatabaseRow): ClienteSumaVentaRecord => {
+      if (
+        !Number.isSafeInteger(row.year) ||
+        row.year < 1 ||
+        !Number.isSafeInteger(row.month) ||
+        row.month < 1 ||
+        row.month > 12
+      ) {
+        throw new Error('Las fechas agregadas de las ventas del cliente no son válidas.');
+      }
+
+      if (!Number.isSafeInteger(row.puc_micros) || !Number.isSafeInteger(row.pvp_micros)) {
+        throw new Error('Las sumas de ventas del cliente superan el rango numérico seguro.');
+      }
+
+      return {
+        year: row.year,
+        month: row.month,
+        pucMicros: row.puc_micros,
+        pvpMicros: row.pvp_micros,
+      };
+    });
   }
 }

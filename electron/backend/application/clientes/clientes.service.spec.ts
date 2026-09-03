@@ -1,6 +1,7 @@
 import ClientesService from '@backend/application/clientes/clientes.service';
 import type ClienteDeactivateResult from '@backend/contracts/clientes/cliente-deactivate-result.type';
 import type {
+  ClienteSumaVentaRecord,
   ClienteTopVentaRecord,
   ClienteUltimaVentaRecord,
 } from '@backend/contracts/clientes/cliente-estadisticas-record.interface';
@@ -93,6 +94,13 @@ class FakeClienteRepository implements ClienteRepository {
    * Devuelve una colección vacía de artículos más comprados.
    */
   findTopVentas(): Promise<readonly ClienteTopVentaRecord[]> {
+    return Promise.resolve([]);
+  }
+
+  /**
+   * Devuelve una colección vacía de sumas mensuales.
+   */
+  findSumaVentas(): Promise<readonly ClienteSumaVentaRecord[]> {
     return Promise.resolve([]);
   }
 }

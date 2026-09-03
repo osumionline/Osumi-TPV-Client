@@ -1,5 +1,6 @@
 import type ClienteDeactivateResult from '@backend/contracts/clientes/cliente-deactivate-result.type';
 import type {
+  ClienteSumaVentaRecord,
   ClienteTopVentaRecord,
   ClienteUltimaVentaRecord,
 } from '@backend/contracts/clientes/cliente-estadisticas-record.interface';
@@ -20,4 +21,10 @@ export default interface ClienteRepository {
   findUltimasVentas(publicId: string, limit: number): Promise<readonly ClienteUltimaVentaRecord[]>;
 
   findTopVentas(publicId: string, limit: number): Promise<readonly ClienteTopVentaRecord[]>;
+
+  /**
+   * Agrega por año y mes los importes históricos
+   * de compra y venta de un cliente.
+   */
+  findSumaVentas(publicId: string): Promise<readonly ClienteSumaVentaRecord[]>;
 }
