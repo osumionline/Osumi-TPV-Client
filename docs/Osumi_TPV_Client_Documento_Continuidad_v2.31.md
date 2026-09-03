@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.30  
+**Versión:** 2.31  
 **Fecha:** 3 de septiembre de 2026  
-**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**. El **Hito 14 — Clientes está en curso 🟦**: `14A–14D` están terminados y `14E.1–14E.4` están implementados, validados funcionalmente y subidos al repositorio. Ya existen la ruta y página de Clientes, el workspace persistente de una sola ficha, la búsqueda totalmente local, las secciones Datos/Facturación, dirty/Cancelar, CREATE, UPDATE, reconciliación post-COMMIT, guardado global, feedback y pulido de UX. El siguiente paso exacto es **`14E.5 — Baja lógica y bloqueo por facturas en borrador`**. Clientes seguirá sin realizar ninguna operación TicketBAI.
+**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**. El **Hito 14 — Clientes está en curso 🟦**: `14A–14E` están terminados, validados funcionalmente y subidos al repositorio. Ya están operativos la entrada y búsqueda local, el workspace persistente de una sola ficha, Datos y Datos de facturación, CREATE/UPDATE, guardado global, reconciliación post-COMMIT, baja lógica protegida por facturas en borrador y el documento de protección de datos basado en información canónica persistida. El siguiente paso exacto es **`14F — Ventas del cliente`**. Clientes no realiza ni realizará ninguna operación TicketBAI.
 
 > **Regla crítica de entorno TicketBAI:** el producto usa `production` por defecto. Durante desarrollo/pruebas manuales se usa `app_data.json → ticketBai.environment = "test"` junto con el token TEST correspondiente. No añadir selector de entorno a la UI.
 
@@ -101,14 +101,17 @@ Ventas 12 — Postventa                             🟦
     14D.1 Secciones y sección activa              ✅
     14D.2 Formulario compartido                   ✅
     14D.3 Integración, dirty y Cancelar           ✅
-  14E Persistencia y mantenimiento                🟦
+  14E Persistencia y mantenimiento                ✅ CERRADO
     14E.1 CREATE + reconciliación segura          ✅
     14E.2 Facturación, validación y guardado     ✅
     14E.3 UPDATE completo                         ✅
     14E.4 Pulido final de UX                      ✅
-    14E.5 Baja lógica + bloqueo borradores        ⬜ SIGUIENTE
-    14E.6 Documento protección datos + cierre     ⬜
-  14F Ventas del cliente                          ⬜
+    14E.5 Baja lógica + bloqueo borradores        ✅
+      14E.5.1 Backend transaccional               ✅
+      14E.5.2 Contrato + IPC + preload            ✅
+      14E.5.3 Servicio Angular + UI               ✅
+    14E.6 Documento protección datos + cierre     ✅
+  14F Ventas del cliente                          ⬜ SIGUIENTE
   14G Estadísticas generales                      ⬜
   14H Consumo mensual                             ⬜
   14I Dominio y listado de facturas               ⬜
@@ -134,6 +137,7 @@ Star TSP100/TSP143 80 mm                          ⏸️ prueba física, no bloq
 - Todo método TS/JS nuevo lleva JSDoc breve.
 - Archivo nuevo: mostrar completo.
 - Archivo existente: mostrar siempre fragmento actual → fragmento nuevo.
+- Cuando haya que añadir un import, indicar únicamente el import nuevo; no especificar su posición entre otros imports, porque Prettier los ordena automáticamente al guardar.
 - Trabajar en lotes coherentes, no micro-pasos.
 - Revisar `main` o archivos actuales antes de proponer patches.
 - No avanzar sin confirmación del usuario.
@@ -3440,7 +3444,7 @@ Con ello, **todo el Hito 13 — Artículos queda terminado y cerrado ✅**.
 
 El análisis funcional y técnico está cerrado. El módulo conservará el modelo mental útil del TPV legacy, pero se implementará sobre la arquitectura actual y corregirá sus problemas de consultas, estado, precisión monetaria, integridad y documentación.
 
-Esta versión se ha contrastado con `origin/main` en el commit `0a2e0a7`, que contiene el cierre validado de `14E.4`.
+Esta versión se ha contrastado con `origin/main` en el commit `32b433b`, que contiene el cierre validado de `14E.6` y, con él, de todo `14E`.
 
 ## 29.1 Objetivo y alcance
 
@@ -3477,10 +3481,11 @@ El desarrollo continuará manualmente y por mini-hitos:
 2. Se acuerda el objetivo del mini-hito.
 3. Para archivos nuevos se entrega el contenido completo.
 4. Para archivos existentes se muestra un fragmento actual identificable y cómo debe quedar.
-5. El usuario aplica manualmente los cambios.
-6. El usuario ejecuta las comprobaciones, valida visual y funcionalmente y comunica cualquier ajuste propio.
-7. No se avanza al siguiente mini-hito hasta recibir su confirmación.
-8. Cada propuesta comienza o termina con un resumen breve de lo completado, el bloque actual y los bloques pendientes.
+5. Cuando haya que añadir imports, basta con indicar cuáles son; Prettier los ordena automáticamente al guardar y no es necesario describir entre qué imports deben colocarse.
+6. El usuario aplica manualmente los cambios.
+7. El usuario ejecuta las comprobaciones, valida visual y funcionalmente y comunica cualquier ajuste propio.
+8. No se avanza al siguiente mini-hito hasta recibir su confirmación.
+9. Cada propuesta comienza o termina con un resumen breve de lo completado, el bloque actual y los bloques pendientes.
 
 El asistente no hará commits ni pull requests. Puede leer los repositorios legacy y actual para fundamentar las propuestas.
 
@@ -3507,17 +3512,19 @@ El repositorio nuevo dispone actualmente de:
 - descuento presentado como porcentaje y persistido en puntos básicos;
 - reconciliación post-COMMIT sin `reload()` obligatorio y conservando la instancia de `Cliente` ya referenciada por Ventas;
 - guardado y Cancelar globales, bloqueo de interacciones durante escritura y feedback temporal de éxito;
+- baja lógica transaccional de clientes con bloqueo atómico cuando existan facturas activas en estado borrador;
+- contrato `deactivate`, canal IPC, preload, servicio Angular y acción de baja completamente operativos;
+- reconciliación post-COMMIT de la baja: eliminación de la colección activa, invalidación de estadísticas y cierre de ficha;
+- preservación de ficha, colección y cachés cuando la baja es rechazada;
 - datos alternativos de facturación conservados aunque `factIgual` esté activo;
 - estadísticas rápidas de últimas compras y top de artículos, con caché e invalidación tras guardar ventas;
-- documento de protección de datos y servicio de impresión ya reutilizables;
+- documento de protección de datos integrado en la ficha usando `AppData`, el cliente canónico persistido y los nombres de provincia;
 - histórico de ventas, detalle, PDF, reimpresión y envío de ticket por email;
 - tablas `factura` y `factura_venta`, estados borrador/emitida/anulada, instantánea de facturación e importación legacy;
 - unicidad de `factura_venta.id_venta`, que garantiza que una venta pertenezca como máximo a una factura.
 
 Todavía faltan:
 
-- baja lógica del cliente y bloqueo cuando tenga facturas en borrador;
-- integración del documento de protección de datos en la ficha;
 - consulta de ventas filtrada por cliente y su UI documental;
 - sumas económicas y consumo gráfico;
 - contratos, repositories, services e IPC operativos para facturas;
@@ -3596,7 +3603,7 @@ Estado implementado y validado:
 - el formulario se mantiene montado al alternar Datos/Facturación, evitando perder estado local;
 - las acciones Guardar y Cancelar están en el footer global de la ficha.
 
-## 29.6 Datos generales y facturación ✅ SALVO BAJA/DOCUMENTO
+## 29.6 Datos generales, facturación y mantenimiento ✅
 
 Datos generales:
 
@@ -3633,7 +3640,7 @@ Persistencia:
 
 Cancelar restaura baseSnapshot después de confirmar si hay cambios.
 
-Estado implementado y validado hasta `14E.4`:
+Estado implementado y validado hasta `14E.6`:
 
 - `ClienteFormModel` contiene todos los campos generales y alternativos de facturación;
 - `factIgual` oculta los campos alternativos, pero ni el mapper renderer ni el backend los destruyen;
@@ -3657,17 +3664,32 @@ Estado implementado y validado hasta `14E.4`:
 - cada nueva ficha vuelve a enfocar Nombre y apellidos aunque el formulario ya estuviera montado;
 - las pruebas renderer usan Vitest (`vi` cuando se necesitan spies), nunca Jasmine.
 
-Baja:
+Baja implementada y validada:
 
-- siempre lógica;
-- conserva las ventas del cliente;
-- conserva sus facturas y relaciones;
-- no desasocia documentos históricos;
-- lo elimina de la colección activa y del buscador;
-- se bloquea mientras el cliente tenga una factura en borrador;
-- si falla el backend, la ficha permanece abierta.
+- siempre es lógica: asigna `cliente.deleted_at` y `updated_at`;
+- repository comprueba y ejecuta la baja en una única transacción;
+- el `UPDATE` incorpora un `NOT EXISTS` sobre facturas activas en estado `borrador`, evitando una carrera entre comprobación y escritura;
+- devuelve internamente `deactivated`, `has_draft_invoices` o `not_found`, que application service traduce a éxito o mensajes de dominio claros;
+- conserva ventas, facturas, relaciones `factura_venta` y demás información histórica;
+- contrato, IPC y preload exponen `clientes.deactivate(publicId)`;
+- solo se permite sobre clientes persistidos, limpios y activos;
+- la UI solicita confirmación y bloquea el resto de acciones durante la operación;
+- tras el COMMIT, `ClientesService` espera lecturas globales anteriores, invalida estadísticas, retira el cliente de la colección activa y cierra su ficha;
+- si backend rechaza la baja —incluido el caso de facturas en borrador— la ficha, la colección y las cachés permanecen intactas;
+- el cliente dado de baja desaparece también del buscador, porque este trabaja sobre la misma colección activa en memoria.
 
-La acción denominada Imprimir LOPD en el TPV antiguo se presentará como documento de protección de datos y reutilizará el generador ya implementado.
+Documento de protección de datos implementado y validado:
+
+- la antigua acción «Imprimir LOPD» se presenta como **Documento de protección de datos**;
+- reutiliza `ClienteProteccionDatosPrintService` y `buildClienteProteccionDatosDocument`;
+- solo aparece para clientes persistidos y queda bloqueada con dirty o mientras exista otra operación en curso;
+- nunca imprime directamente el draft: resuelve el `Cliente` canónico mediante `publicId` y verifica también su id;
+- usa la configuración global de `AppData` y los nombres de provincia cargados por `ProvinciasService`;
+- contempla datos generales y datos de facturación alternativos cuando `factIgual === false`;
+- conserva la apertura síncrona de la ventana desde el click para evitar bloqueos de ventanas emergentes;
+- cualquier ausencia de datos o fallo al abrir la ventana se presenta mediante un mensaje claro sin modificar la ficha.
+
+La regresión funcional completa de Datos, Facturación, Crear, Actualizar, Cancelar, Buscar, Cerrar, Baja y Documento de protección de datos ha sido validada por el usuario. **`14E — Persistencia y mantenimiento` queda cerrado ✅.**
 
 ## 29.7 Ventas del cliente
 
@@ -3886,7 +3908,7 @@ La versión 2.29 cerró el análisis funcional, las decisiones y la secuencia de
 - `draft`/`baseSnapshot` independientes ✅;
 - Datos y Datos de facturación sobre un único modelo ✅.
 
-### 14E — Persistencia y mantenimiento 🟦 EN CURSO
+### 14E — Persistencia y mantenimiento ✅ CERRADO
 
 #### 14E.1 — Creación y reconciliación segura ✅
 
@@ -3918,28 +3940,28 @@ La versión 2.29 cerró el análisis funcional, las decisiones y la secuencia de
 - test de foco con Vitest `vi.spyOn`;
 - tests, build, lint y pruebas funcionales validados por el usuario.
 
-#### 14E.5 — Baja lógica y bloqueo por borradores ⬜ SIGUIENTE
+#### 14E.5 — Baja lógica y bloqueo por borradores ✅
 
-- comprobar en backend si el cliente activo tiene alguna factura en estado borrador;
-- bloquear la baja cuando exista al menos una factura en borrador y devolver un mensaje claro;
-- ejecutar la baja lógica de forma segura, asignando `deleted_at` sin borrar ventas, facturas ni relaciones;
-- exponer repository/service/contrato/API/IPC/preload/Angular;
-- permitir la baja solo para clientes persistidos y limpios;
-- confirmar antes de ejecutar;
-- tras éxito, retirar el cliente de la colección activa y cerrar su ficha;
-- ante fallo, conservar ficha y colección sin una reconciliación falsa;
-- cubrir backend y servicio Angular con tests.
+- `14E.5.1` repository y application service transaccionales ✅;
+- `14E.5.2` contrato, canal IPC y preload ✅;
+- `14E.5.3` servicio Angular, reconciliación y UI ✅;
+- bloqueo atómico mediante `NOT EXISTS` cuando existan facturas activas en estado borrador ✅;
+- soft delete sin borrar ni desasociar ventas, facturas o relaciones históricas ✅;
+- acción exclusiva para clientes persistidos y limpios, con confirmación y estado `Dando de baja…` ✅;
+- éxito: retirar de colección/caché y cerrar ficha; fallo: conservar todo el estado activo ✅;
+- tests backend, Electron/TypeScript, renderer y pruebas funcionales validados ✅.
 
-#### 14E.6 — Documento de protección de datos y cierre funcional ⬜
+#### 14E.6 — Documento de protección de datos y cierre funcional ✅
 
-- integrar en la ficha `ClienteProteccionDatosPrintService` y el builder existentes;
-- usar los datos canónicos del cliente persistido y la configuración de `AppData`;
-- presentar la acción como documento de protección de datos, no como una función genérica de impresión LOPD;
-- definir visibilidad/bloqueos coherentes con identidad, dirty y saving;
-- realizar regresión funcional de Datos, Facturación, Crear, Actualizar, Cancelar, Buscar, Cerrar, Baja y documento;
-- cerrar `14E` antes de comenzar Ventas.
+- `ClienteProteccionDatosPrintService` y el builder existente integrados en la ficha ✅;
+- documento generado con `AppData`, cliente canónico persistido y provincias resueltas ✅;
+- acción denominada `Documento de protección de datos`, nunca `Imprimir LOPD` ✅;
+- visible solo para persistidos y bloqueada con dirty o procesamiento activo ✅;
+- pestañas, formulario y acciones usan el bloqueo común `processing()` ✅;
+- errores de configuración, identidad o apertura de ventana controlados ✅;
+- regresión funcional integral y todos los tests/build/lint validados por el usuario ✅.
 
-### 14F — Ventas del cliente ⬜
+### 14F — Ventas del cliente ⬜ SIGUIENTE
 
 - consulta filtrada;
 - listado y detalle;
@@ -4030,6 +4052,7 @@ Backend y puente Electron:
 ```text
 electron/backend/application/clientes/clientes.service.ts
 electron/backend/application/clientes/clientes.service.spec.ts
+electron/backend/contracts/clientes/cliente-deactivate-result.type.ts
 electron/backend/contracts/clientes/cliente.repository.interface.ts
 electron/infrastructure/database/typeorm/typeorm-cliente.repository.ts
 electron/contracts/clientes/crear-cliente-command.interface.ts
@@ -4040,7 +4063,7 @@ electron/ipc/register-clientes-ipc.ts
 electron/preload.ts
 ```
 
-Documento de protección de datos ya disponible para `14E.6`:
+Documento de protección de datos integrado:
 
 ```text
 src/app/model/clientes/cliente-proteccion-datos-document.builder.ts
@@ -4052,24 +4075,25 @@ src/app/services/cliente-proteccion-datos-print.service.ts
 # 30. Próximo paso exacto
 
 ```text
-14E.5 — Baja lógica y bloqueo por facturas en borrador
+14F — Ventas del cliente
 ```
 
 Antes de proponer cambios:
 
 - actualizar y revisar el main actual;
-- revisar el patrón ya cerrado de baja lógica de Artículos, reutilizando su semántica pero no copiando ciegamente su dominio;
-- revisar las entidades/tablas `cliente`, `factura` y sus estados reales importados;
-- localizar las constantes o representación canónica de `borrador` para no hardcodear una interpretación errónea;
-- diseñar la consulta que compruebe borradores y la baja dentro de una operación backend segura;
-- mantener ventas, facturas, `factura_venta` y todo el histórico;
-- definir contrato, repository, service, IPC/preload y reconciliación Angular;
-- separar el trabajo en subbloques backend, puente Electron y UI si el tamaño lo aconseja;
+- revisar el Histórico de Ventas ya cerrado, especialmente consulta, filtros, tabla, detalle y acciones documentales;
+- revisar el repository/service/API/IPC/preload actuales para decidir la ampliación mínima que permita filtrar por cliente;
+- reutilizar el detalle histórico, el pipeline PDF, la reimpresión y el envío por email; no duplicarlos dentro de Clientes;
+- definir filtros temporales explícitos, evitando que `Todos/Todos` se interprete silenciosamente como el mes actual;
+- asegurar que cada acción opera sobre la venta de su propia fila y no sobre una selección anterior;
+- mantener esta pestaña fuera del draft editable del cliente para que consultar ventas nunca genere dirty;
+- separar el trabajo en subbloques backend/contrato e integración renderer si el tamaño lo aconseja;
 - presentar cada archivo nuevo completo y cada archivo existente como fragmento actual → nuevo;
+- al añadir imports, indicar únicamente los imports nuevos; Prettier se encargará de ordenarlos;
 - indicar las pruebas exactas pertinentes al subbloque;
 - esperar confirmación del usuario antes de avanzar.
 
-No integrar todavía el documento de protección de datos, Ventas, Estadísticas ni la UI de Facturas dentro de `14E.5`. La consulta de facturas en borrador se incorpora aquí únicamente como regla de protección de la baja.
+No integrar todavía Estadísticas completas ni la UI de Facturas dentro de `14F`. La pestaña Ventas será documental y reutilizará la infraestructura postventa existente, sin realizar ninguna operación TicketBAI nueva.
 
 ---
 
@@ -4094,6 +4118,7 @@ No integrar todavía el documento de protección de datos, Ventas, Estadísticas
 | **2.28** | **02/09/2026** | **Hito 13 Artículos completamente cerrado ✅. 13J.2 añade gráfica de barras con ECharts/ngx-echarts, filtros reactivos Tipo/Mes/Año, total, tooltips, estados, protección ante respuestas fuera de orden y diseño compacto definitivo de 275 px; `null` representa Todos mediante `canSelectNullableOptions`. 13K integra las líneas normales de Ventas con la ficha de Artículos, abriendo o activando una única pestaña y preservando cambios dirty y el workspace de Ventas. Todo validado y subido. Siguiente hito: 14 Clientes.** |
 | **2.29** | **02/09/2026** | **14A ✅. Análisis funcional y plan de Clientes cerrados. Se acuerdan workspace de un único cliente, búsqueda totalmente en memoria, CRUD con soft delete, Ventas reutilizando Histórico, estadísticas reales con gráfica y facturas como agrupaciones 1..N de ventas positivas ya cobradas. Cada venta pertenece como máximo a una factura; devoluciones y mixtas no son elegibles; Clientes no usa TicketBAI. Siguiente: 14B Base del apartado Clientes.** |
 | **2.30** | **03/09/2026** | **Clientes 14B–14D y 14E.1–14E.4 terminados, validados y subidos ✅. Ya están operativos ruta/página, workspace persistente de una ficha, búsqueda local, protección dirty, secciones, formulario compartido, datos generales/facturación, CREATE, UPDATE transaccional, reconciliación post-COMMIT, Guardar/Cancelar global, validación entre pestañas, feedback de cuatro segundos, foco en nuevos borradores y defensas durante guardado. Siguiente: 14E.5 baja lógica y bloqueo por facturas en borrador.** |
+| **2.31** | **03/09/2026** | **14E.5 y 14E.6 terminados, validados y subidos; `14E — Persistencia y mantenimiento` queda cerrado ✅. Baja lógica atómica con bloqueo por facturas en borrador, preservación completa del histórico, contrato/IPC/preload, reconciliación Angular post-COMMIT y UI confirmada. Documento de protección de datos integrado con cliente canónico, AppData y provincias. Nueva regla de trabajo: al añadir imports basta con indicar cuáles; Prettier decide su posición. Siguiente: 14F Ventas del cliente.** |
 ---
 
 # 32. Prompt de arranque recomendado
@@ -4102,7 +4127,7 @@ No integrar todavía el documento de protección de datos, Ventas, Estadísticas
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.30.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.31.
 
 Estado:
 - Ventas 12C.1–12C.8 ✅
@@ -4144,13 +4169,17 @@ Estado:
   - 14B Base del apartado Clientes ✅
   - 14C Búsqueda y selección ✅
   - 14D Workspace y formulario ✅
-  - 14E Persistencia y mantenimiento 🟦
+  - 14E Persistencia y mantenimiento ✅ CERRADO
     - 14E.1 CREATE y reconciliación segura ✅
     - 14E.2 facturación, validación y guardado global ✅
     - 14E.3 UPDATE backend/IPC/Angular ✅
     - 14E.4 pulido final de UX ✅
-    - 14E.5 baja lógica y bloqueo por facturas en borrador ⬜ SIGUIENTE
-    - 14E.6 documento de protección de datos y cierre funcional ⬜
+    - 14E.5 baja lógica y bloqueo por facturas en borrador ✅
+      - 14E.5.1 backend transaccional ✅
+      - 14E.5.2 contrato, IPC y preload ✅
+      - 14E.5.3 servicio Angular y UI ✅
+    - 14E.6 documento de protección de datos y cierre funcional ✅
+  - 14F Ventas del cliente ⬜ SIGUIENTE
 
 Hito actual:
 14 Clientes 🟦
@@ -4249,11 +4278,12 @@ Reglas críticas:
 - Al actualizar un cliente, conservar la instancia Cliente existente para no romper referencias activas desde Ventas.
 - El guardado canónico sustituye draft/baseSnapshot, deja dirty=false y conserva activeSection.
 - La validación global navega a la primera sección inválida y muestra sus errores.
-- Durante saving se bloquean formulario, pestañas y acciones tanto en template como en handlers.
+- Durante saving o deactivating se bloquean formulario, pestañas y acciones mediante `processing()`, tanto en template como en handlers.
 - Tras guardar se muestra “Cliente guardado correctamente” durante 4 segundos y se limpia al editar o destruir la página.
 - Cada nuevo borrador enfoca Nombre y apellidos aunque ClientFormComponent ya estuviera montado.
-- Baja de cliente = soft delete; conserva ventas, facturas y relaciones y se bloquea si hay borradores.
-- La acción LOPD reutiliza el documento de protección de datos ya implementado.
+- Baja de cliente = soft delete transaccional con `NOT EXISTS`; conserva ventas, facturas y relaciones y se bloquea si hay facturas activas en borrador.
+- La baja solo se ejecuta sobre cliente persistido y limpio; tras éxito se retira de colección/caché y se cierra la ficha, mientras que un fallo conserva todo el estado.
+- La acción se llama Documento de protección de datos, solo usa el Cliente canónico persistido y reutiliza el builder/servicio de impresión ya implementados.
 - Ventas de cliente reutiliza Histórico, detalle, PDF, impresión y email; no duplicar pipelines.
 - Cada acción de una fila opera sobre esa venta, no sobre una selección anterior.
 - Estadísticas muestra los últimos 20 artículos comprados y top ordenado por importe real.
@@ -4284,14 +4314,15 @@ Convenciones:
 - JSDoc breve para todo método TS/JS nuevo.
 - Revisar main antes de patches.
 - Archivo existente: fragmento actual → nuevo.
+- Para añadir imports, indicar únicamente los imports nuevos; Prettier los ordena al guardar.
 - Líneas en blanco solo estructurales.
 - Trabajar por lotes coherentes y no avanzar sin confirmación.
 - En cada bloque incluir un resumen breve: completado, punto actual y pendiente.
 
 Próximo paso exacto:
-14E.5 — Baja lógica del cliente y bloqueo cuando existan facturas en borrador.
+14F — Ventas del cliente.
 ```
 
 ---
 
-**Fin del documento de continuidad v2.30.**
+**Fin del documento de continuidad v2.31.**
