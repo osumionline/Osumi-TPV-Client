@@ -245,6 +245,57 @@ describe('ClientesService', (): void => {
     expect(service.clientes()).toEqual([ada, zoe]);
     expect(service.loaded()).toBe(true);
   });
+
+  it('guarda un borrador y adopta la respuesta canónica como nuevo snapshot', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    const initialWorkspace: ClienteWorkspace = service.crearBorrador();
+
+    service.seleccionarSeccion('billing');
+    service.actualizarDraft({
+      ...initialWorkspace.draft,
+      nombreApellidos: '  Ada Lovelace  ',
+      telefono: '  944000000  ',
+    });
+
+    createdCliente = {
+      ...createClienteInterface(7, 'cliente-7', 'Ada Lovelace'),
+      telefono: '944000000',
+    };
+
+    const workspace: ClienteWorkspace = await service.guardar();
+
+    expect(receivedCreateCommand).toMatchObject({
+      nombreApellidos: 'Ada Lovelace',
+      telefono: '944000000',
+    });
+    expect(workspace.clienteId).toBe(7);
+    expect(workspace.clientePublicId).toBe('cliente-7');
+    expect(workspace.draft.nombreApellidos).toBe('Ada Lovelace');
+    expect(workspace.draft.telefono).toBe('944000000');
+    expect(workspace.baseSnapshot).toEqual(workspace.draft);
+    expect(workspace.baseSnapshot).not.toBe(workspace.draft);
+    expect(workspace.dirty).toBe(false);
+    expect(workspace.activeSection).toBe('billing');
+    expect(service.workspace()).toBe(workspace);
+    expect(service.findByPublicId('cliente-7')?.nombreApellidos).toBe('Ada Lovelace');
+  });
+
+  it('no intenta crear de nuevo un cliente ya persistido', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    const cliente: Cliente = new Cliente();
+
+    cliente.id = 7;
+    cliente.publicId = 'cliente-7';
+    cliente.nombreApellidos = 'Ada Lovelace';
+
+    service.abrirFicha(cliente);
+
+    await expect(service.guardar()).rejects.toThrow(
+      'La actualización de clientes todavía no está disponible.',
+    );
+
+    expect(receivedCreateCommand).toBeNull();
+  });
 });
 
 function createEstadisticas(nombre: string): ClienteEstadisticasInterface {

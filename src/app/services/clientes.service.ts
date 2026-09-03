@@ -4,6 +4,7 @@ import type { ClienteEstadisticasInterface } from '@desktop-contracts/clientes/c
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import type ClienteEstadisticasState from '@model/clientes/cliente-estadisticas-state.interface';
+import createClienteCommand from '@model/clientes/cliente-form-command.mapper';
 import createClienteFormInitialValue from '@model/clientes/cliente-form.initial-value';
 import createClienteFormModel from '@model/clientes/cliente-form.mapper';
 import type ClienteFormModel from '@model/clientes/cliente-form.model';
@@ -201,6 +202,26 @@ export default class ClientesService {
   }
 
   /**
+   * Persiste el borrador de un cliente nuevo y adopta como nuevo
+   * snapshot la versión canónica devuelta por backend.
+   */
+  async guardar(): Promise<ClienteWorkspace> {
+    const workspace: ClienteWorkspace | null = this.workspace();
+
+    if (workspace === null) {
+      throw new Error('No hay ninguna ficha de cliente abierta.');
+    }
+
+    if (workspace.clienteId !== null) {
+      throw new Error('La actualización de clientes todavía no está disponible.');
+    }
+
+    const cliente: Cliente = await this.create(createClienteCommand(workspace.draft));
+
+    return this.reemplazarWorkspaceTrasGuardado(workspace, cliente);
+  }
+
+  /**
    * Crea un cliente y lo reconcilia en la colección global
    * después de cualquier carga anterior todavía pendiente.
    */
@@ -342,6 +363,33 @@ export default class ClientesService {
     return (
       this.clientes().find((cliente: Cliente): boolean => cliente.publicId === publicId) ?? null
     );
+  }
+
+  /**
+   * Sustituye el draft y el snapshot por la versión canónica persistida,
+   * conservando la sección que el usuario estaba consultando.
+   */
+  private reemplazarWorkspaceTrasGuardado(
+    workspace: ClienteWorkspace,
+    cliente: Cliente,
+  ): ClienteWorkspace {
+    if (cliente.id === null || cliente.publicId === null) {
+      throw new Error('El cliente guardado no contiene una identidad válida.');
+    }
+
+    const draft: ClienteFormModel = createClienteFormModel(cliente);
+    const updatedWorkspace: ClienteWorkspace = {
+      clienteId: cliente.id,
+      clientePublicId: cliente.publicId,
+      draft,
+      baseSnapshot: cloneClienteFormModel(draft),
+      dirty: false,
+      activeSection: workspace.activeSection,
+    };
+
+    this.workspaceSignal.set(updatedWorkspace);
+
+    return updatedWorkspace;
   }
 
   private loadData(): Promise<void> {
