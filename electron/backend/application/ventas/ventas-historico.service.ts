@@ -41,7 +41,7 @@ export default class VentasHistoricoService {
     if (typeof consulta !== 'object' || consulta === null) {
       throw new Error('La consulta del histórico no es válida.');
     }
-
+    const clientePublicId: string | null = this.normalizeClientePublicId(consulta.clientePublicId);
     const desde: LocalDateParts = this.requireLocalDate(
       consulta.desde,
       'La fecha inicial del histórico no es válida.',
@@ -63,6 +63,7 @@ export default class VentasHistoricoService {
     const record: VentasHistoricoResultadoRecord = await this.repository.findByPeriod(
       period.desde,
       period.hastaExclusive,
+      clientePublicId,
     );
 
     const ventas: readonly VentaHistoricoResumen[] = record.ventas.map(
@@ -198,6 +199,29 @@ export default class VentasHistoricoService {
         puedeReintentarTicketBai: record.puedeReintentarTicketBai,
       },
     };
+  }
+
+  /**
+   * Normaliza el filtro opcional de cliente.
+   *
+   * La ausencia del campo mantiene la consulta global del Histórico.
+   */
+  private normalizeClientePublicId(value: string | undefined): string | null {
+    if (value === undefined) {
+      return null;
+    }
+
+    if (typeof value !== 'string') {
+      throw new Error('El identificador del cliente del histórico no es válido.');
+    }
+
+    const normalizedValue: string = value.trim();
+
+    if (normalizedValue.length === 0) {
+      throw new Error('El identificador del cliente del histórico no es válido.');
+    }
+
+    return normalizedValue;
   }
 
   /**

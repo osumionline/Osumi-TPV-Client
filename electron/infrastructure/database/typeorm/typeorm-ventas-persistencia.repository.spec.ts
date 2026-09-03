@@ -430,6 +430,98 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
     ]);
   });
 
+  it('limita ventas y agregados al cliente solicitado', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+        INSERT INTO cliente (
+          public_id,
+          nombre_apellidos
+        )
+        VALUES
+          (?, ?),
+          (?, ?)
+      `,
+      ['cliente-historico-a', 'Cliente histórico A', 'cliente-historico-b', 'Cliente histórico B'],
+    );
+
+    const ventaClienteACommand: GuardarVentaCommand = {
+      ...createNormalSaleCommand('venta-cliente-historico-a'),
+      clientePublicId: 'cliente-historico-a',
+    };
+    const ventaClienteBCommand: GuardarVentaCommand = {
+      ...createNormalSaleCommand('venta-cliente-historico-b'),
+      clientePublicId: 'cliente-historico-b',
+    };
+
+    const ventaClienteA: VentaPersistidaRecord = await requireService().save(ventaClienteACommand);
+    const ventaClienteB: VentaPersistidaRecord = await requireService().save(ventaClienteBCommand);
+
+    await dataSource.query(
+      `
+        UPDATE venta
+        SET
+          created_at = ?,
+          updated_at = ?
+        WHERE id IN (?, ?)
+      `,
+      ['2026-08-25T10:00:00.000Z', '2026-08-25T10:00:00.000Z', ventaClienteA.id, ventaClienteB.id],
+    );
+
+    const historico = await requireHistoricoRepository().findByPeriod(
+      '2026-08-25T00:00:00.000Z',
+      '2026-08-26T00:00:00.000Z',
+      'cliente-historico-a',
+    );
+
+    expect(
+      historico.ventas.map((venta) => ({
+        publicId: venta.publicId,
+        clienteNombre: venta.clienteNombre,
+        totalCents: venta.totalCents,
+        pagos: venta.pagos,
+      })),
+    ).toEqual([
+      {
+        publicId: 'venta-cliente-historico-a',
+        clienteNombre: 'Cliente histórico A',
+        totalCents: 2_200,
+        pagos: [
+          {
+            tipoPagoPublicId: 'tipo-pago-efectivo',
+            nombre: 'Efectivo',
+            importeCents: 1_200,
+          },
+          {
+            tipoPagoPublicId: 'tipo-pago-tarjeta',
+            nombre: 'Tarjeta',
+            importeCents: 1_000,
+          },
+        ],
+      },
+    ]);
+
+    expect(historico.resumen).toEqual({
+      numeroVentas: 1,
+      totalCents: 2_200,
+      ticketMedioCents: 2_200,
+      beneficioCents: 1_400,
+      totalesPorTipoPago: [
+        {
+          tipoPagoPublicId: 'tipo-pago-efectivo',
+          nombre: 'Efectivo',
+          importeCents: 1_200,
+        },
+        {
+          tipoPagoPublicId: 'tipo-pago-tarjeta',
+          nombre: 'Tarjeta',
+          importeCents: 1_000,
+        },
+      ],
+    });
+  });
+
   it('recupera el detalle histórico desde los snapshots persistidos', async (): Promise<void> => {
     const result: VentaPersistidaRecord = await requireService().save(
       createNormalSaleCommand('venta-historico-detalle-1'),

@@ -85,28 +85,39 @@ interface VentaHistoricoLineaDatabaseRow {
   readonly regalo: number;
 }
 
+interface VentaHistoricoPeriodo {
+  readonly desde: string;
+  readonly hastaExclusive: string;
+  readonly clientePublicId: string | null;
+}
+
 export default class TypeOrmVentasHistoricoRepository implements VentasHistoricoRepository {
   constructor(private readonly applicationDatabase: TypeOrmApplicationDatabase) {}
 
   /**
-   * Recupera las ventas y agregados de un intervalo temporal absoluto.
+   * Recupera las ventas y agregados de un intervalo temporal absoluto,
+   * limitado opcionalmente a un cliente.
    */
   async findByPeriod(
     desde: string,
     hastaExclusive: string,
+    clientePublicId: string | null = null,
   ): Promise<VentasHistoricoResultadoRecord> {
     const dataSource: DataSource = await this.applicationDatabase.connect();
+    const periodo: VentaHistoricoPeriodo = {
+      desde,
+      hastaExclusive,
+      clientePublicId,
+    };
 
     const ventaRows: readonly VentaHistoricoResumenDatabaseRow[] = await this.findVentasPeriodo(
       dataSource,
-      desde,
-      hastaExclusive,
+      periodo,
     );
 
     const pagoRows: readonly VentaHistoricoPagoResumenDatabaseRow[] = await this.findPagosPeriodo(
       dataSource,
-      desde,
-      hastaExclusive,
+      periodo,
     );
 
     const pagosPorVenta: ReadonlyMap<number, readonly VentaHistoricoPagoResumenRecord[]> =
@@ -133,12 +144,7 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
       },
     );
 
-    const resumen: ResumenHistoricoRecord = await this.buildResumen(
-      dataSource,
-      ventaRows,
-      desde,
-      hastaExclusive,
-    );
+    const resumen: ResumenHistoricoRecord = await this.buildResumen(dataSource, ventaRows, periodo);
 
     return {
       ventas,
@@ -281,8 +287,7 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
    */
   private async findVentasPeriodo(
     dataSource: DataSource,
-    desde: string,
-    hastaExclusive: string,
+    periodo: VentaHistoricoPeriodo,
   ): Promise<readonly VentaHistoricoResumenDatabaseRow[]> {
     return (await dataSource.query(
       `
@@ -296,6 +301,7 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
           c.nombre_apellidos AS cliente_nombre,
           vtb.estado AS ticketbai_estado
         FROM venta v
+
         LEFT JOIN cliente c
           ON c.id = v.id_cliente
 
@@ -306,12 +312,21 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
           v.created_at >= ?
           AND v.created_at < ?
           AND v.deleted_at IS NULL
+          AND (
+            ? IS NULL
+            OR v.id_cliente = (
+              SELECT cliente_filtro.id
+              FROM cliente cliente_filtro
+              WHERE cliente_filtro.public_id = ?
+              LIMIT 1
+            )
+          )
 
         ORDER BY
           v.created_at DESC,
           v.id DESC
       `,
-      [desde, hastaExclusive],
+      [periodo.desde, periodo.hastaExclusive, periodo.clientePublicId, periodo.clientePublicId],
     )) as readonly VentaHistoricoResumenDatabaseRow[];
   }
 
@@ -320,8 +335,7 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
    */
   private async findPagosPeriodo(
     dataSource: DataSource,
-    desde: string,
-    hastaExclusive: string,
+    periodo: VentaHistoricoPeriodo,
   ): Promise<readonly VentaHistoricoPagoResumenDatabaseRow[]> {
     return (await dataSource.query(
       `
@@ -342,13 +356,22 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
           v.created_at >= ?
           AND v.created_at < ?
           AND v.deleted_at IS NULL
+          AND (
+            ? IS NULL
+            OR v.id_cliente = (
+              SELECT cliente_filtro.id
+              FROM cliente cliente_filtro
+              WHERE cliente_filtro.public_id = ?
+              LIMIT 1
+            )
+          )
 
         ORDER BY
           vp.id_venta,
           vp.orden,
           vp.id
       `,
-      [desde, hastaExclusive],
+      [periodo.desde, periodo.hastaExclusive, periodo.clientePublicId, periodo.clientePublicId],
     )) as readonly VentaHistoricoPagoResumenDatabaseRow[];
   }
 
@@ -384,8 +407,7 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
   private async buildResumen(
     dataSource: DataSource,
     ventaRows: readonly VentaHistoricoResumenDatabaseRow[],
-    desde: string,
-    hastaExclusive: string,
+    periodo: VentaHistoricoPeriodo,
   ): Promise<ResumenHistoricoRecord> {
     let totalCents: number = 0;
 
@@ -402,14 +424,10 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
     const ticketMedioCents: number =
       numeroVentas === 0 ? 0 : this.roundSignedDivision(totalCents, numeroVentas);
 
-    const beneficioMicros: number = await this.findBeneficioMicros(
-      dataSource,
-      desde,
-      hastaExclusive,
-    );
+    const beneficioMicros: number = await this.findBeneficioMicros(dataSource, periodo);
 
     const totalesPorTipoPago: readonly VentaHistoricoTotalTipoPagoRecord[] =
-      await this.findTotalesTipoPago(dataSource, desde, hastaExclusive);
+      await this.findTotalesTipoPago(dataSource, periodo);
 
     return {
       numeroVentas,
@@ -425,8 +443,7 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
    */
   private async findBeneficioMicros(
     dataSource: DataSource,
-    desde: string,
-    hastaExclusive: string,
+    periodo: VentaHistoricoPeriodo,
   ): Promise<number> {
     const rows: readonly VentaHistoricoBeneficioDatabaseRow[] = (await dataSource.query(
       `
@@ -447,8 +464,17 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
           v.created_at >= ?
           AND v.created_at < ?
           AND v.deleted_at IS NULL
+          AND (
+            ? IS NULL
+            OR v.id_cliente = (
+              SELECT cliente_filtro.id
+              FROM cliente cliente_filtro
+              WHERE cliente_filtro.public_id = ?
+              LIMIT 1
+            )
+          )
       `,
-      [desde, hastaExclusive],
+      [periodo.desde, periodo.hastaExclusive, periodo.clientePublicId, periodo.clientePublicId],
     )) as readonly VentaHistoricoBeneficioDatabaseRow[];
 
     const beneficioMicros: number = rows[0]?.beneficio_micros ?? 0;
@@ -465,8 +491,7 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
    */
   private async findTotalesTipoPago(
     dataSource: DataSource,
-    desde: string,
-    hastaExclusive: string,
+    periodo: VentaHistoricoPeriodo,
   ): Promise<readonly VentaHistoricoTotalTipoPagoRecord[]> {
     const rows: readonly VentaHistoricoTotalTipoPagoDatabaseRow[] = (await dataSource.query(
       `
@@ -486,6 +511,15 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
           v.created_at >= ?
           AND v.created_at < ?
           AND v.deleted_at IS NULL
+          AND (
+            ? IS NULL
+            OR v.id_cliente = (
+              SELECT cliente_filtro.id
+              FROM cliente cliente_filtro
+              WHERE cliente_filtro.public_id = ?
+              LIMIT 1
+            )
+          )
 
         GROUP BY
           tp.id,
@@ -496,7 +530,7 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
           tp.nombre COLLATE NOCASE,
           tp.id
       `,
-      [desde, hastaExclusive],
+      [periodo.desde, periodo.hastaExclusive, periodo.clientePublicId, periodo.clientePublicId],
     )) as readonly VentaHistoricoTotalTipoPagoDatabaseRow[];
 
     return rows.map(

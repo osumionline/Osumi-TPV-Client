@@ -8,6 +8,12 @@ export interface VentaHistoricoConsulta {
    * Última fecha local incluida en la consulta, en formato YYYY-MM-DD.
    */
   readonly hasta: string;
+
+  /**
+   * Limita opcionalmente el histórico a las ventas
+   * asociadas a un cliente concreto.
+   */
+  readonly clientePublicId?: string;
 }
 
 export type VentaHistoricoTicketBaiEstado = 'no_aplica' | 'correcto' | 'pendiente' | 'incidencia';

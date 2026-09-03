@@ -41,6 +41,7 @@ describe('VentasHistoricoService', (): void => {
 
     expect(repository.lastDesde).toBe('2026-08-24T22:00:00.000Z');
     expect(repository.lastHastaExclusive).toBe('2026-08-25T22:00:00.000Z');
+    expect(repository.lastClientePublicId).toBeNull();
 
     expect(result).toEqual({
       ventas: [],
@@ -52,6 +53,27 @@ describe('VentasHistoricoService', (): void => {
         totalesPorTipoPago: [],
       },
     });
+  });
+
+  it('normaliza y propaga el filtro opcional de cliente', async (): Promise<void> => {
+    await service.findByPeriod({
+      desde: '2026-08-25',
+      hasta: '2026-08-31',
+      clientePublicId: '  cliente-1  ',
+    });
+
+    expect(repository.lastClientePublicId).toBe('cliente-1');
+    expect(repository.findByPeriodCalls).toBe(1);
+
+    await expect(
+      service.findByPeriod({
+        desde: '2026-08-25',
+        hasta: '2026-08-31',
+        clientePublicId: '   ',
+      }),
+    ).rejects.toThrow('El identificador del cliente del histórico no es válido.');
+
+    expect(repository.findByPeriodCalls).toBe(1);
   });
 
   it('propaga el estado TicketBAI de las ventas del histórico', async (): Promise<void> => {
@@ -345,6 +367,7 @@ class FakeVentasHistoricoRepository implements VentasHistoricoRepository {
   lastDesde: string | null = null;
   lastHastaExclusive: string | null = null;
   lastDetalleVentaId: number | null = null;
+  lastClientePublicId: string | null = null;
 
   periodResult: VentasHistoricoResultadoRecord = {
     ventas: [],
@@ -362,10 +385,15 @@ class FakeVentasHistoricoRepository implements VentasHistoricoRepository {
   /**
    * Registra el intervalo recibido y devuelve el resultado preparado por el test.
    */
-  findByPeriod(desde: string, hastaExclusive: string): Promise<VentasHistoricoResultadoRecord> {
+  findByPeriod(
+    desde: string,
+    hastaExclusive: string,
+    clientePublicId: string | null = null,
+  ): Promise<VentasHistoricoResultadoRecord> {
     this.findByPeriodCalls++;
     this.lastDesde = desde;
     this.lastHastaExclusive = hastaExclusive;
+    this.lastClientePublicId = clientePublicId;
 
     return Promise.resolve(this.periodResult);
   }
