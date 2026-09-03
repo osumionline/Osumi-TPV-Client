@@ -1,3 +1,4 @@
+import type ClienteDeactivateResult from '@backend/contracts/clientes/cliente-deactivate-result.type';
 import type {
   ClienteTopVentaRecord,
   ClienteUltimaVentaRecord,
@@ -56,6 +57,14 @@ interface ClienteUpdateTargetDatabaseRow {
   readonly id: number;
   readonly public_id: string;
   readonly ultima_venta: string | null;
+}
+
+interface ChangesDatabaseRow {
+  readonly total: number;
+}
+
+interface DatabaseIdRow {
+  readonly id: number;
 }
 
 export default class TypeOrmClienteRepository implements ClienteRepository {
@@ -364,6 +373,71 @@ export default class TypeOrmClienteRepository implements ClienteRepository {
           ...command,
           ultimaVenta: target.ultima_venta,
         };
+      },
+    );
+  }
+
+  /**
+   * Da de baja lógicamente un cliente activo, siempre que no
+   * conserve ninguna factura activa en estado borrador.
+   */
+  async deactivate(publicId: string): Promise<ClienteDeactivateResult> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+    const timestamp: string = new Date().toISOString();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<ClienteDeactivateResult> => {
+        await queryRunner.query(
+          `
+          UPDATE cliente
+          SET
+            deleted_at = ?,
+            updated_at = ?
+          WHERE
+            public_id = ?
+            AND deleted_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1
+              FROM factura f
+              WHERE
+                f.id_cliente = cliente.id
+                AND f.estado = 'borrador'
+                AND f.deleted_at IS NULL
+            )
+        `,
+          [timestamp, timestamp, publicId],
+        );
+
+        const changesRows: readonly ChangesDatabaseRow[] = (await queryRunner.query(
+          `
+          SELECT changes() AS total
+        `,
+        )) as readonly ChangesDatabaseRow[];
+
+        const changes: number | undefined = changesRows[0]?.total;
+
+        if (changes === 1) {
+          return 'deactivated';
+        }
+
+        if (changes !== 0) {
+          throw new Error('No se ha podido determinar el resultado de la baja del cliente.');
+        }
+
+        const activeRows: readonly DatabaseIdRow[] = (await queryRunner.query(
+          `
+          SELECT id
+          FROM cliente
+          WHERE
+            public_id = ?
+            AND deleted_at IS NULL
+          LIMIT 1
+        `,
+          [publicId],
+        )) as readonly DatabaseIdRow[];
+
+        return activeRows.length === 0 ? 'not_found' : 'has_draft_invoices';
       },
     );
   }

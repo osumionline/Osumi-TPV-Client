@@ -1,4 +1,5 @@
 import ClientesService from '@backend/application/clientes/clientes.service';
+import type ClienteDeactivateResult from '@backend/contracts/clientes/cliente-deactivate-result.type';
 import type {
   ClienteTopVentaRecord,
   ClienteUltimaVentaRecord,
@@ -19,6 +20,8 @@ class FakeClienteRepository implements ClienteRepository {
   excludedPublicId: string | null = null;
   dniCifExists: boolean = false;
   updateAvailable: boolean = true;
+  deactivatedPublicId: string | null = null;
+  deactivateResult: ClienteDeactivateResult = 'deactivated';
 
   /**
    * Devuelve una colección vacía para las pruebas del servicio.
@@ -68,6 +71,15 @@ class FakeClienteRepository implements ClienteRepository {
       ...command,
       ultimaVenta: null,
     });
+  }
+
+  /**
+   * Simula la baja lógica de un cliente.
+   */
+  deactivate(publicId: string): Promise<ClienteDeactivateResult> {
+    this.deactivatedPublicId = publicId;
+
+    return Promise.resolve(this.deactivateResult);
   }
 
   /**
@@ -230,6 +242,48 @@ describe('ClientesService', (): void => {
     ).rejects.toThrow('El identificador del cliente no es válido.');
 
     expect(repository.updatedCommand).toBeNull();
+  });
+
+  it('normaliza el publicId antes de dar de baja el cliente', async (): Promise<void> => {
+    const repository = new FakeClienteRepository();
+    const service = new ClientesService(repository);
+
+    await service.deactivate('  cliente-1  ');
+
+    expect(repository.deactivatedPublicId).toBe('cliente-1');
+  });
+
+  it('rechaza la baja cuando el cliente tiene facturas en borrador', async (): Promise<void> => {
+    const repository = new FakeClienteRepository();
+    const service = new ClientesService(repository);
+
+    repository.deactivateResult = 'has_draft_invoices';
+
+    await expect(service.deactivate('cliente-1')).rejects.toThrow(
+      'No se puede dar de baja el cliente porque tiene facturas en borrador.',
+    );
+  });
+
+  it('rechaza la baja de un cliente inexistente o inactivo', async (): Promise<void> => {
+    const repository = new FakeClienteRepository();
+    const service = new ClientesService(repository);
+
+    repository.deactivateResult = 'not_found';
+
+    await expect(service.deactivate('cliente-1')).rejects.toThrow(
+      'El cliente indicado no existe o ya no está activo.',
+    );
+  });
+
+  it('rechaza la baja sin un publicId válido', async (): Promise<void> => {
+    const repository = new FakeClienteRepository();
+    const service = new ClientesService(repository);
+
+    await expect(service.deactivate('   ')).rejects.toThrow(
+      'El identificador del cliente no es válido.',
+    );
+
+    expect(repository.deactivatedPublicId).toBeNull();
   });
 });
 

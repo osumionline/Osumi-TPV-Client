@@ -1,3 +1,4 @@
+import type ClienteDeactivateResult from '@backend/contracts/clientes/cliente-deactivate-result.type';
 import type {
   ClienteTopVentaRecord,
   ClienteUltimaVentaRecord,
@@ -13,6 +14,8 @@ export default interface ClienteRepository {
   create(command: CrearClienteRecordCommand): Promise<ClienteRecord>;
 
   update(publicId: string, command: CrearClienteRecordCommand): Promise<ClienteRecord | null>;
+
+  deactivate(publicId: string): Promise<ClienteDeactivateResult>;
 
   findUltimasVentas(publicId: string, limit: number): Promise<readonly ClienteUltimaVentaRecord[]>;
 

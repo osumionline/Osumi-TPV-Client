@@ -1,4 +1,5 @@
 import { PERCENT_TOTAL } from '@backend/constants/percentage.constants';
+import type ClienteDeactivateResult from '@backend/contracts/clientes/cliente-deactivate-result.type';
 import type {
   ClienteTopVentaRecord,
   ClienteUltimaVentaRecord,
@@ -106,6 +107,25 @@ export default class ClientesService {
     }
 
     return this.toInterface(cliente);
+  }
+
+  /**
+   * Da de baja un cliente activo si no tiene facturas en borrador.
+   */
+  async deactivate(publicId: string): Promise<void> {
+    const normalizedPublicId: string = this.requirePublicId(publicId);
+    const result: ClienteDeactivateResult =
+      await this.clienteRepository.deactivate(normalizedPublicId);
+
+    if (result === 'deactivated') {
+      return;
+    }
+
+    if (result === 'has_draft_invoices') {
+      throw new Error('No se puede dar de baja el cliente porque tiene facturas en borrador.');
+    }
+
+    throw new Error('El cliente indicado no existe o ya no está activo.');
   }
 
   /**
