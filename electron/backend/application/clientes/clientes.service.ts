@@ -124,22 +124,27 @@ export default class ClientesService {
       provincia,
 
       factIgual,
-      factNombreApellidos: this.normalizeOptionalText(
+      factNombreApellidos: this.normalizeBillingText(
         command.factNombreApellidos,
+        factIgual,
         'nombre de facturación',
         CLIENT_NAME_MAX_LENGTH,
       ),
-      factDniCif: this.normalizeOptionalText(
+      factDniCif: this.normalizeBillingText(
         command.factDniCif,
+        factIgual,
         'DNI/CIF de facturación',
         CLIENT_DNI_CIF_MAX_LENGTH,
       ),
-      factTelefono: this.normalizeOptionalText(
+      factTelefono: this.normalizeBillingText(
         command.factTelefono,
+        factIgual,
         'teléfono de facturación',
         CLIENT_PHONE_MAX_LENGTH,
       ),
-      factEmail: this.normalizeOptionalEmail(command.factEmail),
+      factEmail: factIgual
+        ? this.normalizeOptionalText(command.factEmail)
+        : this.normalizeOptionalEmail(command.factEmail),
       factDireccion: this.normalizeOptionalText(command.factDireccion),
       factCodigoPostal: this.normalizeOptionalText(command.factCodigoPostal),
       factPoblacion: this.normalizeOptionalText(command.factPoblacion),
@@ -229,6 +234,23 @@ export default class ClientesService {
     }
 
     return email;
+  }
+
+  /**
+   * Normaliza un dato alternativo y aplica sus límites únicamente
+   * cuando esos datos son los efectivos para facturar.
+   */
+  private normalizeBillingText(
+    value: string | null,
+    factIgual: boolean,
+    field: string,
+    maxLength: number,
+  ): string | null {
+    if (factIgual) {
+      return this.normalizeOptionalText(value);
+    }
+
+    return this.normalizeOptionalText(value, field, maxLength);
   }
 
   private normalizeOptionalProvince(value: number | null): number | null {

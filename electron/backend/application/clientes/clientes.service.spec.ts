@@ -99,6 +99,37 @@ describe('ClientesService', (): void => {
       factProvincia: 48,
     });
   });
+
+  it('no valida el formato de un dato alternativo mientras permanece oculto', async (): Promise<void> => {
+    const repository = new FakeClienteRepository();
+    const service = new ClientesService(repository);
+
+    const cliente: ClienteInterface = await service.create(
+      createCommand({
+        factIgual: true,
+        factEmail: '  email-legacy-no-valido  ',
+      }),
+    );
+
+    expect(repository.createdCommand?.factEmail).toBe('email-legacy-no-valido');
+    expect(cliente.factEmail).toBe('email-legacy-no-valido');
+  });
+
+  it('valida los datos alternativos cuando se utilizan para facturar', async (): Promise<void> => {
+    const repository = new FakeClienteRepository();
+    const service = new ClientesService(repository);
+
+    await expect(
+      service.create(
+        createCommand({
+          factIgual: false,
+          factEmail: 'email-no-valido',
+        }),
+      ),
+    ).rejects.toThrow('El email de facturación indicado no tiene un formato válido.');
+
+    expect(repository.createdCommand).toBeNull();
+  });
 });
 
 /**

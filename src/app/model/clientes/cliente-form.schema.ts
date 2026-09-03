@@ -1,4 +1,12 @@
-import { email, max, maxLength, min, required, type SchemaPathTree } from '@angular/forms/signals';
+import {
+  applyWhen,
+  email,
+  max,
+  maxLength,
+  min,
+  required,
+  type SchemaPathTree,
+} from '@angular/forms/signals';
 import { PERCENT_TOTAL } from '@constants/percentage.constants';
 import {
   CLIENT_DNI_CIF_MAX_LENGTH,
@@ -41,23 +49,29 @@ export default function clienteFormSchema(path: SchemaPathTree<ClienteFormModel>
     message: `El descuento no puede superar el ${PERCENT_TOTAL} %.`,
   });
 
-  maxLength(path.factNombreApellidos, CLIENT_NAME_MAX_LENGTH, {
-    message: `El nombre de facturación no puede superar los ${CLIENT_NAME_MAX_LENGTH} caracteres.`,
-  });
+  applyWhen(
+    path,
+    ({ valueOf }): boolean => !valueOf(path.factIgual),
+    (billingPath: SchemaPathTree<ClienteFormModel>): void => {
+      maxLength(billingPath.factNombreApellidos, CLIENT_NAME_MAX_LENGTH, {
+        message: `El nombre de facturación no puede superar los ${CLIENT_NAME_MAX_LENGTH} caracteres.`,
+      });
 
-  maxLength(path.factDniCif, CLIENT_DNI_CIF_MAX_LENGTH, {
-    message: `El DNI/CIF de facturación no puede superar los ${CLIENT_DNI_CIF_MAX_LENGTH} caracteres.`,
-  });
+      maxLength(billingPath.factDniCif, CLIENT_DNI_CIF_MAX_LENGTH, {
+        message: `El DNI/CIF de facturación no puede superar los ${CLIENT_DNI_CIF_MAX_LENGTH} caracteres.`,
+      });
 
-  maxLength(path.factTelefono, CLIENT_PHONE_MAX_LENGTH, {
-    message: `El teléfono de facturación no puede superar los ${CLIENT_PHONE_MAX_LENGTH} caracteres.`,
-  });
+      maxLength(billingPath.factTelefono, CLIENT_PHONE_MAX_LENGTH, {
+        message: `El teléfono de facturación no puede superar los ${CLIENT_PHONE_MAX_LENGTH} caracteres.`,
+      });
 
-  maxLength(path.factEmail, CLIENT_EMAIL_MAX_LENGTH, {
-    message: `El email de facturación no puede superar los ${CLIENT_EMAIL_MAX_LENGTH} caracteres.`,
-  });
+      maxLength(billingPath.factEmail, CLIENT_EMAIL_MAX_LENGTH, {
+        message: `El email de facturación no puede superar los ${CLIENT_EMAIL_MAX_LENGTH} caracteres.`,
+      });
 
-  email(path.factEmail, {
-    message: 'Introduce una dirección de correo de facturación válida.',
-  });
+      email(billingPath.factEmail, {
+        message: 'Introduce una dirección de correo de facturación válida.',
+      });
+    },
+  );
 }
