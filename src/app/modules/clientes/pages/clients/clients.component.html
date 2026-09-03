@@ -84,13 +84,10 @@
             }
 
             @case ('sales') {
-            <div class="clients__section-state">
-                <h2>Ventas</h2>
-
-                <p>
-                    Las ventas asociadas al cliente se mostrarán en este apartado.
-                </p>
-            </div>
+            @if (workspace.clientePublicId; as clientePublicId) {
+            <otpv-client-sales [clientePublicId]="clientePublicId"
+                               [disabled]="processing()" />
+            }
             }
 
             @case ('statistics') {

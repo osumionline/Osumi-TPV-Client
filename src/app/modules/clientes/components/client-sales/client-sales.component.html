@@ -1,0 +1,132 @@
+<section class="client-sales"
+         aria-labelledby="client-sales-title">
+    <header class="client-sales__header">
+        <div>
+            <h2 id="client-sales-title">
+                Ventas
+            </h2>
+
+            <p>
+                Ventas y devoluciones asociadas al cliente en el periodo seleccionado.
+            </p>
+        </div>
+
+        <div class="client-sales__filters"
+             aria-label="Periodo de ventas">
+            <label>
+                <span>
+                    Desde
+                </span>
+
+                <input type="date"
+                       [value]="desde()"
+                       [disabled]="disabled() || loading()"
+                       (change)="onDesdeChange($event)">
+            </label>
+
+            <label>
+                <span>
+                    Hasta
+                </span>
+
+                <input type="date"
+                       [value]="hasta()"
+                       [disabled]="disabled() || loading()"
+                       (change)="onHastaChange($event)">
+            </label>
+
+            <button mat-flat-button
+                    type="button"
+                    [disabled]="disabled() || loading() || !canSearch()"
+                    (click)="search()">
+                Buscar
+            </button>
+        </div>
+    </header>
+
+    @if (invalidRange()) {
+    <div class="client-sales__error"
+         role="alert">
+        La fecha inicial no puede ser posterior a la fecha final.
+    </div>
+    }
+
+    @if (error() !== null) {
+    <div class="client-sales__error"
+         role="alert">
+        {{ error() }}
+    </div>
+    }
+
+    <div class="client-sales__content">
+        @if (loading()) {
+        <div class="client-sales__state"
+             role="status">
+            Cargando ventas del cliente...
+        </div>
+        }
+        @else if (ventas().length === 0) {
+        <div class="client-sales__state">
+            No hay ventas en el periodo seleccionado.
+        </div>
+        }
+        @else {
+        <div class="client-sales__result-summary">
+            {{ resultado()?.resumen?.numeroVentas }}
+            operaciones encontradas
+        </div>
+
+        <div class="client-sales__table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">
+                            Fecha / hora
+                        </th>
+
+                        <th scope="col">
+                            Venta
+                        </th>
+
+                        <th scope="col"
+                            class="client-sales__money">
+                            Importe
+                        </th>
+
+                        <th scope="col">
+                            Tipo(s) de pago
+                        </th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @for (venta of ventas(); track venta.id) {
+                    <tr [class.client-sales__row--return]="venta.totalCents < 0">
+                        <td>
+                            {{ venta.fecha | date:'dd/MM/yyyy HH:mm' }}
+                        </td>
+
+                        <td>
+                            {{ getVentaReferencia(venta) }}
+                        </td>
+
+                        <td class="client-sales__money"
+                            [class.client-sales__negative-amount]="venta.totalCents < 0">
+                            {{
+                                venta.totalCents
+                                    | centsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </td>
+
+                        <td>
+                            {{ getPagosLabel(venta) }}
+                        </td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        }
+    </div>
+</section>
