@@ -12,9 +12,11 @@ import {
 } from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import type {
+  VentaHistoricoDetalle,
   VentaHistoricoResumen,
   VentasHistoricoResultado,
 } from '@desktop-contracts/ventas/venta-historico.interface';
+import HistoricalSaleDetailComponent from '@modules/ventas/components/historical-sale-detail/historical-sale-detail.component';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import VentasHistoricoService from '@services/ventas-historico.service';
 import { getErrorMessage } from '@utils/error.utils';
@@ -34,7 +36,7 @@ interface ClientSalesPeriod {
   selector: 'otpv-client-sales',
   templateUrl: './client-sales.component.html',
   styleUrl: './client-sales.component.scss',
-  imports: [CurrencyPipe, DatePipe, MatButton, CentsToEurosPipe],
+  imports: [HistoricalSaleDetailComponent, CurrencyPipe, DatePipe, MatButton, CentsToEurosPipe],
 })
 export default class ClientSalesComponent implements OnInit {
   private readonly ventasHistoricoService: VentasHistoricoService = inject(VentasHistoricoService);
@@ -48,6 +50,11 @@ export default class ClientSalesComponent implements OnInit {
   readonly error: WritableSignal<string | null> = signal<string | null>(null);
   readonly resultado: WritableSignal<VentasHistoricoResultado | null> =
     signal<VentasHistoricoResultado | null>(null);
+  readonly selectedVentaId: WritableSignal<number | null> = signal<number | null>(null);
+  readonly detalleLoading: WritableSignal<boolean> = signal<boolean>(false);
+  readonly detalleError: WritableSignal<string | null> = signal<string | null>(null);
+  readonly detalle: WritableSignal<VentaHistoricoDetalle | null> =
+    signal<VentaHistoricoDetalle | null>(null);
 
   readonly ventas: Signal<readonly VentaHistoricoResumen[]> = computed(
     (): readonly VentaHistoricoResumen[] => this.resultado()?.ventas ?? [],
@@ -65,6 +72,7 @@ export default class ClientSalesComponent implements OnInit {
   );
 
   private loadRequestId: number = 0;
+  private detailRequestId: number = 0;
 
   /**
    * Inicializa un periodo visible correspondiente al mes actual
@@ -129,12 +137,60 @@ export default class ClientSalesComponent implements OnInit {
   }
 
   /**
+   * Selecciona una venta y recupera su snapshot histórico completo.
+   */
+  selectVenta(idVenta: number): void {
+    if (this.disabled()) {
+      return;
+    }
+
+    if (
+      this.selectedVentaId() === idVenta &&
+      (this.detalleLoading() || this.detalle()?.id === idVenta)
+    ) {
+      return;
+    }
+
+    this.selectedVentaId.set(idVenta);
+    this.detalle.set(null);
+    this.detalleError.set(null);
+
+    void this.loadDetalle(idVenta);
+  }
+
+  /**
+   * Permite seleccionar una venta usando teclado.
+   */
+  selectVentaFromKeyboard(event: KeyboardEvent, idVenta: number): void {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+
+    event.preventDefault();
+    this.selectVenta(idVenta);
+  }
+
+  /**
+   * Reintenta la carga del detalle seleccionado.
+   */
+  retryDetalle(): void {
+    const idVenta: number | null = this.selectedVentaId();
+
+    if (this.disabled() || idVenta === null) {
+      return;
+    }
+
+    void this.loadDetalle(idVenta);
+  }
+
+  /**
    * Recupera el listado evitando que una respuesta antigua
    * sobrescriba una consulta posterior.
    */
   private async load(): Promise<void> {
     const requestId: number = ++this.loadRequestId;
 
+    this.clearDetalleSelection();
     this.loading.set(true);
     this.error.set(null);
     this.resultado.set(null);
@@ -162,6 +218,59 @@ export default class ClientSalesComponent implements OnInit {
         this.loading.set(false);
       }
     }
+  }
+
+  /**
+   * Recupera el detalle de una venta protegiendo la UI
+   * frente a respuestas antiguas.
+   */
+  private async loadDetalle(idVenta: number): Promise<void> {
+    const requestId: number = ++this.detailRequestId;
+
+    this.detalleLoading.set(true);
+    this.detalleError.set(null);
+
+    try {
+      const detalle: VentaHistoricoDetalle | null =
+        await this.ventasHistoricoService.getDetalle(idVenta);
+
+      if (requestId !== this.detailRequestId || this.selectedVentaId() !== idVenta) {
+        return;
+      }
+
+      if (detalle === null) {
+        this.detalle.set(null);
+        this.detalleError.set('La venta seleccionada ya no se encuentra disponible.');
+
+        return;
+      }
+
+      this.detalle.set(detalle);
+    } catch (error: unknown) {
+      if (requestId !== this.detailRequestId || this.selectedVentaId() !== idVenta) {
+        return;
+      }
+
+      this.detalle.set(null);
+      this.detalleError.set(
+        getErrorMessage(error, 'No se ha podido recuperar el detalle de la venta.'),
+      );
+    } finally {
+      if (requestId === this.detailRequestId && this.selectedVentaId() === idVenta) {
+        this.detalleLoading.set(false);
+      }
+    }
+  }
+
+  /**
+   * Cancela cualquier detalle pendiente y elimina la selección actual.
+   */
+  private clearDetalleSelection(): void {
+    this.detailRequestId++;
+    this.selectedVentaId.set(null);
+    this.detalleLoading.set(false);
+    this.detalleError.set(null);
+    this.detalle.set(null);
   }
 
   /**

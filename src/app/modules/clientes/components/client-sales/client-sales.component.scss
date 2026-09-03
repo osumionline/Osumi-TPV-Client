@@ -103,7 +103,7 @@
 
     table {
         width: 100%;
-        min-width: 720px;
+        min-width: 600px;
         border-collapse: collapse;
     }
 
@@ -139,6 +139,86 @@
     .client-sales__negative-amount {
         color: var(--color-red);
         font-weight: 600;
+    }
+
+    .client-sales__workspace {
+        display: grid;
+        min-height: 0;
+        flex: 1 1 auto;
+        grid-template-columns: minmax(520px, 42%) minmax(0, 1fr);
+        gap: 16px;
+    }
+
+    .client-sales__list {
+        display: flex;
+        min-width: 0;
+        min-height: 0;
+        flex-direction: column;
+    }
+
+    .client-sales__detail {
+        min-width: 0;
+        min-height: 0;
+        border: 1px solid var(--separator-color);
+        border-radius: 6px;
+        overflow: auto;
+    }
+
+    .client-sales__detail-state {
+        display: flex;
+        height: 100%;
+        min-height: 220px;
+        padding: 24px;
+        box-sizing: border-box;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        color: var(--disabled-color);
+        text-align: center;
+
+        h3,
+        p {
+            margin: 0;
+        }
+
+        h3 {
+            color: inherit;
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        &.client-sales__detail-state--error {
+            color: #9b1c1c;
+        }
+    }
+
+    .client-sales__row {
+        outline: none;
+        cursor: pointer;
+
+        &:hover,
+        &:focus-visible {
+            background-color: var(--color-very-light-grey);
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--main-color);
+            outline-offset: -2px;
+        }
+
+        &.client-sales__row--selected {
+            background-color: var(--color-light-grey);
+        }
+    }
+}
+
+@media (max-width: 1200px) {
+    .client-sales {
+        .client-sales__workspace {
+            grid-template-columns: 1fr;
+            grid-template-rows: minmax(220px, 42%) minmax(320px, 1fr);
+        }
     }
 }
 

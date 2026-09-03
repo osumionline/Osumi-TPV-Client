@@ -2,6 +2,7 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import type {
   VentaHistoricoConsulta,
+  VentaHistoricoDetalle,
   VentasHistoricoResultado,
 } from '@desktop-contracts/ventas/venta-historico.interface';
 import ClientSalesComponent from '@modules/clientes/components/client-sales/client-sales.component';
@@ -85,10 +86,39 @@ describe('ClientSalesComponent', (): void => {
 
     expect(ventasHistoricoService.consultas).toHaveLength(1);
   });
+
+  it('selecciona una venta y muestra su detalle en modo documental', async (): Promise<void> => {
+    const element: HTMLElement = fixture.nativeElement as HTMLElement;
+    const row: HTMLTableRowElement | null =
+      element.querySelector<HTMLTableRowElement>('.client-sales__row');
+
+    expect(row).not.toBeNull();
+
+    if (row === null) {
+      return;
+    }
+
+    row.click();
+
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(ventasHistoricoService.detalleConsultas).toEqual([17]);
+    expect(element.querySelector('.client-sales__row--selected')).not.toBeNull();
+
+    expect(element.textContent).toContain('Artículo del detalle');
+    expect(element.textContent).toContain('Empleado detalle');
+
+    expect(element.textContent).not.toContain('TicketBAI');
+    expect(element.textContent).not.toContain('Acciones postventa');
+    expect(element.textContent).not.toContain('Cambiar cliente');
+    expect(element.textContent).not.toContain('Reimprimir ticket');
+  });
 });
 
 class FakeVentasHistoricoService {
   readonly consultas: VentaHistoricoConsulta[] = [];
+  readonly detalleConsultas: number[] = [];
 
   /**
    * Registra la consulta y devuelve una venta histórica preparada.
@@ -131,6 +161,63 @@ class FakeVentasHistoricoService {
             importeCents: -1_234,
           },
         ],
+      },
+    });
+  }
+
+  /**
+   * Registra la venta solicitada y devuelve su detalle histórico.
+   */
+  getDetalle(idVenta: number): Promise<VentaHistoricoDetalle | null> {
+    this.detalleConsultas.push(idVenta);
+
+    return Promise.resolve({
+      id: idVenta,
+      publicId: `venta-${idVenta}`,
+      serie: 'A-',
+      numero: idVenta,
+      fecha: '2026-08-25T10:30:00.000Z',
+      empleadoNombre: 'Empleado detalle',
+      cliente: {
+        publicId: 'cliente-1',
+        nombre: 'Cliente test',
+        email: 'cliente@example.com',
+      },
+      totalCents: -1_234,
+      pagos: [
+        {
+          tipoPagoPublicId: 'tipo-pago-tarjeta',
+          nombre: 'Tarjeta',
+          importeCents: -1_234,
+          entregadoCents: null,
+          cambioCents: 0,
+        },
+      ],
+      lineas: [
+        {
+          id: 100,
+          localizador: 123,
+          marca: 'Marca detalle',
+          descripcion: 'Artículo del detalle',
+          unidades: -1,
+          pvpMicros: 12_340_000,
+          descuentoBps: 0,
+          importeDescuentoMicros: 0,
+          importeMicros: -12_340_000,
+          regalo: false,
+        },
+      ],
+      totalUnidades: -1,
+      totalDescuentoMicros: 0,
+      ticketBaiEstado: 'incidencia',
+      ticketBaiUltimoError: 'Incidencia de prueba',
+      capacidades: {
+        puedeCambiarCliente: true,
+        puedeCambiarTipoPago: true,
+        puedeImprimirTicketRegalo: true,
+        puedeProcesarTicketBai: true,
+        puedeComprobarTicketBai: true,
+        puedeReintentarTicketBai: true,
       },
     });
   }

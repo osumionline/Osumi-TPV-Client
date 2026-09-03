@@ -18,6 +18,8 @@ import HistoricalSaleEmailFormComponent from '@modules/ventas/components/histori
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
 
+type HistoricalSaleDetailMode = 'postventa' | 'readonly';
+
 /**
  * Representa el detalle histórico ya resuelto de una venta.
  */
@@ -43,6 +45,8 @@ export default class HistoricalSaleDetailComponent {
   readonly postventaWarning: InputSignal<string | null> = input<string | null>(null);
   readonly emailConfigured: InputSignal<boolean> = input<boolean>(false);
   readonly postventaInfo: InputSignal<string | null> = input<string | null>(null);
+  readonly mode: InputSignal<HistoricalSaleDetailMode> =
+    input<HistoricalSaleDetailMode>('postventa');
 
   readonly changeClientEvent: OutputEmitterRef<void> = output<void>();
   readonly changeTipoPagoEvent: OutputEmitterRef<string> = output<string>();
