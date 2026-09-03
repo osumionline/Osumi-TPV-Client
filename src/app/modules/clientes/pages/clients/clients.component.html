@@ -55,7 +55,7 @@
 
         @if (clientesService.workspace(); as workspace) {
         <otpv-client-section-tabs [workspace]="workspace"
-                                  [disabled]="saving()"
+                                  [disabled]="processing()"
                                   (selectSectionEvent)="selectSection($event)" />
 
         <div class="clients__workspace">
@@ -129,6 +129,20 @@
                   aria-live="polite">
                 Cliente guardado correctamente
             </span>
+            }
+
+            @if (workspace.clienteId !== null && workspace.clientePublicId !== null) {
+            <button mat-stroked-button
+                    type="button"
+                    matTooltip="Abrir documento de protección de datos"
+                    aria-label="Abrir documento de protección de datos"
+                    [disabled]="workspace.dirty || processing()"
+                    (click)="printProteccionDatos()">
+                <mat-icon>
+                    description
+                </mat-icon>
+                Documento de protección de datos
+            </button>
             }
 
             <button mat-stroked-button

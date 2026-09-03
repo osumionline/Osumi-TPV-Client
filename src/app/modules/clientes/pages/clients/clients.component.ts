@@ -13,6 +13,7 @@ import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 import HeaderComponent from '@app/components/header/header.component';
+import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type ClienteFormModel from '@model/clientes/cliente-form.model';
 import type ClienteWorkspaceSection from '@model/clientes/cliente-workspace-section.type';
 import type ClienteWorkspace from '@model/clientes/cliente-workspace.interface';
@@ -22,6 +23,7 @@ import ClientSearchComponent from '@modules/clientes/components/client-search/cl
 import ClientSectionTabsComponent from '@modules/clientes/components/client-section-tabs/client-section-tabs.component';
 import { DialogService } from '@osumi/angular-tools';
 import AppDataService from '@services/app-data.service';
+import ClienteProteccionDatosPrintService from '@services/cliente-proteccion-datos-print.service';
 import ClientesService from '@services/clientes.service';
 import { getErrorMessage } from '@utils/error.utils';
 
@@ -45,6 +47,9 @@ import { getErrorMessage } from '@utils/error.utils';
 })
 export default class ClientsComponent implements OnInit, OnDestroy {
   private readonly dialog: DialogService = inject(DialogService);
+  private readonly clienteProteccionDatosPrintService: ClienteProteccionDatosPrintService = inject(
+    ClienteProteccionDatosPrintService,
+  );
   readonly appDataService: AppDataService = inject(AppDataService);
   readonly clientesService: ClientesService = inject(ClientesService);
 
@@ -336,6 +341,75 @@ export default class ClientsComponent implements OnInit, OnDestroy {
 
         void this.confirmDeactivateCliente(publicId);
       });
+  }
+
+  /**
+   * Abre el documento de protección de datos utilizando
+   * los datos canónicos del cliente persistido.
+   */
+  printProteccionDatos(): void {
+    if (this.processing()) {
+      return;
+    }
+
+    const workspace: ClienteWorkspace | null = this.clientesService.workspace();
+
+    if (workspace === null || workspace.clienteId === null || workspace.clientePublicId === null) {
+      return;
+    }
+
+    if (workspace.dirty) {
+      this.dialog
+        .alert({
+          title: 'Atención',
+          content:
+            'Guarda o cancela los cambios antes de abrir el documento de protección de datos.',
+        })
+        .subscribe();
+
+      return;
+    }
+
+    const appData: AppData | null = this.appDataService.appData();
+
+    if (appData === null) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content:
+            'No se han podido obtener los datos de la empresa para generar el documento de protección de datos.',
+        })
+        .subscribe();
+
+      return;
+    }
+
+    const cliente: Cliente | null = this.clientesService.findByPublicId(workspace.clientePublicId);
+
+    if (cliente === null || cliente.id !== workspace.clienteId) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: 'No se han podido obtener los datos persistidos del cliente.',
+        })
+        .subscribe();
+
+      return;
+    }
+
+    try {
+      this.clienteProteccionDatosPrintService.print(appData, cliente);
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(
+            error,
+            'No se ha podido abrir el documento de protección de datos.',
+          ),
+        })
+        .subscribe();
+    }
   }
 
   /**
