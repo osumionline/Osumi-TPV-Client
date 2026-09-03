@@ -1,5 +1,6 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { computed, Service, signal } from '@angular/core';
+import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type { ClienteEstadisticasInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
@@ -202,8 +203,8 @@ export default class ClientesService {
   }
 
   /**
-   * Persiste el borrador de un cliente nuevo y adopta como nuevo
-   * snapshot la versión canónica devuelta por backend.
+   * Crea o actualiza la ficha abierta y adopta como nuevo snapshot
+   * la versión canónica devuelta por backend.
    */
   async guardar(): Promise<ClienteWorkspace> {
     const workspace: ClienteWorkspace | null = this.workspace();
@@ -212,67 +213,43 @@ export default class ClientesService {
       throw new Error('No hay ninguna ficha de cliente abierta.');
     }
 
-    if (workspace.clienteId !== null) {
-      throw new Error('La actualización de clientes todavía no está disponible.');
+    if ((workspace.clienteId === null) !== (workspace.clientePublicId === null)) {
+      throw new Error('La ficha de cliente contiene una identidad incoherente.');
     }
 
-    const cliente: Cliente = await this.create(createClienteCommand(workspace.draft));
+    const createCommand: CrearClienteCommand = createClienteCommand(workspace.draft);
+    let cliente: Cliente;
+
+    if (workspace.clientePublicId === null) {
+      cliente = await this.create(createCommand);
+    } else {
+      const updateCommand: ActualizarClienteCommand = {
+        ...createCommand,
+        publicId: workspace.clientePublicId,
+      };
+
+      cliente = await this.update(updateCommand);
+    }
 
     return this.reemplazarWorkspaceTrasGuardado(workspace, cliente);
   }
 
   /**
-   * Crea un cliente y lo reconcilia en la colección global
-   * después de cualquier carga anterior todavía pendiente.
+   * Crea un cliente y reconcilia la respuesta confirmada por backend.
    */
   async create(command: CrearClienteCommand): Promise<Cliente> {
     const createdCliente: ClienteInterface = await window.osumiDesktop.clientes.create(command);
 
-    /*
-     * Una lectura iniciada antes de la creación todavía podría
-     * terminar después y sobrescribir la colección con datos antiguos.
-     *
-     * Esperamos a que finalice antes de incorporar la respuesta
-     * confirmada de create. Si aquella lectura falla, el alta sigue
-     * siendo válida porque su COMMIT ya ha sido confirmado.
-     */
-    if (this.pendingRequest !== null) {
-      try {
-        await this.pendingRequest;
-      } catch {
-        /*
-         * La respuesta de create confirma que el COMMIT ya terminó.
-         * Un fallo de una lectura anterior no debe convertirlo en error.
-         */
-      }
-    }
+    return this.reconciliarClientePersistido(createdCliente);
+  }
 
-    const cliente: Cliente = new Cliente().fromInterface(createdCliente);
+  /**
+   * Actualiza un cliente y reconcilia la respuesta confirmada por backend.
+   */
+  async update(command: ActualizarClienteCommand): Promise<Cliente> {
+    const updatedCliente: ClienteInterface = await window.osumiDesktop.clientes.update(command);
 
-    this.clientesSignal.update((clientes: readonly Cliente[]): readonly Cliente[] =>
-      [
-        ...clientes.filter((item: Cliente): boolean => item.publicId !== createdCliente.publicId),
-        cliente,
-      ].sort((left: Cliente, right: Cliente): number => {
-        const nameComparison: number = left.nombreApellidos.localeCompare(
-          right.nombreApellidos,
-          'es',
-          {
-            sensitivity: 'base',
-          },
-        );
-
-        if (nameComparison !== 0) {
-          return nameComparison;
-        }
-
-        return (left.id ?? 0) - (right.id ?? 0);
-      }),
-    );
-
-    this.loadedSignal.set(true);
-
-    return cliente;
+    return this.reconciliarClientePersistido(updatedCliente);
   }
 
   /**
@@ -363,6 +340,64 @@ export default class ClientesService {
     return (
       this.clientes().find((cliente: Cliente): boolean => cliente.publicId === publicId) ?? null
     );
+  }
+
+  /**
+   * Incorpora a la colección la versión canónica devuelta después
+   * de un CREATE o UPDATE confirmado por backend.
+   *
+   * Cuando el cliente ya existe se conserva su instancia para que
+   * cualquier venta en curso que la referencie reciba también los
+   * datos actualizados.
+   */
+  private async reconciliarClientePersistido(persistedCliente: ClienteInterface): Promise<Cliente> {
+    /*
+     * Una lectura iniciada antes de la escritura todavía podría
+     * terminar después y sobrescribir la colección con datos antiguos.
+     *
+     * Esperamos a que finalice antes de incorporar la respuesta
+     * confirmada. Si aquella lectura falla, la escritura sigue siendo
+     * válida porque su COMMIT ya ha sido confirmado.
+     */
+    if (this.pendingRequest !== null) {
+      try {
+        await this.pendingRequest;
+      } catch {
+        /*
+         * La respuesta recibida confirma que el COMMIT ya terminó.
+         * Un fallo de una lectura anterior no debe convertirlo en error.
+         */
+      }
+    }
+
+    const cliente: Cliente = (
+      this.findByPublicId(persistedCliente.publicId) ?? new Cliente()
+    ).fromInterface(persistedCliente);
+
+    this.clientesSignal.update((clientes: readonly Cliente[]): readonly Cliente[] =>
+      [
+        ...clientes.filter((item: Cliente): boolean => item.publicId !== persistedCliente.publicId),
+        cliente,
+      ].sort((left: Cliente, right: Cliente): number => {
+        const nameComparison: number = left.nombreApellidos.localeCompare(
+          right.nombreApellidos,
+          'es',
+          {
+            sensitivity: 'base',
+          },
+        );
+
+        if (nameComparison !== 0) {
+          return nameComparison;
+        }
+
+        return (left.id ?? 0) - (right.id ?? 0);
+      }),
+    );
+
+    this.loadedSignal.set(true);
+
+    return cliente;
   }
 
   /**

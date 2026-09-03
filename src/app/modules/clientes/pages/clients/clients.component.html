@@ -129,11 +129,7 @@
 
             <button mat-flat-button
                     type="button"
-                    [disabled]="
-                                    saving() ||
-                                    !workspace.dirty ||
-                                    workspace.clienteId !== null
-                                "
+                    [disabled]="saving() || !workspace.dirty"
                     (click)="saveCliente()">
                 {{ saving() ? 'Guardando...' : 'Guardar' }}
             </button>

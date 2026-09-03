@@ -1,3 +1,4 @@
+import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type { ClienteEstadisticasInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
@@ -12,13 +13,17 @@ describe('ClientesService', (): void => {
   let originalDesktopDescriptor: PropertyDescriptor | undefined;
   let requestCount: number;
   let createdCliente: ClienteInterface;
+  let updatedCliente: ClienteInterface;
   let receivedCreateCommand: CrearClienteCommand | null;
+  let receivedUpdateCommand: ActualizarClienteCommand | null;
 
   beforeEach((): void => {
     originalDesktopDescriptor = Object.getOwnPropertyDescriptor(window, 'osumiDesktop');
     requestCount = 0;
     createdCliente = createClienteInterface(7, 'cliente-7', 'Ada Lovelace');
+    updatedCliente = createClienteInterface(7, 'cliente-7', 'Ada Lovelace');
     receivedCreateCommand = null;
+    receivedUpdateCommand = null;
 
     Object.defineProperty(window, 'osumiDesktop', {
       configurable: true,
@@ -28,6 +33,11 @@ describe('ClientesService', (): void => {
             receivedCreateCommand = command;
 
             return Promise.resolve(createdCliente);
+          },
+          update: (command: ActualizarClienteCommand): Promise<ClienteInterface> => {
+            receivedUpdateCommand = command;
+
+            return Promise.resolve(updatedCliente);
           },
           getEstadisticas: (): Promise<ClienteEstadisticasInterface> => {
             requestCount++;
@@ -280,21 +290,51 @@ describe('ClientesService', (): void => {
     expect(service.findByPublicId('cliente-7')?.nombreApellidos).toBe('Ada Lovelace');
   });
 
-  it('no intenta crear de nuevo un cliente ya persistido', async (): Promise<void> => {
+  it('actualiza un cliente persistido y adopta la respuesta canónica', async (): Promise<void> => {
     const service: ClientesService = new ClientesService();
-    const cliente: Cliente = new Cliente();
-
-    cliente.id = 7;
-    cliente.publicId = 'cliente-7';
-    cliente.nombreApellidos = 'Ada Lovelace';
-
-    service.abrirFicha(cliente);
-
-    await expect(service.guardar()).rejects.toThrow(
-      'La actualización de clientes todavía no está disponible.',
+    const cliente: Cliente = await service.create(
+      createClienteCommand({
+        ...createClienteFormInitialValue(),
+        nombreApellidos: 'Ada Lovelace',
+      }),
     );
 
+    receivedCreateCommand = null;
+
+    const initialWorkspace: ClienteWorkspace = service.abrirFicha(cliente);
+
+    service.seleccionarSeccion('billing');
+    service.actualizarDraft({
+      ...initialWorkspace.draft,
+      nombreApellidos: '  Ada Byron  ',
+      telefono: '  944000000  ',
+    });
+
+    updatedCliente = {
+      ...createClienteInterface(7, 'cliente-7', 'Ada Byron'),
+      telefono: '944000000',
+    };
+
+    const workspace: ClienteWorkspace = await service.guardar();
+
     expect(receivedCreateCommand).toBeNull();
+    expect(receivedUpdateCommand).toMatchObject({
+      publicId: 'cliente-7',
+      nombreApellidos: 'Ada Byron',
+      telefono: '944000000',
+    });
+    expect(workspace.clienteId).toBe(7);
+    expect(workspace.clientePublicId).toBe('cliente-7');
+    expect(workspace.draft.nombreApellidos).toBe('Ada Byron');
+    expect(workspace.draft.telefono).toBe('944000000');
+    expect(workspace.baseSnapshot).toEqual(workspace.draft);
+    expect(workspace.baseSnapshot).not.toBe(workspace.draft);
+    expect(workspace.dirty).toBe(false);
+    expect(workspace.activeSection).toBe('billing');
+    expect(service.workspace()).toBe(workspace);
+    expect(service.clientes()).toHaveLength(1);
+    expect(service.findByPublicId('cliente-7')).toBe(cliente);
+    expect(service.findByPublicId('cliente-7')?.nombreApellidos).toBe('Ada Byron');
   });
 });
 

@@ -105,12 +105,12 @@ export default class ClientsComponent implements OnInit {
   }
 
   /**
-   * Valida globalmente la ficha y persiste un cliente nuevo.
+   * Valida globalmente y persiste la ficha de cliente abierta.
    */
   async saveCliente(): Promise<void> {
     const workspace: ClienteWorkspace | null = this.clientesService.workspace();
 
-    if (this.saving() || workspace === null || workspace.clienteId !== null || !workspace.dirty) {
+    if (this.saving() || workspace === null || !workspace.dirty) {
       return;
     }
 
@@ -209,13 +209,13 @@ export default class ClientsComponent implements OnInit {
    * Abre una nueva ficha vacía.
    */
   newCliente(): void {
+    this.clearSaveFeedback();
     const workspace: ClienteWorkspace | null = this.clientesService.workspace();
 
     if (workspace === null || !workspace.dirty) {
       this.clientesService.crearBorrador();
       return;
     }
-    this.clearSaveFeedback();
 
     this.dialog
       .confirm({
@@ -236,6 +236,7 @@ export default class ClientsComponent implements OnInit {
    * cuando contiene cambios pendientes.
    */
   closeCliente(): void {
+    this.clearSaveFeedback();
     const workspace: ClienteWorkspace | null = this.clientesService.workspace();
 
     if (workspace === null) {
@@ -246,7 +247,6 @@ export default class ClientsComponent implements OnInit {
       this.clientesService.cerrarFicha();
       return;
     }
-    this.clearSaveFeedback();
 
     this.dialog
       .confirm({
