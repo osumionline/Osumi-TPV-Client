@@ -43,6 +43,16 @@ export default function registerClientesIpc(
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.clientesDeactivate,
+
+    async (event, publicId: string): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await clientesService.deactivate(publicId);
+    },
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.clientesGetEstadisticas,
 
     async (event, publicId: string): Promise<ClienteEstadisticasInterface> => {

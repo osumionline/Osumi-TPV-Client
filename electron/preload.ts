@@ -248,6 +248,9 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
     update: (command: ActualizarClienteCommand): Promise<ClienteInterface> =>
       ipcRenderer.invoke(IPC_CHANNELS.clientesUpdate, command) as Promise<ClienteInterface>,
 
+    deactivate: (publicId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.clientesDeactivate, publicId) as Promise<void>,
+
     getEstadisticas: (publicId: string): Promise<ClienteEstadisticasInterface> =>
       ipcRenderer.invoke(
         IPC_CHANNELS.clientesGetEstadisticas,

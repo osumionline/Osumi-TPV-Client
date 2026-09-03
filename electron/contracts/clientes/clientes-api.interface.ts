@@ -10,5 +10,7 @@ export default interface ClientesApi {
 
   update(command: ActualizarClienteCommand): Promise<ClienteInterface>;
 
+  deactivate(publicId: string): Promise<void>;
+
   getEstadisticas(publicId: string): Promise<ClienteEstadisticasInterface>;
 }
