@@ -6,7 +6,7 @@ import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-
 import type ClienteEstadisticasState from '@model/clientes/cliente-estadisticas-state.interface';
 import createClienteFormInitialValue from '@model/clientes/cliente-form.initial-value';
 import createClienteFormModel from '@model/clientes/cliente-form.mapper';
-import ClienteFormModel from '@model/clientes/cliente-form.model';
+import type ClienteFormModel from '@model/clientes/cliente-form.model';
 import {
   areClienteFormModelsEqual,
   cloneClienteFormModel,
@@ -201,33 +201,55 @@ export default class ClientesService {
   }
 
   /**
-   * Crea un cliente, recarga la colección global y devuelve
-   * la instancia canónica incorporada al servicio.
+   * Crea un cliente y lo reconcilia en la colección global
+   * después de cualquier carga anterior todavía pendiente.
    */
   async create(command: CrearClienteCommand): Promise<Cliente> {
     const createdCliente: ClienteInterface = await window.osumiDesktop.clientes.create(command);
 
     /*
-     * Si existiese una lectura anterior todavía en curso, esperamos
-     * a que termine antes de forzar nuestra recarga posterior.
+     * Una lectura iniciada antes de la creación todavía podría
+     * terminar después y sobrescribir la colección con datos antiguos.
      *
-     * De esta manera evitamos que reload() reutilice una petición
-     * iniciada antes de crear el cliente y que, por tanto, pudiera
-     * no contener todavía el nuevo registro.
+     * Esperamos a que finalice antes de incorporar la respuesta
+     * confirmada de create. Si aquella lectura falla, el alta sigue
+     * siendo válida porque su COMMIT ya ha sido confirmado.
      */
     if (this.pendingRequest !== null) {
-      await this.pendingRequest;
+      try {
+        await this.pendingRequest;
+      } catch {
+        /*
+         * La respuesta de create confirma que el COMMIT ya terminó.
+         * Un fallo de una lectura anterior no debe convertirlo en error.
+         */
+      }
     }
 
-    await this.reload();
+    const cliente: Cliente = new Cliente().fromInterface(createdCliente);
 
-    const cliente: Cliente | null = this.findByPublicId(createdCliente.publicId);
+    this.clientesSignal.update((clientes: readonly Cliente[]): readonly Cliente[] =>
+      [
+        ...clientes.filter((item: Cliente): boolean => item.publicId !== createdCliente.publicId),
+        cliente,
+      ].sort((left: Cliente, right: Cliente): number => {
+        const nameComparison: number = left.nombreApellidos.localeCompare(
+          right.nombreApellidos,
+          'es',
+          {
+            sensitivity: 'base',
+          },
+        );
 
-    if (cliente === null) {
-      throw new Error(
-        'El cliente se ha creado, pero no se ha podido recuperar después de actualizar la lista.',
-      );
-    }
+        if (nameComparison !== 0) {
+          return nameComparison;
+        }
+
+        return (left.id ?? 0) - (right.id ?? 0);
+      }),
+    );
+
+    this.loadedSignal.set(true);
 
     return cliente;
   }

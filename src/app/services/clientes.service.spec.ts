@@ -1,4 +1,8 @@
 import type { ClienteEstadisticasInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
+import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
+import createClienteCommand from '@model/clientes/cliente-form-command.mapper';
+import createClienteFormInitialValue from '@model/clientes/cliente-form.initial-value';
 import type ClienteFormModel from '@model/clientes/cliente-form.model';
 import type ClienteWorkspace from '@model/clientes/cliente-workspace.interface';
 import Cliente from '@model/clientes/cliente.model';
@@ -6,18 +10,25 @@ import ClientesService from '@services/clientes.service';
 
 describe('ClientesService', (): void => {
   let originalDesktopDescriptor: PropertyDescriptor | undefined;
-
   let requestCount: number;
+  let createdCliente: ClienteInterface;
+  let receivedCreateCommand: CrearClienteCommand | null;
 
   beforeEach((): void => {
     originalDesktopDescriptor = Object.getOwnPropertyDescriptor(window, 'osumiDesktop');
-
     requestCount = 0;
+    createdCliente = createClienteInterface(7, 'cliente-7', 'Ada Lovelace');
+    receivedCreateCommand = null;
 
     Object.defineProperty(window, 'osumiDesktop', {
       configurable: true,
       value: {
         clientes: {
+          create: (command: CrearClienteCommand): Promise<ClienteInterface> => {
+            receivedCreateCommand = command;
+
+            return Promise.resolve(createdCliente);
+          },
           getEstadisticas: (): Promise<ClienteEstadisticasInterface> => {
             requestCount++;
 
@@ -207,6 +218,33 @@ describe('ClientesService', (): void => {
     expect(service.workspace()).toBeNull();
     expect(service.hasWorkspace()).toBe(false);
   });
+
+  it('incorpora directamente los clientes creados y mantiene el orden', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    const zoeForm: ClienteFormModel = {
+      ...createClienteFormInitialValue(),
+      nombreApellidos: 'Zoe Baker',
+    };
+    const zoeCommand: CrearClienteCommand = createClienteCommand(zoeForm);
+
+    createdCliente = createClienteInterface(8, 'cliente-8', 'Zoe Baker');
+
+    const zoe: Cliente = await service.create(zoeCommand);
+
+    const adaForm: ClienteFormModel = {
+      ...createClienteFormInitialValue(),
+      nombreApellidos: 'Ada Lovelace',
+    };
+    const adaCommand: CrearClienteCommand = createClienteCommand(adaForm);
+
+    createdCliente = createClienteInterface(7, 'cliente-7', 'Ada Lovelace');
+
+    const ada: Cliente = await service.create(adaCommand);
+
+    expect(receivedCreateCommand).toBe(adaCommand);
+    expect(service.clientes()).toEqual([ada, zoe]);
+    expect(service.loaded()).toBe(true);
+  });
 });
 
 function createEstadisticas(nombre: string): ClienteEstadisticasInterface {
@@ -222,5 +260,39 @@ function createEstadisticas(nombre: string): ClienteEstadisticasInterface {
       },
     ],
     topVentas: [],
+  };
+}
+
+/**
+ * Crea la respuesta mínima de un cliente persistido para las pruebas del servicio.
+ */
+function createClienteInterface(
+  id: number,
+  publicId: string,
+  nombreApellidos: string,
+): ClienteInterface {
+  return {
+    id,
+    publicId,
+    nombreApellidos,
+    dniCif: null,
+    telefono: null,
+    email: null,
+    direccion: null,
+    codigoPostal: null,
+    poblacion: null,
+    provincia: null,
+    factIgual: true,
+    factNombreApellidos: null,
+    factDniCif: null,
+    factTelefono: null,
+    factEmail: null,
+    factDireccion: null,
+    factCodigoPostal: null,
+    factPoblacion: null,
+    factProvincia: null,
+    observaciones: null,
+    descuento: 0,
+    ultimaVenta: null,
   };
 }
