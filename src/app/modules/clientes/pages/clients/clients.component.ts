@@ -4,6 +4,7 @@ import {
   inject,
   signal,
   viewChild,
+  type OnDestroy,
   type OnInit,
   type Signal,
   type WritableSignal,
@@ -42,7 +43,7 @@ import { getErrorMessage } from '@utils/error.utils';
     MatTooltip,
   ],
 })
-export default class ClientsComponent implements OnInit {
+export default class ClientsComponent implements OnInit, OnDestroy {
   private readonly dialog: DialogService = inject(DialogService);
   readonly appDataService: AppDataService = inject(AppDataService);
   readonly clientesService: ClientesService = inject(ClientesService);
@@ -50,6 +51,7 @@ export default class ClientsComponent implements OnInit {
   readonly searchOpen: WritableSignal<boolean> = signal<boolean>(false);
   readonly saving: WritableSignal<boolean> = signal<boolean>(false);
   readonly saveSuccessful: WritableSignal<boolean> = signal<boolean>(false);
+  readonly focusNameRequest: WritableSignal<number> = signal<number>(0);
   readonly clientFormSection: Signal<'data' | 'billing'> = computed((): 'data' | 'billing' =>
     this.clientesService.workspace()?.activeSection === 'billing' ? 'billing' : 'data',
   );
@@ -72,9 +74,20 @@ export default class ClientsComponent implements OnInit {
   }
 
   /**
+   * Cancela el temporizador del aviso de guardado al abandonar la página.
+   */
+  ngOnDestroy(): void {
+    this.clearSaveFeedback();
+  }
+
+  /**
    * Muestra el buscador de clientes cargados en memoria.
    */
   openSearch(): void {
+    if (this.saving()) {
+      return;
+    }
+
     this.searchOpen.set(true);
   }
 
@@ -89,6 +102,10 @@ export default class ClientsComponent implements OnInit {
    * Cambia el apartado activo de la ficha abierta.
    */
   selectSection(section: ClienteWorkspaceSection): void {
+    if (this.saving()) {
+      return;
+    }
+
     this.clientesService.seleccionarSeccion(section);
   }
 
@@ -152,7 +169,7 @@ export default class ClientsComponent implements OnInit {
   cancelClienteChanges(): void {
     const workspace: ClienteWorkspace | null = this.clientesService.workspace();
 
-    if (workspace === null || !workspace.dirty) {
+    if (this.saving() || workspace === null || !workspace.dirty) {
       return;
     }
 
@@ -175,6 +192,9 @@ export default class ClientsComponent implements OnInit {
    * pendientes de la ficha actualmente activa.
    */
   selectCliente(cliente: Cliente): void {
+    if (this.saving()) {
+      return;
+    }
     const workspace: ClienteWorkspace | null = this.clientesService.workspace();
 
     if (workspace?.clientePublicId === cliente.publicId) {
@@ -209,11 +229,15 @@ export default class ClientsComponent implements OnInit {
    * Abre una nueva ficha vacía.
    */
   newCliente(): void {
+    if (this.saving()) {
+      return;
+    }
+
     this.clearSaveFeedback();
     const workspace: ClienteWorkspace | null = this.clientesService.workspace();
 
     if (workspace === null || !workspace.dirty) {
-      this.clientesService.crearBorrador();
+      this.createClienteDraft();
       return;
     }
 
@@ -226,7 +250,7 @@ export default class ClientsComponent implements OnInit {
       })
       .subscribe((result: boolean): void => {
         if (result) {
-          this.clientesService.crearBorrador();
+          this.createClienteDraft();
         }
       });
   }
@@ -236,6 +260,10 @@ export default class ClientsComponent implements OnInit {
    * cuando contiene cambios pendientes.
    */
   closeCliente(): void {
+    if (this.saving()) {
+      return;
+    }
+
     this.clearSaveFeedback();
     const workspace: ClienteWorkspace | null = this.clientesService.workspace();
 
@@ -294,6 +322,14 @@ export default class ClientsComponent implements OnInit {
     this.clearSaveFeedback();
     this.clientesService.abrirFicha(cliente);
     this.searchOpen.set(false);
+  }
+
+  /**
+   * Abre un borrador nuevo y solicita el foco para su campo de nombre.
+   */
+  private createClienteDraft(): void {
+    this.clientesService.crearBorrador();
+    this.focusNameRequest.update((request: number): number => request + 1);
   }
 
   /**

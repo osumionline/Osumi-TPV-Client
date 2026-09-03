@@ -31,4 +31,23 @@ describe('ClientFormComponent', (): void => {
     expect(component.validate()).toBe('billing');
     expect(component.clienteForm.factEmail().touched()).toBe(true);
   });
+
+  it('vuelve a enfocar el nombre cuando recibe una nueva solicitud', (): void => {
+    const nameInput: HTMLInputElement | null = fixture.nativeElement.querySelector(
+      'input[autocomplete="name"]',
+    );
+
+    expect(nameInput).not.toBeNull();
+
+    if (nameInput === null) {
+      return;
+    }
+
+    const focusSpy = vi.spyOn(nameInput, 'focus');
+
+    fixture.componentRef.setInput('focusNameRequest', 1);
+    fixture.detectChanges();
+
+    expect(focusSpy).toHaveBeenCalledOnce();
+  });
 });

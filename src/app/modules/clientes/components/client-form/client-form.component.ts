@@ -1,5 +1,4 @@
 import {
-  afterNextRender,
   Component,
   effect,
   ElementRef,
@@ -45,6 +44,7 @@ export default class ClientFormComponent {
   readonly initialValue: InputSignal<ClienteFormModel> = input<ClienteFormModel>(
     createClienteFormInitialValue(),
   );
+  readonly focusNameRequest: InputSignal<number> = input<number>(0);
   readonly section: InputSignal<ClientFormSection> = input<ClientFormSection>('all');
   readonly showActions: InputSignal<boolean> = input<boolean>(true);
 
@@ -73,7 +73,8 @@ export default class ClientFormComponent {
       this.clienteModel.set(cloneClienteFormModel(initialValue));
     });
 
-    afterNextRender((): void => {
+    effect((): void => {
+      this.focusNameRequest();
       this.nameInput()?.nativeElement.focus();
     });
   }

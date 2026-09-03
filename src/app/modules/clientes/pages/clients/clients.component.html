@@ -66,6 +66,7 @@
                                  ">
                 <otpv-client-form [section]="clientFormSection()"
                                   [initialValue]="workspace.draft"
+                                  [focusNameRequest]="focusNameRequest()"
                                   [saving]="saving()"
                                   [showActions]="false"
                                   (modelChangeEvent)="updateDraft($event)" />
