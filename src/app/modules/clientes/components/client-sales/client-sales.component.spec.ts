@@ -6,14 +6,20 @@ import type {
   VentasHistoricoResultado,
 } from '@desktop-contracts/ventas/venta-historico.interface';
 import ClientSalesComponent from '@modules/clientes/components/client-sales/client-sales.component';
+import VentaTicketDocumentService from '@services/venta-ticket-document.service';
+import VentaTicketEmailService from '@services/venta-ticket-email.service';
 import VentasHistoricoService from '@services/ventas-historico.service';
 
 describe('ClientSalesComponent', (): void => {
   let fixture: ComponentFixture<ClientSalesComponent>;
   let ventasHistoricoService: FakeVentasHistoricoService;
+  let ventaTicketDocumentService: FakeVentaTicketDocumentService;
+  let ventaTicketEmailService: FakeVentaTicketEmailService;
 
   beforeEach(async (): Promise<void> => {
     ventasHistoricoService = new FakeVentasHistoricoService();
+    ventaTicketDocumentService = new FakeVentaTicketDocumentService();
+    ventaTicketEmailService = new FakeVentaTicketEmailService();
 
     await TestBed.configureTestingModule({
       imports: [ClientSalesComponent],
@@ -22,11 +28,21 @@ describe('ClientSalesComponent', (): void => {
           provide: VentasHistoricoService,
           useValue: ventasHistoricoService,
         },
+        {
+          provide: VentaTicketDocumentService,
+          useValue: ventaTicketDocumentService,
+        },
+        {
+          provide: VentaTicketEmailService,
+          useValue: ventaTicketEmailService,
+        },
       ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ClientSalesComponent);
     fixture.componentRef.setInput('clientePublicId', 'cliente-1');
+    fixture.componentRef.setInput('clienteEmail', 'cliente@example.com');
+    fixture.componentRef.setInput('emailConfigured', true);
     fixture.detectChanges();
 
     await fixture.whenStable();
@@ -114,6 +130,80 @@ describe('ClientSalesComponent', (): void => {
     expect(element.textContent).not.toContain('Cambiar cliente');
     expect(element.textContent).not.toContain('Reimprimir ticket');
   });
+
+  it('reimprime la venta de la fila pulsada y no la venta seleccionada', async (): Promise<void> => {
+    const element: HTMLElement = fixture.nativeElement as HTMLElement;
+    const rows: NodeListOf<HTMLTableRowElement> =
+      element.querySelectorAll<HTMLTableRowElement>('.client-sales__row');
+    const reprintButtons: NodeListOf<HTMLButtonElement> =
+      element.querySelectorAll<HTMLButtonElement>('.client-sales__reprint-button');
+
+    expect(rows).toHaveLength(2);
+    expect(reprintButtons).toHaveLength(2);
+
+    rows[0]?.click();
+
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.selectedVentaId()).toBe(17);
+
+    reprintButtons[1]?.click();
+
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(ventaTicketDocumentService.reprintedVentaIds).toEqual([18]);
+    expect(fixture.componentInstance.selectedVentaId()).toBe(17);
+  });
+
+  it('envía por email la venta de la fila que abrió el formulario', async (): Promise<void> => {
+    const element: HTMLElement = fixture.nativeElement as HTMLElement;
+    const rows: NodeListOf<HTMLTableRowElement> =
+      element.querySelectorAll<HTMLTableRowElement>('.client-sales__row');
+    const emailButtons: NodeListOf<HTMLButtonElement> = element.querySelectorAll<HTMLButtonElement>(
+      '.client-sales__email-button',
+    );
+
+    rows[0]?.click();
+
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.selectedVentaId()).toBe(17);
+
+    emailButtons[1]?.click();
+    fixture.detectChanges();
+
+    expect(element.textContent).toContain('Enviar ticket de la venta');
+    expect(element.textContent).toContain('A-18');
+
+    await fixture.componentInstance.sendTicketEmail('destino@example.com');
+    fixture.detectChanges();
+
+    expect(ventaTicketEmailService.sentTickets).toEqual([
+      {
+        idVenta: 18,
+        destinatario: 'destino@example.com',
+      },
+    ]);
+
+    expect(fixture.componentInstance.selectedVentaId()).toBe(17);
+    expect(element.textContent).toContain('El ticket de la venta A-18 se ha enviado correctamente');
+  });
+
+  it('deshabilita el email cuando SMTP no está configurado', (): void => {
+    fixture.componentRef.setInput('emailConfigured', false);
+    fixture.detectChanges();
+
+    const emailButtons: NodeListOf<HTMLButtonElement> = fixture.nativeElement.querySelectorAll(
+      '.client-sales__email-button',
+    );
+
+    expect(emailButtons).toHaveLength(2);
+    expect(emailButtons[0]?.disabled).toBe(true);
+    expect(emailButtons[1]?.disabled).toBe(true);
+  });
 });
 
 class FakeVentasHistoricoService {
@@ -148,13 +238,36 @@ class FakeVentasHistoricoService {
           ticketBaiEstado: 'incidencia',
           tieneIncidenciaTicketBai: true,
         },
+        {
+          id: 18,
+          publicId: 'venta-18',
+          serie: 'A-',
+          numero: 18,
+          fecha: '2026-08-26T11:00:00.000Z',
+          totalCents: 5_000,
+          clienteNombre: 'Cliente test',
+          pagos: [
+            {
+              tipoPagoPublicId: 'tipo-pago-efectivo',
+              nombre: 'Efectivo',
+              importeCents: 5_000,
+            },
+          ],
+          ticketBaiEstado: 'correcto',
+          tieneIncidenciaTicketBai: false,
+        },
       ],
       resumen: {
-        numeroVentas: 1,
-        totalCents: -1_234,
-        ticketMedioCents: -1_234,
-        beneficioCents: -500,
+        numeroVentas: 2,
+        totalCents: 3_766,
+        ticketMedioCents: 1_883,
+        beneficioCents: 1_000,
         totalesPorTipoPago: [
+          {
+            tipoPagoPublicId: 'tipo-pago-efectivo',
+            nombre: 'Efectivo',
+            importeCents: 5_000,
+          },
           {
             tipoPagoPublicId: 'tipo-pago-tarjeta',
             nombre: 'Tarjeta',
@@ -220,6 +333,38 @@ class FakeVentasHistoricoService {
         puedeReintentarTicketBai: true,
       },
     });
+  }
+}
+
+class FakeVentaTicketDocumentService {
+  readonly reprintedVentaIds: number[] = [];
+
+  /**
+   * Registra el id exacto enviado al pipeline de reimpresión.
+   */
+  reprint(idVenta: number): Promise<void> {
+    this.reprintedVentaIds.push(idVenta);
+
+    return Promise.resolve();
+  }
+}
+
+class FakeVentaTicketEmailService {
+  readonly sentTickets: {
+    readonly idVenta: number;
+    readonly destinatario: string;
+  }[] = [];
+
+  /**
+   * Registra el id y destinatario enviados al pipeline de email.
+   */
+  send(idVenta: number, destinatario: string): Promise<void> {
+    this.sentTickets.push({
+      idVenta,
+      destinatario,
+    });
+
+    return Promise.resolve();
   }
 }
 

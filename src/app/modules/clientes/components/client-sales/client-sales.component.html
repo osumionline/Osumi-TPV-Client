@@ -21,6 +21,7 @@
                 <input type="date"
                        [value]="desde()"
                        [disabled]="disabled() || loading()"
+                       [disabled]="disabled() || loading() || actionInProgress()"
                        (change)="onDesdeChange($event)">
             </label>
 
@@ -32,12 +33,18 @@
                 <input type="date"
                        [value]="hasta()"
                        [disabled]="disabled() || loading()"
+                       [disabled]="disabled() || loading() || actionInProgress()"
                        (change)="onHastaChange($event)">
             </label>
 
             <button mat-flat-button
                     type="button"
-                    [disabled]="disabled() || loading() || !canSearch()"
+                    [disabled]="
+                        disabled() ||
+                        loading() ||
+                        actionInProgress() ||
+                        !canSearch()
+                    "
                     (click)="search()">
                 Buscar
             </button>
@@ -55,6 +62,20 @@
     <div class="client-sales__error"
          role="alert">
         {{ error() }}
+    </div>
+    }
+
+    @if (actionError() !== null) {
+    <div class="client-sales__message client-sales__message--error"
+         role="alert">
+        {{ actionError() }}
+    </div>
+    }
+
+    @if (actionInfo() !== null) {
+    <div class="client-sales__message"
+         role="status">
+        {{ actionInfo() }}
     </div>
     }
 
@@ -99,6 +120,11 @@
                                 <th scope="col">
                                     Tipo(s) de pago
                                 </th>
+
+                                <th scope="col"
+                                    class="client-sales__options">
+                                    Opciones
+                                </th>
                             </tr>
                         </thead>
 
@@ -107,8 +133,8 @@
                             <tr class="client-sales__row"
                                 [class.client-sales__row--selected]="selectedVentaId() === venta.id"
                                 [class.client-sales__row--return]="venta.totalCents < 0"
-                                [attr.tabindex]="disabled() ? -1 : 0"
-                                [attr.aria-disabled]="disabled()"
+                                [attr.tabindex]="disabled() || actionInProgress() ? -1 : 0"
+                                [attr.aria-disabled]="disabled() || actionInProgress()"
                                 [attr.aria-label]="'Consultar venta ' + getVentaReferencia(venta)"
                                 (click)="selectVenta(venta.id)"
                                 (keydown)="selectVentaFromKeyboard($event, venta.id)">
@@ -132,6 +158,61 @@
                                 <td>
                                     {{ getPagosLabel(venta) }}
                                 </td>
+
+                                <td class="client-sales__options">
+                                    <button mat-icon-button
+                                            type="button"
+                                            class="client-sales__reprint-button"
+                                            matTooltip="Reimprimir ticket"
+                                            [attr.aria-label]="
+                                                'Reimprimir ticket de la venta ' +
+                                                getVentaReferencia(venta)
+                                            "
+                                            [disabled]="
+                                                disabled() ||
+                                                loading() ||
+                                                actionInProgress()
+                                            "
+                                            (click)="reprintTicket($event, venta)">
+                                        <mat-icon>
+                                            {{
+                                                operation()?.type === 'reprint' &&
+                                                operation()?.ventaId === venta.id
+                                                    ? 'hourglass_top'
+                                                    : 'print'
+                                            }}
+                                        </mat-icon>
+                                    </button>
+
+                                    <button mat-icon-button
+                                            type="button"
+                                            class="client-sales__email-button"
+                                            [matTooltip]="
+                                                emailConfigured()
+                                                    ? 'Enviar ticket por email'
+                                                    : 'SMTP no configurado'
+                                            "
+                                            [attr.aria-label]="
+                                                'Enviar por email el ticket de la venta ' +
+                                                getVentaReferencia(venta)
+                                            "
+                                            [disabled]="
+                                                disabled() ||
+                                                loading() ||
+                                                actionInProgress() ||
+                                                !emailConfigured()
+                                            "
+                                            (click)="openEmailForm($event, venta)">
+                                        <mat-icon>
+                                            {{
+                                                operation()?.type === 'email' &&
+                                                operation()?.ventaId === venta.id
+                                                    ? 'hourglass_top'
+                                                    : 'mail'
+                                            }}
+                                        </mat-icon>
+                                    </button>
+                                </td>
                             </tr>
                             }
                         </tbody>
@@ -141,7 +222,25 @@
 
             <aside class="client-sales__detail"
                    aria-label="Detalle de la venta">
-                @if (detalleLoading()) {
+                @if (emailVenta(); as ventaEmail) {
+                <div class="client-sales__email-panel">
+                    <div class="client-sales__email-context">
+                        Enviar ticket de la venta
+                        <strong>
+                            {{ getVentaReferencia(ventaEmail) }}
+                        </strong>
+                    </div>
+
+                    <otpv-historical-sale-email-form [saving]="
+                                                            operation()?.type === 'email' &&
+                                                            operation()?.ventaId === ventaEmail.id
+                                                        "
+                                                     [destinatarioInicial]="clienteEmail()"
+                                                     (sendEvent)="sendTicketEmail($event)"
+                                                     (cancelEvent)="cancelEmailForm()" />
+                </div>
+                }
+                @else if (detalleLoading()) {
                 <div class="client-sales__detail-state"
                      role="status">
                     <h3>

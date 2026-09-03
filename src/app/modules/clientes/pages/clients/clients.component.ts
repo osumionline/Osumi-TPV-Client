@@ -71,6 +71,11 @@ export default class ClientsComponent implements OnInit, OnDestroy {
 
     return appData?.nombre || appData?.nombreComercial || 'Osumi TPV';
   });
+  readonly emailConfigured: Signal<boolean> = computed((): boolean => {
+    const appData: AppData | null = this.appDataService.appData();
+
+    return appData !== null && appData.emailSmtp !== null;
+  });
 
   private readonly clientForm: Signal<ClientFormComponent | undefined> =
     viewChild<ClientFormComponent>(ClientFormComponent);

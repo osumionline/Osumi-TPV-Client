@@ -10,20 +10,32 @@ import {
   type Signal,
   type WritableSignal,
 } from '@angular/core';
-import { MatButton } from '@angular/material/button';
+import { MatButton, MatIconButton } from '@angular/material/button';
+import { MatIcon } from '@angular/material/icon';
+import { MatTooltip } from '@angular/material/tooltip';
 import type {
   VentaHistoricoDetalle,
   VentaHistoricoResumen,
   VentasHistoricoResultado,
 } from '@desktop-contracts/ventas/venta-historico.interface';
 import HistoricalSaleDetailComponent from '@modules/ventas/components/historical-sale-detail/historical-sale-detail.component';
+import HistoricalSaleEmailFormComponent from '@modules/ventas/components/historical-sale-email-form/historical-sale-email-form.component';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
+import VentaTicketDocumentService from '@services/venta-ticket-document.service';
+import VentaTicketEmailService from '@services/venta-ticket-email.service';
 import VentasHistoricoService from '@services/ventas-historico.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 interface ClientSalesPeriod {
   readonly desde: string;
   readonly hasta: string;
+}
+
+type ClientSaleOperationType = 'reprint' | 'email';
+
+interface ClientSaleOperation {
+  readonly type: ClientSaleOperationType;
+  readonly ventaId: number;
 }
 
 /**
@@ -36,13 +48,30 @@ interface ClientSalesPeriod {
   selector: 'otpv-client-sales',
   templateUrl: './client-sales.component.html',
   styleUrl: './client-sales.component.scss',
-  imports: [HistoricalSaleDetailComponent, CurrencyPipe, DatePipe, MatButton, CentsToEurosPipe],
+  imports: [
+    HistoricalSaleDetailComponent,
+    HistoricalSaleEmailFormComponent,
+    CurrencyPipe,
+    DatePipe,
+    MatButton,
+    MatIcon,
+    MatIconButton,
+    MatTooltip,
+    CentsToEurosPipe,
+  ],
 })
 export default class ClientSalesComponent implements OnInit {
   private readonly ventasHistoricoService: VentasHistoricoService = inject(VentasHistoricoService);
+  private readonly ventaTicketDocumentService: VentaTicketDocumentService = inject(
+    VentaTicketDocumentService,
+  );
+  private readonly ventaTicketEmailService: VentaTicketEmailService =
+    inject(VentaTicketEmailService);
 
   readonly clientePublicId: InputSignal<string> = input.required<string>();
   readonly disabled: InputSignal<boolean> = input<boolean>(false);
+  readonly clienteEmail: InputSignal<string> = input<string>('');
+  readonly emailConfigured: InputSignal<boolean> = input<boolean>(false);
 
   readonly desde: WritableSignal<string> = signal<string>('');
   readonly hasta: WritableSignal<string> = signal<string>('');
@@ -55,6 +84,14 @@ export default class ClientSalesComponent implements OnInit {
   readonly detalleError: WritableSignal<string | null> = signal<string | null>(null);
   readonly detalle: WritableSignal<VentaHistoricoDetalle | null> =
     signal<VentaHistoricoDetalle | null>(null);
+  readonly emailVenta: WritableSignal<VentaHistoricoResumen | null> =
+    signal<VentaHistoricoResumen | null>(null);
+  readonly operation: WritableSignal<ClientSaleOperation | null> =
+    signal<ClientSaleOperation | null>(null);
+  readonly actionError: WritableSignal<string | null> = signal<string | null>(null);
+  readonly actionInfo: WritableSignal<string | null> = signal<string | null>(null);
+
+  readonly actionInProgress: Signal<boolean> = computed((): boolean => this.operation() !== null);
 
   readonly ventas: Signal<readonly VentaHistoricoResumen[]> = computed(
     (): readonly VentaHistoricoResumen[] => this.resultado()?.ventas ?? [],
@@ -111,7 +148,7 @@ export default class ClientSalesComponent implements OnInit {
    * Consulta el periodo temporal mostrado en los filtros.
    */
   async search(): Promise<void> {
-    if (this.disabled() || this.loading() || !this.canSearch()) {
+    if (this.disabled() || this.loading() || this.actionInProgress() || !this.canSearch()) {
       return;
     }
 
@@ -140,9 +177,12 @@ export default class ClientSalesComponent implements OnInit {
    * Selecciona una venta y recupera su snapshot histórico completo.
    */
   selectVenta(idVenta: number): void {
-    if (this.disabled()) {
+    if (this.disabled() || this.actionInProgress()) {
       return;
     }
+
+    this.emailVenta.set(null);
+    this.clearActionFeedback();
 
     if (
       this.selectedVentaId() === idVenta &&
@@ -176,11 +216,116 @@ export default class ClientSalesComponent implements OnInit {
   retryDetalle(): void {
     const idVenta: number | null = this.selectedVentaId();
 
-    if (this.disabled() || idVenta === null) {
+    if (this.disabled() || this.actionInProgress() || idVenta === null) {
       return;
     }
 
     void this.loadDetalle(idVenta);
+  }
+
+  /**
+   * Reimprime el ticket de la fila pulsada.
+   *
+   * No utiliza la venta seleccionada en el panel de detalle.
+   */
+  async reprintTicket(event: MouseEvent, venta: VentaHistoricoResumen): Promise<void> {
+    event.stopPropagation();
+
+    if (this.disabled() || this.loading() || this.actionInProgress()) {
+      return;
+    }
+
+    const operation: ClientSaleOperation = {
+      type: 'reprint',
+      ventaId: venta.id,
+    };
+
+    this.emailVenta.set(null);
+    this.clearActionFeedback();
+    this.operation.set(operation);
+
+    try {
+      await this.ventaTicketDocumentService.reprint(venta.id);
+
+      this.actionInfo.set(
+        `El ticket de la venta ${this.getVentaReferencia(venta)} se ha enviado a impresión.`,
+      );
+    } catch (error: unknown) {
+      this.actionError.set(getErrorMessage(error, 'No se ha podido reimprimir el ticket.'));
+    } finally {
+      if (this.operation() === operation) {
+        this.operation.set(null);
+      }
+    }
+  }
+
+  /**
+   * Abre el formulario de email para la fila pulsada.
+   *
+   * La venta se conserva expresamente para que el envío no dependa
+   * de la selección existente en el panel de detalle.
+   */
+  openEmailForm(event: MouseEvent, venta: VentaHistoricoResumen): void {
+    event.stopPropagation();
+
+    if (this.disabled() || this.loading() || this.actionInProgress() || !this.emailConfigured()) {
+      return;
+    }
+
+    this.clearActionFeedback();
+    this.emailVenta.set(venta);
+  }
+
+  /**
+   * Cierra el formulario de email sin realizar el envío.
+   */
+  cancelEmailForm(): void {
+    if (this.actionInProgress()) {
+      return;
+    }
+
+    this.emailVenta.set(null);
+  }
+
+  /**
+   * Envía el ticket a la dirección indicada usando el id
+   * de la fila que abrió el formulario.
+   */
+  async sendTicketEmail(destinatario: string): Promise<void> {
+    const venta: VentaHistoricoResumen | null = this.emailVenta();
+
+    if (venta === null || this.disabled() || this.actionInProgress() || !this.emailConfigured()) {
+      return;
+    }
+
+    const normalizedRecipient: string = destinatario.trim();
+
+    if (normalizedRecipient.length === 0) {
+      return;
+    }
+
+    const operation: ClientSaleOperation = {
+      type: 'email',
+      ventaId: venta.id,
+    };
+
+    this.clearActionFeedback();
+    this.operation.set(operation);
+
+    try {
+      await this.ventaTicketEmailService.send(venta.id, normalizedRecipient);
+
+      this.emailVenta.set(null);
+      this.actionInfo.set(
+        `El ticket de la venta ${this.getVentaReferencia(venta)} se ha enviado correctamente a ${normalizedRecipient}.`,
+      );
+    } catch (error: unknown) {
+      this.actionError.set(getErrorMessage(error, 'No se ha podido enviar el ticket por email.'));
+    } finally {
+      if (this.operation() === operation) {
+        this.operation.set(null);
+      }
+    }
   }
 
   /**
@@ -191,6 +336,8 @@ export default class ClientSalesComponent implements OnInit {
     const requestId: number = ++this.loadRequestId;
 
     this.clearDetalleSelection();
+    this.emailVenta.set(null);
+    this.clearActionFeedback();
     this.loading.set(true);
     this.error.set(null);
     this.resultado.set(null);
@@ -271,6 +418,14 @@ export default class ClientSalesComponent implements OnInit {
     this.detalleLoading.set(false);
     this.detalleError.set(null);
     this.detalle.set(null);
+  }
+
+  /**
+   * Elimina los mensajes producidos por una acción documental anterior.
+   */
+  private clearActionFeedback(): void {
+    this.actionError.set(null);
+    this.actionInfo.set(null);
   }
 
   /**

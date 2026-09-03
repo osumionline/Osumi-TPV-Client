@@ -86,6 +86,8 @@
             @case ('sales') {
             @if (workspace.clientePublicId; as clientePublicId) {
             <otpv-client-sales [clientePublicId]="clientePublicId"
+                               [clienteEmail]="workspace.baseSnapshot.email"
+                               [emailConfigured]="emailConfigured()"
                                [disabled]="processing()" />
             }
             }
