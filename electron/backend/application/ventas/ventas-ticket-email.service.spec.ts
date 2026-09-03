@@ -73,7 +73,7 @@ describe('VentasTicketEmailService', (): void => {
       fromAddress: 'smtp@example.com',
       to: 'cliente@example.com',
 
-      subject: 'Mi comercio - Ticket A-456',
+      subject: 'Empresa fiscal - Ticket A-456',
 
       text: DEFAULT_TICKET_EMAIL_BODY_TEMPLATE,
     });

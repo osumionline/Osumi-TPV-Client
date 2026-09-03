@@ -99,7 +99,7 @@ export default class VentasTicketEmailService {
     const request: EmailSendRequest = {
       smtp,
 
-      fromName: this.resolveSenderName(appData),
+      fromName: nombreNegocio,
       fromAddress: smtp.user,
 
       to: destinatario,
@@ -234,22 +234,10 @@ export default class VentasTicketEmailService {
   }
 
   /**
-   * Obtiene el nombre visible utilizado por las plantillas.
+   * Obtiene el nombre del negocio utilizado tanto
+   * en las plantillas como en el remitente visible.
    */
   private resolveBusinessName(appData: AppData): string {
-    const commercialName: string = appData.nombreComercial.trim();
-
-    if (commercialName !== '') {
-      return commercialName;
-    }
-
-    return this.resolveSenderName(appData);
-  }
-
-  /**
-   * Obtiene el nombre fiscal utilizado como remitente visible.
-   */
-  private resolveSenderName(appData: AppData): string {
     const name: string = appData.nombre.trim();
 
     return name === '' ? 'Osumi TPV' : name;
