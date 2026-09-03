@@ -1,4 +1,5 @@
 import type ClientesService from '@backend/application/clientes/clientes.service';
+import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type { ClienteEstadisticasInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
@@ -28,6 +29,16 @@ export default function registerClientesIpc(
       assertTrustedSender(event, getMainWindow);
 
       return clientesService.create(command);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.clientesUpdate,
+
+    async (event, command: ActualizarClienteCommand): Promise<ClienteInterface> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return clientesService.update(command);
     },
   );
 
