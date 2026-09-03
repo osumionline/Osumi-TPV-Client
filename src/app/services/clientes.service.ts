@@ -253,6 +253,51 @@ export default class ClientesService {
   }
 
   /**
+   * Da de baja el cliente persistido de la ficha abierta y
+   * reconcilia el estado local después del COMMIT.
+   */
+  async darDeBaja(): Promise<void> {
+    const workspace: ClienteWorkspace | null = this.workspace();
+
+    if (workspace === null || workspace.clienteId === null || workspace.clientePublicId === null) {
+      throw new Error('Solo se puede dar de baja un cliente ya guardado.');
+    }
+
+    if (workspace.dirty) {
+      throw new Error('Guarda o cancela los cambios antes de dar de baja el cliente.');
+    }
+
+    const publicId: string = workspace.clientePublicId;
+
+    await window.osumiDesktop.clientes.deactivate(publicId);
+
+    /*
+     * Una lectura global iniciada antes de la baja podría terminar
+     * después y volver a introducir el cliente en la colección.
+     */
+    if (this.pendingRequest !== null) {
+      try {
+        await this.pendingRequest;
+      } catch {
+        /*
+         * La baja ya está confirmada. El fallo de una lectura
+         * anterior no debe convertir el COMMIT en un error.
+         */
+      }
+    }
+
+    await this.invalidateEstadisticas(publicId);
+
+    this.clientesSignal.update((clientes: readonly Cliente[]): readonly Cliente[] =>
+      clientes.filter((cliente: Cliente): boolean => cliente.publicId !== publicId),
+    );
+
+    if (this.workspace()?.clientePublicId === publicId) {
+      this.workspaceSignal.set(null);
+    }
+  }
+
+  /**
    * Devuelve el estado reactivo cacheado de las estadísticas
    * de un cliente.
    */

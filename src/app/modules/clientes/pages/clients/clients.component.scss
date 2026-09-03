@@ -97,6 +97,11 @@
         flex: 1;
     }
 
+    .clients__deactivate-button {
+        --mdc-filled-button-container-color: var(--color-red);
+        --mdc-filled-button-label-text-color: var(--color-white);
+    }
+
     .clients__dirty-status {
         color: var(--color-dark-green);
         font-size: 13px;

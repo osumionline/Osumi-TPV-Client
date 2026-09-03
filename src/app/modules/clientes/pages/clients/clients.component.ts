@@ -50,6 +50,10 @@ export default class ClientsComponent implements OnInit, OnDestroy {
 
   readonly searchOpen: WritableSignal<boolean> = signal<boolean>(false);
   readonly saving: WritableSignal<boolean> = signal<boolean>(false);
+  readonly deactivating: WritableSignal<boolean> = signal<boolean>(false);
+  readonly processing: Signal<boolean> = computed(
+    (): boolean => this.saving() || this.deactivating(),
+  );
   readonly saveSuccessful: WritableSignal<boolean> = signal<boolean>(false);
   readonly focusNameRequest: WritableSignal<number> = signal<number>(0);
   readonly clientFormSection: Signal<'data' | 'billing'> = computed((): 'data' | 'billing' =>
@@ -84,7 +88,7 @@ export default class ClientsComponent implements OnInit, OnDestroy {
    * Muestra el buscador de clientes cargados en memoria.
    */
   openSearch(): void {
-    if (this.saving()) {
+    if (this.processing()) {
       return;
     }
 
@@ -102,7 +106,7 @@ export default class ClientsComponent implements OnInit, OnDestroy {
    * Cambia el apartado activo de la ficha abierta.
    */
   selectSection(section: ClienteWorkspaceSection): void {
-    if (this.saving()) {
+    if (this.processing()) {
       return;
     }
 
@@ -113,7 +117,7 @@ export default class ClientsComponent implements OnInit, OnDestroy {
    * Incorpora al workspace los cambios realizados en el formulario.
    */
   updateDraft(model: ClienteFormModel): void {
-    if (this.saving()) {
+    if (this.processing()) {
       return;
     }
 
@@ -127,7 +131,7 @@ export default class ClientsComponent implements OnInit, OnDestroy {
   async saveCliente(): Promise<void> {
     const workspace: ClienteWorkspace | null = this.clientesService.workspace();
 
-    if (this.saving() || workspace === null || !workspace.dirty) {
+    if (this.processing() || workspace === null || !workspace.dirty) {
       return;
     }
 
@@ -169,7 +173,7 @@ export default class ClientsComponent implements OnInit, OnDestroy {
   cancelClienteChanges(): void {
     const workspace: ClienteWorkspace | null = this.clientesService.workspace();
 
-    if (this.saving() || workspace === null || !workspace.dirty) {
+    if (this.processing() || workspace === null || !workspace.dirty) {
       return;
     }
 
@@ -192,7 +196,7 @@ export default class ClientsComponent implements OnInit, OnDestroy {
    * pendientes de la ficha actualmente activa.
    */
   selectCliente(cliente: Cliente): void {
-    if (this.saving()) {
+    if (this.processing()) {
       return;
     }
     const workspace: ClienteWorkspace | null = this.clientesService.workspace();
@@ -229,7 +233,7 @@ export default class ClientsComponent implements OnInit, OnDestroy {
    * Abre una nueva ficha vacía.
    */
   newCliente(): void {
-    if (this.saving()) {
+    if (this.processing()) {
       return;
     }
 
@@ -260,7 +264,7 @@ export default class ClientsComponent implements OnInit, OnDestroy {
    * cuando contiene cambios pendientes.
    */
   closeCliente(): void {
-    if (this.saving()) {
+    if (this.processing()) {
       return;
     }
 
@@ -290,6 +294,51 @@ export default class ClientsComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Solicita confirmación antes de dar de baja
+   * un cliente persistido y sin cambios pendientes.
+   */
+  deactivateCliente(): void {
+    if (this.processing()) {
+      return;
+    }
+
+    const workspace: ClienteWorkspace | null = this.clientesService.workspace();
+
+    if (workspace === null || workspace.clienteId === null || workspace.clientePublicId === null) {
+      return;
+    }
+
+    if (workspace.dirty) {
+      this.dialog
+        .alert({
+          title: 'Atención',
+          content: 'Guarda o cancela los cambios antes de dar de baja el cliente.',
+        })
+        .subscribe();
+
+      return;
+    }
+
+    const publicId: string = workspace.clientePublicId;
+
+    this.dialog
+      .confirm({
+        title: 'Confirmar baja',
+        content:
+          `¿Estás seguro de querer dar de baja a "${workspace.draft.nombreApellidos}"? ` +
+          'El cliente dejará de estar disponible en el TPV, ' +
+          'pero sus ventas, facturas y demás información histórica se conservarán.',
+      })
+      .subscribe((result: boolean): void => {
+        if (!result) {
+          return;
+        }
+
+        void this.confirmDeactivateCliente(publicId);
+      });
+  }
+
+  /**
    * Muestra temporalmente la confirmación de guardado.
    */
   private showSaveFeedback(): void {
@@ -312,6 +361,34 @@ export default class ClientsComponent implements OnInit, OnDestroy {
     }
 
     this.saveSuccessful.set(false);
+  }
+
+  /**
+   * Ejecuta la baja confirmada y conserva la ficha activa
+   * cuando backend rechaza la operación.
+   */
+  private async confirmDeactivateCliente(publicId: string): Promise<void> {
+    const workspace: ClienteWorkspace | null = this.clientesService.workspace();
+
+    if (this.processing() || workspace?.clientePublicId !== publicId) {
+      return;
+    }
+
+    this.clearSaveFeedback();
+    this.deactivating.set(true);
+
+    try {
+      await this.clientesService.darDeBaja();
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido dar de baja el cliente.'),
+        })
+        .subscribe();
+    } finally {
+      this.deactivating.set(false);
+    }
   }
 
   /**

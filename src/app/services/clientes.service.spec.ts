@@ -16,6 +16,8 @@ describe('ClientesService', (): void => {
   let updatedCliente: ClienteInterface;
   let receivedCreateCommand: CrearClienteCommand | null;
   let receivedUpdateCommand: ActualizarClienteCommand | null;
+  let receivedDeactivatePublicId: string | null;
+  let deactivateError: Error | null;
 
   beforeEach((): void => {
     originalDesktopDescriptor = Object.getOwnPropertyDescriptor(window, 'osumiDesktop');
@@ -24,6 +26,8 @@ describe('ClientesService', (): void => {
     updatedCliente = createClienteInterface(7, 'cliente-7', 'Ada Lovelace');
     receivedCreateCommand = null;
     receivedUpdateCommand = null;
+    receivedDeactivatePublicId = null;
+    deactivateError = null;
 
     Object.defineProperty(window, 'osumiDesktop', {
       configurable: true,
@@ -38,6 +42,11 @@ describe('ClientesService', (): void => {
             receivedUpdateCommand = command;
 
             return Promise.resolve(updatedCliente);
+          },
+          deactivate: (publicId: string): Promise<void> => {
+            receivedDeactivatePublicId = publicId;
+
+            return deactivateError === null ? Promise.resolve() : Promise.reject(deactivateError);
           },
           getEstadisticas: (): Promise<ClienteEstadisticasInterface> => {
             requestCount++;
@@ -335,6 +344,88 @@ describe('ClientesService', (): void => {
     expect(service.clientes()).toHaveLength(1);
     expect(service.findByPublicId('cliente-7')).toBe(cliente);
     expect(service.findByPublicId('cliente-7')?.nombreApellidos).toBe('Ada Byron');
+  });
+
+  it('da de baja un cliente y lo retira de todo el estado activo', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    const cliente: Cliente = await service.create(
+      createClienteCommand({
+        ...createClienteFormInitialValue(),
+        nombreApellidos: 'Ada Lovelace',
+      }),
+    );
+
+    service.abrirFicha(cliente);
+    await service.loadEstadisticas('cliente-7');
+
+    await service.darDeBaja();
+
+    expect(receivedDeactivatePublicId).toBe('cliente-7');
+    expect(service.findByPublicId('cliente-7')).toBeNull();
+    expect(service.getEstadisticasState('cliente-7').data).toBeNull();
+    expect(service.workspace()).toBeNull();
+  });
+
+  it('conserva la ficha, la colección y la caché cuando la baja falla', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    const cliente: Cliente = await service.create(
+      createClienteCommand({
+        ...createClienteFormInitialValue(),
+        nombreApellidos: 'Ada Lovelace',
+      }),
+    );
+
+    service.abrirFicha(cliente);
+    await service.loadEstadisticas('cliente-7');
+
+    deactivateError = new Error(
+      'No se puede dar de baja el cliente porque tiene facturas en borrador.',
+    );
+
+    await expect(service.darDeBaja()).rejects.toThrow(
+      'No se puede dar de baja el cliente porque tiene facturas en borrador.',
+    );
+
+    expect(receivedDeactivatePublicId).toBe('cliente-7');
+    expect(service.findByPublicId('cliente-7')).toBe(cliente);
+    expect(service.getEstadisticasState('cliente-7').data).not.toBeNull();
+    expect(service.workspace()?.clientePublicId).toBe('cliente-7');
+  });
+
+  it('rechaza la baja de un cliente todavía no guardado', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+
+    service.crearBorrador();
+
+    await expect(service.darDeBaja()).rejects.toThrow(
+      'Solo se puede dar de baja un cliente ya guardado.',
+    );
+
+    expect(receivedDeactivatePublicId).toBeNull();
+  });
+
+  it('rechaza la baja de un cliente con cambios sin guardar', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    const cliente: Cliente = await service.create(
+      createClienteCommand({
+        ...createClienteFormInitialValue(),
+        nombreApellidos: 'Ada Lovelace',
+      }),
+    );
+    const workspace: ClienteWorkspace = service.abrirFicha(cliente);
+
+    service.actualizarDraft({
+      ...workspace.draft,
+      nombreApellidos: 'Ada Byron',
+    });
+
+    await expect(service.darDeBaja()).rejects.toThrow(
+      'Guarda o cancela los cambios antes de dar de baja el cliente.',
+    );
+
+    expect(receivedDeactivatePublicId).toBeNull();
+    expect(service.findByPublicId('cliente-7')).toBe(cliente);
+    expect(service.workspace()?.dirty).toBe(true);
   });
 });
 

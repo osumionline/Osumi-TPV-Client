@@ -21,7 +21,7 @@
                         type="button"
                         matTooltip="Cerrar ficha"
                         aria-label="Cerrar ficha de cliente"
-                        [disabled]="saving()"
+                        [disabled]="processing()"
                         (click)="closeCliente()">
                     <mat-icon>
                         close
@@ -33,7 +33,7 @@
                         type="button"
                         matTooltip="Buscar cliente"
                         aria-label="Buscar cliente"
-                        [disabled]="saving()"
+                        [disabled]="processing()"
                         (click)="openSearch()">
                     <mat-icon>
                         search
@@ -44,7 +44,7 @@
                         type="button"
                         matTooltip="Nuevo cliente"
                         aria-label="Crear un cliente nuevo"
-                        [disabled]="saving()"
+                        [disabled]="processing()"
                         (click)="newCliente()">
                     <mat-icon>
                         person_add
@@ -67,7 +67,7 @@
                 <otpv-client-form [section]="clientFormSection()"
                                   [initialValue]="workspace.draft"
                                   [focusNameRequest]="focusNameRequest()"
-                                  [saving]="saving()"
+                                  [saving]="processing()"
                                   [showActions]="false"
                                   (modelChangeEvent)="updateDraft($event)" />
             </div>
@@ -105,6 +105,16 @@
             }
         </div>
         <footer class="clients__actions">
+            @if (workspace.clienteId !== null && workspace.clientePublicId !== null) {
+            <button mat-flat-button
+                    type="button"
+                    class="clients__deactivate-button"
+                    [disabled]="workspace.dirty || processing()"
+                    (click)="deactivateCliente()">
+                {{ deactivating() ? 'Dando de baja…' : 'Dar de baja' }}
+            </button>
+            }
+
             @if (workspace.dirty) {
             <span class="clients__dirty-status">
                 Cambios sin guardar
@@ -123,14 +133,14 @@
 
             <button mat-stroked-button
                     type="button"
-                    [disabled]="saving() || !workspace.dirty"
+                    [disabled]="processing() || !workspace.dirty"
                     (click)="cancelClienteChanges()">
                 Cancelar
             </button>
 
             <button mat-flat-button
                     type="button"
-                    [disabled]="saving() || !workspace.dirty"
+                    [disabled]="processing() || !workspace.dirty"
                     (click)="saveCliente()">
                 {{ saving() ? 'Guardando...' : 'Guardar' }}
             </button>
