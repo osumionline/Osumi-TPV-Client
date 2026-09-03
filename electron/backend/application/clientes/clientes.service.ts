@@ -124,32 +124,26 @@ export default class ClientesService {
       provincia,
 
       factIgual,
-      factNombreApellidos: factIgual
-        ? null
-        : this.normalizeOptionalText(
-            command.factNombreApellidos,
-            'nombre de facturación',
-            CLIENT_NAME_MAX_LENGTH,
-          ),
-      factDniCif: factIgual
-        ? null
-        : this.normalizeOptionalText(
-            command.factDniCif,
-            'DNI/CIF de facturación',
-            CLIENT_DNI_CIF_MAX_LENGTH,
-          ),
-      factTelefono: factIgual
-        ? null
-        : this.normalizeOptionalText(
-            command.factTelefono,
-            'teléfono de facturación',
-            CLIENT_PHONE_MAX_LENGTH,
-          ),
-      factEmail: factIgual ? null : this.normalizeOptionalEmail(command.factEmail),
-      factDireccion: factIgual ? null : this.normalizeOptionalText(command.factDireccion),
-      factCodigoPostal: factIgual ? null : this.normalizeOptionalText(command.factCodigoPostal),
-      factPoblacion: factIgual ? null : this.normalizeOptionalText(command.factPoblacion),
-      factProvincia: factIgual ? null : this.normalizeOptionalProvince(command.factProvincia),
+      factNombreApellidos: this.normalizeOptionalText(
+        command.factNombreApellidos,
+        'nombre de facturación',
+        CLIENT_NAME_MAX_LENGTH,
+      ),
+      factDniCif: this.normalizeOptionalText(
+        command.factDniCif,
+        'DNI/CIF de facturación',
+        CLIENT_DNI_CIF_MAX_LENGTH,
+      ),
+      factTelefono: this.normalizeOptionalText(
+        command.factTelefono,
+        'teléfono de facturación',
+        CLIENT_PHONE_MAX_LENGTH,
+      ),
+      factEmail: this.normalizeOptionalEmail(command.factEmail),
+      factDireccion: this.normalizeOptionalText(command.factDireccion),
+      factCodigoPostal: this.normalizeOptionalText(command.factCodigoPostal),
+      factPoblacion: this.normalizeOptionalText(command.factPoblacion),
+      factProvincia: this.normalizeOptionalProvince(command.factProvincia),
 
       observaciones: this.normalizeOptionalText(command.observaciones),
       descuentoBps,
