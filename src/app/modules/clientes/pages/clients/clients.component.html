@@ -21,6 +21,7 @@
                         type="button"
                         matTooltip="Cerrar ficha"
                         aria-label="Cerrar ficha de cliente"
+                        [disabled]="saving()"
                         (click)="closeCliente()">
                     <mat-icon>
                         close
@@ -32,6 +33,7 @@
                         type="button"
                         matTooltip="Buscar cliente"
                         aria-label="Buscar cliente"
+                        [disabled]="saving()"
                         (click)="openSearch()">
                     <mat-icon>
                         search
@@ -42,6 +44,7 @@
                         type="button"
                         matTooltip="Nuevo cliente"
                         aria-label="Crear un cliente nuevo"
+                        [disabled]="saving()"
                         (click)="newCliente()">
                     <mat-icon>
                         person_add
@@ -52,28 +55,23 @@
 
         @if (clientesService.workspace(); as workspace) {
         <otpv-client-section-tabs [workspace]="workspace"
+                                  [disabled]="saving()"
                                   (selectSectionEvent)="selectSection($event)" />
 
         <div class="clients__workspace">
+            <div class="clients__form"
+                 [hidden]="
+                                    workspace.activeSection !== 'data' &&
+                                    workspace.activeSection !== 'billing'
+                                 ">
+                <otpv-client-form [section]="clientFormSection()"
+                                  [initialValue]="workspace.draft"
+                                  [saving]="saving()"
+                                  [showActions]="false"
+                                  (modelChangeEvent)="updateDraft($event)" />
+            </div>
+
             @switch (workspace.activeSection) {
-            @case ('data') {
-            <div class="clients__form">
-                <otpv-client-form section="data"
-                                  [initialValue]="workspace.draft"
-                                  [showActions]="false"
-                                  (modelChangeEvent)="updateDraft($event)" />
-            </div>
-            }
-
-            @case ('billing') {
-            <div class="clients__form">
-                <otpv-client-form section="billing"
-                                  [initialValue]="workspace.draft"
-                                  [showActions]="false"
-                                  (modelChangeEvent)="updateDraft($event)" />
-            </div>
-            }
-
             @case ('invoices') {
             <div class="clients__section-state">
                 <h2>Facturas</h2>
@@ -114,17 +112,30 @@
 
             <span class="clients__actions-spacer"></span>
 
+            @if (saveSuccessful()) {
+            <span class="clients__save-feedback"
+                  role="status"
+                  aria-live="polite">
+                Cliente guardado correctamente
+            </span>
+            }
+
             <button mat-stroked-button
                     type="button"
-                    [disabled]="!workspace.dirty"
+                    [disabled]="saving() || !workspace.dirty"
                     (click)="cancelClienteChanges()">
                 Cancelar
             </button>
 
             <button mat-flat-button
                     type="button"
-                    disabled>
-                Guardar
+                    [disabled]="
+                                    saving() ||
+                                    !workspace.dirty ||
+                                    workspace.clienteId !== null
+                                "
+                    (click)="saveCliente()">
+                {{ saving() ? 'Guardando...' : 'Guardar' }}
             </button>
         </footer>
         }

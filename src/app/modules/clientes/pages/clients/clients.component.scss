@@ -103,6 +103,16 @@
         font-weight: 600;
     }
 
+    .clients__save-feedback {
+        margin-right: 4px;
+        padding-right: 16px;
+        border-right: 1px solid var(--separator-color);
+        color: var(--color-dark-green);
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
     .clients__section-state {
         display: flex;
         height: 100%;

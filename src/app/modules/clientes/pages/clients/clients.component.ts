@@ -3,6 +3,7 @@ import {
   computed,
   inject,
   signal,
+  viewChild,
   type OnInit,
   type Signal,
   type WritableSignal,
@@ -47,11 +48,21 @@ export default class ClientsComponent implements OnInit {
   readonly clientesService: ClientesService = inject(ClientesService);
 
   readonly searchOpen: WritableSignal<boolean> = signal<boolean>(false);
+  readonly saving: WritableSignal<boolean> = signal<boolean>(false);
+  readonly saveSuccessful: WritableSignal<boolean> = signal<boolean>(false);
+  readonly clientFormSection: Signal<'data' | 'billing'> = computed((): 'data' | 'billing' =>
+    this.clientesService.workspace()?.activeSection === 'billing' ? 'billing' : 'data',
+  );
   readonly appName: Signal<string> = computed((): string => {
     const appData = this.appDataService.appData();
 
     return appData?.nombre || appData?.nombreComercial || 'Osumi TPV';
   });
+
+  private readonly clientForm: Signal<ClientFormComponent | undefined> =
+    viewChild<ClientFormComponent>(ClientFormComponent);
+
+  private saveFeedbackTimeoutId: number | null = null;
 
   /**
    * Precarga la configuración general utilizada por el módulo.
@@ -85,7 +96,54 @@ export default class ClientsComponent implements OnInit {
    * Incorpora al workspace los cambios realizados en el formulario.
    */
   updateDraft(model: ClienteFormModel): void {
+    if (this.saving()) {
+      return;
+    }
+
+    this.clearSaveFeedback();
     this.clientesService.actualizarDraft(model);
+  }
+
+  /**
+   * Valida globalmente la ficha y persiste un cliente nuevo.
+   */
+  async saveCliente(): Promise<void> {
+    const workspace: ClienteWorkspace | null = this.clientesService.workspace();
+
+    if (this.saving() || workspace === null || workspace.clienteId !== null || !workspace.dirty) {
+      return;
+    }
+
+    const clientForm: ClientFormComponent | undefined = this.clientForm();
+
+    if (clientForm === undefined) {
+      return;
+    }
+
+    const invalidSection: ClienteWorkspaceSection | null = clientForm.validate();
+
+    if (invalidSection !== null) {
+      this.clientesService.seleccionarSeccion(invalidSection);
+
+      return;
+    }
+
+    this.clearSaveFeedback();
+    this.saving.set(true);
+
+    try {
+      await this.clientesService.guardar();
+      this.showSaveFeedback();
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido guardar el cliente.'),
+        })
+        .subscribe();
+    } finally {
+      this.saving.set(false);
+    }
   }
 
   /**
@@ -155,9 +213,9 @@ export default class ClientsComponent implements OnInit {
 
     if (workspace === null || !workspace.dirty) {
       this.clientesService.crearBorrador();
-
       return;
     }
+    this.clearSaveFeedback();
 
     this.dialog
       .confirm({
@@ -186,9 +244,9 @@ export default class ClientsComponent implements OnInit {
 
     if (!workspace.dirty) {
       this.clientesService.cerrarFicha();
-
       return;
     }
+    this.clearSaveFeedback();
 
     this.dialog
       .confirm({
@@ -204,10 +262,36 @@ export default class ClientsComponent implements OnInit {
   }
 
   /**
+   * Muestra temporalmente la confirmación de guardado.
+   */
+  private showSaveFeedback(): void {
+    this.clearSaveFeedback();
+    this.saveSuccessful.set(true);
+
+    this.saveFeedbackTimeoutId = window.setTimeout((): void => {
+      this.saveSuccessful.set(false);
+      this.saveFeedbackTimeoutId = null;
+    }, 4_000);
+  }
+
+  /**
+   * Oculta la confirmación de guardado activa.
+   */
+  private clearSaveFeedback(): void {
+    if (this.saveFeedbackTimeoutId !== null) {
+      window.clearTimeout(this.saveFeedbackTimeoutId);
+      this.saveFeedbackTimeoutId = null;
+    }
+
+    this.saveSuccessful.set(false);
+  }
+
+  /**
    * Sustituye el workspace actual por la ficha del cliente indicado
    * y cierra el buscador.
    */
   private openCliente(cliente: Cliente): void {
+    this.clearSaveFeedback();
     this.clientesService.abrirFicha(cliente);
     this.searchOpen.set(false);
   }

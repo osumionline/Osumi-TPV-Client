@@ -43,6 +43,7 @@ const NEW_CLIENT_HIDDEN_SECTIONS: ReadonlySet<ClienteWorkspaceSection> =
 })
 export default class ClientSectionTabsComponent {
   readonly workspace: InputSignal<ClienteWorkspace> = input.required<ClienteWorkspace>();
+  readonly disabled: InputSignal<boolean> = input<boolean>(false);
   readonly selectSectionEvent: OutputEmitterRef<ClienteWorkspaceSection> =
     output<ClienteWorkspaceSection>();
 
@@ -63,6 +64,10 @@ export default class ClientSectionTabsComponent {
    * Solicita cambiar la sección activa.
    */
   selectSection(section: ClienteWorkspaceSection): void {
+    if (this.disabled()) {
+      return;
+    }
+
     this.selectSectionEvent.emit(section);
   }
 }

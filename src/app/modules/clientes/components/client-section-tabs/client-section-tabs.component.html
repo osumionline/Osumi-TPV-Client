@@ -3,6 +3,7 @@
     @for (section of getSections(); track section.id) {
     <button type="button"
             class="sections__item"
+            [disabled]="disabled()"
             [class.sections__item--active]="workspace().activeSection === section.id"
             (click)="selectSection(section.id)">
         {{ section.label }}

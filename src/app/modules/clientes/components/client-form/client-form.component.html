@@ -1,5 +1,7 @@
 <form class="client-form"
       novalidate
+      [attr.aria-busy]="saving()"
+      [attr.inert]="saving() ? '' : null"
       (input)="modelChanged()"
       (submit)="save($event)">
     @if (section() !== 'billing') {

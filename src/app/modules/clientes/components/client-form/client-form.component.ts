@@ -29,6 +29,7 @@ import {
 import ProvinciasService from '@services/provincias.service';
 
 type ClientFormSection = 'all' | 'data' | 'billing';
+type ClientFormInvalidSection = 'data' | 'billing';
 
 @Component({
   selector: 'otpv-client-form',
@@ -81,7 +82,33 @@ export default class ClientFormComponent {
    * Comunica una modificación realizada por el usuario.
    */
   modelChanged(): void {
+    if (this.saving()) {
+      return;
+    }
+
     this.modelChangeEvent.emit(cloneClienteFormModel(this.clienteModel()));
+  }
+
+  /**
+   * Marca la ficha completa como tocada y devuelve la sección
+   * que contiene el primer bloque de errores.
+   */
+  validate(): ClientFormInvalidSection | null {
+    this.clienteForm().markAsTouched();
+
+    if (!this.clienteForm().invalid()) {
+      return null;
+    }
+
+    if (this.hasDataErrors()) {
+      if (this.section() !== 'billing' && this.clienteForm.nombreApellidos().invalid()) {
+        this.nameInput()?.nativeElement.focus();
+      }
+
+      return 'data';
+    }
+
+    return 'billing';
   }
 
   /**
@@ -94,13 +121,7 @@ export default class ClientFormComponent {
       return;
     }
 
-    this.clienteForm().markAsTouched();
-
-    if (this.clienteForm().invalid()) {
-      if (this.clienteForm.nombreApellidos().invalid()) {
-        this.nameInput()?.nativeElement.focus();
-      }
-
+    if (this.validate() !== null) {
       return;
     }
 
@@ -118,5 +139,23 @@ export default class ClientFormComponent {
     }
 
     this.cancelEvent.emit();
+  }
+
+  /**
+   * Indica si alguno de los campos de Datos contiene errores.
+   */
+  private hasDataErrors(): boolean {
+    return (
+      this.clienteForm.nombreApellidos().invalid() ||
+      this.clienteForm.dniCif().invalid() ||
+      this.clienteForm.telefono().invalid() ||
+      this.clienteForm.email().invalid() ||
+      this.clienteForm.direccion().invalid() ||
+      this.clienteForm.codigoPostal().invalid() ||
+      this.clienteForm.poblacion().invalid() ||
+      this.clienteForm.provincia().invalid() ||
+      this.clienteForm.descuento().invalid() ||
+      this.clienteForm.observaciones().invalid()
+    );
   }
 }
