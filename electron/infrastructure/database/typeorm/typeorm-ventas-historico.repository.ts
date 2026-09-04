@@ -184,7 +184,9 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
             WHEN EXISTS (
               SELECT 1
               FROM factura_venta fv
-              WHERE fv.id_venta = v.id
+              WHERE
+                fv.id_venta = v.id
+                AND fv.activa = 1
             ) THEN 1
             ELSE 0
           END AS facturada,

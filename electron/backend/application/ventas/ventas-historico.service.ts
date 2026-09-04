@@ -190,7 +190,7 @@ export default class VentasHistoricoService {
       ticketBaiEstado: record.ticketBaiEstado,
       ticketBaiUltimoError: record.ticketBaiUltimoError,
       capacidades: {
-        puedeCambiarCliente: !record.facturada,
+        puedeCambiarCliente: true,
         puedeCambiarTipoPago:
           record.totalCents !== 0 && record.numeroPagos === 1 && record.cajaAbierta,
         puedeImprimirTicketRegalo: record.tieneLineasPositivas,

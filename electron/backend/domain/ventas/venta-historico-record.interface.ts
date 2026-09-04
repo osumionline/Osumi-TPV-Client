@@ -83,7 +83,13 @@ export interface VentaHistoricoDetalleRecord {
    */
   readonly numeroPagos: number;
   readonly cajaAbierta: boolean;
+
+  /**
+   * Indica si la venta conserva una relación activa
+   * con un borrador o una factura emitida.
+   */
   readonly facturada: boolean;
+
   readonly tieneLineasPositivas: boolean;
   readonly ticketBaiEstado: VentaHistoricoTicketBaiEstadoRecord;
   readonly ticketBaiUltimoError: string | null;

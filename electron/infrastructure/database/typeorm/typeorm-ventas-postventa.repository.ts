@@ -9,7 +9,6 @@ const MICROS_PER_CENT: number = 10_000;
 interface VentaClienteDatabaseRow {
   readonly id: number;
   readonly id_cliente: number | null;
-  readonly facturada: number;
 }
 
 interface VentaPagoContextDatabaseRow {
@@ -59,18 +58,14 @@ export default class TypeOrmVentasPostventaRepository implements VentasPostventa
   constructor(private readonly applicationDatabase: TypeOrmApplicationDatabase) {}
 
   /**
-   * Cambia el cliente de una venta siempre que todavía
-   * no forme parte de una factura.
+   * Cambia el cliente de una venta sin modificar sus
+   * relaciones ni los documentos ya emitidos.
    */
   async cambiarCliente(idVenta: number, clientePublicId: string | null): Promise<void> {
     const dataSource: DataSource = await this.applicationDatabase.connect();
 
     await runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
       const venta: VentaClienteDatabaseRow = await this.requireVentaCliente(queryRunner, idVenta);
-
-      if (venta.facturada === 1) {
-        throw new Error('No se puede cambiar el cliente de una venta incluida en una factura.');
-      }
 
       const idCliente: number | null = await this.resolveClienteId(queryRunner, clientePublicId);
 
@@ -210,23 +205,15 @@ export default class TypeOrmVentasPostventaRepository implements VentasPostventa
   ): Promise<VentaClienteDatabaseRow> {
     const rows: readonly VentaClienteDatabaseRow[] = (await queryRunner.query(
       `
-          SELECT
-            v.id,
-            v.id_cliente,
-            CASE
-              WHEN EXISTS (
-                SELECT 1
-                FROM factura_venta fv
-                WHERE fv.id_venta = v.id
-              ) THEN 1
-              ELSE 0
-            END AS facturada
-          FROM venta v
-          WHERE
-            v.id = ?
-            AND v.deleted_at IS NULL
-          LIMIT 1
-        `,
+        SELECT
+          v.id,
+          v.id_cliente
+        FROM venta v
+        WHERE
+          v.id = ?
+          AND v.deleted_at IS NULL
+        LIMIT 1
+      `,
       [idVenta],
     )) as readonly VentaClienteDatabaseRow[];
 

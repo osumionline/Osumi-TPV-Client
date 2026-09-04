@@ -280,7 +280,7 @@ describe('VentasHistoricoService', (): void => {
     });
   });
 
-  it('bloquea las capacidades cuando los hechos persistidos no las permiten', async (): Promise<void> => {
+  it('mantiene el cambio de cliente y bloquea las demás capacidades no permitidas', async (): Promise<void> => {
     repository.detalleResult = {
       id: 20,
       publicId: 'venta-historico-20',
@@ -336,7 +336,7 @@ describe('VentasHistoricoService', (): void => {
 
     expect(detalle?.ticketBaiEstado).toBe('no_aplica');
     expect(detalle?.capacidades).toEqual({
-      puedeCambiarCliente: false,
+      puedeCambiarCliente: true,
       puedeCambiarTipoPago: false,
       puedeImprimirTicketRegalo: false,
       puedeProcesarTicketBai: false,

@@ -133,7 +133,7 @@ describe('TypeOrmVentasPostventaRepository', (): void => {
     expect(ventaSinCliente.cliente_public_id).toBeNull();
   });
 
-  it('rechaza cambiar el cliente de una venta facturada', async (): Promise<void> => {
+  it('cambia el cliente de una venta facturada conservando su relación', async (): Promise<void> => {
     const dataSource: DataSource = await requireDatabase().connect();
 
     const idVenta: number = await seedVenta(dataSource, {
@@ -147,24 +147,170 @@ describe('TypeOrmVentasPostventaRepository', (): void => {
 
     await seedFactura(dataSource, idVenta);
 
-    await expect(requireRepository().cambiarCliente(idVenta, 'cliente-2')).rejects.toThrow(
-      'No se puede cambiar el cliente de una venta incluida en una factura.',
-    );
+    await requireRepository().cambiarCliente(idVenta, 'cliente-2');
 
-    const venta: VentaClienteRow = await queryOne<VentaClienteRow>(
+    expect(await getTicketRevision(dataSource, idVenta)).toEqual({
+      ticket_revision: 2,
+      ticket_pdf_revision: 0,
+    });
+
+    const venta: VentaClienteRow & {
+      readonly relaciones_activas: number;
+    } = await queryOne<
+      VentaClienteRow & {
+        readonly relaciones_activas: number;
+      }
+    >(
       dataSource,
       `
         SELECT
-          c.public_id AS cliente_public_id
+          c.public_id AS cliente_public_id,
+          (
+            SELECT COUNT(*)
+            FROM factura_venta fv
+            WHERE
+              fv.id_venta = v.id
+              AND fv.activa = 1
+          ) AS relaciones_activas
         FROM venta v
+
         LEFT JOIN cliente c
           ON c.id = v.id_cliente
+
         WHERE v.id = ?
       `,
       [idVenta],
     );
 
-    expect(venta.cliente_public_id).toBe('cliente-1');
+    expect(venta).toEqual({
+      cliente_public_id: 'cliente-2',
+      relaciones_activas: 1,
+    });
+  });
+
+  it('conserva relaciones históricas y permite como máximo una activa por venta', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const idVenta: number = await seedVenta(dataSource, {
+      publicId: 'venta-relaciones-factura-1',
+      clientePublicId: 'cliente-1',
+      totalCents: 1_800,
+      tipoPagoPublicId: 'tipo-pago-tarjeta',
+      entregadoCents: null,
+      cierreTeoricoCents: 0,
+    });
+
+    await seedFactura(dataSource, idVenta);
+
+    const timestamp: string = '2026-09-04T12:00:00.000Z';
+
+    await dataSource.query(
+      `
+        UPDATE factura
+        SET
+          estado = 'anulada',
+          fecha_anulacion = ?,
+          updated_at = ?
+        WHERE public_id = 'factura-1'
+      `,
+      [timestamp, timestamp],
+    );
+
+    await dataSource.query(
+      `
+        UPDATE factura_venta
+        SET
+          activa = 0,
+          updated_at = ?
+        WHERE id_venta = ?
+      `,
+      [timestamp, idVenta],
+    );
+
+    await dataSource.query(`
+      INSERT INTO factura (
+        public_id,
+        id_cliente,
+        nombre_apellidos
+      )
+      VALUES
+        (
+          'factura-2',
+          (
+            SELECT id
+            FROM cliente
+            WHERE public_id = 'cliente-1'
+          ),
+          'Cliente uno'
+        ),
+        (
+          'factura-3',
+          (
+            SELECT id
+            FROM cliente
+            WHERE public_id = 'cliente-1'
+          ),
+          'Cliente uno'
+        )
+    `);
+
+    await dataSource.query(
+      `
+        INSERT INTO factura_venta (
+          id_factura,
+          id_venta
+        )
+        SELECT
+          f.id,
+          ?
+        FROM factura f
+        WHERE f.public_id = 'factura-2'
+      `,
+      [idVenta],
+    );
+
+    await expect(
+      dataSource.query(
+        `
+          INSERT INTO factura_venta (
+            id_factura,
+            id_venta
+          )
+          SELECT
+            f.id,
+            ?
+          FROM factura f
+          WHERE f.public_id = 'factura-3'
+        `,
+        [idVenta],
+      ),
+    ).rejects.toThrow();
+
+    const relaciones: {
+      readonly total: number;
+      readonly activas: number;
+    } = await queryOne<{
+      readonly total: number;
+      readonly activas: number;
+    }>(
+      dataSource,
+      `
+        SELECT
+          COUNT(*) AS total,
+          COALESCE(
+            SUM(activa),
+            0
+          ) AS activas
+        FROM factura_venta
+        WHERE id_venta = ?
+      `,
+      [idVenta],
+    );
+
+    expect(relaciones).toEqual({
+      total: 2,
+      activas: 1,
+    });
   });
 
   it('cambia efectivo por tarjeta y retira el impacto del cierre teórico', async (): Promise<void> => {
@@ -768,14 +914,17 @@ async function insertPago(
 }
 
 /**
- * Marca una venta como incluida en una factura.
+ * Crea una factura emitida y relaciona con ella la venta indicada.
  */
 async function seedFactura(dataSource: DataSource, idVenta: number): Promise<void> {
   await dataSource.query(`
     INSERT INTO factura (
       public_id,
       id_cliente,
-      nombre_apellidos
+      numero,
+      estado,
+      nombre_apellidos,
+      fecha_emision
     )
     VALUES (
       'factura-1',
@@ -784,7 +933,10 @@ async function seedFactura(dataSource: DataSource, idVenta: number): Promise<voi
         FROM cliente
         WHERE public_id = 'cliente-1'
       ),
-      'Cliente uno'
+      1,
+      'emitida',
+      'Cliente uno',
+      '2026-09-04T10:00:00.000Z'
     )
   `);
 
