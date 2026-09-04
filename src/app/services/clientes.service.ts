@@ -1,7 +1,10 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { computed, Service, signal } from '@angular/core';
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
-import type { ClienteEstadisticasInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type {
+  ClienteEstadisticasGeneralesInterface,
+  ClienteEstadisticasInterface,
+} from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import type ClienteEstadisticasState from '@model/clientes/cliente-estadisticas-state.interface';
@@ -295,6 +298,16 @@ export default class ClientesService {
     if (this.workspace()?.clientePublicId === publicId) {
       this.workspaceSignal.set(null);
     }
+  }
+
+  /**
+   * Solicita las estadísticas generales de la ficha de un cliente.
+   *
+   * La gestión de carga y respuestas antiguas pertenece al
+   * componente que consume estos datos.
+   */
+  getEstadisticasGenerales(publicId: string): Promise<ClienteEstadisticasGeneralesInterface> {
+    return window.osumiDesktop.clientes.getEstadisticasGenerales(publicId);
   }
 
   /**

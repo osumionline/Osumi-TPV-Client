@@ -1,6 +1,9 @@
 import type ClientesService from '@backend/application/clientes/clientes.service';
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
-import type { ClienteEstadisticasInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type {
+  ClienteEstadisticasGeneralesInterface,
+  ClienteEstadisticasInterface,
+} from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
@@ -59,6 +62,16 @@ export default function registerClientesIpc(
       assertTrustedSender(event, getMainWindow);
 
       return clientesService.getEstadisticas(publicId);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.clientesGetEstadisticasGenerales,
+
+    async (event, publicId: string): Promise<ClienteEstadisticasGeneralesInterface> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return clientesService.getEstadisticasGenerales(publicId);
     },
   );
 }

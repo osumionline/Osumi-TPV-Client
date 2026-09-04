@@ -1,5 +1,8 @@
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
-import type { ClienteEstadisticasInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type {
+  ClienteEstadisticasGeneralesInterface,
+  ClienteEstadisticasInterface,
+} from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 
@@ -13,4 +16,6 @@ export default interface ClientesApi {
   deactivate(publicId: string): Promise<void>;
 
   getEstadisticas(publicId: string): Promise<ClienteEstadisticasInterface>;
+
+  getEstadisticasGenerales(publicId: string): Promise<ClienteEstadisticasGeneralesInterface>;
 }

@@ -1,5 +1,8 @@
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
-import type { ClienteEstadisticasInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type {
+  ClienteEstadisticasGeneralesInterface,
+  ClienteEstadisticasInterface,
+} from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import createClienteCommand from '@model/clientes/cliente-form-command.mapper';
@@ -17,6 +20,7 @@ describe('ClientesService', (): void => {
   let receivedCreateCommand: CrearClienteCommand | null;
   let receivedUpdateCommand: ActualizarClienteCommand | null;
   let receivedDeactivatePublicId: string | null;
+  let receivedGeneralStatisticsPublicId: string | null;
   let deactivateError: Error | null;
 
   beforeEach((): void => {
@@ -27,6 +31,7 @@ describe('ClientesService', (): void => {
     receivedCreateCommand = null;
     receivedUpdateCommand = null;
     receivedDeactivatePublicId = null;
+    receivedGeneralStatisticsPublicId = null;
     deactivateError = null;
 
     Object.defineProperty(window, 'osumiDesktop', {
@@ -52,6 +57,13 @@ describe('ClientesService', (): void => {
             requestCount++;
 
             return Promise.resolve(createEstadisticas(`Artículo ${requestCount}`));
+          },
+          getEstadisticasGenerales: (
+            publicId: string,
+          ): Promise<ClienteEstadisticasGeneralesInterface> => {
+            receivedGeneralStatisticsPublicId = publicId;
+
+            return Promise.resolve(createEstadisticasGenerales());
           },
         },
       },
@@ -427,6 +439,17 @@ describe('ClientesService', (): void => {
     expect(service.findByPublicId('cliente-7')).toBe(cliente);
     expect(service.workspace()?.dirty).toBe(true);
   });
+
+  it('solicita las estadísticas generales mediante su API específica', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+
+    const result: ClienteEstadisticasGeneralesInterface =
+      await service.getEstadisticasGenerales('cliente-7');
+
+    expect(receivedGeneralStatisticsPublicId).toBe('cliente-7');
+    expect(result).toEqual(createEstadisticasGenerales());
+    expect(requestCount).toBe(0);
+  });
 });
 
 function createEstadisticas(nombre: string): ClienteEstadisticasInterface {
@@ -442,6 +465,33 @@ function createEstadisticas(nombre: string): ClienteEstadisticasInterface {
       },
     ],
     topVentas: [],
+  };
+}
+
+/**
+ * Crea unas estadísticas generales completas para las pruebas.
+ */
+function createEstadisticasGenerales(): ClienteEstadisticasGeneralesInterface {
+  return {
+    ...createEstadisticas('Artículo general'),
+    sumaVentas: [
+      {
+        year: 2026,
+        pucMicros: 4_000_000,
+        pvpMicros: 10_000_000,
+        beneficioMicros: 6_000_000,
+        margenMicroporcentaje: 60_000_000,
+        months: [
+          {
+            month: 8,
+            pucMicros: 4_000_000,
+            pvpMicros: 10_000_000,
+            beneficioMicros: 6_000_000,
+            margenMicroporcentaje: 60_000_000,
+          },
+        ],
+      },
+    ],
   };
 }
 
