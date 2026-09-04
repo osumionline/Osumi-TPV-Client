@@ -1,0 +1,82 @@
+<section class="client-monthly-consumption"
+         aria-label="Consumo mensual del cliente">
+    <div class="client-monthly-consumption__card">
+        <header class="client-monthly-consumption__header">
+            <strong>Consumo mensual</strong>
+
+            <strong class="client-monthly-consumption__total">
+                {{ formatTotal() }}
+            </strong>
+        </header>
+
+        @if (error() !== null) {
+        <div class="
+                client-monthly-consumption__state
+                client-monthly-consumption__state--error
+            "
+             role="alert">
+            <p>{{ error() }}</p>
+
+            <button mat-stroked-button
+                    type="button"
+                    class="client-monthly-consumption__retry"
+                    (click)="retry()">
+                Reintentar
+            </button>
+        </div>
+        } @else {
+        <div class="client-monthly-consumption__chart-container">
+            <div echarts
+                 class="client-monthly-consumption__chart"
+                 [options]="chartOptions()"></div>
+
+            @if (loading()) {
+            <div class="client-monthly-consumption__loading"
+                 role="status">
+                Cargando consumo mensual...
+            </div>
+            } @else if (noConsumption()) {
+            <div class="client-monthly-consumption__empty">
+                No hay consumo neto para el período seleccionado.
+            </div>
+            }
+        </div>
+        }
+
+        <footer class="client-monthly-consumption__filters">
+            <div class="client-monthly-consumption__field">
+                <label for="client-monthly-consumption-month">Mes</label>
+
+                <mat-select id="client-monthly-consumption-month"
+                            [value]="month()"
+                            [canSelectNullableOptions]="true"
+                            (selectionChange)="onMonthChange($event)">
+                    <mat-option [value]="null">Todos</mat-option>
+
+                    @for (option of months; track option.value) {
+                    <mat-option [value]="option.value">
+                        {{ option.label }}
+                    </mat-option>
+                    }
+                </mat-select>
+            </div>
+
+            <div class="client-monthly-consumption__field">
+                <label for="client-monthly-consumption-year">Año</label>
+
+                <mat-select id="client-monthly-consumption-year"
+                            [value]="year()"
+                            [canSelectNullableOptions]="true"
+                            (selectionChange)="onYearChange($event)">
+                    <mat-option [value]="null">Todos</mat-option>
+
+                    @for (option of yearOptions(); track option) {
+                    <mat-option [value]="option">
+                        {{ option }}
+                    </mat-option>
+                    }
+                </mat-select>
+            </div>
+        </footer>
+    </div>
+</section>
