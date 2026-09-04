@@ -9,9 +9,11 @@ import type {
   ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import type ClienteEstadisticasState from '@model/clientes/cliente-estadisticas-state.interface';
+import type ClienteFacturasState from '@model/clientes/cliente-facturas-state.interface';
 import createClienteCommand from '@model/clientes/cliente-form-command.mapper';
 import createClienteFormInitialValue from '@model/clientes/cliente-form.initial-value';
 import createClienteFormModel from '@model/clientes/cliente-form.mapper';
@@ -24,6 +26,12 @@ import type ClienteWorkspaceSection from '@model/clientes/cliente-workspace-sect
 import type ClienteWorkspace from '@model/clientes/cliente-workspace.interface';
 import Cliente from '@model/clientes/cliente.model';
 import { getErrorMessage } from '@utils/error.utils';
+
+const EMPTY_FACTURAS_STATE: ClienteFacturasState = {
+  data: null,
+  loading: false,
+  error: null,
+};
 
 const EMPTY_ESTADISTICAS_STATE: ClienteEstadisticasState = {
   data: null,
@@ -44,25 +52,33 @@ export default class ClientesService {
 
   private readonly loadedSignal: WritableSignal<boolean> = signal<boolean>(false);
 
+  private readonly facturasSignal: WritableSignal<ReadonlyMap<string, ClienteFacturasState>> =
+    signal<ReadonlyMap<string, ClienteFacturasState>>(new Map<string, ClienteFacturasState>());
   private readonly estadisticasSignal: WritableSignal<
     ReadonlyMap<string, ClienteEstadisticasState>
   > = signal<ReadonlyMap<string, ClienteEstadisticasState>>(
     new Map<string, ClienteEstadisticasState>(),
   );
+
   private readonly workspaceSignal: WritableSignal<ClienteWorkspace | null> =
     signal<ClienteWorkspace | null>(null);
 
   private pendingRequest: Promise<void> | null = null;
 
+  private readonly pendingFacturasRequests: Map<string, Promise<void>> = new Map<
+    string,
+    Promise<void>
+  >();
   private readonly pendingEstadisticasRequests: Map<string, Promise<void>> = new Map<
     string,
     Promise<void>
   >();
 
   /*
-   * Permite invalidar de golpe cualquier petición de estadísticas
-   * anterior cuando se limpia completamente el servicio.
+   * Permiten invalidar las peticiones anteriores cuando
+   * se limpia completamente el servicio.
    */
+  private facturasGeneration: number = 0;
   private estadisticasGeneration: number = 0;
 
   readonly clientes: Signal<readonly Cliente[]> = this.clientesSignal.asReadonly();
@@ -293,7 +309,7 @@ export default class ClientesService {
       }
     }
 
-    await this.invalidateEstadisticas(publicId);
+    await Promise.all([this.invalidateFacturas(publicId), this.invalidateEstadisticas(publicId)]);
 
     this.clientesSignal.update((clientes: readonly Cliente[]): readonly Cliente[] =>
       clientes.filter((cliente: Cliente): boolean => cliente.publicId !== publicId),
@@ -322,6 +338,68 @@ export default class ClientesService {
     consulta: ClienteConsumoMensualConsulta,
   ): Promise<ClienteConsumoMensualResultado> {
     return window.osumiDesktop.clientes.getConsumoMensual(consulta);
+  }
+
+  /**
+   * Devuelve el estado reactivo cacheado de las facturas
+   * de un cliente.
+   */
+  getFacturasState(publicId: string | null): ClienteFacturasState {
+    if (publicId === null) {
+      return EMPTY_FACTURAS_STATE;
+    }
+
+    const normalizedPublicId: string = publicId.trim();
+
+    if (normalizedPublicId === '') {
+      return EMPTY_FACTURAS_STATE;
+    }
+
+    return this.facturasSignal().get(normalizedPublicId) ?? EMPTY_FACTURAS_STATE;
+  }
+
+  /**
+   * Carga las facturas de un cliente únicamente cuando
+   * todavía no están disponibles en caché.
+   */
+  loadFacturas(publicId: string): Promise<void> {
+    return this.loadFacturasData(publicId, false);
+  }
+
+  /**
+   * Fuerza la actualización de las facturas cacheadas.
+   */
+  reloadFacturas(publicId: string): Promise<void> {
+    return this.loadFacturasData(publicId, true);
+  }
+
+  /**
+   * Invalida las facturas cacheadas de un cliente.
+   *
+   * Espera cualquier consulta anterior para evitar que una
+   * respuesta iniciada antes de una escritura repueble la caché.
+   */
+  async invalidateFacturas(publicId: string): Promise<void> {
+    const normalizedPublicId: string = publicId.trim();
+
+    if (normalizedPublicId === '') {
+      throw new Error('El identificador del cliente no es válido.');
+    }
+
+    const pendingRequest: Promise<void> | undefined =
+      this.pendingFacturasRequests.get(normalizedPublicId);
+
+    if (pendingRequest !== undefined) {
+      await pendingRequest;
+    }
+
+    const facturas: Map<string, ClienteFacturasState> = new Map<string, ClienteFacturasState>(
+      this.facturasSignal(),
+    );
+
+    facturas.delete(normalizedPublicId);
+
+    this.facturasSignal.set(facturas);
   }
 
   /**
@@ -392,15 +470,18 @@ export default class ClientesService {
   clear(): void {
     this.clientesSignal.set([]);
     this.loadedSignal.set(false);
+    this.facturasSignal.set(new Map<string, ClienteFacturasState>());
     this.estadisticasSignal.set(new Map<string, ClienteEstadisticasState>());
     this.workspaceSignal.set(null);
 
     /*
-     * Una petición antigua puede seguir físicamente en curso,
-     * pero su respuesta ya no podrá modificar el nuevo estado.
+     * Las peticiones antiguas pueden seguir físicamente en curso,
+     * pero sus respuestas ya no podrán modificar el nuevo estado.
      */
+    this.facturasGeneration += 1;
     this.estadisticasGeneration += 1;
 
+    this.pendingFacturasRequests.clear();
     this.pendingEstadisticasRequests.clear();
   }
 
@@ -523,6 +604,95 @@ export default class ClientesService {
     } finally {
       this.pendingRequest = null;
     }
+  }
+
+  /**
+   * Coordina la caché y las peticiones simultáneas de facturas.
+   */
+  private loadFacturasData(publicId: string, force: boolean): Promise<void> {
+    const normalizedPublicId: string = publicId.trim();
+
+    if (normalizedPublicId === '') {
+      throw new Error('El identificador del cliente no es válido.');
+    }
+
+    const cachedState: ClienteFacturasState | undefined =
+      this.facturasSignal().get(normalizedPublicId);
+
+    if (!force && cachedState?.data !== null && cachedState?.data !== undefined) {
+      return Promise.resolve();
+    }
+
+    const pendingRequest: Promise<void> | undefined =
+      this.pendingFacturasRequests.get(normalizedPublicId);
+
+    if (pendingRequest !== undefined) {
+      return pendingRequest;
+    }
+
+    const generation: number = this.facturasGeneration;
+    const request: Promise<void> = this.requestFacturas(normalizedPublicId, generation);
+
+    this.pendingFacturasRequests.set(normalizedPublicId, request);
+
+    void request.finally((): void => {
+      if (this.pendingFacturasRequests.get(normalizedPublicId) === request) {
+        this.pendingFacturasRequests.delete(normalizedPublicId);
+      }
+    });
+
+    return request;
+  }
+
+  /**
+   * Consulta las facturas y actualiza su estado reactivo.
+   */
+  private async requestFacturas(publicId: string, generation: number): Promise<void> {
+    const currentState: ClienteFacturasState = this.getFacturasState(publicId);
+
+    this.setFacturasState(publicId, {
+      data: currentState.data,
+      loading: true,
+      error: null,
+    });
+
+    try {
+      const result: readonly ClienteFacturaInterface[] =
+        await window.osumiDesktop.clientes.getFacturas(publicId);
+
+      if (generation !== this.facturasGeneration) {
+        return;
+      }
+
+      this.setFacturasState(publicId, {
+        data: result,
+        loading: false,
+        error: null,
+      });
+    } catch (error: unknown) {
+      if (generation !== this.facturasGeneration) {
+        return;
+      }
+
+      this.setFacturasState(publicId, {
+        data: currentState.data,
+        loading: false,
+        error: getErrorMessage(error, 'No se han podido cargar las facturas del cliente.'),
+      });
+    }
+  }
+
+  /**
+   * Sustituye el estado cacheado de las facturas de un cliente.
+   */
+  private setFacturasState(publicId: string, state: ClienteFacturasState): void {
+    const facturas: Map<string, ClienteFacturasState> = new Map<string, ClienteFacturasState>(
+      this.facturasSignal(),
+    );
+
+    facturas.set(publicId, state);
+
+    this.facturasSignal.set(facturas);
   }
 
   private loadEstadisticasData(publicId: string, force: boolean): Promise<void> {

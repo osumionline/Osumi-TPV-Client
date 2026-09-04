@@ -7,6 +7,7 @@ import type {
   ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import createClienteCommand from '@model/clientes/cliente-form-command.mapper';
@@ -19,6 +20,10 @@ import ClientesService from '@services/clientes.service';
 describe('ClientesService', (): void => {
   let originalDesktopDescriptor: PropertyDescriptor | undefined;
   let requestCount: number;
+  let facturasRequestCount: number;
+  let facturasResult: readonly ClienteFacturaInterface[];
+  let facturasRequestFactory: (() => Promise<readonly ClienteFacturaInterface[]>) | null;
+  let receivedFacturasPublicId: string | null;
   let createdCliente: ClienteInterface;
   let updatedCliente: ClienteInterface;
   let receivedCreateCommand: CrearClienteCommand | null;
@@ -31,6 +36,10 @@ describe('ClientesService', (): void => {
   beforeEach((): void => {
     originalDesktopDescriptor = Object.getOwnPropertyDescriptor(window, 'osumiDesktop');
     requestCount = 0;
+    facturasRequestCount = 0;
+    facturasResult = createFacturas(12_345);
+    facturasRequestFactory = null;
+    receivedFacturasPublicId = null;
     createdCliente = createClienteInterface(7, 'cliente-7', 'Ada Lovelace');
     updatedCliente = createClienteInterface(7, 'cliente-7', 'Ada Lovelace');
     receivedCreateCommand = null;
@@ -58,6 +67,12 @@ describe('ClientesService', (): void => {
             receivedDeactivatePublicId = publicId;
 
             return deactivateError === null ? Promise.resolve() : Promise.reject(deactivateError);
+          },
+          getFacturas: (publicId: string): Promise<readonly ClienteFacturaInterface[]> => {
+            receivedFacturasPublicId = publicId;
+            facturasRequestCount++;
+
+            return facturasRequestFactory?.() ?? Promise.resolve(facturasResult);
           },
           getEstadisticas: (): Promise<ClienteEstadisticasInterface> => {
             requestCount++;
@@ -91,6 +106,84 @@ describe('ClientesService', (): void => {
     }
 
     Reflect.deleteProperty(window, 'osumiDesktop');
+  });
+
+  it('cachea las facturas y vuelve a consultarlas después de invalidarlas', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+
+    await service.loadFacturas('  cliente-7  ');
+    await service.loadFacturas('cliente-7');
+
+    expect(receivedFacturasPublicId).toBe('cliente-7');
+    expect(facturasRequestCount).toBe(1);
+    expect(service.getFacturasState('cliente-7')).toEqual({
+      data: createFacturas(12_345),
+      loading: false,
+      error: null,
+    });
+
+    facturasResult = createFacturas(24_690);
+
+    await service.invalidateFacturas('cliente-7');
+
+    expect(service.getFacturasState('cliente-7').data).toBeNull();
+
+    await service.loadFacturas('cliente-7');
+
+    expect(facturasRequestCount).toBe(2);
+    expect(service.getFacturasState('cliente-7').data).toEqual(createFacturas(24_690));
+  });
+
+  it('conserva el error de facturas y permite reintentar la consulta', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+
+    facturasRequestFactory = (): Promise<readonly ClienteFacturaInterface[]> =>
+      Promise.reject(new Error('Fallo IPC'));
+
+    await service.loadFacturas('cliente-7');
+
+    expect(service.getFacturasState('cliente-7')).toEqual({
+      data: null,
+      loading: false,
+      error: 'Fallo IPC',
+    });
+
+    facturasRequestFactory = null;
+
+    await service.reloadFacturas('cliente-7');
+
+    expect(facturasRequestCount).toBe(2);
+    expect(service.getFacturasState('cliente-7')).toEqual({
+      data: createFacturas(12_345),
+      loading: false,
+      error: null,
+    });
+  });
+
+  it('descarta una respuesta de facturas iniciada antes de limpiar el servicio', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    let resolveFacturas: (value: readonly ClienteFacturaInterface[]) => void = (): void =>
+      undefined;
+
+    facturasRequestFactory = (): Promise<readonly ClienteFacturaInterface[]> =>
+      new Promise<readonly ClienteFacturaInterface[]>((resolve): void => {
+        resolveFacturas = resolve;
+      });
+
+    const pendingRequest: Promise<void> = service.loadFacturas('cliente-7');
+
+    expect(service.getFacturasState('cliente-7').loading).toBe(true);
+
+    service.clear();
+    resolveFacturas(createFacturas(12_345));
+
+    await pendingRequest;
+
+    expect(service.getFacturasState('cliente-7')).toEqual({
+      data: null,
+      loading: false,
+      error: null,
+    });
   });
 
   it('vuelve a consultar las estadísticas después de invalidarlas', async (): Promise<void> => {
@@ -381,12 +474,14 @@ describe('ClientesService', (): void => {
     );
 
     service.abrirFicha(cliente);
+    await service.loadFacturas('cliente-7');
     await service.loadEstadisticas('cliente-7');
 
     await service.darDeBaja();
 
     expect(receivedDeactivatePublicId).toBe('cliente-7');
     expect(service.findByPublicId('cliente-7')).toBeNull();
+    expect(service.getFacturasState('cliente-7').data).toBeNull();
     expect(service.getEstadisticasState('cliente-7').data).toBeNull();
     expect(service.workspace()).toBeNull();
   });
@@ -401,6 +496,7 @@ describe('ClientesService', (): void => {
     );
 
     service.abrirFicha(cliente);
+    await service.loadFacturas('cliente-7');
     await service.loadEstadisticas('cliente-7');
 
     deactivateError = new Error(
@@ -413,6 +509,7 @@ describe('ClientesService', (): void => {
 
     expect(receivedDeactivatePublicId).toBe('cliente-7');
     expect(service.findByPublicId('cliente-7')).toBe(cliente);
+    expect(service.getFacturasState('cliente-7').data).not.toBeNull();
     expect(service.getEstadisticasState('cliente-7').data).not.toBeNull();
     expect(service.workspace()?.clientePublicId).toBe('cliente-7');
   });
@@ -479,6 +576,36 @@ describe('ClientesService', (): void => {
     expect(requestCount).toBe(0);
   });
 });
+
+/**
+ * Crea una factura emitida para las pruebas del estado Angular.
+ */
+function createFacturas(importeCents: number): readonly ClienteFacturaInterface[] {
+  return [
+    {
+      publicId: 'factura-1',
+      serie: '',
+      numero: 21,
+      year: 2026,
+      numeroFactura: '21_2026',
+      estado: 'emitida',
+      fecha: '2026-09-04T10:00:00.000Z',
+      fechaCreacion: '2026-09-03T10:00:00.000Z',
+      fechaEmision: '2026-09-04T10:00:00.000Z',
+      fechaAnulacion: null,
+      importeCents,
+      capacidades: {
+        puedeEditar: false,
+        puedeEliminar: false,
+        puedePrevisualizar: false,
+        puedeFacturar: false,
+        puedeImprimir: true,
+        puedeEnviarEmail: true,
+        puedeAnular: true,
+      },
+    },
+  ];
+}
 
 function createEstadisticas(nombre: string): ClienteEstadisticasInterface {
   return {
