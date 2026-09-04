@@ -59,8 +59,10 @@ interface PaymentTypeDatabaseRow {
   readonly slug: string;
 }
 
-interface IdRow {
+interface InvoiceDatabaseRow {
   readonly id: number;
+  readonly estado: 'borrador' | 'emitida' | 'anulada';
+  readonly deleted_at: string | null;
 }
 
 interface DeliveredResolution {
@@ -145,7 +147,8 @@ export default class LegacyImportSalePaymentDataImporter implements LegacyImport
 
       const cashPaymentTypeId: number = this.getCashPaymentTypeId(paymentTypes);
 
-      const invoiceIds: ReadonlySet<number> = await this.readInvoiceIds(queryRunner);
+      const invoicesById: ReadonlyMap<number, InvoiceDatabaseRow> =
+        await this.readInvoicesById(queryRunner);
 
       const decisionsById: ReadonlyMap<string, LegacyImportReviewDecision> = this.createDecisionMap(
         command.reviewDecisions,
@@ -195,7 +198,7 @@ export default class LegacyImportSalePaymentDataImporter implements LegacyImport
         state.sales,
         state.invoiceSales,
         salesById,
-        invoiceIds,
+        invoicesById,
         counters,
       );
 
@@ -748,14 +751,14 @@ export default class LegacyImportSalePaymentDataImporter implements LegacyImport
     sales: readonly LegacySalePaymentRow[],
     invoiceSales: readonly LegacyInvoiceSaleRow[],
     salesById: ReadonlyMap<number, SaleDatabaseRow>,
-    invoiceIds: ReadonlySet<number>,
+    invoicesById: ReadonlyMap<number, InvoiceDatabaseRow>,
     counters: MutableImportCounters,
   ): Promise<void> {
-    const invoiceOwnerBySale: Map<number, number> = new Map<number, number>();
+    const activeInvoiceOwnerBySale: Map<number, number> = new Map<number, number>();
 
     const insertedRelations: Set<string> = new Set<string>();
 
-    const relatedSaleIds: Set<number> = new Set<number>();
+    const activeRelatedSaleIds: Set<number> = new Set<number>();
 
     const sortedRelations: readonly LegacyInvoiceSaleRow[] = [...invoiceSales].sort(
       (first: LegacyInvoiceSaleRow, second: LegacyInvoiceSaleRow): number =>
@@ -763,7 +766,9 @@ export default class LegacyImportSalePaymentDataImporter implements LegacyImport
     );
 
     for (const relation of sortedRelations) {
-      if (!invoiceIds.has(relation.invoiceId)) {
+      const invoice: InvoiceDatabaseRow | undefined = invoicesById.get(relation.invoiceId);
+
+      if (invoice === undefined) {
         throw new Error(
           [
             `La relación factura_venta`,
@@ -789,16 +794,20 @@ export default class LegacyImportSalePaymentDataImporter implements LegacyImport
         continue;
       }
 
-      const existingInvoiceId: number | undefined = invoiceOwnerBySale.get(relation.saleId);
+      const active: boolean = invoice.estado !== 'anulada' && invoice.deleted_at === null;
 
-      if (existingInvoiceId !== undefined && existingInvoiceId !== relation.invoiceId) {
-        throw new Error(
-          [
-            `La venta ${relation.saleId}`,
-            `está asociada a las facturas`,
-            `${existingInvoiceId} y ${relation.invoiceId}.`,
-          ].join(' '),
-        );
+      if (active) {
+        const existingInvoiceId: number | undefined = activeInvoiceOwnerBySale.get(relation.saleId);
+
+        if (existingInvoiceId !== undefined && existingInvoiceId !== relation.invoiceId) {
+          throw new Error(
+            [
+              `La venta ${relation.saleId}`,
+              `está asociada a las facturas activas`,
+              `${existingInvoiceId} y ${relation.invoiceId}.`,
+            ].join(' '),
+          );
+        }
       }
 
       await queryRunner.query(
@@ -806,6 +815,7 @@ export default class LegacyImportSalePaymentDataImporter implements LegacyImport
           INSERT INTO factura_venta (
             id_factura,
             id_venta,
+            activa,
             created_at,
             updated_at
           )
@@ -813,30 +823,39 @@ export default class LegacyImportSalePaymentDataImporter implements LegacyImport
             ?,
             ?,
             ?,
+            ?,
             ?
           )
         `,
-        [relation.invoiceId, relation.saleId, relation.createdAt, relation.updatedAt],
+        [
+          relation.invoiceId,
+          relation.saleId,
+          active ? 1 : 0,
+          relation.createdAt,
+          relation.updatedAt,
+        ],
       );
 
       insertedRelations.add(relationKey);
 
-      invoiceOwnerBySale.set(relation.saleId, relation.invoiceId);
+      if (active) {
+        activeInvoiceOwnerBySale.set(relation.saleId, relation.invoiceId);
 
-      relatedSaleIds.add(relation.saleId);
+        activeRelatedSaleIds.add(relation.saleId);
+      }
 
       counters.importedRows++;
     }
 
     /*
-     * En el modelo nuevo la relación es la fuente de
-     * verdad. El booleano legacy solo se usa para
-     * detectar inconsistencias.
+     * En el modelo nuevo la relación activa es la
+     * fuente de verdad. El booleano legacy solo se
+     * utiliza para detectar inconsistencias.
      */
     for (const sale of sales) {
-      const hasInvoiceRelation: boolean = relatedSaleIds.has(sale.id);
+      const hasActiveInvoiceRelation: boolean = activeRelatedSaleIds.has(sale.id);
 
-      if (sale.invoiced !== hasInvoiceRelation) {
+      if (sale.invoiced !== hasActiveInvoiceRelation) {
         counters.warningCount++;
       }
     }
@@ -893,16 +912,26 @@ export default class LegacyImportSalePaymentDataImporter implements LegacyImport
     return cashPaymentType.id;
   }
 
-  private async readInvoiceIds(queryRunner: QueryRunner): Promise<ReadonlySet<number>> {
-    const rows: readonly IdRow[] = (await queryRunner.query(
+  /**
+   * Indexa las facturas importadas junto con su estado
+   * para clasificar correctamente sus relaciones.
+   */
+  private async readInvoicesById(
+    queryRunner: QueryRunner,
+  ): Promise<ReadonlyMap<number, InvoiceDatabaseRow>> {
+    const rows: readonly InvoiceDatabaseRow[] = (await queryRunner.query(
       `
-            SELECT
-              id
-            FROM factura
-          `,
-    )) as readonly IdRow[];
+        SELECT
+          id,
+          estado,
+          deleted_at
+        FROM factura
+      `,
+    )) as readonly InvoiceDatabaseRow[];
 
-    return new Set<number>(rows.map((row: IdRow): number => row.id));
+    return new Map<number, InvoiceDatabaseRow>(
+      rows.map((row: InvoiceDatabaseRow): [number, InvoiceDatabaseRow] => [row.id, row]),
+    );
   }
 
   private assertAllSalesWereImported(

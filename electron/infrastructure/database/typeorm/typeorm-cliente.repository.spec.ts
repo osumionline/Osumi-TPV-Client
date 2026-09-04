@@ -388,7 +388,8 @@ async function seedClienteHistory(dataSource: DataSource): Promise<void> {
       numero,
       estado,
       nombre_apellidos,
-      importe_cents
+      importe_cents,
+      fecha_emision
     )
     VALUES
       (
@@ -398,7 +399,8 @@ async function seedClienteHistory(dataSource: DataSource): Promise<void> {
         1,
         'emitida',
         'Cliente de prueba',
-        1000
+        1000,
+        '2026-09-03T08:30:00.000Z'
       ),
       (
         2,
@@ -407,7 +409,8 @@ async function seedClienteHistory(dataSource: DataSource): Promise<void> {
         NULL,
         'borrador',
         'Cliente de prueba',
-        0
+        0,
+        NULL
       )
   `);
 

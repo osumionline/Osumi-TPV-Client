@@ -756,6 +756,7 @@ const statements: readonly string[] = [
         ),
 
       fecha_emision TEXT,
+      fecha_anulacion TEXT,
 
       created_at TEXT NOT NULL
         DEFAULT (${SQLITE_TIMESTAMP_DEFAULT}),
@@ -769,13 +770,20 @@ const statements: readonly string[] = [
         (
           estado = 'borrador'
           AND numero IS NULL
+          AND fecha_emision IS NULL
+          AND fecha_anulacion IS NULL
         )
         OR (
-          estado IN (
-            'emitida',
-            'anulada'
-          )
+          estado = 'emitida'
           AND numero IS NOT NULL
+          AND fecha_emision IS NOT NULL
+          AND fecha_anulacion IS NULL
+        )
+        OR (
+          estado = 'anulada'
+          AND numero IS NOT NULL
+          AND fecha_emision IS NOT NULL
+          AND fecha_anulacion IS NOT NULL
         )
       ),
 
@@ -826,6 +834,19 @@ const statements: readonly string[] = [
       id_factura INTEGER NOT NULL,
       id_venta INTEGER NOT NULL,
 
+      /*
+       * Las relaciones de borradores y facturas
+       * emitidas son activas.
+       *
+       * Al anular una factura se conservan como
+       * histórico, pero dejan de bloquear la venta.
+       */
+      activa INTEGER NOT NULL
+        DEFAULT 1
+        CHECK (
+          activa IN (0, 1)
+        ),
+
       created_at TEXT NOT NULL
         DEFAULT (${SQLITE_TIMESTAMP_DEFAULT}),
 
@@ -834,14 +855,6 @@ const statements: readonly string[] = [
 
       PRIMARY KEY (
         id_factura,
-        id_venta
-      ),
-
-      /*
-       * Una venta solo puede formar parte de una
-       * factura.
-       */
-      UNIQUE (
         id_venta
       ),
 
@@ -865,6 +878,19 @@ const statements: readonly string[] = [
         ON DELETE RESTRICT
         ON UPDATE CASCADE
     ) STRICT
+  `,
+
+  /*
+   * Una venta puede conservar varias relaciones
+   * históricas, pero como máximo una activa.
+   */
+  `
+    CREATE UNIQUE INDEX
+      uq_factura_venta_venta_activa
+    ON factura_venta (
+      id_venta
+    )
+    WHERE activa = 1
   `,
 
   `

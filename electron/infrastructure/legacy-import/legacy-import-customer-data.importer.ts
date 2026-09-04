@@ -11,153 +11,93 @@ import type { QueryRunner } from 'typeorm';
 
 interface LegacyCustomerRow {
   readonly id: number;
-
   readonly name: string;
-
   readonly document: string | null;
-
   readonly phone: string | null;
-
   readonly email: string | null;
-
   readonly address: string | null;
-
   readonly postalCode: string | null;
-
   readonly city: string | null;
-
   readonly provinceId: number | null;
-
   readonly sameBillingData: boolean;
-
   readonly billingName: string | null;
-
   readonly billingDocument: string | null;
-
   readonly billingPhone: string | null;
-
   readonly billingEmail: string | null;
-
   readonly billingAddress: string | null;
-
   readonly billingPostalCode: string | null;
-
   readonly billingCity: string | null;
-
   readonly billingProvinceId: number | null;
-
   readonly notes: string | null;
-
   readonly discount: number;
-
   readonly createdAt: string;
-
   readonly updatedAt: string;
-
   readonly deletedAt: string | null;
 }
 
 interface LegacyReservationRow {
   readonly id: number;
-
   readonly customerId: number;
-
   readonly total: number;
-
   readonly createdAt: string;
-
   readonly updatedAt: string;
 }
 
 interface LegacyReservationLineRow {
   readonly id: number;
-
   readonly reservationId: number;
-
   readonly articleId: number | null;
-
   readonly articleName: string | null;
-
   readonly purchasePrice: number;
-
   readonly salePrice: number;
-
   readonly taxRate: number;
-
   readonly total: number;
-
   readonly discount: number | null;
-
   readonly discountAmount: number | null;
-
   readonly units: number;
-
   readonly createdAt: string;
-
   readonly updatedAt: string;
 }
 
 interface LegacyInvoiceRow {
   readonly id: number;
-
   readonly customerId: number;
-
   readonly number: number | null;
-
   readonly name: string;
-
   readonly document: string | null;
-
   readonly phone: string | null;
-
   readonly email: string | null;
-
   readonly address: string | null;
-
   readonly postalCode: string | null;
-
   readonly city: string | null;
-
   readonly provinceId: number | null;
-
   readonly total: number;
-
   readonly printed: boolean;
-
   readonly createdAt: string;
-
   readonly updatedAt: string;
-
   readonly deletedAt: string | null;
 }
 
 interface MutableCustomerDataState {
   readonly customers: LegacyCustomerRow[];
-
   readonly reservations: LegacyReservationRow[];
-
   readonly reservationLines: LegacyReservationLineRow[];
-
   readonly invoices: LegacyInvoiceRow[];
 }
 
 interface MutableImportCounters {
   importedRows: number;
-
   skippedRows: number;
-
   warningCount: number;
 }
 
 interface InsertedCustomers {
   readonly ids: ReadonlySet<number>;
-
   readonly namesById: ReadonlyMap<number, string>;
 }
 
 interface ArticleNameRow {
   readonly id: number;
-
   readonly nombre: string;
 }
 
@@ -787,6 +727,7 @@ export default class LegacyImportCustomerDataImporter implements LegacyImportPha
             importe_cents,
             impresa,
             fecha_emision,
+            fecha_anulacion,
             created_at,
             updated_at,
             deleted_at
@@ -796,6 +737,7 @@ export default class LegacyImportCustomerDataImporter implements LegacyImportPha
             ?,
             ?,
             '',
+            ?,
             ?,
             ?,
             ?,
@@ -834,9 +776,10 @@ export default class LegacyImportCustomerDataImporter implements LegacyImportPha
           ),
           printed ? 1 : 0,
           invoiceNumber === null ? null : invoice.createdAt,
+          status === 'anulada' ? invoice.deletedAt : null,
           invoice.createdAt,
           invoice.updatedAt,
-          invoice.deletedAt,
+          status === 'anulada' ? null : invoice.deletedAt,
         ],
       );
 
