@@ -93,13 +93,9 @@
             }
 
             @case ('statistics') {
-            <div class="clients__section-state">
-                <h2>Estadísticas</h2>
-
-                <p>
-                    Las estadísticas del cliente se mostrarán en este apartado.
-                </p>
-            </div>
+            @if (workspace.clientePublicId; as clientePublicId) {
+            <otpv-client-general-statistics [clientePublicId]="clientePublicId" />
+            }
             }
             }
         </div>

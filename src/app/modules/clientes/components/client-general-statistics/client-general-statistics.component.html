@@ -1,0 +1,211 @@
+<section class="client-general-statistics"
+         aria-label="Estadísticas generales del cliente">
+    @if (loading()) {
+    <div class="client-general-statistics__state"
+         role="status">
+        Cargando estadísticas del cliente...
+    </div>
+    }
+    @else if (error(); as errorMessage) {
+    <div class="client-general-statistics__state client-general-statistics__state--error"
+         role="alert">
+        <span>
+            {{ errorMessage }}
+        </span>
+
+        <button mat-button
+                type="button"
+                class="client-general-statistics__retry"
+                (click)="retry()">
+            Reintentar
+        </button>
+    </div>
+    }
+    @else if (result(); as data) {
+    <section class="client-general-statistics__block"
+             aria-labelledby="client-general-statistics-recent-title">
+        <h2 id="client-general-statistics-recent-title">
+            Últimos artículos comprados
+        </h2>
+
+        @if (data.ultimasVentas.length > 0) {
+        <div class="
+                 client-general-statistics__table-container
+                 client-general-statistics__table-container--recent
+             ">
+            <table class="client-general-statistics__table">
+                <thead>
+                    <tr>
+                        <th scope="col"
+                            class="client-general-statistics__date">
+                            Fecha
+                        </th>
+
+                        <th scope="col"
+                            class="client-general-statistics__locator">
+                            Localizador
+                        </th>
+
+                        <th scope="col">
+                            Nombre
+                        </th>
+
+                        <th scope="col"
+                            class="client-general-statistics__units">
+                            Unidades
+                        </th>
+
+                        <th scope="col"
+                            class="
+                                client-general-statistics__money
+                                client-general-statistics__unit-price
+                            ">
+                            PVP
+                        </th>
+
+                        <th scope="col"
+                            class="
+                                client-general-statistics__money
+                                client-general-statistics__amount
+                            ">
+                            Importe
+                        </th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @for (item of data.ultimasVentas; track $index) {
+                    <tr class="client-general-statistics__recent-row">
+                        <td class="client-general-statistics__date">
+                            {{ item.fecha | isoDateToSpanish }}
+                        </td>
+
+                        <td class="client-general-statistics__locator">
+                            {{ item.localizador ?? '—' }}
+                        </td>
+
+                        <td class="client-general-statistics__name"
+                            [title]="item.nombre">
+                            {{ item.nombre }}
+                        </td>
+
+                        <td class="client-general-statistics__units"
+                            [class.client-general-statistics__negative]="item.unidades < 0">
+                            {{ item.unidades }}
+                        </td>
+
+                        <td class="
+                                client-general-statistics__money
+                                client-general-statistics__unit-price
+                            ">
+                            {{
+                                item.pvpMicros
+                                    | microsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </td>
+
+                        <td class="
+                                client-general-statistics__money
+                                client-general-statistics__amount
+                            "
+                            [class.client-general-statistics__negative]="item.importeMicros < 0">
+                            {{
+                                item.importeMicros
+                                    | microsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        }
+        @else {
+        <div class="client-general-statistics__empty">
+            El cliente no ha comprado ningún artículo todavía.
+        </div>
+        }
+    </section>
+
+    <section class="client-general-statistics__block"
+             aria-labelledby="client-general-statistics-top-title">
+        <h2 id="client-general-statistics-top-title">
+            Artículos más comprados
+        </h2>
+
+        @if (data.topVentas.length > 0) {
+        <div class="
+                 client-general-statistics__table-container
+                 client-general-statistics__table-container--top
+             ">
+            <table class="client-general-statistics__table">
+                <thead>
+                    <tr>
+                        <th scope="col"
+                            class="client-general-statistics__locator">
+                            Localizador
+                        </th>
+
+                        <th scope="col">
+                            Nombre
+                        </th>
+
+                        <th scope="col"
+                            class="client-general-statistics__units">
+                            Unidades
+                        </th>
+
+                        <th scope="col"
+                            class="
+                                client-general-statistics__money
+                                client-general-statistics__amount
+                            ">
+                            Importe
+                        </th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @for (item of data.topVentas; track $index) {
+                    <tr class="client-general-statistics__top-row">
+                        <td class="client-general-statistics__locator">
+                            {{ item.localizador ?? '—' }}
+                        </td>
+
+                        <td class="client-general-statistics__name"
+                            [title]="item.nombre">
+                            {{ item.nombre }}
+                        </td>
+
+                        <td class="client-general-statistics__units"
+                            [class.client-general-statistics__negative]="item.unidades < 0">
+                            {{ item.unidades }}
+                        </td>
+
+                        <td class="
+                                client-general-statistics__money
+                                client-general-statistics__amount
+                            "
+                            [class.client-general-statistics__negative]="item.importeMicros < 0">
+                            {{
+                                item.importeMicros
+                                    | microsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        }
+        @else {
+        <div class="client-general-statistics__empty">
+            No hay artículos suficientes para mostrar este listado.
+        </div>
+        }
+    </section>
+    }
+</section>

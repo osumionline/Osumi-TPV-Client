@@ -1,0 +1,146 @@
+:host {
+    display: block;
+    min-height: 100%;
+}
+
+.client-general-statistics {
+    display: flex;
+    min-width: 0;
+    min-height: 100%;
+    flex-direction: column;
+    gap: 20px;
+    padding: 24px;
+
+    .client-general-statistics__block {
+        min-width: 0;
+
+        h2 {
+            margin: 0 0 8px;
+            font-size: 17px;
+            font-weight: 600;
+        }
+    }
+
+    .client-general-statistics__state {
+        display: flex;
+        min-height: 240px;
+        flex: 1;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        color: var(--disabled-color);
+        text-align: center;
+    }
+
+    .client-general-statistics__state--error {
+        color: var(--color-red);
+    }
+
+    .client-general-statistics__table-container {
+        min-width: 0;
+        border: 1px solid var(--table-border);
+        border-radius: 6px;
+        overflow: auto;
+    }
+
+    .client-general-statistics__table-container--recent {
+        max-height: 250px;
+    }
+
+    .client-general-statistics__table-container--top {
+        max-height: 220px;
+    }
+
+    .client-general-statistics__table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        table-layout: fixed;
+
+        th,
+        td {
+            min-width: 0;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--table-border);
+            vertical-align: middle;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background-color: var(--table-header-bg);
+            font-weight: 500;
+            text-align: left;
+        }
+
+        tbody {
+            tr:last-child {
+                td {
+                    border-bottom: 0;
+                }
+            }
+        }
+    }
+
+    .client-general-statistics__date {
+        width: 130px;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .client-general-statistics__locator {
+        width: 120px;
+        text-align: center;
+    }
+
+    .client-general-statistics__units {
+        width: 100px;
+        text-align: center;
+    }
+
+    .client-general-statistics__unit-price {
+        width: 120px;
+    }
+
+    .client-general-statistics__amount {
+        width: 140px;
+    }
+
+    .client-general-statistics__money {
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    .client-general-statistics__name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .client-general-statistics__negative {
+        color: var(--color-red);
+    }
+
+    .client-general-statistics__empty {
+        display: flex;
+        min-height: 72px;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        border: 1px solid var(--separator-color);
+        border-radius: 6px;
+        color: var(--disabled-color);
+        text-align: center;
+    }
+}
+
+@media (max-width: 900px) {
+    .client-general-statistics {
+        padding: 16px;
+
+        .client-general-statistics__table {
+            min-width: 780px;
+        }
+    }
+}

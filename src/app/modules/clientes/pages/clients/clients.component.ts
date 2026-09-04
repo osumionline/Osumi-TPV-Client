@@ -19,6 +19,7 @@ import type ClienteWorkspaceSection from '@model/clientes/cliente-workspace-sect
 import type ClienteWorkspace from '@model/clientes/cliente-workspace.interface';
 import type Cliente from '@model/clientes/cliente.model';
 import ClientFormComponent from '@modules/clientes/components/client-form/client-form.component';
+import ClientGeneralStatisticsComponent from '@modules/clientes/components/client-general-statistics/client-general-statistics.component';
 import ClientSalesComponent from '@modules/clientes/components/client-sales/client-sales.component';
 import ClientSearchComponent from '@modules/clientes/components/client-search/client-search.component';
 import ClientSectionTabsComponent from '@modules/clientes/components/client-section-tabs/client-section-tabs.component';
@@ -37,6 +38,7 @@ import { getErrorMessage } from '@utils/error.utils';
   styleUrl: './clients.component.scss',
   imports: [
     ClientFormComponent,
+    ClientGeneralStatisticsComponent,
     ClientSalesComponent,
     ClientSearchComponent,
     ClientSectionTabsComponent,
