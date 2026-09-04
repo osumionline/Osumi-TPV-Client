@@ -1,5 +1,9 @@
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type {
+  ClienteConsumoMensualConsulta,
+  ClienteConsumoMensualResultado,
+} from '@desktop-contracts/clientes/cliente-consumo-mensual.interface';
+import type {
   ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
@@ -18,4 +22,11 @@ export default interface ClientesApi {
   getEstadisticas(publicId: string): Promise<ClienteEstadisticasInterface>;
 
   getEstadisticasGenerales(publicId: string): Promise<ClienteEstadisticasGeneralesInterface>;
+
+  /**
+   * Obtiene la serie temporal del consumo de un cliente.
+   */
+  getConsumoMensual(
+    consulta: ClienteConsumoMensualConsulta,
+  ): Promise<ClienteConsumoMensualResultado>;
 }

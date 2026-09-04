@@ -2,6 +2,10 @@ import type { Signal, WritableSignal } from '@angular/core';
 import { computed, Service, signal } from '@angular/core';
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type {
+  ClienteConsumoMensualConsulta,
+  ClienteConsumoMensualResultado,
+} from '@desktop-contracts/clientes/cliente-consumo-mensual.interface';
+import type {
   ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
@@ -308,6 +312,16 @@ export default class ClientesService {
    */
   getEstadisticasGenerales(publicId: string): Promise<ClienteEstadisticasGeneralesInterface> {
     return window.osumiDesktop.clientes.getEstadisticasGenerales(publicId);
+  }
+
+  /**
+   * Solicita la serie temporal de consumo mensual
+   * correspondiente a los filtros indicados.
+   */
+  getConsumoMensual(
+    consulta: ClienteConsumoMensualConsulta,
+  ): Promise<ClienteConsumoMensualResultado> {
+    return window.osumiDesktop.clientes.getConsumoMensual(consulta);
   }
 
   /**

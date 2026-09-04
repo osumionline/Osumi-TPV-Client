@@ -1,5 +1,9 @@
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type {
+  ClienteConsumoMensualConsulta,
+  ClienteConsumoMensualResultado,
+} from '@desktop-contracts/clientes/cliente-consumo-mensual.interface';
+import type {
   ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
@@ -22,6 +26,7 @@ describe('ClientesService', (): void => {
   let receivedDeactivatePublicId: string | null;
   let receivedGeneralStatisticsPublicId: string | null;
   let deactivateError: Error | null;
+  let receivedConsumoMensualConsulta: ClienteConsumoMensualConsulta | null;
 
   beforeEach((): void => {
     originalDesktopDescriptor = Object.getOwnPropertyDescriptor(window, 'osumiDesktop');
@@ -33,6 +38,7 @@ describe('ClientesService', (): void => {
     receivedDeactivatePublicId = null;
     receivedGeneralStatisticsPublicId = null;
     deactivateError = null;
+    receivedConsumoMensualConsulta = null;
 
     Object.defineProperty(window, 'osumiDesktop', {
       configurable: true,
@@ -64,6 +70,13 @@ describe('ClientesService', (): void => {
             receivedGeneralStatisticsPublicId = publicId;
 
             return Promise.resolve(createEstadisticasGenerales());
+          },
+          getConsumoMensual: (
+            consulta: ClienteConsumoMensualConsulta,
+          ): Promise<ClienteConsumoMensualResultado> => {
+            receivedConsumoMensualConsulta = consulta;
+
+            return Promise.resolve(createConsumoMensual());
           },
         },
       },
@@ -450,6 +463,21 @@ describe('ClientesService', (): void => {
     expect(result).toEqual(createEstadisticasGenerales());
     expect(requestCount).toBe(0);
   });
+
+  it('solicita el consumo mensual mediante su API específica', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    const consulta: ClienteConsumoMensualConsulta = {
+      clientePublicId: 'cliente-7',
+      year: null,
+      month: 8,
+    };
+
+    const result: ClienteConsumoMensualResultado = await service.getConsumoMensual(consulta);
+
+    expect(receivedConsumoMensualConsulta).toBe(consulta);
+    expect(result).toEqual(createConsumoMensual());
+    expect(requestCount).toBe(0);
+  });
 });
 
 function createEstadisticas(nombre: string): ClienteEstadisticasInterface {
@@ -532,5 +560,29 @@ function createClienteInterface(
     observaciones: null,
     descuento: 0,
     ultimaVenta: null,
+  };
+}
+
+/**
+ * Crea una serie de consumo mensual para las pruebas.
+ */
+function createConsumoMensual(): ClienteConsumoMensualResultado {
+  return {
+    availableYears: [2025, 2026],
+    points: [
+      {
+        year: 2025,
+        month: 8,
+        day: null,
+        importeMicros: 4_000_000,
+      },
+      {
+        year: 2026,
+        month: 8,
+        day: null,
+        importeMicros: 8_000_000,
+      },
+    ],
+    totalMicros: 12_000_000,
   };
 }

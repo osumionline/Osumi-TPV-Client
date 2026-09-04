@@ -1,6 +1,10 @@
 import type ClientesService from '@backend/application/clientes/clientes.service';
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type {
+  ClienteConsumoMensualConsulta,
+  ClienteConsumoMensualResultado,
+} from '@desktop-contracts/clientes/cliente-consumo-mensual.interface';
+import type {
   ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
@@ -72,6 +76,19 @@ export default function registerClientesIpc(
       assertTrustedSender(event, getMainWindow);
 
       return clientesService.getEstadisticasGenerales(publicId);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.clientesGetConsumoMensual,
+
+    async (
+      event,
+      consulta: ClienteConsumoMensualConsulta,
+    ): Promise<ClienteConsumoMensualResultado> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return clientesService.getConsumoMensual(consulta);
     },
   );
 }

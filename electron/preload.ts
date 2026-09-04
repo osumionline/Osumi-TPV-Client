@@ -16,6 +16,10 @@ import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.inte
 import type CategoriaInterface from '@desktop-contracts/categorias/categoria.interface';
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type {
+  ClienteConsumoMensualConsulta,
+  ClienteConsumoMensualResultado,
+} from '@desktop-contracts/clientes/cliente-consumo-mensual.interface';
+import type {
   ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
@@ -265,6 +269,14 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         IPC_CHANNELS.clientesGetEstadisticasGenerales,
         publicId,
       ) as Promise<ClienteEstadisticasGeneralesInterface>,
+
+    getConsumoMensual: (
+      consulta: ClienteConsumoMensualConsulta,
+    ): Promise<ClienteConsumoMensualResultado> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.clientesGetConsumoMensual,
+        consulta,
+      ) as Promise<ClienteConsumoMensualResultado>,
   }),
 
   caja: Object.freeze({
