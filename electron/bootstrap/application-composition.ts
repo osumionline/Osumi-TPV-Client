@@ -4,6 +4,7 @@ import ApplicationStateService from '@backend/application/application/applicatio
 import ArticulosService from '@backend/application/articulos/articulos.service';
 import CajaService from '@backend/application/caja/caja.service';
 import CategoriasService from '@backend/application/categorias/categorias.service';
+import ClienteFacturasService from '@backend/application/clientes/cliente-facturas.service';
 import ClientesService from '@backend/application/clientes/clientes.service';
 import ConfigurationService from '@backend/application/configuration/configuration.service';
 import InstallationService from '@backend/application/configuration/installation.service';
@@ -29,6 +30,7 @@ import VentasTicketsService from '@backend/application/ventas/ventas-tickets.ser
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';
+import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type ClienteRepository from '@backend/contracts/clientes/cliente.repository.interface';
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
 import type InstallationDatabase from '@backend/contracts/configuration/installation-database.interface';
@@ -67,6 +69,7 @@ import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm
 import TypeOrmArticulosRepository from '@infrastructure/database/typeorm/typeorm-articulos.repository';
 import TypeOrmCajaRepository from '@infrastructure/database/typeorm/typeorm-caja.repository';
 import TypeOrmCategoriaRepository from '@infrastructure/database/typeorm/typeorm-categoria.repository';
+import TypeOrmClienteFacturasRepository from '@infrastructure/database/typeorm/typeorm-cliente-facturas.repository';
 import TypeOrmClienteRepository from '@infrastructure/database/typeorm/typeorm-cliente.repository';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import TypeOrmEmpleadoRepository from '@infrastructure/database/typeorm/typeorm-empleado.repository';
@@ -260,6 +263,13 @@ export default function createApplicationComposition(
 
   const clienteRepository: ClienteRepository = new TypeOrmClienteRepository(operationalDatabase);
   const clientesService: ClientesService = new ClientesService(clienteRepository);
+
+  const clienteFacturasRepository: ClienteFacturasRepository = new TypeOrmClienteFacturasRepository(
+    operationalDatabase,
+  );
+  const clienteFacturasService: ClienteFacturasService = new ClienteFacturasService(
+    clienteFacturasRepository,
+  );
 
   const reservasRepository: ReservasRepository = new TypeOrmReservasRepository(operationalDatabase);
   const reservasService: ReservasService = new ReservasService(reservasRepository);
@@ -457,7 +467,7 @@ export default function createApplicationComposition(
   registerMarcasIpc(getMainWindow, marcasService);
   registerProveedoresIpc(getMainWindow, proveedoresService);
   registerEmpleadosIpc(getMainWindow, empleadosService);
-  registerClientesIpc(getMainWindow, clientesService);
+  registerClientesIpc(getMainWindow, clientesService, clienteFacturasService);
   registerCategoriasIpc(getMainWindow, categoriasService);
   registerCajaIpc(getMainWindow, cajaService);
   registerReservasIpc(getMainWindow, reservasService);

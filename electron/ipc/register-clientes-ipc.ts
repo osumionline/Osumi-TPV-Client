@@ -1,3 +1,4 @@
+import type ClienteFacturasService from '@backend/application/clientes/cliente-facturas.service';
 import type ClientesService from '@backend/application/clientes/clientes.service';
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type {
@@ -8,6 +9,7 @@ import type {
   ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
@@ -18,6 +20,7 @@ import { ipcMain } from 'electron';
 export default function registerClientesIpc(
   getMainWindow: MainWindowProvider,
   clientesService: ClientesService,
+  clienteFacturasService: ClienteFacturasService,
 ): void {
   ipcMain.handle(
     IPC_CHANNELS.clientesGetAll,
@@ -56,6 +59,16 @@ export default function registerClientesIpc(
       assertTrustedSender(event, getMainWindow);
 
       await clientesService.deactivate(publicId);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.clientesGetFacturas,
+
+    async (event, publicId: string): Promise<readonly ClienteFacturaInterface[]> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return clienteFacturasService.getByClientePublicId(publicId);
     },
   );
 
