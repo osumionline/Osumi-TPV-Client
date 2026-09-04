@@ -1,3 +1,4 @@
+import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
 import type { ClienteFacturaRecord } from '@backend/domain/clientes/cliente-factura-record.interface';
 import type { ClienteFacturaVentaDisponibleRecord } from '@backend/domain/clientes/cliente-factura-venta-record.interface';
 
@@ -7,6 +8,12 @@ export default interface ClienteFacturasRepository {
    * ordenadas desde la más reciente.
    */
   findByClientePublicId(publicId: string): Promise<readonly ClienteFacturaRecord[]>;
+
+  /**
+   * Crea un borrador revalidando y relacionando
+   * sus ventas dentro de una única transacción.
+   */
+  createBorrador(command: CrearClienteFacturaBorradorRecordCommand): Promise<ClienteFacturaRecord>;
 
   /**
    * Recupera las ventas elegibles para una factura.

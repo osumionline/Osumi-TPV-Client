@@ -14,6 +14,29 @@ let tempDirectory: string | null = null;
 let applicationDatabase: TypeOrmApplicationDatabase | null = null;
 let repository: TypeOrmClienteFacturasRepository | null = null;
 
+interface ClienteFacturaBorradorDatabaseRow {
+  readonly public_id: string;
+  readonly nombre_apellidos: string;
+  readonly dni_cif: string | null;
+  readonly telefono: string | null;
+  readonly email: string | null;
+  readonly direccion: string | null;
+  readonly codigo_postal: string | null;
+  readonly poblacion: string | null;
+  readonly id_provincia: number | null;
+  readonly importe_cents: number;
+  readonly estado: string;
+  readonly numero: number | null;
+  readonly fecha_emision: string | null;
+  readonly fecha_anulacion: string | null;
+  readonly deleted_at: string | null;
+}
+
+interface ClienteFacturaVentaRelacionDatabaseRow {
+  readonly public_id: string;
+  readonly activa: number;
+}
+
 describe('TypeOrmClienteFacturasRepository', (): void => {
   beforeEach(async (): Promise<void> => {
     tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-cliente-facturas-'));
@@ -105,6 +128,165 @@ describe('TypeOrmClienteFacturasRepository', (): void => {
     expect(await requireRepository().findByClientePublicId('cliente-inexistente')).toEqual([]);
 
     expect(await requireRepository().findByClientePublicId('cliente-inactivo')).toEqual([]);
+  });
+
+  it('crea un borrador transaccional con los datos actuales y el importe recalculado', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    await dataSource.query(`
+      UPDATE cliente
+      SET
+        datos_facturacion_iguales = 0,
+        fact_nombre_apellidos = 'Facturación principal',
+        fact_dni_cif = 'B12345678',
+        fact_telefono = '944000000',
+        fact_email = 'facturacion@example.com',
+        fact_direccion = 'Gran Vía 1',
+        fact_codigo_postal = '48001',
+        fact_poblacion = 'Bilbao',
+        fact_id_provincia = 48
+      WHERE public_id = 'cliente-1'
+    `);
+
+    const result: ClienteFacturaRecord = await requireRepository().createBorrador({
+      clientePublicId: 'cliente-1',
+      ventasPublicIds: ['venta-disponible', 'venta-historica'],
+    });
+
+    expect(result.publicId).not.toBe('');
+    expect(result).toEqual({
+      publicId: result.publicId,
+      serie: '',
+      numero: null,
+      year: null,
+      estado: 'borrador',
+      importeCents: 2_500,
+      fechaCreacion: result.fechaCreacion,
+      fechaEmision: null,
+      fechaAnulacion: null,
+    });
+
+    const facturas: readonly ClienteFacturaBorradorDatabaseRow[] = (await dataSource.query(
+      `
+          SELECT
+            public_id,
+            nombre_apellidos,
+            dni_cif,
+            telefono,
+            email,
+            direccion,
+            codigo_postal,
+            poblacion,
+            id_provincia,
+            importe_cents,
+            estado,
+            numero,
+            fecha_emision,
+            fecha_anulacion,
+            deleted_at
+          FROM factura
+          WHERE public_id = ?
+        `,
+      [result.publicId],
+    )) as readonly ClienteFacturaBorradorDatabaseRow[];
+
+    expect(facturas).toEqual([
+      {
+        public_id: result.publicId,
+        nombre_apellidos: 'Facturación principal',
+        dni_cif: 'B12345678',
+        telefono: '944000000',
+        email: 'facturacion@example.com',
+        direccion: 'Gran Vía 1',
+        codigo_postal: '48001',
+        poblacion: 'Bilbao',
+        id_provincia: 48,
+        importe_cents: 2_500,
+        estado: 'borrador',
+        numero: null,
+        fecha_emision: null,
+        fecha_anulacion: null,
+        deleted_at: null,
+      },
+    ]);
+
+    const relaciones: readonly ClienteFacturaVentaRelacionDatabaseRow[] = (await dataSource.query(
+      `
+          SELECT
+            v.public_id,
+            fv.activa
+          FROM factura_venta fv
+
+          INNER JOIN factura f
+            ON f.id = fv.id_factura
+
+          INNER JOIN venta v
+            ON v.id = fv.id_venta
+
+          WHERE f.public_id = ?
+
+          ORDER BY v.public_id
+        `,
+      [result.publicId],
+    )) as readonly ClienteFacturaVentaRelacionDatabaseRow[];
+
+    expect(relaciones).toEqual([
+      {
+        public_id: 'venta-disponible',
+        activa: 1,
+      },
+      {
+        public_id: 'venta-historica',
+        activa: 1,
+      },
+    ]);
+  });
+
+  it('rechaza borradores vacíos, ventas duplicadas y ventas no disponibles sin persistir nada', async (): Promise<void> => {
+    const initialCount: number = await countFacturas();
+
+    await expect(
+      requireRepository().createBorrador({
+        clientePublicId: 'cliente-1',
+        ventasPublicIds: [],
+      }),
+    ).rejects.toThrow('La factura debe incluir al menos una venta.');
+
+    await expect(
+      requireRepository().createBorrador({
+        clientePublicId: 'cliente-1',
+        ventasPublicIds: ['venta-disponible', 'venta-disponible'],
+      }),
+    ).rejects.toThrow('Una venta no se puede incluir más de una vez en la misma factura.');
+
+    await expect(
+      requireRepository().createBorrador({
+        clientePublicId: 'cliente-1',
+        ventasPublicIds: ['venta-disponible', 'venta-facturada'],
+      }),
+    ).rejects.toThrow('Alguna de las ventas seleccionadas ya no está disponible para facturar.');
+
+    expect(await countFacturas()).toBe(initialCount);
+  });
+
+  it('rechaza la creación para clientes inexistentes o inactivos', async (): Promise<void> => {
+    const initialCount: number = await countFacturas();
+
+    await expect(
+      requireRepository().createBorrador({
+        clientePublicId: 'cliente-inexistente',
+        ventasPublicIds: ['venta-disponible'],
+      }),
+    ).rejects.toThrow('El cliente indicado no existe o ya no está activo.');
+
+    await expect(
+      requireRepository().createBorrador({
+        clientePublicId: 'cliente-inactivo',
+        ventasPublicIds: ['venta-cliente-inactivo'],
+      }),
+    ).rejects.toThrow('El cliente indicado no existe o ya no está activo.');
+
+    expect(await countFacturas()).toBe(initialCount);
   });
 
   it('recupera únicamente las ventas disponibles para una factura nueva', async (): Promise<void> => {
@@ -661,6 +843,31 @@ async function seedVentas(dataSource: DataSource): Promise<void> {
       (2, 8, 1),
       (3, 10, 0)
   `);
+}
+
+/**
+ * Devuelve la conexión utilizada por la prueba.
+ */
+async function requireDataSource(): Promise<DataSource> {
+  if (applicationDatabase === null) {
+    throw new Error('La base de datos de facturas de Clientes no está inicializada.');
+  }
+
+  return applicationDatabase.connect();
+}
+
+/**
+ * Cuenta las facturas persistidas actualmente.
+ */
+async function countFacturas(): Promise<number> {
+  const dataSource: DataSource = await requireDataSource();
+
+  const rows: readonly { readonly total: number }[] = (await dataSource.query(`
+    SELECT COUNT(*) AS total
+    FROM factura
+  `)) as readonly { readonly total: number }[];
+
+  return rows[0]?.total ?? 0;
 }
 
 /**

@@ -1,4 +1,5 @@
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
+import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
 import type {
   ClienteFacturaEstadoRecord,
   ClienteFacturaRecord,
@@ -7,8 +8,11 @@ import type {
   ClienteFacturaVentaDisponibleRecord,
   ClienteFacturaVentaPagoRecord,
 } from '@backend/domain/clientes/cliente-factura-venta-record.interface';
+import { getLastInsertId } from '@infrastructure/database/typeorm/sqlite.utils';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
-import type { DataSource } from 'typeorm';
+import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
+import { randomUUID } from 'node:crypto';
+import type { DataSource, QueryRunner } from 'typeorm';
 
 interface ClienteFacturaDatabaseRow {
   readonly public_id: string;
@@ -44,6 +48,24 @@ interface ClienteFacturaVentaAccumulator {
   readonly totalCents: number;
   readonly incluidaEnBorrador: boolean;
   readonly pagos: ClienteFacturaVentaPagoRecord[];
+}
+
+interface ClienteFacturaClienteDatabaseRow {
+  readonly id: number;
+  readonly nombre_apellidos: string;
+  readonly dni_cif: string | null;
+  readonly telefono: string | null;
+  readonly email: string | null;
+  readonly direccion: string | null;
+  readonly codigo_postal: string | null;
+  readonly poblacion: string | null;
+  readonly id_provincia: number | null;
+}
+
+interface ClienteFacturaVentaSeleccionadaDatabaseRow {
+  readonly id: number;
+  readonly public_id: string;
+  readonly total_cents: number;
 }
 
 export default class TypeOrmClienteFacturasRepository implements ClienteFacturasRepository {
@@ -110,6 +132,57 @@ export default class TypeOrmClienteFacturasRepository implements ClienteFacturas
       fechaEmision: row.fecha_emision,
       fechaAnulacion: row.fecha_anulacion,
     }));
+  }
+
+  /**
+   * Crea un borrador utilizando exclusivamente datos
+   * canónicos y ventas revalidadas dentro de la transacción.
+   */
+  async createBorrador(
+    command: CrearClienteFacturaBorradorRecordCommand,
+  ): Promise<ClienteFacturaRecord> {
+    const ventasPublicIds: readonly string[] = this.normalizeVentaPublicIds(
+      command.ventasPublicIds,
+    );
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+    const publicId: string = randomUUID();
+    const timestamp: string = new Date().toISOString();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<ClienteFacturaRecord> => {
+        const cliente: ClienteFacturaClienteDatabaseRow = await this.resolveClienteFacturacion(
+          queryRunner,
+          command.clientePublicId,
+        );
+
+        const ventas: readonly ClienteFacturaVentaSeleccionadaDatabaseRow[] =
+          await this.resolveVentasSeleccionadas(queryRunner, cliente.id, ventasPublicIds);
+
+        const importeCents: number = this.sumImporteVentas(ventas);
+
+        await this.insertBorrador(queryRunner, publicId, cliente, importeCents, timestamp);
+
+        const facturaId: number = await getLastInsertId(
+          queryRunner,
+          'No se ha podido obtener el identificador del borrador creado.',
+        );
+
+        await this.insertRelacionesBorrador(queryRunner, facturaId, ventas, timestamp);
+
+        return {
+          publicId,
+          serie: '',
+          numero: null,
+          year: null,
+          estado: 'borrador',
+          importeCents,
+          fechaCreacion: timestamp,
+          fechaEmision: null,
+          fechaAnulacion: null,
+        };
+      },
+    );
   }
 
   /**
@@ -244,5 +317,290 @@ export default class TypeOrmClienteFacturasRepository implements ClienteFacturas
     }
 
     return Array.from(ventas.values());
+  }
+
+  /**
+   * Normaliza los identificadores seleccionados y rechaza
+   * listas vacías, valores inválidos o duplicados.
+   */
+  private normalizeVentaPublicIds(values: readonly string[]): readonly string[] {
+    if (!Array.isArray(values) || values.length === 0) {
+      throw new Error('La factura debe incluir al menos una venta.');
+    }
+
+    const normalizedValues: readonly string[] = values.map((value: string): string => {
+      if (typeof value !== 'string') {
+        throw new Error('Una de las ventas seleccionadas no tiene un identificador válido.');
+      }
+
+      const normalizedValue: string = value.trim();
+
+      if (normalizedValue.length === 0) {
+        throw new Error('Una de las ventas seleccionadas no tiene un identificador válido.');
+      }
+
+      return normalizedValue;
+    });
+
+    if (new Set<string>(normalizedValues).size !== normalizedValues.length) {
+      throw new Error('Una venta no se puede incluir más de una vez en la misma factura.');
+    }
+
+    return normalizedValues;
+  }
+
+  /**
+   * Recupera el cliente activo y construye los datos de
+   * facturación efectivos que se copiarán al borrador.
+   */
+  private async resolveClienteFacturacion(
+    queryRunner: QueryRunner,
+    publicId: string,
+  ): Promise<ClienteFacturaClienteDatabaseRow> {
+    const rows: readonly ClienteFacturaClienteDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT
+          c.id,
+          CASE
+            WHEN c.datos_facturacion_iguales = 1
+              THEN c.nombre_apellidos
+            ELSE COALESCE(
+              c.fact_nombre_apellidos,
+              c.nombre_apellidos
+            )
+          END AS nombre_apellidos,
+          CASE
+            WHEN c.datos_facturacion_iguales = 1
+              THEN c.dni_cif
+            ELSE c.fact_dni_cif
+          END AS dni_cif,
+          CASE
+            WHEN c.datos_facturacion_iguales = 1
+              THEN c.telefono
+            ELSE c.fact_telefono
+          END AS telefono,
+          CASE
+            WHEN c.datos_facturacion_iguales = 1
+              THEN c.email
+            ELSE c.fact_email
+          END AS email,
+          CASE
+            WHEN c.datos_facturacion_iguales = 1
+              THEN c.direccion
+            ELSE c.fact_direccion
+          END AS direccion,
+          CASE
+            WHEN c.datos_facturacion_iguales = 1
+              THEN c.codigo_postal
+            ELSE c.fact_codigo_postal
+          END AS codigo_postal,
+          CASE
+            WHEN c.datos_facturacion_iguales = 1
+              THEN c.poblacion
+            ELSE c.fact_poblacion
+          END AS poblacion,
+          CASE
+            WHEN c.datos_facturacion_iguales = 1
+              THEN c.id_provincia
+            ELSE c.fact_id_provincia
+          END AS id_provincia
+        FROM cliente c
+        WHERE
+          c.public_id = ?
+          AND c.deleted_at IS NULL
+        LIMIT 1
+      `,
+      [publicId],
+    )) as readonly ClienteFacturaClienteDatabaseRow[];
+
+    const cliente: ClienteFacturaClienteDatabaseRow | undefined = rows[0];
+
+    if (cliente === undefined) {
+      throw new Error('El cliente indicado no existe o ya no está activo.');
+    }
+
+    return cliente;
+  }
+
+  /**
+   * Revalida las ventas seleccionadas dentro de la transacción.
+   */
+  private async resolveVentasSeleccionadas(
+    queryRunner: QueryRunner,
+    clienteId: number,
+    publicIds: readonly string[],
+  ): Promise<readonly ClienteFacturaVentaSeleccionadaDatabaseRow[]> {
+    const placeholders: string = publicIds.map((): string => '?').join(', ');
+
+    const rows: readonly ClienteFacturaVentaSeleccionadaDatabaseRow[] = (await queryRunner.query(
+      `
+          SELECT
+            v.id,
+            v.public_id,
+            v.total_cents
+          FROM venta v
+          WHERE
+            v.public_id IN (${placeholders})
+            AND v.id_cliente = ?
+            AND v.deleted_at IS NULL
+            AND v.total_cents > 0
+            AND v.id_venta_origen_devolucion IS NULL
+            AND NOT EXISTS (
+              SELECT 1
+              FROM linea_venta lv
+              WHERE
+                lv.id_venta = v.id
+                AND (
+                  lv.unidades < 0
+                  OR lv.id_linea_venta_origen_devolucion IS NOT NULL
+                )
+            )
+            AND NOT EXISTS (
+              SELECT 1
+              FROM factura_venta fv
+              WHERE
+                fv.id_venta = v.id
+                AND fv.activa = 1
+            )
+        `,
+      [...publicIds, clienteId],
+    )) as readonly ClienteFacturaVentaSeleccionadaDatabaseRow[];
+
+    if (rows.length !== publicIds.length) {
+      throw new Error('Alguna de las ventas seleccionadas ya no está disponible para facturar.');
+    }
+
+    return rows;
+  }
+
+  /**
+   * Suma los importes canónicos de las ventas comprobando
+   * que el resultado siga siendo un entero seguro.
+   */
+  private sumImporteVentas(ventas: readonly ClienteFacturaVentaSeleccionadaDatabaseRow[]): number {
+    let importeCents: bigint = 0n;
+
+    for (const venta of ventas) {
+      if (!Number.isSafeInteger(venta.total_cents) || venta.total_cents <= 0) {
+        throw new Error('El importe de una de las ventas seleccionadas no es válido.');
+      }
+
+      importeCents += BigInt(venta.total_cents);
+    }
+
+    const result: number = Number(importeCents);
+
+    if (!Number.isSafeInteger(result)) {
+      throw new Error('El importe de la factura supera el rango numérico seguro.');
+    }
+
+    return result;
+  }
+
+  /**
+   * Inserta el borrador con una instantánea de los
+   * datos de facturación actuales del cliente.
+   */
+  private async insertBorrador(
+    queryRunner: QueryRunner,
+    publicId: string,
+    cliente: ClienteFacturaClienteDatabaseRow,
+    importeCents: number,
+    timestamp: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+        INSERT INTO factura (
+          public_id,
+          id_cliente,
+          serie,
+          numero,
+          estado,
+          nombre_apellidos,
+          dni_cif,
+          telefono,
+          email,
+          direccion,
+          codigo_postal,
+          poblacion,
+          id_provincia,
+          importe_cents,
+          impresa,
+          fecha_emision,
+          fecha_anulacion,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          ?,
+          ?,
+          '',
+          NULL,
+          'borrador',
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          0,
+          NULL,
+          NULL,
+          ?,
+          ?
+        )
+      `,
+      [
+        publicId,
+        cliente.id,
+        cliente.nombre_apellidos,
+        cliente.dni_cif,
+        cliente.telefono,
+        cliente.email,
+        cliente.direccion,
+        cliente.codigo_postal,
+        cliente.poblacion,
+        cliente.id_provincia,
+        importeCents,
+        timestamp,
+        timestamp,
+      ],
+    );
+  }
+
+  /**
+   * Crea las relaciones activas entre el borrador
+   * y todas sus ventas seleccionadas.
+   */
+  private async insertRelacionesBorrador(
+    queryRunner: QueryRunner,
+    facturaId: number,
+    ventas: readonly ClienteFacturaVentaSeleccionadaDatabaseRow[],
+    timestamp: string,
+  ): Promise<void> {
+    for (const venta of ventas) {
+      await queryRunner.query(
+        `
+          INSERT INTO factura_venta (
+            id_factura,
+            id_venta,
+            activa,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            ?,
+            ?,
+            1,
+            ?,
+            ?
+          )
+        `,
+        [facturaId, venta.id, timestamp, timestamp],
+      );
+    }
   }
 }
