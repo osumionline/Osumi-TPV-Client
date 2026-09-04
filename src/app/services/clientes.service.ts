@@ -9,6 +9,10 @@ import type {
   ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type {
+  ClienteFacturaVentaDisponibleInterface,
+  ClienteFacturaVentasDisponiblesConsulta,
+} from '@desktop-contracts/clientes/cliente-factura-venta.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
@@ -338,6 +342,19 @@ export default class ClientesService {
     consulta: ClienteConsumoMensualConsulta,
   ): Promise<ClienteConsumoMensualResultado> {
     return window.osumiDesktop.clientes.getConsumoMensual(consulta);
+  }
+
+  /**
+   * Solicita una instantánea actual de las ventas
+   * disponibles para crear o editar una factura.
+   *
+   * Esta consulta no se cachea porque la disponibilidad
+   * puede cambiar después de cualquier operación de facturación.
+   */
+  getFacturaVentasDisponibles(
+    consulta: ClienteFacturaVentasDisponiblesConsulta,
+  ): Promise<readonly ClienteFacturaVentaDisponibleInterface[]> {
+    return window.osumiDesktop.clientes.getFacturaVentasDisponibles(consulta);
   }
 
   /**

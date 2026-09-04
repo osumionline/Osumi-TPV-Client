@@ -7,6 +7,10 @@ import type {
   ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type {
+  ClienteFacturaVentaDisponibleInterface,
+  ClienteFacturaVentasDisponiblesConsulta,
+} from '@desktop-contracts/clientes/cliente-factura-venta.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
@@ -24,6 +28,8 @@ describe('ClientesService', (): void => {
   let facturasResult: readonly ClienteFacturaInterface[];
   let facturasRequestFactory: (() => Promise<readonly ClienteFacturaInterface[]>) | null;
   let receivedFacturasPublicId: string | null;
+  let ventasDisponiblesResult: readonly ClienteFacturaVentaDisponibleInterface[];
+  let receivedVentasDisponiblesConsulta: ClienteFacturaVentasDisponiblesConsulta | null;
   let createdCliente: ClienteInterface;
   let updatedCliente: ClienteInterface;
   let receivedCreateCommand: CrearClienteCommand | null;
@@ -40,6 +46,8 @@ describe('ClientesService', (): void => {
     facturasResult = createFacturas(12_345);
     facturasRequestFactory = null;
     receivedFacturasPublicId = null;
+    ventasDisponiblesResult = createVentasDisponibles();
+    receivedVentasDisponiblesConsulta = null;
     createdCliente = createClienteInterface(7, 'cliente-7', 'Ada Lovelace');
     updatedCliente = createClienteInterface(7, 'cliente-7', 'Ada Lovelace');
     receivedCreateCommand = null;
@@ -73,6 +81,13 @@ describe('ClientesService', (): void => {
             facturasRequestCount++;
 
             return facturasRequestFactory?.() ?? Promise.resolve(facturasResult);
+          },
+          getFacturaVentasDisponibles: (
+            consulta: ClienteFacturaVentasDisponiblesConsulta,
+          ): Promise<readonly ClienteFacturaVentaDisponibleInterface[]> => {
+            receivedVentasDisponiblesConsulta = consulta;
+
+            return Promise.resolve(ventasDisponiblesResult);
           },
           getEstadisticas: (): Promise<ClienteEstadisticasInterface> => {
             requestCount++;
@@ -550,6 +565,21 @@ describe('ClientesService', (): void => {
     expect(service.workspace()?.dirty).toBe(true);
   });
 
+  it('solicita las ventas disponibles mediante su API específica', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    const consulta: ClienteFacturaVentasDisponiblesConsulta = {
+      clientePublicId: 'cliente-7',
+      borradorPublicId: 'factura-borrador',
+    };
+
+    const result: readonly ClienteFacturaVentaDisponibleInterface[] =
+      await service.getFacturaVentasDisponibles(consulta);
+
+    expect(receivedVentasDisponiblesConsulta).toBe(consulta);
+    expect(result).toEqual(createVentasDisponibles());
+    expect(facturasRequestCount).toBe(0);
+  });
+
   it('solicita las estadísticas generales mediante su API específica', async (): Promise<void> => {
     const service: ClientesService = new ClientesService();
 
@@ -576,6 +606,31 @@ describe('ClientesService', (): void => {
     expect(requestCount).toBe(0);
   });
 });
+
+/**
+ * Crea una colección de ventas disponibles para
+ * las pruebas del acceso Angular.
+ */
+function createVentasDisponibles(): readonly ClienteFacturaVentaDisponibleInterface[] {
+  return [
+    {
+      id: 41,
+      publicId: 'venta-41',
+      serie: '',
+      numero: 412,
+      fecha: '2026-08-31T10:30:00.000Z',
+      totalCents: 1_250,
+      incluidaEnBorrador: true,
+      pagos: [
+        {
+          tipoPagoPublicId: 'efectivo',
+          nombre: 'Efectivo',
+          importeCents: 1_250,
+        },
+      ],
+    },
+  ];
+}
 
 /**
  * Crea una factura emitida para las pruebas del estado Angular.
