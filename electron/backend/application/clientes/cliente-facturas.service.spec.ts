@@ -33,6 +33,14 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
   }
 
   /**
+   * Devuelve un borrador válido para mantener completo
+   * el contrato utilizado por estas pruebas.
+   */
+  updateBorrador(): Promise<ClienteFacturaRecord> {
+    return Promise.resolve(createRecord());
+  }
+
+  /**
    * Registra la consulta y devuelve las ventas
    * disponibles preparadas para cada prueba.
    */

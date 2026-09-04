@@ -1,3 +1,4 @@
+import type ActualizarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/actualizar-cliente-factura-borrador-record-command.interface';
 import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
 import type { ClienteFacturaRecord } from '@backend/domain/clientes/cliente-factura-record.interface';
 import type { ClienteFacturaVentaDisponibleRecord } from '@backend/domain/clientes/cliente-factura-venta-record.interface';
@@ -14,6 +15,14 @@ export default interface ClienteFacturasRepository {
    * sus ventas dentro de una única transacción.
    */
   createBorrador(command: CrearClienteFacturaBorradorRecordCommand): Promise<ClienteFacturaRecord>;
+
+  /**
+   * Actualiza un borrador y sincroniza sus ventas
+   * dentro de una única transacción.
+   */
+  updateBorrador(
+    command: ActualizarClienteFacturaBorradorRecordCommand,
+  ): Promise<ClienteFacturaRecord>;
 
   /**
    * Recupera las ventas elegibles para una factura.

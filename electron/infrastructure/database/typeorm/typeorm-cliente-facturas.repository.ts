@@ -1,3 +1,4 @@
+import ActualizarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/actualizar-cliente-factura-borrador-record-command.interface';
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
 import type {
@@ -66,6 +67,12 @@ interface ClienteFacturaVentaSeleccionadaDatabaseRow {
   readonly id: number;
   readonly public_id: string;
   readonly total_cents: number;
+}
+
+interface ClienteFacturaBorradorEditableDatabaseRow {
+  readonly id: number;
+  readonly public_id: string;
+  readonly created_at: string;
 }
 
 export default class TypeOrmClienteFacturasRepository implements ClienteFacturasRepository {
@@ -157,7 +164,7 @@ export default class TypeOrmClienteFacturasRepository implements ClienteFacturas
         );
 
         const ventas: readonly ClienteFacturaVentaSeleccionadaDatabaseRow[] =
-          await this.resolveVentasSeleccionadas(queryRunner, cliente.id, ventasPublicIds);
+          await this.resolveVentasSeleccionadas(queryRunner, cliente.id, ventasPublicIds, null);
 
         const importeCents: number = this.sumImporteVentas(ventas);
 
@@ -178,6 +185,60 @@ export default class TypeOrmClienteFacturasRepository implements ClienteFacturas
           estado: 'borrador',
           importeCents,
           fechaCreacion: timestamp,
+          fechaEmision: null,
+          fechaAnulacion: null,
+        };
+      },
+    );
+  }
+
+  /**
+   * Actualiza un borrador revalidando todas sus ventas,
+   * su importe y los datos actuales del cliente.
+   */
+  async updateBorrador(
+    command: ActualizarClienteFacturaBorradorRecordCommand,
+  ): Promise<ClienteFacturaRecord> {
+    const borradorPublicId: string = this.normalizeBorradorPublicId(command.borradorPublicId);
+    const ventasPublicIds: readonly string[] = this.normalizeVentaPublicIds(
+      command.ventasPublicIds,
+    );
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+    const timestamp: string = new Date().toISOString();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<ClienteFacturaRecord> => {
+        const cliente: ClienteFacturaClienteDatabaseRow = await this.resolveClienteFacturacion(
+          queryRunner,
+          command.clientePublicId,
+        );
+
+        const borrador: ClienteFacturaBorradorEditableDatabaseRow =
+          await this.resolveBorradorEditable(queryRunner, cliente.id, borradorPublicId);
+
+        const ventas: readonly ClienteFacturaVentaSeleccionadaDatabaseRow[] =
+          await this.resolveVentasSeleccionadas(
+            queryRunner,
+            cliente.id,
+            ventasPublicIds,
+            borrador.id,
+          );
+
+        const importeCents: number = this.sumImporteVentas(ventas);
+
+        await this.updateBorradorData(queryRunner, borrador.id, cliente, importeCents, timestamp);
+
+        await this.syncRelacionesBorrador(queryRunner, borrador.id, ventas, timestamp);
+
+        return {
+          publicId: borrador.public_id,
+          serie: '',
+          numero: null,
+          year: null,
+          estado: 'borrador',
+          importeCents,
+          fechaCreacion: borrador.created_at,
           fechaEmision: null,
           fechaAnulacion: null,
         };
@@ -350,6 +411,23 @@ export default class TypeOrmClienteFacturasRepository implements ClienteFacturas
   }
 
   /**
+   * Normaliza el identificador requerido del borrador.
+   */
+  private normalizeBorradorPublicId(value: string): string {
+    if (typeof value !== 'string') {
+      throw new Error('El identificador del borrador de factura no es válido.');
+    }
+
+    const normalizedValue: string = value.trim();
+
+    if (normalizedValue.length === 0) {
+      throw new Error('El identificador del borrador de factura no es válido.');
+    }
+
+    return normalizedValue;
+  }
+
+  /**
    * Recupera el cliente activo y construye los datos de
    * facturación efectivos que se copiarán al borrador.
    */
@@ -423,12 +501,51 @@ export default class TypeOrmClienteFacturasRepository implements ClienteFacturas
   }
 
   /**
+   * Recupera un borrador editable perteneciente
+   * al cliente indicado.
+   */
+  private async resolveBorradorEditable(
+    queryRunner: QueryRunner,
+    clienteId: number,
+    publicId: string,
+  ): Promise<ClienteFacturaBorradorEditableDatabaseRow> {
+    const rows: readonly ClienteFacturaBorradorEditableDatabaseRow[] = (await queryRunner.query(
+      `
+          SELECT
+            f.id,
+            f.public_id,
+            f.created_at
+          FROM factura f
+          WHERE
+            f.public_id = ?
+            AND f.id_cliente = ?
+            AND f.estado = 'borrador'
+            AND f.deleted_at IS NULL
+          LIMIT 1
+        `,
+      [publicId, clienteId],
+    )) as readonly ClienteFacturaBorradorEditableDatabaseRow[];
+
+    const borrador: ClienteFacturaBorradorEditableDatabaseRow | undefined = rows[0];
+
+    if (borrador === undefined) {
+      throw new Error('El borrador de factura no pertenece al cliente o ya no está disponible.');
+    }
+
+    return borrador;
+  }
+
+  /**
    * Revalida las ventas seleccionadas dentro de la transacción.
+   *
+   * Al editar un borrador, sus propias relaciones activas
+   * no bloquean las ventas que se desean conservar.
    */
   private async resolveVentasSeleccionadas(
     queryRunner: QueryRunner,
     clienteId: number,
     publicIds: readonly string[],
+    facturaIdPermitida: number | null,
   ): Promise<readonly ClienteFacturaVentaSeleccionadaDatabaseRow[]> {
     const placeholders: string = publicIds.map((): string => '?').join(', ');
 
@@ -461,9 +578,13 @@ export default class TypeOrmClienteFacturasRepository implements ClienteFacturas
               WHERE
                 fv.id_venta = v.id
                 AND fv.activa = 1
+                AND (
+                  ? IS NULL
+                  OR fv.id_factura <> ?
+                )
             )
         `,
-      [...publicIds, clienteId],
+      [...publicIds, clienteId, facturaIdPermitida, facturaIdPermitida],
     )) as readonly ClienteFacturaVentaSeleccionadaDatabaseRow[];
 
     if (rows.length !== publicIds.length) {
@@ -569,6 +690,104 @@ export default class TypeOrmClienteFacturasRepository implements ClienteFacturas
         timestamp,
       ],
     );
+  }
+
+  /**
+   * Actualiza el importe y la instantánea de facturación
+   * del borrador sin modificar su fecha de creación.
+   */
+  private async updateBorradorData(
+    queryRunner: QueryRunner,
+    facturaId: number,
+    cliente: ClienteFacturaClienteDatabaseRow,
+    importeCents: number,
+    timestamp: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+        UPDATE factura
+        SET
+          nombre_apellidos = ?,
+          dni_cif = ?,
+          telefono = ?,
+          email = ?,
+          direccion = ?,
+          codigo_postal = ?,
+          poblacion = ?,
+          id_provincia = ?,
+          importe_cents = ?,
+          updated_at = ?
+        WHERE
+          id = ?
+          AND estado = 'borrador'
+          AND deleted_at IS NULL
+      `,
+      [
+        cliente.nombre_apellidos,
+        cliente.dni_cif,
+        cliente.telefono,
+        cliente.email,
+        cliente.direccion,
+        cliente.codigo_postal,
+        cliente.poblacion,
+        cliente.id_provincia,
+        importeCents,
+        timestamp,
+        facturaId,
+      ],
+    );
+  }
+
+  /**
+   * Elimina las relaciones retiradas y crea o reactiva
+   * las correspondientes a la selección actual.
+   */
+  private async syncRelacionesBorrador(
+    queryRunner: QueryRunner,
+    facturaId: number,
+    ventas: readonly ClienteFacturaVentaSeleccionadaDatabaseRow[],
+    timestamp: string,
+  ): Promise<void> {
+    const placeholders: string = ventas.map((): string => '?').join(', ');
+
+    await queryRunner.query(
+      `
+        DELETE FROM factura_venta
+        WHERE
+          id_factura = ?
+          AND id_venta NOT IN (${placeholders})
+      `,
+      [facturaId, ...ventas.map((venta): number => venta.id)],
+    );
+
+    for (const venta of ventas) {
+      await queryRunner.query(
+        `
+          INSERT INTO factura_venta (
+            id_factura,
+            id_venta,
+            activa,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            ?,
+            ?,
+            1,
+            ?,
+            ?
+          )
+          ON CONFLICT (
+            id_factura,
+            id_venta
+          )
+          DO UPDATE SET
+            activa = 1,
+            updated_at = excluded.updated_at
+        `,
+        [facturaId, venta.id, timestamp, timestamp],
+      );
+    }
   }
 
   /**
