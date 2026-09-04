@@ -1,6 +1,7 @@
 import ClienteFacturasService from '@backend/application/clientes/cliente-facturas.service';
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type { ClienteFacturaRecord } from '@backend/domain/clientes/cliente-factura-record.interface';
+import type { ClienteFacturaVentaDisponibleRecord } from '@backend/domain/clientes/cliente-factura-venta-record.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import { describe, expect, it } from 'vitest';
 
@@ -17,6 +18,14 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
     this.requestedPublicId = publicId;
 
     return Promise.resolve(this.records);
+  }
+
+  /**
+   * Devuelve una colección vacía porque estas pruebas
+   * todavía no ejercitan la selección de ventas.
+   */
+  findVentasDisponibles(): Promise<readonly ClienteFacturaVentaDisponibleRecord[]> {
+    return Promise.resolve([]);
   }
 }
 
