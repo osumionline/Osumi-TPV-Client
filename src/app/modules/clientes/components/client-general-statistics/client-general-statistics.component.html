@@ -207,5 +207,224 @@
         </div>
         }
     </section>
+
+    <section class="client-general-statistics__block"
+             aria-labelledby="client-general-statistics-summary-title">
+        <h2 id="client-general-statistics-summary-title">
+            Suma de ventas
+        </h2>
+
+        @if (data.sumaVentas.length > 0) {
+        <div class="client-general-statistics__sales-summary">
+            <mat-accordion class="client-general-statistics__accordion"
+                           displayMode="flat">
+                @for (year of data.sumaVentas; track year.year) {
+                <mat-expansion-panel class="client-general-statistics__year-panel">
+                    <mat-expansion-panel-header class="client-general-statistics__year-header">
+                        <div class="client-general-statistics__year-summary">
+                            <span class="client-general-statistics__year">
+                                {{ year.year }}
+                            </span>
+
+                            <span class="client-general-statistics__metric"
+                                  [class.client-general-statistics__negative]="year.pucMicros < 0">
+                                <strong>PUC:</strong>
+
+                                {{
+                                            year.pucMicros
+                                                | microsToEuros
+                                                | currency:'EUR':'symbol':'1.2-2'
+                                        }}
+                            </span>
+
+                            <span class="client-general-statistics__metric"
+                                  [class.client-general-statistics__negative]="year.pvpMicros < 0">
+                                <strong>PVP:</strong>
+
+                                {{
+                                            year.pvpMicros
+                                                | microsToEuros
+                                                | currency:'EUR':'symbol':'1.2-2'
+                                        }}
+                            </span>
+
+                            <span class="client-general-statistics__metric"
+                                  [class.client-general-statistics__negative]="
+                                              year.beneficioMicros < 0
+                                          ">
+                                <strong>Beneficio:</strong>
+
+                                {{
+                                            year.beneficioMicros
+                                                | microsToEuros
+                                                | currency:'EUR':'symbol':'1.2-2'
+                                        }}
+                            </span>
+
+                            <span class="client-general-statistics__metric"
+                                  [class.client-general-statistics__negative]="
+                                              year.margenMicroporcentaje !== null
+                                              && year.margenMicroporcentaje < 0
+                                          ">
+                                <strong>Margen:</strong>
+
+                                {{ formatMargin(year.margenMicroporcentaje) }}
+                            </span>
+                        </div>
+                    </mat-expansion-panel-header>
+
+                    <div class="
+                                     client-general-statistics__table-container
+                                     client-general-statistics__table-container--months
+                                 ">
+                        <table class="
+                                           client-general-statistics__table
+                                           client-general-statistics__month-table
+                                       ">
+                            <thead>
+                                <tr>
+                                    <th scope="col"
+                                        class="client-general-statistics__month">
+                                        Mes
+                                    </th>
+
+                                    <th scope="col"
+                                        class="client-general-statistics__money">
+                                        PUC
+                                    </th>
+
+                                    <th scope="col"
+                                        class="client-general-statistics__money">
+                                        PVP
+                                    </th>
+
+                                    <th scope="col"
+                                        class="client-general-statistics__money">
+                                        Beneficio
+                                    </th>
+
+                                    <th scope="col"
+                                        class="client-general-statistics__money">
+                                        Margen
+                                    </th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @for (month of year.months; track month.month) {
+                                <tr class="client-general-statistics__month-row">
+                                    <td class="client-general-statistics__month">
+                                        {{ getMonthName(month.month) }}
+                                    </td>
+
+                                    <td class="client-general-statistics__money"
+                                        [class.client-general-statistics__negative]="
+                                                    month.pucMicros < 0
+                                                ">
+                                        {{
+                                                    month.pucMicros
+                                                        | microsToEuros
+                                                        | currency:'EUR':'symbol':'1.2-2'
+                                                }}
+                                    </td>
+
+                                    <td class="client-general-statistics__money"
+                                        [class.client-general-statistics__negative]="
+                                                    month.pvpMicros < 0
+                                                ">
+                                        {{
+                                                    month.pvpMicros
+                                                        | microsToEuros
+                                                        | currency:'EUR':'symbol':'1.2-2'
+                                                }}
+                                    </td>
+
+                                    <td class="client-general-statistics__money"
+                                        [class.client-general-statistics__negative]="
+                                                    month.beneficioMicros < 0
+                                                ">
+                                        {{
+                                                    month.beneficioMicros
+                                                        | microsToEuros
+                                                        | currency:'EUR':'symbol':'1.2-2'
+                                                }}
+                                    </td>
+
+                                    <td class="client-general-statistics__money"
+                                        [class.client-general-statistics__negative]="
+                                                    month.margenMicroporcentaje !== null
+                                                    && month.margenMicroporcentaje < 0
+                                                ">
+                                        {{ formatMargin(month.margenMicroporcentaje) }}
+                                    </td>
+                                </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </mat-expansion-panel>
+                }
+            </mat-accordion>
+
+            <div class="client-general-statistics__totals"
+                 role="group"
+                 aria-label="Totales de suma de ventas">
+                <span class="client-general-statistics__total-item"
+                      [class.client-general-statistics__negative]="
+                                  data.sumaVentasTotal.pucMicros < 0
+                              ">
+                    <strong>PUC:</strong>
+
+                    {{
+                                data.sumaVentasTotal.pucMicros
+                                    | microsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                </span>
+
+                <span class="client-general-statistics__total-item"
+                      [class.client-general-statistics__negative]="
+                                  data.sumaVentasTotal.pvpMicros < 0
+                              ">
+                    <strong>PVP:</strong>
+
+                    {{
+                                data.sumaVentasTotal.pvpMicros
+                                    | microsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                </span>
+
+                <span class="client-general-statistics__total-item"
+                      [class.client-general-statistics__negative]="
+                                  data.sumaVentasTotal.beneficioMicros < 0
+                              ">
+                    <strong>Beneficio:</strong>
+
+                    {{
+                                data.sumaVentasTotal.beneficioMicros
+                                    | microsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                </span>
+
+                <span class="client-general-statistics__total-item"
+                      [class.client-general-statistics__negative]="
+                                  data.sumaVentasTotal.margenMicroporcentaje !== null
+                                  && data.sumaVentasTotal.margenMicroporcentaje < 0
+                              ">
+                    <strong>Margen:</strong>
+
+                    {{ formatMargin(data.sumaVentasTotal.margenMicroporcentaje) }}
+                </span>
+            </div>
+        </div>
+        }
+        @else {
+        <div class="client-general-statistics__empty">
+            El cliente no tiene ventas para mostrar este resumen.
+        </div>
+        }
+    </section>
     }
 </section>

@@ -105,6 +105,56 @@ describe('ClientGeneralStatisticsComponent', (): void => {
     expect(element.textContent).toContain(
       'No hay artículos suficientes para mostrar este listado.',
     );
+
+    expect(element.textContent).toContain('El cliente no tiene ventas para mostrar este resumen.');
+
+    expect(element.querySelector('.client-general-statistics__totals')).toBeNull();
+  });
+
+  it('muestra el acordeón anual, el total y mantiene un único año abierto', async (): Promise<void> => {
+    const element: HTMLElement = fixture.nativeElement as HTMLElement;
+
+    expect(element.textContent).toContain('Suma de ventas');
+
+    const panels: HTMLElement[] = Array.from(
+      element.querySelectorAll<HTMLElement>('.client-general-statistics__year-panel'),
+    );
+
+    const headers: HTMLElement[] = Array.from(
+      element.querySelectorAll<HTMLElement>('.client-general-statistics__year-header'),
+    );
+
+    expect(panels).toHaveLength(2);
+    expect(headers).toHaveLength(2);
+    expect(panels[0].textContent).toContain('2025');
+    expect(panels[1].textContent).toContain('2026');
+    expect(
+      panels.every((panel: HTMLElement): boolean => !panel.classList.contains('mat-expanded')),
+    ).toBe(true);
+
+    expect(fixture.componentInstance.getMonthName(1)).toBe('Enero');
+    expect(fixture.componentInstance.formatMargin(60_784_314)).toBe('60,78 %');
+    expect(fixture.componentInstance.formatMargin(null)).toBe('—');
+
+    headers[0].click();
+
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(panels[0].classList.contains('mat-expanded')).toBe(true);
+    expect(panels[0].textContent).toContain('Diciembre');
+
+    headers[1].click();
+
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(panels[0].classList.contains('mat-expanded')).toBe(false);
+    expect(panels[1].classList.contains('mat-expanded')).toBe(true);
+    expect(panels[1].textContent).toContain('Enero');
+    expect(panels[1].textContent).toContain('Febrero');
+
+    expect(element.querySelector('.client-general-statistics__totals')).not.toBeNull();
   });
 });
 
@@ -156,7 +206,47 @@ function createEstadisticasGenerales(recentName: string): ClienteEstadisticasGen
         importeMicros: 45_000_000,
       },
     ],
-    sumaVentas: [],
+    sumaVentas: [
+      {
+        year: 2025,
+        pucMicros: 9_000_000,
+        pvpMicros: 30_000_000,
+        beneficioMicros: 21_000_000,
+        margenMicroporcentaje: 70_000_000,
+        months: [
+          {
+            month: 12,
+            pucMicros: 9_000_000,
+            pvpMicros: 30_000_000,
+            beneficioMicros: 21_000_000,
+            margenMicroporcentaje: 70_000_000,
+          },
+        ],
+      },
+      {
+        year: 2026,
+        pucMicros: 11_000_000,
+        pvpMicros: 21_000_000,
+        beneficioMicros: 10_000_000,
+        margenMicroporcentaje: 47_619_048,
+        months: [
+          {
+            month: 1,
+            pucMicros: 4_000_000,
+            pvpMicros: 10_000_000,
+            beneficioMicros: 6_000_000,
+            margenMicroporcentaje: 60_000_000,
+          },
+          {
+            month: 2,
+            pucMicros: 7_000_000,
+            pvpMicros: 11_000_000,
+            beneficioMicros: 4_000_000,
+            margenMicroporcentaje: 36_363_636,
+          },
+        ],
+      },
+    ],
     sumaVentasTotal: {
       pucMicros: 20_000_000,
       pvpMicros: 51_000_000,

@@ -133,6 +133,92 @@
         color: var(--disabled-color);
         text-align: center;
     }
+
+    .client-general-statistics__sales-summary {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .client-general-statistics__accordion {
+        display: block;
+        border: 1px solid var(--separator-color);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .client-general-statistics__year-panel {
+        margin: 0;
+        border-radius: 0;
+        background-color: var(--color-white);
+        box-shadow: none;
+
+        &:not(:last-child) {
+            border-bottom: 1px solid var(--table-data-border);
+        }
+
+        &.mat-expanded {
+            margin: 0;
+        }
+    }
+
+    .client-general-statistics__year-header {
+        height: auto;
+        min-height: 56px;
+        padding: 0 16px;
+    }
+
+    .client-general-statistics__year-summary {
+        display: grid;
+        width: 100%;
+        align-items: center;
+        gap: 16px;
+        grid-template-columns:
+            minmax(70px, 0.6fr) repeat(4, minmax(130px, 1fr));
+    }
+
+    .client-general-statistics__year {
+        font-weight: 600;
+    }
+
+    .client-general-statistics__metric,
+    .client-general-statistics__total-item {
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .client-general-statistics__table-container--months {
+        margin-bottom: 16px;
+        border-color: var(--table-data-border);
+    }
+
+    .client-general-statistics__month-table {
+
+        th,
+        td {
+            text-align: right;
+        }
+
+        th.client-general-statistics__month,
+        td.client-general-statistics__month {
+            text-align: left;
+        }
+    }
+
+    .client-general-statistics__month {
+        width: 22%;
+    }
+
+    .client-general-statistics__totals {
+        display: grid;
+        min-width: 0;
+        padding: 12px 16px;
+        border: 1px solid var(--separator-color);
+        border-radius: 6px;
+        gap: 16px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
 }
 
 @media (max-width: 900px) {
@@ -141,6 +227,33 @@
 
         .client-general-statistics__table {
             min-width: 780px;
+        }
+
+        .client-general-statistics__year-header {
+            min-height: 0;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+
+        .client-general-statistics__year-summary {
+            gap: 8px 16px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .client-general-statistics__year {
+            grid-column: 1 / -1;
+        }
+
+        .client-general-statistics__totals {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+}
+
+@media (max-width: 600px) {
+    .client-general-statistics {
+        .client-general-statistics__totals {
+            grid-template-columns: 1fr;
         }
     }
 }

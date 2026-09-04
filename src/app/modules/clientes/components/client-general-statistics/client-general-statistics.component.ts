@@ -10,11 +10,36 @@ import {
   type WritableSignal,
 } from '@angular/core';
 import { MatButton } from '@angular/material/button';
+import {
+  MatAccordion,
+  MatExpansionPanel,
+  MatExpansionPanelHeader,
+} from '@angular/material/expansion';
 import type { ClienteEstadisticasGeneralesInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import IsoDateToSpanishPipe from '@pipes/iso-date-to-spanish.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
 import ClientesService from '@services/clientes.service';
 import { getErrorMessage } from '@utils/error.utils';
+
+const MONTH_NAMES: readonly string[] = [
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
+];
+
+const MARGIN_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 
 /**
  * Muestra las estadísticas históricas generales
@@ -24,7 +49,15 @@ import { getErrorMessage } from '@utils/error.utils';
   selector: 'otpv-client-general-statistics',
   templateUrl: './client-general-statistics.component.html',
   styleUrl: './client-general-statistics.component.scss',
-  imports: [CurrencyPipe, IsoDateToSpanishPipe, MatButton, MicrosToEurosPipe],
+  imports: [
+    CurrencyPipe,
+    IsoDateToSpanishPipe,
+    MatAccordion,
+    MatButton,
+    MatExpansionPanel,
+    MatExpansionPanelHeader,
+    MicrosToEurosPipe,
+  ],
 })
 export default class ClientGeneralStatisticsComponent implements OnInit, OnDestroy {
   private readonly clientesService: ClientesService = inject(ClientesService);
@@ -59,6 +92,24 @@ export default class ClientGeneralStatisticsComponent implements OnInit, OnDestr
    */
   retry(): void {
     void this.load();
+  }
+
+  /**
+   * Obtiene el nombre en español de un mes.
+   */
+  getMonthName(month: number): string {
+    return MONTH_NAMES[month - 1] ?? `Mes ${month}`;
+  }
+
+  /**
+   * Formatea un margen almacenado como microporcentaje.
+   */
+  formatMargin(margenMicroporcentaje: number | null): string {
+    if (margenMicroporcentaje === null) {
+      return '—';
+    }
+
+    return `${MARGIN_FORMATTER.format(margenMicroporcentaje / 1_000_000)} %`;
   }
 
   /**
