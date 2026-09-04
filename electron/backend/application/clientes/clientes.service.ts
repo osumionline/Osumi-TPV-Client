@@ -1,6 +1,9 @@
+import createClienteConsumoMensualResult from '@backend/application/clientes/cliente-consumo-mensual.utils';
 import { PERCENT_TOTAL } from '@backend/constants/percentage.constants';
+import type ClienteConsumoMensualRepositoryQuery from '@backend/contracts/clientes/cliente-consumo-mensual-query.interface';
 import type ClienteDeactivateResult from '@backend/contracts/clientes/cliente-deactivate-result.type';
 import type {
+  ClienteConsumoMensualRepositoryResult,
   ClienteSumaVentaRecord,
   ClienteTopVentaRecord,
   ClienteUltimaVentaRecord,
@@ -10,6 +13,10 @@ import type CrearClienteRecordCommand from '@backend/contracts/clientes/crear-cl
 import type ClienteRecord from '@backend/domain/clientes/cliente-record.interface';
 import { bpsToPercent, percentToBps } from '@backend/utils/percentage.utils';
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
+import type {
+  ClienteConsumoMensualConsulta,
+  ClienteConsumoMensualResultado,
+} from '@desktop-contracts/clientes/cliente-consumo-mensual.interface';
 import type {
   ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
@@ -98,6 +105,51 @@ export default class ClientesService {
       sumaVentas,
       sumaVentasTotal: this.buildSumaVentasTotal(sumaVentas),
     };
+  }
+
+  /**
+   * Recupera la serie temporal completa de consumo
+   * correspondiente a los filtros solicitados.
+   */
+  async getConsumoMensual(
+    consulta: ClienteConsumoMensualConsulta,
+  ): Promise<ClienteConsumoMensualResultado> {
+    if (typeof consulta !== 'object' || consulta === null) {
+      throw new Error('La consulta de consumo mensual no es válida.');
+    }
+
+    const clientePublicId: string = this.requirePublicId(consulta.clientePublicId);
+
+    if (
+      consulta.year !== null &&
+      (!Number.isSafeInteger(consulta.year) || consulta.year < 1 || consulta.year > 9999)
+    ) {
+      throw new Error('El año del consumo mensual no es válido.');
+    }
+
+    if (
+      consulta.month !== null &&
+      (!Number.isSafeInteger(consulta.month) || consulta.month < 1 || consulta.month > 12)
+    ) {
+      throw new Error('El mes del consumo mensual no es válido.');
+    }
+
+    const normalizedConsulta: ClienteConsumoMensualConsulta = {
+      clientePublicId,
+      year: consulta.year,
+      month: consulta.month,
+    };
+
+    const repositoryQuery: ClienteConsumoMensualRepositoryQuery = {
+      publicId: clientePublicId,
+      year: consulta.year,
+      month: consulta.month,
+    };
+
+    const repositoryResult: ClienteConsumoMensualRepositoryResult =
+      await this.clienteRepository.findConsumoMensual(repositoryQuery);
+
+    return createClienteConsumoMensualResult(normalizedConsulta, repositoryResult);
   }
 
   /**

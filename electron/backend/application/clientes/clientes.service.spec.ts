@@ -11,6 +11,7 @@ import type ClienteRepository from '@backend/contracts/clientes/cliente.reposito
 import type CrearClienteRecordCommand from '@backend/contracts/clientes/crear-cliente-record-command.interface';
 import type ClienteRecord from '@backend/domain/clientes/cliente-record.interface';
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
+import type { ClienteConsumoMensualResultado } from '@desktop-contracts/clientes/cliente-consumo-mensual.interface';
 import type { ClienteEstadisticasGeneralesInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
@@ -479,6 +480,72 @@ describe('ClientesService', (): void => {
         ],
       },
     ]);
+  });
+
+  it('normaliza la consulta y construye la serie completa de consumo mensual', async (): Promise<void> => {
+    const repository = new FakeClienteRepository();
+    const service = new ClientesService(repository);
+
+    repository.consumoMensualResult = {
+      years: [2024, 2026],
+      items: [
+        {
+          year: 2026,
+          month: 2,
+          day: null,
+          importeMicros: 5_000_000,
+        },
+      ],
+    };
+
+    const result: ClienteConsumoMensualResultado = await service.getConsumoMensual({
+      clientePublicId: '  cliente-1  ',
+      year: 2026,
+      month: null,
+    });
+
+    expect(repository.consumoMensualQuery).toEqual({
+      publicId: 'cliente-1',
+      year: 2026,
+      month: null,
+    });
+
+    expect(result.availableYears).toEqual([2024, 2025, 2026]);
+    expect(result.points).toHaveLength(12);
+    expect(result.points[0]?.importeMicros).toBe(0);
+    expect(result.points[1]?.importeMicros).toBe(5_000_000);
+    expect(result.totalMicros).toBe(5_000_000);
+  });
+
+  it('rechaza identificadores y filtros de consumo mensual no válidos', async (): Promise<void> => {
+    const repository = new FakeClienteRepository();
+    const service = new ClientesService(repository);
+
+    await expect(
+      service.getConsumoMensual({
+        clientePublicId: '   ',
+        year: null,
+        month: null,
+      }),
+    ).rejects.toThrow('El identificador del cliente no es válido.');
+
+    await expect(
+      service.getConsumoMensual({
+        clientePublicId: 'cliente-1',
+        year: 0,
+        month: null,
+      }),
+    ).rejects.toThrow('El año del consumo mensual no es válido.');
+
+    await expect(
+      service.getConsumoMensual({
+        clientePublicId: 'cliente-1',
+        year: null,
+        month: 13,
+      }),
+    ).rejects.toThrow('El mes del consumo mensual no es válido.');
+
+    expect(repository.consumoMensualQuery).toBeNull();
   });
 });
 
