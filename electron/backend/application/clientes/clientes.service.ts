@@ -1,6 +1,7 @@
 import { PERCENT_TOTAL } from '@backend/constants/percentage.constants';
 import type ClienteDeactivateResult from '@backend/contracts/clientes/cliente-deactivate-result.type';
 import type {
+  ClienteSumaVentaRecord,
   ClienteTopVentaRecord,
   ClienteUltimaVentaRecord,
 } from '@backend/contracts/clientes/cliente-estadisticas-record.interface';
@@ -10,7 +11,11 @@ import type ClienteRecord from '@backend/domain/clientes/cliente-record.interfac
 import { bpsToPercent, percentToBps } from '@backend/utils/percentage.utils';
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type {
+  ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
+  ClienteSumaVentasMesInterface,
+  ClienteSumaVentasValoresInterface,
+  ClienteSumaVentasYearInterface,
   ClienteTopVentaInterface,
   ClienteUltimaVentaInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
@@ -25,6 +30,7 @@ import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-
 
 const ULTIMAS_VENTAS_LIMIT: number = 20;
 const TOP_VENTAS_LIMIT: number = 10;
+const MICRO_PERCENTAGE_TOTAL: bigint = 100_000_000n;
 
 export default class ClientesService {
   constructor(private readonly clienteRepository: ClienteRepository) {}
@@ -39,11 +45,7 @@ export default class ClientesService {
    * Recupera las estadísticas rápidas de compra de un cliente.
    */
   async getEstadisticas(publicId: string): Promise<ClienteEstadisticasInterface> {
-    const normalizedPublicId: string = publicId.trim();
-
-    if (normalizedPublicId === '') {
-      throw new Error('El identificador del cliente no es válido.');
-    }
+    const normalizedPublicId: string = this.requirePublicId(publicId);
 
     const [ultimasVentas, topVentas]: [
       readonly ClienteUltimaVentaRecord[],
@@ -70,6 +72,27 @@ export default class ClientesService {
         unidades: item.unidades,
         importeMicros: item.importeMicros,
       })),
+    };
+  }
+
+  /**
+   * Recupera las estadísticas completas utilizadas
+   * exclusivamente por la ficha de Clientes.
+   */
+  async getEstadisticasGenerales(publicId: string): Promise<ClienteEstadisticasGeneralesInterface> {
+    const normalizedPublicId: string = this.requirePublicId(publicId);
+
+    const [estadisticas, sumaVentasRecords]: [
+      ClienteEstadisticasInterface,
+      readonly ClienteSumaVentaRecord[],
+    ] = await Promise.all([
+      this.getEstadisticas(normalizedPublicId),
+      this.clienteRepository.findSumaVentas(normalizedPublicId),
+    ]);
+
+    return {
+      ...estadisticas,
+      sumaVentas: this.buildSumaVentas(sumaVentasRecords),
     };
   }
 
@@ -126,6 +149,175 @@ export default class ClientesService {
     }
 
     throw new Error('El cliente indicado no existe o ya no está activo.');
+  }
+
+  /**
+   * Agrupa los registros mensuales por año y calcula
+   * los valores derivados de cada período.
+   */
+  private buildSumaVentas(
+    records: readonly ClienteSumaVentaRecord[],
+  ): readonly ClienteSumaVentasYearInterface[] {
+    const monthsByYear: Map<number, ClienteSumaVentasMesInterface[]> = new Map<
+      number,
+      ClienteSumaVentasMesInterface[]
+    >();
+
+    for (const record of records) {
+      const months: ClienteSumaVentasMesInterface[] = monthsByYear.get(record.year) ?? [];
+
+      months.push({
+        month: record.month,
+        ...this.createSumaVentasValues(record.pucMicros, record.pvpMicros),
+      });
+
+      monthsByYear.set(record.year, months);
+    }
+
+    const years: readonly number[] = [...monthsByYear.keys()].sort(
+      (left: number, right: number): number => left - right,
+    );
+
+    return years.map((year: number): ClienteSumaVentasYearInterface => {
+      const months: readonly ClienteSumaVentasMesInterface[] = [
+        ...(monthsByYear.get(year) ?? []),
+      ].sort(
+        (left: ClienteSumaVentasMesInterface, right: ClienteSumaVentasMesInterface): number =>
+          left.month - right.month,
+      );
+
+      let pucMicros: number = 0;
+      let pvpMicros: number = 0;
+
+      for (const month of months) {
+        pucMicros = this.safeAdd(
+          pucMicros,
+          month.pucMicros,
+          'El PUC anual de las ventas del cliente supera el rango numérico seguro.',
+        );
+
+        pvpMicros = this.safeAdd(
+          pvpMicros,
+          month.pvpMicros,
+          'El PVP anual de las ventas del cliente supera el rango numérico seguro.',
+        );
+      }
+
+      return {
+        year,
+        ...this.createSumaVentasValues(pucMicros, pvpMicros),
+        months,
+      };
+    });
+  }
+
+  /**
+   * Calcula beneficio y margen para un período agregado.
+   */
+  private createSumaVentasValues(
+    pucMicros: number,
+    pvpMicros: number,
+  ): ClienteSumaVentasValoresInterface {
+    const beneficioMicros: number = this.safeSubtract(
+      pvpMicros,
+      pucMicros,
+      'El beneficio de las ventas del cliente supera el rango numérico seguro.',
+    );
+
+    return {
+      pucMicros,
+      pvpMicros,
+      beneficioMicros,
+      margenMicroporcentaje: this.calculateMarginMicroporcentaje(beneficioMicros, pvpMicros),
+    };
+  }
+
+  /**
+   * Calcula el margen sobre el importe real de venta.
+   *
+   * Un PVP igual a cero no permite calcular un porcentaje.
+   */
+  private calculateMarginMicroporcentaje(
+    beneficioMicros: number,
+    pvpMicros: number,
+  ): number | null {
+    const errorMessage: string =
+      'El margen de las ventas del cliente supera el rango numérico seguro.';
+
+    const pvpValue: bigint = this.toSafeBigInt(pvpMicros, errorMessage);
+
+    if (pvpValue === 0n) {
+      return null;
+    }
+
+    const beneficioValue: bigint = this.toSafeBigInt(beneficioMicros, errorMessage);
+    const numerator: bigint = beneficioValue * MICRO_PERCENTAGE_TOTAL;
+    const positiveDenominator: bigint = pvpValue < 0n ? -pvpValue : pvpValue;
+    const normalizedNumerator: bigint = pvpValue < 0n ? -numerator : numerator;
+
+    return this.toSafeNumber(
+      this.roundDivide(normalizedNumerator, positiveDenominator),
+      errorMessage,
+    );
+  }
+
+  /**
+   * Suma dos enteros mediante BigInt y comprueba el resultado.
+   */
+  private safeAdd(left: number, right: number, errorMessage: string): number {
+    const result: bigint =
+      this.toSafeBigInt(left, errorMessage) + this.toSafeBigInt(right, errorMessage);
+
+    return this.toSafeNumber(result, errorMessage);
+  }
+
+  /**
+   * Resta dos enteros mediante BigInt y comprueba el resultado.
+   */
+  private safeSubtract(left: number, right: number, errorMessage: string): number {
+    const result: bigint =
+      this.toSafeBigInt(left, errorMessage) - this.toSafeBigInt(right, errorMessage);
+
+    return this.toSafeNumber(result, errorMessage);
+  }
+
+  /**
+   * Divide dos BigInt aplicando redondeo simétrico.
+   */
+  private roundDivide(numerator: bigint, denominator: bigint): bigint {
+    if (denominator <= 0n) {
+      throw new Error('El divisor debe ser un entero mayor que cero.');
+    }
+
+    const negative: boolean = numerator < 0n;
+    const absoluteNumerator: bigint = negative ? -numerator : numerator;
+    const rounded: bigint = (absoluteNumerator + denominator / 2n) / denominator;
+
+    return negative ? -rounded : rounded;
+  }
+
+  /**
+   * Convierte un entero seguro a BigInt.
+   */
+  private toSafeBigInt(value: number, errorMessage: string): bigint {
+    if (!Number.isSafeInteger(value)) {
+      throw new Error(errorMessage);
+    }
+
+    return BigInt(value);
+  }
+
+  /**
+   * Convierte un BigInt a number comprobando su rango seguro.
+   */
+  private toSafeNumber(value: bigint, errorMessage: string): number {
+    const result: number = Number(value);
+
+    if (!Number.isSafeInteger(result)) {
+      throw new Error(errorMessage);
+    }
+
+    return result;
   }
 
   /**

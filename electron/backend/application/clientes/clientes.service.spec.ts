@@ -9,6 +9,7 @@ import type ClienteRepository from '@backend/contracts/clientes/cliente.reposito
 import type CrearClienteRecordCommand from '@backend/contracts/clientes/crear-cliente-record-command.interface';
 import type ClienteRecord from '@backend/domain/clientes/cliente-record.interface';
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
+import type { ClienteEstadisticasGeneralesInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import { describe, expect, it } from 'vitest';
@@ -23,6 +24,12 @@ class FakeClienteRepository implements ClienteRepository {
   updateAvailable: boolean = true;
   deactivatedPublicId: string | null = null;
   deactivateResult: ClienteDeactivateResult = 'deactivated';
+  ultimasVentas: readonly ClienteUltimaVentaRecord[] = [];
+  topVentas: readonly ClienteTopVentaRecord[] = [];
+  sumaVentas: readonly ClienteSumaVentaRecord[] = [];
+  ultimasVentasPublicId: string | null = null;
+  topVentasPublicId: string | null = null;
+  sumaVentasPublicId: string | null = null;
 
   /**
    * Devuelve una colección vacía para las pruebas del servicio.
@@ -84,24 +91,30 @@ class FakeClienteRepository implements ClienteRepository {
   }
 
   /**
-   * Devuelve una colección vacía de últimas ventas.
+   * Devuelve las últimas ventas configuradas para la prueba.
    */
-  findUltimasVentas(): Promise<readonly ClienteUltimaVentaRecord[]> {
-    return Promise.resolve([]);
+  findUltimasVentas(publicId: string): Promise<readonly ClienteUltimaVentaRecord[]> {
+    this.ultimasVentasPublicId = publicId;
+
+    return Promise.resolve(this.ultimasVentas);
   }
 
   /**
-   * Devuelve una colección vacía de artículos más comprados.
+   * Devuelve los artículos más comprados configurados para la prueba.
    */
-  findTopVentas(): Promise<readonly ClienteTopVentaRecord[]> {
-    return Promise.resolve([]);
+  findTopVentas(publicId: string): Promise<readonly ClienteTopVentaRecord[]> {
+    this.topVentasPublicId = publicId;
+
+    return Promise.resolve(this.topVentas);
   }
 
   /**
-   * Devuelve una colección vacía de sumas mensuales.
+   * Devuelve las sumas mensuales configuradas para la prueba.
    */
-  findSumaVentas(): Promise<readonly ClienteSumaVentaRecord[]> {
-    return Promise.resolve([]);
+  findSumaVentas(publicId: string): Promise<readonly ClienteSumaVentaRecord[]> {
+    this.sumaVentasPublicId = publicId;
+
+    return Promise.resolve(this.sumaVentas);
   }
 }
 
@@ -292,6 +305,139 @@ describe('ClientesService', (): void => {
     );
 
     expect(repository.deactivatedPublicId).toBeNull();
+  });
+
+  it('construye las estadísticas generales ordenadas por años y meses', async (): Promise<void> => {
+    const repository = new FakeClienteRepository();
+    const service = new ClientesService(repository);
+
+    repository.ultimasVentas = [
+      {
+        fecha: '2026-02-15T10:00:00.000Z',
+        localizador: 260001,
+        nombre: 'Producto reciente',
+        unidades: 2,
+        pvpMicros: 10_000_000,
+        importeMicros: 20_000_000,
+      },
+    ];
+
+    repository.topVentas = [
+      {
+        localizador: 260002,
+        nombre: 'Producto principal',
+        unidades: 4,
+        importeMicros: 40_000_000,
+      },
+    ];
+
+    repository.sumaVentas = [
+      {
+        year: 2026,
+        month: 2,
+        pucMicros: -4_000_000,
+        pvpMicros: -10_000_000,
+      },
+      {
+        year: 2025,
+        month: 12,
+        pucMicros: 9_000_000,
+        pvpMicros: 30_000_000,
+      },
+      {
+        year: 2026,
+        month: 1,
+        pucMicros: 4_000_000,
+        pvpMicros: 20_000_000,
+      },
+    ];
+
+    const result: ClienteEstadisticasGeneralesInterface =
+      await service.getEstadisticasGenerales('  cliente-1  ');
+
+    expect(repository.ultimasVentasPublicId).toBe('cliente-1');
+    expect(repository.topVentasPublicId).toBe('cliente-1');
+    expect(repository.sumaVentasPublicId).toBe('cliente-1');
+    expect(result.ultimasVentas).toEqual(repository.ultimasVentas);
+    expect(result.topVentas).toEqual(repository.topVentas);
+
+    expect(result.sumaVentas).toEqual([
+      {
+        year: 2025,
+        pucMicros: 9_000_000,
+        pvpMicros: 30_000_000,
+        beneficioMicros: 21_000_000,
+        margenMicroporcentaje: 70_000_000,
+        months: [
+          {
+            month: 12,
+            pucMicros: 9_000_000,
+            pvpMicros: 30_000_000,
+            beneficioMicros: 21_000_000,
+            margenMicroporcentaje: 70_000_000,
+          },
+        ],
+      },
+      {
+        year: 2026,
+        pucMicros: 0,
+        pvpMicros: 10_000_000,
+        beneficioMicros: 10_000_000,
+        margenMicroporcentaje: 100_000_000,
+        months: [
+          {
+            month: 1,
+            pucMicros: 4_000_000,
+            pvpMicros: 20_000_000,
+            beneficioMicros: 16_000_000,
+            margenMicroporcentaje: 80_000_000,
+          },
+          {
+            month: 2,
+            pucMicros: -4_000_000,
+            pvpMicros: -10_000_000,
+            beneficioMicros: -6_000_000,
+            margenMicroporcentaje: 60_000_000,
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('devuelve margen nulo cuando el PVP acumulado es cero', async (): Promise<void> => {
+    const repository = new FakeClienteRepository();
+    const service = new ClientesService(repository);
+
+    repository.sumaVentas = [
+      {
+        year: 2026,
+        month: 3,
+        pucMicros: 5_000_000,
+        pvpMicros: 0,
+      },
+    ];
+
+    const result: ClienteEstadisticasGeneralesInterface =
+      await service.getEstadisticasGenerales('cliente-1');
+
+    expect(result.sumaVentas).toEqual([
+      {
+        year: 2026,
+        pucMicros: 5_000_000,
+        pvpMicros: 0,
+        beneficioMicros: -5_000_000,
+        margenMicroporcentaje: null,
+        months: [
+          {
+            month: 3,
+            pucMicros: 5_000_000,
+            pvpMicros: 0,
+            beneficioMicros: -5_000_000,
+            margenMicroporcentaje: null,
+          },
+        ],
+      },
+    ]);
   });
 });
 
