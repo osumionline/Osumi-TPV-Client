@@ -7,6 +7,10 @@ import type {
   ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type {
+  ClienteFacturaVentaDisponibleInterface,
+  ClienteFacturaVentasDisponiblesConsulta,
+} from '@desktop-contracts/clientes/cliente-factura-venta.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
@@ -24,6 +28,14 @@ export default interface ClientesApi {
    * Obtiene las facturas visibles de un cliente.
    */
   getFacturas(publicId: string): Promise<readonly ClienteFacturaInterface[]>;
+
+  /**
+   * Obtiene las ventas disponibles para crear
+   * o editar una factura de cliente.
+   */
+  getFacturaVentasDisponibles(
+    consulta: ClienteFacturaVentasDisponiblesConsulta,
+  ): Promise<readonly ClienteFacturaVentaDisponibleInterface[]>;
 
   getEstadisticas(publicId: string): Promise<ClienteEstadisticasInterface>;
 

@@ -32,6 +32,7 @@ const IPC_CHANNELS = {
   clientesUpdate: 'clientes:update',
   clientesDeactivate: 'clientes:deactivate',
   clientesGetFacturas: 'clientes:get-facturas',
+  clientesGetFacturaVentasDisponibles: 'clientes:get-factura-ventas-disponibles',
   clientesGetEstadisticas: 'clientes:get-estadisticas',
   clientesGetEstadisticasGenerales: 'clientes:get-estadisticas-generales',
   clientesGetConsumoMensual: 'clientes:get-consumo-mensual',

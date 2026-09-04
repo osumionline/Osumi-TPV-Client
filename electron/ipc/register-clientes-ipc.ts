@@ -9,6 +9,10 @@ import type {
   ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type {
+  ClienteFacturaVentaDisponibleInterface,
+  ClienteFacturaVentasDisponiblesConsulta,
+} from '@desktop-contracts/clientes/cliente-factura-venta.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
@@ -69,6 +73,19 @@ export default function registerClientesIpc(
       assertTrustedSender(event, getMainWindow);
 
       return clienteFacturasService.getByClientePublicId(publicId);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.clientesGetFacturaVentasDisponibles,
+
+    async (
+      event,
+      consulta: ClienteFacturaVentasDisponiblesConsulta,
+    ): Promise<readonly ClienteFacturaVentaDisponibleInterface[]> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return clienteFacturasService.getVentasDisponibles(consulta);
     },
   );
 

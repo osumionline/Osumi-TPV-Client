@@ -23,6 +23,10 @@ import type {
   ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type {
+  ClienteFacturaVentaDisponibleInterface,
+  ClienteFacturaVentasDisponiblesConsulta,
+} from '@desktop-contracts/clientes/cliente-factura-venta.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
@@ -262,6 +266,13 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
     getFacturas: (publicId: string): Promise<readonly ClienteFacturaInterface[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.clientesGetFacturas, publicId) as Promise<
         readonly ClienteFacturaInterface[]
+      >,
+
+    getFacturaVentasDisponibles: (
+      consulta: ClienteFacturaVentasDisponiblesConsulta,
+    ): Promise<readonly ClienteFacturaVentaDisponibleInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.clientesGetFacturaVentasDisponibles, consulta) as Promise<
+        readonly ClienteFacturaVentaDisponibleInterface[]
       >,
 
     getEstadisticas: (publicId: string): Promise<ClienteEstadisticasInterface> =>
