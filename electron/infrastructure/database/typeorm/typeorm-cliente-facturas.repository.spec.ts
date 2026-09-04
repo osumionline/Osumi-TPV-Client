@@ -47,6 +47,12 @@ interface ClienteFacturaBorradorActualizadoDatabaseRow {
   readonly updated_at: string;
 }
 
+interface ClienteFacturaBorradorEliminadoDatabaseRow {
+  readonly estado: string;
+  readonly updated_at: string;
+  readonly deleted_at: string | null;
+}
+
 describe('TypeOrmClienteFacturasRepository', (): void => {
   beforeEach(async (): Promise<void> => {
     tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-cliente-facturas-'));
@@ -470,6 +476,117 @@ describe('TypeOrmClienteFacturasRepository', (): void => {
         }),
       ).rejects.toThrow('El borrador de factura no pertenece al cliente o ya no está disponible.');
     }
+  });
+
+  it('elimina lógicamente un borrador, borra sus relaciones y libera sus ventas', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    await requireRepository().deleteBorrador({
+      clientePublicId: 'cliente-1',
+      borradorPublicId: 'factura-borrador',
+    });
+
+    const facturas: readonly ClienteFacturaBorradorEliminadoDatabaseRow[] =
+      (await dataSource.query(`
+        SELECT
+          estado,
+          updated_at,
+          deleted_at
+        FROM factura
+        WHERE public_id = 'factura-borrador'
+      `)) as readonly ClienteFacturaBorradorEliminadoDatabaseRow[];
+
+    expect(facturas).toHaveLength(1);
+    expect(facturas[0]?.estado).toBe('borrador');
+    expect(facturas[0]?.deleted_at).not.toBeNull();
+    expect(facturas[0]?.updated_at).toBe(facturas[0]?.deleted_at);
+
+    const relaciones: readonly ClienteFacturaVentaRelacionDatabaseRow[] = (await dataSource.query(`
+        SELECT
+          v.public_id,
+          fv.activa
+        FROM factura_venta fv
+
+        INNER JOIN venta v
+          ON v.id = fv.id_venta
+
+        INNER JOIN factura f
+          ON f.id = fv.id_factura
+
+        WHERE f.public_id = 'factura-borrador'
+      `)) as readonly ClienteFacturaVentaRelacionDatabaseRow[];
+
+    expect(relaciones).toEqual([]);
+
+    const facturasCliente: readonly ClienteFacturaRecord[] =
+      await requireRepository().findByClientePublicId('cliente-1');
+
+    expect(
+      facturasCliente.some(
+        (factura: ClienteFacturaRecord): boolean => factura.publicId === 'factura-borrador',
+      ),
+    ).toBe(false);
+
+    const disponibles: readonly ClienteFacturaVentaDisponibleRecord[] =
+      await requireRepository().findVentasDisponibles('cliente-1', null);
+
+    expect(
+      disponibles.some(
+        (venta: ClienteFacturaVentaDisponibleRecord): boolean =>
+          venta.publicId === 'venta-borrador',
+      ),
+    ).toBe(true);
+  });
+
+  it('rechaza la eliminación de facturas no editables o pertenecientes a otro cliente', async (): Promise<void> => {
+    const nonEditablePublicIds: readonly string[] = [
+      'factura-emitida',
+      'factura-anulada',
+      'factura-borrador-eliminado',
+      'factura-otro-cliente',
+    ];
+
+    for (const borradorPublicId of nonEditablePublicIds) {
+      await expect(
+        requireRepository().deleteBorrador({
+          clientePublicId: 'cliente-1',
+          borradorPublicId,
+        }),
+      ).rejects.toThrow('El borrador de factura no pertenece al cliente o ya no está disponible.');
+    }
+
+    const dataSource: DataSource = await requireDataSource();
+
+    const relaciones: readonly ClienteFacturaVentaRelacionDatabaseRow[] = (await dataSource.query(`
+        SELECT
+          v.public_id,
+          fv.activa
+        FROM factura_venta fv
+
+        INNER JOIN venta v
+          ON v.id = fv.id_venta
+
+        INNER JOIN factura f
+          ON f.id = fv.id_factura
+
+        WHERE f.public_id = 'factura-borrador'
+      `)) as readonly ClienteFacturaVentaRelacionDatabaseRow[];
+
+    expect(relaciones).toEqual([
+      {
+        public_id: 'venta-borrador',
+        activa: 1,
+      },
+    ]);
+  });
+
+  it('rechaza la eliminación cuando el cliente ya no está activo', async (): Promise<void> => {
+    await expect(
+      requireRepository().deleteBorrador({
+        clientePublicId: 'cliente-inactivo',
+        borradorPublicId: 'factura-cliente-inactivo',
+      }),
+    ).rejects.toThrow('El cliente indicado no existe o ya no está activo.');
   });
 
   it('recupera únicamente las ventas disponibles para una factura nueva', async (): Promise<void> => {

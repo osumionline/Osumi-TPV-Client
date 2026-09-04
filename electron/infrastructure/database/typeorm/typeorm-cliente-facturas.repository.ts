@@ -1,6 +1,7 @@
 import ActualizarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/actualizar-cliente-factura-borrador-record-command.interface';
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
+import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
 import type {
   ClienteFacturaEstadoRecord,
   ClienteFacturaRecord,
@@ -73,6 +74,10 @@ interface ClienteFacturaBorradorEditableDatabaseRow {
   readonly id: number;
   readonly public_id: string;
   readonly created_at: string;
+}
+
+interface ClienteFacturaChangesDatabaseRow {
+  readonly total: number;
 }
 
 export default class TypeOrmClienteFacturasRepository implements ClienteFacturasRepository {
@@ -244,6 +249,29 @@ export default class TypeOrmClienteFacturasRepository implements ClienteFacturas
         };
       },
     );
+  }
+
+  /**
+   * Elimina lógicamente un borrador y borra físicamente
+   * sus relaciones para liberar las ventas incluidas.
+   */
+  async deleteBorrador(command: EliminarClienteFacturaBorradorRecordCommand): Promise<void> {
+    const borradorPublicId: string = this.normalizeBorradorPublicId(command.borradorPublicId);
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+    const timestamp: string = new Date().toISOString();
+
+    return runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
+      const cliente: ClienteFacturaClienteDatabaseRow = await this.resolveClienteFacturacion(
+        queryRunner,
+        command.clientePublicId,
+      );
+
+      const borrador: ClienteFacturaBorradorEditableDatabaseRow =
+        await this.resolveBorradorEditable(queryRunner, cliente.id, borradorPublicId);
+
+      await this.softDeleteBorrador(queryRunner, borrador.id, timestamp);
+      await this.deleteRelacionesBorrador(queryRunner, borrador.id);
+    });
   }
 
   /**
@@ -533,6 +561,55 @@ export default class TypeOrmClienteFacturasRepository implements ClienteFacturas
     }
 
     return borrador;
+  }
+
+  /**
+   * Marca el borrador como eliminado comprobando que
+   * siga siendo editable en el momento de modificarlo.
+   */
+  private async softDeleteBorrador(
+    queryRunner: QueryRunner,
+    facturaId: number,
+    timestamp: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+        UPDATE factura
+        SET
+          updated_at = ?,
+          deleted_at = ?
+        WHERE
+          id = ?
+          AND estado = 'borrador'
+          AND deleted_at IS NULL
+      `,
+      [timestamp, timestamp, facturaId],
+    );
+
+    const rows: readonly ClienteFacturaChangesDatabaseRow[] = (await queryRunner.query(`
+      SELECT changes() AS total
+    `)) as readonly ClienteFacturaChangesDatabaseRow[];
+
+    if (rows[0]?.total !== 1) {
+      throw new Error('El borrador de factura no pertenece al cliente o ya no está disponible.');
+    }
+  }
+
+  /**
+   * Elimina todas las relaciones del borrador para
+   * que sus ventas vuelvan a estar disponibles.
+   */
+  private async deleteRelacionesBorrador(
+    queryRunner: QueryRunner,
+    facturaId: number,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+        DELETE FROM factura_venta
+        WHERE id_factura = ?
+      `,
+      [facturaId],
+    );
   }
 
   /**

@@ -41,6 +41,14 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
   }
 
   /**
+   * Simula la eliminación de un borrador para mantener
+   * completo el contrato utilizado por estas pruebas.
+   */
+  deleteBorrador(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  /**
    * Registra la consulta y devuelve las ventas
    * disponibles preparadas para cada prueba.
    */
