@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.34  
+**Versión:** 2.35  
 **Fecha:** 4 de septiembre de 2026  
-**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**. El **Hito 14 — Clientes está en curso 🟦**: `14A–14H` están terminados, validados funcionalmente y subidos al repositorio. Además de la ficha completa, su mantenimiento, Ventas y las Estadísticas generales, ya está operativo `14H — Consumo mensual`: consulta SQLite agregada, series temporales completas, contrato/API/IPC/preload/servicio Angular y gráfica ECharts con filtros Mes/Año, total, estados y protección frente a respuestas antiguas. El siguiente paso exacto es **`14I.0 — revisión funcional guiada de Facturas y contraste con el TPV antiguo`**. Antes de diseñar o implementar ese bloque se revisarán cuidadosamente las explicaciones, pantallas y comportamiento legacy que aporte el usuario. Clientes no realiza ni realizará ninguna operación TicketBAI.
+**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**. El **Hito 14 — Clientes está en curso 🟦**: `14A–14H` están terminados, validados funcionalmente y subidos al repositorio, y `14I.0 — revisión funcional guiada de Facturas y contraste legacy` queda **cerrado ✅**. Se ha definido el plan completo de `14I–14K`: listado con estados explícitos, borradores editables, selección de ventas disponibles, emisión con numeración global transaccional, previsualización en ventana independiente, PDF definitivo inmutable, impresión/email y anulación con liberación de ventas sin perder la relación histórica. El siguiente paso exacto es **`14I.1 — persistencia y relaciones históricas de facturas`**. Clientes no realiza ni realizará ninguna operación TicketBAI.
 
 > **Regla crítica de entorno TicketBAI:** el producto usa `production` por defecto. Durante desarrollo/pruebas manuales se usa `app_data.json → ticketBai.environment = "test"` junto con el token TEST correspondiente. No añadir selector de entorno a la UI.
 
@@ -133,10 +133,24 @@ Ventas 12 — Postventa                             🟦
     14H.3 Renderer                                ✅
       14H.3A Componente, gráfica, filtros/estados ✅
       14H.3B Integración y validación final       ✅
-  14I Dominio y listado de facturas               ⬜ SIGUIENTE
-    14I.0 Revisión funcional guiada y legacy      ⬜ PRIMERO
+  14I Dominio y listado de facturas               🟦 SIGUIENTE
+    14I.0 Revisión funcional guiada y legacy      ✅
+    14I.1 Persistencia y relaciones históricas    ⬜ PRIMERO
+    14I.2 Dominio, contratos y repository         ⬜
+    14I.3 API, IPC, preload y servicio Angular    ⬜
+    14I.4 Listado Angular                         ⬜
   14J Editor de factura                           ⬜
+    14J.1 Ventas disponibles                      ⬜
+    14J.2 Persistencia de borradores              ⬜
+    14J.3 Modal Angular                           ⬜
+    14J.4 Dirty y convivencia con la ficha        ⬜
   14K Emisión y documentos                        ⬜
+    14K.1 Emisión transaccional                   ⬜
+    14K.2 Documento y previsualización            ⬜
+    14K.3 PDF inmutable                           ⬜
+    14K.4 Impresión y email                       ⬜
+    14K.5 Anulación                               ⬜
+    14K.6 Integración y cierre                    ⬜
 15 Almacén                                        ⬜
 16 Compras                                        ⬜
 
@@ -3561,7 +3575,7 @@ El repositorio nuevo dispone actualmente de:
 - estados independientes de carga, vacío y error/reintento, protección frente a respuestas fuera de orden e invalidación al destruir el componente;
 - integración lazy de Consumo mensual dentro de Estadísticas sin formar parte del draft ni generar dirty;
 - tablas `factura` y `factura_venta`, estados borrador/emitida/anulada, instantánea de facturación e importación legacy;
-- unicidad de `factura_venta.id_venta`, que garantiza que una venta pertenezca como máximo a una factura.
+- unicidad global actual de `factura_venta.id_venta`; `14I.1` la sustituirá por una unicidad parcial sobre relaciones activas para conservar asociaciones históricas de facturas anuladas y liberar sus ventas.
 
 Todavía faltan:
 
@@ -3947,21 +3961,23 @@ Reglas cerradas:
 - crear, editar, cerrar, imprimir o enviar una factura de Clientes no cobra nada;
 - Clientes no realiza ninguna llamada ni operación TicketBAI;
 - la factura sirve como justificante oficial de la tienda sobre las compras agrupadas;
-- cerrar una factura no modifica las ventas incluidas;
+- finalizar una factura no modifica las ventas incluidas;
 - el importe se deriva de las ventas persistidas.
 
 Cardinalidad correcta:
 
 ```text
 Factura → 1..N ventas
-Venta   → 0..1 factura
+Venta   → 0..1 factura activa
+Venta   → 0..N facturas anuladas históricas
 ```
 
 Por tanto:
 
 - una factura puede y debe agrupar una o varias ventas;
-- una misma venta no puede pertenecer a varias facturas;
-- el UNIQUE sobre factura_venta.id_venta expresa esta última restricción;
+- una misma venta no puede pertenecer simultáneamente a más de una factura activa;
+- una factura anulada conserva sus relaciones históricas, pero deja de bloquear sus ventas;
+- `14I.1` sustituirá el UNIQUE global sobre `factura_venta.id_venta` por una restricción parcial sobre relaciones activas;
 - nunca debe interpretarse como una única venta por factura.
 
 Ventas elegibles:
@@ -3970,17 +3986,17 @@ Ventas elegibles:
 - no están soft-deleted;
 - son ventas positivas ordinarias;
 - no son devoluciones;
-- no pertenecen a ninguna otra factura;
+- no tienen relación activa con ninguna otra factura;
 - las operaciones mixtas con componente de devolución quedan fuera mientras su dominio permanezca pendiente;
 - al editar un borrador, sus ventas ya asociadas continúan seleccionables.
 
-Las devoluciones siguen apareciendo en Ventas y restando en Estadísticas, pero nunca pueden incorporarse a una factura.
+La UI mostrará únicamente ventas disponibles y las pertenecientes al propio borrador. No mostrará en gris ventas bloqueadas por otras facturas. Las devoluciones siguen apareciendo en Ventas y restando en Estadísticas, pero nunca pueden incorporarse a una factura.
 
 Estados:
 
 - borrador: editable;
-- emitida: cerrada e inmutable;
-- anulada: inmutable y conservada para trazabilidad.
+- emitida: finalizada e inmutable;
+- anulada: inmutable, consultable y conservada para trazabilidad.
 
 Borrador:
 
@@ -3991,7 +4007,9 @@ Borrador:
 - puede eliminarse;
 - al eliminarlo, sus ventas quedan disponibles de nuevo.
 
-Emitir/cerrar debe realizar en una única transacción:
+La numeración es global para todas las facturas, no por cliente. La fuente de verdad es `secuencia_documento` con tipo `factura` y serie. En una instalación sin facturas se usa `facturaInicial`; si ese dato no existe o no es válido, se adopta `1`. El número solo se consume al finalizar y nunca se reutiliza, tampoco después de una anulación. El formato visible será `numero_año`.
+
+Emitir/finalizar debe realizar en una única transacción:
 
 1. validar cliente y borrador;
 2. validar que todas las ventas siguen siendo elegibles;
@@ -4001,9 +4019,22 @@ Emitir/cerrar debe realizar en una única transacción:
 6. asignar serie, número y fecha de emisión;
 7. cambiar el estado a emitida.
 
-Después del COMMIT, la factura es de solo consulta. Imprimir y enviar por email son acciones documentales posteriores e independientes. No cambian su estado, no cobran y no ejecutan TicketBAI.
+Después del COMMIT, la factura es de solo consulta. La finalización materializa además un PDF definitivo que debe conservarse de forma inmutable. Impresión y email consumen ese PDF y son acciones documentales posteriores e independientes: no cambian el estado, no cobran y no ejecutan TicketBAI.
 
-Las facturas anuladas conservan sus relaciones con ventas. Solo eliminar un borrador libera las ventas.
+El documento de previsualización es temporal, muestra la marca `PREVISUALIZACIÓN` y conserva el botón Facturar. Si el borrador tiene cambios, se guarda antes de abrir la ventana. Facturar desde el modal o desde la previsualización ejecuta el mismo caso de uso. La vista final permite plegar/desplegar ventas; al imprimir o generar el PDF se ocultan los controles y se despliega todo.
+
+El PDF congela la representación definitiva de los datos del negocio, datos de facturación del cliente, ventas, líneas, impuestos e importes. Los únicos cambios admitidos posteriormente sobre una venta desde Histórico —cliente asignado o forma de pago— no alteran líneas ni importes y no modifican la factura ni su PDF.
+
+El email de una factura emitida abre un formulario cuyo destinatario inicial es el email actual del cliente, no la dirección congelada en la factura. El usuario puede modificarlo antes de enviar y ese cambio no muta cliente, factura ni PDF. Por tratarse de documentación oficial, asunto y cuerpo usan `AppData.nombreComercial`.
+
+Anular una factura emitida debe realizar en una única transacción:
+
+1. comprobar que continúa emitida;
+2. cambiar el estado a anulada y registrar la fecha de anulación;
+3. convertir sus relaciones con ventas en históricas/inactivas;
+4. liberar esas ventas para nuevas facturas.
+
+La factura anulada conserva número, fecha, importe, PDF y relaciones históricas. Permanece consultable, pero no puede modificarse, imprimirse ni enviarse por email. Si una venta liberada ha cambiado de cliente, será elegible para el cliente que tenga asignado en ese momento. Una nueva factura que la incluya recibirá un número nuevo.
 
 La UI de factura mantendrá el patrón útil del legacy:
 
@@ -4011,6 +4042,16 @@ La UI de factura mantendrá el patrón útil del legacy:
 - detalle de la venta seleccionada a la derecha;
 - selección múltiple en borradores;
 - consulta sin controles de edición en emitidas/anuladas.
+
+El listado incorpora las columnas Factura, Fecha, Importe, Estado y Acciones. Un borrador muestra `Borrador`; una emitida o anulada muestra su número oficial, nunca el id interno. La fecha de un borrador es su creación y la de una emitida/anulada es su fecha de emisión. Solo las emitidas ofrecen email e impresión en la tabla.
+
+Títulos del editor:
+
+- nueva sin guardar: `Nueva factura`;
+- borrador persistido: `Borrador de factura`;
+- emitida/anulada: `Factura numero_año`.
+
+La creación o finalización de facturas exige un cliente persistido y sin cambios pendientes en la ficha, para que los datos efectivos de facturación procedan siempre del estado canónico guardado.
 
 ## 29.10 Correcciones respecto al TPV legacy
 
@@ -4021,8 +4062,13 @@ No se portarán literalmente estos comportamientos:
 | El buscador llamaba al backend aunque los clientes estaban cargados | Filtrado exclusivo en memoria |
 | Al seleccionar cliente se cargaba todo a la vez | Carga lazy por pestaña |
 | impresa representaba a la vez impresión y cierre | estado explícito; impresa no gobierna la mutabilidad |
+| La columna Factura y el título del modal mostraban el id interno | Borrador o número oficial `numero_año`; nunca el id interno |
 | Facturas actualizaba relaciones sin una transacción única | Guardado y emisión transaccionales |
 | Número de factura mediante MAX + 1 sin protección | Numeración transaccional por serie y restricción UNIQUE |
+| Una venta quedaba bloqueada incluso si la factura se anulaba | Relación histórica inactiva y venta nuevamente disponible |
+| El listado mezclaba ventas disponibles y bloqueadas en gris | Mostrar únicamente disponibles y las propias del borrador |
+| Cierre e impresión eran la misma operación | Emisión, materialización PDF e impresión son conceptos separados |
+| El asunto del email utilizaba el id interno | Número oficial y `AppData.nombreComercial` |
 | Totales y márgenes con floats y cálculo en renderer | Agregación SQLite y dinero entero |
 | Años limitados al actual y cuatro anteriores | Años reales disponibles |
 | Todos/Todos significaba mes actual | Filtros explícitos y coherentes |
@@ -4210,44 +4256,152 @@ La versión 2.29 cerró el análisis funcional, las decisiones y la secuencia de
 - lectura lazy sin modificar el draft ni generar dirty ✅;
 - tests y pruebas funcionales/visuales validados por el usuario ✅.
 
-### 14I — Dominio y listado de facturas ⬜ SIGUIENTE
+### 14I — Dominio y listado de facturas 🟦 SIGUIENTE
 
-#### 14I.0 — Revisión funcional guiada y contraste legacy ⬜ PRIMERO
+#### 14I.0 — Revisión funcional guiada y contraste legacy ✅
 
-Antes de concretar contratos o implementar código:
+- explicación funcional completa y capturas legacy revisadas ✅;
+- contraste con frontend/API antiguos, esquema, importadores y pipeline documental nuevos ✅;
+- significado postventa, estados, numeración, listado, editor, documentos, email y anulación cerrados ✅;
+- plan técnico definitivo de `14I–14K` acordado ✅.
 
-- el usuario explicará con detalle el funcionamiento real del apartado Facturas;
-- aportará las pantallas del TPV antiguo que resulten útiles;
-- se revisarán conjuntamente los flujos de listado, alta, edición, selección de ventas, consulta y acciones;
-- se contrastarán las explicaciones y capturas con los repositorios legacy y con el esquema/importador ya presentes en la aplicación nueva;
-- se identificarán comportamientos legacy que deben conservarse, corregirse o descartarse;
-- cualquier duda funcional o propuesta se resolverá antes de cerrar el plan técnico definitivo de `14I–14K`.
+#### 14I.1 — Persistencia y relaciones históricas ⬜ PRIMERO
 
-Base ya acordada, pendiente de completar con esa revisión:
+- adaptar `factura_venta` para distinguir relaciones activas e históricas;
+- mantener como máximo una relación activa por venta mediante índice único parcial;
+- conservar relaciones inactivas de facturas anuladas;
+- añadir fecha de anulación a `factura`;
+- mantener `impresa` solo por compatibilidad legacy, sin gobernar estado ni mutabilidad;
+- adaptar importadores: borradores/emitidas activas, anuladas históricas;
+- verificar la secuencia global como máximo entre `facturaInicial - 1` y el último número importado;
+- mantener `DATABASE_SCHEMA_VERSION = 1` y recrear/reimportar la base durante desarrollo.
 
-- contratos/repository/service/API/IPC/preload;
-- listado y estados;
-- ventas disponibles;
-- creación de borradores;
-- cero operaciones TicketBAI.
+#### 14I.2 — Dominio, contratos y repository ⬜
+
+- modelo público con estado, número oficial, fechas, importe y acciones permitidas;
+- consulta por cliente ordenada desde la factura más reciente;
+- borrador sin número oficial; emitida/anulada con `numero_año`;
+- fecha de creación para borradores y fecha de emisión para emitidas/anuladas;
+- importes en enteros y ausencia total de TicketBAI.
+
+#### 14I.3 — API, IPC, preload y servicio Angular ⬜
+
+- consulta lazy de facturas del cliente;
+- handler con sender validado y preload tipado;
+- servicio Angular directo;
+- protección frente a respuestas antiguas;
+- invalidación/recarga después de guardar, emitir, anular o eliminar.
+
+#### 14I.4 — Listado Angular ⬜
+
+- columnas Factura, Fecha, Importe, Estado y Acciones;
+- estados de carga, vacío y error/reintento;
+- fila clicable para los tres estados;
+- email e impresión solo para emitidas;
+- acciones de fila sin abrir accidentalmente el modal;
+- botón Nueva factura;
+- nunca mostrar el id interno como número de factura.
 
 ### 14J — Editor de factura ⬜
 
-- selección de varias ventas;
-- exclusión de devoluciones y ventas ya facturadas;
-- detalle de venta;
-- guardar/eliminar borrador;
-- liberar relaciones al eliminar.
+#### 14J.1 — Ventas disponibles ⬜
+
+- consulta específica por cliente;
+- únicamente ventas ordinarias positivas, no eliminadas y sin devolución;
+- exclusión de cualquier venta con relación activa a otra factura;
+- inclusión de las ventas ya pertenecientes al propio borrador;
+- no mostrar ventas bloqueadas por otras facturas;
+- una venta liberada por anulación se evalúa con su cliente actual.
+
+#### 14J.2 — Persistencia de borradores ⬜
+
+- crear, actualizar y eliminar borradores transaccionalmente;
+- exigir al menos una venta;
+- revalidar disponibilidad dentro de la transacción;
+- recalcular el importe desde SQLite;
+- eliminar relaciones retiradas de un borrador;
+- eliminar todas las relaciones al borrar el borrador;
+- rechazar cualquier mutación de emitidas o anuladas.
+
+#### 14J.3 — Modal Angular ⬜
+
+- ventas y selección múltiple a la izquierda;
+- detalle de la venta activa a la derecha;
+- nueva factura y borrador en modo edición;
+- emitida y anulada en modo consulta;
+- títulos `Nueva factura`, `Borrador de factura` y `Factura numero_año`;
+- acciones de borrador: Eliminar, Guardar, Previsualizar y Facturar;
+- acciones de emitida: Anular e Imprimir;
+- anulada sin acciones documentales.
+
+#### 14J.4 — Dirty y convivencia con la ficha ⬜
+
+- dirty propio del modal y confirmación al cerrar con cambios;
+- bloqueo durante cualquier operación;
+- guardado automático antes de previsualizar;
+- creación/finalización solo con cliente persistido y ficha limpia;
+- datos de facturación siempre procedentes del cliente canónico guardado.
 
 ### 14K — Emisión y documentos ⬜
 
-- validación y cierre transaccional;
-- número, fecha, instantánea e importe;
-- bloqueo de emitida/anulada;
-- previsualización;
-- documento estable;
-- impresión y email;
-- regresión integral y cierre del Hito 14.
+#### 14K.1 — Emisión transaccional ⬜
+
+- validar cliente, borrador y ventas dentro de la transacción;
+- obtener el siguiente número de la secuencia global;
+- usar `facturaInicial` cuando todavía no haya facturas y `1` como fallback;
+- fijar serie, número y fecha de emisión;
+- congelar datos efectivos de facturación del cliente;
+- recalcular importe y cambiar el estado a emitida;
+- consumir el número únicamente al finalizar y no reutilizarlo nunca.
+
+#### 14K.2 — Documento y previsualización ⬜
+
+- builder específico con `AppData.nombreComercial`, cliente, ventas, líneas, impuestos y totales;
+- cálculos monetarios enteros fuera del renderer;
+- previsualización temporal con marca visible y botón Facturar;
+- misma operación de emisión desde modal o ventana de previsualización;
+- sincronización con la ventana principal;
+- vista final interactiva con ventas plegables/desplegables;
+- controles ocultos y contenido desplegado en formato imprimible.
+
+#### 14K.3 — PDF inmutable ⬜
+
+- storage específico inspirado en el de tickets;
+- creación y persistencia del PDF definitivo al finalizar;
+- impresión/email desde los bytes almacenados;
+- nunca sustituir el PDF de una factura emitida;
+- reintento de materialización si falla después del COMMIT;
+- materialización inicial bajo demanda para facturas legacy emitidas sin PDF.
+
+#### 14K.4 — Impresión y email ⬜
+
+- acciones exclusivas de facturas emitidas;
+- formulario de email con la dirección actual del cliente como valor inicial;
+- destinatario editable sin modificar cliente, factura ni PDF;
+- asunto/cuerpo con `AppData.nombreComercial`;
+- adjunto nombrado con el número oficial;
+- anuladas sin impresión ni email.
+
+#### 14K.5 — Anulación ⬜
+
+- transición transaccional exclusiva de emitida a anulada;
+- fecha de anulación;
+- relaciones activas convertidas en históricas/inactivas;
+- ventas liberadas y disponibles según su cliente actual;
+- conservación de número, fecha, importe, PDF y detalle consultable;
+- prohibición de modificar, imprimir o enviar;
+- cualquier factura posterior recibe un número nuevo.
+
+#### 14K.6 — Integración y cierre ⬜
+
+- cobertura de estados, transiciones y conflictos entre borradores;
+- numeración global y `facturaInicial`;
+- anulación, trazabilidad y reutilización de ventas;
+- previsualización, PDF, impresión y email;
+- sincronización entre ventanas;
+- regresión de ficha, Ventas y Estadísticas;
+- confirmación explícita de cero operaciones TicketBAI;
+- cierre completo del Hito 14.
 
 ## 29.12 Archivos clave actuales de Clientes
 
@@ -4372,33 +4526,47 @@ src/app/modules/clientes/components/client-monthly-consumption/
 src/app/modules/clientes/components/client-general-statistics/
 ```
 
+Base de persistencia, importación y documentos para Facturas:
+
+```text
+electron/infrastructure/database/schema/sales.database-schema.ts
+electron/infrastructure/database/schema/complete-database-schema.tables.ts
+electron/infrastructure/legacy-import/legacy-import-customer-data.importer.ts
+electron/infrastructure/legacy-import/legacy-import-sale-payment-data.importer.ts
+electron/infrastructure/database/typeorm/typeorm-legacy-import-database.ts
+electron/backend/application/ventas/ventas-tickets.service.ts
+electron/backend/contracts/ventas/venta-ticket-pdf-storage.interface.ts
+electron/infrastructure/filesystem/file-venta-ticket-pdf.storage.ts
+src/app/services/venta-ticket-document.service.ts
+src/app/modules/ventas/components/historical-sale-detail/
+```
+
 ---
 
 # 30. Próximo paso exacto
 
 ```text
-14I.0 — Revisión funcional guiada de Facturas y contraste con el TPV antiguo
+14I.1 — Persistencia y relaciones históricas de facturas
 ```
 
 Antes de proponer cambios:
 
 - actualizar y revisar el main actual;
-- escuchar primero la explicación funcional del usuario y revisar todas las imágenes legacy que aporte;
-- no cerrar contratos, estados, comandos ni estructura de UI mientras esa explicación no haya terminado;
-- contrastar después el comportamiento descrito con los repositorios del TPV antiguo;
-- revisar en la aplicación nueva las entidades y tablas `factura`/`factura_venta`, el importador legacy, los contratos de ventas y los pipelines documentales reutilizables;
-- documentar qué comportamientos legacy se conservan, cuáles se corrigen y cuáles se descartan;
-- comprobar y completar las decisiones preliminares sobre listado, borradores, ventas elegibles, edición, emisión/cierre, anulación, impresión y email;
-- aclarar antes del desarrollo cualquier detalle todavía abierto, especialmente numeración/serie, fechas, estados visibles, datos efectivos de facturación y acciones permitidas en cada estado;
-- confirmar el alcance y dividir `14I–14K` en bloques pequeños y verificables solo después del análisis;
-- mantener como reglas cerradas que una factura agrupa `1..N` ventas ya cobradas, cada venta pertenece como máximo a una factura y las devoluciones no son elegibles;
+- revisar conjuntamente `factura`, `factura_venta`, sus índices y los dos importadores legacy implicados;
+- diseñar la relación activa/histórica sin perder la consulta de facturas anuladas;
+- garantizar en SQLite que una venta tenga como máximo una relación activa;
+- añadir la fecha de anulación sin usar `impresa` como estado;
+- conservar borradores y emitidas como relaciones activas e importar anuladas como históricas;
+- verificar que la secuencia `factura` queda situada tras el mayor número importado o `facturaInicial - 1`;
+- mantener como reglas cerradas que una factura agrupa `1..N` ventas ya cobradas, una venta pertenece como máximo a una factura activa y las devoluciones no son elegibles;
 - mantener completamente fuera de Facturas cualquier operación TicketBAI;
+- mantener `DATABASE_SCHEMA_VERSION = 1`; tras cambiar el esquema, recrear instalación y reimportar `.otpv`;
 - presentar cada archivo nuevo completo y cada archivo existente como fragmento actual → nuevo;
 - al añadir imports, indicar únicamente los imports nuevos; Prettier se encargará de ordenarlos;
 - indicar las pruebas exactas pertinentes al subbloque;
 - esperar confirmación del usuario antes de avanzar.
 
-`14H — Consumo mensual` está cerrado y no debe reabrirse al comenzar Facturas. El primer intercambio de `14I` será exclusivamente de análisis: el usuario explicará el apartado y aportará referencias visuales antes de que se proponga implementación.
+`14I.0` está cerrado. No reabrir el análisis funcional salvo que aparezca un requisito nuevo o una incompatibilidad real durante el desarrollo. El primer bloque de código será exclusivamente la persistencia y adaptación del import legacy; contratos, listado y UI comenzarán después de validar `14I.1`.
 
 ---
 
@@ -4427,6 +4595,7 @@ Antes de proponer cambios:
 | **2.32** | **03/09/2026** | **`14F — Ventas del cliente` terminado, validado y subido ✅. El Histórico admite filtro opcional por `clientePublicId` aplicado en SQLite al listado, pagos y agregados. La pestaña ofrece fechas explícitas, importes firmados, selección accesible, detalle readonly, reimpresión y email reutilizando los pipelines existentes, con protección ante respuestas antiguas y acciones ligadas a su propia fila. Ajuste responsive final sin scroll horizontal. Remitente y `{nombreNegocio}` de los emails de tickets usan `AppData.nombre`; `nombreComercial` queda fuera de estas comunicaciones. Siguiente: 14G Estadísticas generales.** |
 | **2.33** | **04/09/2026** | **`14G — Estadísticas generales` terminado y validado ✅. Consulta lazy específica con últimos 20 artículos, top por importe real y sumas SQLite por año/mes. PUC firmado, PVP real, beneficio, margen y total general se calculan en backend con enteros seguros/BigInt; devoluciones restan y ventas soft-deleted se excluyen. Renderer con estados, protección ante respuestas antiguas, tablas superiores, acordeón anual de apertura única, detalle mensual, total siempre visible, negativos, margen `null` como `—`, alineación final y overlay corregido. Siguiente: 14H Consumo mensual.** |
 | **2.34** | **04/09/2026** | **`14H — Consumo mensual` terminado, validado y subido ✅. Consulta SQLite específica por cliente con importe real, devoluciones negativas y ventas soft-deleted excluidas; contrato público, series temporales completas, años intermedios, huecos a cero y total seguro; API/IPC/preload/servicio Angular; componente ECharts lazy con filtros Mes/Año, cuatro resoluciones temporales, total, tooltips, estados independientes y protección frente a respuestas antiguas. No genera dirty. El siguiente paso es `14I.0`: explicación funcional guiada, capturas y contraste cuidadoso de Facturas con el TPV antiguo antes de diseñar o implementar.** |
+| **2.35** | **04/09/2026** | **`14I.0 — Revisión funcional guiada de Facturas` cerrado ✅. Facturas queda definida como agrupación postventa de 1..N ventas ya cobradas y completamente ajena a TicketBAI. Se acuerdan numeración global desde `facturaInicial`, estados Borrador/Finalizada/Anulada, listado con estado explícito, ventas disponibles, borradores editables, emisión transaccional, previsualización facturable, PDF definitivo inmutable, impresión/email desde el PDF y destinatario editable. Anular conserva número/PDF/relaciones históricas, bloquea impresión/email y libera las ventas mediante relaciones inactivas. Plan detallado `14I–14K` cerrado. Siguiente: `14I.1 — Persistencia y relaciones históricas`.** |
 
 ---
 
@@ -4436,7 +4605,7 @@ Antes de proponer cambios:
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.34.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.35.
 
 Estado:
 - Ventas 12C.1–12C.8 ✅
@@ -4510,8 +4679,24 @@ Estado:
     - 14H.3 renderer ✅
       - 14H.3A componente ECharts, filtros, total y estados ✅
       - 14H.3B integración y validación funcional/visual ✅
-  - 14I Dominio y listado de facturas ⬜ SIGUIENTE
-    - 14I.0 revisión funcional guiada y contraste legacy ⬜ PRIMERO
+  - 14I Dominio y listado de facturas 🟦 SIGUIENTE
+    - 14I.0 revisión funcional guiada y contraste legacy ✅
+    - 14I.1 persistencia y relaciones históricas ⬜ PRIMERO
+    - 14I.2 dominio, contratos y repository ⬜
+    - 14I.3 API, IPC, preload y servicio Angular ⬜
+    - 14I.4 listado Angular ⬜
+  - 14J Editor de factura ⬜
+    - 14J.1 ventas disponibles ⬜
+    - 14J.2 persistencia de borradores ⬜
+    - 14J.3 modal Angular ⬜
+    - 14J.4 dirty y convivencia con la ficha ⬜
+  - 14K Emisión y documentos ⬜
+    - 14K.1 emisión transaccional ⬜
+    - 14K.2 documento y previsualización ⬜
+    - 14K.3 PDF inmutable ⬜
+    - 14K.4 impresión y email ⬜
+    - 14K.5 anulación ⬜
+    - 14K.6 integración y cierre ⬜
 
 Hito actual:
 14 Clientes 🟦
@@ -4646,13 +4831,27 @@ Reglas críticas:
 - La gráfica es lazy, de solo lectura, tiene estados independientes y no forma parte del draft ni genera dirty.
 - Las estadísticas completas se cargan lazy en Clientes; no sobrecargar las estadísticas rápidas de Ventas.
 - Factura de Clientes = agrupación posterior de 1..N ventas ya cobradas.
-- Venta = 0..1 factura; UNIQUE factura_venta.id_venta impide reutilizarla en otra factura.
-- Solo ventas positivas ordinarias del mismo cliente y no facturadas son elegibles.
+- Venta = 0..1 factura activa y 0..N relaciones históricas con facturas anuladas.
+- `14I.1` sustituirá el UNIQUE global de `factura_venta.id_venta` por unicidad parcial sobre relaciones activas.
+- Solo ventas positivas ordinarias del mismo cliente, no eliminadas y sin relación activa son elegibles.
 - Devoluciones y operaciones mixtas con componente de devolución no pueden incluirse.
 - Editar un borrador permite mantener seleccionadas sus propias ventas.
-- Eliminar un borrador libera sus ventas; emitidas y anuladas conservan relaciones.
+- El editor muestra solo ventas disponibles y las propias del borrador; no muestra bloqueadas en gris.
+- Eliminar un borrador elimina sus relaciones y libera sus ventas.
 - Factura borrador editable; emitida/anulada inmutable.
+- Anular conserva relaciones históricas inactivas y libera las ventas para nuevas facturas.
+- Una factura anulada conserva número, fecha, importe y PDF; es consultable, pero no imprimible ni enviable.
+- La numeración de facturas es global por serie, parte de `facturaInicial` —o 1 como fallback— y nunca reutiliza números.
+- Borradores no tienen número; emitidas/anuladas muestran `numero_año`, nunca el id interno.
 - Emitir valida y recalcula en SQLite y guarda número, fecha, snapshot e importe en una única transacción.
+- Previsualizar guarda primero el borrador, abre una ventana con marca PREVISUALIZACIÓN y mantiene el botón Facturar.
+- Facturar desde modal o previsualización ejecuta el mismo caso de uso.
+- Al finalizar se crea un PDF definitivo inmutable; impresión y email consumen exactamente ese PDF.
+- La vista final es interactiva; impresión/PDF ocultan controles y despliegan todas las ventas.
+- El email de factura usa como valor inicial el email actual del cliente y permite editar el destinatario sin mutar cliente/factura/PDF.
+- Asunto y cuerpo de factura usan `AppData.nombreComercial`, al tratarse de documentación oficial.
+- Los cambios históricos permitidos en una venta —cliente o forma de pago— no alteran líneas/importes ni el PDF emitido.
+- Crear/finalizar exige cliente persistido y ficha limpia para usar datos de facturación canónicos.
 - Clientes no cobra ni ejecuta TicketBAI al crear, editar, emitir, imprimir o enviar facturas.
 - Imprimir/email son acciones documentales posteriores al COMMIT y no gobiernan el estado de la factura.
 - Desarrollo manual: el asistente propone archivos/fragmentos y el usuario aplica, valida e informa cambios.
@@ -4674,16 +4873,17 @@ Convenciones:
 - En cada bloque incluir un resumen breve: completado, punto actual y pendiente.
 
 Próximo paso exacto:
-14I.0 — Revisión funcional guiada de Facturas y contraste con el TPV antiguo.
+14I.1 — Persistencia y relaciones históricas de facturas.
 
-Antes de proponer código de Facturas:
-- dejar que el usuario termine de explicar el funcionamiento real del apartado;
-- revisar las imágenes del TPV antiguo que aporte;
-- contrastar después esas explicaciones con los repositorios legacy y la implementación nueva;
-- plantear dudas y propuestas y cerrar conjuntamente el plan actualizado de 14I–14K;
-- no diseñar contratos ni implementar nada hasta completar ese análisis.
+Primero:
+- revisar el schema `factura`/`factura_venta` y los importadores legacy actuales;
+- añadir relación activa/histórica, unicidad parcial y fecha de anulación;
+- adaptar la importación de relaciones según el estado de la factura;
+- verificar la secuencia global tras una importación;
+- mantener `DATABASE_SCHEMA_VERSION = 1` y validar recreando/reimportando la instalación;
+- no avanzar a contratos/listado hasta validar este subbloque.
 ```
 
 ---
 
-**Fin del documento de continuidad v2.34.**
+**Fin del documento de continuidad v2.35.**
