@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.33  
+**Versión:** 2.34  
 **Fecha:** 4 de septiembre de 2026  
-**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**. El **Hito 14 — Clientes está en curso 🟦**: `14A–14G` están terminados y validados funcionalmente. Además de la ficha completa, su mantenimiento y la pestaña Ventas, ya está operativa la carga lazy de Estadísticas generales con los últimos 20 artículos comprados, top por importe real, sumas económicas agrupadas por año y mes, total general y cálculos seguros de PUC, PVP real, beneficio y margen. El siguiente paso exacto es **`14H — Consumo mensual`**, que añadirá la gráfica temporal y sus filtros sin modificar el dominio ya cerrado de `14G`. Clientes no realiza ni realizará ninguna operación TicketBAI.
+**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**. El **Hito 14 — Clientes está en curso 🟦**: `14A–14H` están terminados, validados funcionalmente y subidos al repositorio. Además de la ficha completa, su mantenimiento, Ventas y las Estadísticas generales, ya está operativo `14H — Consumo mensual`: consulta SQLite agregada, series temporales completas, contrato/API/IPC/preload/servicio Angular y gráfica ECharts con filtros Mes/Año, total, estados y protección frente a respuestas antiguas. El siguiente paso exacto es **`14I.0 — revisión funcional guiada de Facturas y contraste con el TPV antiguo`**. Antes de diseñar o implementar ese bloque se revisarán cuidadosamente las explicaciones, pantallas y comportamiento legacy que aporte el usuario. Clientes no realiza ni realizará ninguna operación TicketBAI.
 
 > **Regla crítica de entorno TicketBAI:** el producto usa `production` por defecto. Durante desarrollo/pruebas manuales se usa `app_data.json → ticketBai.environment = "test"` junto con el token TEST correspondiente. No añadir selector de entorno a la UI.
 
@@ -125,8 +125,16 @@ Ventas 12 — Postventa                             🟦
       14G.3A Total general en backend             ✅
       14G.3B Carga lazy, estados y tablas         ✅
       14G.3C Acordeón, meses, total y pulido      ✅
-  14H Consumo mensual                             ⬜ SIGUIENTE
-  14I Dominio y listado de facturas               ⬜
+  14H Consumo mensual                             ✅ CERRADO
+    14H.1 Backend, series y contratos             ✅
+      14H.1A Consulta SQLite y contrato interno   ✅
+      14H.1B Contrato público y series completas  ✅
+    14H.2 API, IPC, preload y servicio Angular    ✅
+    14H.3 Renderer                                ✅
+      14H.3A Componente, gráfica, filtros/estados ✅
+      14H.3B Integración y validación final       ✅
+  14I Dominio y listado de facturas               ⬜ SIGUIENTE
+    14I.0 Revisión funcional guiada y legacy      ⬜ PRIMERO
   14J Editor de factura                           ⬜
   14K Emisión y documentos                        ⬜
 15 Almacén                                        ⬜
@@ -3543,12 +3551,20 @@ El repositorio nuevo dispone actualmente de:
 - años y meses reales disponibles ordenados cronológicamente, acordeón inicialmente cerrado y limitado a un único año abierto;
 - presentación segura de márgenes no calculables mediante `—`, diferenciación de valores negativos y alineación final de Mes a la izquierda y columnas numéricas a la derecha;
 - corrección local de apilamiento del buscador de clientes para que su overlay permanezca por encima de las cabeceras sticky de las tablas;
+- consulta específica de consumo mensual por `clientePublicId`, año y mes nullable, agregada en SQLite sobre el importe real de las líneas de venta;
+- exclusión de ventas soft-deleted e inclusión de devoluciones con signo negativo también en Consumo mensual;
+- series temporales completas con días, doce meses, comparación del mismo mes entre años o todos los meses cronológicos según los filtros;
+- períodos sin actividad rellenados con cero y `availableYears` continuo entre el primer y el último año real;
+- `ClienteConsumoMensualResultado` con puntos en microeuros y total calculado de forma segura fuera del renderer;
+- puente completo `ClientesApi` → IPC → preload → `ClientesService.getConsumoMensual()`;
+- `ClientMonthlyConsumptionComponent` con ECharts/ngx-echarts modular, CanvasRenderer, filtros Mes/Año, total, tooltips y selección inicial año actual + Todos los meses;
+- estados independientes de carga, vacío y error/reintento, protección frente a respuestas fuera de orden e invalidación al destruir el componente;
+- integración lazy de Consumo mensual dentro de Estadísticas sin formar parte del draft ni generar dirty;
 - tablas `factura` y `factura_venta`, estados borrador/emitida/anulada, instantánea de facturación e importación legacy;
 - unicidad de `factura_venta.id_venta`, que garantiza que una venta pertenezca como máximo a una factura.
 
 Todavía faltan:
 
-- consumo mensual gráfico;
 - contratos, repositories, services e IPC operativos para facturas;
 - listado/editor de borradores, emisión y pipeline documental de facturas.
 
@@ -3866,27 +3882,59 @@ Se corrigió además el `z-index` local del buscador de clientes: su overlay usa
 
 Los tests de repository SQLite, application service, contratos/servicios renderer y componente Angular, junto con typecheck/build/lint y las pruebas funcionales y visuales, han sido validados. **`14G — Estadísticas generales` queda cerrado ✅.**
 
-### Consumo mensual pendiente para 14H
+### Consumo mensual — 14H cerrado ✅
 
-La cuarta parte de Estadísticas sigue deliberadamente separada como `14H — Consumo mensual`. Implementará lo que quedó incompleto en el TPV antiguo usando el patrón funcional y visual de Estadísticas de Artículos:
+La cuarta parte de Estadísticas, que había quedado incompleta en el TPV antiguo, está implementada como un bloque específico e independiente de `14G`.
 
-- gráfica de barras con ECharts/ngx-echarts;
-- métrica de importe real consumido;
-- filtro Mes concreto/Todos;
-- filtro Año concreto/Todos;
-- refresco al cambiar cualquier filtro;
-- protección ante respuestas fuera de orden;
-- períodos sin actividad rellenados con cero;
-- año actual y Todos los meses como selección inicial.
+Backend y contrato:
 
-Resoluciones acordadas:
+- `ClienteConsumoMensualRepositoryQuery` transporta `publicId`, `year` y `month` nullable;
+- `ClienteRepository.findConsumoMensual()` agrega `SUM(linea_venta.importe_micros)` en SQLite;
+- se incluyen únicamente clientes activos y ventas no soft-deleted;
+- las devoluciones participan con su importe negativo;
+- una consulta independiente obtiene los años reales disponibles;
+- la agregación es diaria cuando año y mes son concretos, y mensual en el resto de combinaciones;
+- los valores procedentes de SQLite se validan como enteros seguros;
+- `ClienteConsumoMensualConsulta`, `ClienteConsumoMensualPoint` y `ClienteConsumoMensualResultado` constituyen el contrato público;
+- `createClienteConsumoMensualResult()` completa todos los huecos temporales con cero, genera años intermedios y calcula `totalMicros` de forma segura;
+- febrero respeta correctamente los años bisiestos;
+- año válido: `1..9999`; mes válido: `1..12`; `null` significa Todos.
 
-- año + mes → días del mes;
-- año + Todos → doce meses;
-- Todos + mes → ese mes entre años;
-- Todos + Todos → todos los meses cronológicos.
+Resoluciones temporales definitivas:
 
-La gráfica continuará siendo de solo lectura, lazy y ajena al draft. No debe modificar ni duplicar la consulta ya cerrada de `14G` salvo que una reutilización explícita resulte técnicamente conveniente.
+- año + mes → todos los días del mes;
+- año + Todos → los doce meses;
+- Todos + mes → ese mes para cada año de la serie continua;
+- Todos + Todos → todos los meses cronológicos desde el primer año real hasta el último.
+
+Puente de escritorio:
+
+- `ClientesService.getConsumoMensual()` normaliza y valida la consulta antes de acceder al repository;
+- `ClientesApi.getConsumoMensual()` expone el contrato público;
+- el canal `clientes:get-consumo-mensual`, su handler con validación de sender y el preload tipado completan el puente;
+- `ClientesService` Angular ofrece un método directo sin duplicar estado ni lógica de negocio.
+
+Renderer:
+
+- `ClientMonthlyConsumptionComponent` es standalone y está integrado al final de `ClientGeneralStatisticsComponent`;
+- se carga lazy únicamente al entrar en la pestaña Estadísticas de un cliente persistido;
+- selección inicial: año local actual y Todos los meses;
+- cualquier cambio en Mes o Año refresca automáticamente la consulta;
+- `availableYears` mantiene visible el año seleccionado y se presenta en orden descendente;
+- ECharts ^6.1.0 y ngx-echarts ^22.0.0 se usan de forma modular con `BarChart`, `GridComponent`, `TooltipComponent` y `CanvasRenderer`;
+- la gráfica recibe puntos ya completos y se limita a convertir microeuros a euros, generar etiquetas y presentar barras/tooltips;
+- el total del período procede directamente del backend;
+- la gráfica conserva los datos anteriores bajo el overlay mientras carga un nuevo filtro;
+- las respuestas IPC antiguas se descartan mediante una secuencia incremental;
+- destruir el componente invalida cualquier respuesta pendiente;
+- error y reintento son propios del consumo y no dependen del estado de `14G`;
+- un período completamente a cero muestra un estado vacío específico;
+- la consulta es de solo lectura, no forma parte del `ClienteWorkspace` y nunca genera dirty;
+- el buscador de clientes continúa cubriendo correctamente la gráfica y el resto de Estadísticas.
+
+La integración del componente real se sustituye por un componente mínimo en el spec del padre para no inicializar CanvasRenderer en ese test. La lógica asíncrona del componente real dispone de pruebas propias para carga inicial, filtros, valores inválidos, respuestas fuera de orden, error, reintento y período vacío.
+
+Todos los tests Electron/Angular, builds, lint y las pruebas funcionales y visuales de las cuatro combinaciones de filtros han sido validados por el usuario. **`14H — Consumo mensual` queda cerrado ✅.**
 
 ## 29.9 Facturas: significado de dominio
 
@@ -4134,14 +4182,48 @@ La versión 2.29 cerró el análisis funcional, las decisiones y la secuencia de
 - responsive final y overlay del buscador por encima de cabeceras sticky ✅;
 - tests y pruebas funcionales/visuales validados por el usuario ✅.
 
-### 14H — Consumo mensual ⬜ SIGUIENTE
+### 14H — Consumo mensual ✅ CERRADO
 
-- endpoint agregado;
-- series temporales completas;
-- gráfica ECharts;
-- filtros y estados.
+#### 14H.1 — Backend, series y contratos ✅
 
-### 14I — Dominio y listado de facturas ⬜
+- `14H.1A` consulta SQLite agregada y contrato interno ✅;
+- `14H.1B` contrato público, series completas, total y application service ✅;
+- importe real en microeuros, devoluciones negativas y ventas soft-deleted excluidas ✅;
+- años intermedios y períodos sin actividad completados con cero ✅;
+- cuatro resoluciones temporales Mes/Año y años bisiestos cubiertos ✅.
+
+#### 14H.2 — API, IPC, preload y servicio Angular ✅
+
+- `ClientesApi.getConsumoMensual()` ✅;
+- canal y handler IPC con sender validado ✅;
+- preload tipado ✅;
+- método directo en `ClientesService` Angular ✅;
+- prueba funcional del puente completo validada desde Electron ✅.
+
+#### 14H.3 — Renderer ✅
+
+- `14H.3A` componente autónomo con ECharts, filtros, total y estados ✅;
+- carga inicial año actual + Todos los meses ✅;
+- refresco automático y protección frente a respuestas fuera de orden ✅;
+- `14H.3B` integración independiente dentro de Estadísticas ✅;
+- estado vacío, error/reintento, tooltips, responsive y overlay validados ✅;
+- lectura lazy sin modificar el draft ni generar dirty ✅;
+- tests y pruebas funcionales/visuales validados por el usuario ✅.
+
+### 14I — Dominio y listado de facturas ⬜ SIGUIENTE
+
+#### 14I.0 — Revisión funcional guiada y contraste legacy ⬜ PRIMERO
+
+Antes de concretar contratos o implementar código:
+
+- el usuario explicará con detalle el funcionamiento real del apartado Facturas;
+- aportará las pantallas del TPV antiguo que resulten útiles;
+- se revisarán conjuntamente los flujos de listado, alta, edición, selección de ventas, consulta y acciones;
+- se contrastarán las explicaciones y capturas con los repositorios legacy y con el esquema/importador ya presentes en la aplicación nueva;
+- se identificarán comportamientos legacy que deben conservarse, corregirse o descartarse;
+- cualquier duda funcional o propuesta se resolverá antes de cerrar el plan técnico definitivo de `14I–14K`.
+
+Base ya acordada, pendiente de completar con esa revisión:
 
 - contratos/repository/service/API/IPC/preload;
 - listado y estados;
@@ -4267,36 +4349,56 @@ electron/ipc/register-clientes-ipc.ts
 electron/preload.ts
 ```
 
+Consumo mensual:
+
+```text
+electron/backend/contracts/clientes/cliente-consumo-mensual-query.interface.ts
+electron/backend/contracts/clientes/cliente-estadisticas-record.interface.ts
+electron/backend/contracts/clientes/cliente.repository.interface.ts
+electron/backend/application/clientes/cliente-consumo-mensual.utils.ts
+electron/backend/application/clientes/cliente-consumo-mensual.utils.spec.ts
+electron/backend/application/clientes/clientes.service.ts
+electron/backend/application/clientes/clientes.service.spec.ts
+electron/infrastructure/database/typeorm/typeorm-cliente.repository.ts
+electron/infrastructure/database/typeorm/typeorm-cliente.repository.spec.ts
+electron/contracts/clientes/cliente-consumo-mensual.interface.ts
+electron/contracts/clientes/clientes-api.interface.ts
+electron/ipc/channels.ts
+electron/ipc/register-clientes-ipc.ts
+electron/preload.ts
+src/app/services/clientes.service.ts
+src/app/services/clientes.service.spec.ts
+src/app/modules/clientes/components/client-monthly-consumption/
+src/app/modules/clientes/components/client-general-statistics/
+```
+
 ---
 
 # 30. Próximo paso exacto
 
 ```text
-14H — Consumo mensual
+14I.0 — Revisión funcional guiada de Facturas y contraste con el TPV antiguo
 ```
 
 Antes de proponer cambios:
 
 - actualizar y revisar el main actual;
-- revisar `13J — Estadísticas de Artículos` para reutilizar su modelo temporal, integración modular ECharts/ngx-echarts, filtros y estados sin copiar lógica innecesaria;
-- revisar la implementación incompleta de Consumo mensual en el TPV legacy únicamente como referencia funcional y visual;
-- conservar intacto el contrato y la UI ya cerrados de `14G`, salvo una reutilización explícita y justificada;
-- definir un contrato específico para la consulta temporal de consumo por `clientePublicId`, `month` y `year` nullable;
-- agregar en SQLite el importe real mediante `SUM(linea_venta.importe_micros)`, excluyendo ventas soft-deleted e incluyendo devoluciones con signo negativo;
-- mantener las cuatro resoluciones acordadas: días, doce meses, mismo mes entre años y todos los meses cronológicos;
-- devolver series completas y rellenar con cero los períodos sin actividad fuera del renderer;
-- derivar `availableYears` de los datos reales y representar también los años intermedios cuando sean necesarios para una serie continua;
-- seleccionar inicialmente Todos los meses y el año local actual;
-- cargar la gráfica de forma lazy dentro de Estadísticas, sin incorporarla al startup ni a las estadísticas rápidas usadas en Ventas;
-- proteger la UI frente a respuestas antiguas, ofrecer carga/vacío/error/reintento y no generar dirty;
-- limitar ECharts a presentación; no reagrupar ni recalcular datos de negocio en Angular;
-- separar el trabajo en subbloques de dominio/backend, contrato/IPC/preload y renderer si el tamaño lo aconseja;
+- escuchar primero la explicación funcional del usuario y revisar todas las imágenes legacy que aporte;
+- no cerrar contratos, estados, comandos ni estructura de UI mientras esa explicación no haya terminado;
+- contrastar después el comportamiento descrito con los repositorios del TPV antiguo;
+- revisar en la aplicación nueva las entidades y tablas `factura`/`factura_venta`, el importador legacy, los contratos de ventas y los pipelines documentales reutilizables;
+- documentar qué comportamientos legacy se conservan, cuáles se corrigen y cuáles se descartan;
+- comprobar y completar las decisiones preliminares sobre listado, borradores, ventas elegibles, edición, emisión/cierre, anulación, impresión y email;
+- aclarar antes del desarrollo cualquier detalle todavía abierto, especialmente numeración/serie, fechas, estados visibles, datos efectivos de facturación y acciones permitidas en cada estado;
+- confirmar el alcance y dividir `14I–14K` en bloques pequeños y verificables solo después del análisis;
+- mantener como reglas cerradas que una factura agrupa `1..N` ventas ya cobradas, cada venta pertenece como máximo a una factura y las devoluciones no son elegibles;
+- mantener completamente fuera de Facturas cualquier operación TicketBAI;
 - presentar cada archivo nuevo completo y cada archivo existente como fragmento actual → nuevo;
 - al añadir imports, indicar únicamente los imports nuevos; Prettier se encargará de ordenarlos;
 - indicar las pruebas exactas pertinentes al subbloque;
 - esperar confirmación del usuario antes de avanzar.
 
-No integrar todavía la UI de Facturas dentro de `14H`; las facturas comenzarán en `14I`. Consumo mensual es una consulta estadística de solo lectura, no forma parte del draft y no realiza ninguna operación TicketBAI.
+`14H — Consumo mensual` está cerrado y no debe reabrirse al comenzar Facturas. El primer intercambio de `14I` será exclusivamente de análisis: el usuario explicará el apartado y aportará referencias visuales antes de que se proponga implementación.
 
 ---
 
@@ -4324,6 +4426,7 @@ No integrar todavía la UI de Facturas dentro de `14H`; las facturas comenzarán
 | **2.31** | **03/09/2026** | **14E.5 y 14E.6 terminados, validados y subidos; `14E — Persistencia y mantenimiento` queda cerrado ✅. Baja lógica atómica con bloqueo por facturas en borrador, preservación completa del histórico, contrato/IPC/preload, reconciliación Angular post-COMMIT y UI confirmada. Documento de protección de datos integrado con cliente canónico, AppData y provincias. Nueva regla de trabajo: al añadir imports basta con indicar cuáles; Prettier decide su posición. Siguiente: 14F Ventas del cliente.** |
 | **2.32** | **03/09/2026** | **`14F — Ventas del cliente` terminado, validado y subido ✅. El Histórico admite filtro opcional por `clientePublicId` aplicado en SQLite al listado, pagos y agregados. La pestaña ofrece fechas explícitas, importes firmados, selección accesible, detalle readonly, reimpresión y email reutilizando los pipelines existentes, con protección ante respuestas antiguas y acciones ligadas a su propia fila. Ajuste responsive final sin scroll horizontal. Remitente y `{nombreNegocio}` de los emails de tickets usan `AppData.nombre`; `nombreComercial` queda fuera de estas comunicaciones. Siguiente: 14G Estadísticas generales.** |
 | **2.33** | **04/09/2026** | **`14G — Estadísticas generales` terminado y validado ✅. Consulta lazy específica con últimos 20 artículos, top por importe real y sumas SQLite por año/mes. PUC firmado, PVP real, beneficio, margen y total general se calculan en backend con enteros seguros/BigInt; devoluciones restan y ventas soft-deleted se excluyen. Renderer con estados, protección ante respuestas antiguas, tablas superiores, acordeón anual de apertura única, detalle mensual, total siempre visible, negativos, margen `null` como `—`, alineación final y overlay corregido. Siguiente: 14H Consumo mensual.** |
+| **2.34** | **04/09/2026** | **`14H — Consumo mensual` terminado, validado y subido ✅. Consulta SQLite específica por cliente con importe real, devoluciones negativas y ventas soft-deleted excluidas; contrato público, series temporales completas, años intermedios, huecos a cero y total seguro; API/IPC/preload/servicio Angular; componente ECharts lazy con filtros Mes/Año, cuatro resoluciones temporales, total, tooltips, estados independientes y protección frente a respuestas antiguas. No genera dirty. El siguiente paso es `14I.0`: explicación funcional guiada, capturas y contraste cuidadoso de Facturas con el TPV antiguo antes de diseñar o implementar.** |
 
 ---
 
@@ -4333,7 +4436,7 @@ No integrar todavía la UI de Facturas dentro de `14H`; las facturas comenzarán
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.33.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.34.
 
 Estado:
 - Ventas 12C.1–12C.8 ✅
@@ -4399,7 +4502,16 @@ Estado:
       - 14G.3A total general calculado en backend ✅
       - 14G.3B carga lazy, estados y tablas superiores ✅
       - 14G.3C acordeón anual, meses, total y pulido visual ✅
-  - 14H Consumo mensual ⬜ SIGUIENTE
+  - 14H Consumo mensual ✅ CERRADO
+    - 14H.1 backend, series y contratos ✅
+      - 14H.1A consulta SQLite y contrato interno ✅
+      - 14H.1B contrato público, series completas y application service ✅
+    - 14H.2 API, IPC, preload y servicio Angular ✅
+    - 14H.3 renderer ✅
+      - 14H.3A componente ECharts, filtros, total y estados ✅
+      - 14H.3B integración y validación funcional/visual ✅
+  - 14I Dominio y listado de facturas ⬜ SIGUIENTE
+    - 14I.0 revisión funcional guiada y contraste legacy ⬜ PRIMERO
 
 Hito actual:
 14 Clientes 🟦
@@ -4518,13 +4630,20 @@ Reglas críticas:
 - Suma de ventas: PUC coste firmado; PVP importe real tras descuentos; beneficio PVP−PUC; margen beneficio/PVP.
 - Repository agrega por mes en SQLite; application service agrupa años, calcula valores derivados y genera el total general con enteros seguros/BigInt.
 - `ClienteEstadisticasGeneralesInterface` devuelve `ultimasVentas`, `topVentas`, `sumaVentas` jerárquica y `sumaVentasTotal`.
-- Los años y meses de `14G` son únicamente los períodos reales disponibles y se ordenan ascendentemente; los huecos a cero corresponden a la futura serie de `14H`.
+- Los años y meses de `14G` son únicamente los períodos reales disponibles y se ordenan ascendentemente; los huecos a cero pertenecen exclusivamente a la serie temporal de `14H`.
 - Devoluciones restan en estadísticas y ventas soft-deleted se excluyen, pero las devoluciones no son elegibles para facturas.
 - La UI de `14G` carga lazy, protege frente a respuestas antiguas, no genera dirty y muestra estados completos.
 - El acordeón anual comienza cerrado, solo permite un año abierto y mantiene el total general siempre visible.
 - En el desglose mensual, Mes queda alineado a la izquierda y PUC/PVP/Beneficio/Margen, incluidas sus cabeceras, a la derecha.
 - El overlay del buscador de clientes debe permanecer por encima de las cabeceras sticky de Estadísticas.
-- `14H` reutilizará ECharts/ngx-echarts y las cuatro resoluciones Mes/Año de Artículos usando importe real, con períodos vacíos rellenados con cero.
+- `14H` está cerrado: usa una consulta específica de importe real, series completas y ECharts/ngx-echarts con las cuatro resoluciones Mes/Año y períodos vacíos rellenados con cero.
+- `ClienteConsumoMensualConsulta` usa `clientePublicId`, `year` y `month`; año/mes `null` significa Todos.
+- Año concreto + mes concreto devuelve días; año + Todos devuelve 12 meses; Todos + mes compara años; Todos + Todos devuelve meses cronológicos.
+- `availableYears` forma una serie continua entre los años reales mínimo y máximo; el año seleccionado permanece disponible en el selector.
+- Consumo mensual excluye ventas soft-deleted, incluye devoluciones con signo negativo y suma `linea_venta.importe_micros`.
+- El backend rellena los huecos con cero y calcula `totalMicros`; Angular no agrega ni recalcula datos de negocio.
+- `ClientMonthlyConsumptionComponent` carga inicialmente año actual + Todos los meses, refresca cada filtro y descarta respuestas fuera de orden.
+- La gráfica es lazy, de solo lectura, tiene estados independientes y no forma parte del draft ni genera dirty.
 - Las estadísticas completas se cargan lazy en Clientes; no sobrecargar las estadísticas rápidas de Ventas.
 - Factura de Clientes = agrupación posterior de 1..N ventas ya cobradas.
 - Venta = 0..1 factura; UNIQUE factura_venta.id_venta impide reutilizarla en otra factura.
@@ -4555,9 +4674,16 @@ Convenciones:
 - En cada bloque incluir un resumen breve: completado, punto actual y pendiente.
 
 Próximo paso exacto:
-14H — Consumo mensual.
+14I.0 — Revisión funcional guiada de Facturas y contraste con el TPV antiguo.
+
+Antes de proponer código de Facturas:
+- dejar que el usuario termine de explicar el funcionamiento real del apartado;
+- revisar las imágenes del TPV antiguo que aporte;
+- contrastar después esas explicaciones con los repositorios legacy y la implementación nueva;
+- plantear dudas y propuestas y cerrar conjuntamente el plan actualizado de 14I–14K;
+- no diseñar contratos ni implementar nada hasta completar ese análisis.
 ```
 
 ---
 
-**Fin del documento de continuidad v2.33.**
+**Fin del documento de continuidad v2.34.**
