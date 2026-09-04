@@ -402,6 +402,29 @@ describe('ClientesService', (): void => {
         ],
       },
     ]);
+
+    expect(result.sumaVentasTotal).toEqual({
+      pucMicros: 9_000_000,
+      pvpMicros: 40_000_000,
+      beneficioMicros: 31_000_000,
+      margenMicroporcentaje: 77_500_000,
+    });
+  });
+
+  it('devuelve un total neutro cuando el cliente no tiene ventas', async (): Promise<void> => {
+    const repository = new FakeClienteRepository();
+    const service = new ClientesService(repository);
+
+    const result: ClienteEstadisticasGeneralesInterface =
+      await service.getEstadisticasGenerales('cliente-1');
+
+    expect(result.sumaVentas).toEqual([]);
+    expect(result.sumaVentasTotal).toEqual({
+      pucMicros: 0,
+      pvpMicros: 0,
+      beneficioMicros: 0,
+      margenMicroporcentaje: null,
+    });
   });
 
   it('devuelve margen nulo cuando el PVP acumulado es cero', async (): Promise<void> => {

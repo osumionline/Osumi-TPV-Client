@@ -492,6 +492,12 @@ function createEstadisticasGenerales(): ClienteEstadisticasGeneralesInterface {
         ],
       },
     ],
+    sumaVentasTotal: {
+      pucMicros: 4_000_000,
+      pvpMicros: 10_000_000,
+      beneficioMicros: 6_000_000,
+      margenMicroporcentaje: 60_000_000,
+    },
   };
 }
 

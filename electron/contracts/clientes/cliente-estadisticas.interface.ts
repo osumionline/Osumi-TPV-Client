@@ -37,4 +37,5 @@ export interface ClienteSumaVentasYearInterface extends ClienteSumaVentasValores
 
 export interface ClienteEstadisticasGeneralesInterface extends ClienteEstadisticasInterface {
   readonly sumaVentas: readonly ClienteSumaVentasYearInterface[];
+  readonly sumaVentasTotal: ClienteSumaVentasValoresInterface;
 }

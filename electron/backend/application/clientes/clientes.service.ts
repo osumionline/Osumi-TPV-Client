@@ -90,9 +90,13 @@ export default class ClientesService {
       this.clienteRepository.findSumaVentas(normalizedPublicId),
     ]);
 
+    const sumaVentas: readonly ClienteSumaVentasYearInterface[] =
+      this.buildSumaVentas(sumaVentasRecords);
+
     return {
       ...estadisticas,
-      sumaVentas: this.buildSumaVentas(sumaVentasRecords),
+      sumaVentas,
+      sumaVentasTotal: this.buildSumaVentasTotal(sumaVentas),
     };
   }
 
@@ -209,6 +213,33 @@ export default class ClientesService {
         months,
       };
     });
+  }
+
+  /**
+   * Calcula el total general utilizando los importes
+   * anuales ya agregados.
+   */
+  private buildSumaVentasTotal(
+    years: readonly ClienteSumaVentasYearInterface[],
+  ): ClienteSumaVentasValoresInterface {
+    let pucMicros: number = 0;
+    let pvpMicros: number = 0;
+
+    for (const year of years) {
+      pucMicros = this.safeAdd(
+        pucMicros,
+        year.pucMicros,
+        'El PUC total de las ventas del cliente supera el rango numérico seguro.',
+      );
+
+      pvpMicros = this.safeAdd(
+        pvpMicros,
+        year.pvpMicros,
+        'El PVP total de las ventas del cliente supera el rango numérico seguro.',
+      );
+    }
+
+    return this.createSumaVentasValues(pucMicros, pvpMicros);
   }
 
   /**
