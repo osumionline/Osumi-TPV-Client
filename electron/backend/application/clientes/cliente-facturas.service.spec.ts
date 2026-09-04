@@ -2,13 +2,17 @@ import ClienteFacturasService from '@backend/application/clientes/cliente-factur
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type { ClienteFacturaRecord } from '@backend/domain/clientes/cliente-factura-record.interface';
 import type { ClienteFacturaVentaDisponibleRecord } from '@backend/domain/clientes/cliente-factura-venta-record.interface';
+import type { ClienteFacturaVentaDisponibleInterface } from '@desktop-contracts/clientes/cliente-factura-venta.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import { describe, expect, it } from 'vitest';
 
 class FakeClienteFacturasRepository implements ClienteFacturasRepository {
   records: readonly ClienteFacturaRecord[] = [];
+  ventasDisponibles: readonly ClienteFacturaVentaDisponibleRecord[] = [];
 
   requestedPublicId: string | null = null;
+  requestedVentasClientePublicId: string | null = null;
+  requestedBorradorPublicId: string | null = null;
 
   /**
    * Registra el cliente solicitado y devuelve las
@@ -21,11 +25,17 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
   }
 
   /**
-   * Devuelve una colección vacía porque estas pruebas
-   * todavía no ejercitan la selección de ventas.
+   * Registra la consulta y devuelve las ventas
+   * disponibles preparadas para cada prueba.
    */
-  findVentasDisponibles(): Promise<readonly ClienteFacturaVentaDisponibleRecord[]> {
-    return Promise.resolve([]);
+  findVentasDisponibles(
+    clientePublicId: string,
+    borradorPublicId: string | null,
+  ): Promise<readonly ClienteFacturaVentaDisponibleRecord[]> {
+    this.requestedVentasClientePublicId = clientePublicId;
+    this.requestedBorradorPublicId = borradorPublicId;
+
+    return Promise.resolve(this.ventasDisponibles);
   }
 }
 
@@ -143,6 +153,132 @@ describe('ClienteFacturasService', (): void => {
     ]);
   });
 
+  it('normaliza la consulta y construye las ventas disponibles para una factura nueva', async (): Promise<void> => {
+    const repository = new FakeClienteFacturasRepository();
+
+    repository.ventasDisponibles = [
+      createVentaRecord({
+        pagos: [
+          {
+            tipoPagoPublicId: 'efectivo',
+            nombre: 'Efectivo',
+            importeCents: 750,
+          },
+          {
+            tipoPagoPublicId: 'tarjeta',
+            nombre: 'Tarjeta',
+            importeCents: 500,
+          },
+        ],
+      }),
+    ];
+
+    const service = new ClienteFacturasService(repository);
+
+    const result: readonly ClienteFacturaVentaDisponibleInterface[] =
+      await service.getVentasDisponibles({
+        clientePublicId: '  cliente-1  ',
+        borradorPublicId: null,
+      });
+
+    expect(repository.requestedVentasClientePublicId).toBe('cliente-1');
+    expect(repository.requestedBorradorPublicId).toBeNull();
+    expect(result).toEqual([
+      {
+        id: 41,
+        publicId: 'venta-41',
+        serie: '',
+        numero: 412,
+        fecha: '2026-08-31T10:30:00.000Z',
+        totalCents: 1_250,
+        incluidaEnBorrador: false,
+        pagos: [
+          {
+            tipoPagoPublicId: 'efectivo',
+            nombre: 'Efectivo',
+            importeCents: 750,
+          },
+          {
+            tipoPagoPublicId: 'tarjeta',
+            nombre: 'Tarjeta',
+            importeCents: 500,
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('incluye las ventas pertenecientes al propio borrador', async (): Promise<void> => {
+    const repository = new FakeClienteFacturasRepository();
+
+    repository.records = [
+      createRecord({
+        publicId: 'factura-borrador',
+      }),
+    ];
+    repository.ventasDisponibles = [
+      createVentaRecord({
+        incluidaEnBorrador: true,
+      }),
+    ];
+
+    const service = new ClienteFacturasService(repository);
+
+    const result: readonly ClienteFacturaVentaDisponibleInterface[] =
+      await service.getVentasDisponibles({
+        clientePublicId: '  cliente-1  ',
+        borradorPublicId: '  factura-borrador  ',
+      });
+
+    expect(repository.requestedPublicId).toBe('cliente-1');
+    expect(repository.requestedVentasClientePublicId).toBe('cliente-1');
+    expect(repository.requestedBorradorPublicId).toBe('factura-borrador');
+    expect(result[0]?.incluidaEnBorrador).toBe(true);
+  });
+
+  it('rechaza identificadores no válidos antes de consultar las ventas', async (): Promise<void> => {
+    const repository = new FakeClienteFacturasRepository();
+    const service = new ClienteFacturasService(repository);
+
+    await expect(
+      service.getVentasDisponibles({
+        clientePublicId: '   ',
+        borradorPublicId: null,
+      }),
+    ).rejects.toThrow('El identificador del cliente no es válido.');
+
+    await expect(
+      service.getVentasDisponibles({
+        clientePublicId: 'cliente-1',
+        borradorPublicId: '   ',
+      }),
+    ).rejects.toThrow('El identificador del borrador de factura no es válido.');
+
+    expect(repository.requestedVentasClientePublicId).toBeNull();
+  });
+
+  it('rechaza una factura que ya no es un borrador editable', async (): Promise<void> => {
+    const repository = new FakeClienteFacturasRepository();
+
+    repository.records = [
+      createRecord({
+        publicId: 'factura-emitida',
+        estado: 'emitida',
+      }),
+    ];
+
+    const service = new ClienteFacturasService(repository);
+
+    await expect(
+      service.getVentasDisponibles({
+        clientePublicId: 'cliente-1',
+        borradorPublicId: 'factura-emitida',
+      }),
+    ).rejects.toThrow('El borrador de factura no pertenece al cliente o ya no está disponible.');
+
+    expect(repository.requestedVentasClientePublicId).toBeNull();
+  });
+
   it('rechaza un identificador de cliente vacío antes de consultar el repository', async (): Promise<void> => {
     const repository = new FakeClienteFacturasRepository();
     const service = new ClienteFacturasService(repository);
@@ -209,6 +345,32 @@ function createRecord(overrides: Partial<ClienteFacturaRecord> = {}): ClienteFac
     fechaCreacion: '2026-09-04T09:00:00.000Z',
     fechaEmision: null,
     fechaAnulacion: null,
+    ...overrides,
+  };
+}
+
+/**
+ * Crea una venta disponible válida y permite
+ * sobrescribir los datos relevantes para cada prueba.
+ */
+function createVentaRecord(
+  overrides: Partial<ClienteFacturaVentaDisponibleRecord> = {},
+): ClienteFacturaVentaDisponibleRecord {
+  return {
+    id: 41,
+    publicId: 'venta-41',
+    serie: '',
+    numero: 412,
+    fecha: '2026-08-31T10:30:00.000Z',
+    totalCents: 1_250,
+    incluidaEnBorrador: false,
+    pagos: [
+      {
+        tipoPagoPublicId: 'efectivo',
+        nombre: 'Efectivo',
+        importeCents: 1_250,
+      },
+    ],
     ...overrides,
   };
 }

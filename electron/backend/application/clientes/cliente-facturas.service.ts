@@ -4,6 +4,15 @@ import type {
   ClienteFacturaRecord,
 } from '@backend/domain/clientes/cliente-factura-record.interface';
 import type {
+  ClienteFacturaVentaDisponibleRecord,
+  ClienteFacturaVentaPagoRecord,
+} from '@backend/domain/clientes/cliente-factura-venta-record.interface';
+import type {
+  ClienteFacturaVentaDisponibleInterface,
+  ClienteFacturaVentaPagoInterface,
+  ClienteFacturaVentasDisponiblesConsulta,
+} from '@desktop-contracts/clientes/cliente-factura-venta.interface';
+import type {
   ClienteFacturaCapacidadesInterface,
   ClienteFacturaInterface,
 } from '@desktop-contracts/clientes/cliente-factura.interface';
@@ -24,6 +33,80 @@ export default class ClienteFacturasService {
     return records.map((record: ClienteFacturaRecord): ClienteFacturaInterface =>
       this.toInterface(record),
     );
+  }
+
+  /**
+   * Recupera las ventas que pueden seleccionarse
+   * al crear o editar una factura.
+   */
+  async getVentasDisponibles(
+    consulta: ClienteFacturaVentasDisponiblesConsulta,
+  ): Promise<readonly ClienteFacturaVentaDisponibleInterface[]> {
+    if (typeof consulta !== 'object' || consulta === null) {
+      throw new Error('La consulta de ventas disponibles no es válida.');
+    }
+
+    const clientePublicId: string = this.requirePublicId(consulta.clientePublicId);
+    const borradorPublicId: string | null = this.normalizeBorradorPublicId(
+      consulta.borradorPublicId,
+    );
+
+    if (borradorPublicId !== null) {
+      await this.requireBorradorEditable(clientePublicId, borradorPublicId);
+    }
+
+    const records: readonly ClienteFacturaVentaDisponibleRecord[] =
+      await this.clienteFacturasRepository.findVentasDisponibles(clientePublicId, borradorPublicId);
+
+    return records.map(
+      (record: ClienteFacturaVentaDisponibleRecord): ClienteFacturaVentaDisponibleInterface =>
+        this.toVentaDisponibleInterface(record),
+    );
+  }
+
+  /**
+   * Comprueba que la factura indicada sea un borrador
+   * activo perteneciente al cliente solicitado.
+   */
+  private async requireBorradorEditable(
+    clientePublicId: string,
+    borradorPublicId: string,
+  ): Promise<void> {
+    const facturas: readonly ClienteFacturaRecord[] =
+      await this.clienteFacturasRepository.findByClientePublicId(clientePublicId);
+
+    const borrador: ClienteFacturaRecord | undefined = facturas.find(
+      (factura: ClienteFacturaRecord): boolean => factura.publicId === borradorPublicId,
+    );
+
+    if (borrador === undefined || borrador.estado !== 'borrador') {
+      throw new Error('El borrador de factura no pertenece al cliente o ya no está disponible.');
+    }
+  }
+
+  /**
+   * Convierte una venta elegible interna en el
+   * contrato público consumido por el renderer.
+   */
+  private toVentaDisponibleInterface(
+    record: ClienteFacturaVentaDisponibleRecord,
+  ): ClienteFacturaVentaDisponibleInterface {
+    return {
+      id: record.id,
+      publicId: record.publicId,
+      serie: record.serie,
+      numero: record.numero,
+      fecha: record.fecha,
+      totalCents: record.totalCents,
+      incluidaEnBorrador: record.incluidaEnBorrador,
+      pagos: record.pagos.map(
+        (pago: ClienteFacturaVentaPagoRecord): ClienteFacturaVentaPagoInterface => ({
+          tipoPagoPublicId: pago.tipoPagoPublicId,
+          nombre: pago.nombre,
+          importeCents: pago.importeCents,
+        }),
+      ),
+    };
   }
 
   /**
@@ -138,6 +221,27 @@ export default class ClienteFacturasService {
 
     if (normalizedValue.length === 0) {
       throw new Error('El identificador del cliente no es válido.');
+    }
+
+    return normalizedValue;
+  }
+
+  /**
+   * Normaliza el identificador opcional del borrador.
+   */
+  private normalizeBorradorPublicId(value: string | null): string | null {
+    if (value === null) {
+      return null;
+    }
+
+    if (typeof value !== 'string') {
+      throw new Error('El identificador del borrador de factura no es válido.');
+    }
+
+    const normalizedValue: string = value.trim();
+
+    if (normalizedValue.length === 0) {
+      throw new Error('El identificador del borrador de factura no es válido.');
     }
 
     return normalizedValue;
