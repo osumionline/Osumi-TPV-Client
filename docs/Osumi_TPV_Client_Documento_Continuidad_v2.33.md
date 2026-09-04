@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.32  
-**Fecha:** 3 de septiembre de 2026  
-**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**. El **Hito 14 — Clientes está en curso 🟦**: `14A–14F` están terminados, validados funcionalmente y subidos al repositorio. Además de la ficha completa y su mantenimiento, ya está operativa la pestaña Ventas con consulta por fechas filtrada en SQLite por cliente, listado de operaciones e importes firmados, detalle histórico de líneas y pagos, reimpresión y envío del ticket por email reutilizando íntegramente el pipeline postventa. El nombre mostrado en remitente y plantillas del email del ticket —incluido el asunto mediante `{nombreNegocio}`— procede de `AppData.nombre`; `nombreComercial` queda reservado para los documentos oficiales que lo necesiten. El siguiente paso exacto es **`14G — Estadísticas generales`**. Clientes no realiza ni realizará ninguna operación TicketBAI.
+**Versión:** 2.33  
+**Fecha:** 4 de septiembre de 2026  
+**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**. El **Hito 14 — Clientes está en curso 🟦**: `14A–14G` están terminados y validados funcionalmente. Además de la ficha completa, su mantenimiento y la pestaña Ventas, ya está operativa la carga lazy de Estadísticas generales con los últimos 20 artículos comprados, top por importe real, sumas económicas agrupadas por año y mes, total general y cálculos seguros de PUC, PVP real, beneficio y margen. El siguiente paso exacto es **`14H — Consumo mensual`**, que añadirá la gráfica temporal y sus filtros sin modificar el dominio ya cerrado de `14G`. Clientes no realiza ni realizará ninguna operación TicketBAI.
 
 > **Regla crítica de entorno TicketBAI:** el producto usa `production` por defecto. Durante desarrollo/pruebas manuales se usa `app_data.json → ticketBai.environment = "test"` junto con el token TEST correspondiente. No añadir selector de entorno a la UI.
 
@@ -116,8 +116,16 @@ Ventas 12 — Postventa                             🟦
     14F.2 Filtros y listado                       ✅
     14F.3 Selección y detalle documental          ✅
     14F.4 Reimpresión, email y pulido final       ✅
-  14G Estadísticas generales                      ⬜ SIGUIENTE
-  14H Consumo mensual                             ⬜
+  14G Estadísticas generales                      ✅ CERRADO
+    14G.1 Backend, agregados y contratos          ✅
+      14G.1A Consultas SQLite y top               ✅
+      14G.1B Jerarquía anual, beneficio y margen  ✅
+    14G.2 API, IPC, preload y servicio Angular    ✅
+    14G.3 Renderer                                ✅
+      14G.3A Total general en backend             ✅
+      14G.3B Carga lazy, estados y tablas         ✅
+      14G.3C Acordeón, meses, total y pulido      ✅
+  14H Consumo mensual                             ⬜ SIGUIENTE
   14I Dominio y listado de facturas               ⬜
   14J Editor de factura                           ⬜
   14K Emisión y documentos                        ⬜
@@ -3448,7 +3456,7 @@ Con ello, **todo el Hito 13 — Artículos queda terminado y cerrado ✅**.
 
 El análisis funcional y técnico está cerrado. El módulo conservará el modelo mental útil del TPV legacy, pero se implementará sobre la arquitectura actual y corregirá sus problemas de consultas, estado, precisión monetaria, integridad y documentación.
 
-Esta versión se ha contrastado con `origin/main` en el commit `eea2a4a`, que contiene el cierre validado de `14F — Ventas del cliente` y la corrección final del nombre utilizado en las plantillas del email del ticket.
+Esta versión parte del estado de `origin/main` revisado hasta el commit `4864c2b`, que ya contiene `14G.3B`, e incorpora también el cierre funcional y visual de `14G.3C` validado por el usuario en esta conversación.
 
 ## 29.1 Objetivo y alcance
 
@@ -3528,12 +3536,18 @@ El repositorio nuevo dispone actualmente de:
 - protección frente a respuestas antiguas tanto en la carga del listado como en la del detalle;
 - acciones documentales vinculadas siempre a la venta de su propia fila, independientemente de la selección del panel derecho;
 - nombre del email del ticket unificado: remitente y `{nombreNegocio}` usan `AppData.nombre`;
+- estadísticas generales específicas para la ficha de Clientes, expuestas mediante `getEstadisticasGenerales(publicId)` sin sobrecargar la carga inicial de clientes;
+- consultas SQLite para últimos artículos, top y suma mensual/anual, con ventas soft-deleted excluidas y devoluciones incluidas con signo negativo;
+- jerarquía pública de sumas por años y meses, beneficio y margen calculados en backend, más un total general igualmente calculado antes de llegar al renderer;
+- `ClientGeneralStatisticsComponent` con carga lazy, protección frente a respuestas antiguas, estados completos, dos tablas superiores, acordeón anual y total general;
+- años y meses reales disponibles ordenados cronológicamente, acordeón inicialmente cerrado y limitado a un único año abierto;
+- presentación segura de márgenes no calculables mediante `—`, diferenciación de valores negativos y alineación final de Mes a la izquierda y columnas numéricas a la derecha;
+- corrección local de apilamiento del buscador de clientes para que su overlay permanezca por encima de las cabeceras sticky de las tablas;
 - tablas `factura` y `factura_venta`, estados borrador/emitida/anulada, instantánea de facturación e importación legacy;
 - unicidad de `factura_venta.id_venta`, que garantiza que una venta pertenezca como máximo a una factura.
 
 Todavía faltan:
 
-- estadísticas generales del cliente: últimos artículos, top y sumas económicas anuales/mensuales;
 - consumo mensual gráfico;
 - contratos, repositories, services e IPC operativos para facturas;
 - listado/editor de borradores, emisión y pipeline documental de facturas.
@@ -3605,7 +3619,7 @@ Estado implementado y validado:
 
 - las cinco secciones existen y la sección activa forma parte del workspace;
 - Datos y Datos de facturación están operativas;
-- Facturas y Estadísticas conservan por ahora contenido placeholder; Ventas está completamente operativa;
+- Facturas conserva por ahora contenido placeholder; Ventas y Estadísticas están completamente operativas;
 - un borrador nuevo solo permite Datos y Datos de facturación;
 - tras el primer guardado, la misma ficha obtiene identidad persistida y habilita las cinco secciones;
 - el formulario se mantiene montado al alternar Datos/Facturación, evitando perder estado local;
@@ -3743,58 +3757,118 @@ Acciones documentales:
 
 Se reutilizaron y reforzaron los componentes del Histórico sin alterar sus usos existentes. Los tests backend, repository SQLite, renderer, build y lint, así como las pruebas funcionales de listado, detalle, impresión, email y diseño, fueron correctos. **`14F — Ventas del cliente` queda cerrado ✅.**
 
-## 29.8 Estadísticas
+## 29.8 Estadísticas generales ✅
 
-Estadísticas tendrá cuatro bloques.
+`14G — Estadísticas generales` está completamente implementado y validado. La sección es de solo lectura, queda fuera del draft del cliente y nunca genera dirty.
 
-### Últimos artículos comprados
+### Backend y semántica económica
 
-El contenido histórico llamado Últimas ventas son realmente líneas de venta. Se mostrará como Últimos artículos comprados, con un límite inicial de 20 registros.
+`ClienteRepository` mantiene las consultas rápidas existentes y añade `findSumaVentas(publicId)`. `ClientesService.getEstadisticasGenerales(publicId)` compone en paralelo los tres bloques necesarios para la ficha completa:
 
-Campos previstos:
+- `findUltimasVentas(publicId, 20)` devuelve las últimas líneas compradas, ordenadas por venta descendente y línea descendente;
+- `findTopVentas(publicId, 10)` agrupa unidades e importe real en SQLite;
+- `findSumaVentas(publicId)` agrega PUC y PVP real por año y mes.
 
-- fecha;
-- localizador;
-- nombre;
-- unidades;
-- PVP;
-- importe real.
+Las consultas resuelven al cliente activo mediante `publicId`, excluyen ventas soft-deleted y conservan las devoluciones con sus unidades e importes negativos.
 
-### Artículos más comprados
-
-Top de artículos agregado por cliente.
-
-Orden cerrado:
+El top usa el orden definitivo:
 
 ```text
 importe real DESC
 → unidades DESC
-→ nombre
+→ nombre COLLATE NOCASE
 ```
 
-Se corrige el legacy, que ordenaba primero por unidades pese a mostrar el importe como dato principal.
+Se corrige así el TPV legacy, que daba prioridad a las unidades pese a presentar el importe como magnitud principal.
 
-### Suma de ventas
+La semántica económica implementada es:
 
-Acordeón agrupado por año y, al desplegar, por meses.
-
-Semántica económica acordada:
-
-- PUC = coste firmado;
-- PVP = importe real vendido después de descuentos;
+- PUC = `SUM(linea_venta.puc_micros × linea_venta.unidades)`;
+- PVP = `SUM(linea_venta.importe_micros)`, es decir, importe real después de descuentos;
 - Beneficio = PVP real − PUC;
 - Margen = Beneficio / PVP real;
-- si el denominador es cero, el margen se presenta de forma segura.
+- si PVP es cero, el margen es `null` y la UI muestra `—`.
 
-Las devoluciones restan en las estadísticas. Las ventas soft-deleted se excluyen. Los agregados se calculan en SQLite con unidades monetarias enteras; Angular solo presenta los resultados.
+SQLite devuelve registros mensuales con dinero entero. El application service:
 
-Los años se derivan de los datos disponibles, sin lista fija de cinco años.
+- valida años, meses e importes como enteros seguros;
+- ordena meses y años ascendentemente;
+- agrupa los meses reales disponibles dentro de cada año, sin inventar meses vacíos en este resumen;
+- calcula los totales anuales con sumas seguras;
+- calcula `beneficioMicros` y `margenMicroporcentaje` para mes, año y total general;
+- utiliza `BigInt` y división redondeada para el margen, evitando floats encadenados;
+- devuelve total general cero con margen `null` cuando no existen ventas.
 
-### Consumo mensual
+El total general se calcula en backend a partir de los acumulados anuales. Angular no reagrupa ni recalcula importes de negocio.
 
-Se implementará la parte que quedó incompleta en el TPV antiguo.
+### Contratos y puente Electron
 
-Usará el patrón funcional y visual de Estadísticas de Artículos:
+`cliente-estadisticas.interface.ts` conserva `ClienteEstadisticasInterface` para las estadísticas rápidas y añade la jerarquía completa:
+
+```text
+ClienteEstadisticasGeneralesInterface
+├── ultimasVentas[]
+├── topVentas[]
+├── sumaVentas[]
+│   └── año
+│       └── months[]
+└── sumaVentasTotal
+```
+
+Meses, años y total comparten `ClienteSumaVentasValoresInterface`, con:
+
+- `pucMicros`;
+- `pvpMicros`;
+- `beneficioMicros`;
+- `margenMicroporcentaje: number | null`.
+
+El método `getEstadisticasGenerales(publicId)` está conectado de extremo a extremo mediante:
+
+- contrato `ClientesApi`;
+- canal `clientes:get-estadisticas-generales`;
+- handler IPC protegido por remitente permitido;
+- preload `window.osumiDesktop.clientes`;
+- método directo de `ClientesService` Angular.
+
+No se incorpora esta carga completa al startup ni a las estadísticas rápidas utilizadas desde Ventas.
+
+### Renderer y experiencia de uso
+
+`ClientGeneralStatisticsComponent` se monta únicamente al activar Estadísticas sobre un cliente persistido y realiza entonces la consulta lazy. Dispone de:
+
+- estado de carga;
+- estado de error con reintento;
+- estados vacíos independientes para cada bloque;
+- invalidación de respuestas antiguas mediante un identificador incremental de petición;
+- invalidación adicional al destruir el componente;
+- importes presentados desde microeuros mediante los pipes ya existentes.
+
+La interfaz final contiene:
+
+1. **Últimos artículos comprados**, con un máximo de 20 líneas y columnas Fecha, Localizador, Nombre, Unidades, PVP e Importe.
+2. **Artículos más comprados**, con Localizador, Nombre, Unidades e Importe.
+3. **Suma de ventas**, con un acordeón de años, desglose mensual y total general siempre visible bajo el acordeón.
+
+En Suma de ventas:
+
+- todos los años comienzan cerrados;
+- solo puede permanecer abierto un año cada vez;
+- cada cabecera anual muestra PUC, PVP, Beneficio y Margen;
+- al desplegar se muestran únicamente los meses con actividad;
+- el total general permanece visible aunque ningún año esté abierto;
+- los márgenes se presentan con dos decimales y `null` como `—`;
+- los valores negativos se diferencian visualmente;
+- Mes queda alineado a la izquierda y todas las columnas numéricas, incluidas sus cabeceras, a la derecha;
+- las tablas superiores tienen altura limitada, cabecera sticky y scroll interno;
+- la distribución se adapta a anchuras menores sin perder legibilidad.
+
+Se corrigió además el `z-index` local del buscador de clientes: su overlay usa una capa superior a las cabeceras sticky y vuelve a cubrir correctamente todo el contenido de Estadísticas.
+
+Los tests de repository SQLite, application service, contratos/servicios renderer y componente Angular, junto con typecheck/build/lint y las pruebas funcionales y visuales, han sido validados. **`14G — Estadísticas generales` queda cerrado ✅.**
+
+### Consumo mensual pendiente para 14H
+
+La cuarta parte de Estadísticas sigue deliberadamente separada como `14H — Consumo mensual`. Implementará lo que quedó incompleto en el TPV antiguo usando el patrón funcional y visual de Estadísticas de Artículos:
 
 - gráfica de barras con ECharts/ngx-echarts;
 - métrica de importe real consumido;
@@ -3805,16 +3879,14 @@ Usará el patrón funcional y visual de Estadísticas de Artículos:
 - períodos sin actividad rellenados con cero;
 - año actual y Todos los meses como selección inicial.
 
-Resoluciones:
+Resoluciones acordadas:
 
 - año + mes → días del mes;
 - año + Todos → doce meses;
 - Todos + mes → ese mes entre años;
 - Todos + Todos → todos los meses cronológicos.
 
-Las estadísticas son de solo lectura, se cargan al entrar en la pestaña y nunca generan dirty.
-
-Las estadísticas rápidas ya usadas en Ventas se mantendrán ligeras. Las sumas y la gráfica completa no deben cargarse innecesariamente en el workspace de Ventas.
+La gráfica continuará siendo de solo lectura, lazy y ajena al draft. No debe modificar ni duplicar la consulta ya cerrada de `14G` salvo que una reutilización explícita resulte técnicamente conveniente.
 
 ## 29.9 Facturas: significado de dominio
 
@@ -4030,14 +4102,39 @@ La versión 2.29 cerró el análisis funcional, las decisiones y la secuencia de
 - `AppData.nombre` unificado como nombre del remitente y valor de `{nombreNegocio}` en las plantillas del ticket;
 - todos los tests y pruebas funcionales validados y cambios subidos.
 
-### 14G — Estadísticas generales ⬜ SIGUIENTE
+### 14G — Estadísticas generales ✅ CERRADO
 
-- últimos artículos;
-- top por importe;
-- sumas anuales/mensuales;
-- PUC/PVP real/beneficio/margen.
+#### 14G.1 — Backend, agregados y contratos ✅
 
-### 14H — Consumo mensual ⬜
+- `14G.1A` consultas SQLite de últimos artículos, top y sumas mensuales ✅;
+- máximo 20 líneas recientes y 10 posiciones de top ✅;
+- top ordenado por importe real, unidades y nombre ✅;
+- devoluciones con signo negativo y ventas soft-deleted excluidas ✅;
+- `14G.1B` contrato público jerárquico por años/meses ✅;
+- beneficio y margen calculados con enteros seguros y `BigInt` ✅;
+- margen `null` cuando PVP es cero ✅.
+
+#### 14G.2 — API, IPC, preload y servicio Angular ✅
+
+- `ClientesApi.getEstadisticasGenerales(publicId)` ✅;
+- canal IPC y handler con validación de sender ✅;
+- preload tipado ✅;
+- método directo en `ClientesService` Angular ✅;
+- estadísticas rápidas existentes preservadas ✅.
+
+#### 14G.3 — Renderer ✅
+
+- `14G.3A` total general calculado en backend para PUC, PVP, beneficio y margen ✅;
+- `14G.3B` componente lazy, estados, reintento, protección frente a respuestas antiguas y dos tablas superiores ✅;
+- `14G.3C` acordeón anual, desglose mensual, un único año abierto, total general y estados vacíos ✅;
+- años cerrados inicialmente y ordenados ascendentemente ✅;
+- meses reales con nombres en castellano ✅;
+- valores negativos y margen no calculable representados de forma segura ✅;
+- Mes alineado a la izquierda y columnas numéricas a la derecha ✅;
+- responsive final y overlay del buscador por encima de cabeceras sticky ✅;
+- tests y pruebas funcionales/visuales validados por el usuario ✅.
+
+### 14H — Consumo mensual ⬜ SIGUIENTE
 
 - endpoint agregado;
 - series temporales completas;
@@ -4147,17 +4244,25 @@ electron/backend/contracts/ventas/ventas-historico.repository.interface.ts
 electron/infrastructure/database/typeorm/typeorm-ventas-historico.repository.ts
 ```
 
-Estadísticas rápidas existentes que deben revisarse antes de `14G`:
+Estadísticas rápidas y generales de Clientes:
 
 ```text
 src/app/model/clientes/cliente-estadisticas-state.interface.ts
 src/app/services/clientes.service.ts
+src/app/services/clientes.service.spec.ts
+src/app/modules/clientes/components/client-general-statistics/
+src/app/modules/clientes/pages/clients/clients.component.ts
+src/app/modules/clientes/pages/clients/clients.component.html
+src/app/modules/clientes/pages/clients/clients.component.scss
 electron/contracts/clientes/cliente-estadisticas.interface.ts
 electron/contracts/clientes/clientes-api.interface.ts
 electron/backend/contracts/clientes/cliente-estadisticas-record.interface.ts
 electron/backend/contracts/clientes/cliente.repository.interface.ts
 electron/backend/application/clientes/clientes.service.ts
+electron/backend/application/clientes/clientes.service.spec.ts
 electron/infrastructure/database/typeorm/typeorm-cliente.repository.ts
+electron/infrastructure/database/typeorm/typeorm-cliente.repository.spec.ts
+electron/ipc/channels.ts
 electron/ipc/register-clientes-ipc.ts
 electron/preload.ts
 ```
@@ -4167,29 +4272,31 @@ electron/preload.ts
 # 30. Próximo paso exacto
 
 ```text
-14G — Estadísticas generales
+14H — Consumo mensual
 ```
 
 Antes de proponer cambios:
 
 - actualizar y revisar el main actual;
-- revisar las estadísticas rápidas de clientes ya existentes y su uso actual en Ventas, pero mantenerlas ligeras y no sobrecargarlas con toda la nueva pestaña;
-- revisar los cálculos y contratos históricos del TPV legacy para contrastar campos, agrupaciones y presentación, sin trasladar sus cálculos con floats al renderer;
-- definir una consulta backend específica y lazy para los tres bloques de `14G`: últimos artículos comprados, artículos más comprados y suma de ventas anual/mensual;
-- calcular en SQLite usando dinero entero: PUC como coste firmado, PVP como importe real tras descuentos, beneficio como PVP−PUC y margen como beneficio/PVP;
-- incluir devoluciones con signo negativo y excluir ventas soft-deleted;
-- derivar los años de los datos disponibles, sin limitarse al actual y cuatro anteriores;
-- devolver inicialmente un máximo de 20 líneas en Últimos artículos comprados;
-- ordenar el top por importe real descendente, después unidades descendentes y finalmente nombre;
-- mantener Estadísticas fuera del draft del cliente, con carga lazy al entrar en la pestaña, estados completos y protección frente a respuestas antiguas;
-- reservar la gráfica y sus filtros Mes/Año para `14H — Consumo mensual`;
+- revisar `13J — Estadísticas de Artículos` para reutilizar su modelo temporal, integración modular ECharts/ngx-echarts, filtros y estados sin copiar lógica innecesaria;
+- revisar la implementación incompleta de Consumo mensual en el TPV legacy únicamente como referencia funcional y visual;
+- conservar intacto el contrato y la UI ya cerrados de `14G`, salvo una reutilización explícita y justificada;
+- definir un contrato específico para la consulta temporal de consumo por `clientePublicId`, `month` y `year` nullable;
+- agregar en SQLite el importe real mediante `SUM(linea_venta.importe_micros)`, excluyendo ventas soft-deleted e incluyendo devoluciones con signo negativo;
+- mantener las cuatro resoluciones acordadas: días, doce meses, mismo mes entre años y todos los meses cronológicos;
+- devolver series completas y rellenar con cero los períodos sin actividad fuera del renderer;
+- derivar `availableYears` de los datos reales y representar también los años intermedios cuando sean necesarios para una serie continua;
+- seleccionar inicialmente Todos los meses y el año local actual;
+- cargar la gráfica de forma lazy dentro de Estadísticas, sin incorporarla al startup ni a las estadísticas rápidas usadas en Ventas;
+- proteger la UI frente a respuestas antiguas, ofrecer carga/vacío/error/reintento y no generar dirty;
+- limitar ECharts a presentación; no reagrupar ni recalcular datos de negocio en Angular;
 - separar el trabajo en subbloques de dominio/backend, contrato/IPC/preload y renderer si el tamaño lo aconseja;
 - presentar cada archivo nuevo completo y cada archivo existente como fragmento actual → nuevo;
 - al añadir imports, indicar únicamente los imports nuevos; Prettier se encargará de ordenarlos;
 - indicar las pruebas exactas pertinentes al subbloque;
 - esperar confirmación del usuario antes de avanzar.
 
-No integrar todavía Consumo mensual ni la UI de Facturas dentro de `14G`. La gráfica queda reservada para `14H`, y las facturas comenzarán en `14I`. Las estadísticas son de solo lectura y no realizan ninguna operación TicketBAI.
+No integrar todavía la UI de Facturas dentro de `14H`; las facturas comenzarán en `14I`. Consumo mensual es una consulta estadística de solo lectura, no forma parte del draft y no realiza ninguna operación TicketBAI.
 
 ---
 
@@ -4216,6 +4323,8 @@ No integrar todavía Consumo mensual ni la UI de Facturas dentro de `14G`. La gr
 | **2.30** | **03/09/2026** | **Clientes 14B–14D y 14E.1–14E.4 terminados, validados y subidos ✅. Ya están operativos ruta/página, workspace persistente de una ficha, búsqueda local, protección dirty, secciones, formulario compartido, datos generales/facturación, CREATE, UPDATE transaccional, reconciliación post-COMMIT, Guardar/Cancelar global, validación entre pestañas, feedback de cuatro segundos, foco en nuevos borradores y defensas durante guardado. Siguiente: 14E.5 baja lógica y bloqueo por facturas en borrador.** |
 | **2.31** | **03/09/2026** | **14E.5 y 14E.6 terminados, validados y subidos; `14E — Persistencia y mantenimiento` queda cerrado ✅. Baja lógica atómica con bloqueo por facturas en borrador, preservación completa del histórico, contrato/IPC/preload, reconciliación Angular post-COMMIT y UI confirmada. Documento de protección de datos integrado con cliente canónico, AppData y provincias. Nueva regla de trabajo: al añadir imports basta con indicar cuáles; Prettier decide su posición. Siguiente: 14F Ventas del cliente.** |
 | **2.32** | **03/09/2026** | **`14F — Ventas del cliente` terminado, validado y subido ✅. El Histórico admite filtro opcional por `clientePublicId` aplicado en SQLite al listado, pagos y agregados. La pestaña ofrece fechas explícitas, importes firmados, selección accesible, detalle readonly, reimpresión y email reutilizando los pipelines existentes, con protección ante respuestas antiguas y acciones ligadas a su propia fila. Ajuste responsive final sin scroll horizontal. Remitente y `{nombreNegocio}` de los emails de tickets usan `AppData.nombre`; `nombreComercial` queda fuera de estas comunicaciones. Siguiente: 14G Estadísticas generales.** |
+| **2.33** | **04/09/2026** | **`14G — Estadísticas generales` terminado y validado ✅. Consulta lazy específica con últimos 20 artículos, top por importe real y sumas SQLite por año/mes. PUC firmado, PVP real, beneficio, margen y total general se calculan en backend con enteros seguros/BigInt; devoluciones restan y ventas soft-deleted se excluyen. Renderer con estados, protección ante respuestas antiguas, tablas superiores, acordeón anual de apertura única, detalle mensual, total siempre visible, negativos, margen `null` como `—`, alineación final y overlay corregido. Siguiente: 14H Consumo mensual.** |
+
 ---
 
 # 32. Prompt de arranque recomendado
@@ -4224,7 +4333,7 @@ No integrar todavía Consumo mensual ni la UI de Facturas dentro de `14G`. La gr
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.32.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.33.
 
 Estado:
 - Ventas 12C.1–12C.8 ✅
@@ -4281,7 +4390,16 @@ Estado:
     - 14F.2 filtros y listado ✅
     - 14F.3 selección y detalle documental ✅
     - 14F.4 reimpresión, email y pulido final ✅
-  - 14G Estadísticas generales ⬜ SIGUIENTE
+  - 14G Estadísticas generales ✅ CERRADO
+    - 14G.1 backend, agregados y contratos ✅
+      - 14G.1A consultas SQLite y top ✅
+      - 14G.1B jerarquía anual, beneficio y margen ✅
+    - 14G.2 API, IPC, preload y servicio Angular ✅
+    - 14G.3 renderer ✅
+      - 14G.3A total general calculado en backend ✅
+      - 14G.3B carga lazy, estados y tablas superiores ✅
+      - 14G.3C acordeón anual, meses, total y pulido visual ✅
+  - 14H Consumo mensual ⬜ SIGUIENTE
 
 Hito actual:
 14 Clientes 🟦
@@ -4395,10 +4513,18 @@ Reglas críticas:
 - Reimpresión y email bloquean acciones concurrentes y muestran feedback propio.
 - La tabla reserva anchuras para fecha, referencia, importe y opciones; el tipo de pago ocupa el espacio restante para evitar scroll horizontal innecesario.
 - En emails de tickets, remitente y variable `{nombreNegocio}` usan `AppData.nombre`; no usar `nombreComercial` en asunto, cuerpo ni remitente.
-- Estadísticas muestra los últimos 20 artículos comprados y top ordenado por importe real.
+- `14G` está cerrado: Estadísticas muestra los últimos 20 artículos comprados, top de 10 posiciones ordenado por importe real y suma de ventas anual/mensual.
+- `ClientesService.getEstadisticasGenerales(publicId)` compone las estadísticas rápidas y `findSumaVentas()` sin incorporar esa carga completa al startup.
 - Suma de ventas: PUC coste firmado; PVP importe real tras descuentos; beneficio PVP−PUC; margen beneficio/PVP.
-- Devoluciones restan en estadísticas, pero no son elegibles para facturas.
-- Consumo mensual reutiliza ECharts/ngx-echarts y las cuatro resoluciones Mes/Año de Artículos, usando importe real.
+- Repository agrega por mes en SQLite; application service agrupa años, calcula valores derivados y genera el total general con enteros seguros/BigInt.
+- `ClienteEstadisticasGeneralesInterface` devuelve `ultimasVentas`, `topVentas`, `sumaVentas` jerárquica y `sumaVentasTotal`.
+- Los años y meses de `14G` son únicamente los períodos reales disponibles y se ordenan ascendentemente; los huecos a cero corresponden a la futura serie de `14H`.
+- Devoluciones restan en estadísticas y ventas soft-deleted se excluyen, pero las devoluciones no son elegibles para facturas.
+- La UI de `14G` carga lazy, protege frente a respuestas antiguas, no genera dirty y muestra estados completos.
+- El acordeón anual comienza cerrado, solo permite un año abierto y mantiene el total general siempre visible.
+- En el desglose mensual, Mes queda alineado a la izquierda y PUC/PVP/Beneficio/Margen, incluidas sus cabeceras, a la derecha.
+- El overlay del buscador de clientes debe permanecer por encima de las cabeceras sticky de Estadísticas.
+- `14H` reutilizará ECharts/ngx-echarts y las cuatro resoluciones Mes/Año de Artículos usando importe real, con períodos vacíos rellenados con cero.
 - Las estadísticas completas se cargan lazy en Clientes; no sobrecargar las estadísticas rápidas de Ventas.
 - Factura de Clientes = agrupación posterior de 1..N ventas ya cobradas.
 - Venta = 0..1 factura; UNIQUE factura_venta.id_venta impide reutilizarla en otra factura.
@@ -4429,9 +4555,9 @@ Convenciones:
 - En cada bloque incluir un resumen breve: completado, punto actual y pendiente.
 
 Próximo paso exacto:
-14G — Estadísticas generales.
+14H — Consumo mensual.
 ```
 
 ---
 
-**Fin del documento de continuidad v2.32.**
+**Fin del documento de continuidad v2.33.**
