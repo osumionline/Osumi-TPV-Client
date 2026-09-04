@@ -28,6 +28,7 @@ import AppDataService from '@services/app-data.service';
 import ClienteProteccionDatosPrintService from '@services/cliente-proteccion-datos-print.service';
 import ClientesService from '@services/clientes.service';
 import { getErrorMessage } from '@utils/error.utils';
+import ClientInvoicesComponent from '@modules/clientes/components/client-invoices/client-invoices.component';
 
 /**
  * Página principal del módulo de Clientes.
@@ -42,6 +43,7 @@ import { getErrorMessage } from '@utils/error.utils';
     ClientSalesComponent,
     ClientSearchComponent,
     ClientSectionTabsComponent,
+    ClientInvoicesComponent,
     HeaderComponent,
     MatButton,
     MatIconButton,

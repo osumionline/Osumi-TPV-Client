@@ -73,14 +73,13 @@
             </div>
 
             @switch (workspace.activeSection) {
-            @case ('invoices') {
-            <div class="clients__section-state">
-                <h2>Facturas</h2>
-
-                <p>
-                    Las facturas del cliente se mostrarán en este apartado.
-                </p>
-            </div>
+                        @case ('invoices') {
+            @if (workspace.clientePublicId; as clientePublicId) {
+            <otpv-client-invoices [clientePublicId]="clientePublicId"
+                                  [emailConfigured]="emailConfigured()"
+                                  [disabled]="processing()"
+                                  [createDisabled]="workspace.dirty || processing()" />
+            }
             }
 
             @case ('sales') {

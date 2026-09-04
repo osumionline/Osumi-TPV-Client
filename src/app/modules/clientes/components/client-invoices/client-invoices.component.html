@@ -1,0 +1,207 @@
+<section class="client-invoices"
+         aria-labelledby="client-invoices-title">
+    <header class="client-invoices__header">
+        <div>
+            <h2 id="client-invoices-title">
+                Facturas
+            </h2>
+
+            <p>
+                Facturas emitidas y borradores del cliente.
+            </p>
+        </div>
+
+        <button mat-flat-button
+                type="button"
+                class="client-invoices__new-button"
+                [disabled]="disabled() || createDisabled()"
+                (click)="newFactura()">
+            <mat-icon>
+                add
+            </mat-icon>
+
+            Nueva factura
+        </button>
+    </header>
+
+    @if (state(); as currentState) {
+    @if (currentState.loading && currentState.data === null) {
+    <div class="client-invoices__state"
+         role="status">
+        Cargando facturas del cliente...
+    </div>
+    }
+    @else if (currentState.error !== null && currentState.data === null) {
+    <div class="client-invoices__state client-invoices__state--error"
+         role="alert">
+        <span>
+            {{ currentState.error }}
+        </span>
+
+        <button mat-button
+                type="button"
+                [disabled]="disabled()"
+                (click)="retry()">
+            Reintentar
+        </button>
+    </div>
+    }
+    @else if (currentState.data !== null) {
+    @if (currentState.loading) {
+    <div class="client-invoices__message"
+         role="status">
+        Actualizando facturas...
+    </div>
+    }
+
+    @if (currentState.error !== null) {
+    <div class="client-invoices__message client-invoices__message--error"
+         role="alert">
+        <span>
+            {{ currentState.error }}
+        </span>
+
+        <button mat-button
+                type="button"
+                [disabled]="disabled()"
+                (click)="retry()">
+            Reintentar
+        </button>
+    </div>
+    }
+
+    @if (facturas().length === 0) {
+    <div class="client-invoices__state">
+        El cliente todavía no tiene facturas.
+    </div>
+    }
+    @else {
+    <div class="client-invoices__table-container">
+        <table class="client-invoices__table">
+            <thead>
+                <tr>
+                    <th scope="col"
+                        class="client-invoices__number">
+                        Factura
+                    </th>
+
+                    <th scope="col"
+                        class="client-invoices__date">
+                        Fecha
+                    </th>
+
+                    <th scope="col"
+                        class="client-invoices__money">
+                        Importe
+                    </th>
+
+                    <th scope="col"
+                        class="client-invoices__status-column">
+                        Estado
+                    </th>
+
+                    <th scope="col"
+                        class="client-invoices__actions">
+                        Acciones
+                    </th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @for (factura of facturas(); track factura.publicId) {
+                <tr class="client-invoices__row"
+                    [class.client-invoices__row--disabled]="disabled()"
+                    [attr.tabindex]="disabled() ? -1 : 0"
+                    [attr.aria-disabled]="disabled()"
+                    [attr.aria-label]="'Consultar factura ' + getFacturaLabel(factura)"
+                    (click)="selectFactura(factura)"
+                    (keydown)="selectFacturaFromKeyboard($event, factura)">
+                    <td class="client-invoices__number">
+                        {{ getFacturaLabel(factura) }}
+                    </td>
+
+                    <td class="client-invoices__date">
+                        {{ factura.fecha | date:'dd/MM/yyyy HH:mm' }}
+                    </td>
+
+                    <td class="client-invoices__money">
+                        {{
+                            factura.importeCents
+                                | centsToEuros
+                                | currency:'EUR':'symbol':'1.2-2'
+                        }}
+                    </td>
+
+                    <td class="client-invoices__status-column">
+                        <span class="client-invoices__status"
+                              [class.client-invoices__status--draft]="
+                                  factura.estado === 'borrador'
+                              "
+                              [class.client-invoices__status--issued]="
+                                  factura.estado === 'emitida'
+                              "
+                              [class.client-invoices__status--cancelled]="
+                                  factura.estado === 'anulada'
+                              ">
+                            {{ getEstadoLabel(factura.estado) }}
+                        </span>
+                    </td>
+
+                    <td class="client-invoices__actions">
+                        @if (factura.capacidades.puedeEnviarEmail) {
+                        <button mat-icon-button
+                                type="button"
+                                class="client-invoices__email-button"
+                                [matTooltip]="
+                                    emailConfigured()
+                                        ? 'Enviar factura por email'
+                                        : 'El email no está configurado'
+                                "
+                                [attr.aria-label]="
+                                    'Enviar por email la factura ' +
+                                    getFacturaLabel(factura)
+                                "
+                                [disabled]="disabled() || !emailConfigured()"
+                                (click)="emailFactura($event, factura)">
+                            <mat-icon>
+                                email
+                            </mat-icon>
+                        </button>
+                        }
+
+                        @if (factura.capacidades.puedeImprimir) {
+                        <button mat-icon-button
+                                type="button"
+                                class="client-invoices__print-button"
+                                matTooltip="Imprimir factura"
+                                [attr.aria-label]="
+                                    'Imprimir la factura ' +
+                                    getFacturaLabel(factura)
+                                "
+                                [disabled]="disabled()"
+                                (click)="printFactura($event, factura)">
+                            <mat-icon>
+                                print
+                            </mat-icon>
+                        </button>
+                        }
+
+                        @if (
+                            !factura.capacidades.puedeEnviarEmail &&
+                            !factura.capacidades.puedeImprimir
+                        ) {
+                        <span class="client-invoices__no-actions"
+                              aria-label="Sin acciones disponibles">
+                            —
+                        </span>
+                        }
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    }
+    }
+    }
+</section>
