@@ -1,5 +1,8 @@
+import type ClienteConsumoMensualRepositoryQuery from '@backend/contracts/clientes/cliente-consumo-mensual-query.interface';
 import type ClienteDeactivateResult from '@backend/contracts/clientes/cliente-deactivate-result.type';
 import type {
+  ClienteConsumoMensualAggregateRecord,
+  ClienteConsumoMensualRepositoryResult,
   ClienteSumaVentaRecord,
   ClienteTopVentaRecord,
   ClienteUltimaVentaRecord,
@@ -59,6 +62,17 @@ interface ClienteSumaVentaDatabaseRow {
   readonly month: number;
   readonly puc_micros: number;
   readonly pvp_micros: number;
+}
+
+interface ClienteConsumoMensualDatabaseRow {
+  readonly year: number;
+  readonly month: number;
+  readonly day: number | null;
+  readonly importe_micros: number;
+}
+
+interface ClienteConsumoMensualYearDatabaseRow {
+  readonly year: number;
 }
 
 interface ClienteUpdateTargetDatabaseRow {
@@ -632,5 +646,138 @@ export default class TypeOrmClienteRepository implements ClienteRepository {
         pvpMicros: row.pvp_micros,
       };
     });
+  }
+
+  /**
+   * Agrega el importe real consumido por un cliente
+   * según los filtros temporales solicitados.
+   */
+  async findConsumoMensual(
+    query: ClienteConsumoMensualRepositoryQuery,
+  ): Promise<ClienteConsumoMensualRepositoryResult> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+    const yearExpression: string = "CAST(strftime('%Y', v.created_at) AS INTEGER)";
+    const monthExpression: string = "CAST(strftime('%m', v.created_at) AS INTEGER)";
+    const daily: boolean = query.year !== null && query.month !== null;
+    const dayExpression: string = daily ? "CAST(strftime('%d', v.created_at) AS INTEGER)" : 'NULL';
+
+    const conditions: string[] = [
+      'c.public_id = ?',
+      'c.deleted_at IS NULL',
+      'v.deleted_at IS NULL',
+    ];
+
+    const parameters: (string | number)[] = [query.publicId];
+
+    if (query.year !== null) {
+      conditions.push(`${yearExpression} = ?`);
+      parameters.push(query.year);
+    }
+
+    if (query.month !== null) {
+      conditions.push(`${monthExpression} = ?`);
+      parameters.push(query.month);
+    }
+
+    const groupByExpression: string = daily
+      ? `${yearExpression}, ${monthExpression}, ${dayExpression}`
+      : `${yearExpression}, ${monthExpression}`;
+
+    const rows: readonly ClienteConsumoMensualDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT
+          ${yearExpression} AS year,
+          ${monthExpression} AS month,
+          ${dayExpression} AS day,
+          CAST(
+            SUM(lv.importe_micros)
+            AS INTEGER
+          ) AS importe_micros
+        FROM cliente c
+
+        INNER JOIN venta v
+          ON v.id_cliente = c.id
+
+        INNER JOIN linea_venta lv
+          ON lv.id_venta = v.id
+
+        WHERE
+          ${conditions.join('\n          AND ')}
+
+        GROUP BY
+          ${groupByExpression}
+
+        ORDER BY
+          ${groupByExpression}
+      `,
+      parameters,
+    )) as readonly ClienteConsumoMensualDatabaseRow[];
+
+    const yearRows: readonly ClienteConsumoMensualYearDatabaseRow[] = (await dataSource.query(
+      `
+          SELECT DISTINCT
+            ${yearExpression} AS year
+          FROM cliente c
+
+          INNER JOIN venta v
+            ON v.id_cliente = c.id
+
+          INNER JOIN linea_venta lv
+            ON lv.id_venta = v.id
+
+          WHERE
+            c.public_id = ?
+            AND c.deleted_at IS NULL
+            AND v.deleted_at IS NULL
+
+          ORDER BY
+            year
+        `,
+      [query.publicId],
+    )) as readonly ClienteConsumoMensualYearDatabaseRow[];
+
+    const years: readonly number[] = yearRows.map(
+      (row: ClienteConsumoMensualYearDatabaseRow): number => {
+        if (!Number.isSafeInteger(row.year) || row.year < 1 || row.year > 9999) {
+          throw new Error('Los años disponibles del consumo del cliente no son válidos.');
+        }
+
+        return row.year;
+      },
+    );
+
+    const items: readonly ClienteConsumoMensualAggregateRecord[] = rows.map(
+      (row: ClienteConsumoMensualDatabaseRow): ClienteConsumoMensualAggregateRecord => {
+        const validDay: boolean =
+          row.day === null || (Number.isSafeInteger(row.day) && row.day >= 1 && row.day <= 31);
+
+        if (
+          !Number.isSafeInteger(row.year) ||
+          row.year < 1 ||
+          row.year > 9999 ||
+          !Number.isSafeInteger(row.month) ||
+          row.month < 1 ||
+          row.month > 12 ||
+          !validDay ||
+          (daily && row.day === null) ||
+          (!daily && row.day !== null) ||
+          !Number.isSafeInteger(row.importe_micros)
+        ) {
+          throw new Error('Los agregados de consumo mensual del cliente no son válidos.');
+        }
+
+        return {
+          year: row.year,
+          month: row.month,
+          day: row.day,
+          importeMicros: row.importe_micros,
+        };
+      },
+    );
+
+    return {
+      years,
+      items,
+    };
   }
 }

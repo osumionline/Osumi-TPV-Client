@@ -1,5 +1,6 @@
 import type ClienteDeactivateResult from '@backend/contracts/clientes/cliente-deactivate-result.type';
 import type {
+  ClienteConsumoMensualRepositoryResult,
   ClienteSumaVentaRecord,
   ClienteTopVentaRecord,
 } from '@backend/contracts/clientes/cliente-estadisticas-record.interface';
@@ -181,6 +182,68 @@ describe('TypeOrmClienteRepository', (): void => {
         pvpMicros: -20_000_000,
       },
     ]);
+  });
+
+  it('agrega el consumo por meses con importes firmados y años disponibles', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await seedClienteStatistics(dataSource);
+
+    const result: ClienteConsumoMensualRepositoryResult =
+      await requireRepository().findConsumoMensual({
+        publicId: 'cliente-1',
+        year: null,
+        month: null,
+      });
+
+    expect(result).toEqual({
+      years: [2025, 2026],
+      items: [
+        {
+          year: 2025,
+          month: 12,
+          day: null,
+          importeMicros: 30_000_000,
+        },
+        {
+          year: 2026,
+          month: 1,
+          day: null,
+          importeMicros: 20_000_000,
+        },
+        {
+          year: 2026,
+          month: 2,
+          day: null,
+          importeMicros: -20_000_000,
+        },
+      ],
+    });
+  });
+
+  it('agrega el consumo por días al filtrar un año y un mes', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await seedClienteStatistics(dataSource);
+
+    const result: ClienteConsumoMensualRepositoryResult =
+      await requireRepository().findConsumoMensual({
+        publicId: 'cliente-1',
+        year: 2026,
+        month: 1,
+      });
+
+    expect(result).toEqual({
+      years: [2025, 2026],
+      items: [
+        {
+          year: 2026,
+          month: 1,
+          day: 10,
+          importeMicros: 20_000_000,
+        },
+      ],
+    });
   });
 
   it('ordena el top principalmente por importe real y después por unidades', async (): Promise<void> => {

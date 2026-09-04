@@ -1,5 +1,7 @@
+import type ClienteConsumoMensualRepositoryQuery from '@backend/contracts/clientes/cliente-consumo-mensual-query.interface';
 import type ClienteDeactivateResult from '@backend/contracts/clientes/cliente-deactivate-result.type';
 import type {
+  ClienteConsumoMensualRepositoryResult,
   ClienteSumaVentaRecord,
   ClienteTopVentaRecord,
   ClienteUltimaVentaRecord,
@@ -27,4 +29,12 @@ export default interface ClienteRepository {
    * de compra y venta de un cliente.
    */
   findSumaVentas(publicId: string): Promise<readonly ClienteSumaVentaRecord[]>;
+
+  /**
+   * Recupera el consumo real agregado para una
+   * combinación de filtros temporales.
+   */
+  findConsumoMensual(
+    query: ClienteConsumoMensualRepositoryQuery,
+  ): Promise<ClienteConsumoMensualRepositoryResult>;
 }

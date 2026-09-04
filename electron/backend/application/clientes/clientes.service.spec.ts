@@ -1,6 +1,8 @@
 import ClientesService from '@backend/application/clientes/clientes.service';
+import type ClienteConsumoMensualRepositoryQuery from '@backend/contracts/clientes/cliente-consumo-mensual-query.interface';
 import type ClienteDeactivateResult from '@backend/contracts/clientes/cliente-deactivate-result.type';
 import type {
+  ClienteConsumoMensualRepositoryResult,
   ClienteSumaVentaRecord,
   ClienteTopVentaRecord,
   ClienteUltimaVentaRecord,
@@ -30,6 +32,11 @@ class FakeClienteRepository implements ClienteRepository {
   ultimasVentasPublicId: string | null = null;
   topVentasPublicId: string | null = null;
   sumaVentasPublicId: string | null = null;
+  consumoMensualResult: ClienteConsumoMensualRepositoryResult = {
+    years: [],
+    items: [],
+  };
+  consumoMensualQuery: ClienteConsumoMensualRepositoryQuery | null = null;
 
   /**
    * Devuelve una colección vacía para las pruebas del servicio.
@@ -115,6 +122,17 @@ class FakeClienteRepository implements ClienteRepository {
     this.sumaVentasPublicId = publicId;
 
     return Promise.resolve(this.sumaVentas);
+  }
+
+  /**
+   * Devuelve el consumo temporal configurado para la prueba.
+   */
+  findConsumoMensual(
+    query: ClienteConsumoMensualRepositoryQuery,
+  ): Promise<ClienteConsumoMensualRepositoryResult> {
+    this.consumoMensualQuery = query;
+
+    return Promise.resolve(this.consumoMensualResult);
   }
 }
 
