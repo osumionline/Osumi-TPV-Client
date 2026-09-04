@@ -1,7 +1,9 @@
+import { Component, input, type InputSignal } from '@angular/core';
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import type { ClienteEstadisticasGeneralesInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import ClientGeneralStatisticsComponent from '@modules/clientes/components/client-general-statistics/client-general-statistics.component';
+import ClientMonthlyConsumptionComponent from '@modules/clientes/components/client-monthly-consumption/client-monthly-consumption.component';
 import ClientesService from '@services/clientes.service';
 
 describe('ClientGeneralStatisticsComponent', (): void => {
@@ -19,7 +21,16 @@ describe('ClientGeneralStatisticsComponent', (): void => {
           useValue: clientesService,
         },
       ],
-    }).compileComponents();
+    })
+      .overrideComponent(ClientGeneralStatisticsComponent, {
+        remove: {
+          imports: [ClientMonthlyConsumptionComponent],
+        },
+        add: {
+          imports: [FakeClientMonthlyConsumptionComponent],
+        },
+      })
+      .compileComponents();
 
     fixture = TestBed.createComponent(ClientGeneralStatisticsComponent);
     fixture.componentRef.setInput('clientePublicId', 'cliente-1');
@@ -156,6 +167,17 @@ describe('ClientGeneralStatisticsComponent', (): void => {
 
     expect(element.querySelector('.client-general-statistics__totals')).not.toBeNull();
   });
+
+  it('integra el consumo mensual usando el cliente activo', (): void => {
+    const element: HTMLElement = fixture.nativeElement as HTMLElement;
+
+    const monthlyConsumption: HTMLElement | null = element.querySelector<HTMLElement>(
+      '.fake-client-monthly-consumption',
+    );
+
+    expect(monthlyConsumption).not.toBeNull();
+    expect(monthlyConsumption?.textContent).toContain('cliente-1');
+  });
 });
 
 class FakeClientesService {
@@ -254,4 +276,19 @@ function createEstadisticasGenerales(recentName: string): ClienteEstadisticasGen
       margenMicroporcentaje: 60_784_314,
     },
   };
+}
+
+/**
+ * Sustituye la gráfica real en las pruebas del componente padre.
+ */
+@Component({
+  selector: 'otpv-client-monthly-consumption',
+  template: `
+    <span class="fake-client-monthly-consumption">
+      {{ clientePublicId() }}
+    </span>
+  `,
+})
+class FakeClientMonthlyConsumptionComponent {
+  readonly clientePublicId: InputSignal<string> = input.required<string>();
 }

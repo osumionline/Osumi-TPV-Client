@@ -16,6 +16,7 @@ import {
   MatExpansionPanelHeader,
 } from '@angular/material/expansion';
 import type { ClienteEstadisticasGeneralesInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import ClientMonthlyConsumptionComponent from '@modules/clientes/components/client-monthly-consumption/client-monthly-consumption.component';
 import IsoDateToSpanishPipe from '@pipes/iso-date-to-spanish.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
 import ClientesService from '@services/clientes.service';
@@ -50,6 +51,7 @@ const MARGIN_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
   templateUrl: './client-general-statistics.component.html',
   styleUrl: './client-general-statistics.component.scss',
   imports: [
+    ClientMonthlyConsumptionComponent,
     CurrencyPipe,
     IsoDateToSpanishPipe,
     MatAccordion,
