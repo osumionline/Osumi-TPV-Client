@@ -69,7 +69,7 @@ export default class ClientsComponent implements OnInit, OnDestroy {
   readonly saving: WritableSignal<boolean> = signal<boolean>(false);
   readonly deactivating: WritableSignal<boolean> = signal<boolean>(false);
   readonly processing: Signal<boolean> = computed(
-    (): boolean => this.saving() || this.deactivating(),
+    (): boolean => this.saving() || this.deactivating() || this.invoiceEditorOpen(),
   );
   readonly saveSuccessful: WritableSignal<boolean> = signal<boolean>(false);
   readonly focusNameRequest: WritableSignal<number> = signal<number>(0);

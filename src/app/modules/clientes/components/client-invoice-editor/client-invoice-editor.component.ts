@@ -75,9 +75,9 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
   readonly loading: WritableSignal<boolean> = signal<boolean>(false);
   readonly loadError: WritableSignal<string | null> = signal<string | null>(null);
   readonly processing: WritableSignal<boolean> = signal<boolean>(false);
+  readonly dialogOpen: WritableSignal<boolean> = signal<boolean>(false);
   readonly operationError: WritableSignal<string | null> = signal<string | null>(null);
   readonly operationInfo: WritableSignal<string | null> = signal<string | null>(null);
-
   readonly detalleLoading: WritableSignal<boolean> = signal<boolean>(false);
   readonly detalleError: WritableSignal<string | null> = signal<string | null>(null);
   readonly detalle: WritableSignal<VentaHistoricoDetalle | null> =
@@ -88,6 +88,10 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
 
     return factura === null || factura.estado === 'borrador';
   });
+
+  readonly blocked: Signal<boolean> = computed(
+    (): boolean => this.processing() || this.dialogOpen(),
+  );
 
   readonly title: Signal<string> = computed((): string => {
     const factura: ClienteFacturaInterface | null = this.currentFactura();
@@ -129,7 +133,7 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
     (): boolean =>
       this.editable() &&
       !this.loading() &&
-      !this.processing() &&
+      !this.blocked() &&
       this.selectedVentasCount() > 0 &&
       this.hasChanges(),
   );
@@ -161,24 +165,42 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Solicita cerrar el editor.
-   *
-   * La protección frente a cambios sin guardar se
-   * incorporará en 14J.4.
+   * Cierra directamente una factura limpia o solicita
+   * confirmación cuando existen cambios sin guardar.
    */
   requestClose(): void {
-    if (this.processing()) {
+    if (this.blocked()) {
       return;
     }
 
-    this.closeEvent.emit();
+    if (!this.hasChanges()) {
+      this.closeEvent.emit();
+
+      return;
+    }
+
+    this.dialogOpen.set(true);
+
+    this.dialog
+      .confirm({
+        title: 'Cambios sin guardar',
+        content:
+          'La factura contiene cambios sin guardar. ' + '¿Quieres cerrarla y perder esos cambios?',
+      })
+      .subscribe((result: boolean): void => {
+        this.dialogOpen.set(false);
+
+        if (result) {
+          this.closeEvent.emit();
+        }
+      });
   }
 
   /**
    * Reintenta la carga inicial del editor.
    */
   retry(): void {
-    if (this.processing()) {
+    if (this.blocked()) {
       return;
     }
 
@@ -214,7 +236,7 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
    * Añade o retira una venta de la factura editable.
    */
   toggleVenta(publicId: string): void {
-    if (!this.editable() || this.processing()) {
+    if (!this.editable() || this.blocked()) {
       return;
     }
 
@@ -236,7 +258,7 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
    * histórico completo en el panel derecho.
    */
   selectVenta(idVenta: number): void {
-    if (this.processing()) {
+    if (this.blocked()) {
       return;
     }
 
@@ -272,7 +294,7 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
   retryDetalle(): void {
     const idVenta: number | null = this.selectedVentaId();
 
-    if (idVenta === null || this.processing()) {
+    if (idVenta === null || this.blocked()) {
       return;
     }
 
@@ -335,13 +357,15 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
     const factura: ClienteFacturaInterface | null = this.currentFactura();
 
     if (
-      this.processing() ||
+      this.blocked() ||
       factura === null ||
       factura.estado !== 'borrador' ||
       !factura.capacidades.puedeEliminar
     ) {
       return;
     }
+
+    this.dialogOpen.set(true);
 
     this.dialog
       .confirm({
@@ -351,6 +375,8 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
           'Las ventas incluidas volverán a quedar disponibles para facturar.',
       })
       .subscribe((result: boolean): void => {
+        this.dialogOpen.set(false);
+
         if (result) {
           void this.confirmDeleteBorrador(factura.publicId);
         }

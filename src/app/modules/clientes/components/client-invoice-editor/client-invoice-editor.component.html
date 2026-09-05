@@ -2,7 +2,7 @@
     <button class="overlay__backdrop"
             type="button"
             aria-label="Cerrar editor de factura"
-            [disabled]="processing()"
+            [disabled]="blocked()"
             (click)="requestClose()">
     </button>
 
@@ -46,7 +46,7 @@
             <button mat-icon-button
                     type="button"
                     aria-label="Cerrar editor de factura"
-                    [disabled]="processing()"
+                    [disabled]="blocked()"
                     (click)="requestClose()">
                 <mat-icon>
                     close
@@ -87,6 +87,7 @@
 
                 <button mat-stroked-button
                         type="button"
+                        [disabled]="blocked()"
                         (click)="retry()">
                     Reintentar
                 </button>
@@ -176,7 +177,7 @@
                                     @if (editable()) {
                                     <td class="client-invoice-editor__select-column">
                                         <mat-checkbox [checked]="isVentaSelected(venta.publicId)"
-                                                      [disabled]="processing()"
+                                                      [disabled]="blocked()"
                                                       [attr.aria-label]="
                                                           'Incluir venta ' +
                                                           getVentaReferencia(venta)
@@ -240,7 +241,7 @@
 
                         <button mat-stroked-button
                                 type="button"
-                                [disabled]="processing()"
+                                [disabled]="blocked()"
                                 (click)="retryDetalle()">
                             Reintentar
                         </button>
@@ -274,7 +275,7 @@
             <button mat-flat-button
                     type="button"
                     class="client-invoice-editor__delete"
-                    [disabled]="processing()"
+                    [disabled]="blocked()"
                     (click)="deleteBorrador()">
                 Eliminar
             </button>
@@ -301,7 +302,7 @@
 
             <button mat-stroked-button
                     type="button"
-                    [disabled]="processing()"
+                    [disabled]="blocked()"
                     (click)="requestClose()">
                 Cerrar
             </button>

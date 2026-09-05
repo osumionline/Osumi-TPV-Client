@@ -14,6 +14,7 @@ import ClientInvoiceEditorComponent from '@modules/clientes/components/client-in
 import { DialogService } from '@osumi/angular-tools';
 import ClientesService from '@services/clientes.service';
 import VentasHistoricoService from '@services/ventas-historico.service';
+import type { Observable } from 'rxjs';
 import { of } from 'rxjs';
 
 class FakeClientesService {
@@ -99,14 +100,31 @@ class FakeVentasHistoricoService {
   }
 }
 
+class FakeDialogService {
+  result: boolean = true;
+  confirmCount: number = 0;
+
+  /**
+   * Registra cada confirmación y devuelve el
+   * resultado configurado para la prueba.
+   */
+  confirm(): Observable<boolean> {
+    this.confirmCount++;
+
+    return of(this.result);
+  }
+}
+
 describe('ClientInvoiceEditorComponent', (): void => {
   let fixture: ComponentFixture<ClientInvoiceEditorComponent>;
   let clientesService: FakeClientesService;
   let ventasHistoricoService: FakeVentasHistoricoService;
+  let dialogService: FakeDialogService;
 
   beforeEach(async (): Promise<void> => {
     clientesService = new FakeClientesService();
     ventasHistoricoService = new FakeVentasHistoricoService();
+    dialogService = new FakeDialogService();
 
     await TestBed.configureTestingModule({
       imports: [ClientInvoiceEditorComponent],
@@ -121,9 +139,7 @@ describe('ClientInvoiceEditorComponent', (): void => {
         },
         {
           provide: DialogService,
-          useValue: {
-            confirm: () => of(true),
-          },
+          useValue: dialogService,
         },
       ],
     }).compileComponents();
@@ -216,6 +232,65 @@ describe('ClientInvoiceEditorComponent', (): void => {
     expect(fixture.componentInstance.detalleError()).toBe(
       'La venta seleccionada ya no se encuentra disponible.',
     );
+  });
+
+  it('cierra directamente el editor cuando no existen cambios', async (): Promise<void> => {
+    await createFixture(null);
+
+    const closeRequests: boolean[] = [];
+
+    fixture.componentInstance.closeEvent.subscribe((): void => {
+      closeRequests.push(true);
+    });
+
+    fixture.componentInstance.requestClose();
+
+    expect(dialogService.confirmCount).toBe(0);
+    expect(closeRequests).toEqual([true]);
+  });
+
+  it('mantiene abierto el editor cuando se cancela el descarte de cambios', async (): Promise<void> => {
+    await createFixture(null);
+
+    const closeRequests: boolean[] = [];
+
+    fixture.componentInstance.closeEvent.subscribe((): void => {
+      closeRequests.push(true);
+    });
+
+    fixture.componentInstance.toggleVenta('venta-1');
+
+    expect(fixture.componentInstance.hasChanges()).toBe(true);
+
+    dialogService.result = false;
+
+    fixture.componentInstance.requestClose();
+
+    expect(dialogService.confirmCount).toBe(1);
+    expect(closeRequests).toEqual([]);
+    expect(fixture.componentInstance.hasChanges()).toBe(true);
+    expect(fixture.componentInstance.blocked()).toBe(false);
+  });
+
+  it('cierra el editor cuando se confirma el descarte de cambios', async (): Promise<void> => {
+    await createFixture(createFacturaBorrador());
+
+    const closeRequests: boolean[] = [];
+
+    fixture.componentInstance.closeEvent.subscribe((): void => {
+      closeRequests.push(true);
+    });
+
+    fixture.componentInstance.toggleVenta('venta-2');
+
+    expect(fixture.componentInstance.hasChanges()).toBe(true);
+
+    dialogService.result = true;
+
+    fixture.componentInstance.requestClose();
+
+    expect(dialogService.confirmCount).toBe(1);
+    expect(closeRequests).toEqual([true]);
   });
 
   it('elimina un borrador confirmado y cierra el modal', async (): Promise<void> => {
