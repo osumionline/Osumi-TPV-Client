@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.35  
-**Fecha:** 4 de septiembre de 2026  
-**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**. El **Hito 14 — Clientes está en curso 🟦**: `14A–14H` están terminados, validados funcionalmente y subidos al repositorio, y `14I.0 — revisión funcional guiada de Facturas y contraste legacy` queda **cerrado ✅**. Se ha definido el plan completo de `14I–14K`: listado con estados explícitos, borradores editables, selección de ventas disponibles, emisión con numeración global transaccional, previsualización en ventana independiente, PDF definitivo inmutable, impresión/email y anulación con liberación de ventas sin perder la relación histórica. El siguiente paso exacto es **`14I.1 — persistencia y relaciones históricas de facturas`**. Clientes no realiza ni realizará ninguna operación TicketBAI.
+**Versión:** 2.36  
+**Fecha:** 5 de septiembre de 2026  
+**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**. El **Hito 14 — Clientes está en curso 🟦**: `14A–14I` están terminados y `14J.1–14J.2` también están cerrados, validados y subidos. Facturas ya dispone de relaciones activas/históricas, listado completo, ventas elegibles y persistencia transaccional de borradores con reconciliación segura de caché. El siguiente paso exacto es **`14J.3 — modal Angular del editor de factura`**. `14K — Emisión y documentos` continúa pendiente. Clientes no realiza ni realizará ninguna operación TicketBAI.
 
 > **Regla crítica de entorno TicketBAI:** el producto usa `production` por defecto. Durante desarrollo/pruebas manuales se usa `app_data.json → ticketBai.environment = "test"` junto con el token TEST correspondiente. No añadir selector de entorno a la UI.
 
@@ -94,7 +94,7 @@ Ventas 12 — Postventa                             🟦
     14B.1 Navegación y página base               ✅
     14B.2 Estado persistente de una ficha         ✅
   14C Búsqueda y selección                        ✅
-    14C.1 Cliente persistido → draft editable   ✅
+    14C.1 Cliente persistido → draft editable     ✅
     14C.2 Modal y búsqueda local                  ✅
     14C.3 Protección al sustituir ficha           ✅
   14D Workspace y formulario                     ✅
@@ -103,7 +103,7 @@ Ventas 12 — Postventa                             🟦
     14D.3 Integración, dirty y Cancelar           ✅
   14E Persistencia y mantenimiento                ✅ CERRADO
     14E.1 CREATE + reconciliación segura          ✅
-    14E.2 Facturación, validación y guardado     ✅
+    14E.2 Facturación, validación y guardado      ✅
     14E.3 UPDATE completo                         ✅
     14E.4 Pulido final de UX                      ✅
     14E.5 Baja lógica + bloqueo borradores        ✅
@@ -133,16 +133,33 @@ Ventas 12 — Postventa                             🟦
     14H.3 Renderer                                ✅
       14H.3A Componente, gráfica, filtros/estados ✅
       14H.3B Integración y validación final       ✅
-  14I Dominio y listado de facturas               🟦 SIGUIENTE
+  14I Dominio y listado de facturas               ✅ CERRADO
     14I.0 Revisión funcional guiada y legacy      ✅
-    14I.1 Persistencia y relaciones históricas    ⬜ PRIMERO
-    14I.2 Dominio, contratos y repository         ⬜
-    14I.3 API, IPC, preload y servicio Angular    ⬜
-    14I.4 Listado Angular                         ⬜
-  14J Editor de factura                           ⬜
-    14J.1 Ventas disponibles                      ⬜
-    14J.2 Persistencia de borradores              ⬜
-    14J.3 Modal Angular                           ⬜
+    14I.1 Persistencia y relaciones históricas    ✅
+      14I.1A Esquema + importación legacy         ✅
+      14I.1B Consumidores + regresiones           ✅
+    14I.2 Dominio, contratos y repository         ✅
+      14I.2A Modelo interno + consulta SQLite     ✅
+      14I.2B Contrato público + application svc   ✅
+    14I.3 API, IPC, preload y servicio Angular    ✅
+      14I.3A Puente Electron                      ✅
+      14I.3B Caché/estado Angular                 ✅
+    14I.4 Listado Angular                         ✅
+  14J Editor de factura                           🟦 EN CURSO
+    14J.1 Ventas disponibles                      ✅ CERRADO
+      14J.1A Repository SQLite                    ✅
+      14J.1B Contrato + application service       ✅
+      14J.1C API + IPC + preload                  ✅
+      14J.1D Servicio Angular                     ✅
+    14J.2 Persistencia de borradores              ✅ CERRADO
+      14J.2A Creación transaccional               ✅
+      14J.2B Actualización transaccional          ✅
+      14J.2C Eliminación transaccional            ✅
+      14J.2D Integración completa                 ✅
+        14J.2D1 Application service/contratos    ✅
+        14J.2D2 API + IPC + preload              ✅
+        14J.2D3 Angular + reconciliación caché   ✅
+    14J.3 Modal Angular                           ⬜ SIGUIENTE
     14J.4 Dirty y convivencia con la ficha        ⬜
   14K Emisión y documentos                        ⬜
     14K.1 Emisión transaccional                   ⬜
@@ -3478,7 +3495,7 @@ Con ello, **todo el Hito 13 — Artículos queda terminado y cerrado ✅**.
 
 El análisis funcional y técnico está cerrado. El módulo conservará el modelo mental útil del TPV legacy, pero se implementará sobre la arquitectura actual y corregirá sus problemas de consultas, estado, precisión monetaria, integridad y documentación.
 
-Esta versión parte del estado de `origin/main` revisado hasta el commit `4864c2b`, que ya contiene `14G.3B`, e incorpora también el cierre funcional y visual de `14G.3C` validado por el usuario en esta conversación.
+Esta versión toma como nueva base funcional el estado de `main` contrastado hasta el commit `8be974b`, que cierra `14J.2D3 — servicio Angular y reconciliación de caché`. Después se ha limpiado la duplicación accidental de tres tests de `clientes.service.spec.ts`, sin cambio funcional. Todo `14I`, `14J.1` y `14J.2` queda validado; el siguiente bloque es `14J.3 — modal Angular`.
 
 ## 29.1 Objetivo y alcance
 
@@ -3574,13 +3591,32 @@ El repositorio nuevo dispone actualmente de:
 - `ClientMonthlyConsumptionComponent` con ECharts/ngx-echarts modular, CanvasRenderer, filtros Mes/Año, total, tooltips y selección inicial año actual + Todos los meses;
 - estados independientes de carga, vacío y error/reintento, protección frente a respuestas fuera de orden e invalidación al destruir el componente;
 - integración lazy de Consumo mensual dentro de Estadísticas sin formar parte del draft ni generar dirty;
-- tablas `factura` y `factura_venta`, estados borrador/emitida/anulada, instantánea de facturación e importación legacy;
-- unicidad global actual de `factura_venta.id_venta`; `14I.1` la sustituirá por una unicidad parcial sobre relaciones activas para conservar asociaciones históricas de facturas anuladas y liberar sus ventas.
+- tablas `factura` y `factura_venta` con estados borrador/emitida/anulada, `fecha_emision`, `fecha_anulacion`, instantánea de facturación e importación legacy;
+- `factura_venta.activa` distingue relaciones vigentes de relaciones históricas;
+- índice único parcial sobre `id_venta WHERE activa = 1`, que permite conservar 0..N relaciones históricas y como máximo una activa;
+- importación legacy adaptada: factura numerada eliminada → `anulada`, fecha de eliminación → `fecha_anulacion`, relación histórica inactiva y factura visible;
+- Histórico considera `facturada` únicamente cuando existe una relación activa;
+- cambiar el cliente de una venta facturada está permitido y no altera sus relaciones ni sus documentos ya emitidos;
+- `ClienteFacturasRepository` y `TypeOrmClienteFacturasRepository` operativos para listado, ventas disponibles y CRUD de borradores;
+- contrato público `ClienteFacturaInterface` con estado, número oficial `numero_año`, fechas, importe y capacidades derivadas en backend;
+- listado de Facturas lazy y cacheado en `ClientesService`, con protección frente a respuestas antiguas, invalidación y reintento;
+- `ClientInvoicesComponent` operativo con estados Borrador/Emitida/Anulada, columnas Factura/Fecha/Importe/Estado/Acciones y botón Nueva factura;
+- email e impresión visibles solo para emitidas; email se deshabilita si SMTP no está configurado;
+- `Nueva factura` se bloquea cuando la ficha del cliente tiene cambios sin guardar;
+- consulta de ventas disponibles por cliente y borrador, excluyendo ventas eliminadas, devoluciones, operaciones mixtas y relaciones activas ajenas;
+- las ventas del propio borrador se incluyen y se marcan como seleccionadas; las relaciones históricas anuladas no bloquean;
+- pagos de cada venta disponible se recuperan ordenados para el editor y se conserva el id interno de venta para reutilizar el detalle histórico;
+- creación de borrador transaccional: exige 1..N ventas, revalida disponibilidad, recalcula importe desde SQLite, copia datos de facturación canónicos y crea relaciones activas;
+- actualización transaccional: solo borradores del cliente activo, mantiene ventas propias, elimina relaciones retiradas, añade nuevas elegibles y recalcula el importe;
+- eliminación transaccional: soft delete de la factura borrador + eliminación física de sus relaciones `factura_venta`, liberando inmediatamente las ventas;
+- application service, contratos públicos, IPC y preload exponen crear/actualizar/eliminar borradores;
+- `ClientesService` Angular reconcilia el resultado de escrituras confirmadas directamente en la caché, esperando lecturas anteriores cuando sea necesario y sin depender de un `reload()` post-COMMIT.
 
 Todavía faltan:
 
-- contratos, repositories, services e IPC operativos para facturas;
-- listado/editor de borradores, emisión y pipeline documental de facturas.
+- `14J.3` modal Angular del editor de factura;
+- `14J.4` dirty propio del modal y convivencia con la ficha;
+- `14K` emisión, previsualización, PDF definitivo, impresión/email, anulación e integración final.
 
 ## 29.4 Entrada, búsqueda y selección ✅
 
@@ -3649,7 +3685,7 @@ Estado implementado y validado:
 
 - las cinco secciones existen y la sección activa forma parte del workspace;
 - Datos y Datos de facturación están operativas;
-- Facturas conserva por ahora contenido placeholder; Ventas y Estadísticas están completamente operativas;
+- Facturas ya dispone de listado real lazy/cacheado; el editor modal comienza en `14J.3`. Ventas y Estadísticas están completamente operativas;
 - un borrador nuevo solo permite Datos y Datos de facturación;
 - tras el primer guardado, la misma ficha obtiene identidad persistida y habilita las cinco secciones;
 - el formulario se mantiene montado al alternar Datos/Facturación, evitando perder estado local;
@@ -3977,7 +4013,7 @@ Por tanto:
 - una factura puede y debe agrupar una o varias ventas;
 - una misma venta no puede pertenecer simultáneamente a más de una factura activa;
 - una factura anulada conserva sus relaciones históricas, pero deja de bloquear sus ventas;
-- `14I.1` sustituirá el UNIQUE global sobre `factura_venta.id_venta` por una restricción parcial sobre relaciones activas;
+- `14I.1` ya sustituyó el UNIQUE global sobre `factura_venta.id_venta` por una restricción parcial sobre relaciones activas;
 - nunca debe interpretarse como una única venta por factura.
 
 Ventas elegibles:
@@ -4256,7 +4292,7 @@ La versión 2.29 cerró el análisis funcional, las decisiones y la secuencia de
 - lectura lazy sin modificar el draft ni generar dirty ✅;
 - tests y pruebas funcionales/visuales validados por el usuario ✅.
 
-### 14I — Dominio y listado de facturas 🟦 SIGUIENTE
+### 14I — Dominio y listado de facturas ✅ CERRADO
 
 #### 14I.0 — Revisión funcional guiada y contraste legacy ✅
 
@@ -4265,74 +4301,175 @@ La versión 2.29 cerró el análisis funcional, las decisiones y la secuencia de
 - significado postventa, estados, numeración, listado, editor, documentos, email y anulación cerrados ✅;
 - plan técnico definitivo de `14I–14K` acordado ✅.
 
-#### 14I.1 — Persistencia y relaciones históricas ⬜ PRIMERO
+#### 14I.1 — Persistencia y relaciones históricas ✅
 
-- adaptar `factura_venta` para distinguir relaciones activas e históricas;
-- mantener como máximo una relación activa por venta mediante índice único parcial;
-- conservar relaciones inactivas de facturas anuladas;
-- añadir fecha de anulación a `factura`;
-- mantener `impresa` solo por compatibilidad legacy, sin gobernar estado ni mutabilidad;
-- adaptar importadores: borradores/emitidas activas, anuladas históricas;
-- verificar la secuencia global como máximo entre `facturaInicial - 1` y el último número importado;
-- mantener `DATABASE_SCHEMA_VERSION = 1` y recrear/reimportar la base durante desarrollo.
+`14I.1A — esquema e importación legacy` ✅:
 
-#### 14I.2 — Dominio, contratos y repository ⬜
+- `factura` incorpora `fecha_anulacion`;
+- el `CHECK` de estado exige coherencia completa: borrador sin número/emisión/anulación; emitida con número+emisión y sin anulación; anulada con número+emisión+anulación;
+- `factura_venta` incorpora `activa INTEGER NOT NULL DEFAULT 1`;
+- se elimina `UNIQUE(id_venta)` global y se sustituye por `uq_factura_venta_venta_activa` con `WHERE activa = 1`;
+- una venta puede conservar múltiples relaciones históricas, pero como máximo una activa;
+- la importación convierte facturas legacy numeradas y eliminadas en `anulada`, mueve la fecha legacy a `fecha_anulacion` y mantiene la factura visible con `deleted_at = NULL`;
+- las relaciones de borradores/emitidas se importan activas y las de anuladas/inactivas como históricas;
+- el booleano legacy de venta facturada solo se utiliza para detectar inconsistencias;
+- `prepareDocumentSequences()` ya cubría correctamente mayor número importado vs `facturaInicial - 1`; no necesitó cambios;
+- `DATABASE_SCHEMA_VERSION` permanece en `1` y la instalación se recreó/reimportó correctamente.
 
-- modelo público con estado, número oficial, fechas, importe y acciones permitidas;
-- consulta por cliente ordenada desde la factura más reciente;
-- borrador sin número oficial; emitida/anulada con `numero_año`;
-- fecha de creación para borradores y fecha de emisión para emitidas/anuladas;
-- importes en enteros y ausencia total de TicketBAI.
+`14I.1B — consumidores y regresiones` ✅:
 
-#### 14I.3 — API, IPC, preload y servicio Angular ⬜
+- Histórico considera `facturada` solo cuando existe `factura_venta.activa = 1`;
+- cambiar el cliente de una venta facturada vuelve a estar permitido;
+- el cambio de cliente conserva la relación de factura y los documentos históricos;
+- pruebas SQLite confirman que una venta puede tener relaciones históricas múltiples y solo una relación activa simultánea;
+- medio de pago no requirió cambios porque ya era independiente de Facturas.
 
-- consulta lazy de facturas del cliente;
-- handler con sender validado y preload tipado;
-- servicio Angular directo;
-- protección frente a respuestas antiguas;
-- invalidación/recarga después de guardar, emitir, anular o eliminar.
+#### 14I.2 — Dominio, contratos y repository ✅
 
-#### 14I.4 — Listado Angular ⬜
+`14I.2A` ✅:
 
+- `ClienteFacturaRecord` y estado interno borrador/emitida/anulada;
+- `ClienteFacturasRepository.findByClientePublicId()`;
+- `TypeOrmClienteFacturasRepository` con consulta por cliente activo, exclusión de soft-deleted y orden por fecha visible;
+- año de factura derivado de `fecha_emision` para facturas numeradas;
+- tests SQLite para borradores, emitidas, anuladas, clientes inexistentes/inactivos y facturas eliminadas.
+
+`14I.2B` ✅:
+
+- contrato público `ClienteFacturaInterface`;
+- `numeroFactura = numero_año` para emitidas/anuladas y `null` para borradores;
+- fecha visible = creación en borrador, emisión en emitida/anulada;
+- capacidades derivadas exclusivamente desde el estado canónico;
+- borrador: editar/eliminar/previsualizar/facturar;
+- emitida: imprimir/email/anular;
+- anulada: solo consulta, sin acciones mutables/documentales;
+- application service valida coherencia de número, fechas y estado antes de devolver el modelo público.
+
+#### 14I.3 — API, IPC, preload y servicio Angular ✅
+
+`14I.3A` ✅:
+
+- `ClientesApi.getFacturas()`;
+- canal `clientes:get-facturas` y handler con sender validado;
+- `ClienteFacturasService` incorporado a la composición Electron;
+- preload tipado hasta `window.osumiDesktop.clientes.getFacturas()`.
+
+`14I.3B` ✅:
+
+- `ClienteFacturasState` con `data/loading/error`;
+- caché por `clientePublicId` en `ClientesService`;
+- deduplicación de peticiones simultáneas;
+- `loadFacturas`, `reloadFacturas` e `invalidateFacturas`;
+- generación global para impedir que una respuesta anterior a `clear()` repueble el nuevo estado;
+- baja de cliente invalida también sus facturas;
+- error conservado y reintento sin destruir datos válidos previos.
+
+#### 14I.4 — Listado Angular ✅
+
+- `ClientInvoicesComponent` standalone integrado en la sección Facturas;
+- carga lazy al entrar y conservación de caché al salir/volver;
 - columnas Factura, Fecha, Importe, Estado y Acciones;
-- estados de carga, vacío y error/reintento;
-- fila clicable para los tres estados;
-- email e impresión solo para emitidas;
-- acciones de fila sin abrir accidentalmente el modal;
-- botón Nueva factura;
-- nunca mostrar el id interno como número de factura.
+- estados carga, actualización, vacío y error/reintento;
+- filas accesibles por click/teclado;
+- borradores muestran `Borrador`, nunca su `publicId`;
+- emitidas/anuladas muestran `numero_año`;
+- solo emitidas muestran email e impresión;
+- email se deshabilita cuando SMTP no está configurado;
+- `Nueva factura` queda deshabilitado con cambios pendientes en la ficha del cliente;
+- eventos de apertura/nueva/imprimir/email quedan preparados para `14J`/`14K` sin ejecutar todavía esas acciones.
 
-### 14J — Editor de factura ⬜
+**`14I — Dominio y listado de facturas` queda completamente cerrado ✅.**
 
-#### 14J.1 — Ventas disponibles ⬜
+### 14J — Editor de factura 🟦 EN CURSO
 
-- consulta específica por cliente;
-- únicamente ventas ordinarias positivas, no eliminadas y sin devolución;
-- exclusión de cualquier venta con relación activa a otra factura;
-- inclusión de las ventas ya pertenecientes al propio borrador;
-- no mostrar ventas bloqueadas por otras facturas;
-- una venta liberada por anulación se evalúa con su cliente actual.
+#### 14J.1 — Ventas disponibles ✅ CERRADO
 
-#### 14J.2 — Persistencia de borradores ⬜
+`14J.1A — repository SQLite` ✅:
 
-- crear, actualizar y eliminar borradores transaccionalmente;
-- exigir al menos una venta;
-- revalidar disponibilidad dentro de la transacción;
-- recalcular el importe desde SQLite;
-- eliminar relaciones retiradas de un borrador;
-- eliminar todas las relaciones al borrar el borrador;
-- rechazar cualquier mutación de emitidas o anuladas.
+- modelo interno de venta disponible y pagos;
+- consulta específica por cliente y borrador opcional;
+- únicamente ventas positivas ordinarias, no eliminadas y sin devolución/componente mixto;
+- una relación activa con otra factura bloquea la venta;
+- relaciones históricas inactivas no bloquean;
+- las ventas del propio borrador se recuperan y se marcan `incluidaEnBorrador = true`;
+- pagos recuperados y ordenados;
+- cliente inactivo, borrador ajeno/no editable y ventas no elegibles cubiertos por tests.
 
-#### 14J.3 — Modal Angular ⬜
+`14J.1B — contrato y application service` ✅:
+
+- `ClienteFacturaVentasDisponiblesConsulta`;
+- `ClienteFacturaVentaDisponibleInterface` y pagos públicos;
+- se conserva `id` interno de la venta para reutilizar el detalle histórico existente;
+- normalización y validación de cliente/borrador antes del repository;
+- transformación del registro interno al contrato público.
+
+`14J.1C — API, IPC y preload` ✅:
+
+- `ClientesApi.getFacturaVentasDisponibles()`;
+- canal IPC y handler con sender validado;
+- preload tipado.
+
+`14J.1D — servicio Angular` ✅:
+
+- acceso directo desde `ClientesService` a la instantánea actual de ventas disponibles;
+- no se mantiene una caché persistente de elegibilidad: cada apertura/edición puede consultar el estado actual.
+
+#### 14J.2 — Persistencia de borradores ✅ CERRADO
+
+`14J.2A — creación transaccional` ✅:
+
+- exige al menos una venta y rechaza ids duplicados;
+- exige cliente activo;
+- revalida todas las ventas dentro de la transacción;
+- recalcula el importe desde SQLite, nunca desde el renderer;
+- copia la instantánea efectiva de facturación del cliente canónico;
+- crea factura en estado borrador, sin número ni fecha de emisión/anulación;
+- crea las relaciones activas `factura_venta`;
+- una venta liberada por factura anulada puede reutilizarse;
+- cualquier error revierte la operación completa.
+
+`14J.2B — actualización transaccional` ✅:
+
+- solo permite borradores activos pertenecientes al cliente;
+- revalida la nueva selección dentro de la transacción;
+- las ventas ya propias del borrador siguen siendo elegibles;
+- elimina relaciones retiradas y crea las nuevas;
+- recalcula `importe_cents` desde las ventas persistidas;
+- emitidas, anuladas, borradores eliminados o de otro cliente se rechazan sin mutación parcial.
+
+`14J.2C — eliminación transaccional` ✅:
+
+- solo permite borrar borradores activos del cliente;
+- la factura se conserva mediante soft delete;
+- sus relaciones `factura_venta` se eliminan físicamente;
+- las ventas quedan inmediatamente disponibles para otra factura;
+- emitidas/anuladas/ajenas/inactivas se rechazan.
+
+`14J.2D — integración completa` ✅:
+
+- `14J.2D1`: comandos públicos, validación/normalización y casos de uso `createBorrador`, `updateBorrador`, `deleteBorrador` ✅;
+- `14J.2D2`: API, canales IPC, handlers con sender validado y preload ✅;
+- `14J.2D3`: métodos Angular `createFacturaBorrador`, `updateFacturaBorrador`, `deleteFacturaBorrador` ✅;
+- tras un COMMIT, la factura confirmada por backend se inserta/sustituye directamente en la caché;
+- eliminar retira el borrador de la caché;
+- si una lectura anterior estaba pendiente, la reconciliación espera esa lectura antes de aplicar el resultado confirmado;
+- no se hace depender una escritura ya confirmada de un `reload()` posterior;
+- los tests de reconciliación duplicados accidentalmente en `clientes.service.spec.ts` fueron limpiados después del cierre funcional de `14J.2D3`.
+
+**`14J.1` y `14J.2` quedan completamente cerrados ✅.**
+
+#### 14J.3 — Modal Angular ⬜ SIGUIENTE
 
 - ventas y selección múltiple a la izquierda;
-- detalle de la venta activa a la derecha;
+- detalle de la venta activa a la derecha reutilizando el detalle histórico existente cuando encaje;
 - nueva factura y borrador en modo edición;
 - emitida y anulada en modo consulta;
 - títulos `Nueva factura`, `Borrador de factura` y `Factura numero_año`;
-- acciones de borrador: Eliminar, Guardar, Previsualizar y Facturar;
-- acciones de emitida: Anular e Imprimir;
-- anulada sin acciones documentales.
+- conectar los eventos ya preparados por `ClientInvoicesComponent`;
+- acciones de borrador: Eliminar, Guardar, Previsualizar y Facturar, dejando la emisión/documentos reales para `14K`;
+- acciones de emitida: Anular e Imprimir cuando `14K` las implemente;
+- anulada sin acciones documentales;
+- estados de carga/error durante la obtención de ventas y detalle.
 
 #### 14J.4 — Dirty y convivencia con la ficha ⬜
 
@@ -4546,27 +4683,27 @@ src/app/modules/ventas/components/historical-sale-detail/
 # 30. Próximo paso exacto
 
 ```text
-14I.1 — Persistencia y relaciones históricas de facturas
+14J.3 — Modal Angular del editor de factura
 ```
 
 Antes de proponer cambios:
 
-- actualizar y revisar el main actual;
-- revisar conjuntamente `factura`, `factura_venta`, sus índices y los dos importadores legacy implicados;
-- diseñar la relación activa/histórica sin perder la consulta de facturas anuladas;
-- garantizar en SQLite que una venta tenga como máximo una relación activa;
-- añadir la fecha de anulación sin usar `impresa` como estado;
-- conservar borradores y emitidas como relaciones activas e importar anuladas como históricas;
-- verificar que la secuencia `factura` queda situada tras el mayor número importado o `facturaInicial - 1`;
-- mantener como reglas cerradas que una factura agrupa `1..N` ventas ya cobradas, una venta pertenece como máximo a una factura activa y las devoluciones no son elegibles;
-- mantener completamente fuera de Facturas cualquier operación TicketBAI;
-- mantener `DATABASE_SCHEMA_VERSION = 1`; tras cambiar el esquema, recrear instalación y reimportar `.otpv`;
-- presentar cada archivo nuevo completo y cada archivo existente como fragmento actual → nuevo;
-- al añadir imports, indicar únicamente los imports nuevos; Prettier se encargará de ordenarlos;
-- indicar las pruebas exactas pertinentes al subbloque;
-- esperar confirmación del usuario antes de avanzar.
+- actualizar y revisar `main` y los componentes/servicios actuales de Clientes y Facturas;
+- partir de que `14I`, `14J.1` y `14J.2` están cerrados y no reimplementar sus consultas ni su persistencia;
+- conectar `newFacturaEvent` y `openFacturaEvent` del listado con un modal real;
+- usar `ClientesService.getFacturaVentasDisponibles()` para obtener la selección actual de ventas;
+- usar `createFacturaBorrador()`, `updateFacturaBorrador()` y `deleteFacturaBorrador()` como únicas escrituras de borrador desde Angular;
+- reutilizar el detalle histórico de venta en la zona derecha siempre que sea compatible, evitando duplicar pipeline documental o consultas;
+- mantener cuatro modos conceptuales: nueva, borrador editable, emitida consulta y anulada consulta;
+- no implementar todavía la emisión transaccional ni el PDF definitivo dentro de `14J.3`: pertenecen a `14K`;
+- respetar la ficha del cliente como fuente canónica: no crear/finalizar facturas con un cliente nuevo o con cambios sin guardar;
+- mantener fuera de Facturas cualquier operación TicketBAI;
+- presentar archivos nuevos completos y archivos existentes como fragmento actual → nuevo;
+- al añadir imports, indicar únicamente los imports nuevos; Prettier decidirá su posición;
+- líneas en blanco solo estructurales; no separar propiedades relacionadas de interfaces/tipos/clases con líneas vacías;
+- indicar las pruebas exactas pertinentes al subbloque y esperar confirmación del usuario antes de avanzar.
 
-`14I.0` está cerrado. No reabrir el análisis funcional salvo que aparezca un requisito nuevo o una incompatibilidad real durante el desarrollo. El primer bloque de código será exclusivamente la persistencia y adaptación del import legacy; contratos, listado y UI comenzarán después de validar `14I.1`.
+`14J.2` está cerrado. El modal debe consumir la infraestructura existente, no introducir una segunda caché ni un segundo modelo de persistencia de borradores.
 
 ---
 
@@ -4596,6 +4733,7 @@ Antes de proponer cambios:
 | **2.33** | **04/09/2026** | **`14G — Estadísticas generales` terminado y validado ✅. Consulta lazy específica con últimos 20 artículos, top por importe real y sumas SQLite por año/mes. PUC firmado, PVP real, beneficio, margen y total general se calculan en backend con enteros seguros/BigInt; devoluciones restan y ventas soft-deleted se excluyen. Renderer con estados, protección ante respuestas antiguas, tablas superiores, acordeón anual de apertura única, detalle mensual, total siempre visible, negativos, margen `null` como `—`, alineación final y overlay corregido. Siguiente: 14H Consumo mensual.** |
 | **2.34** | **04/09/2026** | **`14H — Consumo mensual` terminado, validado y subido ✅. Consulta SQLite específica por cliente con importe real, devoluciones negativas y ventas soft-deleted excluidas; contrato público, series temporales completas, años intermedios, huecos a cero y total seguro; API/IPC/preload/servicio Angular; componente ECharts lazy con filtros Mes/Año, cuatro resoluciones temporales, total, tooltips, estados independientes y protección frente a respuestas antiguas. No genera dirty. El siguiente paso es `14I.0`: explicación funcional guiada, capturas y contraste cuidadoso de Facturas con el TPV antiguo antes de diseñar o implementar.** |
 | **2.35** | **04/09/2026** | **`14I.0 — Revisión funcional guiada de Facturas` cerrado ✅. Facturas queda definida como agrupación postventa de 1..N ventas ya cobradas y completamente ajena a TicketBAI. Se acuerdan numeración global desde `facturaInicial`, estados Borrador/Finalizada/Anulada, listado con estado explícito, ventas disponibles, borradores editables, emisión transaccional, previsualización facturable, PDF definitivo inmutable, impresión/email desde el PDF y destinatario editable. Anular conserva número/PDF/relaciones históricas, bloquea impresión/email y libera las ventas mediante relaciones inactivas. Plan detallado `14I–14K` cerrado. Siguiente: `14I.1 — Persistencia y relaciones históricas`.** |
+| **2.36** | **05/09/2026** | **`14I — Dominio y listado de facturas` cerrado ✅ y `14J.1–14J.2` cerrados ✅. Esquema con `fecha_anulacion` y relaciones activas/históricas mediante índice único parcial; import legacy adaptado; listado público/cacheado; ventas disponibles con reglas de elegibilidad; creación, actualización y eliminación transaccional de borradores; API/IPC/preload y reconciliación Angular post-COMMIT sin `reload()` obligatorio. Limpieza posterior de tests duplicados en `clientes.service.spec.ts`. Siguiente: `14J.3 — modal Angular del editor de factura`.** |
 
 ---
 
@@ -4605,285 +4743,90 @@ Antes de proponer cambios:
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.35.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.36.
 
-Estado:
+Estado principal:
 - Ventas 12C.1–12C.8 ✅
 - 12C.9 TicketBAI devoluciones/mixtas ⏸️ Berein
 - Hito 13 Artículos ✅ COMPLETAMENTE CERRADO
-- 13A análisis/diseño ✅
-- 13B infraestructura backend completa ✅
-  - categorías N:M ✅
-  - lectura/resolución ✅
-  - alta/edición/histórico/baja ✅
-  - fotos/staging/storage/promoción ✅
-  - unificación TOTAL de imágenes WebP ✅
-- 13C Workspace y carga de artículos ✅
-- 13D General ✅ CERRADO DEFINITIVAMENTE
-- 13E WEB ✅ CERRADO
-  - contenido WEB ✅
-  - fotos 0..N ✅
-  - crop + staging + cleanup ✅
-- 13F Códigos de barras ✅ CERRADO
-- 13G Observaciones ✅ CERRADO
-- 13H Histórico ✅ CERRADO
-  - backend + API paginada ✅
-  - tabla + orden + paginación ✅
-  - MatPaginator global en castellano ✅
-- refinamiento UX: drafts nuevos enfocan Localizador automáticamente ✅
-- 13I Baja / duplicado / acciones ✅ CERRADO
-  - 13I.1 Guardar / Cancelar global ✅
-  - feedback visual de guardado 4 s ✅
-  - 13I.2 Duplicar ✅
-  - 13I.3 Baja lógica ✅
-- 13J Estadísticas ✅ CERRADO
-  - 13J.1 backend + consulta agregada ✅
-  - 13J.2 gráfica + filtros ✅
-- 13K Integración con Ventas ✅ CERRADO
-- Todos los cambios del Hito 13 están validados y subidos al repositorio.
 - Hito 14 Clientes 🟦 EN CURSO
-  - análisis funcional y técnico ✅
-  - 14A Documento de continuidad y plan ✅
-  - 14B Base del apartado Clientes ✅
-  - 14C Búsqueda y selección ✅
-  - 14D Workspace y formulario ✅
-  - 14E Persistencia y mantenimiento ✅ CERRADO
-    - 14E.1 CREATE y reconciliación segura ✅
-    - 14E.2 facturación, validación y guardado global ✅
-    - 14E.3 UPDATE backend/IPC/Angular ✅
-    - 14E.4 pulido final de UX ✅
-    - 14E.5 baja lógica y bloqueo por facturas en borrador ✅
-      - 14E.5.1 backend transaccional ✅
-      - 14E.5.2 contrato, IPC y preload ✅
-      - 14E.5.3 servicio Angular y UI ✅
-    - 14E.6 documento de protección de datos y cierre funcional ✅
-  - 14F Ventas del cliente ✅ CERRADO
-    - 14F.1 contrato y consulta backend filtrada por cliente ✅
-    - 14F.2 filtros y listado ✅
-    - 14F.3 selección y detalle documental ✅
-    - 14F.4 reimpresión, email y pulido final ✅
-  - 14G Estadísticas generales ✅ CERRADO
-    - 14G.1 backend, agregados y contratos ✅
-      - 14G.1A consultas SQLite y top ✅
-      - 14G.1B jerarquía anual, beneficio y margen ✅
-    - 14G.2 API, IPC, preload y servicio Angular ✅
-    - 14G.3 renderer ✅
-      - 14G.3A total general calculado en backend ✅
-      - 14G.3B carga lazy, estados y tablas superiores ✅
-      - 14G.3C acordeón anual, meses, total y pulido visual ✅
-  - 14H Consumo mensual ✅ CERRADO
-    - 14H.1 backend, series y contratos ✅
-      - 14H.1A consulta SQLite y contrato interno ✅
-      - 14H.1B contrato público, series completas y application service ✅
-    - 14H.2 API, IPC, preload y servicio Angular ✅
-    - 14H.3 renderer ✅
-      - 14H.3A componente ECharts, filtros, total y estados ✅
-      - 14H.3B integración y validación funcional/visual ✅
-  - 14I Dominio y listado de facturas 🟦 SIGUIENTE
-    - 14I.0 revisión funcional guiada y contraste legacy ✅
-    - 14I.1 persistencia y relaciones históricas ⬜ PRIMERO
-    - 14I.2 dominio, contratos y repository ⬜
-    - 14I.3 API, IPC, preload y servicio Angular ⬜
-    - 14I.4 listado Angular ⬜
-  - 14J Editor de factura ⬜
-    - 14J.1 ventas disponibles ⬜
-    - 14J.2 persistencia de borradores ⬜
-    - 14J.3 modal Angular ⬜
+  - 14A–14H ✅
+  - 14I Dominio y listado de facturas ✅ CERRADO
+    - 14I.0 revisión funcional guiada ✅
+    - 14I.1 persistencia y relaciones históricas ✅
+    - 14I.2 dominio/contratos/repository ✅
+    - 14I.3 API/IPC/preload/Angular ✅
+    - 14I.4 listado Angular ✅
+  - 14J Editor de factura 🟦 EN CURSO
+    - 14J.1 ventas disponibles ✅ CERRADO
+    - 14J.2 persistencia de borradores ✅ CERRADO
+      - creación transaccional ✅
+      - actualización transaccional ✅
+      - eliminación transaccional ✅
+      - application service/API/IPC/preload/Angular ✅
+      - reconciliación de caché post-COMMIT ✅
+    - 14J.3 modal Angular ⬜ SIGUIENTE
     - 14J.4 dirty y convivencia con la ficha ⬜
   - 14K Emisión y documentos ⬜
-    - 14K.1 emisión transaccional ⬜
-    - 14K.2 documento y previsualización ⬜
-    - 14K.3 PDF inmutable ⬜
-    - 14K.4 impresión y email ⬜
-    - 14K.5 anulación ⬜
-    - 14K.6 integración y cierre ⬜
+- Roadmap posterior: 15 Almacén, 16 Compras.
 
-Hito actual:
-14 Clientes 🟦
+Punto base de repositorio:
+- estado funcional contrastado hasta el commit 8be974b, que cierra 14J.2D3;
+- después se limpió una duplicación accidental de tres tests en clientes.service.spec.ts, sin cambio funcional.
 
-Roadmap posterior:
-15 Almacén
-16 Compras
+Reglas críticas generales:
+- Angular 22 standalone, signals/computed/input/output/inject.
+- No añadir explícitamente ChangeDetectionStrategy.OnPush.
+- TypeScript estricto; no any, usar unknown cuando corresponda.
+- @if/@for/@switch.
+- JSDoc breve en todo método TS/JS nuevo.
+- Líneas en blanco solo estructurales; una propiedad por línea y sin líneas vacías entre propiedades relacionadas.
+- Si un archivo exporta un único elemento → export default. Si exporta varios → todos nombrados y ningún default.
+- Archivo nuevo: mostrar completo. Archivo existente: fragmento actual → fragmento nuevo.
+- Para imports nuevos, indicar solo el import; Prettier ordena su posición.
+- Trabajar por lotes coherentes, revisar main antes de patches y no avanzar sin confirmación.
+- El usuario aplica cambios, ejecuta pruebas y hace commits; el asistente no hace commits/PR ni ejecuta npm/ng.
+- Frontend habitual: npm test, npm run build, npm run lint.
+- Backend/Electron: npm run test:electron, npm run build:electron, npm run lint.
+- DATABASE_SCHEMA_VERSION permanece en 1 hasta la primera versión estable con usuarios; ante cambios incompatibles se recrea/reimporta la instalación.
 
-Reglas críticas:
-- DATABASE_SCHEMA_VERSION debe permanecer en 1 durante todo el desarrollo previo al primer lanzamiento.
-- Si un archivo TS exporta un único elemento, usar export default. Si exporta varios elementos, todos nombrados y ninguno default.
-- TODAS las imágenes persistidas por Osumi TPV deben ser WebP. No hay excepciones.
-- El logo también es WebP desde .otpv y desde Configuración.
-- Sharp: JPEG/PNG/WebP → WebP, calidad 85, effort 4, orientación EXIF, sin resize.
-- Localizador nuevo: YY + 4 cifras, iterativo y no editable.
-- Solo una pestaña por artículo persistido; drafts nuevos múltiples.
-- El workspace Angular conserva tabs, activeTab, draft, baseSnapshot, dirty y activeSection durante la sesión.
-- Reabrir un artículo ya abierto activa su pestaña y NO recarga BD ni pierde cambios locales.
-- Todo draft nuevo enfoca automáticamente el campo Localizador al crearse/activarse.
-- Campo Localizador reutiliza buscador de Ventas; Enter resuelve localizador/acceso directo/barcode.
-- Si búsqueda/resolución se inicia desde una pestaña de artículo nuevo, el primer artículo encontrado reutiliza esa misma pestaña; si ya estaba abierto, se cierra el borrador origen y se activa la existente.
-- Acceso directo se gestiona desde un modal global junto al Localizador y se persiste inmediatamente.
-- Categorías 0..N equivalentes.
-- Marca obligatoria; Proveedor opcional.
-- AppData global en renderer mediante AppDataService; Artículos no depende de VentasContextService.
-- tipoIva=iva → RE efectivo 0. tipoIva=re → ivaList/reList son pares por índice.
-- No hardcodear IVA/RE si la configuración de instalación ya los define.
-- Precio albarán y PUC en microeuros; PVP en céntimos; IVA/RE en bps; margen en microporcentaje.
-- 1 % = 1_000_000 microporcentaje.
-- Motor de precios usa enteros/BigInt; evitar floats encadenados.
-- UI de importes y porcentajes: máximo 2 decimales, sin reducir la precisión interna.
-- Los decimales recalculan durante escritura salvo estados transitorios como `12,`, `12.`, `-` o vacío.
-- Al recibir foco, importes/márgenes y stock seleccionan el contenido una vez; clicks posteriores con foco no reseleccionan.
-- `marginList` alimenta el modal de sugerencias de margen; Margen sigue siendo editable directamente.
-- PALB → PUC → mantener margen → PVP.
-- PUC → PALB → mantener margen → PVP.
-- PVP → margen. Margen → PVP.
-- Descuento persistido mediante pvpDescuentoCents + margenDescuentoMicroporcentaje nullable; el porcentaje de descuento es derivado/editable de UI.
-- Creación Marca+Proveedor y Proveedor+marcas se hace transaccionalmente en backend.
-- Tras un COMMIT de creación no hacer depender el éxito de una recarga posterior innecesaria.
-- Código por defecto = fila real codigo_barras basada en localizador.
-- Códigos adicionales se añaden/eliminan solo en draft; no hay edición inline ni guardado independiente.
-- La pestaña Códigos enfoca el input nuevo, acepta lector USB + Enter y muestra QR con angularx-qrcode en tarjetas 3 por fila.
-- Observaciones usa textarea + MatSlideToggle independientes para Pedidos/Ventas sobre el mismo draft.
-- Histórico NO forma parte del ArticuloDraft y nunca genera dirty.
-- Histórico se pagina/ordena en SQLite, no en MatTableDataSource. Páginas 20/50/100/200.
-- Tipos de histórico: 1 Venta, 2 Venta web, 3 Pedido, 4 Manual, 5 Inventario, 6 Inventario múltiple; desconocidos → `Tipo N`.
-- MatPaginator usa SpanishPaginatorIntlService global para textos/tooltips en castellano.
-- Cambio manual de stock crea historico_articulo tipo 4.
-- Alta con stock inicial no genera histórico.
-- Guardar/Cancelar son acciones globales de TODA la ficha, no de cada sección.
-- createArticuloSaveCommand valida nombre, marca y fiscalidad y normaliza strings opcionales antes de ArticulosApi.save().
-- Guardar llama al backend transaccional, reemplaza draft/baseSnapshot con el artículo fresco y deja dirty=false.
-- Cancelar confirma, limpia staged nuevos y restaura baseSnapshot.
-- Tras guardar correctamente se muestra “Artículo guardado correctamente” durante 4 segundos; desaparece antes si la ficha vuelve a cambiar.
-- Duplicar solo se permite sobre artículo persistido limpio; crea una nueva pestaña dirty sin escribir SQLite.
-- Duplicar resetea id/publicId/localizador, referencia, stock, acceso directo, códigos adicionales y observaciones; nombre pasa a “(copia)”.
-- Duplicar conserva marca/proveedor/categorías/precios/fiscalidad/márgenes/descuento/stock min-max/lote/WEB/descripciones/fotos/flags de observaciones.
-- Las fotos persistidas del duplicado reutilizan el mismo asset `archivo` y crean nuevas relaciones `articulo_archivo`; no se duplica físicamente el WebP.
-- Baja solo aparece para artículos persistidos y exige dirty=false; confirma antes de ejecutar.
-- Baja = soft delete artículo + códigos activos; conserva histórico/categorías/relaciones/fotos/assets.
-- Tras baja correcta se cierra la pestaña; si falla backend, permanece abierta.
-- Venta online muestra WEB; desactivarla oculta pero no borra datos.
-- WEB NO tiene guardado propio: comparte el único ArticuloDraft y las acciones globales del artículo.
-- Fotos WEB: crop libre → staging → Sharp/WebP; la galería mantiene orden y una única principal.
-- Staged nuevos se limpian al eliminar, cancelar cambios, cerrar descartando o sustituir un borrador por un artículo localizado; navegar entre módulos no los descarta.
-- Estadísticas es lectura persistida y NO debe formar parte de ArticuloDraft ni generar dirty.
-- Estadísticas usa venta NETA: SUM(unidades) o SUM(importe_micros); devoluciones negativas restan y ventas soft-deleted se excluyen.
-- Filtros Estadísticas: Tipo Unidades/Importe, Mes concreto/Todos, Año concreto/Todos; cualquier cambio refresca automáticamente.
-- Año concreto + mes concreto → días; año concreto + Todos → 12 meses; Todos + mes → ese mes entre años; Todos + Todos → todos los meses cronológicos.
-- Períodos sin actividad se rellenan con 0; availableYears completa también años intermedios.
-- 13J.1 ya expone getEstadisticas() por repository/service/API/IPC/preload/Angular y devuelve series completas con value en unidades o microeuros.
-- Estadísticas usa ECharts ^6.1.0 + ngx-echarts ^22.0.0 con integración modular y CanvasRenderer. No usar ng-apexcharts para esta implementación.
-- ECharts debe limitarse a presentación: no reagrupar ventas ni recalcular estadísticas en renderer.
-- Estadísticas muestra gráfica de barras, total, MatSelect Tipo/Mes/Año, tooltips, estados y protección ante respuestas IPC fuera de orden.
-- Selección inicial Estadísticas: Unidades + Todos los meses + año actual.
-- Mes/Año `null` significa Todos; los MatSelect usan canSelectNullableOptions.
-- Gráfica definitiva de Estadísticas: 275 px, cabecera y filtros compactos, sin subtítulo ni etiqueta Total.
-- Estadísticas e Histórico no se muestran en drafts nuevos sin id.
-- Desde una línea normal de Ventas, click en el nombre llama a ArticulosService.cargarPorId(idArticulo) y navega a /articulos.
-- Abrir desde Ventas activa la ficha existente sin recargarla ni perder cambios dirty; si no existe, crea una única pestaña.
-- Varios, Devolución y Reserva mantienen sus acciones especiales y no abren la ficha normal de Artículos.
-- Si el artículo de una línea ya no está disponible, se avisa sin abandonar Ventas.
-- El workspace de Ventas permanece intacto al navegar a Artículos y volver.
-- Clientes usa un workspace de un único cliente, no pestañas múltiples.
-- El workspace conserva cliente/draft/baseSnapshot/dirty/sección activa durante la sesión.
-- Cambiar, quitar o crear cliente con dirty exige confirmación.
-- Clientes se busca exclusivamente en la colección ya cargada en memoria; no añadir IPC/backend/SQLite para el buscador.
-- La búsqueda normaliza nombre, DNI/CIF, teléfono y email.
-- Solo nombre y apellidos es obligatorio para crear un cliente.
-- Cliente nuevo solo muestra Datos y Datos de facturación; el resto exige cliente persistido.
-- Datos y Datos de facturación comparten un único draft y Guardar/Cancelar global.
-- Mismos datos para facturación deriva los datos efectivos de los generales y conserva ocultos los alternativos.
-- Los campos alternativos de facturación solo se validan cuando factIgual=false, pero se conservan también cuando factIgual=true.
-- CREATE/UPDATE actualiza la colección Angular con el resultado post-COMMIT; no hacer depender el éxito de reload().
-- Al actualizar un cliente, conservar la instancia Cliente existente para no romper referencias activas desde Ventas.
-- El guardado canónico sustituye draft/baseSnapshot, deja dirty=false y conserva activeSection.
-- La validación global navega a la primera sección inválida y muestra sus errores.
-- Durante saving o deactivating se bloquean formulario, pestañas y acciones mediante `processing()`, tanto en template como en handlers.
-- Tras guardar se muestra “Cliente guardado correctamente” durante 4 segundos y se limpia al editar o destruir la página.
-- Cada nuevo borrador enfoca Nombre y apellidos aunque ClientFormComponent ya estuviera montado.
-- Baja de cliente = soft delete transaccional con `NOT EXISTS`; conserva ventas, facturas y relaciones y se bloquea si hay facturas activas en borrador.
-- La baja solo se ejecuta sobre cliente persistido y limpio; tras éxito se retira de colección/caché y se cierra la ficha, mientras que un fallo conserva todo el estado.
-- La acción se llama Documento de protección de datos, solo usa el Cliente canónico persistido y reutiliza el builder/servicio de impresión ya implementados.
-- Ventas de cliente reutiliza Histórico, detalle, PDF, impresión y email; no duplica pipelines.
-- `VentaHistoricoConsulta.clientePublicId` es opcional: con valor filtra todas las consultas/agregados por cliente; ausente conserva el Histórico global.
-- La pestaña Ventas comienza en el mes local actual, exige Desde/Hasta explícitos y muestra también devoluciones con importe firmado.
-- Cada acción de una fila opera sobre esa venta, no sobre una selección anterior.
-- El detalle de Ventas reutiliza `HistoricalSaleDetailComponent` en modo `readonly` y su carga no genera dirty.
-- Las cargas de listado y detalle están protegidas frente a respuestas antiguas fuera de orden.
-- Reimpresión y email bloquean acciones concurrentes y muestran feedback propio.
-- La tabla reserva anchuras para fecha, referencia, importe y opciones; el tipo de pago ocupa el espacio restante para evitar scroll horizontal innecesario.
-- En emails de tickets, remitente y variable `{nombreNegocio}` usan `AppData.nombre`; no usar `nombreComercial` en asunto, cuerpo ni remitente.
-- `14G` está cerrado: Estadísticas muestra los últimos 20 artículos comprados, top de 10 posiciones ordenado por importe real y suma de ventas anual/mensual.
-- `ClientesService.getEstadisticasGenerales(publicId)` compone las estadísticas rápidas y `findSumaVentas()` sin incorporar esa carga completa al startup.
-- Suma de ventas: PUC coste firmado; PVP importe real tras descuentos; beneficio PVP−PUC; margen beneficio/PVP.
-- Repository agrega por mes en SQLite; application service agrupa años, calcula valores derivados y genera el total general con enteros seguros/BigInt.
-- `ClienteEstadisticasGeneralesInterface` devuelve `ultimasVentas`, `topVentas`, `sumaVentas` jerárquica y `sumaVentasTotal`.
-- Los años y meses de `14G` son únicamente los períodos reales disponibles y se ordenan ascendentemente; los huecos a cero pertenecen exclusivamente a la serie temporal de `14H`.
-- Devoluciones restan en estadísticas y ventas soft-deleted se excluyen, pero las devoluciones no son elegibles para facturas.
-- La UI de `14G` carga lazy, protege frente a respuestas antiguas, no genera dirty y muestra estados completos.
-- El acordeón anual comienza cerrado, solo permite un año abierto y mantiene el total general siempre visible.
-- En el desglose mensual, Mes queda alineado a la izquierda y PUC/PVP/Beneficio/Margen, incluidas sus cabeceras, a la derecha.
-- El overlay del buscador de clientes debe permanecer por encima de las cabeceras sticky de Estadísticas.
-- `14H` está cerrado: usa una consulta específica de importe real, series completas y ECharts/ngx-echarts con las cuatro resoluciones Mes/Año y períodos vacíos rellenados con cero.
-- `ClienteConsumoMensualConsulta` usa `clientePublicId`, `year` y `month`; año/mes `null` significa Todos.
-- Año concreto + mes concreto devuelve días; año + Todos devuelve 12 meses; Todos + mes compara años; Todos + Todos devuelve meses cronológicos.
-- `availableYears` forma una serie continua entre los años reales mínimo y máximo; el año seleccionado permanece disponible en el selector.
-- Consumo mensual excluye ventas soft-deleted, incluye devoluciones con signo negativo y suma `linea_venta.importe_micros`.
-- El backend rellena los huecos con cero y calcula `totalMicros`; Angular no agrega ni recalcula datos de negocio.
-- `ClientMonthlyConsumptionComponent` carga inicialmente año actual + Todos los meses, refresca cada filtro y descarta respuestas fuera de orden.
-- La gráfica es lazy, de solo lectura, tiene estados independientes y no forma parte del draft ni genera dirty.
-- Las estadísticas completas se cargan lazy en Clientes; no sobrecargar las estadísticas rápidas de Ventas.
-- Factura de Clientes = agrupación posterior de 1..N ventas ya cobradas.
-- Venta = 0..1 factura activa y 0..N relaciones históricas con facturas anuladas.
-- `14I.1` sustituirá el UNIQUE global de `factura_venta.id_venta` por unicidad parcial sobre relaciones activas.
-- Solo ventas positivas ordinarias del mismo cliente, no eliminadas y sin relación activa son elegibles.
-- Devoluciones y operaciones mixtas con componente de devolución no pueden incluirse.
-- Editar un borrador permite mantener seleccionadas sus propias ventas.
-- El editor muestra solo ventas disponibles y las propias del borrador; no muestra bloqueadas en gris.
-- Eliminar un borrador elimina sus relaciones y libera sus ventas.
-- Factura borrador editable; emitida/anulada inmutable.
-- Anular conserva relaciones históricas inactivas y libera las ventas para nuevas facturas.
-- Una factura anulada conserva número, fecha, importe y PDF; es consultable, pero no imprimible ni enviable.
-- La numeración de facturas es global por serie, parte de `facturaInicial` —o 1 como fallback— y nunca reutiliza números.
-- Borradores no tienen número; emitidas/anuladas muestran `numero_año`, nunca el id interno.
-- Emitir valida y recalcula en SQLite y guarda número, fecha, snapshot e importe en una única transacción.
-- Previsualizar guarda primero el borrador, abre una ventana con marca PREVISUALIZACIÓN y mantiene el botón Facturar.
-- Facturar desde modal o previsualización ejecuta el mismo caso de uso.
-- Al finalizar se crea un PDF definitivo inmutable; impresión y email consumen exactamente ese PDF.
-- La vista final es interactiva; impresión/PDF ocultan controles y despliegan todas las ventas.
-- El email de factura usa como valor inicial el email actual del cliente y permite editar el destinatario sin mutar cliente/factura/PDF.
-- Asunto y cuerpo de factura usan `AppData.nombreComercial`, al tratarse de documentación oficial.
-- Los cambios históricos permitidos en una venta —cliente o forma de pago— no alteran líneas/importes ni el PDF emitido.
-- Crear/finalizar exige cliente persistido y ficha limpia para usar datos de facturación canónicos.
+Reglas cerradas de Clientes/Facturas:
+- Cliente usa un único workspace persistente durante la sesión; cambiar/quitar/crear con dirty exige confirmación.
+- Crear/finalizar una factura exige cliente persistido y ficha limpia para usar datos canónicos de facturación.
+- Factura de Clientes = agrupación postventa de 1..N ventas ya cobradas.
 - Clientes no cobra ni ejecuta TicketBAI al crear, editar, emitir, imprimir o enviar facturas.
-- Imprimir/email son acciones documentales posteriores al COMMIT y no gobiernan el estado de la factura.
-- Desarrollo manual: el asistente propone archivos/fragmentos y el usuario aplica, valida e informa cambios.
-- No hacer commits ni pull requests desde el asistente.
-- El asistente no ejecuta comandos npm/ng; indica al usuario cuáles corresponden a cada bloque.
-- npm test ya incluye --watch=false; no añadirlo otra vez.
-- Frontend: solicitar según corresponda npm test, npm run build y npm run lint.
-- Backend/Electron: solicitar según corresponda npm run test:electron, npm run build:electron y npm run lint; build:electron ya incluye typecheck:electron.
-
-Convenciones:
-- Angular standalone/signals/inject/input/output.
-- No any; usar unknown.
-- JSDoc breve para todo método TS/JS nuevo.
-- Revisar main antes de patches.
-- Archivo existente: fragmento actual → nuevo.
-- Para añadir imports, indicar únicamente los imports nuevos; Prettier los ordena al guardar.
-- Líneas en blanco solo estructurales.
-- Trabajar por lotes coherentes y no avanzar sin confirmación.
-- En cada bloque incluir un resumen breve: completado, punto actual y pendiente.
+- Venta → 0..1 factura activa y 0..N relaciones históricas de facturas anuladas.
+- factura_venta.activa distingue relación vigente/histórica; índice único parcial permite como máximo una activa por venta.
+- Borradores y emitidas conservan relaciones activas; anular las convertirá en históricas/inactivas y liberará las ventas.
+- Solo ventas positivas ordinarias del cliente, no eliminadas, sin devolución/mixta y sin relación activa ajena son elegibles.
+- Al editar un borrador, sus propias ventas siguen siendo elegibles y aparecen marcadas como incluidas.
+- Relaciones históricas anuladas no bloquean una venta.
+- Cambiar el cliente de una venta ya facturada está permitido y no altera relaciones/documentos históricos.
+- Borrador: sin número oficial, editable; emitida: numero_año e inmutable; anulada: numero_año, inmutable y solo consulta.
+- Listado Facturas ya está implementado y cacheado; borradores muestran “Borrador”, no publicId.
+- Email/impresión del listado solo aparecen para emitidas; email se deshabilita sin SMTP.
+- Nueva factura se bloquea si la ficha del cliente tiene cambios sin guardar.
+- Crear borrador exige 1..N ventas, revalida en SQLite, recalcula importe y copia snapshot de facturación en una única transacción.
+- Actualizar borrador sincroniza relaciones y recalcula importe de forma transaccional.
+- Eliminar borrador hace soft delete de factura y borra sus relaciones, liberando ventas.
+- Tras COMMIT de crear/actualizar/eliminar, ClientesService reconcilia directamente la caché; no depender de reload() posterior.
+- La numeración futura de emisión es global por serie, desde facturaInicial o 1 como fallback, y nunca reutiliza números.
+- 14K conservará emisión transaccional, previsualización, PDF definitivo inmutable, impresión/email desde ese PDF y anulación histórica.
 
 Próximo paso exacto:
-14I.1 — Persistencia y relaciones históricas de facturas.
+14J.3 — Modal Angular del editor de factura.
 
-Primero:
-- revisar el schema `factura`/`factura_venta` y los importadores legacy actuales;
-- añadir relación activa/histórica, unicidad parcial y fecha de anulación;
-- adaptar la importación de relaciones según el estado de la factura;
-- verificar la secuencia global tras una importación;
-- mantener `DATABASE_SCHEMA_VERSION = 1` y validar recreando/reimportando la instalación;
-- no avanzar a contratos/listado hasta validar este subbloque.
+Para 14J.3:
+- revisar main actual antes de proponer cambios;
+- conectar eventos Nueva factura / abrir factura del ClientInvoicesComponent;
+- usar getFacturaVentasDisponibles para la selección;
+- usar create/update/deleteFacturaBorrador para persistencia;
+- reutilizar HistoricalSaleDetailComponent o su patrón para el detalle de la venta seleccionada;
+- nueva y borrador = edición; emitida/anulada = consulta;
+- mantener dirty propio del modal para 14J.4 y no mezclarlo con el dirty de la ficha;
+- no implementar todavía emisión/PDF real: eso pertenece a 14K.
 ```
 
 ---
 
-**Fin del documento de continuidad v2.35.**
+**Fin del documento de continuidad v2.36.**
