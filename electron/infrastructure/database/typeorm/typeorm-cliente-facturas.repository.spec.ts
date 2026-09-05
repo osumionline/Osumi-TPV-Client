@@ -1,5 +1,8 @@
 import type { ClienteFacturaRecord } from '@backend/domain/clientes/cliente-factura-record.interface';
-import type { ClienteFacturaVentaDisponibleRecord } from '@backend/domain/clientes/cliente-factura-venta-record.interface';
+import type {
+  ClienteFacturaVentaDisponibleRecord,
+  ClienteFacturaVentaRecord,
+} from '@backend/domain/clientes/cliente-factura-venta-record.interface';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import TypeOrmClienteFacturasRepository from '@infrastructure/database/typeorm/typeorm-cliente-facturas.repository';
@@ -587,6 +590,86 @@ describe('TypeOrmClienteFacturasRepository', (): void => {
         borradorPublicId: 'factura-cliente-inactivo',
       }),
     ).rejects.toThrow('El cliente indicado no existe o ya no está activo.');
+  });
+
+  it('recupera las relaciones activas e históricas de cualquier estado de factura', async (): Promise<void> => {
+    const emitida: readonly ClienteFacturaVentaRecord[] =
+      await requireRepository().findVentasByFacturaPublicId('cliente-1', 'factura-emitida');
+
+    expect(emitida).toEqual([
+      {
+        id: 7,
+        publicId: 'venta-facturada',
+        serie: '',
+        numero: 7,
+        fecha: '2026-09-05T10:00:00.000Z',
+        totalCents: 3_000,
+        pagos: [],
+      },
+    ]);
+
+    const borrador: readonly ClienteFacturaVentaRecord[] =
+      await requireRepository().findVentasByFacturaPublicId('cliente-1', 'factura-borrador');
+
+    expect(borrador).toEqual([
+      {
+        id: 8,
+        publicId: 'venta-borrador',
+        serie: '',
+        numero: 8,
+        fecha: '2026-09-04T09:00:00.000Z',
+        totalCents: 2_000,
+        pagos: [
+          {
+            tipoPagoPublicId: 'tipo-pago-tarjeta',
+            nombre: 'Tarjeta',
+            importeCents: 2_000,
+          },
+        ],
+      },
+    ]);
+
+    const anulada: readonly ClienteFacturaVentaRecord[] =
+      await requireRepository().findVentasByFacturaPublicId('cliente-1', 'factura-anulada');
+
+    expect(anulada).toEqual([
+      {
+        id: 10,
+        publicId: 'venta-historica',
+        serie: '',
+        numero: 10,
+        fecha: '2026-09-12T10:00:00.000Z',
+        totalCents: 1_500,
+        pagos: [
+          {
+            tipoPagoPublicId: 'tipo-pago-efectivo',
+            nombre: 'Efectivo',
+            importeCents: 1_500,
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('conserva la relación de una factura aunque su venta cambie después de cliente', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    await dataSource.query(`
+      UPDATE venta
+      SET id_cliente = 2
+      WHERE public_id = 'venta-facturada'
+    `);
+
+    const result: readonly ClienteFacturaVentaRecord[] =
+      await requireRepository().findVentasByFacturaPublicId('cliente-1', 'factura-emitida');
+
+    expect(result.map((venta: ClienteFacturaVentaRecord): string => venta.publicId)).toEqual([
+      'venta-facturada',
+    ]);
+
+    expect(
+      await requireRepository().findVentasByFacturaPublicId('cliente-2', 'factura-emitida'),
+    ).toEqual([]);
   });
 
   it('recupera únicamente las ventas disponibles para una factura nueva', async (): Promise<void> => {

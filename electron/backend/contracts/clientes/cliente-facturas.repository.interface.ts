@@ -2,7 +2,10 @@ import type ActualizarClienteFacturaBorradorRecordCommand from '@backend/contrac
 import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
 import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
 import type { ClienteFacturaRecord } from '@backend/domain/clientes/cliente-factura-record.interface';
-import type { ClienteFacturaVentaDisponibleRecord } from '@backend/domain/clientes/cliente-factura-venta-record.interface';
+import type {
+  ClienteFacturaVentaDisponibleRecord,
+  ClienteFacturaVentaRecord,
+} from '@backend/domain/clientes/cliente-factura-venta-record.interface';
 
 export default interface ClienteFacturasRepository {
   /**
@@ -30,6 +33,15 @@ export default interface ClienteFacturasRepository {
    * sus relaciones dentro de una única transacción.
    */
   deleteBorrador(command: EliminarClienteFacturaBorradorRecordCommand): Promise<void>;
+  /**
+   * Recupera las ventas relacionadas históricamente
+   * con una factura visible del cliente.
+   */
+
+  findVentasByFacturaPublicId(
+    clientePublicId: string,
+    facturaPublicId: string,
+  ): Promise<readonly ClienteFacturaVentaRecord[]>;
 
   /**
    * Recupera las ventas elegibles para una factura.

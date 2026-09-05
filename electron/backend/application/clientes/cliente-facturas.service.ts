@@ -9,11 +9,14 @@ import type {
 import type {
   ClienteFacturaVentaDisponibleRecord,
   ClienteFacturaVentaPagoRecord,
+  ClienteFacturaVentaRecord,
 } from '@backend/domain/clientes/cliente-factura-venta-record.interface';
 import type ActualizarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/actualizar-cliente-factura-borrador-command.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
+  ClienteFacturaVentaInterface,
   ClienteFacturaVentaPagoInterface,
+  ClienteFacturaVentasConsulta,
   ClienteFacturaVentasDisponiblesConsulta,
 } from '@desktop-contracts/clientes/cliente-factura-venta.interface';
 import type {
@@ -104,6 +107,30 @@ export default class ClienteFacturasService {
   }
 
   /**
+   * Recupera las ventas históricamente relacionadas
+   * con una factura persistida.
+   */
+  async getVentas(
+    consulta: ClienteFacturaVentasConsulta,
+  ): Promise<readonly ClienteFacturaVentaInterface[]> {
+    if (typeof consulta !== 'object' || consulta === null) {
+      throw new Error('La consulta de ventas de la factura no es válida.');
+    }
+
+    const clientePublicId: string = this.requirePublicId(consulta.clientePublicId);
+    const facturaPublicId: string = this.requireFacturaPublicId(consulta.facturaPublicId);
+    const records: readonly ClienteFacturaVentaRecord[] =
+      await this.clienteFacturasRepository.findVentasByFacturaPublicId(
+        clientePublicId,
+        facturaPublicId,
+      );
+
+    return records.map((record: ClienteFacturaVentaRecord): ClienteFacturaVentaInterface =>
+      this.toVentaInterface(record),
+    );
+  }
+
+  /**
    * Recupera las ventas que pueden seleccionarse
    * al crear o editar una factura.
    */
@@ -153,12 +180,10 @@ export default class ClienteFacturasService {
   }
 
   /**
-   * Convierte una venta elegible interna en el
-   * contrato público consumido por el renderer.
+   * Convierte una venta interna relacionada con una
+   * factura en su contrato público.
    */
-  private toVentaDisponibleInterface(
-    record: ClienteFacturaVentaDisponibleRecord,
-  ): ClienteFacturaVentaDisponibleInterface {
+  private toVentaInterface(record: ClienteFacturaVentaRecord): ClienteFacturaVentaInterface {
     return {
       id: record.id,
       publicId: record.publicId,
@@ -166,7 +191,6 @@ export default class ClienteFacturasService {
       numero: record.numero,
       fecha: record.fecha,
       totalCents: record.totalCents,
-      incluidaEnBorrador: record.incluidaEnBorrador,
       pagos: record.pagos.map(
         (pago: ClienteFacturaVentaPagoRecord): ClienteFacturaVentaPagoInterface => ({
           tipoPagoPublicId: pago.tipoPagoPublicId,
@@ -174,6 +198,19 @@ export default class ClienteFacturasService {
           importeCents: pago.importeCents,
         }),
       ),
+    };
+  }
+
+  /**
+   * Añade al contrato común de venta el estado
+   * específico del editor de borradores.
+   */
+  private toVentaDisponibleInterface(
+    record: ClienteFacturaVentaDisponibleRecord,
+  ): ClienteFacturaVentaDisponibleInterface {
+    return {
+      ...this.toVentaInterface(record),
+      incluidaEnBorrador: record.incluidaEnBorrador,
     };
   }
 
@@ -305,6 +342,23 @@ export default class ClienteFacturasService {
     }
 
     return normalizedValues;
+  }
+
+  /**
+   * Normaliza un identificador obligatorio de factura.
+   */
+  private requireFacturaPublicId(value: string): string {
+    if (typeof value !== 'string') {
+      throw new Error('El identificador de la factura no es válido.');
+    }
+
+    const normalizedValue: string = value.trim();
+
+    if (normalizedValue.length === 0) {
+      throw new Error('El identificador de la factura no es válido.');
+    }
+
+    return normalizedValue;
   }
 
   /**

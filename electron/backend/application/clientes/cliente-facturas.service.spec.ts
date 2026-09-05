@@ -4,13 +4,20 @@ import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-
 import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
 import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
 import type { ClienteFacturaRecord } from '@backend/domain/clientes/cliente-factura-record.interface';
-import type { ClienteFacturaVentaDisponibleRecord } from '@backend/domain/clientes/cliente-factura-venta-record.interface';
-import type { ClienteFacturaVentaDisponibleInterface } from '@desktop-contracts/clientes/cliente-factura-venta.interface';
+import type {
+  ClienteFacturaVentaDisponibleRecord,
+  ClienteFacturaVentaRecord,
+} from '@backend/domain/clientes/cliente-factura-venta-record.interface';
+import type {
+  ClienteFacturaVentaDisponibleInterface,
+  ClienteFacturaVentaInterface,
+} from '@desktop-contracts/clientes/cliente-factura-venta.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import { describe, expect, it } from 'vitest';
 
 class FakeClienteFacturasRepository implements ClienteFacturasRepository {
   records: readonly ClienteFacturaRecord[] = [];
+  ventasFactura: readonly ClienteFacturaVentaRecord[] = [];
   ventasDisponibles: readonly ClienteFacturaVentaDisponibleRecord[] = [];
   createdRecord: ClienteFacturaRecord = createRecord({
     publicId: 'factura-creada',
@@ -24,6 +31,7 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
   requestedUpdateCommand: ActualizarClienteFacturaBorradorRecordCommand | null = null;
   requestedDeleteCommand: EliminarClienteFacturaBorradorRecordCommand | null = null;
   requestedVentasClientePublicId: string | null = null;
+  requestedFacturaPublicId: string | null = null;
   requestedBorradorPublicId: string | null = null;
 
   /**
@@ -66,6 +74,20 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
     this.requestedDeleteCommand = command;
 
     return Promise.resolve();
+  }
+
+  /**
+   * Registra la factura consultada y devuelve sus
+   * ventas preparadas para la prueba.
+   */
+  findVentasByFacturaPublicId(
+    clientePublicId: string,
+    facturaPublicId: string,
+  ): Promise<readonly ClienteFacturaVentaRecord[]> {
+    this.requestedVentasClientePublicId = clientePublicId;
+    this.requestedFacturaPublicId = facturaPublicId;
+
+    return Promise.resolve(this.ventasFactura);
   }
 
   /**
@@ -291,6 +313,73 @@ describe('ClienteFacturasService', (): void => {
     expect(repository.requestedCreateCommand).toBeNull();
     expect(repository.requestedUpdateCommand).toBeNull();
     expect(repository.requestedDeleteCommand).toBeNull();
+  });
+
+  it('normaliza y construye las ventas relacionadas con una factura persistida', async (): Promise<void> => {
+    const repository = new FakeClienteFacturasRepository();
+
+    repository.ventasFactura = [
+      createVentaRecord({
+        pagos: [
+          {
+            tipoPagoPublicId: 'efectivo',
+            nombre: 'Efectivo',
+            importeCents: 750,
+          },
+          {
+            tipoPagoPublicId: 'tarjeta',
+            nombre: 'Tarjeta',
+            importeCents: 500,
+          },
+        ],
+      }),
+    ];
+
+    const service = new ClienteFacturasService(repository);
+    const result: readonly ClienteFacturaVentaInterface[] = await service.getVentas({
+      clientePublicId: '  cliente-1  ',
+      facturaPublicId: '  factura-emitida  ',
+    });
+
+    expect(repository.requestedVentasClientePublicId).toBe('cliente-1');
+    expect(repository.requestedFacturaPublicId).toBe('factura-emitida');
+    expect(result).toEqual([
+      {
+        id: 41,
+        publicId: 'venta-41',
+        serie: '',
+        numero: 412,
+        fecha: '2026-08-31T10:30:00.000Z',
+        totalCents: 1_250,
+        pagos: [
+          {
+            tipoPagoPublicId: 'efectivo',
+            nombre: 'Efectivo',
+            importeCents: 750,
+          },
+          {
+            tipoPagoPublicId: 'tarjeta',
+            nombre: 'Tarjeta',
+            importeCents: 500,
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('rechaza identificadores inválidos antes de consultar las ventas de una factura', async (): Promise<void> => {
+    const repository = new FakeClienteFacturasRepository();
+    const service = new ClienteFacturasService(repository);
+
+    await expect(
+      service.getVentas({
+        clientePublicId: 'cliente-1',
+        facturaPublicId: '   ',
+      }),
+    ).rejects.toThrow('El identificador de la factura no es válido.');
+
+    expect(repository.requestedVentasClientePublicId).toBeNull();
+    expect(repository.requestedFacturaPublicId).toBeNull();
   });
 
   it('normaliza la consulta y construye las ventas disponibles para una factura nueva', async (): Promise<void> => {

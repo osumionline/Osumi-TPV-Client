@@ -9,6 +9,7 @@ import type {
 import type {
   ClienteFacturaVentaDisponibleRecord,
   ClienteFacturaVentaPagoRecord,
+  ClienteFacturaVentaRecord,
 } from '@backend/domain/clientes/cliente-factura-venta-record.interface';
 import { getLastInsertId } from '@infrastructure/database/typeorm/sqlite.utils';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
@@ -28,17 +29,20 @@ interface ClienteFacturaDatabaseRow {
   readonly fecha_anulacion: string | null;
 }
 
-interface ClienteFacturaVentaDisponibleDatabaseRow {
+interface ClienteFacturaVentaDatabaseRow {
   readonly id: number;
   readonly public_id: string;
   readonly serie: string;
   readonly numero: number;
   readonly fecha: string;
   readonly total_cents: number;
-  readonly incluida_en_borrador: number;
   readonly tipo_pago_public_id: string | null;
   readonly tipo_pago_nombre: string | null;
   readonly pago_importe_cents: number | null;
+}
+
+interface ClienteFacturaVentaDisponibleDatabaseRow extends ClienteFacturaVentaDatabaseRow {
+  readonly incluida_en_borrador: number;
 }
 
 interface ClienteFacturaVentaAccumulator {
@@ -48,7 +52,6 @@ interface ClienteFacturaVentaAccumulator {
   readonly numero: number;
   readonly fecha: string;
   readonly totalCents: number;
-  readonly incluidaEnBorrador: boolean;
   readonly pagos: ClienteFacturaVentaPagoRecord[];
 }
 
@@ -275,6 +278,62 @@ export default class TypeOrmClienteFacturasRepository implements ClienteFacturas
   }
 
   /**
+   * Recupera las ventas relacionadas con una factura
+   * independientemente de que su relación siga activa.
+   */
+  async findVentasByFacturaPublicId(
+    clientePublicId: string,
+    facturaPublicId: string,
+  ): Promise<readonly ClienteFacturaVentaRecord[]> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+    const rows: readonly ClienteFacturaVentaDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT
+          v.id,
+          v.public_id,
+          v.serie,
+          v.numero,
+          v.created_at AS fecha,
+          v.total_cents,
+          tp.public_id AS tipo_pago_public_id,
+          tp.nombre AS tipo_pago_nombre,
+          vp.importe_cents AS pago_importe_cents
+        FROM factura f
+
+        INNER JOIN cliente c
+          ON c.id = f.id_cliente
+
+        INNER JOIN factura_venta fv
+          ON fv.id_factura = f.id
+
+        INNER JOIN venta v
+          ON v.id = fv.id_venta
+
+        LEFT JOIN venta_pago vp
+          ON vp.id_venta = v.id
+
+        LEFT JOIN tipo_pago tp
+          ON tp.id = vp.id_tipo_pago
+
+        WHERE
+          c.public_id = ?
+          AND c.deleted_at IS NULL
+          AND f.public_id = ?
+          AND f.deleted_at IS NULL
+
+        ORDER BY
+          v.created_at DESC,
+          v.id DESC,
+          vp.orden ASC,
+          vp.id ASC
+      `,
+      [clientePublicId, facturaPublicId],
+    )) as readonly ClienteFacturaVentaDatabaseRow[];
+
+    return this.mapVentaRows(rows);
+  }
+
+  /**
    * Recupera las ventas positivas y no bloqueadas que pueden
    * incorporarse a una factura del cliente.
    */
@@ -369,6 +428,29 @@ export default class TypeOrmClienteFacturasRepository implements ClienteFacturas
       [borradorPublicId, clientePublicId, borradorPublicId, borradorPublicId],
     )) as readonly ClienteFacturaVentaDisponibleDatabaseRow[];
 
+    const incluidaEnBorradorById: Map<number, boolean> = new Map<number, boolean>();
+
+    for (const row of rows) {
+      if (!incluidaEnBorradorById.has(row.id)) {
+        incluidaEnBorradorById.set(row.id, row.incluida_en_borrador === 1);
+      }
+    }
+
+    return this.mapVentaRows(rows).map(
+      (venta: ClienteFacturaVentaRecord): ClienteFacturaVentaDisponibleRecord => ({
+        ...venta,
+        incluidaEnBorrador: incluidaEnBorradorById.get(venta.id) ?? false,
+      }),
+    );
+  }
+
+  /**
+   * Agrupa las filas SQLite de ventas y pagos en
+   * un único registro por venta.
+   */
+  private mapVentaRows(
+    rows: readonly ClienteFacturaVentaDatabaseRow[],
+  ): readonly ClienteFacturaVentaRecord[] {
     const ventas: Map<number, ClienteFacturaVentaAccumulator> = new Map<
       number,
       ClienteFacturaVentaAccumulator
@@ -385,7 +467,6 @@ export default class TypeOrmClienteFacturasRepository implements ClienteFacturas
           numero: row.numero,
           fecha: row.fecha,
           totalCents: row.total_cents,
-          incluidaEnBorrador: row.incluida_en_borrador === 1,
           pagos: [],
         };
 
