@@ -1,0 +1,319 @@
+<div class="overlay client-invoice-editor-overlay">
+    <button class="overlay__backdrop"
+            type="button"
+            aria-label="Cerrar editor de factura"
+            [disabled]="processing()"
+            (click)="requestClose()">
+    </button>
+
+    <section class="client-invoice-editor overlay__panel"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="client-invoice-editor-title"
+             (keydown.escape)="requestClose()">
+        <header class="client-invoice-editor__header">
+            <div>
+                <h2 id="client-invoice-editor-title">
+                    {{ title() }}
+                </h2>
+
+                @if (currentFactura(); as facturaActual) {
+                <span class="client-invoice-editor__status"
+                      [class.client-invoice-editor__status--draft]="
+                          facturaActual.estado === 'borrador'
+                      "
+                      [class.client-invoice-editor__status--issued]="
+                          facturaActual.estado === 'emitida'
+                      "
+                      [class.client-invoice-editor__status--cancelled]="
+                          facturaActual.estado === 'anulada'
+                      ">
+                    @switch (facturaActual.estado) {
+                    @case ('borrador') {
+                    Borrador
+                    }
+                    @case ('emitida') {
+                    Emitida
+                    }
+                    @case ('anulada') {
+                    Anulada
+                    }
+                    }
+                </span>
+                }
+            </div>
+
+            <button mat-icon-button
+                    type="button"
+                    aria-label="Cerrar editor de factura"
+                    [disabled]="processing()"
+                    (click)="requestClose()">
+                <mat-icon>
+                    close
+                </mat-icon>
+            </button>
+        </header>
+
+        @if (operationError() !== null) {
+        <div class="client-invoice-editor__message client-invoice-editor__message--error"
+             role="alert">
+            {{ operationError() }}
+        </div>
+        }
+
+        @if (operationInfo() !== null) {
+        <div class="client-invoice-editor__message"
+             role="status">
+            {{ operationInfo() }}
+        </div>
+        }
+
+        <div class="client-invoice-editor__body">
+            @if (loading()) {
+            <div class="client-invoice-editor__state"
+                 role="status">
+                Cargando ventas...
+            </div>
+            }
+            @else if (loadError() !== null) {
+            <div class="client-invoice-editor__state client-invoice-editor__state--error">
+                <h3>
+                    No se ha podido cargar la factura
+                </h3>
+
+                <p>
+                    {{ loadError() }}
+                </p>
+
+                <button mat-stroked-button
+                        type="button"
+                        (click)="retry()">
+                    Reintentar
+                </button>
+            </div>
+            }
+            @else if (ventas().length === 0) {
+            <div class="client-invoice-editor__state">
+                <h3>
+                    No hay ventas
+                </h3>
+
+                <p>
+                    @if (editable()) {
+                    No hay ventas disponibles para incluir en esta factura.
+                    }
+                    @else {
+                    La factura no contiene ventas consultables.
+                    }
+                </p>
+            </div>
+            }
+            @else {
+            <div class="client-invoice-editor__workspace">
+                <section class="client-invoice-editor__sales"
+                         aria-label="Ventas de la factura">
+                    <div class="client-invoice-editor__sales-header">
+                        <div>
+                            <h3>
+                                Ventas
+                            </h3>
+
+                            @if (editable()) {
+                            <span>
+                                Selecciona las ventas que formarán parte de la factura.
+                            </span>
+                            }
+                            @else {
+                            <span>
+                                Ventas incluidas en la factura.
+                            </span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="client-invoice-editor__table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    @if (editable()) {
+                                    <th scope="col"
+                                        class="client-invoice-editor__select-column">
+                                        Incluir
+                                    </th>
+                                    }
+
+                                    <th scope="col">
+                                        Fecha
+                                    </th>
+
+                                    <th scope="col">
+                                        Venta
+                                    </th>
+
+                                    <th scope="col"
+                                        class="client-invoice-editor__money">
+                                        Importe
+                                    </th>
+
+                                    <th scope="col">
+                                        Pago
+                                    </th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @for (venta of ventas(); track venta.publicId) {
+                                <tr class="client-invoice-editor__sale-row"
+                                    [class.client-invoice-editor__sale-row--active]="
+                                        selectedVentaId() === venta.id
+                                    "
+                                    tabindex="0"
+                                    [attr.aria-label]="
+                                        'Consultar venta ' + getVentaReferencia(venta)
+                                    "
+                                    (click)="selectVenta(venta.id)"
+                                    (keydown)="selectVentaFromKeyboard($event, venta.id)">
+                                    @if (editable()) {
+                                    <td class="client-invoice-editor__select-column">
+                                        <mat-checkbox [checked]="isVentaSelected(venta.publicId)"
+                                                      [disabled]="processing()"
+                                                      [attr.aria-label]="
+                                                          'Incluir venta ' +
+                                                          getVentaReferencia(venta)
+                                                      "
+                                                      (click)="$event.stopPropagation()"
+                                                      (change)="toggleVenta(venta.publicId)" />
+                                    </td>
+                                    }
+
+                                    <td>
+                                        {{ venta.fecha | date:'dd/MM/yyyy HH:mm' }}
+                                    </td>
+
+                                    <td>
+                                        <strong>
+                                            {{ getVentaReferencia(venta) }}
+                                        </strong>
+                                    </td>
+
+                                    <td class="client-invoice-editor__money">
+                                        {{
+                                            venta.totalCents
+                                                | centsToEuros
+                                                | currency:'EUR':'symbol':'1.2-2'
+                                        }}
+                                    </td>
+
+                                    <td>
+                                        {{ getPagosLabel(venta) }}
+                                    </td>
+                                </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <aside class="client-invoice-editor__detail"
+                       aria-label="Detalle de la venta">
+                    @if (detalleLoading()) {
+                    <div class="client-invoice-editor__detail-state"
+                         role="status">
+                        <h3>
+                            Cargando detalle
+                        </h3>
+
+                        <p>
+                            Recuperando la información histórica de la venta.
+                        </p>
+                    </div>
+                    }
+                    @else if (detalleError() !== null) {
+                    <div class="client-invoice-editor__detail-state client-invoice-editor__detail-state--error">
+                        <h3>
+                            No se ha podido cargar el detalle
+                        </h3>
+
+                        <p>
+                            {{ detalleError() }}
+                        </p>
+
+                        <button mat-stroked-button
+                                type="button"
+                                [disabled]="processing()"
+                                (click)="retryDetalle()">
+                            Reintentar
+                        </button>
+                    </div>
+                    }
+                    @else if (detalle(); as detalleVenta) {
+                    <otpv-historical-sale-detail mode="readonly"
+                                                 [detalle]="detalleVenta" />
+                    }
+                    @else {
+                    <div class="client-invoice-editor__detail-state">
+                        <h3>
+                            Detalle de venta
+                        </h3>
+
+                        <p>
+                            Selecciona una venta para consultar sus líneas y pagos.
+                        </p>
+                    </div>
+                    }
+                </aside>
+            </div>
+            }
+        </div>
+
+        <footer class="client-invoice-editor__footer">
+            @if (
+            currentFactura()?.estado === 'borrador' &&
+            currentFactura()?.capacidades?.puedeEliminar
+            ) {
+            <button mat-flat-button
+                    type="button"
+                    class="client-invoice-editor__delete"
+                    [disabled]="processing()"
+                    (click)="deleteBorrador()">
+                Eliminar
+            </button>
+            }
+
+            <div class="client-invoice-editor__summary">
+                @if (editable()) {
+                <strong>
+                    {{ selectedVentasCount() }}
+                    {{ selectedVentasCount() === 1 ? 'venta seleccionada' : 'ventas seleccionadas' }}
+                </strong>
+                }
+
+                <span>
+                    {{
+                        selectedTotalCents()
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
+                </span>
+            </div>
+
+            <span class="client-invoice-editor__spacer"></span>
+
+            <button mat-stroked-button
+                    type="button"
+                    [disabled]="processing()"
+                    (click)="requestClose()">
+                Cerrar
+            </button>
+
+            @if (editable()) {
+            <button mat-flat-button
+                    type="button"
+                    [disabled]="!canSave()"
+                    (click)="save()">
+                {{ processing() ? 'Guardando...' : 'Guardar' }}
+            </button>
+            }
+        </footer>
+    </section>
+</div>

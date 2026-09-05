@@ -73,12 +73,14 @@
             </div>
 
             @switch (workspace.activeSection) {
-                        @case ('invoices') {
+            @case ('invoices') {
             @if (workspace.clientePublicId; as clientePublicId) {
             <otpv-client-invoices [clientePublicId]="clientePublicId"
                                   [emailConfigured]="emailConfigured()"
                                   [disabled]="processing()"
-                                  [createDisabled]="workspace.dirty || processing()" />
+                                  [createDisabled]="workspace.dirty || processing()"
+                                  (openFacturaEvent)="openFacturaEditor($event)"
+                                  (newFacturaEvent)="openNewFacturaEditor()" />
             }
             }
 
@@ -173,4 +175,12 @@
                     [selectedPublicId]="clientesService.workspace()?.clientePublicId ?? null"
                     (selectEvent)="selectCliente($event)"
                     (cancelEvent)="closeSearch()" />
+}
+
+@if (invoiceEditorOpen()) {
+@if (clientesService.workspace()?.clientePublicId; as clientePublicId) {
+<otpv-client-invoice-editor [clientePublicId]="clientePublicId"
+                            [factura]="invoiceEditorFactura()"
+                            (closeEvent)="closeFacturaEditor()" />
+}
 }

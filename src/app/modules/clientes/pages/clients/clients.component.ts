@@ -13,6 +13,7 @@ import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 import HeaderComponent from '@app/components/header/header.component';
+import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type ClienteFormModel from '@model/clientes/cliente-form.model';
 import type ClienteWorkspaceSection from '@model/clientes/cliente-workspace-section.type';
@@ -20,6 +21,8 @@ import type ClienteWorkspace from '@model/clientes/cliente-workspace.interface';
 import type Cliente from '@model/clientes/cliente.model';
 import ClientFormComponent from '@modules/clientes/components/client-form/client-form.component';
 import ClientGeneralStatisticsComponent from '@modules/clientes/components/client-general-statistics/client-general-statistics.component';
+import ClientInvoiceEditorComponent from '@modules/clientes/components/client-invoice-editor/client-invoice-editor.component';
+import ClientInvoicesComponent from '@modules/clientes/components/client-invoices/client-invoices.component';
 import ClientSalesComponent from '@modules/clientes/components/client-sales/client-sales.component';
 import ClientSearchComponent from '@modules/clientes/components/client-search/client-search.component';
 import ClientSectionTabsComponent from '@modules/clientes/components/client-section-tabs/client-section-tabs.component';
@@ -28,7 +31,6 @@ import AppDataService from '@services/app-data.service';
 import ClienteProteccionDatosPrintService from '@services/cliente-proteccion-datos-print.service';
 import ClientesService from '@services/clientes.service';
 import { getErrorMessage } from '@utils/error.utils';
-import ClientInvoicesComponent from '@modules/clientes/components/client-invoices/client-invoices.component';
 
 /**
  * Página principal del módulo de Clientes.
@@ -44,6 +46,7 @@ import ClientInvoicesComponent from '@modules/clientes/components/client-invoice
     ClientSearchComponent,
     ClientSectionTabsComponent,
     ClientInvoicesComponent,
+    ClientInvoiceEditorComponent,
     HeaderComponent,
     MatButton,
     MatIconButton,
@@ -60,6 +63,9 @@ export default class ClientsComponent implements OnInit, OnDestroy {
   readonly clientesService: ClientesService = inject(ClientesService);
 
   readonly searchOpen: WritableSignal<boolean> = signal<boolean>(false);
+  readonly invoiceEditorOpen: WritableSignal<boolean> = signal<boolean>(false);
+  readonly invoiceEditorFactura: WritableSignal<ClienteFacturaInterface | null> =
+    signal<ClienteFacturaInterface | null>(null);
   readonly saving: WritableSignal<boolean> = signal<boolean>(false);
   readonly deactivating: WritableSignal<boolean> = signal<boolean>(false);
   readonly processing: Signal<boolean> = computed(
@@ -116,6 +122,48 @@ export default class ClientsComponent implements OnInit, OnDestroy {
    */
   closeSearch(): void {
     this.searchOpen.set(false);
+  }
+
+  /**
+   * Abre el editor para crear una factura nueva.
+   */
+  openNewFacturaEditor(): void {
+    const workspace: ClienteWorkspace | null = this.clientesService.workspace();
+
+    if (
+      this.processing() ||
+      workspace === null ||
+      workspace.clientePublicId === null ||
+      workspace.dirty
+    ) {
+      return;
+    }
+
+    this.invoiceEditorFactura.set(null);
+    this.invoiceEditorOpen.set(true);
+  }
+
+  /**
+   * Abre una factura existente en el modo correspondiente
+   * a su estado persistido.
+   */
+  openFacturaEditor(factura: ClienteFacturaInterface): void {
+    const workspace: ClienteWorkspace | null = this.clientesService.workspace();
+
+    if (this.processing() || workspace === null || workspace.clientePublicId === null) {
+      return;
+    }
+
+    this.invoiceEditorFactura.set(factura);
+    this.invoiceEditorOpen.set(true);
+  }
+
+  /**
+   * Cierra el editor de facturas activo.
+   */
+  closeFacturaEditor(): void {
+    this.invoiceEditorOpen.set(false);
+    this.invoiceEditorFactura.set(null);
   }
 
   /**
