@@ -15,6 +15,7 @@ import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.in
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
 import type CategoriaInterface from '@desktop-contracts/categorias/categoria.interface';
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
+import type ActualizarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/actualizar-cliente-factura-borrador-command.interface';
 import type {
   ClienteConsumoMensualConsulta,
   ClienteConsumoMensualResultado,
@@ -30,6 +31,8 @@ import type {
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
+import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes/crear-cliente-factura-borrador-command.interface';
+import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type { InstallationResult } from '@desktop-contracts/configuration/installation-result.interface';
@@ -267,6 +270,25 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
       ipcRenderer.invoke(IPC_CHANNELS.clientesGetFacturas, publicId) as Promise<
         readonly ClienteFacturaInterface[]
       >,
+
+    createFacturaBorrador: (
+      command: CrearClienteFacturaBorradorCommand,
+    ): Promise<ClienteFacturaInterface> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.clientesCreateFacturaBorrador,
+        command,
+      ) as Promise<ClienteFacturaInterface>,
+
+    updateFacturaBorrador: (
+      command: ActualizarClienteFacturaBorradorCommand,
+    ): Promise<ClienteFacturaInterface> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.clientesUpdateFacturaBorrador,
+        command,
+      ) as Promise<ClienteFacturaInterface>,
+
+    deleteFacturaBorrador: (command: EliminarClienteFacturaBorradorCommand): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.clientesDeleteFacturaBorrador, command) as Promise<void>,
 
     getFacturaVentasDisponibles: (
       consulta: ClienteFacturaVentasDisponiblesConsulta,

@@ -1,6 +1,7 @@
 import type ClienteFacturasService from '@backend/application/clientes/cliente-facturas.service';
 import type ClientesService from '@backend/application/clientes/clientes.service';
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
+import type ActualizarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/actualizar-cliente-factura-borrador-command.interface';
 import type {
   ClienteConsumoMensualConsulta,
   ClienteConsumoMensualResultado,
@@ -16,6 +17,8 @@ import type {
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
+import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes/crear-cliente-factura-borrador-command.interface';
+import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
 import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
 import { assertTrustedSender } from '@ipc/assert-trusted-sender';
 import IPC_CHANNELS from '@ipc/channels';
@@ -73,6 +76,42 @@ export default function registerClientesIpc(
       assertTrustedSender(event, getMainWindow);
 
       return clienteFacturasService.getByClientePublicId(publicId);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.clientesCreateFacturaBorrador,
+
+    async (
+      event,
+      command: CrearClienteFacturaBorradorCommand,
+    ): Promise<ClienteFacturaInterface> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return clienteFacturasService.createBorrador(command);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.clientesUpdateFacturaBorrador,
+
+    async (
+      event,
+      command: ActualizarClienteFacturaBorradorCommand,
+    ): Promise<ClienteFacturaInterface> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return clienteFacturasService.updateBorrador(command);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.clientesDeleteFacturaBorrador,
+
+    async (event, command: EliminarClienteFacturaBorradorCommand): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await clienteFacturasService.deleteBorrador(command);
     },
   );
 
