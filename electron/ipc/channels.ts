@@ -35,6 +35,7 @@ const IPC_CHANNELS = {
   clientesCreateFacturaBorrador: 'clientes:create-factura-borrador',
   clientesUpdateFacturaBorrador: 'clientes:update-factura-borrador',
   clientesDeleteFacturaBorrador: 'clientes:delete-factura-borrador',
+  clientesGetFacturaVentas: 'clientes:get-factura-ventas',
   clientesGetFacturaVentasDisponibles: 'clientes:get-factura-ventas-disponibles',
   clientesGetEstadisticas: 'clientes:get-estadisticas',
   clientesGetEstadisticasGenerales: 'clientes:get-estadisticas-generales',

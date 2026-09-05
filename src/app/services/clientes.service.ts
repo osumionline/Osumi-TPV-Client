@@ -12,6 +12,8 @@ import type {
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
+  ClienteFacturaVentaInterface,
+  ClienteFacturaVentasConsulta,
   ClienteFacturaVentasDisponiblesConsulta,
 } from '@desktop-contracts/clientes/cliente-factura-venta.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
@@ -385,6 +387,19 @@ export default class ClientesService {
     await window.osumiDesktop.clientes.deleteFacturaBorrador(command);
 
     await this.reconciliarFacturaEliminada(command.clientePublicId, command.borradorPublicId);
+  }
+
+  /**
+   * Recupera las ventas históricamente relacionadas
+   * con una factura persistida.
+   *
+   * La consulta no se cachea: el editor obtiene una
+   * instantánea al abrir cada factura.
+   */
+  getFacturaVentas(
+    consulta: ClienteFacturaVentasConsulta,
+  ): Promise<readonly ClienteFacturaVentaInterface[]> {
+    return window.osumiDesktop.clientes.getFacturaVentas(consulta);
   }
 
   /**

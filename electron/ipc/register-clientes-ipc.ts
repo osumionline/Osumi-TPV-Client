@@ -12,6 +12,8 @@ import type {
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
+  ClienteFacturaVentaInterface,
+  ClienteFacturaVentasConsulta,
   ClienteFacturaVentasDisponiblesConsulta,
 } from '@desktop-contracts/clientes/cliente-factura-venta.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
@@ -116,8 +118,19 @@ export default function registerClientesIpc(
   );
 
   ipcMain.handle(
-    IPC_CHANNELS.clientesGetFacturaVentasDisponibles,
+    IPC_CHANNELS.clientesGetFacturaVentas,
+    async (
+      event,
+      consulta: ClienteFacturaVentasConsulta,
+    ): Promise<readonly ClienteFacturaVentaInterface[]> => {
+      assertTrustedSender(event, getMainWindow);
 
+      return clienteFacturasService.getVentas(consulta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.clientesGetFacturaVentasDisponibles,
     async (
       event,
       consulta: ClienteFacturaVentasDisponiblesConsulta,

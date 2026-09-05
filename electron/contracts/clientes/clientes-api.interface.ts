@@ -10,6 +10,8 @@ import type {
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
+  ClienteFacturaVentaInterface,
+  ClienteFacturaVentasConsulta,
   ClienteFacturaVentasDisponiblesConsulta,
 } from '@desktop-contracts/clientes/cliente-factura-venta.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
@@ -50,6 +52,14 @@ export default interface ClientesApi {
    * Elimina un borrador y libera sus ventas.
    */
   deleteFacturaBorrador(command: EliminarClienteFacturaBorradorCommand): Promise<void>;
+
+  /**
+   * Obtiene las ventas relacionadas históricamente
+   * con una factura persistida.
+   */
+  getFacturaVentas(
+    consulta: ClienteFacturaVentasConsulta,
+  ): Promise<readonly ClienteFacturaVentaInterface[]>;
 
   /**
    * Obtiene las ventas disponibles para crear

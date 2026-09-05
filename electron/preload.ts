@@ -26,6 +26,8 @@ import type {
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
+  ClienteFacturaVentaInterface,
+  ClienteFacturaVentasConsulta,
   ClienteFacturaVentasDisponiblesConsulta,
 } from '@desktop-contracts/clientes/cliente-factura-venta.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
@@ -289,6 +291,13 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
 
     deleteFacturaBorrador: (command: EliminarClienteFacturaBorradorCommand): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.clientesDeleteFacturaBorrador, command) as Promise<void>,
+
+    getFacturaVentas: (
+      consulta: ClienteFacturaVentasConsulta,
+    ): Promise<readonly ClienteFacturaVentaInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.clientesGetFacturaVentas, consulta) as Promise<
+        readonly ClienteFacturaVentaInterface[]
+      >,
 
     getFacturaVentasDisponibles: (
       consulta: ClienteFacturaVentasDisponiblesConsulta,

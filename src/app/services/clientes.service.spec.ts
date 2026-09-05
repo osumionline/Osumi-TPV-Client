@@ -10,6 +10,8 @@ import type {
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
+  ClienteFacturaVentaInterface,
+  ClienteFacturaVentasConsulta,
   ClienteFacturaVentasDisponiblesConsulta,
 } from '@desktop-contracts/clientes/cliente-factura-venta.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
@@ -31,6 +33,8 @@ describe('ClientesService', (): void => {
   let facturasResult: readonly ClienteFacturaInterface[];
   let facturasRequestFactory: (() => Promise<readonly ClienteFacturaInterface[]>) | null;
   let receivedFacturasPublicId: string | null;
+  let ventasFacturaResult: readonly ClienteFacturaVentaInterface[];
+  let receivedVentasFacturaConsulta: ClienteFacturaVentasConsulta | null;
   let ventasDisponiblesResult: readonly ClienteFacturaVentaDisponibleInterface[];
   let receivedVentasDisponiblesConsulta: ClienteFacturaVentasDisponiblesConsulta | null;
   let createdFacturaBorrador: ClienteFacturaInterface;
@@ -54,6 +58,8 @@ describe('ClientesService', (): void => {
     facturasResult = createFacturas(12_345);
     facturasRequestFactory = null;
     receivedFacturasPublicId = null;
+    ventasFacturaResult = createVentasFactura();
+    receivedVentasFacturaConsulta = null;
     ventasDisponiblesResult = createVentasDisponibles();
     receivedVentasDisponiblesConsulta = null;
     createdFacturaBorrador = createFacturaBorrador('factura-borrador-creada', 2_500);
@@ -109,13 +115,22 @@ describe('ClientesService', (): void => {
 
             return Promise.resolve(updatedFacturaBorrador);
           },
+
           deleteFacturaBorrador: (
             command: EliminarClienteFacturaBorradorCommand,
           ): Promise<void> => {
             receivedDeleteFacturaBorradorCommand = command;
-
             return Promise.resolve();
           },
+
+          getFacturaVentas: (
+            consulta: ClienteFacturaVentasConsulta,
+          ): Promise<readonly ClienteFacturaVentaInterface[]> => {
+            receivedVentasFacturaConsulta = consulta;
+
+            return Promise.resolve(ventasFacturaResult);
+          },
+
           getFacturaVentasDisponibles: (
             consulta: ClienteFacturaVentasDisponiblesConsulta,
           ): Promise<readonly ClienteFacturaVentaDisponibleInterface[]> => {
@@ -123,6 +138,7 @@ describe('ClientesService', (): void => {
 
             return Promise.resolve(ventasDisponiblesResult);
           },
+
           getEstadisticas: (): Promise<ClienteEstadisticasInterface> => {
             requestCount++;
 
@@ -680,6 +696,21 @@ describe('ClientesService', (): void => {
     });
   });
 
+  it('solicita las ventas de una factura mediante su API específica', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    const consulta: ClienteFacturaVentasConsulta = {
+      clientePublicId: 'cliente-7',
+      facturaPublicId: 'factura-1',
+    };
+
+    const result: readonly ClienteFacturaVentaInterface[] =
+      await service.getFacturaVentas(consulta);
+
+    expect(receivedVentasFacturaConsulta).toBe(consulta);
+    expect(result).toEqual(createVentasFactura());
+    expect(facturasRequestCount).toBe(0);
+  });
+
   it('solicita las ventas disponibles mediante su API específica', async (): Promise<void> => {
     const service: ClientesService = new ClientesService();
     const consulta: ClienteFacturaVentasDisponiblesConsulta = {
@@ -721,6 +752,30 @@ describe('ClientesService', (): void => {
     expect(requestCount).toBe(0);
   });
 });
+
+/**
+ * Crea una colección de ventas pertenecientes a
+ * una factura para las pruebas del acceso Angular.
+ */
+function createVentasFactura(): readonly ClienteFacturaVentaInterface[] {
+  return [
+    {
+      id: 41,
+      publicId: 'venta-41',
+      serie: '',
+      numero: 412,
+      fecha: '2026-08-31T10:30:00.000Z',
+      totalCents: 1_250,
+      pagos: [
+        {
+          tipoPagoPublicId: 'efectivo',
+          nombre: 'Efectivo',
+          importeCents: 1_250,
+        },
+      ],
+    },
+  ];
+}
 
 /**
  * Crea una colección de ventas disponibles para
