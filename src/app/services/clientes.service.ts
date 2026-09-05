@@ -1,6 +1,7 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { computed, Service, signal } from '@angular/core';
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
+import type ActualizarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/actualizar-cliente-factura-borrador-command.interface';
 import type {
   ClienteConsumoMensualConsulta,
   ClienteConsumoMensualResultado,
@@ -16,6 +17,8 @@ import type {
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
+import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes/crear-cliente-factura-borrador-command.interface';
+import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
 import type ClienteEstadisticasState from '@model/clientes/cliente-estadisticas-state.interface';
 import type ClienteFacturasState from '@model/clientes/cliente-facturas-state.interface';
 import createClienteCommand from '@model/clientes/cliente-form-command.mapper';
@@ -345,6 +348,46 @@ export default class ClientesService {
   }
 
   /**
+   * Crea un borrador y reconcilia en la caché
+   * la factura confirmada por el backend.
+   */
+  async createFacturaBorrador(
+    command: CrearClienteFacturaBorradorCommand,
+  ): Promise<ClienteFacturaInterface> {
+    const factura: ClienteFacturaInterface =
+      await window.osumiDesktop.clientes.createFacturaBorrador(command);
+
+    await this.reconciliarFacturaPersistida(command.clientePublicId, factura);
+
+    return factura;
+  }
+
+  /**
+   * Actualiza un borrador y reconcilia en la caché
+   * la factura confirmada por el backend.
+   */
+  async updateFacturaBorrador(
+    command: ActualizarClienteFacturaBorradorCommand,
+  ): Promise<ClienteFacturaInterface> {
+    const factura: ClienteFacturaInterface =
+      await window.osumiDesktop.clientes.updateFacturaBorrador(command);
+
+    await this.reconciliarFacturaPersistida(command.clientePublicId, factura);
+
+    return factura;
+  }
+
+  /**
+   * Elimina un borrador confirmado por el backend
+   * y lo retira de la caché del cliente.
+   */
+  async deleteFacturaBorrador(command: EliminarClienteFacturaBorradorCommand): Promise<void> {
+    await window.osumiDesktop.clientes.deleteFacturaBorrador(command);
+
+    await this.reconciliarFacturaEliminada(command.clientePublicId, command.borradorPublicId);
+  }
+
+  /**
    * Solicita una instantánea actual de las ventas
    * disponibles para crear o editar una factura.
    *
@@ -621,6 +664,91 @@ export default class ClientesService {
     } finally {
       this.pendingRequest = null;
     }
+  }
+
+  /**
+   * Espera una lectura anterior de facturas sin permitir
+   * que su fallo invalide una escritura ya confirmada.
+   */
+  private async waitPendingFacturaRequest(publicId: string): Promise<void> {
+    const pendingRequest: Promise<void> | undefined = this.pendingFacturasRequests.get(publicId);
+
+    if (pendingRequest === undefined) {
+      return;
+    }
+
+    try {
+      await pendingRequest;
+    } catch {
+      /*
+       * La escritura ya está confirmada. El fallo de una lectura
+       * anterior no debe convertir el COMMIT en un error.
+       */
+    }
+  }
+
+  /**
+   * Añade o sustituye una factura confirmada conservando
+   * el orden anterior de las facturas ya existentes.
+   */
+  private async reconciliarFacturaPersistida(
+    clientePublicId: string,
+    factura: ClienteFacturaInterface,
+  ): Promise<void> {
+    const normalizedPublicId: string = clientePublicId.trim();
+
+    await this.waitPendingFacturaRequest(normalizedPublicId);
+
+    const currentState: ClienteFacturasState = this.getFacturasState(normalizedPublicId);
+    let data: readonly ClienteFacturaInterface[] | null = currentState.data;
+
+    if (data !== null) {
+      const facturaIndex: number = data.findIndex(
+        (item: ClienteFacturaInterface): boolean => item.publicId === factura.publicId,
+      );
+
+      data =
+        facturaIndex === -1
+          ? [factura, ...data]
+          : data.map((item: ClienteFacturaInterface): ClienteFacturaInterface =>
+              item.publicId === factura.publicId ? factura : item,
+            );
+    }
+
+    this.setFacturasState(normalizedPublicId, {
+      data,
+      loading: false,
+      error: null,
+    });
+  }
+
+  /**
+   * Retira una factura eliminada de la caché sin construir
+   * una colección parcial si todavía no estaba cargada.
+   */
+  private async reconciliarFacturaEliminada(
+    clientePublicId: string,
+    borradorPublicId: string,
+  ): Promise<void> {
+    const normalizedPublicId: string = clientePublicId.trim();
+    const normalizedBorradorPublicId: string = borradorPublicId.trim();
+
+    await this.waitPendingFacturaRequest(normalizedPublicId);
+
+    const currentState: ClienteFacturasState = this.getFacturasState(normalizedPublicId);
+    const data: readonly ClienteFacturaInterface[] | null =
+      currentState.data === null
+        ? null
+        : currentState.data.filter(
+            (factura: ClienteFacturaInterface): boolean =>
+              factura.publicId !== normalizedBorradorPublicId,
+          );
+
+    this.setFacturasState(normalizedPublicId, {
+      data,
+      loading: false,
+      error: null,
+    });
   }
 
   /**

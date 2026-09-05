@@ -1,4 +1,5 @@
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
+import type ActualizarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/actualizar-cliente-factura-borrador-command.interface';
 import type {
   ClienteConsumoMensualConsulta,
   ClienteConsumoMensualResultado,
@@ -14,6 +15,8 @@ import type {
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
+import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes/crear-cliente-factura-borrador-command.interface';
+import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
 import createClienteCommand from '@model/clientes/cliente-form-command.mapper';
 import createClienteFormInitialValue from '@model/clientes/cliente-form.initial-value';
 import type ClienteFormModel from '@model/clientes/cliente-form.model';
@@ -30,6 +33,11 @@ describe('ClientesService', (): void => {
   let receivedFacturasPublicId: string | null;
   let ventasDisponiblesResult: readonly ClienteFacturaVentaDisponibleInterface[];
   let receivedVentasDisponiblesConsulta: ClienteFacturaVentasDisponiblesConsulta | null;
+  let createdFacturaBorrador: ClienteFacturaInterface;
+  let updatedFacturaBorrador: ClienteFacturaInterface;
+  let receivedCreateFacturaBorradorCommand: CrearClienteFacturaBorradorCommand | null;
+  let receivedUpdateFacturaBorradorCommand: ActualizarClienteFacturaBorradorCommand | null;
+  let receivedDeleteFacturaBorradorCommand: EliminarClienteFacturaBorradorCommand | null;
   let createdCliente: ClienteInterface;
   let updatedCliente: ClienteInterface;
   let receivedCreateCommand: CrearClienteCommand | null;
@@ -48,6 +56,11 @@ describe('ClientesService', (): void => {
     receivedFacturasPublicId = null;
     ventasDisponiblesResult = createVentasDisponibles();
     receivedVentasDisponiblesConsulta = null;
+    createdFacturaBorrador = createFacturaBorrador('factura-borrador-creada', 2_500);
+    updatedFacturaBorrador = createFacturaBorrador('factura-borrador', 3_500);
+    receivedCreateFacturaBorradorCommand = null;
+    receivedUpdateFacturaBorradorCommand = null;
+    receivedDeleteFacturaBorradorCommand = null;
     createdCliente = createClienteInterface(7, 'cliente-7', 'Ada Lovelace');
     updatedCliente = createClienteInterface(7, 'cliente-7', 'Ada Lovelace');
     receivedCreateCommand = null;
@@ -81,6 +94,27 @@ describe('ClientesService', (): void => {
             facturasRequestCount++;
 
             return facturasRequestFactory?.() ?? Promise.resolve(facturasResult);
+          },
+          createFacturaBorrador: (
+            command: CrearClienteFacturaBorradorCommand,
+          ): Promise<ClienteFacturaInterface> => {
+            receivedCreateFacturaBorradorCommand = command;
+
+            return Promise.resolve(createdFacturaBorrador);
+          },
+          updateFacturaBorrador: (
+            command: ActualizarClienteFacturaBorradorCommand,
+          ): Promise<ClienteFacturaInterface> => {
+            receivedUpdateFacturaBorradorCommand = command;
+
+            return Promise.resolve(updatedFacturaBorrador);
+          },
+          deleteFacturaBorrador: (
+            command: EliminarClienteFacturaBorradorCommand,
+          ): Promise<void> => {
+            receivedDeleteFacturaBorradorCommand = command;
+
+            return Promise.resolve();
           },
           getFacturaVentasDisponibles: (
             consulta: ClienteFacturaVentasDisponiblesConsulta,
@@ -565,6 +599,168 @@ describe('ClientesService', (): void => {
     expect(service.workspace()?.dirty).toBe(true);
   });
 
+  it('reconcilia un borrador creado después de cualquier lectura anterior', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    let resolveFacturas: (value: readonly ClienteFacturaInterface[]) => void = (): void =>
+      undefined;
+
+    facturasRequestFactory = (): Promise<readonly ClienteFacturaInterface[]> =>
+      new Promise<readonly ClienteFacturaInterface[]>((resolve): void => {
+        resolveFacturas = resolve;
+      });
+
+    const loadRequest: Promise<void> = service.loadFacturas('cliente-7');
+    const command: CrearClienteFacturaBorradorCommand = {
+      clientePublicId: 'cliente-7',
+      ventasPublicIds: ['venta-1'],
+    };
+    const createRequest: Promise<ClienteFacturaInterface> = service.createFacturaBorrador(command);
+
+    resolveFacturas(createFacturas(12_345));
+
+    const [result] = await Promise.all([createRequest, loadRequest]);
+
+    expect(receivedCreateFacturaBorradorCommand).toBe(command);
+    expect(result).toBe(createdFacturaBorrador);
+    expect(service.getFacturasState('cliente-7')).toEqual({
+      data: [createdFacturaBorrador, ...createFacturas(12_345)],
+      loading: false,
+      error: null,
+    });
+  });
+
+  it('sustituye un borrador actualizado sin duplicarlo en la caché', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    const originalBorrador: ClienteFacturaInterface = createFacturaBorrador(
+      'factura-borrador',
+      2_000,
+    );
+
+    facturasResult = [originalBorrador, ...createFacturas(12_345)];
+
+    await service.loadFacturas('cliente-7');
+
+    const command: ActualizarClienteFacturaBorradorCommand = {
+      clientePublicId: 'cliente-7',
+      borradorPublicId: 'factura-borrador',
+      ventasPublicIds: ['venta-1', 'venta-2'],
+    };
+
+    const result: ClienteFacturaInterface = await service.updateFacturaBorrador(command);
+
+    expect(receivedUpdateFacturaBorradorCommand).toBe(command);
+    expect(result).toBe(updatedFacturaBorrador);
+    expect(service.getFacturasState('cliente-7')).toEqual({
+      data: [updatedFacturaBorrador, ...createFacturas(12_345)],
+      loading: false,
+      error: null,
+    });
+  });
+
+  it('retira de la caché un borrador eliminado', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    const borrador: ClienteFacturaInterface = createFacturaBorrador('factura-borrador', 2_000);
+
+    facturasResult = [borrador, ...createFacturas(12_345)];
+
+    await service.loadFacturas('cliente-7');
+
+    const command: EliminarClienteFacturaBorradorCommand = {
+      clientePublicId: 'cliente-7',
+      borradorPublicId: 'factura-borrador',
+    };
+
+    await service.deleteFacturaBorrador(command);
+
+    expect(receivedDeleteFacturaBorradorCommand).toBe(command);
+    expect(service.getFacturasState('cliente-7')).toEqual({
+      data: createFacturas(12_345),
+      loading: false,
+      error: null,
+    });
+  });
+
+  it('reconcilia un borrador creado después de cualquier lectura anterior', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    let resolveFacturas: (value: readonly ClienteFacturaInterface[]) => void = (): void =>
+      undefined;
+
+    facturasRequestFactory = (): Promise<readonly ClienteFacturaInterface[]> =>
+      new Promise<readonly ClienteFacturaInterface[]>((resolve): void => {
+        resolveFacturas = resolve;
+      });
+
+    const loadRequest: Promise<void> = service.loadFacturas('cliente-7');
+    const command: CrearClienteFacturaBorradorCommand = {
+      clientePublicId: 'cliente-7',
+      ventasPublicIds: ['venta-1'],
+    };
+    const createRequest: Promise<ClienteFacturaInterface> = service.createFacturaBorrador(command);
+
+    resolveFacturas(createFacturas(12_345));
+
+    const [result] = await Promise.all([createRequest, loadRequest]);
+
+    expect(receivedCreateFacturaBorradorCommand).toBe(command);
+    expect(result).toBe(createdFacturaBorrador);
+    expect(service.getFacturasState('cliente-7')).toEqual({
+      data: [createdFacturaBorrador, ...createFacturas(12_345)],
+      loading: false,
+      error: null,
+    });
+  });
+
+  it('sustituye un borrador actualizado sin duplicarlo en la caché', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    const originalBorrador: ClienteFacturaInterface = createFacturaBorrador(
+      'factura-borrador',
+      2_000,
+    );
+
+    facturasResult = [originalBorrador, ...createFacturas(12_345)];
+
+    await service.loadFacturas('cliente-7');
+
+    const command: ActualizarClienteFacturaBorradorCommand = {
+      clientePublicId: 'cliente-7',
+      borradorPublicId: 'factura-borrador',
+      ventasPublicIds: ['venta-1', 'venta-2'],
+    };
+
+    const result: ClienteFacturaInterface = await service.updateFacturaBorrador(command);
+
+    expect(receivedUpdateFacturaBorradorCommand).toBe(command);
+    expect(result).toBe(updatedFacturaBorrador);
+    expect(service.getFacturasState('cliente-7')).toEqual({
+      data: [updatedFacturaBorrador, ...createFacturas(12_345)],
+      loading: false,
+      error: null,
+    });
+  });
+
+  it('retira de la caché un borrador eliminado', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    const borrador: ClienteFacturaInterface = createFacturaBorrador('factura-borrador', 2_000);
+
+    facturasResult = [borrador, ...createFacturas(12_345)];
+
+    await service.loadFacturas('cliente-7');
+
+    const command: EliminarClienteFacturaBorradorCommand = {
+      clientePublicId: 'cliente-7',
+      borradorPublicId: 'factura-borrador',
+    };
+
+    await service.deleteFacturaBorrador(command);
+
+    expect(receivedDeleteFacturaBorradorCommand).toBe(command);
+    expect(service.getFacturasState('cliente-7')).toEqual({
+      data: createFacturas(12_345),
+      loading: false,
+      error: null,
+    });
+  });
+
   it('solicita las ventas disponibles mediante su API específica', async (): Promise<void> => {
     const service: ClientesService = new ClientesService();
     const consulta: ClienteFacturaVentasDisponiblesConsulta = {
@@ -630,6 +826,35 @@ function createVentasDisponibles(): readonly ClienteFacturaVentaDisponibleInterf
       ],
     },
   ];
+}
+
+/**
+ * Crea un borrador de factura para probar
+ * la reconciliación del estado Angular.
+ */
+function createFacturaBorrador(publicId: string, importeCents: number): ClienteFacturaInterface {
+  return {
+    publicId,
+    serie: '',
+    numero: null,
+    year: null,
+    numeroFactura: null,
+    estado: 'borrador',
+    fecha: '2026-09-05T10:00:00.000Z',
+    fechaCreacion: '2026-09-05T10:00:00.000Z',
+    fechaEmision: null,
+    fechaAnulacion: null,
+    importeCents,
+    capacidades: {
+      puedeEditar: true,
+      puedeEliminar: true,
+      puedePrevisualizar: true,
+      puedeFacturar: true,
+      puedeImprimir: false,
+      puedeEnviarEmail: false,
+      puedeAnular: false,
+    },
+  };
 }
 
 /**
