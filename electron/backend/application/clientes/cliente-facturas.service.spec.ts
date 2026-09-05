@@ -1,5 +1,8 @@
 import ClienteFacturasService from '@backend/application/clientes/cliente-facturas.service';
+import type ActualizarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/actualizar-cliente-factura-borrador-record-command.interface';
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
+import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
+import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
 import type { ClienteFacturaRecord } from '@backend/domain/clientes/cliente-factura-record.interface';
 import type { ClienteFacturaVentaDisponibleRecord } from '@backend/domain/clientes/cliente-factura-venta-record.interface';
 import type { ClienteFacturaVentaDisponibleInterface } from '@desktop-contracts/clientes/cliente-factura-venta.interface';
@@ -9,8 +12,17 @@ import { describe, expect, it } from 'vitest';
 class FakeClienteFacturasRepository implements ClienteFacturasRepository {
   records: readonly ClienteFacturaRecord[] = [];
   ventasDisponibles: readonly ClienteFacturaVentaDisponibleRecord[] = [];
+  createdRecord: ClienteFacturaRecord = createRecord({
+    publicId: 'factura-creada',
+  });
+  updatedRecord: ClienteFacturaRecord = createRecord({
+    publicId: 'factura-actualizada',
+  });
 
   requestedPublicId: string | null = null;
+  requestedCreateCommand: CrearClienteFacturaBorradorRecordCommand | null = null;
+  requestedUpdateCommand: ActualizarClienteFacturaBorradorRecordCommand | null = null;
+  requestedDeleteCommand: EliminarClienteFacturaBorradorRecordCommand | null = null;
   requestedVentasClientePublicId: string | null = null;
   requestedBorradorPublicId: string | null = null;
 
@@ -25,26 +37,34 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
   }
 
   /**
-   * Devuelve un borrador válido para mantener completo
-   * el contrato utilizado por estas pruebas.
+   * Registra el comando de creación y devuelve
+   * el borrador preparado para la prueba.
    */
-  createBorrador(): Promise<ClienteFacturaRecord> {
-    return Promise.resolve(createRecord());
+  createBorrador(command: CrearClienteFacturaBorradorRecordCommand): Promise<ClienteFacturaRecord> {
+    this.requestedCreateCommand = command;
+
+    return Promise.resolve(this.createdRecord);
   }
 
   /**
-   * Devuelve un borrador válido para mantener completo
-   * el contrato utilizado por estas pruebas.
+   * Registra el comando de actualización y devuelve
+   * el borrador preparado para la prueba.
    */
-  updateBorrador(): Promise<ClienteFacturaRecord> {
-    return Promise.resolve(createRecord());
+  updateBorrador(
+    command: ActualizarClienteFacturaBorradorRecordCommand,
+  ): Promise<ClienteFacturaRecord> {
+    this.requestedUpdateCommand = command;
+
+    return Promise.resolve(this.updatedRecord);
   }
 
   /**
-   * Simula la eliminación de un borrador para mantener
-   * completo el contrato utilizado por estas pruebas.
+   * Registra el comando utilizado para eliminar
+   * un borrador de factura.
    */
-  deleteBorrador(): Promise<void> {
+  deleteBorrador(command: EliminarClienteFacturaBorradorRecordCommand): Promise<void> {
+    this.requestedDeleteCommand = command;
+
     return Promise.resolve();
   }
 
@@ -175,6 +195,102 @@ describe('ClienteFacturasService', (): void => {
         },
       },
     ]);
+  });
+
+  it('normaliza y crea un borrador mediante el repository', async (): Promise<void> => {
+    const repository = new FakeClienteFacturasRepository();
+    const service = new ClienteFacturasService(repository);
+
+    const result: ClienteFacturaInterface = await service.createBorrador({
+      clientePublicId: '  cliente-1  ',
+      ventasPublicIds: ['  venta-1  ', 'venta-2'],
+    });
+
+    expect(repository.requestedCreateCommand).toEqual({
+      clientePublicId: 'cliente-1',
+      ventasPublicIds: ['venta-1', 'venta-2'],
+    });
+    expect(result.publicId).toBe('factura-creada');
+    expect(result.estado).toBe('borrador');
+  });
+
+  it('normaliza y actualiza un borrador mediante el repository', async (): Promise<void> => {
+    const repository = new FakeClienteFacturasRepository();
+    const service = new ClienteFacturasService(repository);
+
+    const result: ClienteFacturaInterface = await service.updateBorrador({
+      clientePublicId: '  cliente-1  ',
+      borradorPublicId: '  factura-borrador  ',
+      ventasPublicIds: ['  venta-1  ', 'venta-2'],
+    });
+
+    expect(repository.requestedUpdateCommand).toEqual({
+      clientePublicId: 'cliente-1',
+      borradorPublicId: 'factura-borrador',
+      ventasPublicIds: ['venta-1', 'venta-2'],
+    });
+    expect(result.publicId).toBe('factura-actualizada');
+    expect(result.estado).toBe('borrador');
+  });
+
+  it('normaliza y elimina un borrador mediante el repository', async (): Promise<void> => {
+    const repository = new FakeClienteFacturasRepository();
+    const service = new ClienteFacturasService(repository);
+
+    await service.deleteBorrador({
+      clientePublicId: '  cliente-1  ',
+      borradorPublicId: '  factura-borrador  ',
+    });
+
+    expect(repository.requestedDeleteCommand).toEqual({
+      clientePublicId: 'cliente-1',
+      borradorPublicId: 'factura-borrador',
+    });
+  });
+
+  it('rechaza comandos de borrador inválidos antes de consultar el repository', async (): Promise<void> => {
+    const repository = new FakeClienteFacturasRepository();
+    const service = new ClienteFacturasService(repository);
+
+    await expect(
+      service.createBorrador({
+        clientePublicId: '   ',
+        ventasPublicIds: ['venta-1'],
+      }),
+    ).rejects.toThrow('El identificador del cliente no es válido.');
+
+    await expect(
+      service.createBorrador({
+        clientePublicId: 'cliente-1',
+        ventasPublicIds: [],
+      }),
+    ).rejects.toThrow('La factura debe incluir al menos una venta.');
+
+    await expect(
+      service.createBorrador({
+        clientePublicId: 'cliente-1',
+        ventasPublicIds: ['venta-1', ' venta-1 '],
+      }),
+    ).rejects.toThrow('Una venta no se puede incluir más de una vez en la misma factura.');
+
+    await expect(
+      service.updateBorrador({
+        clientePublicId: 'cliente-1',
+        borradorPublicId: '   ',
+        ventasPublicIds: ['venta-1'],
+      }),
+    ).rejects.toThrow('El identificador del borrador de factura no es válido.');
+
+    await expect(
+      service.deleteBorrador({
+        clientePublicId: 'cliente-1',
+        borradorPublicId: '   ',
+      }),
+    ).rejects.toThrow('El identificador del borrador de factura no es válido.');
+
+    expect(repository.requestedCreateCommand).toBeNull();
+    expect(repository.requestedUpdateCommand).toBeNull();
+    expect(repository.requestedDeleteCommand).toBeNull();
   });
 
   it('normaliza la consulta y construye las ventas disponibles para una factura nueva', async (): Promise<void> => {

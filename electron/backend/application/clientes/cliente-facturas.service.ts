@@ -1,4 +1,7 @@
+import type ActualizarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/actualizar-cliente-factura-borrador-record-command.interface';
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
+import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
+import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
 import type {
   ClienteFacturaEstadoRecord,
   ClienteFacturaRecord,
@@ -7,6 +10,7 @@ import type {
   ClienteFacturaVentaDisponibleRecord,
   ClienteFacturaVentaPagoRecord,
 } from '@backend/domain/clientes/cliente-factura-venta-record.interface';
+import type ActualizarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/actualizar-cliente-factura-borrador-command.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
   ClienteFacturaVentaPagoInterface,
@@ -16,6 +20,8 @@ import type {
   ClienteFacturaCapacidadesInterface,
   ClienteFacturaInterface,
 } from '@desktop-contracts/clientes/cliente-factura.interface';
+import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes/crear-cliente-factura-borrador-command.interface';
+import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
 
 export default class ClienteFacturasService {
   constructor(private readonly clienteFacturasRepository: ClienteFacturasRepository) {}
@@ -33,6 +39,68 @@ export default class ClienteFacturasService {
     return records.map((record: ClienteFacturaRecord): ClienteFacturaInterface =>
       this.toInterface(record),
     );
+  }
+
+  /**
+   * Crea un borrador después de normalizar sus
+   * identificadores y ventas seleccionadas.
+   */
+  async createBorrador(
+    command: CrearClienteFacturaBorradorCommand,
+  ): Promise<ClienteFacturaInterface> {
+    if (typeof command !== 'object' || command === null) {
+      throw new Error('Los datos para crear el borrador de factura no son válidos.');
+    }
+
+    const recordCommand: CrearClienteFacturaBorradorRecordCommand = {
+      clientePublicId: this.requirePublicId(command.clientePublicId),
+      ventasPublicIds: this.normalizeVentasPublicIds(command.ventasPublicIds),
+    };
+
+    const record: ClienteFacturaRecord =
+      await this.clienteFacturasRepository.createBorrador(recordCommand);
+
+    return this.toInterface(record);
+  }
+
+  /**
+   * Actualiza un borrador después de normalizar
+   * todos los identificadores recibidos.
+   */
+  async updateBorrador(
+    command: ActualizarClienteFacturaBorradorCommand,
+  ): Promise<ClienteFacturaInterface> {
+    if (typeof command !== 'object' || command === null) {
+      throw new Error('Los datos para actualizar el borrador de factura no son válidos.');
+    }
+
+    const recordCommand: ActualizarClienteFacturaBorradorRecordCommand = {
+      clientePublicId: this.requirePublicId(command.clientePublicId),
+      borradorPublicId: this.requireBorradorPublicId(command.borradorPublicId),
+      ventasPublicIds: this.normalizeVentasPublicIds(command.ventasPublicIds),
+    };
+
+    const record: ClienteFacturaRecord =
+      await this.clienteFacturasRepository.updateBorrador(recordCommand);
+
+    return this.toInterface(record);
+  }
+
+  /**
+   * Elimina un borrador después de normalizar
+   * sus identificadores públicos.
+   */
+  async deleteBorrador(command: EliminarClienteFacturaBorradorCommand): Promise<void> {
+    if (typeof command !== 'object' || command === null) {
+      throw new Error('Los datos para eliminar el borrador de factura no son válidos.');
+    }
+
+    const recordCommand: EliminarClienteFacturaBorradorRecordCommand = {
+      clientePublicId: this.requirePublicId(command.clientePublicId),
+      borradorPublicId: this.requireBorradorPublicId(command.borradorPublicId),
+    };
+
+    await this.clienteFacturasRepository.deleteBorrador(recordCommand);
   }
 
   /**
@@ -207,6 +275,49 @@ export default class ClienteFacturasService {
       puedeEnviarEmail: emitida,
       puedeAnular: emitida,
     };
+  }
+
+  /**
+   * Normaliza las ventas seleccionadas y rechaza
+   * listas vacías, identificadores inválidos o duplicados.
+   */
+  private normalizeVentasPublicIds(values: readonly string[]): readonly string[] {
+    if (!Array.isArray(values) || values.length === 0) {
+      throw new Error('La factura debe incluir al menos una venta.');
+    }
+
+    const normalizedValues: readonly string[] = values.map((value: string): string => {
+      if (typeof value !== 'string') {
+        throw new Error('Una de las ventas seleccionadas no tiene un identificador válido.');
+      }
+
+      const normalizedValue: string = value.trim();
+
+      if (normalizedValue.length === 0) {
+        throw new Error('Una de las ventas seleccionadas no tiene un identificador válido.');
+      }
+
+      return normalizedValue;
+    });
+
+    if (new Set<string>(normalizedValues).size !== normalizedValues.length) {
+      throw new Error('Una venta no se puede incluir más de una vez en la misma factura.');
+    }
+
+    return normalizedValues;
+  }
+
+  /**
+   * Normaliza un identificador obligatorio de borrador.
+   */
+  private requireBorradorPublicId(value: string): string {
+    const normalizedValue: string | null = this.normalizeBorradorPublicId(value);
+
+    if (normalizedValue === null) {
+      throw new Error('El identificador del borrador de factura no es válido.');
+    }
+
+    return normalizedValue;
   }
 
   /**
