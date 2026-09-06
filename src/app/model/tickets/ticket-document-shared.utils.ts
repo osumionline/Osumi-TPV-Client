@@ -1,9 +1,8 @@
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
+import BUSINESS_LOGO_URL from '@model/documents/business-logo-url.constant';
 import { escapeHtml } from '@utils/html.utils';
 import { centsToEuros, microsToEuros } from '@utils/money.utils';
 import { trimToNull } from '@utils/string.utils';
-
-const BUSINESS_LOGO_URL: string = 'osumi://assets/logo';
 
 const TWITTER_ICON_URL: string = 'osumi://assets/app/icons/twitter.svg';
 

@@ -77,6 +77,7 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
   readonly loading: WritableSignal<boolean> = signal<boolean>(false);
   readonly loadError: WritableSignal<string | null> = signal<string | null>(null);
   readonly processing: WritableSignal<boolean> = signal<boolean>(false);
+  readonly previewing: WritableSignal<boolean> = signal<boolean>(false);
   readonly dialogOpen: WritableSignal<boolean> = signal<boolean>(false);
   readonly operationError: WritableSignal<string | null> = signal<string | null>(null);
   readonly operationInfo: WritableSignal<string | null> = signal<string | null>(null);
@@ -92,7 +93,7 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
   });
 
   readonly blocked: Signal<boolean> = computed(
-    (): boolean => this.processing() || this.dialogOpen(),
+    (): boolean => this.processing() || this.previewing() || this.dialogOpen(),
   );
 
   readonly title: Signal<string> = computed((): string => {
@@ -139,6 +140,19 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
       this.selectedVentasCount() > 0 &&
       this.hasChanges(),
   );
+
+  readonly canPreview: Signal<boolean> = computed((): boolean => {
+    const factura: ClienteFacturaInterface | null = this.currentFactura();
+
+    return (
+      this.editable() &&
+      (factura === null || factura.capacidades.puedePrevisualizar) &&
+      !this.clienteDirty() &&
+      !this.loading() &&
+      !this.blocked() &&
+      this.selectedVentasCount() > 0
+    );
+  });
 
   readonly canEmit: Signal<boolean> = computed((): boolean => {
     const factura: ClienteFacturaInterface | null = this.currentFactura();
@@ -319,43 +333,21 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Crea o actualiza el borrador con la selección actual.
+   * Crea o actualiza manualmente el borrador con
+   * la selección actual.
    */
   async save(): Promise<void> {
     if (!this.canSave()) {
       return;
     }
 
-    const clientePublicId: string = this.clientePublicId();
-    const ventasPublicIds: readonly string[] = this.getSelectedVentasPublicIds();
-    const factura: ClienteFacturaInterface | null = this.currentFactura();
-
     this.processing.set(true);
     this.operationError.set(null);
     this.operationInfo.set(null);
 
     try {
-      let persistedFactura: ClienteFacturaInterface;
+      await this.persistBorrador();
 
-      if (factura === null) {
-        const command: CrearClienteFacturaBorradorCommand = {
-          clientePublicId,
-          ventasPublicIds,
-        };
-
-        persistedFactura = await this.clientesService.createFacturaBorrador(command);
-      } else {
-        const command: ActualizarClienteFacturaBorradorCommand = {
-          clientePublicId,
-          borradorPublicId: factura.publicId,
-          ventasPublicIds,
-        };
-
-        persistedFactura = await this.clientesService.updateFacturaBorrador(command);
-      }
-
-      this.currentFactura.set(persistedFactura);
-      this.setBaseSelection(this.selectedVentasPublicIds());
       this.operationInfo.set('Borrador guardado correctamente.');
     } catch (error: unknown) {
       this.operationError.set(
@@ -543,6 +535,106 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
         this.detalleLoading.set(false);
       }
     }
+  }
+
+  /**
+   * Abre la preview guardando primero cualquier
+   * selección todavía no persistida.
+   */
+  async previewFactura(): Promise<void> {
+    if (!this.canPreview()) {
+      return;
+    }
+
+    this.previewing.set(true);
+    this.operationError.set(null);
+    this.operationInfo.set(null);
+
+    try {
+      const factura: ClienteFacturaInterface = await this.ensurePreviewBorrador();
+
+      const emittedFactura: ClienteFacturaInterface | null =
+        await this.clientesService.openFacturaPreview({
+          clientePublicId: this.clientePublicId(),
+          facturaPublicId: factura.publicId,
+        });
+
+      if (emittedFactura !== null) {
+        this.adoptEmittedFactura(emittedFactura);
+
+        this.operationInfo.set(
+          emittedFactura.numeroFactura === null
+            ? 'Factura emitida correctamente.'
+            : `Factura ${emittedFactura.numeroFactura} emitida correctamente.`,
+        );
+      }
+    } catch (error: unknown) {
+      this.operationError.set(
+        getErrorMessage(error, 'No se ha podido abrir la previsualización de la factura.'),
+      );
+    } finally {
+      this.previewing.set(false);
+    }
+  }
+
+  /**
+   * Garantiza que la preview trabaje siempre sobre
+   * un borrador persistido y limpio.
+   */
+  private async ensurePreviewBorrador(): Promise<ClienteFacturaInterface> {
+    const factura: ClienteFacturaInterface | null = this.currentFactura();
+
+    if (factura === null || this.hasChanges()) {
+      return this.persistBorrador();
+    }
+
+    if (factura.estado !== 'borrador') {
+      throw new Error('Solo se pueden previsualizar borradores de factura.');
+    }
+
+    return factura;
+  }
+
+  /**
+   * Persiste la selección y adopta como base la
+   * respuesta canónica confirmada por backend.
+   */
+  private async persistBorrador(): Promise<ClienteFacturaInterface> {
+    const clientePublicId: string = this.clientePublicId();
+    const ventasPublicIds: readonly string[] = this.getSelectedVentasPublicIds();
+    const factura: ClienteFacturaInterface | null = this.currentFactura();
+
+    if (ventasPublicIds.length === 0) {
+      throw new Error('La factura debe incluir al menos una venta.');
+    }
+
+    let persistedFactura: ClienteFacturaInterface;
+
+    if (factura === null) {
+      const command: CrearClienteFacturaBorradorCommand = {
+        clientePublicId,
+        ventasPublicIds,
+      };
+
+      persistedFactura = await this.clientesService.createFacturaBorrador(command);
+    } else {
+      if (factura.estado !== 'borrador') {
+        throw new Error('La factura ya no está disponible para editar.');
+      }
+
+      const command: ActualizarClienteFacturaBorradorCommand = {
+        clientePublicId,
+        borradorPublicId: factura.publicId,
+        ventasPublicIds,
+      };
+
+      persistedFactura = await this.clientesService.updateFacturaBorrador(command);
+    }
+
+    this.currentFactura.set(persistedFactura);
+    this.setBaseSelection(this.selectedVentasPublicIds());
+
+    return persistedFactura;
   }
 
   /**

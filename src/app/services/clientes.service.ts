@@ -10,6 +10,7 @@ import type {
   ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type { ClienteFacturaDocumentoConsulta } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
   ClienteFacturaVentaInterface,
@@ -401,6 +402,23 @@ export default class ClientesService {
       await window.osumiDesktop.clientes.emitFacturaBorrador(command);
 
     await this.reconciliarFacturaPersistida(command.clientePublicId, factura);
+
+    return factura;
+  }
+
+  /**
+   * Abre la preview documental y reconcilia cualquier
+   * emisión realizada desde su propia ventana.
+   */
+  async openFacturaPreview(
+    consulta: ClienteFacturaDocumentoConsulta,
+  ): Promise<ClienteFacturaInterface | null> {
+    const factura: ClienteFacturaInterface | null =
+      await window.osumiDesktop.clientes.openFacturaPreview(consulta);
+
+    if (factura !== null) {
+      await this.reconciliarFacturaPersistida(consulta.clientePublicId, factura);
+    }
 
     return factura;
   }

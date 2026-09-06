@@ -316,6 +316,15 @@
             </button>
             }
 
+            @if (editable()) {
+            <button mat-stroked-button
+                    type="button"
+                    [disabled]="!canPreview()"
+                    (click)="previewFactura()">
+                {{ previewing() ? 'Previsualizando...' : 'Previsualizar' }}
+            </button>
+            }
+
             @if (
             currentFactura()?.estado === 'borrador' &&
             currentFactura()?.capacidades?.puedeFacturar

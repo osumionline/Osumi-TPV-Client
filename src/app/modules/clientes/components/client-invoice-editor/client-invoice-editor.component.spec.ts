@@ -1,6 +1,7 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import type ActualizarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/actualizar-cliente-factura-borrador-command.interface';
+import type { ClienteFacturaDocumentoConsulta } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
   ClienteFacturaVentaInterface,
@@ -28,6 +29,8 @@ class FakeClientesService {
   receivedUpdateCommand: ActualizarClienteFacturaBorradorCommand | null = null;
   receivedDeleteCommand: EliminarClienteFacturaBorradorCommand | null = null;
   receivedEmitCommand: EmitirClienteFacturaCommand | null = null;
+  previewResult: ClienteFacturaInterface | null = null;
+  receivedPreviewConsulta: ClienteFacturaDocumentoConsulta | null = null;
 
   /**
    * Devuelve las ventas disponibles preparadas para la prueba.
@@ -94,6 +97,17 @@ class FakeClientesService {
     this.receivedEmitCommand = command;
 
     return Promise.resolve(createFacturaEmitida());
+  }
+
+  /**
+   * Simula el ciclo completo de la ventana preview.
+   */
+  openFacturaPreview(
+    consulta: ClienteFacturaDocumentoConsulta,
+  ): Promise<ClienteFacturaInterface | null> {
+    this.receivedPreviewConsulta = consulta;
+
+    return Promise.resolve(this.previewResult);
   }
 }
 
@@ -302,6 +316,64 @@ describe('ClientInvoiceEditorComponent', (): void => {
 
     expect(dialogService.confirmCount).toBe(1);
     expect(closeRequests).toEqual([true]);
+  });
+
+  it('crea automáticamente una factura nueva antes de previsualizarla', async (): Promise<void> => {
+    await createFixture(null);
+
+    fixture.componentInstance.toggleVenta('venta-1');
+
+    expect(fixture.componentInstance.hasChanges()).toBe(true);
+    expect(fixture.componentInstance.canPreview()).toBe(true);
+
+    await fixture.componentInstance.previewFactura();
+
+    expect(clientesService.receivedCreateCommand).toEqual({
+      clientePublicId: 'cliente-1',
+      ventasPublicIds: ['venta-1'],
+    });
+    expect(clientesService.receivedPreviewConsulta).toEqual({
+      clientePublicId: 'cliente-1',
+      facturaPublicId: 'factura-borrador',
+    });
+    expect(fixture.componentInstance.hasChanges()).toBe(false);
+  });
+
+  it('actualiza automáticamente un borrador modificado antes de previsualizarlo', async (): Promise<void> => {
+    clientesService.ventasDisponibles = [
+      createVentaDisponible('venta-1', 41, 1_000, true),
+      createVentaDisponible('venta-2', 42, 2_000, false),
+    ];
+
+    await createFixture(createFacturaBorrador());
+
+    fixture.componentInstance.toggleVenta('venta-2');
+
+    await fixture.componentInstance.previewFactura();
+
+    expect(clientesService.receivedUpdateCommand).toEqual({
+      clientePublicId: 'cliente-1',
+      borradorPublicId: 'factura-borrador',
+      ventasPublicIds: ['venta-1', 'venta-2'],
+    });
+    expect(clientesService.receivedPreviewConsulta).toEqual({
+      clientePublicId: 'cliente-1',
+      facturaPublicId: 'factura-borrador',
+    });
+    expect(fixture.componentInstance.hasChanges()).toBe(false);
+  });
+
+  it('adopta la factura emitida desde la ventana de previsualización', async (): Promise<void> => {
+    clientesService.ventasDisponibles = [createVentaDisponible('venta-1', 41, 1_000, true)];
+    clientesService.previewResult = createFacturaEmitida();
+
+    await createFixture(createFacturaBorrador());
+
+    await fixture.componentInstance.previewFactura();
+
+    expect(fixture.componentInstance.currentFactura()?.estado).toBe('emitida');
+    expect(fixture.componentInstance.currentFactura()?.numeroFactura).toBe('21_2026');
+    expect(fixture.componentInstance.editable()).toBe(false);
   });
 
   it('emite un borrador limpio y convierte el editor a modo consulta', async (): Promise<void> => {

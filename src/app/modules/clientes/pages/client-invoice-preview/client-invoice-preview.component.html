@@ -1,0 +1,323 @@
+<main class="invoice-preview">
+    @if (loading()) {
+    <section class="invoice-preview__state"
+             role="status">
+        Cargando factura...
+    </section>
+    }
+    @else if (loadError() !== null) {
+    <section class="invoice-preview__state invoice-preview__state--error">
+        <h1>
+            No se ha podido cargar la factura
+        </h1>
+
+        <p>
+            {{ loadError() }}
+        </p>
+
+        <button type="button"
+                (click)="retry()">
+            Reintentar
+        </button>
+    </section>
+    }
+    @else if (documento(); as factura) {
+    <article class="invoice-document">
+        <header class="invoice-document__header">
+            <section class="invoice-business">
+                <img class="invoice-business__logo"
+                     [src]="logoUrl"
+                     alt="">
+
+                <div class="invoice-business__data">
+                    <strong>
+                        {{ factura.emisor.nombreComercial }}
+                    </strong>
+
+                    @if (factura.emisor.cif !== '') {
+                    <span>
+                        {{ factura.emisor.cif }}
+                    </span>
+                    }
+
+                    @if (factura.emisor.direccion !== '') {
+                    <span>
+                        {{ factura.emisor.direccion }}
+                    </span>
+                    }
+
+                    @if (getBusinessContact(factura) !== '') {
+                    <span>
+                        {{ getBusinessContact(factura) }}
+                    </span>
+                    }
+                </div>
+            </section>
+
+            <section class="invoice-recipient">
+                <dl class="invoice-meta">
+                    <dt>
+                        FECHA:
+                    </dt>
+                    <dd>
+                        {{ formatDate(factura.fechaDocumento) }}
+                    </dd>
+
+                    <dt>
+                        FACTURA:
+                    </dt>
+                    <dd>
+                        {{ factura.numeroFactura }}
+                    </dd>
+                </dl>
+
+                <div class="invoice-recipient__data">
+                    <strong>
+                        {{ factura.cliente.nombreApellidos }}
+                    </strong>
+
+                    @if (factura.cliente.dniCif !== null) {
+                    <strong>
+                        {{ factura.cliente.dniCif }}
+                    </strong>
+                    }
+
+                    @if (factura.cliente.direccion !== null) {
+                    <span>
+                        {{ factura.cliente.direccion }}
+                    </span>
+                    }
+
+                    @if (getClienteLocalidad(factura) !== '') {
+                    <span>
+                        {{ getClienteLocalidad(factura) }}
+                    </span>
+                    }
+                </div>
+            </section>
+        </header>
+
+        @if (operationError() !== null) {
+        <div class="invoice-document__error"
+             role="alert">
+            {{ operationError() }}
+        </div>
+        }
+
+        <div class="invoice-table-container">
+            <table class="invoice-table">
+                <thead>
+                    <tr>
+                        <th class="invoice-table__expand"
+                            scope="col">
+                            <button type="button"
+                                    class="invoice-table__expand-button"
+                                    [attr.aria-expanded]="allVentasExpanded()"
+                                    [attr.aria-label]="
+                                        allVentasExpanded()
+                                            ? 'Ocultar líneas de todas las ventas'
+                                            : 'Mostrar líneas de todas las ventas'
+                                    "
+                                    (click)="toggleAllVentas()">
+                                <mat-icon>{{ allVentasExpanded() ? 'keyboard_arrow_down' : 'keyboard_arrow_right' }}keyboard_arrow_down</mat-icon>
+                            </button>
+                        </th>
+                        <th scope="col">
+                            CONCEPTO
+                        </th>
+                        <th scope="col">
+                            PVP
+                        </th>
+                        <th scope="col">
+                            BASE UD
+                        </th>
+                        <th class="invoice-table__units"
+                            scope="col">
+                            UD
+                        </th>
+                        <th scope="col">
+                            SUBTOTAL
+                        </th>
+                        <th colspan="2"
+                            scope="colgroup">
+                            IVA
+                        </th>
+                        <th scope="col">
+                            DTO
+                        </th>
+                        <th scope="col">
+                            TOTAL
+                        </th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @for (venta of factura.ventas; track venta.publicId) {
+                    <tr class="invoice-table__sale">
+                        <td class="invoice-table__expand">
+                            <button type="button"
+                                    class="invoice-table__expand-button"
+                                    [attr.aria-expanded]="
+                                        isVentaExpanded(venta.publicId)
+                                    "
+                                    [attr.aria-label]="
+                                        isVentaExpanded(venta.publicId)
+                                            ? 'Ocultar líneas de la venta'
+                                            : 'Mostrar líneas de la venta'
+                                    "
+                                    (click)="toggleVenta(venta.publicId)">
+                                <mat-icon>{{ isVentaExpanded(venta.publicId) ? 'keyboard_arrow_down' : 'keyboard_arrow_right' }}keyboard_arrow_down</mat-icon>
+                            </button>
+                        </td>
+
+                        <td>
+                            Ticket Nº {{ getVentaReferencia(venta) }}
+                            ({{ formatDateTime(venta.fecha) }})
+                        </td>
+
+                        <td class="invoice-table__money">
+                            {{ formatCents(venta.pvpCents) }}
+                        </td>
+
+                        <td class="invoice-table__money">
+                            {{ formatCents(venta.baseCents) }}
+                        </td>
+
+                        <td>
+                        </td>
+
+                        <td class="invoice-table__money">
+                            {{ formatCents(venta.subtotalCents) }}
+                        </td>
+
+                        <td>
+                        </td>
+
+                        <td class="invoice-table__money">
+                            {{ formatCents(venta.ivaCents) }}
+                        </td>
+
+                        <td class="invoice-table__money">
+                            {{ formatCents(venta.descuentoCents) }}
+                        </td>
+
+                        <td class="invoice-table__money">
+                            {{ formatCents(venta.totalCents) }}
+                        </td>
+                    </tr>
+
+                    @if (isVentaExpanded(venta.publicId)) {
+                    @for (linea of venta.lineas; track $index) {
+                    <tr class="invoice-table__line">
+                        <td>
+                        </td>
+
+                        <td>
+                            {{ linea.nombre }}
+                        </td>
+
+                        <td class="invoice-table__money">
+                            {{ formatCents(linea.pvpCents) }}
+                        </td>
+
+                        <td class="invoice-table__money">
+                            {{ formatCents(linea.baseUnitCents) }}
+                        </td>
+
+                        <td class="invoice-table__units">
+                            {{ linea.unidades }}
+                        </td>
+
+                        <td class="invoice-table__money">
+                            {{ formatCents(linea.subtotalCents) }}
+                        </td>
+
+                        <td class="invoice-table__percentage">
+                            {{ formatPercentage(linea.ivaBps) }}
+                        </td>
+
+                        <td class="invoice-table__money">
+                            {{ formatCents(linea.ivaCents) }}
+                        </td>
+
+                        <td class="invoice-table__money">
+                            {{ formatCents(linea.descuentoCents) }}
+                        </td>
+
+                        <td class="invoice-table__money">
+                            {{ formatCents(linea.totalCents) }}
+                        </td>
+                    </tr>
+                    }
+                    }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <section class="invoice-summary">
+            <div class="invoice-summary__status">
+                @if (!factura.previsualizacion) {
+                <div class="invoice-paid">
+                    {{ factura.estado === 'anulada' ? 'ANULADA' : 'PAGADO' }}
+                </div>
+                }
+            </div>
+
+            <div class="invoice-totals">
+                <div>
+                    <span>
+                        SUBTOTAL
+                    </span>
+                    <strong>
+                        {{ formatCents(factura.subtotalCents) }}
+                    </strong>
+                </div>
+
+                @for (impuesto of factura.impuestos; track impuesto.ivaBps) {
+                <div>
+                    <span>
+                        IVA {{ formatPercentage(impuesto.ivaBps) }}
+                    </span>
+                    <strong>
+                        {{ formatCents(impuesto.cuotaCents) }}
+                    </strong>
+                </div>
+                }
+
+                <div>
+                    <span>
+                        DESCUENTO
+                    </span>
+                    <strong>
+                        {{ formatCents(factura.descuentoCents) }}
+                    </strong>
+                </div>
+
+                <div class="invoice-totals__total">
+                    <span>
+                        TOTAL
+                    </span>
+                    <strong>
+                        {{ formatCents(factura.totalCents) }}
+                    </strong>
+                </div>
+            </div>
+        </section>
+
+        @if (factura.previsualizacion) {
+        <footer class="invoice-preview-actions">
+            <span>
+                PREVISUALIZACIÓN
+            </span>
+
+            <button type="button"
+                    [disabled]="!canEmit()"
+                    (click)="emitFactura()">
+                {{ processing() ? 'Facturando...' : 'Facturar' }}
+            </button>
+        </footer>
+        }
+    </article>
+    }
+</main>
