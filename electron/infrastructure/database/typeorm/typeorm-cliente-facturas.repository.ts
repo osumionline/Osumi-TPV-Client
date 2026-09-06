@@ -1,8 +1,14 @@
 import ActualizarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/actualizar-cliente-factura-borrador-record-command.interface';
+import type ClienteFacturaDocumentosRepository from '@backend/contracts/clientes/cliente-factura-documentos.repository.interface';
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
 import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
 import type EmitirClienteFacturaRecordCommand from '@backend/contracts/clientes/emitir-cliente-factura-record-command.interface';
+import type {
+  ClienteFacturaDocumentoLineaRecord,
+  ClienteFacturaDocumentoRecord,
+  ClienteFacturaDocumentoVentaRecord,
+} from '@backend/domain/clientes/cliente-factura-documento-record.interface';
 import type {
   ClienteFacturaEstadoRecord,
   ClienteFacturaRecord,
@@ -93,10 +99,55 @@ interface ClienteFacturaSecuenciaDatabaseRow {
   readonly ultimo_numero: number;
 }
 
+interface ClienteFacturaDocumentoDatabaseRow {
+  readonly id: number;
+  readonly public_id: string;
+  readonly serie: string;
+  readonly numero: number | null;
+  readonly estado: ClienteFacturaEstadoRecord;
+  readonly nombre_apellidos: string;
+  readonly dni_cif: string | null;
+  readonly telefono: string | null;
+  readonly email: string | null;
+  readonly direccion: string | null;
+  readonly codigo_postal: string | null;
+  readonly poblacion: string | null;
+  readonly id_provincia: number | null;
+  readonly importe_cents: number;
+  readonly fecha_creacion: string;
+  readonly fecha_emision: string | null;
+  readonly fecha_anulacion: string | null;
+}
+
+interface ClienteFacturaDocumentoVentaDatabaseRow {
+  readonly id: number;
+  readonly public_id: string;
+  readonly serie: string;
+  readonly numero: number;
+  readonly fecha: string;
+  readonly total_cents: number;
+}
+
+interface ClienteFacturaDocumentoLineaDatabaseRow {
+  readonly id_venta: number;
+  readonly localizador: number;
+  readonly marca: string;
+  readonly nombre: string;
+  readonly pvp_micros: number;
+  readonly iva_bps: number;
+  readonly importe_micros: number;
+  readonly descuento_bps: number;
+  readonly importe_descuento_micros: number;
+  readonly unidades: number;
+  readonly regalo: number;
+}
+
 const FACTURA_DOCUMENT_TYPE: string = 'factura';
 const FACTURA_SERIE: string = '';
 
-export default class TypeOrmClienteFacturasRepository implements ClienteFacturasRepository {
+export default class TypeOrmClienteFacturasRepository
+  implements ClienteFacturasRepository, ClienteFacturaDocumentosRepository
+{
   constructor(private readonly applicationDatabase: TypeOrmApplicationDatabase) {}
 
   /**
@@ -160,6 +211,178 @@ export default class TypeOrmClienteFacturasRepository implements ClienteFacturas
       fechaEmision: row.fecha_emision,
       fechaAnulacion: row.fecha_anulacion,
     }));
+  }
+
+  /**
+   * Recupera en una misma transacción de lectura la
+   * factura, sus ventas y sus líneas históricas.
+   */
+  async findDocumentoByPublicId(
+    clientePublicId: string,
+    facturaPublicId: string,
+  ): Promise<ClienteFacturaDocumentoRecord | null> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<ClienteFacturaDocumentoRecord | null> => {
+        const facturaRows: readonly ClienteFacturaDocumentoDatabaseRow[] = (await queryRunner.query(
+          `
+              SELECT
+                f.id,
+                f.public_id,
+                f.serie,
+                f.numero,
+                f.estado,
+                f.nombre_apellidos,
+                f.dni_cif,
+                f.telefono,
+                f.email,
+                f.direccion,
+                f.codigo_postal,
+                f.poblacion,
+                f.id_provincia,
+                f.importe_cents,
+                f.created_at AS fecha_creacion,
+                f.fecha_emision,
+                f.fecha_anulacion
+              FROM factura f
+
+              INNER JOIN cliente c
+                ON c.id = f.id_cliente
+
+              WHERE
+                c.public_id = ?
+                AND c.deleted_at IS NULL
+                AND f.public_id = ?
+                AND f.deleted_at IS NULL
+
+              LIMIT 1
+            `,
+          [clientePublicId, facturaPublicId],
+        )) as readonly ClienteFacturaDocumentoDatabaseRow[];
+
+        const factura: ClienteFacturaDocumentoDatabaseRow | undefined = facturaRows[0];
+
+        if (factura === undefined) {
+          return null;
+        }
+
+        const ventasRows: readonly ClienteFacturaDocumentoVentaDatabaseRow[] =
+          (await queryRunner.query(
+            `
+              SELECT
+                v.id,
+                v.public_id,
+                v.serie,
+                v.numero,
+                v.created_at AS fecha,
+                v.total_cents
+              FROM factura_venta fv
+
+              INNER JOIN venta v
+                ON v.id = fv.id_venta
+
+              WHERE fv.id_factura = ?
+
+              ORDER BY
+                fv.created_at ASC,
+                v.id ASC
+            `,
+            [factura.id],
+          )) as readonly ClienteFacturaDocumentoVentaDatabaseRow[];
+
+        const lineasRows: readonly ClienteFacturaDocumentoLineaDatabaseRow[] =
+          (await queryRunner.query(
+            `
+              SELECT
+                lv.id_venta,
+                lv.localizador,
+                lv.marca,
+                lv.nombre_articulo AS nombre,
+                lv.pvp_micros,
+                lv.iva_bps,
+                lv.importe_micros,
+                lv.descuento_bps,
+                lv.importe_descuento_micros,
+                lv.unidades,
+                lv.regalo
+              FROM factura_venta fv
+
+              INNER JOIN linea_venta lv
+                ON lv.id_venta = fv.id_venta
+
+              WHERE fv.id_factura = ?
+
+              ORDER BY
+                fv.created_at ASC,
+                lv.id_venta ASC,
+                lv.id ASC
+            `,
+            [factura.id],
+          )) as readonly ClienteFacturaDocumentoLineaDatabaseRow[];
+
+        const lineasByVentaId: Map<number, ClienteFacturaDocumentoLineaRecord[]> = new Map<
+          number,
+          ClienteFacturaDocumentoLineaRecord[]
+        >();
+
+        for (const row of lineasRows) {
+          const lineas: ClienteFacturaDocumentoLineaRecord[] =
+            lineasByVentaId.get(row.id_venta) ?? [];
+
+          lineas.push({
+            localizador: row.localizador,
+            marca: row.marca,
+            nombre: row.nombre,
+            pvpMicros: row.pvp_micros,
+            ivaBps: row.iva_bps,
+            importeMicros: row.importe_micros,
+            descuentoBps: row.descuento_bps,
+            importeDescuentoMicros: row.importe_descuento_micros,
+            unidades: row.unidades,
+            regalo: row.regalo === 1,
+          });
+
+          if (!lineasByVentaId.has(row.id_venta)) {
+            lineasByVentaId.set(row.id_venta, lineas);
+          }
+        }
+
+        const ventas: readonly ClienteFacturaDocumentoVentaRecord[] = ventasRows.map(
+          (row: ClienteFacturaDocumentoVentaDatabaseRow): ClienteFacturaDocumentoVentaRecord => ({
+            publicId: row.public_id,
+            serie: row.serie,
+            numero: row.numero,
+            fecha: row.fecha,
+            totalCents: row.total_cents,
+            lineas: lineasByVentaId.get(row.id) ?? [],
+          }),
+        );
+
+        return {
+          publicId: factura.public_id,
+          serie: factura.serie,
+          numero: factura.numero,
+          estado: factura.estado,
+          importeCents: factura.importe_cents,
+          fechaCreacion: factura.fecha_creacion,
+          fechaEmision: factura.fecha_emision,
+          fechaAnulacion: factura.fecha_anulacion,
+          cliente: {
+            nombreApellidos: factura.nombre_apellidos,
+            dniCif: factura.dni_cif,
+            telefono: factura.telefono,
+            email: factura.email,
+            direccion: factura.direccion,
+            codigoPostal: factura.codigo_postal,
+            poblacion: factura.poblacion,
+            provinciaId: factura.id_provincia,
+          },
+          ventas,
+        };
+      },
+    );
   }
 
   /**

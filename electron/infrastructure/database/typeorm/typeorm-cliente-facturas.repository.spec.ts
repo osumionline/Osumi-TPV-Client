@@ -1,3 +1,4 @@
+import type { ClienteFacturaDocumentoRecord } from '@backend/domain/clientes/cliente-factura-documento-record.interface';
 import type { ClienteFacturaRecord } from '@backend/domain/clientes/cliente-factura-record.interface';
 import type {
   ClienteFacturaVentaDisponibleRecord,
@@ -852,6 +853,111 @@ describe('TypeOrmClienteFacturasRepository', (): void => {
         }),
       ).rejects.toThrow('El borrador de factura no pertenece al cliente o ya no está disponible.');
     }
+  });
+
+  it('recupera el snapshot documental de la factura y no los datos actuales del cliente', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    await dataSource.query(`
+      UPDATE factura
+      SET
+        nombre_apellidos = 'Facturación histórica',
+        dni_cif = 'B12345678',
+        telefono = '944123456',
+        email = 'historica@example.com',
+        direccion = 'Gran Vía 10',
+        codigo_postal = '48001',
+        poblacion = 'Bilbao',
+        id_provincia = 48
+      WHERE public_id = 'factura-emitida'
+    `);
+
+    await dataSource.query(`
+      UPDATE cliente
+      SET nombre_apellidos = 'Cliente cambiado posteriormente'
+      WHERE public_id = 'cliente-1'
+    `);
+
+    await dataSource.query(`
+      UPDATE linea_venta
+      SET
+        iva_bps = 2100,
+        descuento_bps = 1000,
+        importe_descuento_micros = 3000000
+      WHERE public_id = 'linea-8'
+    `);
+
+    const result: ClienteFacturaDocumentoRecord | null =
+      await requireRepository().findDocumentoByPublicId('cliente-1', 'factura-emitida');
+
+    expect(result).toEqual({
+      publicId: 'factura-emitida',
+      serie: '',
+      numero: 7,
+      estado: 'emitida',
+      importeCents: 12_345,
+      fechaCreacion: '2026-08-19T10:00:00.000Z',
+      fechaEmision: '2026-08-20 09:00:00',
+      fechaAnulacion: null,
+      cliente: {
+        nombreApellidos: 'Facturación histórica',
+        dniCif: 'B12345678',
+        telefono: '944123456',
+        email: 'historica@example.com',
+        direccion: 'Gran Vía 10',
+        codigoPostal: '48001',
+        poblacion: 'Bilbao',
+        provinciaId: 48,
+      },
+      ventas: [
+        {
+          publicId: 'venta-facturada',
+          serie: '',
+          numero: 7,
+          fecha: '2026-09-05T10:00:00.000Z',
+          totalCents: 3_000,
+          lineas: [
+            {
+              localizador: 1007,
+              marca: 'Marca',
+              nombre: 'Facturada',
+              pvpMicros: 30_000_000,
+              ivaBps: 2100,
+              importeMicros: 30_000_000,
+              descuentoBps: 1000,
+              importeDescuentoMicros: 3_000_000,
+              unidades: 1,
+              regalo: false,
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('conserva las ventas históricas de una factura anulada en su documento', async (): Promise<void> => {
+    const result: ClienteFacturaDocumentoRecord | null =
+      await requireRepository().findDocumentoByPublicId('cliente-1', 'factura-anulada');
+
+    expect(result?.estado).toBe('anulada');
+    expect(result?.ventas.map((venta): string => venta.publicId)).toEqual(['venta-historica']);
+  });
+
+  it('no recupera documentos ajenos, eliminados o pertenecientes a clientes inactivos', async (): Promise<void> => {
+    expect(
+      await requireRepository().findDocumentoByPublicId('cliente-2', 'factura-emitida'),
+    ).toBeNull();
+
+    expect(
+      await requireRepository().findDocumentoByPublicId('cliente-1', 'factura-borrador-eliminado'),
+    ).toBeNull();
+
+    expect(
+      await requireRepository().findDocumentoByPublicId(
+        'cliente-inactivo',
+        'factura-cliente-inactivo',
+      ),
+    ).toBeNull();
   });
 
   it('recupera las relaciones activas e históricas de cualquier estado de factura', async (): Promise<void> => {
