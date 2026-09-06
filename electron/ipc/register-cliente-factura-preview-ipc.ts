@@ -1,4 +1,5 @@
 import type ClienteFacturaDocumentosService from '@backend/application/clientes/cliente-factura-documentos.service';
+import type ClienteFacturaPdfService from '@backend/application/clientes/cliente-factura-pdf.service';
 import type ClienteFacturasService from '@backend/application/clientes/cliente-facturas.service';
 import type ClienteFacturaPreviewWindow from '@backend/contracts/clientes/cliente-factura-preview-window.interface';
 import type {
@@ -13,6 +14,7 @@ export default function registerClienteFacturaPreviewIpc(
   previewWindow: ClienteFacturaPreviewWindow,
   documentosService: ClienteFacturaDocumentosService,
   facturasService: ClienteFacturasService,
+  pdfService: ClienteFacturaPdfService,
 ): void {
   ipcMain.handle(
     IPC_CHANNELS.clienteFacturaPreviewGetDocumento,
@@ -34,11 +36,20 @@ export default function registerClienteFacturaPreviewIpc(
       });
 
       /*
-       * El COMMIT ya se ha confirmado. Guardamos
-       * inmediatamente el resultado antes de cualquier
-       * lectura documental posterior.
+       * A partir de aquí el COMMIT es definitivo.
+       * Guardamos primero el resultado para que cerrar
+       * la preview nunca pierda esa información.
        */
       previewWindow.markEmitted(event.sender.id, factura);
+
+      /*
+       * La factura ya puede responder como emitida aunque
+       * Chromium o filesystem fallen materializando el PDF.
+       */
+      void pdfService.materializeAfterEmit({
+        clientePublicId: consulta.clientePublicId,
+        facturaPublicId: factura.publicId,
+      });
 
       return documentosService.getDocumento(consulta);
     },

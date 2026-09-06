@@ -1,3 +1,4 @@
+import type ClienteFacturaPdfService from '@backend/application/clientes/cliente-factura-pdf.service';
 import type ClienteFacturasService from '@backend/application/clientes/cliente-facturas.service';
 import type ClientesService from '@backend/application/clientes/clientes.service';
 import type ClienteFacturaPreviewWindow from '@backend/contracts/clientes/cliente-factura-preview-window.interface';
@@ -34,6 +35,7 @@ export default function registerClientesIpc(
   clientesService: ClientesService,
   clienteFacturasService: ClienteFacturasService,
   clienteFacturaPreviewWindow: ClienteFacturaPreviewWindow,
+  clienteFacturaPdfService: ClienteFacturaPdfService,
 ): void {
   ipcMain.handle(
     IPC_CHANNELS.clientesGetAll,
@@ -123,11 +125,22 @@ export default function registerClientesIpc(
 
   ipcMain.handle(
     IPC_CHANNELS.clientesEmitFacturaBorrador,
-
     async (event, command: EmitirClienteFacturaCommand): Promise<ClienteFacturaInterface> => {
       assertTrustedSender(event, getMainWindow);
 
-      return clienteFacturasService.emitBorrador(command);
+      const factura: ClienteFacturaInterface = await clienteFacturasService.emitBorrador(command);
+
+      /*
+       * La factura ya está confirmada por SQLite.
+       * La materialización documental nunca puede
+       * transformar ese COMMIT en un error de emisión.
+       */
+      void clienteFacturaPdfService.materializeAfterEmit({
+        clientePublicId: command.clientePublicId,
+        facturaPublicId: factura.publicId,
+      });
+
+      return factura;
     },
   );
 

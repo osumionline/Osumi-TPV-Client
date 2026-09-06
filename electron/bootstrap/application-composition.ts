@@ -5,6 +5,8 @@ import ArticulosService from '@backend/application/articulos/articulos.service';
 import CajaService from '@backend/application/caja/caja.service';
 import CategoriasService from '@backend/application/categorias/categorias.service';
 import ClienteFacturaDocumentosService from '@backend/application/clientes/cliente-factura-documentos.service';
+import ClienteFacturaPdfHtmlBuilder from '@backend/application/clientes/cliente-factura-pdf-html.builder';
+import ClienteFacturaPdfService from '@backend/application/clientes/cliente-factura-pdf.service';
 import ClienteFacturasService from '@backend/application/clientes/cliente-facturas.service';
 import ClientesService from '@backend/application/clientes/clientes.service';
 import ConfigurationService from '@backend/application/configuration/configuration.service';
@@ -32,6 +34,7 @@ import type ArticulosRepository from '@backend/contracts/articulos/articulos.rep
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';
 import type ClienteFacturaDocumentosRepository from '@backend/contracts/clientes/cliente-factura-documentos.repository.interface';
+import type ClienteFacturaPdfStorage from '@backend/contracts/clientes/cliente-factura-pdf-storage.interface';
 import type ClienteFacturaPreviewWindow from '@backend/contracts/clientes/cliente-factura-preview-window.interface';
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type ClienteRepository from '@backend/contracts/clientes/cliente.repository.interface';
@@ -44,6 +47,7 @@ import type SecretStorage from '@backend/contracts/configuration/secret-storage.
 import type { EmailSender } from '@backend/contracts/email/email-sender.interface';
 import type EmpleadoRepository from '@backend/contracts/empleados/empleado.repository.interface';
 import type MarcaRepository from '@backend/contracts/marcas/marca.repository.interface';
+import type A4DocumentRenderer from '@backend/contracts/printing/a4-document-renderer.interface';
 import type HtmlDocumentRenderer from '@backend/contracts/printing/html-document-renderer.interface';
 import type PrinterProvider from '@backend/contracts/printing/printer.provider.interface';
 import type PrintingSettingsRepository from '@backend/contracts/printing/printing-settings.repository.interface';
@@ -88,6 +92,7 @@ import TypeOrmVentasPersistenciaRepository from '@infrastructure/database/typeor
 import TypeOrmVentasPostventaRepository from '@infrastructure/database/typeorm/typeorm-ventas-postventa.repository';
 import TypeOrmVentasTicketBaiRepository from '@infrastructure/database/typeorm/typeorm-ventas-ticket-bai.repository';
 import TypeOrmVentasTicketsRepository from '@infrastructure/database/typeorm/typeorm-ventas-tickets.repository';
+import ElectronA4DocumentRenderer from '@infrastructure/electron/electron-a4-document.renderer';
 import ElectronAssetUrlBuilder from '@infrastructure/electron/electron-asset-url.builder';
 import ElectronClienteFacturaPreviewWindow from '@infrastructure/electron/electron-cliente-factura-preview-window';
 import ElectronHtmlDocumentRenderer from '@infrastructure/electron/electron-html-document.renderer';
@@ -98,6 +103,7 @@ import { ElectronRuntimeInfoProvider } from '@infrastructure/electron/electron-r
 import ElectronSafeStorageSecretStorage from '@infrastructure/electron/electron-safe-storage-secret-storage';
 import { getMainWindow } from '@infrastructure/electron/main-window';
 import NodemailerEmailSender from '@infrastructure/email/nodemailer-email.sender';
+import FileClienteFacturaPdfStorage from '@infrastructure/filesystem/file-cliente-factura-pdf.storage';
 import FileInstallationStaging from '@infrastructure/filesystem/file-installation-staging';
 import FileVentaTicketPdfStorage from '@infrastructure/filesystem/file-venta-ticket-pdf.storage';
 import FilesystemImageFileStorage from '@infrastructure/filesystem/filesystem-image-file.storage';
@@ -281,6 +287,19 @@ export default function createApplicationComposition(
   );
   const clienteFacturaDocumentosService: ClienteFacturaDocumentosService =
     new ClienteFacturaDocumentosService(configurationService, clienteFacturaDocumentosRepository);
+
+  const clienteFacturaPdfStorage: ClienteFacturaPdfStorage = new FileClienteFacturaPdfStorage(
+    join(applicationPaths.filesDirectory, 'clientes', 'facturas'),
+  );
+  const a4DocumentRenderer: A4DocumentRenderer = new ElectronA4DocumentRenderer();
+  const clienteFacturaPdfHtmlBuilder: ClienteFacturaPdfHtmlBuilder =
+    new ClienteFacturaPdfHtmlBuilder();
+  const clienteFacturaPdfService: ClienteFacturaPdfService = new ClienteFacturaPdfService(
+    clienteFacturaDocumentosService,
+    clienteFacturaPdfHtmlBuilder,
+    a4DocumentRenderer,
+    clienteFacturaPdfStorage,
+  );
 
   const clienteFacturaPreviewWindow: ClienteFacturaPreviewWindow =
     new ElectronClienteFacturaPreviewWindow(getMainWindow);
@@ -486,11 +505,14 @@ export default function createApplicationComposition(
     clientesService,
     clienteFacturasService,
     clienteFacturaPreviewWindow,
+    clienteFacturaPdfService,
   );
+
   registerClienteFacturaPreviewIpc(
     clienteFacturaPreviewWindow,
     clienteFacturaDocumentosService,
     clienteFacturasService,
+    clienteFacturaPdfService,
   );
   registerCategoriasIpc(getMainWindow, categoriasService);
   registerCajaIpc(getMainWindow, cajaService);
