@@ -70,17 +70,16 @@ export default class ClienteFacturaEmailService {
 
     const pdf: Uint8Array = await this.pdfProvider.getOrCreatePdf(consulta);
 
-    const nombreNegocio: string = this.resolveBusinessName(appData);
-    const nombreAsunto: string = this.resolveSubjectBusinessName(appData);
+    const nombreEmail: string = this.resolveEmailBusinessName(appData);
     const referencia: string = documento.numeroFactura;
 
     const request: EmailSendRequest = {
       smtp,
-      fromName: nombreNegocio,
+      fromName: nombreEmail,
       fromAddress: smtp.user,
       to: destinatario,
-      subject: `${nombreAsunto} - Factura ${referencia}`,
-      text: `Adjuntamos la factura ${referencia} de ${nombreNegocio}.`,
+      subject: `${nombreEmail} - Factura ${referencia}`,
+      text: `Adjuntamos la factura ${referencia} de ${nombreEmail}.`,
       attachments: [
         {
           filename: this.buildAttachmentFileName(referencia),
@@ -188,26 +187,10 @@ export default class ClienteFacturaEmailService {
   }
 
   /**
-   * Obtiene el nombre comercial visible utilizado
-   * como remitente y en el contenido del email.
+   * Obtiene el nombre utilizado en asunto y cuerpo
+   * siguiendo el mismo criterio que los tickets.
    */
-  private resolveBusinessName(appData: AppData): string {
-    const nombreComercial: string = appData.nombreComercial.trim();
-
-    if (nombreComercial !== '') {
-      return nombreComercial;
-    }
-
-    const nombre: string = appData.nombre.trim();
-
-    return nombre === '' ? 'Osumi TPV' : nombre;
-  }
-
-  /**
-   * Obtiene el nombre utilizado en el asunto del
-   * email siguiendo el mismo criterio que los tickets.
-   */
-  private resolveSubjectBusinessName(appData: AppData): string {
+  private resolveEmailBusinessName(appData: AppData): string {
     const nombre: string = appData.nombre.trim();
 
     return nombre === '' ? 'Osumi TPV' : nombre;

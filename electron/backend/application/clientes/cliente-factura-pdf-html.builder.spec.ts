@@ -43,6 +43,8 @@ describe('ClienteFacturaPdfHtmlBuilder', (): void => {
     expect(html).toContain('&lt;Tienda &amp; Co&gt;');
     expect(html).toContain('&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;');
     expect(html).not.toContain('<script>alert("x")</script>');
+    expect(html).toContain('size: A4 portrait;');
+    expect(html).not.toContain('size: A4 landscape;');
   });
 
   it('rechaza generar un PDF definitivo desde un borrador', (): void => {

@@ -3,10 +3,10 @@ import { BrowserWindow, type WebContents } from 'electron';
 
 export default class ElectronA4DocumentRenderer implements A4DocumentRenderer {
   /**
-   * Renderiza un HTML completo como PDF A4 horizontal
-   * utilizando una BrowserWindow aislada.
+   * Renderiza un HTML completo como PDF A4 respetando
+   * la orientación definida por sus estilos.
    */
-  async renderLandscapePdf(documentHtml: string): Promise<Uint8Array> {
+  async renderPdf(documentHtml: string): Promise<Uint8Array> {
     if (typeof documentHtml !== 'string' || documentHtml.trim().length === 0) {
       throw new Error('El documento HTML de la factura está vacío.');
     }
@@ -42,7 +42,7 @@ export default class ElectronA4DocumentRenderer implements A4DocumentRenderer {
 
       const pdf: Uint8Array = new Uint8Array(
         await documentWindow.webContents.printToPDF({
-          landscape: true,
+          landscape: false,
           displayHeaderFooter: false,
           printBackground: true,
           pageSize: 'A4',

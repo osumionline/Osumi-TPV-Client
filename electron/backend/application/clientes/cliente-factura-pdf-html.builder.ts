@@ -283,7 +283,7 @@ ${this.getStyles()}
   private getStyles(): string {
     return `
 @page {
-  size: A4 landscape;
+  size: A4 portrait;
   margin: 10mm;
 }
 
@@ -298,13 +298,13 @@ body {
   color: #111;
   background: #fff;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 10pt;
+  font-size: 8pt;
 }
 
 .header {
   display: grid;
-  grid-template-columns: 1fr 0.7fr;
-  gap: 24mm;
+  grid-template-columns: minmax(0, 1fr) minmax(60mm, 0.8fr);
+  gap: 10mm;
   margin-bottom: 8mm;
 }
 
@@ -316,8 +316,8 @@ body {
 }
 
 .logo {
-  width: 72mm;
-  max-height: 24mm;
+  width: 55mm;
+  max-height: 20mm;
   margin-bottom: 4mm;
   object-fit: contain;
   object-position: left center;
@@ -364,8 +364,9 @@ body {
 
 .invoice-table th,
 .invoice-table td {
-  padding: 1.6mm 2mm;
+  padding: 1.4mm 1mm;
   border-right: 0.25mm solid #111;
+  overflow: hidden;
 }
 
 .invoice-table th:first-child,
@@ -387,8 +388,19 @@ body {
 }
 
 .invoice-table .concept {
-  width: 31%;
+  width: 34%;
   text-align: left;
+}
+
+.invoice-table th:nth-child(4),
+.invoice-table td:nth-child(4) {
+  width: 5%;
+  text-align: center;
+}
+
+.invoice-table th:not(.concept),
+.invoice-table td:not(.concept) {
+  white-space: nowrap;
 }
 
 .money {
@@ -398,15 +410,15 @@ body {
 
 .summary {
   display: grid;
-  grid-template-columns: 1fr 75mm;
-  gap: 20mm;
+  grid-template-columns: minmax(0, 1fr) 65mm;
+  gap: 10mm;
   align-items: end;
   margin-top: 8mm;
   break-inside: avoid;
 }
 
 .paid {
-  width: 75%;
+  width: 80%;
   margin: 0 auto;
   padding: 6mm;
   border-top: 0.5mm solid #111;

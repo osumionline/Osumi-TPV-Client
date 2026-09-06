@@ -39,7 +39,7 @@ class FakeA4DocumentRenderer implements A4DocumentRenderer {
    * Simula el renderer permitiendo bloquear su
    * resolución para comprobar concurrencia.
    */
-  async renderLandscapePdf(documentHtml: string): Promise<Uint8Array> {
+  async renderPdf(documentHtml: string): Promise<Uint8Array> {
     this.calls += 1;
     this.receivedHtml = documentHtml;
     this.onRenderStarted?.();

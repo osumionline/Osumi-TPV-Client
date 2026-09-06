@@ -75,7 +75,7 @@ export default class ElectronPdfPrintDialog implements PdfPrintDialog {
         {
           silent: false,
           printBackground: true,
-          landscape: true,
+          landscape: false,
           pageSize: 'A4',
           margins: {
             marginType: 'none',

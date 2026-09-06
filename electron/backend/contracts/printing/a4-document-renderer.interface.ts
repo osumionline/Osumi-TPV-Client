@@ -1,7 +1,7 @@
 export default interface A4DocumentRenderer {
   /**
-   * Genera un PDF A4 horizontal a partir de
-   * un documento HTML completo.
+   * Genera un PDF A4 respetando la orientación
+   * definida por el documento HTML.
    */
-  renderLandscapePdf(documentHtml: string): Promise<Uint8Array>;
+  renderPdf(documentHtml: string): Promise<Uint8Array>;
 }

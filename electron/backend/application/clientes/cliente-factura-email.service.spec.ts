@@ -63,11 +63,11 @@ describe('ClienteFacturaEmailService', (): void => {
         user: 'smtp@example.com',
         pass: 'smtp-password',
       },
-      fromName: 'Mi comercio',
+      fromName: 'Empresa fiscal',
       fromAddress: 'smtp@example.com',
       to: 'cliente@example.com',
       subject: 'Empresa fiscal - Factura 21_2026',
-      text: 'Adjuntamos la factura 21_2026 de Mi comercio.',
+      text: 'Adjuntamos la factura 21_2026 de Empresa fiscal.',
     });
 
     const attachment = emailSender.requests[0]?.attachments[0];

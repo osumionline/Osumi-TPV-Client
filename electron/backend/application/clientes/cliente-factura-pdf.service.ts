@@ -87,7 +87,7 @@ export default class ClienteFacturaPdfService {
 
     const documentHtml: string = this.htmlBuilder.build(documento);
 
-    const renderedPdf: Uint8Array = await this.documentRenderer.renderLandscapePdf(documentHtml);
+    const renderedPdf: Uint8Array = await this.documentRenderer.renderPdf(documentHtml);
 
     await this.pdfStorage.save(documento.facturaPublicId, renderedPdf);
 
