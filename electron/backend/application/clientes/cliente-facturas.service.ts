@@ -1,4 +1,5 @@
 import type ActualizarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/actualizar-cliente-factura-borrador-record-command.interface';
+import type AnularClienteFacturaRecordCommand from '@backend/contracts/clientes/anular-cliente-factura-record-command.interface';
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
 import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
@@ -13,6 +14,7 @@ import type {
   ClienteFacturaVentaRecord,
 } from '@backend/domain/clientes/cliente-factura-venta-record.interface';
 import type ActualizarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/actualizar-cliente-factura-borrador-command.interface';
+import type AnularClienteFacturaCommand from '@desktop-contracts/clientes/anular-cliente-factura-command.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
   ClienteFacturaVentaInterface,
@@ -124,6 +126,26 @@ export default class ClienteFacturasService {
 
     const record: ClienteFacturaRecord =
       await this.clienteFacturasRepository.emitBorrador(recordCommand);
+
+    return this.toInterface(record);
+  }
+
+  /**
+   * Anula una factura emitida utilizando exclusivamente
+   * identificadores normalizados por aplicación.
+   */
+  async anularFactura(command: AnularClienteFacturaCommand): Promise<ClienteFacturaInterface> {
+    if (typeof command !== 'object' || command === null) {
+      throw new Error('Los datos para anular la factura no son válidos.');
+    }
+
+    const recordCommand: AnularClienteFacturaRecordCommand = {
+      clientePublicId: this.requirePublicId(command.clientePublicId),
+      facturaPublicId: this.requireFacturaPublicId(command.facturaPublicId),
+    };
+
+    const record: ClienteFacturaRecord =
+      await this.clienteFacturasRepository.anularFactura(recordCommand);
 
     return this.toInterface(record);
   }

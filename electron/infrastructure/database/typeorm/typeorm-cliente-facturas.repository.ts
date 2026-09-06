@@ -1,4 +1,5 @@
 import ActualizarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/actualizar-cliente-factura-borrador-record-command.interface';
+import type AnularClienteFacturaRecordCommand from '@backend/contracts/clientes/anular-cliente-factura-record-command.interface';
 import type ClienteFacturaDocumentosRepository from '@backend/contracts/clientes/cliente-factura-documentos.repository.interface';
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
@@ -84,6 +85,16 @@ interface ClienteFacturaBorradorEditableDatabaseRow {
   readonly id: number;
   readonly public_id: string;
   readonly created_at: string;
+}
+
+interface ClienteFacturaEmitidaAnulableDatabaseRow {
+  readonly id: number;
+  readonly public_id: string;
+  readonly serie: string;
+  readonly numero: number;
+  readonly importe_cents: number;
+  readonly created_at: string;
+  readonly fecha_emision: string;
 }
 
 interface ClienteFacturaChangesDatabaseRow {
@@ -574,6 +585,44 @@ export default class TypeOrmClienteFacturasRepository
   }
 
   /**
+   * Anula una factura emitida y convierte todas sus
+   * relaciones activas en histórico dentro del mismo COMMIT.
+   */
+  async anularFactura(command: AnularClienteFacturaRecordCommand): Promise<ClienteFacturaRecord> {
+    const facturaPublicId: string = this.normalizeFacturaPublicId(command.facturaPublicId);
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+    const timestamp: string = new Date().toISOString();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<ClienteFacturaRecord> => {
+        const factura: ClienteFacturaEmitidaAnulableDatabaseRow =
+          await this.resolveFacturaEmitidaAnulable(
+            queryRunner,
+            command.clientePublicId,
+            facturaPublicId,
+          );
+
+        await this.markFacturaAnulada(queryRunner, factura.id, timestamp);
+
+        await this.deactivateFacturaRelaciones(queryRunner, factura.id, timestamp);
+
+        return {
+          publicId: factura.public_id,
+          serie: factura.serie,
+          numero: factura.numero,
+          year: this.getTimestampYear(factura.fecha_emision),
+          estado: 'anulada',
+          importeCents: factura.importe_cents,
+          fechaCreacion: factura.created_at,
+          fechaEmision: factura.fecha_emision,
+          fechaAnulacion: timestamp,
+        };
+      },
+    );
+  }
+
+  /**
    * Recupera las ventas relacionadas con una factura
    * independientemente de que su relación siga activa.
    */
@@ -830,6 +879,143 @@ export default class TypeOrmClienteFacturasRepository
     }
 
     return normalizedValue;
+  }
+
+  /**
+   * Normaliza el identificador de una factura
+   * persistida requerida por una operación final.
+   */
+  private normalizeFacturaPublicId(value: string): string {
+    if (typeof value !== 'string') {
+      throw new Error('El identificador de la factura no es válido.');
+    }
+
+    const normalizedValue: string = value.trim();
+
+    if (normalizedValue.length === 0) {
+      throw new Error('El identificador de la factura no es válido.');
+    }
+
+    return normalizedValue;
+  }
+
+  /**
+   * Recupera una factura emitida perteneciente al
+   * cliente activo y todavía disponible para anular.
+   */
+  private async resolveFacturaEmitidaAnulable(
+    queryRunner: QueryRunner,
+    clientePublicId: string,
+    facturaPublicId: string,
+  ): Promise<ClienteFacturaEmitidaAnulableDatabaseRow> {
+    const rows: readonly ClienteFacturaEmitidaAnulableDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT
+          f.id,
+          f.public_id,
+          f.serie,
+          f.numero,
+          f.importe_cents,
+          f.created_at,
+          f.fecha_emision
+        FROM factura f
+
+        INNER JOIN cliente c
+          ON c.id = f.id_cliente
+
+        WHERE
+          c.public_id = ?
+          AND c.deleted_at IS NULL
+          AND f.public_id = ?
+          AND f.estado = 'emitida'
+          AND f.numero IS NOT NULL
+          AND f.fecha_emision IS NOT NULL
+          AND f.fecha_anulacion IS NULL
+          AND f.deleted_at IS NULL
+
+        LIMIT 1
+      `,
+      [clientePublicId, facturaPublicId],
+    )) as readonly ClienteFacturaEmitidaAnulableDatabaseRow[];
+
+    const factura: ClienteFacturaEmitidaAnulableDatabaseRow | undefined = rows[0];
+
+    if (factura === undefined) {
+      throw new Error('La factura no pertenece al cliente o ya no está disponible para anular.');
+    }
+
+    return factura;
+  }
+
+  /**
+   * Cambia exclusivamente el estado y la fecha de
+   * anulación sin alterar los datos emitidos.
+   */
+  private async markFacturaAnulada(
+    queryRunner: QueryRunner,
+    facturaId: number,
+    timestamp: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+      UPDATE factura
+      SET
+        estado = 'anulada',
+        fecha_anulacion = ?,
+        updated_at = ?
+      WHERE
+        id = ?
+        AND estado = 'emitida'
+        AND numero IS NOT NULL
+        AND fecha_emision IS NOT NULL
+        AND fecha_anulacion IS NULL
+        AND deleted_at IS NULL
+    `,
+      [timestamp, timestamp, facturaId],
+    );
+
+    const rows: readonly ClienteFacturaChangesDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT changes() AS total
+      `,
+    )) as readonly ClienteFacturaChangesDatabaseRow[];
+
+    if (rows[0]?.total !== 1) {
+      throw new Error('La factura ya no está disponible para anular.');
+    }
+  }
+
+  /**
+   * Convierte todas las relaciones activas de la
+   * factura anulada en relaciones históricas.
+   */
+  private async deactivateFacturaRelaciones(
+    queryRunner: QueryRunner,
+    facturaId: number,
+    timestamp: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+      UPDATE factura_venta
+      SET
+        activa = 0,
+        updated_at = ?
+      WHERE
+        id_factura = ?
+        AND activa = 1
+    `,
+      [timestamp, facturaId],
+    );
+
+    const rows: readonly ClienteFacturaChangesDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT changes() AS total
+      `,
+    )) as readonly ClienteFacturaChangesDatabaseRow[];
+
+    if (rows[0] === undefined || rows[0].total < 1) {
+      throw new Error('La factura emitida no contiene ventas activas para liberar.');
+    }
   }
 
   /**

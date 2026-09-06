@@ -1,5 +1,6 @@
 import ClienteFacturasService from '@backend/application/clientes/cliente-facturas.service';
 import type ActualizarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/actualizar-cliente-factura-borrador-record-command.interface';
+import type AnularClienteFacturaRecordCommand from '@backend/contracts/clientes/anular-cliente-factura-record-command.interface';
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
 import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
@@ -9,6 +10,7 @@ import type {
   ClienteFacturaVentaDisponibleRecord,
   ClienteFacturaVentaRecord,
 } from '@backend/domain/clientes/cliente-factura-venta-record.interface';
+import type AnularClienteFacturaCommand from '@desktop-contracts/clientes/anular-cliente-factura-command.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
   ClienteFacturaVentaInterface,
@@ -33,12 +35,21 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
     estado: 'emitida',
     fechaEmision: '2026-09-06T10:00:00.000Z',
   });
+  annulledRecord: ClienteFacturaRecord = createRecord({
+    publicId: 'factura-emitida',
+    numero: 25,
+    year: 2026,
+    estado: 'anulada',
+    fechaEmision: '2026-09-06T10:00:00.000Z',
+    fechaAnulacion: '2026-09-06T12:00:00.000Z',
+  });
 
   requestedPublicId: string | null = null;
   requestedCreateCommand: CrearClienteFacturaBorradorRecordCommand | null = null;
   requestedUpdateCommand: ActualizarClienteFacturaBorradorRecordCommand | null = null;
   requestedDeleteCommand: EliminarClienteFacturaBorradorRecordCommand | null = null;
   requestedEmitCommand: EmitirClienteFacturaRecordCommand | null = null;
+  requestedAnnulCommand: AnularClienteFacturaRecordCommand | null = null;
   requestedVentasClientePublicId: string | null = null;
   requestedFacturaPublicId: string | null = null;
   requestedBorradorPublicId: string | null = null;
@@ -93,6 +104,16 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
     this.requestedEmitCommand = command;
 
     return Promise.resolve(this.emittedRecord);
+  }
+
+  /**
+   * Registra el comando de anulación y devuelve
+   * la factura anulada preparada para la prueba.
+   */
+  anularFactura(command: AnularClienteFacturaRecordCommand): Promise<ClienteFacturaRecord> {
+    this.requestedAnnulCommand = command;
+
+    return Promise.resolve(this.annulledRecord);
   }
 
   /**
@@ -320,6 +341,46 @@ describe('ClienteFacturasService', (): void => {
     });
   });
 
+  it('normaliza y anula una factura emitida mediante el repository', async (): Promise<void> => {
+    const repository = new FakeClienteFacturasRepository();
+    const service = new ClienteFacturasService(repository);
+
+    const command: AnularClienteFacturaCommand = {
+      clientePublicId: '  cliente-1  ',
+      facturaPublicId: '  factura-emitida  ',
+    };
+
+    const result: ClienteFacturaInterface = await service.anularFactura(command);
+
+    expect(repository.requestedAnnulCommand).toEqual({
+      clientePublicId: 'cliente-1',
+      facturaPublicId: 'factura-emitida',
+    });
+
+    expect(result).toEqual({
+      publicId: 'factura-emitida',
+      serie: '',
+      numero: 25,
+      year: 2026,
+      numeroFactura: '25_2026',
+      estado: 'anulada',
+      fecha: '2026-09-06T10:00:00.000Z',
+      fechaCreacion: '2026-09-04T09:00:00.000Z',
+      fechaEmision: '2026-09-06T10:00:00.000Z',
+      fechaAnulacion: '2026-09-06T12:00:00.000Z',
+      importeCents: 1_000,
+      capacidades: {
+        puedeEditar: false,
+        puedeEliminar: false,
+        puedePrevisualizar: false,
+        puedeFacturar: false,
+        puedeImprimir: false,
+        puedeEnviarEmail: false,
+        puedeAnular: false,
+      },
+    });
+  });
+
   it('rechaza comandos de borrador inválidos antes de consultar el repository', async (): Promise<void> => {
     const repository = new FakeClienteFacturasRepository();
     const service = new ClienteFacturasService(repository);
@@ -367,10 +428,18 @@ describe('ClienteFacturasService', (): void => {
       }),
     ).rejects.toThrow('El identificador del borrador de factura no es válido.');
 
+    await expect(
+      service.anularFactura({
+        clientePublicId: 'cliente-1',
+        facturaPublicId: '   ',
+      }),
+    ).rejects.toThrow('El identificador de la factura no es válido.');
+
     expect(repository.requestedCreateCommand).toBeNull();
     expect(repository.requestedUpdateCommand).toBeNull();
     expect(repository.requestedDeleteCommand).toBeNull();
     expect(repository.requestedEmitCommand).toBeNull();
+    expect(repository.requestedAnnulCommand).toBeNull();
   });
 
   it('normaliza y construye las ventas relacionadas con una factura persistida', async (): Promise<void> => {

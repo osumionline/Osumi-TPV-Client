@@ -74,6 +74,16 @@ interface ClienteFacturaSecuenciaDatabaseRow {
   readonly ultimo_numero: number;
 }
 
+interface ClienteFacturaAnuladaDatabaseRow {
+  readonly numero: number;
+  readonly estado: string;
+  readonly nombre_apellidos: string;
+  readonly importe_cents: number;
+  readonly fecha_emision: string;
+  readonly fecha_anulacion: string | null;
+  readonly deleted_at: string | null;
+}
+
 describe('TypeOrmClienteFacturasRepository', (): void => {
   beforeEach(async (): Promise<void> => {
     tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-cliente-facturas-'));
@@ -852,6 +862,170 @@ describe('TypeOrmClienteFacturasRepository', (): void => {
           borradorPublicId,
         }),
       ).rejects.toThrow('El borrador de factura no pertenece al cliente o ya no está disponible.');
+    }
+  });
+
+  it('anula una factura emitida conservando su identidad y libera sus ventas', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    const result: ClienteFacturaRecord = await requireRepository().anularFactura({
+      clientePublicId: 'cliente-1',
+      facturaPublicId: 'factura-emitida',
+    });
+
+    expect(result).toEqual({
+      publicId: 'factura-emitida',
+      serie: '',
+      numero: 7,
+      year: 2026,
+      estado: 'anulada',
+      importeCents: 12_345,
+      fechaCreacion: '2026-08-19T10:00:00.000Z',
+      fechaEmision: '2026-08-20 09:00:00',
+      fechaAnulacion: result.fechaAnulacion,
+    });
+
+    expect(result.fechaAnulacion).not.toBeNull();
+
+    const facturas: readonly ClienteFacturaAnuladaDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT
+          numero,
+          estado,
+          nombre_apellidos,
+          importe_cents,
+          fecha_emision,
+          fecha_anulacion,
+          deleted_at
+        FROM factura
+        WHERE public_id = 'factura-emitida'
+      `,
+    )) as readonly ClienteFacturaAnuladaDatabaseRow[];
+
+    expect(facturas).toEqual([
+      {
+        numero: 7,
+        estado: 'anulada',
+        nombre_apellidos: 'Cliente principal',
+        importe_cents: 12_345,
+        fecha_emision: '2026-08-20 09:00:00',
+        fecha_anulacion: result.fechaAnulacion,
+        deleted_at: null,
+      },
+    ]);
+
+    const relaciones: readonly ClienteFacturaVentaRelacionDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT
+          v.public_id,
+          fv.activa
+        FROM factura_venta fv
+
+        INNER JOIN venta v
+          ON v.id = fv.id_venta
+
+        INNER JOIN factura f
+          ON f.id = fv.id_factura
+
+        WHERE f.public_id = 'factura-emitida'
+      `,
+    )) as readonly ClienteFacturaVentaRelacionDatabaseRow[];
+
+    expect(relaciones).toEqual([
+      {
+        public_id: 'venta-facturada',
+        activa: 0,
+      },
+    ]);
+
+    const disponibles: readonly ClienteFacturaVentaDisponibleRecord[] =
+      await requireRepository().findVentasDisponibles('cliente-1', null);
+
+    expect(
+      disponibles.some(
+        (venta: ClienteFacturaVentaDisponibleRecord): boolean =>
+          venta.publicId === 'venta-facturada',
+      ),
+    ).toBe(true);
+
+    const historicas: readonly ClienteFacturaVentaRecord[] =
+      await requireRepository().findVentasByFacturaPublicId('cliente-1', 'factura-emitida');
+
+    expect(historicas.map((venta: ClienteFacturaVentaRecord): string => venta.publicId)).toEqual([
+      'venta-facturada',
+    ]);
+  });
+
+  it('revierte la anulación si la factura emitida no tiene relaciones activas', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    await dataSource.query(
+      `
+      UPDATE factura_venta
+      SET activa = 0
+      WHERE id_factura = 1
+    `,
+    );
+
+    await expect(
+      requireRepository().anularFactura({
+        clientePublicId: 'cliente-1',
+        facturaPublicId: 'factura-emitida',
+      }),
+    ).rejects.toThrow('La factura emitida no contiene ventas activas para liberar.');
+
+    const facturas: readonly {
+      readonly estado: string;
+      readonly fecha_anulacion: string | null;
+    }[] = (await dataSource.query(
+      `
+        SELECT
+          estado,
+          fecha_anulacion
+        FROM factura
+        WHERE public_id = 'factura-emitida'
+      `,
+    )) as readonly {
+      readonly estado: string;
+      readonly fecha_anulacion: string | null;
+    }[];
+
+    expect(facturas).toEqual([
+      {
+        estado: 'emitida',
+        fecha_anulacion: null,
+      },
+    ]);
+  });
+
+  it('rechaza anular borradores, anuladas, eliminadas, ajenas o de clientes inactivos', async (): Promise<void> => {
+    const commands = [
+      {
+        clientePublicId: 'cliente-1',
+        facturaPublicId: 'factura-borrador',
+      },
+      {
+        clientePublicId: 'cliente-1',
+        facturaPublicId: 'factura-anulada',
+      },
+      {
+        clientePublicId: 'cliente-1',
+        facturaPublicId: 'factura-borrador-eliminado',
+      },
+      {
+        clientePublicId: 'cliente-1',
+        facturaPublicId: 'factura-otro-cliente',
+      },
+      {
+        clientePublicId: 'cliente-inactivo',
+        facturaPublicId: 'factura-cliente-inactivo',
+      },
+    ] as const;
+
+    for (const command of commands) {
+      await expect(requireRepository().anularFactura(command)).rejects.toThrow(
+        'La factura no pertenece al cliente o ya no está disponible para anular.',
+      );
     }
   });
 

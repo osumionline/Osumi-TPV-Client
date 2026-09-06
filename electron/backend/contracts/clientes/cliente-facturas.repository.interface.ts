@@ -1,4 +1,5 @@
 import type ActualizarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/actualizar-cliente-factura-borrador-record-command.interface';
+import type AnularClienteFacturaRecordCommand from '@backend/contracts/clientes/anular-cliente-factura-record-command.interface';
 import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
 import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
 import type EmitirClienteFacturaRecordCommand from '@backend/contracts/clientes/emitir-cliente-factura-record-command.interface';
@@ -40,6 +41,12 @@ export default interface ClienteFacturasRepository {
    * definitiva y congela sus datos.
    */
   emitBorrador(command: EmitirClienteFacturaRecordCommand): Promise<ClienteFacturaRecord>;
+
+  /**
+   * Anula una factura emitida y libera sus ventas
+   * conservando todas las relaciones históricas.
+   */
+  anularFactura(command: AnularClienteFacturaRecordCommand): Promise<ClienteFacturaRecord>;
 
   /**
    * Recupera las ventas relacionadas históricamente
