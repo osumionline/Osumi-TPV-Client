@@ -5,6 +5,7 @@ import ArticulosService from '@backend/application/articulos/articulos.service';
 import CajaService from '@backend/application/caja/caja.service';
 import CategoriasService from '@backend/application/categorias/categorias.service';
 import ClienteFacturaDocumentosService from '@backend/application/clientes/cliente-factura-documentos.service';
+import ClienteFacturaEmailService from '@backend/application/clientes/cliente-factura-email.service';
 import ClienteFacturaPdfHtmlBuilder from '@backend/application/clientes/cliente-factura-pdf-html.builder';
 import ClienteFacturaPdfService from '@backend/application/clientes/cliente-factura-pdf.service';
 import ClienteFacturaPrintService from '@backend/application/clientes/cliente-factura-print.service';
@@ -405,6 +406,14 @@ export default function createApplicationComposition(
 
   const emailSender: EmailSender = new NodemailerEmailSender();
 
+  const clienteFacturaEmailService: ClienteFacturaEmailService = new ClienteFacturaEmailService(
+    configurationService,
+    operationalSecretStorage,
+    clienteFacturaDocumentosService,
+    clienteFacturaPdfService,
+    emailSender,
+  );
+
   const ventasTicketEmailService: VentasTicketEmailService = new VentasTicketEmailService(
     configurationService,
     operationalSecretStorage,
@@ -516,6 +525,7 @@ export default function createApplicationComposition(
     clienteFacturaPreviewWindow,
     clienteFacturaPdfService,
     clienteFacturaPrintService,
+    clienteFacturaEmailService,
   );
 
   registerClienteFacturaPreviewIpc(

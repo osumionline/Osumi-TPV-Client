@@ -9,6 +9,7 @@ import type {
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type { ClienteFacturaDocumentoConsulta } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
+import type ClienteFacturaEmailCommand from '@desktop-contracts/clientes/cliente-factura-email-command.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
   ClienteFacturaVentaInterface,
@@ -55,6 +56,7 @@ describe('ClientesService', (): void => {
   let deactivateError: Error | null;
   let receivedConsumoMensualConsulta: ClienteConsumoMensualConsulta | null;
   let receivedPrintFacturaConsulta: ClienteFacturaDocumentoConsulta | null;
+  let receivedEmailFacturaCommand: ClienteFacturaEmailCommand | null;
 
   beforeEach((): void => {
     originalDesktopDescriptor = Object.getOwnPropertyDescriptor(window, 'osumiDesktop');
@@ -83,6 +85,7 @@ describe('ClientesService', (): void => {
     deactivateError = null;
     receivedConsumoMensualConsulta = null;
     receivedPrintFacturaConsulta = null;
+    receivedEmailFacturaCommand = null;
 
     Object.defineProperty(window, 'osumiDesktop', {
       configurable: true,
@@ -159,6 +162,12 @@ describe('ClientesService', (): void => {
             receivedVentasDisponiblesConsulta = consulta;
 
             return Promise.resolve(ventasDisponiblesResult);
+          },
+
+          emailFactura: (command: ClienteFacturaEmailCommand): Promise<void> => {
+            receivedEmailFacturaCommand = command;
+
+            return Promise.resolve();
           },
 
           getEstadisticas: (): Promise<ClienteEstadisticasInterface> => {
@@ -784,6 +793,19 @@ describe('ClientesService', (): void => {
     expect(receivedPrintFacturaConsulta).toBe(consulta);
 
     expect(facturasRequestCount).toBe(0);
+  });
+
+  it('solicita el envío por email de una factura mediante su API específica', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    const command: ClienteFacturaEmailCommand = {
+      clientePublicId: 'cliente-7',
+      facturaPublicId: 'factura-1',
+      destinatario: 'cliente@example.com',
+    };
+
+    await service.emailFactura(command);
+
+    expect(receivedEmailFacturaCommand).toBe(command);
   });
 
   it('solicita las estadísticas generales mediante su API específica', async (): Promise<void> => {

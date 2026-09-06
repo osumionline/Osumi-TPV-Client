@@ -1,3 +1,4 @@
+import type ClienteFacturaEmailService from '@backend/application/clientes/cliente-factura-email.service';
 import type ClienteFacturaPdfService from '@backend/application/clientes/cliente-factura-pdf.service';
 import type ClienteFacturaPrintService from '@backend/application/clientes/cliente-factura-print.service';
 import type ClienteFacturasService from '@backend/application/clientes/cliente-facturas.service';
@@ -14,6 +15,7 @@ import type {
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type { ClienteFacturaDocumentoConsulta } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
+import type ClienteFacturaEmailCommand from '@desktop-contracts/clientes/cliente-factura-email-command.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
   ClienteFacturaVentaInterface,
@@ -38,6 +40,7 @@ export default function registerClientesIpc(
   clienteFacturaPreviewWindow: ClienteFacturaPreviewWindow,
   clienteFacturaPdfService: ClienteFacturaPdfService,
   clienteFacturaPrintService: ClienteFacturaPrintService,
+  clienteFacturaEmailService: ClienteFacturaEmailService,
 ): void {
   ipcMain.handle(
     IPC_CHANNELS.clientesGetAll,
@@ -164,6 +167,15 @@ export default function registerClientesIpc(
       assertTrustedSender(event, getMainWindow);
 
       await clienteFacturaPrintService.print(consulta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.clientesEmailFactura,
+    async (event, command: ClienteFacturaEmailCommand): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await clienteFacturaEmailService.send(command);
     },
   );
 

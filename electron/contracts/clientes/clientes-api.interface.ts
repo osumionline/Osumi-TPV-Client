@@ -9,6 +9,7 @@ import type {
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type { ClienteFacturaDocumentoConsulta } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
+import type ClienteFacturaEmailCommand from '@desktop-contracts/clientes/cliente-factura-email-command.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
   ClienteFacturaVentaInterface,
@@ -73,6 +74,12 @@ export default interface ClientesApi {
    * el PDF definitivo de una factura.
    */
   printFactura(consulta: ClienteFacturaDocumentoConsulta): Promise<void>;
+
+  /**
+   * Envía por email el PDF definitivo
+   * de una factura emitida.
+   */
+  emailFactura(command: ClienteFacturaEmailCommand): Promise<void>;
 
   /**
    * Obtiene las ventas relacionadas históricamente

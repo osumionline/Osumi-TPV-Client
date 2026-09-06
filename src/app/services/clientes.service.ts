@@ -11,6 +11,7 @@ import type {
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import type { ClienteFacturaDocumentoConsulta } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
+import type ClienteFacturaEmailCommand from '@desktop-contracts/clientes/cliente-factura-email-command.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
   ClienteFacturaVentaInterface,
@@ -429,6 +430,14 @@ export default class ClientesService {
    */
   printFactura(consulta: ClienteFacturaDocumentoConsulta): Promise<void> {
     return window.osumiDesktop.clientes.printFactura(consulta);
+  }
+
+  /**
+   * Solicita el envío del PDF definitivo de una
+   * factura al destinatario indicado.
+   */
+  emailFactura(command: ClienteFacturaEmailCommand): Promise<void> {
+    return window.osumiDesktop.clientes.emailFactura(command);
   }
 
   /**
