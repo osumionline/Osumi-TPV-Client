@@ -63,6 +63,7 @@ export default class ClientInvoicesComponent implements OnInit {
   readonly newFacturaEvent: OutputEmitterRef<void> = output<void>();
   readonly printFacturaEvent: OutputEmitterRef<ClienteFacturaInterface> =
     output<ClienteFacturaInterface>();
+  readonly actionProcessingEvent: OutputEmitterRef<boolean> = output<boolean>();
 
   readonly state: Signal<ClienteFacturasState> = computed((): ClienteFacturasState =>
     this.clientesService.getFacturasState(this.clientePublicId()),
@@ -149,7 +150,8 @@ export default class ClientInvoicesComponent implements OnInit {
   }
 
   /**
-   * Solicita imprimir la factura emitida de su propia fila.
+   * Solicita imprimir la factura emitida de su propia
+   * fila y cierra cualquier formulario de email abierto.
    */
   printFactura(event: MouseEvent, factura: ClienteFacturaInterface): void {
     event.stopPropagation();
@@ -158,6 +160,8 @@ export default class ClientInvoicesComponent implements OnInit {
       return;
     }
 
+    this.emailFacturaSeleccionada.set(null);
+    this.clearActionFeedback();
     this.printFacturaEvent.emit(factura);
   }
 
@@ -223,6 +227,7 @@ export default class ClientInvoicesComponent implements OnInit {
 
     this.clearActionFeedback();
     this.emailSending.set(true);
+    this.actionProcessingEvent.emit(true);
 
     try {
       await this.clientesService.emailFactura(command);
@@ -235,6 +240,7 @@ export default class ClientInvoicesComponent implements OnInit {
       this.actionError.set(getErrorMessage(error, 'No se ha podido enviar la factura por email.'));
     } finally {
       this.emailSending.set(false);
+      this.actionProcessingEvent.emit(false);
     }
   }
 

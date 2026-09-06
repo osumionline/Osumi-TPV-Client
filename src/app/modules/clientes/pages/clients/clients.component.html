@@ -82,7 +82,8 @@
                                   [createDisabled]="workspace.dirty || processing()"
                                   (openFacturaEvent)="openFacturaEditor($event)"
                                   (newFacturaEvent)="openNewFacturaEditor()"
-                                  (printFacturaEvent)="printFactura($event)" />
+                                  (printFacturaEvent)="printFactura($event)"
+                                  (actionProcessingEvent)="setInvoiceActionProcessing($event)" />
             }
             }
 

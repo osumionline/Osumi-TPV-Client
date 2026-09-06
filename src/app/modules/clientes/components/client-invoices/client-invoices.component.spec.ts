@@ -207,6 +207,41 @@ describe('ClientInvoicesComponent', (): void => {
 
     expect(printButton?.disabled).toBe(true);
   });
+
+  it('notifica al padre mientras está enviando una factura por email', async (): Promise<void> => {
+    const factura: ClienteFacturaInterface = createFacturas()[1]!;
+    const processingStates: boolean[] = [];
+
+    fixture.componentInstance.actionProcessingEvent.subscribe((processing: boolean): void => {
+      processingStates.push(processing);
+    });
+
+    fixture.componentInstance.openEmailForm(new MouseEvent('click'), factura);
+
+    await fixture.componentInstance.sendFacturaEmail('cliente@example.com');
+
+    expect(processingStates).toEqual([true, false]);
+  });
+
+  it('libera el bloqueo global cuando falla el envío por email', async (): Promise<void> => {
+    const factura: ClienteFacturaInterface = createFacturas()[1]!;
+    const processingStates: boolean[] = [];
+
+    clientesService.emailError = new Error('SMTP no disponible');
+
+    fixture.componentInstance.actionProcessingEvent.subscribe((processing: boolean): void => {
+      processingStates.push(processing);
+    });
+
+    fixture.componentInstance.openEmailForm(new MouseEvent('click'), factura);
+
+    await fixture.componentInstance.sendFacturaEmail('cliente@example.com');
+
+    expect(processingStates).toEqual([true, false]);
+    expect(fixture.componentInstance.emailSending()).toBe(false);
+    expect(fixture.componentInstance.actionError()).toBe('SMTP no disponible');
+    expect(fixture.componentInstance.emailFacturaSeleccionada()?.publicId).toBe('factura-emitida');
+  });
 });
 
 class FakeClientesService {

@@ -14,7 +14,11 @@
         <button mat-flat-button
                 type="button"
                 class="client-invoices__new-button"
-                [disabled]="disabled() || createDisabled()"
+                [disabled]="
+                    disabled() ||
+                    createDisabled() ||
+                    actionInProgress()
+                "
                 (click)="newFactura()">
             <mat-icon>
                 add

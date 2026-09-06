@@ -207,6 +207,14 @@ export default class ClientsComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Integra las operaciones documentales internas
+   * del listado en el bloqueo global de la ficha.
+   */
+  setInvoiceActionProcessing(processing: boolean): void {
+    this.invoiceActionProcessing.set(processing);
+  }
+
+  /**
    * Cambia el apartado activo de la ficha abierta.
    */
   selectSection(section: ClienteWorkspaceSection): void {
