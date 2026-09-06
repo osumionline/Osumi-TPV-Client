@@ -281,6 +281,19 @@
             </button>
             }
 
+            @if (
+            currentFactura()?.estado === 'emitida' &&
+            currentFactura()?.capacidades?.puedeAnular
+            ) {
+            <button mat-flat-button
+                    type="button"
+                    class="client-invoice-editor__annul"
+                    [disabled]="!canAnnul()"
+                    (click)="anularFactura()">
+                Anular
+            </button>
+            }
+
             <div class="client-invoice-editor__summary">
                 @if (editable()) {
                 <strong>

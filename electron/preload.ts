@@ -16,6 +16,7 @@ import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.inte
 import type CategoriaInterface from '@desktop-contracts/categorias/categoria.interface';
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type ActualizarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/actualizar-cliente-factura-borrador-command.interface';
+import type AnularClienteFacturaCommand from '@desktop-contracts/clientes/anular-cliente-factura-command.interface';
 import type {
   ClienteConsumoMensualConsulta,
   ClienteConsumoMensualResultado,
@@ -298,6 +299,12 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
     emitFacturaBorrador: (command: EmitirClienteFacturaCommand): Promise<ClienteFacturaInterface> =>
       ipcRenderer.invoke(
         IPC_CHANNELS.clientesEmitFacturaBorrador,
+        command,
+      ) as Promise<ClienteFacturaInterface>,
+
+    anularFactura: (command: AnularClienteFacturaCommand): Promise<ClienteFacturaInterface> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.clientesAnularFactura,
         command,
       ) as Promise<ClienteFacturaInterface>,
 

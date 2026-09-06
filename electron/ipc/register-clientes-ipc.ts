@@ -6,6 +6,7 @@ import type ClientesService from '@backend/application/clientes/clientes.service
 import type ClienteFacturaPreviewWindow from '@backend/contracts/clientes/cliente-factura-preview-window.interface';
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type ActualizarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/actualizar-cliente-factura-borrador-command.interface';
+import type AnularClienteFacturaCommand from '@desktop-contracts/clientes/anular-cliente-factura-command.interface';
 import type {
   ClienteConsumoMensualConsulta,
   ClienteConsumoMensualResultado,
@@ -146,6 +147,15 @@ export default function registerClientesIpc(
       });
 
       return factura;
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.clientesAnularFactura,
+    async (event, command: AnularClienteFacturaCommand): Promise<ClienteFacturaInterface> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return clienteFacturasService.anularFactura(command);
     },
   );
 

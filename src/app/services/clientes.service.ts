@@ -2,6 +2,7 @@ import type { Signal, WritableSignal } from '@angular/core';
 import { computed, Service, signal } from '@angular/core';
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type ActualizarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/actualizar-cliente-factura-borrador-command.interface';
+import type AnularClienteFacturaCommand from '@desktop-contracts/clientes/anular-cliente-factura-command.interface';
 import type {
   ClienteConsumoMensualConsulta,
   ClienteConsumoMensualResultado,
@@ -401,6 +402,19 @@ export default class ClientesService {
   ): Promise<ClienteFacturaInterface> {
     const factura: ClienteFacturaInterface =
       await window.osumiDesktop.clientes.emitFacturaBorrador(command);
+
+    await this.reconciliarFacturaPersistida(command.clientePublicId, factura);
+
+    return factura;
+  }
+
+  /**
+   * Anula una factura y sustituye en caché
+   * su estado emitido por la versión anulada.
+   */
+  async anularFactura(command: AnularClienteFacturaCommand): Promise<ClienteFacturaInterface> {
+    const factura: ClienteFacturaInterface =
+      await window.osumiDesktop.clientes.anularFactura(command);
 
     await this.reconciliarFacturaPersistida(command.clientePublicId, factura);
 

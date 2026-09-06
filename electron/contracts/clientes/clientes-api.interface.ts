@@ -1,5 +1,6 @@
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type ActualizarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/actualizar-cliente-factura-borrador-command.interface';
+import type AnularClienteFacturaCommand from '@desktop-contracts/clientes/anular-cliente-factura-command.interface';
 import type {
   ClienteConsumoMensualConsulta,
   ClienteConsumoMensualResultado,
@@ -60,6 +61,12 @@ export default interface ClientesApi {
    * Emite definitivamente un borrador de factura.
    */
   emitFacturaBorrador(command: EmitirClienteFacturaCommand): Promise<ClienteFacturaInterface>;
+
+  /**
+   * Anula una factura emitida y libera sus
+   * ventas conservando el histórico.
+   */
+  anularFactura(command: AnularClienteFacturaCommand): Promise<ClienteFacturaInterface>;
 
   /**
    * Abre una ventana independiente con la representación

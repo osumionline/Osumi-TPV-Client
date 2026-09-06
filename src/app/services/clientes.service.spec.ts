@@ -1,5 +1,6 @@
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type ActualizarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/actualizar-cliente-factura-borrador-command.interface';
+import type AnularClienteFacturaCommand from '@desktop-contracts/clientes/anular-cliente-factura-command.interface';
 import type {
   ClienteConsumoMensualConsulta,
   ClienteConsumoMensualResultado,
@@ -43,10 +44,12 @@ describe('ClientesService', (): void => {
   let createdFacturaBorrador: ClienteFacturaInterface;
   let updatedFacturaBorrador: ClienteFacturaInterface;
   let emittedFactura: ClienteFacturaInterface;
+  let annulledFactura: ClienteFacturaInterface;
   let receivedCreateFacturaBorradorCommand: CrearClienteFacturaBorradorCommand | null;
   let receivedUpdateFacturaBorradorCommand: ActualizarClienteFacturaBorradorCommand | null;
   let receivedDeleteFacturaBorradorCommand: EliminarClienteFacturaBorradorCommand | null;
   let receivedEmitFacturaCommand: EmitirClienteFacturaCommand | null;
+  let receivedAnnulFacturaCommand: AnularClienteFacturaCommand | null;
   let createdCliente: ClienteInterface;
   let updatedCliente: ClienteInterface;
   let receivedCreateCommand: CrearClienteCommand | null;
@@ -72,10 +75,12 @@ describe('ClientesService', (): void => {
     createdFacturaBorrador = createFacturaBorrador('factura-borrador-creada', 2_500);
     updatedFacturaBorrador = createFacturaBorrador('factura-borrador', 3_500);
     emittedFactura = createFacturaEmitida('factura-borrador', 25, 3_500);
+    annulledFactura = createFacturaAnulada('factura-1', 21, 12_345);
     receivedCreateFacturaBorradorCommand = null;
     receivedUpdateFacturaBorradorCommand = null;
     receivedDeleteFacturaBorradorCommand = null;
     receivedEmitFacturaCommand = null;
+    receivedAnnulFacturaCommand = null;
     createdCliente = createClienteInterface(7, 'cliente-7', 'Ada Lovelace');
     updatedCliente = createClienteInterface(7, 'cliente-7', 'Ada Lovelace');
     receivedCreateCommand = null;
@@ -140,6 +145,14 @@ describe('ClientesService', (): void => {
             receivedEmitFacturaCommand = command;
 
             return Promise.resolve(emittedFactura);
+          },
+
+          anularFactura: (
+            command: AnularClienteFacturaCommand,
+          ): Promise<ClienteFacturaInterface> => {
+            receivedAnnulFacturaCommand = command;
+
+            return Promise.resolve(annulledFactura);
           },
 
           printFactura: (consulta: ClienteFacturaDocumentoConsulta): Promise<void> => {
@@ -751,6 +764,33 @@ describe('ClientesService', (): void => {
     });
   });
 
+  it('sustituye en caché una factura emitida por su versión anulada', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+
+    facturasResult = createFacturas(12_345);
+
+    await service.loadFacturas('cliente-7');
+
+    const command: AnularClienteFacturaCommand = {
+      clientePublicId: 'cliente-7',
+      facturaPublicId: 'factura-1',
+    };
+
+    const result: ClienteFacturaInterface = await service.anularFactura(command);
+
+    expect(receivedAnnulFacturaCommand).toBe(command);
+
+    expect(result).toBe(annulledFactura);
+
+    expect(service.getFacturasState('cliente-7')).toEqual({
+      data: [annulledFactura],
+      loading: false,
+      error: null,
+    });
+
+    expect(facturasRequestCount).toBe(1);
+  });
+
   it('solicita las ventas de una factura mediante su API específica', async (): Promise<void> => {
     const service: ClientesService = new ClientesService();
     const consulta: ClienteFacturaVentasConsulta = {
@@ -942,6 +982,31 @@ function createFacturaEmitida(
       puedeImprimir: true,
       puedeEnviarEmail: true,
       puedeAnular: true,
+    },
+  };
+}
+
+/**
+ * Crea una factura anulada conservando
+ * exactamente su identidad emitida.
+ */
+function createFacturaAnulada(
+  publicId: string,
+  numero: number,
+  importeCents: number,
+): ClienteFacturaInterface {
+  return {
+    ...createFacturaEmitida(publicId, numero, importeCents),
+    estado: 'anulada',
+    fechaAnulacion: '2026-09-06T12:00:00.000Z',
+    capacidades: {
+      puedeEditar: false,
+      puedeEliminar: false,
+      puedePrevisualizar: false,
+      puedeFacturar: false,
+      puedeImprimir: false,
+      puedeEnviarEmail: false,
+      puedeAnular: false,
     },
   };
 }

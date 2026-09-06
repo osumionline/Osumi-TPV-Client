@@ -1,6 +1,7 @@
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import type ActualizarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/actualizar-cliente-factura-borrador-command.interface';
+import type AnularClienteFacturaCommand from '@desktop-contracts/clientes/anular-cliente-factura-command.interface';
 import type { ClienteFacturaDocumentoConsulta } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
@@ -29,6 +30,7 @@ class FakeClientesService {
   receivedUpdateCommand: ActualizarClienteFacturaBorradorCommand | null = null;
   receivedDeleteCommand: EliminarClienteFacturaBorradorCommand | null = null;
   receivedEmitCommand: EmitirClienteFacturaCommand | null = null;
+  receivedAnnulCommand: AnularClienteFacturaCommand | null = null;
   previewResult: ClienteFacturaInterface | null = null;
   receivedPreviewConsulta: ClienteFacturaDocumentoConsulta | null = null;
 
@@ -97,6 +99,16 @@ class FakeClientesService {
     this.receivedEmitCommand = command;
 
     return Promise.resolve(createFacturaEmitida());
+  }
+
+  /**
+   * Simula la anulación definitiva de
+   * una factura emitida.
+   */
+  anularFactura(command: AnularClienteFacturaCommand): Promise<ClienteFacturaInterface> {
+    this.receivedAnnulCommand = command;
+
+    return Promise.resolve(createFacturaAnulada());
   }
 
   /**
@@ -242,6 +254,60 @@ describe('ClientInvoiceEditorComponent', (): void => {
     expect(fixture.componentInstance.editable()).toBe(false);
     expect(fixture.componentInstance.canSave()).toBe(false);
     expect(fixture.componentInstance.selectedVentasCount()).toBe(1);
+  });
+
+  it('anula una factura emitida y conserva sus ventas históricas en el editor', async (): Promise<void> => {
+    await createFixture(createFacturaEmitida());
+
+    expect(fixture.componentInstance.canAnnul()).toBe(true);
+
+    fixture.componentInstance.anularFactura();
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(dialogService.confirmCount).toBe(1);
+
+    expect(clientesService.receivedAnnulCommand).toEqual({
+      clientePublicId: 'cliente-1',
+      facturaPublicId: 'factura-emitida',
+    });
+
+    expect(fixture.componentInstance.currentFactura()?.estado).toBe('anulada');
+
+    expect(fixture.componentInstance.currentFactura()?.numeroFactura).toBe('21_2026');
+
+    expect(fixture.componentInstance.currentFactura()?.fechaAnulacion).toBe(
+      '2026-09-06T12:00:00.000Z',
+    );
+
+    expect(fixture.componentInstance.canAnnul()).toBe(false);
+
+    expect(
+      fixture.componentInstance
+        .ventas()
+        .map((venta: ClienteFacturaVentaInterface): string => venta.publicId),
+    ).toEqual(['venta-1']);
+
+    expect(fixture.componentInstance.operationInfo()).toContain(
+      'Sus ventas vuelven a estar disponibles',
+    );
+  });
+
+  it('no anula la factura cuando se cancela la confirmación', async (): Promise<void> => {
+    dialogService.result = false;
+
+    await createFixture(createFacturaEmitida());
+
+    fixture.componentInstance.anularFactura();
+
+    await Promise.resolve();
+
+    expect(dialogService.confirmCount).toBe(1);
+
+    expect(clientesService.receivedAnnulCommand).toBeNull();
+
+    expect(fixture.componentInstance.currentFactura()?.estado).toBe('emitida');
   });
 
   it('reutiliza el detalle histórico al seleccionar una venta', async (): Promise<void> => {
@@ -599,6 +665,27 @@ function createFacturaEmitida(): ClienteFacturaInterface {
       puedeImprimir: true,
       puedeEnviarEmail: true,
       puedeAnular: true,
+    },
+  };
+}
+
+/**
+ * Crea la versión anulada de la factura
+ * emitida utilizada por las pruebas.
+ */
+function createFacturaAnulada(): ClienteFacturaInterface {
+  return {
+    ...createFacturaEmitida(),
+    estado: 'anulada',
+    fechaAnulacion: '2026-09-06T12:00:00.000Z',
+    capacidades: {
+      puedeEditar: false,
+      puedeEliminar: false,
+      puedePrevisualizar: false,
+      puedeFacturar: false,
+      puedeImprimir: false,
+      puedeEnviarEmail: false,
+      puedeAnular: false,
     },
   };
 }

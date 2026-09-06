@@ -17,6 +17,7 @@ import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatCheckbox } from '@angular/material/checkbox';
 import { MatIcon } from '@angular/material/icon';
 import type ActualizarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/actualizar-cliente-factura-borrador-command.interface';
+import type AnularClienteFacturaCommand from '@desktop-contracts/clientes/anular-cliente-factura-command.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
   ClienteFacturaVentaInterface,
@@ -166,6 +167,18 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
       !this.blocked() &&
       !this.hasChanges() &&
       this.selectedVentasCount() > 0
+    );
+  });
+
+  readonly canAnnul: Signal<boolean> = computed((): boolean => {
+    const factura: ClienteFacturaInterface | null = this.currentFactura();
+
+    return (
+      factura !== null &&
+      factura.estado === 'emitida' &&
+      factura.capacidades.puedeAnular &&
+      !this.loading() &&
+      !this.blocked()
     );
   });
 
@@ -383,6 +396,36 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
 
         if (result) {
           void this.confirmEmitFactura(factura.publicId);
+        }
+      });
+  }
+
+  /**
+   * Solicita confirmación antes de anular una
+   * factura emitida y liberar sus ventas.
+   */
+  anularFactura(): void {
+    const factura: ClienteFacturaInterface | null = this.currentFactura();
+
+    if (!this.canAnnul() || factura === null || factura.estado !== 'emitida') {
+      return;
+    }
+
+    this.dialogOpen.set(true);
+
+    this.dialog
+      .confirm({
+        title: 'Anular factura',
+        content:
+          `¿Quieres anular la factura ${factura.numeroFactura ?? ''}? ` +
+          'Sus ventas volverán a quedar disponibles para facturar. ' +
+          'El número y el documento emitido se conservarán.',
+      })
+      .subscribe((result: boolean): void => {
+        this.dialogOpen.set(false);
+
+        if (result) {
+          void this.confirmAnnulFactura(factura.publicId);
         }
       });
   }
@@ -695,6 +738,47 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
       this.detalleError.set(null);
       this.detalleLoading.set(false);
     }
+  }
+
+  /**
+   * Ejecuta la anulación y adopta inmediatamente
+   * la respuesta confirmada por SQLite.
+   */
+  private async confirmAnnulFactura(facturaPublicId: string): Promise<void> {
+    const command: AnularClienteFacturaCommand = {
+      clientePublicId: this.clientePublicId(),
+      facturaPublicId,
+    };
+
+    this.processing.set(true);
+    this.operationError.set(null);
+    this.operationInfo.set(null);
+
+    try {
+      const factura: ClienteFacturaInterface = await this.clientesService.anularFactura(command);
+
+      this.adoptAnnulledFactura(factura);
+
+      this.operationInfo.set(
+        factura.numeroFactura === null
+          ? 'Factura anulada correctamente.'
+          : `Factura ${factura.numeroFactura} anulada correctamente. Sus ventas vuelven a estar disponibles para facturar.`,
+      );
+    } catch (error: unknown) {
+      this.operationError.set(getErrorMessage(error, 'No se ha podido anular la factura.'));
+    } finally {
+      this.processing.set(false);
+    }
+  }
+
+  /**
+   * Convierte el editor abierto al estado histórico
+   * anulado sin realizar ninguna lectura posterior.
+   */
+  private adoptAnnulledFactura(factura: ClienteFacturaInterface): void {
+    this.currentFactura.set(factura);
+
+    this.setBaseSelection(this.selectedVentasPublicIds());
   }
 
   /**

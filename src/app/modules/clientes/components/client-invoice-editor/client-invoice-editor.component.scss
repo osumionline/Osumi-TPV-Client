@@ -256,9 +256,10 @@
         background-color: var(--color-white);
     }
 
-    .client-invoice-editor__delete {
-        --mdc-filled-button-container-color: var(--color-red);
-        --mdc-filled-button-label-text-color: var(--color-white);
+    .client-invoice-editor__delete,
+    .client-invoice-editor__annul {
+        --mat-button-filled-container-color: var(--color-red);
+        --mat-button-filled-label-text-color: var(--color-white);
     }
 
     .client-invoice-editor__summary {
