@@ -19,6 +19,7 @@ import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes/crear-cliente-factura-borrador-command.interface';
 import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
+import type EmitirClienteFacturaCommand from '@desktop-contracts/clientes/emitir-cliente-factura-command.interface';
 import createClienteCommand from '@model/clientes/cliente-form-command.mapper';
 import createClienteFormInitialValue from '@model/clientes/cliente-form.initial-value';
 import type ClienteFormModel from '@model/clientes/cliente-form.model';
@@ -39,9 +40,11 @@ describe('ClientesService', (): void => {
   let receivedVentasDisponiblesConsulta: ClienteFacturaVentasDisponiblesConsulta | null;
   let createdFacturaBorrador: ClienteFacturaInterface;
   let updatedFacturaBorrador: ClienteFacturaInterface;
+  let emittedFactura: ClienteFacturaInterface;
   let receivedCreateFacturaBorradorCommand: CrearClienteFacturaBorradorCommand | null;
   let receivedUpdateFacturaBorradorCommand: ActualizarClienteFacturaBorradorCommand | null;
   let receivedDeleteFacturaBorradorCommand: EliminarClienteFacturaBorradorCommand | null;
+  let receivedEmitFacturaCommand: EmitirClienteFacturaCommand | null;
   let createdCliente: ClienteInterface;
   let updatedCliente: ClienteInterface;
   let receivedCreateCommand: CrearClienteCommand | null;
@@ -64,9 +67,11 @@ describe('ClientesService', (): void => {
     receivedVentasDisponiblesConsulta = null;
     createdFacturaBorrador = createFacturaBorrador('factura-borrador-creada', 2_500);
     updatedFacturaBorrador = createFacturaBorrador('factura-borrador', 3_500);
+    emittedFactura = createFacturaEmitida('factura-borrador', 25, 3_500);
     receivedCreateFacturaBorradorCommand = null;
     receivedUpdateFacturaBorradorCommand = null;
     receivedDeleteFacturaBorradorCommand = null;
+    receivedEmitFacturaCommand = null;
     createdCliente = createClienteInterface(7, 'cliente-7', 'Ada Lovelace');
     updatedCliente = createClienteInterface(7, 'cliente-7', 'Ada Lovelace');
     receivedCreateCommand = null;
@@ -121,6 +126,14 @@ describe('ClientesService', (): void => {
           ): Promise<void> => {
             receivedDeleteFacturaBorradorCommand = command;
             return Promise.resolve();
+          },
+
+          emitFacturaBorrador: (
+            command: EmitirClienteFacturaCommand,
+          ): Promise<ClienteFacturaInterface> => {
+            receivedEmitFacturaCommand = command;
+
+            return Promise.resolve(emittedFactura);
           },
 
           getFacturaVentas: (
@@ -696,6 +709,30 @@ describe('ClientesService', (): void => {
     });
   });
 
+  it('sustituye en caché un borrador por su factura emitida', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    const borrador: ClienteFacturaInterface = createFacturaBorrador('factura-borrador', 3_500);
+
+    facturasResult = [borrador, ...createFacturas(12_345)];
+
+    await service.loadFacturas('cliente-7');
+
+    const command: EmitirClienteFacturaCommand = {
+      clientePublicId: 'cliente-7',
+      borradorPublicId: 'factura-borrador',
+    };
+
+    const result: ClienteFacturaInterface = await service.emitFacturaBorrador(command);
+
+    expect(receivedEmitFacturaCommand).toBe(command);
+    expect(result).toBe(emittedFactura);
+    expect(service.getFacturasState('cliente-7')).toEqual({
+      data: [emittedFactura, ...createFacturas(12_345)],
+      loading: false,
+      error: null,
+    });
+  });
+
   it('solicita las ventas de una factura mediante su API específica', async (): Promise<void> => {
     const service: ClientesService = new ClientesService();
     const consulta: ClienteFacturaVentasConsulta = {
@@ -832,33 +869,43 @@ function createFacturaBorrador(publicId: string, importeCents: number): ClienteF
 }
 
 /**
+ * Crea una factura emitida con identidad y numeración
+ * configurables para las pruebas.
+ */
+function createFacturaEmitida(
+  publicId: string,
+  numero: number,
+  importeCents: number,
+): ClienteFacturaInterface {
+  return {
+    publicId,
+    serie: '',
+    numero,
+    year: 2026,
+    numeroFactura: `${numero}_2026`,
+    estado: 'emitida',
+    fecha: '2026-09-06T10:00:00.000Z',
+    fechaCreacion: '2026-09-05T10:00:00.000Z',
+    fechaEmision: '2026-09-06T10:00:00.000Z',
+    fechaAnulacion: null,
+    importeCents,
+    capacidades: {
+      puedeEditar: false,
+      puedeEliminar: false,
+      puedePrevisualizar: false,
+      puedeFacturar: false,
+      puedeImprimir: true,
+      puedeEnviarEmail: true,
+      puedeAnular: true,
+    },
+  };
+}
+
+/**
  * Crea una factura emitida para las pruebas del estado Angular.
  */
 function createFacturas(importeCents: number): readonly ClienteFacturaInterface[] {
-  return [
-    {
-      publicId: 'factura-1',
-      serie: '',
-      numero: 21,
-      year: 2026,
-      numeroFactura: '21_2026',
-      estado: 'emitida',
-      fecha: '2026-09-04T10:00:00.000Z',
-      fechaCreacion: '2026-09-03T10:00:00.000Z',
-      fechaEmision: '2026-09-04T10:00:00.000Z',
-      fechaAnulacion: null,
-      importeCents,
-      capacidades: {
-        puedeEditar: false,
-        puedeEliminar: false,
-        puedePrevisualizar: false,
-        puedeFacturar: false,
-        puedeImprimir: true,
-        puedeEnviarEmail: true,
-        puedeAnular: true,
-      },
-    },
-  ];
+  return [createFacturaEmitida('factura-1', 21, importeCents)];
 }
 
 function createEstadisticas(nombre: string): ClienteEstadisticasInterface {

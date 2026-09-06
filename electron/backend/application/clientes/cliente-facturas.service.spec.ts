@@ -289,6 +289,37 @@ describe('ClienteFacturasService', (): void => {
     });
   });
 
+  it('normaliza y emite un borrador mediante el repository', async (): Promise<void> => {
+    const repository = new FakeClienteFacturasRepository();
+    const service = new ClienteFacturasService(repository);
+
+    const result: ClienteFacturaInterface = await service.emitBorrador({
+      clientePublicId: '  cliente-1  ',
+      borradorPublicId: '  factura-borrador  ',
+    });
+
+    expect(repository.requestedEmitCommand).toEqual({
+      clientePublicId: 'cliente-1',
+      borradorPublicId: 'factura-borrador',
+    });
+
+    expect(result.publicId).toBe('factura-emitida');
+    expect(result.estado).toBe('emitida');
+    expect(result.numero).toBe(25);
+    expect(result.year).toBe(2026);
+    expect(result.numeroFactura).toBe('25_2026');
+    expect(result.fechaEmision).toBe('2026-09-06T10:00:00.000Z');
+    expect(result.capacidades).toEqual({
+      puedeEditar: false,
+      puedeEliminar: false,
+      puedePrevisualizar: false,
+      puedeFacturar: false,
+      puedeImprimir: true,
+      puedeEnviarEmail: true,
+      puedeAnular: true,
+    });
+  });
+
   it('rechaza comandos de borrador inválidos antes de consultar el repository', async (): Promise<void> => {
     const repository = new FakeClienteFacturasRepository();
     const service = new ClienteFacturasService(repository);
@@ -329,9 +360,17 @@ describe('ClienteFacturasService', (): void => {
       }),
     ).rejects.toThrow('El identificador del borrador de factura no es válido.');
 
+    await expect(
+      service.emitBorrador({
+        clientePublicId: 'cliente-1',
+        borradorPublicId: '   ',
+      }),
+    ).rejects.toThrow('El identificador del borrador de factura no es válido.');
+
     expect(repository.requestedCreateCommand).toBeNull();
     expect(repository.requestedUpdateCommand).toBeNull();
     expect(repository.requestedDeleteCommand).toBeNull();
+    expect(repository.requestedEmitCommand).toBeNull();
   });
 
   it('normaliza y construye las ventas relacionadas con una factura persistida', async (): Promise<void> => {

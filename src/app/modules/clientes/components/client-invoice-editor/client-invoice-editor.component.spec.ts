@@ -10,6 +10,7 @@ import type {
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes/crear-cliente-factura-borrador-command.interface';
 import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
+import type EmitirClienteFacturaCommand from '@desktop-contracts/clientes/emitir-cliente-factura-command.interface';
 import ClientInvoiceEditorComponent from '@modules/clientes/components/client-invoice-editor/client-invoice-editor.component';
 import { DialogService } from '@osumi/angular-tools';
 import ClientesService from '@services/clientes.service';
@@ -26,6 +27,7 @@ class FakeClientesService {
   receivedCreateCommand: CrearClienteFacturaBorradorCommand | null = null;
   receivedUpdateCommand: ActualizarClienteFacturaBorradorCommand | null = null;
   receivedDeleteCommand: EliminarClienteFacturaBorradorCommand | null = null;
+  receivedEmitCommand: EmitirClienteFacturaCommand | null = null;
 
   /**
    * Devuelve las ventas disponibles preparadas para la prueba.
@@ -83,6 +85,15 @@ class FakeClientesService {
     this.receivedDeleteCommand = command;
 
     return Promise.resolve();
+  }
+
+  /**
+   * Simula la emisión definitiva de un borrador.
+   */
+  emitFacturaBorrador(command: EmitirClienteFacturaCommand): Promise<ClienteFacturaInterface> {
+    this.receivedEmitCommand = command;
+
+    return Promise.resolve(createFacturaEmitida());
   }
 }
 
@@ -291,6 +302,78 @@ describe('ClientInvoiceEditorComponent', (): void => {
 
     expect(dialogService.confirmCount).toBe(1);
     expect(closeRequests).toEqual([true]);
+  });
+
+  it('emite un borrador limpio y convierte el editor a modo consulta', async (): Promise<void> => {
+    clientesService.ventasDisponibles = [
+      createVentaDisponible('venta-1', 41, 1_000, true),
+      createVentaDisponible('venta-2', 42, 2_000, false),
+    ];
+
+    await createFixture(createFacturaBorrador());
+
+    expect(fixture.componentInstance.hasChanges()).toBe(false);
+    expect(fixture.componentInstance.canEmit()).toBe(true);
+
+    fixture.componentInstance.emitFactura();
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(dialogService.confirmCount).toBe(1);
+    expect(clientesService.receivedEmitCommand).toEqual({
+      clientePublicId: 'cliente-1',
+      borradorPublicId: 'factura-borrador',
+    });
+    expect(fixture.componentInstance.currentFactura()?.estado).toBe('emitida');
+    expect(fixture.componentInstance.currentFactura()?.numeroFactura).toBe('21_2026');
+    expect(fixture.componentInstance.editable()).toBe(false);
+    expect(fixture.componentInstance.hasChanges()).toBe(false);
+    expect(
+      fixture.componentInstance
+        .ventas()
+        .map((venta: ClienteFacturaVentaInterface): string => venta.publicId),
+    ).toEqual(['venta-1']);
+  });
+
+  it('no permite emitir un borrador con cambios pendientes', async (): Promise<void> => {
+    clientesService.ventasDisponibles = [
+      createVentaDisponible('venta-1', 41, 1_000, true),
+      createVentaDisponible('venta-2', 42, 2_000, false),
+    ];
+
+    await createFixture(createFacturaBorrador());
+
+    fixture.componentInstance.toggleVenta('venta-2');
+
+    expect(fixture.componentInstance.hasChanges()).toBe(true);
+    expect(fixture.componentInstance.canEmit()).toBe(false);
+
+    fixture.componentInstance.emitFactura();
+
+    expect(dialogService.confirmCount).toBe(0);
+    expect(clientesService.receivedEmitCommand).toBeNull();
+  });
+
+  it('no permite emitir mientras la ficha de cliente tiene cambios pendientes', async (): Promise<void> => {
+    clientesService.ventasDisponibles = [createVentaDisponible('venta-1', 41, 1_000, true)];
+
+    fixture = TestBed.createComponent(ClientInvoiceEditorComponent);
+    fixture.componentRef.setInput('clientePublicId', 'cliente-1');
+    fixture.componentRef.setInput('clienteDirty', true);
+    fixture.componentRef.setInput('factura', createFacturaBorrador());
+    fixture.detectChanges();
+
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.hasChanges()).toBe(false);
+    expect(fixture.componentInstance.canEmit()).toBe(false);
+
+    fixture.componentInstance.emitFactura();
+
+    expect(dialogService.confirmCount).toBe(0);
+    expect(clientesService.receivedEmitCommand).toBeNull();
   });
 
   it('elimina un borrador confirmado y cierra el modal', async (): Promise<void> => {

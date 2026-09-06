@@ -180,6 +180,7 @@
 @if (invoiceEditorOpen()) {
 @if (clientesService.workspace()?.clientePublicId; as clientePublicId) {
 <otpv-client-invoice-editor [clientePublicId]="clientePublicId"
+                            [clienteDirty]="clientesService.workspace()?.dirty ?? false"
                             [factura]="invoiceEditorFactura()"
                             (closeEvent)="closeFacturaEditor()" />
 }

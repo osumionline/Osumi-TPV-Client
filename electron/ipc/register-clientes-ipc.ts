@@ -21,6 +21,7 @@ import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes/crear-cliente-factura-borrador-command.interface';
 import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
+import type EmitirClienteFacturaCommand from '@desktop-contracts/clientes/emitir-cliente-factura-command.interface';
 import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
 import { assertTrustedSender } from '@ipc/assert-trusted-sender';
 import IPC_CHANNELS from '@ipc/channels';
@@ -114,6 +115,16 @@ export default function registerClientesIpc(
       assertTrustedSender(event, getMainWindow);
 
       await clienteFacturasService.deleteBorrador(command);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.clientesEmitFacturaBorrador,
+
+    async (event, command: EmitirClienteFacturaCommand): Promise<ClienteFacturaInterface> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return clienteFacturasService.emitBorrador(command);
     },
   );
 

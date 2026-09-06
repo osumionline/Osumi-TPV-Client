@@ -19,6 +19,7 @@ import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes/crear-cliente-factura-borrador-command.interface';
 import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
+import type EmitirClienteFacturaCommand from '@desktop-contracts/clientes/emitir-cliente-factura-command.interface';
 
 export default interface ClientesApi {
   getAll(): Promise<readonly ClienteInterface[]>;
@@ -52,6 +53,11 @@ export default interface ClientesApi {
    * Elimina un borrador y libera sus ventas.
    */
   deleteFacturaBorrador(command: EliminarClienteFacturaBorradorCommand): Promise<void>;
+
+  /**
+   * Emite definitivamente un borrador de factura.
+   */
+  emitFacturaBorrador(command: EmitirClienteFacturaCommand): Promise<ClienteFacturaInterface>;
 
   /**
    * Obtiene las ventas relacionadas históricamente

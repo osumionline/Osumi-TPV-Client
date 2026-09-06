@@ -35,6 +35,7 @@ import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes/crear-cliente-factura-borrador-command.interface';
 import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
+import type EmitirClienteFacturaCommand from '@desktop-contracts/clientes/emitir-cliente-factura-command.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type { InstallationResult } from '@desktop-contracts/configuration/installation-result.interface';
@@ -291,6 +292,12 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
 
     deleteFacturaBorrador: (command: EliminarClienteFacturaBorradorCommand): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.clientesDeleteFacturaBorrador, command) as Promise<void>,
+
+    emitFacturaBorrador: (command: EmitirClienteFacturaCommand): Promise<ClienteFacturaInterface> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.clientesEmitFacturaBorrador,
+        command,
+      ) as Promise<ClienteFacturaInterface>,
 
     getFacturaVentas: (
       consulta: ClienteFacturaVentasConsulta,

@@ -315,6 +315,18 @@
                 {{ processing() ? 'Guardando...' : 'Guardar' }}
             </button>
             }
+
+            @if (
+            currentFactura()?.estado === 'borrador' &&
+            currentFactura()?.capacidades?.puedeFacturar
+            ) {
+            <button mat-flat-button
+                    type="button"
+                    [disabled]="!canEmit()"
+                    (click)="emitFactura()">
+                Facturar
+            </button>
+            }
         </footer>
     </section>
 </div>

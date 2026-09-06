@@ -2,6 +2,7 @@ import type ActualizarClienteFacturaBorradorRecordCommand from '@backend/contrac
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
 import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
+import type EmitirClienteFacturaRecordCommand from '@backend/contracts/clientes/emitir-cliente-factura-record-command.interface';
 import type {
   ClienteFacturaEstadoRecord,
   ClienteFacturaRecord,
@@ -25,6 +26,7 @@ import type {
 } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes/crear-cliente-factura-borrador-command.interface';
 import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
+import type EmitirClienteFacturaCommand from '@desktop-contracts/clientes/emitir-cliente-factura-command.interface';
 
 export default class ClienteFacturasService {
   constructor(private readonly clienteFacturasRepository: ClienteFacturasRepository) {}
@@ -104,6 +106,26 @@ export default class ClienteFacturasService {
     };
 
     await this.clienteFacturasRepository.deleteBorrador(recordCommand);
+  }
+
+  /**
+   * Emite un borrador utilizando exclusivamente
+   * identificadores normalizados por aplicación.
+   */
+  async emitBorrador(command: EmitirClienteFacturaCommand): Promise<ClienteFacturaInterface> {
+    if (typeof command !== 'object' || command === null) {
+      throw new Error('Los datos para emitir la factura no son válidos.');
+    }
+
+    const recordCommand: EmitirClienteFacturaRecordCommand = {
+      clientePublicId: this.requirePublicId(command.clientePublicId),
+      borradorPublicId: this.requireBorradorPublicId(command.borradorPublicId),
+    };
+
+    const record: ClienteFacturaRecord =
+      await this.clienteFacturasRepository.emitBorrador(recordCommand);
+
+    return this.toInterface(record);
   }
 
   /**

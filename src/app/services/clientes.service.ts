@@ -21,6 +21,7 @@ import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes/crear-cliente-factura-borrador-command.interface';
 import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
+import type EmitirClienteFacturaCommand from '@desktop-contracts/clientes/emitir-cliente-factura-command.interface';
 import type ClienteEstadisticasState from '@model/clientes/cliente-estadisticas-state.interface';
 import type ClienteFacturasState from '@model/clientes/cliente-facturas-state.interface';
 import createClienteCommand from '@model/clientes/cliente-form-command.mapper';
@@ -387,6 +388,21 @@ export default class ClientesService {
     await window.osumiDesktop.clientes.deleteFacturaBorrador(command);
 
     await this.reconciliarFacturaEliminada(command.clientePublicId, command.borradorPublicId);
+  }
+
+  /**
+   * Emite un borrador y sustituye en caché su versión
+   * editable por la factura definitiva confirmada.
+   */
+  async emitFacturaBorrador(
+    command: EmitirClienteFacturaCommand,
+  ): Promise<ClienteFacturaInterface> {
+    const factura: ClienteFacturaInterface =
+      await window.osumiDesktop.clientes.emitFacturaBorrador(command);
+
+    await this.reconciliarFacturaPersistida(command.clientePublicId, factura);
+
+    return factura;
   }
 
   /**

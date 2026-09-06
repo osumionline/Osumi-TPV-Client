@@ -24,6 +24,7 @@ import type {
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes/crear-cliente-factura-borrador-command.interface';
 import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
+import type EmitirClienteFacturaCommand from '@desktop-contracts/clientes/emitir-cliente-factura-command.interface';
 import type { VentaHistoricoDetalle } from '@desktop-contracts/ventas/venta-historico.interface';
 import HistoricalSaleDetailComponent from '@modules/ventas/components/historical-sale-detail/historical-sale-detail.component';
 import { DialogService } from '@osumi/angular-tools';
@@ -57,6 +58,7 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
   private readonly dialog: DialogService = inject(DialogService);
 
   readonly clientePublicId: InputSignal<string> = input.required<string>();
+  readonly clienteDirty: InputSignal<boolean> = input<boolean>(false);
   readonly factura: InputSignal<ClienteFacturaInterface | null> =
     input<ClienteFacturaInterface | null>(null);
 
@@ -137,6 +139,21 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
       this.selectedVentasCount() > 0 &&
       this.hasChanges(),
   );
+
+  readonly canEmit: Signal<boolean> = computed((): boolean => {
+    const factura: ClienteFacturaInterface | null = this.currentFactura();
+
+    return (
+      factura !== null &&
+      factura.estado === 'borrador' &&
+      factura.capacidades.puedeFacturar &&
+      !this.clienteDirty() &&
+      !this.loading() &&
+      !this.blocked() &&
+      !this.hasChanges() &&
+      this.selectedVentasCount() > 0
+    );
+  });
 
   private readonly baseVentasPublicIds: WritableSignal<ReadonlySet<string>> = signal<
     ReadonlySet<string>
@@ -350,6 +367,35 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Solicita confirmación antes de convertir el
+   * borrador en una factura definitiva.
+   */
+  emitFactura(): void {
+    const factura: ClienteFacturaInterface | null = this.currentFactura();
+
+    if (!this.canEmit() || factura === null || factura.estado !== 'borrador') {
+      return;
+    }
+
+    this.dialogOpen.set(true);
+
+    this.dialog
+      .confirm({
+        title: 'Facturar',
+        content:
+          'Al facturar se asignará un número definitivo y la factura dejará de poder editarse. ' +
+          '¿Quieres continuar?',
+      })
+      .subscribe((result: boolean): void => {
+        this.dialogOpen.set(false);
+
+        if (result) {
+          void this.confirmEmitFactura(factura.publicId);
+        }
+      });
+  }
+
+  /**
    * Solicita confirmación antes de eliminar un
    * borrador ya persistido.
    */
@@ -496,6 +542,66 @@ export default class ClientInvoiceEditorComponent implements OnInit, OnDestroy {
       if (requestId === this.detailRequestId && this.selectedVentaId() === idVenta) {
         this.detalleLoading.set(false);
       }
+    }
+  }
+
+  /**
+   * Ejecuta la emisión y adopta la respuesta ya
+   * confirmada por la transacción de backend.
+   */
+  private async confirmEmitFactura(borradorPublicId: string): Promise<void> {
+    const command: EmitirClienteFacturaCommand = {
+      clientePublicId: this.clientePublicId(),
+      borradorPublicId,
+    };
+
+    this.processing.set(true);
+    this.operationError.set(null);
+    this.operationInfo.set(null);
+
+    try {
+      const factura: ClienteFacturaInterface =
+        await this.clientesService.emitFacturaBorrador(command);
+
+      this.adoptEmittedFactura(factura);
+
+      this.operationInfo.set(
+        factura.numeroFactura === null
+          ? 'Factura emitida correctamente.'
+          : `Factura ${factura.numeroFactura} emitida correctamente.`,
+      );
+    } catch (error: unknown) {
+      this.operationError.set(getErrorMessage(error, 'No se ha podido emitir la factura.'));
+    } finally {
+      this.processing.set(false);
+    }
+  }
+
+  /**
+   * Convierte el estado local del editor a modo de
+   * consulta sin depender de una lectura post-COMMIT.
+   */
+  private adoptEmittedFactura(factura: ClienteFacturaInterface): void {
+    const selectedPublicIds: ReadonlySet<string> = this.selectedVentasPublicIds();
+    const ventas: readonly ClienteFacturaVentaInterface[] = this.ventas().filter(
+      (venta: ClienteFacturaVentaInterface): boolean => selectedPublicIds.has(venta.publicId),
+    );
+
+    this.currentFactura.set(factura);
+    this.ventas.set(ventas);
+    this.setBaseSelection(selectedPublicIds);
+
+    const selectedVentaId: number | null = this.selectedVentaId();
+
+    if (
+      selectedVentaId !== null &&
+      !ventas.some((venta: ClienteFacturaVentaInterface): boolean => venta.id === selectedVentaId)
+    ) {
+      this.detailRequestId++;
+      this.selectedVentaId.set(null);
+      this.detalle.set(null);
+      this.detalleError.set(null);
+      this.detalleLoading.set(false);
     }
   }
 
