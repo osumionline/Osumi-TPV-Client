@@ -31,12 +31,14 @@ export interface ClienteFacturaDocumentoLineaInterface {
   readonly localizador: number;
   readonly marca: string;
   readonly nombre: string;
-  readonly pvpMicros: number;
-  readonly ivaBps: number;
-  readonly importeMicros: number;
-  readonly descuentoBps: number;
-  readonly importeDescuentoMicros: number;
+  readonly pvpCents: number;
+  readonly baseUnitCents: number;
   readonly unidades: number;
+  readonly subtotalCents: number;
+  readonly ivaBps: number;
+  readonly ivaCents: number;
+  readonly descuentoCents: number;
+  readonly totalCents: number;
   readonly regalo: boolean;
 }
 
@@ -45,6 +47,11 @@ export interface ClienteFacturaDocumentoVentaInterface {
   readonly serie: string;
   readonly numero: number;
   readonly fecha: string;
+  readonly pvpCents: number;
+  readonly baseCents: number;
+  readonly subtotalCents: number;
+  readonly ivaCents: number;
+  readonly descuentoCents: number;
   readonly totalCents: number;
   readonly lineas: readonly ClienteFacturaDocumentoLineaInterface[];
 }
@@ -60,8 +67,8 @@ export interface ClienteFacturaDocumentoInterface {
   readonly facturaPublicId: string;
   readonly serie: string;
   readonly numero: number | null;
-  readonly year: number | null;
-  readonly numeroFactura: string | null;
+  readonly year: number;
+  readonly numeroFactura: string;
   readonly estado: ClienteFacturaEstado;
   readonly previsualizacion: boolean;
   readonly generatedAt: string;
@@ -73,5 +80,7 @@ export interface ClienteFacturaDocumentoInterface {
   readonly cliente: ClienteFacturaDocumentoClienteInterface;
   readonly ventas: readonly ClienteFacturaDocumentoVentaInterface[];
   readonly impuestos: readonly ClienteFacturaDocumentoImpuestoInterface[];
+  readonly subtotalCents: number;
+  readonly descuentoCents: number;
   readonly totalCents: number;
 }

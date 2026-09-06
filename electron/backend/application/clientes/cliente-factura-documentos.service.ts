@@ -14,12 +14,6 @@ import type {
 } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 
-interface VentaImpuestoAccumulator {
-  readonly ivaBps: number;
-  importeMicros: bigint;
-  totalCents: bigint;
-}
-
 interface FacturaImpuestoAccumulator {
   baseCents: bigint;
   cuotaCents: bigint;
@@ -65,9 +59,39 @@ export default class ClienteFacturaDocumentosService {
 
     const generatedAt: string = new Date().toISOString();
     const previsualizacion: boolean = record.estado === 'borrador';
-    const year: number | null = previsualizacion ? null : this.resolveEmissionYear(record);
-    const numeroFactura: string | null =
-      record.numero === null || year === null ? null : `${record.numero}_${year}`;
+    const year: number = previsualizacion
+      ? this.resolveDocumentYear(generatedAt)
+      : this.resolveEmissionYear(record);
+    const numeroFactura: string = record.numero === null ? `_${year}` : `${record.numero}_${year}`;
+
+    const ventas: readonly ClienteFacturaDocumentoVentaInterface[] = record.ventas.map(
+      (venta: ClienteFacturaDocumentoVentaRecord): ClienteFacturaDocumentoVentaInterface =>
+        this.toVentaInterface(venta),
+    );
+    const impuestos: readonly ClienteFacturaDocumentoImpuestoInterface[] =
+      this.buildImpuestos(ventas);
+    const subtotalCents: number = this.sumSafe(
+      ventas.map((venta: ClienteFacturaDocumentoVentaInterface): number => venta.subtotalCents),
+      'El subtotal de la factura supera el rango numérico seguro.',
+    );
+    const descuentoCents: number = this.sumSafe(
+      ventas.map((venta: ClienteFacturaDocumentoVentaInterface): number => venta.descuentoCents),
+      'El descuento de la factura supera el rango numérico seguro.',
+    );
+    const ivaCents: number = this.sumSafe(
+      impuestos.map(
+        (impuesto: ClienteFacturaDocumentoImpuestoInterface): number => impuesto.cuotaCents,
+      ),
+      'La cuota total de IVA supera el rango numérico seguro.',
+    );
+    const calculatedTotalCents: number = this.sumSafe(
+      [subtotalCents, ivaCents, descuentoCents],
+      'El total calculado de la factura supera el rango numérico seguro.',
+    );
+
+    if (calculatedTotalCents !== record.importeCents) {
+      throw new Error('El total de la factura no coincide con sus ventas.');
+    }
 
     return {
       facturaPublicId: record.publicId,
@@ -102,11 +126,10 @@ export default class ClienteFacturaDocumentosService {
         poblacion: record.cliente.poblacion,
         provinciaId: record.cliente.provinciaId,
       },
-      ventas: record.ventas.map(
-        (venta: ClienteFacturaDocumentoVentaRecord): ClienteFacturaDocumentoVentaInterface =>
-          this.toVentaInterface(venta),
-      ),
-      impuestos: this.buildImpuestos(record),
+      ventas,
+      impuestos,
+      subtotalCents,
+      descuentoCents,
       totalCents: record.importeCents,
     };
   }
@@ -115,84 +138,152 @@ export default class ClienteFacturaDocumentosService {
    * Convierte una venta documental interna al
    * contrato consumido por las capas superiores.
    */
+  /**
+   * Convierte una venta persistida en la fila resumen
+   * utilizada por la factura y sus líneas desplegables.
+   */
   private toVentaInterface(
     venta: ClienteFacturaDocumentoVentaRecord,
   ): ClienteFacturaDocumentoVentaInterface {
+    if (!Number.isSafeInteger(venta.totalCents)) {
+      throw new Error('El importe de una venta de la factura no es válido.');
+    }
+
+    if (venta.lineas.length === 0) {
+      throw new Error('Una de las ventas de la factura no contiene líneas documentables.');
+    }
+
+    let importeMicros: bigint = 0n;
+
+    for (const linea of venta.lineas) {
+      if (!Number.isSafeInteger(linea.importeMicros)) {
+        throw new Error('El importe de una línea de factura no es válido.');
+      }
+
+      importeMicros += BigInt(linea.importeMicros);
+    }
+
+    if (this.roundMicrosToCents(importeMicros) !== venta.totalCents) {
+      throw new Error('El total de una venta no coincide con sus líneas.');
+    }
+
+    const lineas: readonly ClienteFacturaDocumentoLineaInterface[] = venta.lineas.map(
+      (linea: ClienteFacturaDocumentoLineaRecord): ClienteFacturaDocumentoLineaInterface =>
+        this.toLineaInterface(linea),
+    );
+    const subtotalCents: number = this.sumSafe(
+      lineas.map((linea: ClienteFacturaDocumentoLineaInterface): number => linea.subtotalCents),
+      'La base de una venta supera el rango numérico seguro.',
+    );
+    const ivaCents: number = this.sumSafe(
+      lineas.map((linea: ClienteFacturaDocumentoLineaInterface): number => linea.ivaCents),
+      'El IVA de una venta supera el rango numérico seguro.',
+    );
+    const pvpCents: number = this.sumSafe(
+      [subtotalCents, ivaCents],
+      'El PVP de una venta supera el rango numérico seguro.',
+    );
+    const descuentoCents: number = this.toSafeNumber(
+      BigInt(venta.totalCents) - BigInt(pvpCents),
+      'El descuento de una venta supera el rango numérico seguro.',
+    );
+
     return {
       publicId: venta.publicId,
       serie: venta.serie,
       numero: venta.numero,
       fecha: venta.fecha,
+      pvpCents,
+      baseCents: subtotalCents,
+      subtotalCents,
+      ivaCents,
+      descuentoCents,
       totalCents: venta.totalCents,
-      lineas: venta.lineas.map(
-        (linea: ClienteFacturaDocumentoLineaRecord): ClienteFacturaDocumentoLineaInterface => ({
-          localizador: linea.localizador,
-          marca: linea.marca,
-          nombre: linea.nombre,
-          pvpMicros: linea.pvpMicros,
-          ivaBps: linea.ivaBps,
-          importeMicros: linea.importeMicros,
-          descuentoBps: linea.descuentoBps,
-          importeDescuentoMicros: linea.importeDescuentoMicros,
-          unidades: linea.unidades,
-          regalo: linea.regalo,
-        }),
-      ),
+      lineas,
     };
   }
 
   /**
-   * Calcula bases e IVA por tipo preservando el total
-   * canónico en céntimos de cada venta.
+   * Calcula las columnas documentales de una línea
+   * manteniendo el descuento separado de base e IVA.
    */
-  private buildImpuestos(
-    record: ClienteFacturaDocumentoRecord,
-  ): readonly ClienteFacturaDocumentoImpuestoInterface[] {
-    if (record.ventas.length === 0) {
-      throw new Error('La factura no contiene ventas documentables.');
+  private toLineaInterface(
+    linea: ClienteFacturaDocumentoLineaRecord,
+  ): ClienteFacturaDocumentoLineaInterface {
+    if (!Number.isSafeInteger(linea.pvpMicros) || linea.pvpMicros < 0) {
+      throw new Error('El PVP de una línea de factura no es válido.');
     }
 
+    if (!Number.isSafeInteger(linea.importeMicros) || linea.importeMicros < 0) {
+      throw new Error('El importe de una línea de factura no es válido.');
+    }
+
+    if (!Number.isSafeInteger(linea.unidades) || linea.unidades <= 0) {
+      throw new Error('Las unidades de una línea de factura no son válidas.');
+    }
+
+    if (!Number.isSafeInteger(linea.ivaBps) || linea.ivaBps < 0 || linea.ivaBps > 10_000) {
+      throw new Error('El tipo de IVA de una línea de factura no es válido.');
+    }
+
+    const ivaDivisor: bigint = BPS_BASE + BigInt(linea.ivaBps);
+    const pvpMicros: bigint = BigInt(linea.pvpMicros);
+    const totalPvpMicros: bigint = pvpMicros * BigInt(linea.unidades);
+    const baseUnitMicros: bigint = this.roundDivision(pvpMicros * BPS_BASE, ivaDivisor);
+    const subtotalMicros: bigint = this.roundDivision(totalPvpMicros * BPS_BASE, ivaDivisor);
+    const pvpCents: number = this.roundMicrosToCents(pvpMicros);
+    const totalPvpCents: number = this.roundMicrosToCents(totalPvpMicros);
+    const baseUnitCents: number = this.roundMicrosToCents(baseUnitMicros);
+    const subtotalCents: number = this.roundMicrosToCents(subtotalMicros);
+    const ivaCents: number = totalPvpCents - subtotalCents;
+    const totalCents: number = this.roundMicrosToCents(BigInt(linea.importeMicros));
+    const descuentoCents: number = this.toSafeNumber(
+      BigInt(totalCents) - BigInt(totalPvpCents),
+      'El descuento de una línea supera el rango numérico seguro.',
+    );
+
+    return {
+      localizador: linea.localizador,
+      marca: linea.marca,
+      nombre: linea.nombre,
+      pvpCents,
+      baseUnitCents,
+      unidades: linea.unidades,
+      subtotalCents,
+      ivaBps: linea.ivaBps,
+      ivaCents,
+      descuentoCents,
+      totalCents,
+      regalo: linea.regalo,
+    };
+  }
+
+  /**
+   * Agrupa las bases e IVA previos al descuento
+   * utilizando las mismas cifras mostradas en tabla.
+   */
+  private buildImpuestos(
+    ventas: readonly ClienteFacturaDocumentoVentaInterface[],
+  ): readonly ClienteFacturaDocumentoImpuestoInterface[] {
     const impuestos: Map<number, FacturaImpuestoAccumulator> = new Map<
       number,
       FacturaImpuestoAccumulator
     >();
-    let ventasTotalCents: bigint = 0n;
 
-    for (const venta of record.ventas) {
-      if (!Number.isSafeInteger(venta.totalCents)) {
-        throw new Error('El importe de una venta de la factura no es válido.');
-      }
-
-      ventasTotalCents += BigInt(venta.totalCents);
-
-      const grupos: VentaImpuestoAccumulator[] = this.buildVentaImpuestos(venta);
-
-      for (const grupo of grupos) {
-        const baseCents: bigint = this.roundDivision(
-          grupo.totalCents * BPS_BASE,
-          BPS_BASE + BigInt(grupo.ivaBps),
-        );
-        const cuotaCents: bigint = grupo.totalCents - baseCents;
-        const acumulado: FacturaImpuestoAccumulator = impuestos.get(grupo.ivaBps) ?? {
+    for (const venta of ventas) {
+      for (const linea of venta.lineas) {
+        const acumulado: FacturaImpuestoAccumulator = impuestos.get(linea.ivaBps) ?? {
           baseCents: 0n,
           cuotaCents: 0n,
           totalCents: 0n,
         };
 
-        acumulado.baseCents += baseCents;
-        acumulado.cuotaCents += cuotaCents;
-        acumulado.totalCents += grupo.totalCents;
-        impuestos.set(grupo.ivaBps, acumulado);
-      }
-    }
+        acumulado.baseCents += BigInt(linea.subtotalCents);
+        acumulado.cuotaCents += BigInt(linea.ivaCents);
+        acumulado.totalCents += BigInt(linea.subtotalCents + linea.ivaCents);
 
-    if (
-      this.toSafeNumber(
-        ventasTotalCents,
-        'El importe total de las ventas supera el rango numérico seguro.',
-      ) !== record.importeCents
-    ) {
-      throw new Error('El total de la factura no coincide con sus ventas.');
+        impuestos.set(linea.ivaBps, acumulado);
+      }
     }
 
     return Array.from(impuestos.entries())
@@ -224,72 +315,21 @@ export default class ClienteFacturaDocumentosService {
   }
 
   /**
-   * Agrupa los importes finales de una venta por IVA
-   * y reconcilia el redondeo con su total canónico.
+   * Suma importes utilizando bigint y devuelve
+   * únicamente un entero seguro de JavaScript.
    */
-  private buildVentaImpuestos(
-    venta: ClienteFacturaDocumentoVentaRecord,
-  ): VentaImpuestoAccumulator[] {
-    if (venta.lineas.length === 0) {
-      throw new Error('Una de las ventas de la factura no contiene líneas documentables.');
-    }
+  private sumSafe(values: readonly number[], message: string): number {
+    let total: bigint = 0n;
 
-    const gruposByIva: Map<number, VentaImpuestoAccumulator> = new Map<
-      number,
-      VentaImpuestoAccumulator
-    >();
-    let importeMicros: bigint = 0n;
-
-    for (const linea of venta.lineas) {
-      if (!Number.isSafeInteger(linea.importeMicros)) {
-        throw new Error('El importe de una línea de factura no es válido.');
+    for (const value of values) {
+      if (!Number.isSafeInteger(value)) {
+        throw new Error(message);
       }
 
-      if (!Number.isSafeInteger(linea.ivaBps) || linea.ivaBps < 0 || linea.ivaBps > 10_000) {
-        throw new Error('El tipo de IVA de una línea de factura no es válido.');
-      }
-
-      const lineaMicros: bigint = BigInt(linea.importeMicros);
-      const grupo: VentaImpuestoAccumulator = gruposByIva.get(linea.ivaBps) ?? {
-        ivaBps: linea.ivaBps,
-        importeMicros: 0n,
-        totalCents: 0n,
-      };
-
-      grupo.importeMicros += lineaMicros;
-      gruposByIva.set(linea.ivaBps, grupo);
-      importeMicros += lineaMicros;
+      total += BigInt(value);
     }
 
-    if (this.roundMicrosToCents(importeMicros) !== venta.totalCents) {
-      throw new Error('El total de una venta no coincide con sus líneas.');
-    }
-
-    const grupos: VentaImpuestoAccumulator[] = Array.from(gruposByIva.values());
-
-    for (const grupo of grupos) {
-      grupo.totalCents = BigInt(this.roundMicrosToCents(grupo.importeMicros));
-    }
-
-    const gruposTotalCents: bigint = grupos.reduce(
-      (total: bigint, grupo: VentaImpuestoAccumulator): bigint => total + grupo.totalCents,
-      0n,
-    );
-    const residual: bigint = BigInt(venta.totalCents) - gruposTotalCents;
-
-    if (residual !== 0n) {
-      let target: VentaImpuestoAccumulator = grupos[0];
-
-      for (const grupo of grupos.slice(1)) {
-        if (this.absBigInt(grupo.importeMicros) > this.absBigInt(target.importeMicros)) {
-          target = grupo;
-        }
-      }
-
-      target.totalCents += residual;
-    }
-
-    return grupos;
+    return this.toSafeNumber(total, message);
   }
 
   /**
@@ -344,11 +384,17 @@ export default class ClienteFacturaDocumentosService {
    * de emisión de una factura finalizada.
    */
   private resolveEmissionYear(record: ClienteFacturaDocumentoRecord): number {
-    const fechaEmision: string = this.requireFechaEmision(record);
-    const year: number = Number(fechaEmision.slice(0, 4));
+    return this.resolveDocumentYear(this.requireFechaEmision(record));
+  }
+
+  /**
+   * Obtiene el año documental de una fecha ISO.
+   */
+  private resolveDocumentYear(timestamp: string): number {
+    const year: number = Number(timestamp.slice(0, 4));
 
     if (!Number.isSafeInteger(year) || year < 1 || year > 9999) {
-      throw new Error('La fecha de emisión de la factura no es válida.');
+      throw new Error('La fecha de la factura no es válida.');
     }
 
     return year;

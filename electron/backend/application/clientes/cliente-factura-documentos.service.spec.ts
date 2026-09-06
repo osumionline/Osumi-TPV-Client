@@ -88,6 +88,29 @@ describe('ClienteFacturaDocumentosService', (): void => {
     expect(result.emisor.nombre).toBe('Empresa fiscal');
     expect(result.emisor.nombreComercial).toBe('Mi tienda');
 
+    expect(result.ventas[0]).toMatchObject({
+      pvpCents: 1_210,
+      baseCents: 1_000,
+      subtotalCents: 1_000,
+      ivaCents: 210,
+      descuentoCents: 0,
+      totalCents: 1_210,
+    });
+
+    expect(result.ventas[0]?.lineas[0]).toMatchObject({
+      pvpCents: 1_210,
+      baseUnitCents: 1_000,
+      unidades: 1,
+      subtotalCents: 1_000,
+      ivaBps: 2_100,
+      ivaCents: 210,
+      descuentoCents: 0,
+      totalCents: 1_210,
+    });
+
+    expect(result.subtotalCents).toBe(2_000);
+    expect(result.descuentoCents).toBe(0);
+
     expect(result.cliente.nombreApellidos).toBe('Cliente histórico');
     expect(result.cliente.dniCif).toBe('12345678Z');
     expect(result.cliente.provinciaId).toBe(48);
@@ -129,9 +152,81 @@ describe('ClienteFacturaDocumentosService', (): void => {
 
     expect(result.previsualizacion).toBe(true);
     expect(result.numero).toBeNull();
-    expect(result.year).toBeNull();
-    expect(result.numeroFactura).toBeNull();
+    expect(result.year).toBe(Number(result.generatedAt.slice(0, 4)));
+    expect(result.numeroFactura).toBe(`_${result.year}`);
     expect(result.fechaDocumento).toBe(result.generatedAt);
+  });
+
+  it('mantiene el descuento separado de base e IVA como en la factura final', async (): Promise<void> => {
+    const repository = new FakeClienteFacturaDocumentosRepository();
+    const appDataRepository = new FakeAppDataRepository();
+
+    repository.record = {
+      ...createDocumentoRecord(),
+      importeCents: 23_816,
+      ventas: [
+        {
+          publicId: 'venta-descuento',
+          serie: '',
+          numero: 10465,
+          fecha: '2026-04-24T13:57:00.000Z',
+          totalCents: 23_816,
+          lineas: [
+            {
+              localizador: 1003,
+              marca: 'Marca',
+              nombre: 'Artículo con descuento',
+              pvpMicros: 242_560_000,
+              ivaBps: 1_000,
+              importeMicros: 238_160_000,
+              descuentoBps: 0,
+              importeDescuentoMicros: 4_400_000,
+              unidades: 1,
+              regalo: false,
+            },
+          ],
+        },
+      ],
+    };
+
+    const service = createService(repository, appDataRepository);
+    const result: ClienteFacturaDocumentoInterface = await service.getDocumento({
+      clientePublicId: 'cliente-1',
+      facturaPublicId: 'factura-1',
+    });
+
+    expect(result.ventas[0]).toMatchObject({
+      pvpCents: 24_256,
+      baseCents: 22_051,
+      subtotalCents: 22_051,
+      ivaCents: 2_205,
+      descuentoCents: -440,
+      totalCents: 23_816,
+    });
+
+    expect(result.ventas[0]?.lineas[0]).toMatchObject({
+      pvpCents: 24_256,
+      baseUnitCents: 22_051,
+      unidades: 1,
+      subtotalCents: 22_051,
+      ivaBps: 1_000,
+      ivaCents: 2_205,
+      descuentoCents: -440,
+      totalCents: 23_816,
+    });
+
+    expect(result.impuestos).toEqual([
+      {
+        ivaBps: 1_000,
+        baseCents: 22_051,
+        cuotaCents: 2_205,
+        totalCents: 24_256,
+      },
+    ]);
+
+    expect(result.subtotalCents).toBe(22_051);
+    expect(result.descuentoCents).toBe(-440);
+    expect(result.totalCents).toBe(23_816);
   });
 
   it('rechaza un documento cuyo total no coincide con las ventas', async (): Promise<void> => {
