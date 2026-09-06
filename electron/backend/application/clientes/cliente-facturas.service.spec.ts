@@ -3,6 +3,7 @@ import type ActualizarClienteFacturaBorradorRecordCommand from '@backend/contrac
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
 import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
+import type EmitirClienteFacturaRecordCommand from '@backend/contracts/clientes/emitir-cliente-factura-record-command.interface';
 import type { ClienteFacturaRecord } from '@backend/domain/clientes/cliente-factura-record.interface';
 import type {
   ClienteFacturaVentaDisponibleRecord,
@@ -25,11 +26,19 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
   updatedRecord: ClienteFacturaRecord = createRecord({
     publicId: 'factura-actualizada',
   });
+  emittedRecord: ClienteFacturaRecord = createRecord({
+    publicId: 'factura-emitida',
+    numero: 25,
+    year: 2026,
+    estado: 'emitida',
+    fechaEmision: '2026-09-06T10:00:00.000Z',
+  });
 
   requestedPublicId: string | null = null;
   requestedCreateCommand: CrearClienteFacturaBorradorRecordCommand | null = null;
   requestedUpdateCommand: ActualizarClienteFacturaBorradorRecordCommand | null = null;
   requestedDeleteCommand: EliminarClienteFacturaBorradorRecordCommand | null = null;
+  requestedEmitCommand: EmitirClienteFacturaRecordCommand | null = null;
   requestedVentasClientePublicId: string | null = null;
   requestedFacturaPublicId: string | null = null;
   requestedBorradorPublicId: string | null = null;
@@ -74,6 +83,16 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
     this.requestedDeleteCommand = command;
 
     return Promise.resolve();
+  }
+
+  /**
+   * Registra el comando de emisión y devuelve
+   * la factura emitida preparada para la prueba.
+   */
+  emitBorrador(command: EmitirClienteFacturaRecordCommand): Promise<ClienteFacturaRecord> {
+    this.requestedEmitCommand = command;
+
+    return Promise.resolve(this.emittedRecord);
   }
 
   /**

@@ -1,6 +1,7 @@
 import type ActualizarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/actualizar-cliente-factura-borrador-record-command.interface';
 import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
 import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
+import type EmitirClienteFacturaRecordCommand from '@backend/contracts/clientes/emitir-cliente-factura-record-command.interface';
 import type { ClienteFacturaRecord } from '@backend/domain/clientes/cliente-factura-record.interface';
 import type {
   ClienteFacturaVentaDisponibleRecord,
@@ -33,11 +34,17 @@ export default interface ClienteFacturasRepository {
    * sus relaciones dentro de una única transacción.
    */
   deleteBorrador(command: EliminarClienteFacturaBorradorRecordCommand): Promise<void>;
+
+  /**
+   * Finaliza un borrador, asigna su numeración
+   * definitiva y congela sus datos.
+   */
+  emitBorrador(command: EmitirClienteFacturaRecordCommand): Promise<ClienteFacturaRecord>;
+
   /**
    * Recupera las ventas relacionadas históricamente
    * con una factura visible del cliente.
    */
-
   findVentasByFacturaPublicId(
     clientePublicId: string,
     facturaPublicId: string,

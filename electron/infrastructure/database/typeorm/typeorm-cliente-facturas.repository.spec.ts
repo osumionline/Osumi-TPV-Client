@@ -56,6 +56,23 @@ interface ClienteFacturaBorradorEliminadoDatabaseRow {
   readonly deleted_at: string | null;
 }
 
+interface ClienteFacturaEmitidaDatabaseRow {
+  readonly serie: string;
+  readonly numero: number;
+  readonly estado: string;
+  readonly nombre_apellidos: string;
+  readonly dni_cif: string | null;
+  readonly email: string | null;
+  readonly direccion: string | null;
+  readonly importe_cents: number;
+  readonly fecha_emision: string;
+  readonly fecha_anulacion: string | null;
+}
+
+interface ClienteFacturaSecuenciaDatabaseRow {
+  readonly ultimo_numero: number;
+}
+
 describe('TypeOrmClienteFacturasRepository', (): void => {
   beforeEach(async (): Promise<void> => {
     tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-cliente-facturas-'));
@@ -590,6 +607,251 @@ describe('TypeOrmClienteFacturasRepository', (): void => {
         borradorPublicId: 'factura-cliente-inactivo',
       }),
     ).rejects.toThrow('El cliente indicado no existe o ya no está activo.');
+  });
+
+  it('emite un borrador congelando los datos actuales y consumiendo la secuencia global', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    await dataSource.query(`
+      UPDATE cliente
+      SET
+        datos_facturacion_iguales = 0,
+        fact_nombre_apellidos = 'Facturación definitiva',
+        fact_dni_cif = 'B87654321',
+        fact_email = 'definitiva@example.com',
+        fact_direccion = 'Calle definitiva 10'
+      WHERE public_id = 'cliente-1'
+    `);
+
+    /*
+     * Simula facturaInicial = 25.
+     * La secuencia conserva el último utilizado, por
+     * lo que antes de emitir debe contener 24.
+     */
+    await dataSource.query(`
+      INSERT INTO secuencia_documento (
+        tipo,
+        serie,
+        ultimo_numero
+      )
+      VALUES (
+        'factura',
+        '',
+        24
+      )
+    `);
+
+    const result: ClienteFacturaRecord = await requireRepository().emitBorrador({
+      clientePublicId: 'cliente-1',
+      borradorPublicId: 'factura-borrador',
+    });
+
+    expect(result.estado).toBe('emitida');
+    expect(result.numero).toBe(25);
+    expect(result.serie).toBe('');
+    expect(result.importeCents).toBe(2_000);
+    expect(result.fechaEmision).not.toBeNull();
+    expect(result.fechaAnulacion).toBeNull();
+
+    const fechaEmision: string | null = result.fechaEmision;
+
+    if (fechaEmision === null) {
+      throw new Error('La prueba esperaba una fecha de emisión.');
+    }
+
+    expect(result.year).toBe(Number(fechaEmision.slice(0, 4)));
+
+    const facturas: readonly ClienteFacturaEmitidaDatabaseRow[] = (await dataSource.query(`
+      SELECT
+        serie,
+        numero,
+        estado,
+        nombre_apellidos,
+        dni_cif,
+        email,
+        direccion,
+        importe_cents,
+        fecha_emision,
+        fecha_anulacion
+      FROM factura
+      WHERE public_id = 'factura-borrador'
+    `)) as readonly ClienteFacturaEmitidaDatabaseRow[];
+
+    expect(facturas).toEqual([
+      {
+        serie: '',
+        numero: 25,
+        estado: 'emitida',
+        nombre_apellidos: 'Facturación definitiva',
+        dni_cif: 'B87654321',
+        email: 'definitiva@example.com',
+        direccion: 'Calle definitiva 10',
+        importe_cents: 2_000,
+        fecha_emision: fechaEmision,
+        fecha_anulacion: null,
+      },
+    ]);
+
+    const secuencias: readonly ClienteFacturaSecuenciaDatabaseRow[] = (await dataSource.query(`
+      SELECT ultimo_numero
+      FROM secuencia_documento
+      WHERE
+        tipo = 'factura'
+        AND serie = ''
+    `)) as readonly ClienteFacturaSecuenciaDatabaseRow[];
+
+    expect(secuencias).toEqual([
+      {
+        ultimo_numero: 25,
+      },
+    ]);
+
+    const relaciones: readonly ClienteFacturaVentaRelacionDatabaseRow[] = (await dataSource.query(`
+        SELECT
+          v.public_id,
+          fv.activa
+        FROM factura_venta fv
+
+        INNER JOIN factura f
+          ON f.id = fv.id_factura
+
+        INNER JOIN venta v
+          ON v.id = fv.id_venta
+
+        WHERE f.public_id = 'factura-borrador'
+      `)) as readonly ClienteFacturaVentaRelacionDatabaseRow[];
+
+    expect(relaciones).toEqual([
+      {
+        public_id: 'venta-borrador',
+        activa: 1,
+      },
+    ]);
+  });
+
+  it('sincroniza la secuencia con el máximo histórico antes de emitir', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    const result: ClienteFacturaRecord = await requireRepository().emitBorrador({
+      clientePublicId: 'cliente-1',
+      borradorPublicId: 'factura-borrador',
+    });
+
+    /*
+     * El fixture ya contiene una factura histórica
+     * número 9. Sin secuencia inicial explícita, el
+     * siguiente número debe ser 10 y nunca 1.
+     */
+    expect(result.numero).toBe(10);
+
+    const secuencias: readonly ClienteFacturaSecuenciaDatabaseRow[] = (await dataSource.query(`
+      SELECT ultimo_numero
+      FROM secuencia_documento
+      WHERE
+        tipo = 'factura'
+        AND serie = ''
+    `)) as readonly ClienteFacturaSecuenciaDatabaseRow[];
+
+    expect(secuencias).toEqual([
+      {
+        ultimo_numero: 10,
+      },
+    ]);
+  });
+
+  it('no consume numeración ni modifica el borrador cuando una venta deja de ser elegible', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    await dataSource.query(`
+      INSERT INTO secuencia_documento (
+        tipo,
+        serie,
+        ultimo_numero
+      )
+      VALUES (
+        'factura',
+        '',
+        30
+      )
+    `);
+
+    /*
+     * La venta pertenecía al cliente cuando se añadió
+     * al borrador, pero cambia antes de la emisión.
+     */
+    await dataSource.query(`
+      UPDATE venta
+      SET id_cliente = 2
+      WHERE public_id = 'venta-borrador'
+    `);
+
+    await expect(
+      requireRepository().emitBorrador({
+        clientePublicId: 'cliente-1',
+        borradorPublicId: 'factura-borrador',
+      }),
+    ).rejects.toThrow('Alguna de las ventas seleccionadas ya no está disponible para facturar.');
+
+    const facturas: readonly {
+      readonly numero: number | null;
+      readonly estado: string;
+      readonly fecha_emision: string | null;
+      readonly importe_cents: number;
+    }[] = (await dataSource.query(`
+      SELECT
+        numero,
+        estado,
+        fecha_emision,
+        importe_cents
+      FROM factura
+      WHERE public_id = 'factura-borrador'
+    `)) as readonly {
+      readonly numero: number | null;
+      readonly estado: string;
+      readonly fecha_emision: string | null;
+      readonly importe_cents: number;
+    }[];
+
+    expect(facturas).toEqual([
+      {
+        numero: null,
+        estado: 'borrador',
+        fecha_emision: null,
+        importe_cents: 5_000,
+      },
+    ]);
+
+    const secuencias: readonly ClienteFacturaSecuenciaDatabaseRow[] = (await dataSource.query(`
+      SELECT ultimo_numero
+      FROM secuencia_documento
+      WHERE
+        tipo = 'factura'
+        AND serie = ''
+    `)) as readonly ClienteFacturaSecuenciaDatabaseRow[];
+
+    expect(secuencias).toEqual([
+      {
+        ultimo_numero: 30,
+      },
+    ]);
+  });
+
+  it('rechaza emitir facturas finalizadas, eliminadas o pertenecientes a otro cliente', async (): Promise<void> => {
+    const nonEditablePublicIds: readonly string[] = [
+      'factura-emitida',
+      'factura-anulada',
+      'factura-borrador-eliminado',
+      'factura-otro-cliente',
+    ];
+
+    for (const borradorPublicId of nonEditablePublicIds) {
+      await expect(
+        requireRepository().emitBorrador({
+          clientePublicId: 'cliente-1',
+          borradorPublicId,
+        }),
+      ).rejects.toThrow('El borrador de factura no pertenece al cliente o ya no está disponible.');
+    }
   });
 
   it('recupera las relaciones activas e históricas de cualquier estado de factura', async (): Promise<void> => {

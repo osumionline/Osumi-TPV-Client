@@ -2,6 +2,7 @@ import ActualizarClienteFacturaBorradorRecordCommand from '@backend/contracts/cl
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
 import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
+import type EmitirClienteFacturaRecordCommand from '@backend/contracts/clientes/emitir-cliente-factura-record-command.interface';
 import type {
   ClienteFacturaEstadoRecord,
   ClienteFacturaRecord,
@@ -82,6 +83,18 @@ interface ClienteFacturaBorradorEditableDatabaseRow {
 interface ClienteFacturaChangesDatabaseRow {
   readonly total: number;
 }
+
+interface ClienteFacturaVentaRelacionDatabaseRow {
+  readonly public_id: string;
+  readonly activa: number;
+}
+
+interface ClienteFacturaSecuenciaDatabaseRow {
+  readonly ultimo_numero: number;
+}
+
+const FACTURA_DOCUMENT_TYPE: string = 'factura';
+const FACTURA_SERIE: string = '';
 
 export default class TypeOrmClienteFacturasRepository implements ClienteFacturasRepository {
   constructor(private readonly applicationDatabase: TypeOrmApplicationDatabase) {}
@@ -275,6 +288,66 @@ export default class TypeOrmClienteFacturasRepository implements ClienteFacturas
       await this.softDeleteBorrador(queryRunner, borrador.id, timestamp);
       await this.deleteRelacionesBorrador(queryRunner, borrador.id);
     });
+  }
+
+  /**
+   * Finaliza un borrador revalidando sus datos,
+   * ventas, importe y numeración en una transacción.
+   */
+  async emitBorrador(command: EmitirClienteFacturaRecordCommand): Promise<ClienteFacturaRecord> {
+    const borradorPublicId: string = this.normalizeBorradorPublicId(command.borradorPublicId);
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<ClienteFacturaRecord> => {
+        const cliente: ClienteFacturaClienteDatabaseRow = await this.resolveClienteFacturacion(
+          queryRunner,
+          command.clientePublicId,
+        );
+
+        const borrador: ClienteFacturaBorradorEditableDatabaseRow =
+          await this.resolveBorradorEditable(queryRunner, cliente.id, borradorPublicId);
+
+        const ventasPublicIds: readonly string[] = await this.resolveBorradorVentasPublicIds(
+          queryRunner,
+          borrador.id,
+        );
+
+        const ventas: readonly ClienteFacturaVentaSeleccionadaDatabaseRow[] =
+          await this.resolveVentasSeleccionadas(
+            queryRunner,
+            cliente.id,
+            ventasPublicIds,
+            borrador.id,
+          );
+
+        const importeCents: number = this.sumImporteVentas(ventas);
+        const timestamp: string = new Date().toISOString();
+        const numero: number = await this.nextFacturaNumber(queryRunner, timestamp);
+
+        await this.finalizeBorrador(
+          queryRunner,
+          borrador.id,
+          cliente,
+          importeCents,
+          numero,
+          timestamp,
+        );
+
+        return {
+          publicId: borrador.public_id,
+          serie: FACTURA_SERIE,
+          numero,
+          year: this.getTimestampYear(timestamp),
+          estado: 'emitida',
+          importeCents,
+          fechaCreacion: borrador.created_at,
+          fechaEmision: timestamp,
+          fechaAnulacion: null,
+        };
+      },
+    );
   }
 
   /**
@@ -694,6 +767,44 @@ export default class TypeOrmClienteFacturasRepository implements ClienteFacturas
   }
 
   /**
+   * Recupera las relaciones actuales del borrador y
+   * comprueba que todas continúen activas.
+   */
+  private async resolveBorradorVentasPublicIds(
+    queryRunner: QueryRunner,
+    facturaId: number,
+  ): Promise<readonly string[]> {
+    const rows: readonly ClienteFacturaVentaRelacionDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT
+          v.public_id,
+          fv.activa
+        FROM factura_venta fv
+
+        INNER JOIN venta v
+          ON v.id = fv.id_venta
+
+        WHERE fv.id_factura = ?
+
+        ORDER BY
+          fv.created_at ASC,
+          v.id ASC
+      `,
+      [facturaId],
+    )) as readonly ClienteFacturaVentaRelacionDatabaseRow[];
+
+    if (rows.length === 0) {
+      throw new Error('La factura debe incluir al menos una venta.');
+    }
+
+    if (rows.some((row: ClienteFacturaVentaRelacionDatabaseRow): boolean => row.activa !== 1)) {
+      throw new Error('El borrador de factura contiene relaciones de ventas no válidas.');
+    }
+
+    return rows.map((row: ClienteFacturaVentaRelacionDatabaseRow): string => row.public_id);
+  }
+
+  /**
    * Revalida las ventas seleccionadas dentro de la transacción.
    *
    * Al editar un borrador, sus propias relaciones activas
@@ -774,6 +885,179 @@ export default class TypeOrmClienteFacturasRepository implements ClienteFacturas
     }
 
     return result;
+  }
+
+  /**
+   * Obtiene y consume dentro de la transacción el
+   * siguiente número global de factura.
+   */
+  private async nextFacturaNumber(queryRunner: QueryRunner, timestamp: string): Promise<number> {
+    /*
+     * Si por cualquier motivo no existe la secuencia,
+     * se crea con fallback 0 para que la primera factura
+     * pueda recibir el número 1.
+     *
+     * Si ya existe, conserva facturaInicial - 1 o el
+     * máximo importado preparado durante la instalación.
+     */
+    await queryRunner.query(
+      `
+        INSERT INTO secuencia_documento (
+          tipo,
+          serie,
+          ultimo_numero,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          ?,
+          ?,
+          0,
+          ?,
+          ?
+        )
+        ON CONFLICT (
+          tipo,
+          serie
+        )
+        DO NOTHING
+      `,
+      [FACTURA_DOCUMENT_TYPE, FACTURA_SERIE, timestamp, timestamp],
+    );
+
+    /*
+     * La secuencia se vuelve a sincronizar defensivamente
+     * con cualquier número histórico existente.
+     *
+     * Así nunca se reutiliza un número aunque proceda
+     * de una importación legacy o una factura anulada.
+     */
+    await queryRunner.query(
+      `
+        UPDATE secuencia_documento
+        SET
+          ultimo_numero = MAX(
+            ultimo_numero,
+            (
+              SELECT
+                COALESCE(
+                  MAX(numero),
+                  0
+                )
+              FROM factura
+              WHERE serie = ?
+            )
+          ) + 1,
+          updated_at = ?
+        WHERE
+          tipo = ?
+          AND serie = ?
+      `,
+      [FACTURA_SERIE, timestamp, FACTURA_DOCUMENT_TYPE, FACTURA_SERIE],
+    );
+
+    const rows: readonly ClienteFacturaSecuenciaDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT
+          ultimo_numero
+        FROM secuencia_documento
+        WHERE
+          tipo = ?
+          AND serie = ?
+        LIMIT 1
+      `,
+      [FACTURA_DOCUMENT_TYPE, FACTURA_SERIE],
+    )) as readonly ClienteFacturaSecuenciaDatabaseRow[];
+
+    const numero: number | undefined = rows[0]?.ultimo_numero;
+
+    if (numero === undefined || !Number.isSafeInteger(numero) || numero <= 0) {
+      throw new Error('No se ha podido obtener el siguiente número de factura.');
+    }
+
+    return numero;
+  }
+
+  /**
+   * Convierte el borrador en factura emitida congelando
+   * número, fecha, importe y datos de facturación.
+   */
+  private async finalizeBorrador(
+    queryRunner: QueryRunner,
+    facturaId: number,
+    cliente: ClienteFacturaClienteDatabaseRow,
+    importeCents: number,
+    numero: number,
+    timestamp: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+        UPDATE factura
+        SET
+          serie = ?,
+          numero = ?,
+          estado = 'emitida',
+          nombre_apellidos = ?,
+          dni_cif = ?,
+          telefono = ?,
+          email = ?,
+          direccion = ?,
+          codigo_postal = ?,
+          poblacion = ?,
+          id_provincia = ?,
+          importe_cents = ?,
+          fecha_emision = ?,
+          fecha_anulacion = NULL,
+          updated_at = ?
+        WHERE
+          id = ?
+          AND estado = 'borrador'
+          AND numero IS NULL
+          AND fecha_emision IS NULL
+          AND fecha_anulacion IS NULL
+          AND deleted_at IS NULL
+      `,
+      [
+        FACTURA_SERIE,
+        numero,
+        cliente.nombre_apellidos,
+        cliente.dni_cif,
+        cliente.telefono,
+        cliente.email,
+        cliente.direccion,
+        cliente.codigo_postal,
+        cliente.poblacion,
+        cliente.id_provincia,
+        importeCents,
+        timestamp,
+        timestamp,
+        facturaId,
+      ],
+    );
+
+    const rows: readonly ClienteFacturaChangesDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT changes() AS total
+      `,
+    )) as readonly ClienteFacturaChangesDatabaseRow[];
+
+    if (rows[0]?.total !== 1) {
+      throw new Error('El borrador de factura ya no está disponible para emitir.');
+    }
+  }
+
+  /**
+   * Obtiene el año UTC de una fecha ISO generada
+   * por la propia aplicación.
+   */
+  private getTimestampYear(timestamp: string): number {
+    const year: number = Number(timestamp.slice(0, 4));
+
+    if (!Number.isSafeInteger(year) || year < 1 || year > 9999) {
+      throw new Error('La fecha de emisión de la factura no es válida.');
+    }
+
+    return year;
   }
 
   /**
