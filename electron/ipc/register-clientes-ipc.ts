@@ -27,6 +27,7 @@ import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/client
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes/crear-cliente-factura-borrador-command.interface';
+import type CrearClienteFacturaDesdeVentaCommand from '@desktop-contracts/clientes/crear-cliente-factura-desde-venta-command.interface';
 import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
 import type EmitirClienteFacturaCommand from '@desktop-contracts/clientes/emitir-cliente-factura-command.interface';
 import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
@@ -140,6 +141,31 @@ export default function registerClientesIpc(
        * La factura ya está confirmada por SQLite.
        * La materialización documental nunca puede
        * transformar ese COMMIT en un error de emisión.
+       */
+      void clienteFacturaPdfService.materializeAfterEmit({
+        clientePublicId: command.clientePublicId,
+        facturaPublicId: factura.publicId,
+      });
+
+      return factura;
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.clientesCreateFacturaDesdeVenta,
+    async (
+      event,
+      command: CrearClienteFacturaDesdeVentaCommand,
+    ): Promise<ClienteFacturaInterface> => {
+      assertTrustedSender(event, getMainWindow);
+
+      const factura: ClienteFacturaInterface =
+        await clienteFacturasService.createFacturaDesdeVenta(command);
+
+      /*
+       * La factura ya está emitida y numerada.
+       * Un fallo documental posterior nunca debe
+       * convertir el COMMIT en un error comercial.
        */
       void clienteFacturaPdfService.materializeAfterEmit({
         clientePublicId: command.clientePublicId,

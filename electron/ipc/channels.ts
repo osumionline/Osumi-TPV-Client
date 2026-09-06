@@ -36,6 +36,7 @@ const IPC_CHANNELS = {
   clientesUpdateFacturaBorrador: 'clientes:update-factura-borrador',
   clientesDeleteFacturaBorrador: 'clientes:delete-factura-borrador',
   clientesEmitFacturaBorrador: 'clientes:emit-factura-borrador',
+  clientesCreateFacturaDesdeVenta: 'clientes:create-factura-desde-venta',
   clientesAnularFactura: 'clientes:anular-factura',
   clientesOpenFacturaPreview: 'clientes:open-factura-preview',
   clientesPrintFactura: 'clientes:print-factura',

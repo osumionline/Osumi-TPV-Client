@@ -3,6 +3,7 @@ import type AnularClienteFacturaRecordCommand from '@backend/contracts/clientes/
 import type ClienteFacturaDocumentosRepository from '@backend/contracts/clientes/cliente-factura-documentos.repository.interface';
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
+import type CrearClienteFacturaDesdeVentaRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-desde-venta-record-command.interface';
 import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
 import type EmitirClienteFacturaRecordCommand from '@backend/contracts/clientes/emitir-cliente-factura-record-command.interface';
 import type {
@@ -585,6 +586,71 @@ export default class TypeOrmClienteFacturasRepository
   }
 
   /**
+   * Crea y emite una factura de una única venta dentro
+   * de una sola transacción, sin borrador observable.
+   */
+  async createEmitidaFromVenta(
+    command: CrearClienteFacturaDesdeVentaRecordCommand,
+  ): Promise<ClienteFacturaRecord> {
+    const ventaPublicId: string = this.normalizeVentaPublicId(command.ventaPublicId);
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+    const publicId: string = randomUUID();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<ClienteFacturaRecord> => {
+        const cliente: ClienteFacturaClienteDatabaseRow = await this.resolveClienteFacturacion(
+          queryRunner,
+          command.clientePublicId,
+        );
+
+        /*
+         * Esta revalidación es la autoridad definitiva:
+         * misma clientela, venta positiva ordinaria,
+         * no devolución/mixta y sin otra factura activa.
+         */
+        const ventas: readonly ClienteFacturaVentaSeleccionadaDatabaseRow[] =
+          await this.resolveVentasSeleccionadas(queryRunner, cliente.id, [ventaPublicId], null);
+
+        const importeCents: number = this.sumImporteVentas(ventas);
+        const timestamp: string = new Date().toISOString();
+
+        await this.insertBorrador(queryRunner, publicId, cliente, importeCents, timestamp);
+
+        const facturaId: number = await getLastInsertId(
+          queryRunner,
+          'No se ha podido obtener el identificador de la factura creada.',
+        );
+
+        await this.insertRelacionesBorrador(queryRunner, facturaId, ventas, timestamp);
+
+        const numero: number = await this.nextFacturaNumber(queryRunner, timestamp);
+
+        await this.finalizeBorrador(
+          queryRunner,
+          facturaId,
+          cliente,
+          importeCents,
+          numero,
+          timestamp,
+        );
+
+        return {
+          publicId,
+          serie: FACTURA_SERIE,
+          numero,
+          year: this.getTimestampYear(timestamp),
+          estado: 'emitida',
+          importeCents,
+          fechaCreacion: timestamp,
+          fechaEmision: timestamp,
+          fechaAnulacion: null,
+        };
+      },
+    );
+  }
+
+  /**
    * Anula una factura emitida y convierte todas sus
    * relaciones activas en histórico dentro del mismo COMMIT.
    */
@@ -862,6 +928,24 @@ export default class TypeOrmClienteFacturasRepository
     }
 
     return normalizedValues;
+  }
+
+  /**
+   * Normaliza el identificador de la única venta
+   * utilizada por la facturación automática.
+   */
+  private normalizeVentaPublicId(value: string): string {
+    if (typeof value !== 'string') {
+      throw new Error('El identificador de la venta no es válido.');
+    }
+
+    const normalizedValue: string = value.trim();
+
+    if (normalizedValue.length === 0) {
+      throw new Error('El identificador de la venta no es válido.');
+    }
+
+    return normalizedValue;
   }
 
   /**

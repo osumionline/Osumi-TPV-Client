@@ -3,6 +3,7 @@ import type ActualizarClienteFacturaBorradorRecordCommand from '@backend/contrac
 import type AnularClienteFacturaRecordCommand from '@backend/contracts/clientes/anular-cliente-factura-record-command.interface';
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
+import type CrearClienteFacturaDesdeVentaRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-desde-venta-record-command.interface';
 import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
 import type EmitirClienteFacturaRecordCommand from '@backend/contracts/clientes/emitir-cliente-factura-record-command.interface';
 import type { ClienteFacturaRecord } from '@backend/domain/clientes/cliente-factura-record.interface';
@@ -16,6 +17,7 @@ import type {
   ClienteFacturaVentaInterface,
 } from '@desktop-contracts/clientes/cliente-factura-venta.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
+import type CrearClienteFacturaDesdeVentaCommand from '@desktop-contracts/clientes/crear-cliente-factura-desde-venta-command.interface';
 import { describe, expect, it } from 'vitest';
 
 class FakeClienteFacturasRepository implements ClienteFacturasRepository {
@@ -35,6 +37,13 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
     estado: 'emitida',
     fechaEmision: '2026-09-06T10:00:00.000Z',
   });
+  createdFromVentaRecord: ClienteFacturaRecord = createRecord({
+    publicId: 'factura-desde-venta',
+    numero: 26,
+    year: 2026,
+    estado: 'emitida',
+    fechaEmision: '2026-09-06T13:00:00.000Z',
+  });
   annulledRecord: ClienteFacturaRecord = createRecord({
     publicId: 'factura-emitida',
     numero: 25,
@@ -49,6 +58,7 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
   requestedUpdateCommand: ActualizarClienteFacturaBorradorRecordCommand | null = null;
   requestedDeleteCommand: EliminarClienteFacturaBorradorRecordCommand | null = null;
   requestedEmitCommand: EmitirClienteFacturaRecordCommand | null = null;
+  requestedCreateFromVentaCommand: CrearClienteFacturaDesdeVentaRecordCommand | null = null;
   requestedAnnulCommand: AnularClienteFacturaRecordCommand | null = null;
   requestedVentasClientePublicId: string | null = null;
   requestedFacturaPublicId: string | null = null;
@@ -104,6 +114,18 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
     this.requestedEmitCommand = command;
 
     return Promise.resolve(this.emittedRecord);
+  }
+
+  /**
+   * Registra la creación directa desde una venta
+   * y devuelve la factura emitida preparada.
+   */
+  createEmitidaFromVenta(
+    command: CrearClienteFacturaDesdeVentaRecordCommand,
+  ): Promise<ClienteFacturaRecord> {
+    this.requestedCreateFromVentaCommand = command;
+
+    return Promise.resolve(this.createdFromVentaRecord);
   }
 
   /**
@@ -440,6 +462,55 @@ describe('ClienteFacturasService', (): void => {
     expect(repository.requestedDeleteCommand).toBeNull();
     expect(repository.requestedEmitCommand).toBeNull();
     expect(repository.requestedAnnulCommand).toBeNull();
+  });
+
+  it('normaliza y crea una factura emitida directamente desde una venta', async (): Promise<void> => {
+    const repository = new FakeClienteFacturasRepository();
+    const service = new ClienteFacturasService(repository);
+
+    const command: CrearClienteFacturaDesdeVentaCommand = {
+      clientePublicId: '  cliente-1  ',
+      ventaPublicId: '  venta-123  ',
+    };
+
+    const result: ClienteFacturaInterface = await service.createFacturaDesdeVenta(command);
+
+    expect(repository.requestedCreateFromVentaCommand).toEqual({
+      clientePublicId: 'cliente-1',
+      ventaPublicId: 'venta-123',
+    });
+
+    expect(result).toMatchObject({
+      publicId: 'factura-desde-venta',
+      estado: 'emitida',
+      numero: 26,
+      year: 2026,
+      numeroFactura: '26_2026',
+      fechaEmision: '2026-09-06T13:00:00.000Z',
+      capacidades: {
+        puedeEditar: false,
+        puedeEliminar: false,
+        puedePrevisualizar: false,
+        puedeFacturar: false,
+        puedeImprimir: true,
+        puedeEnviarEmail: true,
+        puedeAnular: true,
+      },
+    });
+  });
+
+  it('rechaza una venta sin identificador antes de crear su factura directa', async (): Promise<void> => {
+    const repository = new FakeClienteFacturasRepository();
+    const service = new ClienteFacturasService(repository);
+
+    await expect(
+      service.createFacturaDesdeVenta({
+        clientePublicId: 'cliente-1',
+        ventaPublicId: '   ',
+      }),
+    ).rejects.toThrow('El identificador de la venta no es válido.');
+
+    expect(repository.requestedCreateFromVentaCommand).toBeNull();
   });
 
   it('normaliza y construye las ventas relacionadas con una factura persistida', async (): Promise<void> => {

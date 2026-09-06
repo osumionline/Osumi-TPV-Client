@@ -21,6 +21,7 @@ import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/client
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes/crear-cliente-factura-borrador-command.interface';
+import type CrearClienteFacturaDesdeVentaCommand from '@desktop-contracts/clientes/crear-cliente-factura-desde-venta-command.interface';
 import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
 import type EmitirClienteFacturaCommand from '@desktop-contracts/clientes/emitir-cliente-factura-command.interface';
 import createClienteCommand from '@model/clientes/cliente-form-command.mapper';
@@ -60,6 +61,8 @@ describe('ClientesService', (): void => {
   let receivedConsumoMensualConsulta: ClienteConsumoMensualConsulta | null;
   let receivedPrintFacturaConsulta: ClienteFacturaDocumentoConsulta | null;
   let receivedEmailFacturaCommand: ClienteFacturaEmailCommand | null;
+  let createdFacturaDesdeVenta: ClienteFacturaInterface;
+  let receivedCreateFacturaDesdeVentaCommand: CrearClienteFacturaDesdeVentaCommand | null;
 
   beforeEach((): void => {
     originalDesktopDescriptor = Object.getOwnPropertyDescriptor(window, 'osumiDesktop');
@@ -91,6 +94,8 @@ describe('ClientesService', (): void => {
     receivedConsumoMensualConsulta = null;
     receivedPrintFacturaConsulta = null;
     receivedEmailFacturaCommand = null;
+    createdFacturaDesdeVenta = createFacturaEmitida('factura-desde-venta', 26, 1_000);
+    receivedCreateFacturaDesdeVentaCommand = null;
 
     Object.defineProperty(window, 'osumiDesktop', {
       configurable: true,
@@ -145,6 +150,14 @@ describe('ClientesService', (): void => {
             receivedEmitFacturaCommand = command;
 
             return Promise.resolve(emittedFactura);
+          },
+
+          createFacturaDesdeVenta: (
+            command: CrearClienteFacturaDesdeVentaCommand,
+          ): Promise<ClienteFacturaInterface> => {
+            receivedCreateFacturaDesdeVentaCommand = command;
+
+            return Promise.resolve(createdFacturaDesdeVenta);
           },
 
           anularFactura: (
@@ -872,6 +885,39 @@ describe('ClientesService', (): void => {
     expect(receivedConsumoMensualConsulta).toBe(consulta);
     expect(result).toEqual(createConsumoMensual());
     expect(requestCount).toBe(0);
+  });
+
+  it('crea una factura emitida desde una venta y la reconcilia si la caché está cargada', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+
+    await service.loadFacturas('cliente-7');
+
+    const command: CrearClienteFacturaDesdeVentaCommand = {
+      clientePublicId: 'cliente-7',
+      ventaPublicId: 'venta-123',
+    };
+
+    const result: ClienteFacturaInterface = await service.createFacturaDesdeVenta(command);
+
+    expect(receivedCreateFacturaDesdeVentaCommand).toBe(command);
+
+    expect(result).toBe(createdFacturaDesdeVenta);
+
+    expect(service.getFacturasState('cliente-7').data).toEqual([
+      createdFacturaDesdeVenta,
+      ...createFacturas(12_345),
+    ]);
+  });
+
+  it('no construye una caché parcial al crear una factura desde Ventas', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+
+    await service.createFacturaDesdeVenta({
+      clientePublicId: 'cliente-7',
+      ventaPublicId: 'venta-123',
+    });
+
+    expect(service.getFacturasState('cliente-7').data).toBeNull();
   });
 });
 

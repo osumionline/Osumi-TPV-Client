@@ -2,6 +2,7 @@ import type ActualizarClienteFacturaBorradorRecordCommand from '@backend/contrac
 import type AnularClienteFacturaRecordCommand from '@backend/contracts/clientes/anular-cliente-factura-record-command.interface';
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-borrador-record-command.interface';
+import type CrearClienteFacturaDesdeVentaRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-desde-venta-record-command.interface';
 import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
 import type EmitirClienteFacturaRecordCommand from '@backend/contracts/clientes/emitir-cliente-factura-record-command.interface';
 import type {
@@ -27,6 +28,7 @@ import type {
   ClienteFacturaInterface,
 } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes/crear-cliente-factura-borrador-command.interface';
+import type CrearClienteFacturaDesdeVentaCommand from '@desktop-contracts/clientes/crear-cliente-factura-desde-venta-command.interface';
 import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
 import type EmitirClienteFacturaCommand from '@desktop-contracts/clientes/emitir-cliente-factura-command.interface';
 
@@ -126,6 +128,28 @@ export default class ClienteFacturasService {
 
     const record: ClienteFacturaRecord =
       await this.clienteFacturasRepository.emitBorrador(recordCommand);
+
+    return this.toInterface(record);
+  }
+
+  /**
+   * Crea y emite directamente una factura asociada
+   * exclusivamente a una venta ya finalizada.
+   */
+  async createFacturaDesdeVenta(
+    command: CrearClienteFacturaDesdeVentaCommand,
+  ): Promise<ClienteFacturaInterface> {
+    if (typeof command !== 'object' || command === null) {
+      throw new Error('Los datos para crear la factura desde la venta no son válidos.');
+    }
+
+    const recordCommand: CrearClienteFacturaDesdeVentaRecordCommand = {
+      clientePublicId: this.requirePublicId(command.clientePublicId),
+      ventaPublicId: this.requireVentaPublicId(command.ventaPublicId),
+    };
+
+    const record: ClienteFacturaRecord =
+      await this.clienteFacturasRepository.createEmitidaFromVenta(recordCommand);
 
     return this.toInterface(record);
   }
@@ -400,6 +424,24 @@ export default class ClienteFacturasService {
 
     if (normalizedValue.length === 0) {
       throw new Error('El identificador de la factura no es válido.');
+    }
+
+    return normalizedValue;
+  }
+
+  /**
+   * Normaliza un identificador obligatorio
+   * de venta ya persistida.
+   */
+  private requireVentaPublicId(value: string): string {
+    if (typeof value !== 'string') {
+      throw new Error('El identificador de la venta no es válido.');
+    }
+
+    const normalizedValue: string = value.trim();
+
+    if (normalizedValue.length === 0) {
+      throw new Error('El identificador de la venta no es válido.');
     }
 
     return normalizedValue;

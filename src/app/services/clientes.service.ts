@@ -23,6 +23,7 @@ import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/client
 import type ClienteInterface from '@desktop-contracts/clientes/cliente.interface';
 import type CrearClienteCommand from '@desktop-contracts/clientes/crear-cliente-command.interface';
 import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes/crear-cliente-factura-borrador-command.interface';
+import type CrearClienteFacturaDesdeVentaCommand from '@desktop-contracts/clientes/crear-cliente-factura-desde-venta-command.interface';
 import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
 import type EmitirClienteFacturaCommand from '@desktop-contracts/clientes/emitir-cliente-factura-command.interface';
 import type ClienteEstadisticasState from '@model/clientes/cliente-estadisticas-state.interface';
@@ -402,6 +403,21 @@ export default class ClientesService {
   ): Promise<ClienteFacturaInterface> {
     const factura: ClienteFacturaInterface =
       await window.osumiDesktop.clientes.emitFacturaBorrador(command);
+
+    await this.reconciliarFacturaPersistida(command.clientePublicId, factura);
+
+    return factura;
+  }
+
+  /**
+   * Crea una factura ya emitida desde una única
+   * venta y reconcilia cualquier caché ya cargada.
+   */
+  async createFacturaDesdeVenta(
+    command: CrearClienteFacturaDesdeVentaCommand,
+  ): Promise<ClienteFacturaInterface> {
+    const factura: ClienteFacturaInterface =
+      await window.osumiDesktop.clientes.createFacturaDesdeVenta(command);
 
     await this.reconciliarFacturaPersistida(command.clientePublicId, factura);
 

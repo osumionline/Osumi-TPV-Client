@@ -865,6 +865,170 @@ describe('TypeOrmClienteFacturasRepository', (): void => {
     }
   });
 
+  it('crea y emite atómicamente una factura formada por una única venta', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+    const initialCount: number = await countFacturas();
+
+    await dataSource.query(`
+      UPDATE cliente
+      SET
+        datos_facturacion_iguales = 0,
+        fact_nombre_apellidos = 'Facturación principal',
+        fact_dni_cif = 'B12345678',
+        fact_telefono = '944000000',
+        fact_email = 'facturacion@example.com',
+        fact_direccion = 'Gran Vía 1',
+        fact_codigo_postal = '48001',
+        fact_poblacion = 'Bilbao',
+        fact_id_provincia = 48
+      WHERE public_id = 'cliente-1'
+    `);
+
+    /*
+     * Simula facturaInicial = 25.
+     */
+    await dataSource.query(`
+    INSERT INTO secuencia_documento (
+      tipo,
+      serie,
+      ultimo_numero
+    )
+    VALUES (
+      'factura',
+      '',
+      24
+    )
+  `);
+
+    const result: ClienteFacturaRecord = await requireRepository().createEmitidaFromVenta({
+      clientePublicId: 'cliente-1',
+      ventaPublicId: 'venta-disponible',
+    });
+
+    expect(result.publicId).not.toBe('');
+    expect(result.estado).toBe('emitida');
+    expect(result.serie).toBe('');
+    expect(result.numero).toBe(25);
+    expect(result.year).toBe(Number(result.fechaEmision?.slice(0, 4)));
+    expect(result.importeCents).toBe(1_000);
+    expect(result.fechaEmision).not.toBeNull();
+    expect(result.fechaAnulacion).toBeNull();
+
+    expect(await countFacturas()).toBe(initialCount + 1);
+
+    const facturas: readonly ClienteFacturaEmitidaDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT
+          serie,
+          numero,
+          estado,
+          nombre_apellidos,
+          dni_cif,
+          email,
+          direccion,
+          importe_cents,
+          fecha_emision,
+          fecha_anulacion
+        FROM factura
+        WHERE public_id = ?
+      `,
+      [result.publicId],
+    )) as readonly ClienteFacturaEmitidaDatabaseRow[];
+
+    expect(facturas).toEqual([
+      {
+        serie: '',
+        numero: 25,
+        estado: 'emitida',
+        nombre_apellidos: 'Facturación principal',
+        dni_cif: 'B12345678',
+        email: 'facturacion@example.com',
+        direccion: 'Gran Vía 1',
+        importe_cents: 1_000,
+        fecha_emision: result.fechaEmision,
+        fecha_anulacion: null,
+      },
+    ]);
+
+    const relaciones: readonly ClienteFacturaVentaRelacionDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT
+          v.public_id,
+          fv.activa
+        FROM factura_venta fv
+
+        INNER JOIN venta v
+          ON v.id = fv.id_venta
+
+        INNER JOIN factura f
+          ON f.id = fv.id_factura
+
+        WHERE f.public_id = ?
+      `,
+      [result.publicId],
+    )) as readonly ClienteFacturaVentaRelacionDatabaseRow[];
+
+    expect(relaciones).toEqual([
+      {
+        public_id: 'venta-disponible',
+        activa: 1,
+      },
+    ]);
+
+    const disponibles: readonly ClienteFacturaVentaDisponibleRecord[] =
+      await requireRepository().findVentasDisponibles('cliente-1', null);
+
+    expect(
+      disponibles.some(
+        (venta: ClienteFacturaVentaDisponibleRecord): boolean =>
+          venta.publicId === 'venta-disponible',
+      ),
+    ).toBe(false);
+  });
+
+  it('no deja borrador ni consume numeración cuando la venta no puede facturarse', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+    const initialCount: number = await countFacturas();
+
+    await dataSource.query(`
+    INSERT INTO secuencia_documento (
+      tipo,
+      serie,
+      ultimo_numero
+    )
+    VALUES (
+      'factura',
+      '',
+      24
+    )
+  `);
+
+    await expect(
+      requireRepository().createEmitidaFromVenta({
+        clientePublicId: 'cliente-1',
+        ventaPublicId: 'venta-facturada',
+      }),
+    ).rejects.toThrow('Alguna de las ventas seleccionadas ya no está disponible para facturar.');
+
+    expect(await countFacturas()).toBe(initialCount);
+
+    const secuencias: readonly ClienteFacturaSecuenciaDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT ultimo_numero
+        FROM secuencia_documento
+        WHERE
+          tipo = 'factura'
+          AND serie = ''
+      `,
+    )) as readonly ClienteFacturaSecuenciaDatabaseRow[];
+
+    expect(secuencias).toEqual([
+      {
+        ultimo_numero: 24,
+      },
+    ]);
+  });
+
   it('anula una factura emitida conservando su identidad y libera sus ventas', async (): Promise<void> => {
     const dataSource: DataSource = await requireDataSource();
 
