@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.39  
+**Versión:** 2.40  
 **Fecha:** 6 de septiembre de 2026  
-**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**. El **Hito 14 — Clientes está en curso 🟦**: `14A–14J` están completamente cerrados, `14K.1–14K.3` están terminados y `14K.4A–14K.4B` también están implementados, validados funcionalmente y subidos. Facturas ya dispone de listado, editor completo, dirty propio, CRUD transaccional de borradores, emisión definitiva con numeración global, modelo documental común, previsualización interactiva en BrowserWindow independiente, PDF definitivo **A4 vertical** materializado de forma inmutable, impresión mediante el diálogo estándar del sistema y envío SMTP del PDF canónico. El PDF final usa el mismo modelo documental, muestra solo filas resumen de ventas/tickets, logo común `osumi://assets/logo`, `AppData.nombreComercial`, número oficial y `PAGADO`; nunca incluye líneas de artículos. El email propone el email persistido actual del cliente, permite editarlo solo para el envío y usa `AppData.nombre` como `fromName`, asunto y cuerpo. La materialización se ejecuta después del COMMIT, se deduplica y un fallo documental no revierte ni falsea la emisión confirmada. El siguiente paso exacto es **`14K.4C — Integración y cierre de impresión/email`**. Clientes no realiza ni realizará ninguna operación TicketBAI.
+**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**. El **Hito 14 — Clientes está en curso 🟦**: `14A–14J` están completamente cerrados y `14K.1–14K.4` también están ya cerrados, validados funcionalmente y subidos. Facturas dispone de listado, editor completo, dirty propio, CRUD transaccional de borradores, emisión definitiva con numeración global, modelo documental común, previsualización interactiva en BrowserWindow independiente, PDF definitivo **A4 vertical** materializado de forma inmutable, impresión mediante el diálogo estándar del sistema y envío SMTP del PDF canónico. El PDF final usa el mismo modelo documental, muestra solo filas resumen de ventas/tickets, logo común `osumi://assets/logo`, `AppData.nombreComercial`, número oficial y `PAGADO`; nunca incluye líneas de artículos. El email propone el email persistido actual del cliente, permite editarlo solo para el envío y usa `AppData.nombre` como `fromName`, asunto y cuerpo. Impresión y email están integrados con el bloqueo global de la ficha durante operaciones en curso y liberan correctamente ese bloqueo tanto en éxito como en error. La materialización se ejecuta después del COMMIT, se deduplica y un fallo documental no revierte ni falsea la emisión confirmada. El siguiente paso exacto es **`14K.5 — Anulación`**. Además, `14K.6 — Integración final con Ventas` incorpora ya como requisito pendiente la opción **`Imprimir factura`** en el modal de finalización: solo disponible cuando la venta tiene cliente asignado y debe guardar/finalizar la venta, imprimir el ticket, crear una factura con esa única venta, emitirla, materializar su PDF y abrir el diálogo estándar de impresión. Clientes no realiza ni realizará ninguna operación TicketBAI.
 
 > **Regla crítica de entorno TicketBAI:** el producto usa `production` por defecto. Durante desarrollo/pruebas manuales se usa `app_data.json → ticketBai.environment = "test"` junto con el token TEST correspondiente. No añadir selector de entorno a la UI.
 
@@ -167,15 +167,17 @@ Ventas 12 — Postventa                             🟦
     14K.3 PDF definitivo inmutable                ✅ CERRADO
       14K.3A Renderer + HTML + storage             ✅
       14K.3B Materialización e integración         ✅
-    14K.4 Impresión y email                       🟦 EN CURSO
+    14K.4 Impresión y email                       ✅ CERRADO
       14K.4A Impresión                            ✅
       14K.4B Email                                ✅
         14K.4B1 Backend + API/IPC/preload         ✅
         14K.4B2 Formulario Angular                ✅
       14K.4B.R A4 vertical + criterio email       ✅
-      14K.4C Integración/cierre                   ⬜ SIGUIENTE
-    14K.5 Anulación                               ⬜
-    14K.6 Integración y cierre                    ⬜
+      14K.4C Integración/cierre                   ✅
+    14K.5 Anulación                               ⬜ SIGUIENTE
+    14K.6 Integración final con Ventas            ⬜
+      14K.6A Opción "Imprimir factura"            ⬜
+      14K.6B Regresión integral + cierre Hito 14  ⬜
 15 Almacén                                        ⬜
 16 Compras                                        ⬜
 
@@ -3503,7 +3505,7 @@ Con ello, **todo el Hito 13 — Artículos queda terminado y cerrado ✅**.
 
 El análisis funcional y técnico está cerrado. El módulo conservará el modelo mental útil del TPV legacy, pero se implementará sobre la arquitectura actual y corregirá sus problemas de consultas, estado, precisión monetaria, integridad y documentación.
 
-Esta versión toma como nueva base funcional el `main` validado y subido el 6 de septiembre de 2026, después de cerrar completamente `14J — Editor de factura`, `14K.1 — Emisión transaccional`, `14K.2 — Documento y previsualización`, `14K.3 — PDF definitivo inmutable` y de completar funcionalmente `14K.4A — Impresión` y `14K.4B — Email`. La última validación incluye la BrowserWindow independiente de preview, auto-guardado previo, emisión desde la propia preview, reconciliación con la ventana principal, ventas desplegables individualmente o en bloque mediante iconos Angular Material, logo común de tickets/facturas, `nombreComercial` en cabecera, materialización post-COMMIT del PDF definitivo, impresión mediante diálogo estándar del sistema y envío SMTP del mismo PDF canónico. El PDF definitivo se ha ajustado a **A4 vertical**, se construye desde el mismo `ClienteFacturaDocumentoInterface`, omite siempre las líneas de artículos, se almacena bajo `files/clientes/facturas/<facturaPublicId>.pdf`, conserva de forma inmutable los primeros bytes válidos y puede recuperarse/materializarse bajo demanda mediante `getOrCreatePdf()`. El email de factura usa `AppData.nombre` como remitente visible (`fromName`), en el asunto y en el cuerpo; `AppData.nombreComercial` queda reservado para la cabecera visual del documento. El siguiente bloque exacto es `14K.4C — Integración y cierre de impresión/email`.
+Esta versión toma como nueva base funcional el `main` validado y subido el 6 de septiembre de 2026, después de cerrar completamente `14J — Editor de factura`, `14K.1 — Emisión transaccional`, `14K.2 — Documento y previsualización`, `14K.3 — PDF definitivo inmutable` y **`14K.4 — Impresión y email`**. La última validación incluye la BrowserWindow independiente de preview, auto-guardado previo, emisión desde la propia preview, reconciliación con la ventana principal, ventas desplegables individualmente o en bloque mediante iconos Angular Material, logo común de tickets/facturas, `nombreComercial` en cabecera, materialización post-COMMIT del PDF definitivo, impresión mediante diálogo estándar del sistema y envío SMTP del mismo PDF canónico. El PDF definitivo es **A4 vertical**, se construye desde el mismo `ClienteFacturaDocumentoInterface`, omite siempre las líneas de artículos, se almacena bajo `files/clientes/facturas/<facturaPublicId>.pdf`, conserva de forma inmutable los primeros bytes válidos y puede recuperarse/materializarse bajo demanda mediante `getOrCreatePdf()`. El email de factura usa `AppData.nombre` como remitente visible (`fromName`), en el asunto y en el cuerpo; `AppData.nombreComercial` queda reservado para la cabecera visual del documento. `14K.4C` integra además el envío SMTP con el bloqueo global de la ficha mediante `actionProcessingEvent`: mientras el email está en curso no se puede cambiar de ficha/pestaña ni lanzar acciones documentales paralelas, y el bloqueo se libera tanto en éxito como en error; imprimir cierra cualquier formulario de email abierto y el formulario permanece disponible para reintento si SMTP falla. El siguiente bloque exacto es **`14K.5 — Anulación`**. Para `14K.6` queda fijada una integración adicional con Ventas: la opción **`Imprimir factura`** del modal de finalización solo puede utilizarse si la venta tiene cliente asignado y debe encadenar venta finalizada → impresión de ticket → factura con esa única venta → emisión → PDF definitivo → diálogo estándar de impresión.
 
 ## 29.1 Objetivo y alcance
 
@@ -3648,9 +3650,9 @@ El repositorio nuevo dispone actualmente de:
 
 Todavía faltan:
 
-- `14K.4A–14K.4B` impresión y email desde los bytes PDF almacenados ✅; `14K.4C` queda pendiente para regresión e integración final del bloque;
 - `14K.5` anulación transaccional y liberación histórica de ventas;
-- `14K.6` regresión integral y cierre del Hito 14.
+- `14K.6A` integración final con Ventas mediante la opción `Imprimir factura`, obligatoriamente con cliente asignado;
+- `14K.6B` regresión integral y cierre del Hito 14.
 
 ## 29.4 Entrada, búsqueda y selección ✅
 
@@ -4597,7 +4599,7 @@ PDF DEFINITIVO
 
 **`14K.3 — PDF definitivo inmutable` queda completamente cerrado ✅.**
 
-#### 14K.4 — Impresión y email 🟦 EN CURSO
+#### 14K.4 — Impresión y email ✅ CERRADO
 
 `14K.4A — Impresión` ✅:
 
@@ -4632,14 +4634,19 @@ PDF DEFINITIVO
 - criterio definitivo de nombres: PDF/cabecera → `AppData.nombreComercial`; email `fromName` → `AppData.nombre`; asunto → `AppData.nombre`; cuerpo → `AppData.nombre`;
 - pruebas y validación funcional del PDF vertical completadas; el usuario confirmó que el resultado visual queda bien.
 
-`14K.4C — Integración y cierre` ⬜ **SIGUIENTE**:
+`14K.4C — Integración y cierre` ✅:
 
-- regresión conjunta de imprimir + email desde listado de facturas emitidas;
-- verificar estados/disabled/feedback al convivir con workspace dirty, editor abierto y acciones en curso;
-- comprobar recuperación automática de PDF faltante tanto desde impresión como desde email;
-- verificar que ambos caminos consumen exactamente el mismo storage inmutable y no regeneran un PDF existente;
-- confirmar que borradores/anuladas no ofrecen ni ejecutan impresión/email;
-- cerrar definitivamente `14K.4` antes de entrar en anulación.
+- `ClientInvoicesComponent` expone `actionProcessingEvent` para propagar al padre las operaciones documentales internas que deben bloquear globalmente la ficha;
+- `ClientsComponent.invoiceActionProcessing` entra en `processing()`, de modo que durante SMTP quedan bloqueados cambio/cierre de cliente, pestañas, editor y acciones documentales paralelas;
+- el bloqueo se activa antes del envío y se libera siempre en `finally`, tanto en éxito como en error SMTP;
+- en error el formulario permanece abierto y conserva la factura seleccionada para permitir corregir/reintentar;
+- imprimir una factura cierra cualquier formulario de email abierto y limpia feedback previo;
+- el botón Nueva factura y las acciones del listado reflejan visualmente `actionInProgress()` además de protegerse en método;
+- impresión y email continúan usando exclusivamente `ClienteFacturaPdfService.getOrCreatePdf()` y por tanto los mismos bytes inmutables del mismo storage;
+- borradores y anuladas siguen sin ofrecer ni ejecutar impresión/email por capacidades y validación backend;
+- pruebas Angular, build/lint y pruebas funcionales completadas y cambios subidos al repositorio.
+
+**`14K.4 — Impresión y email` queda completamente cerrado ✅.**
 
 #### 14K.5 — Anulación ⬜
 
@@ -4651,7 +4658,25 @@ PDF DEFINITIVO
 - anulada permanece consultable pero no editable, imprimible ni enviable;
 - ningún número se reutiliza.
 
-#### 14K.6 — Integración y cierre ⬜
+#### 14K.6 — Integración final con Ventas y cierre ⬜
+
+`14K.6A — Opción Imprimir factura al finalizar venta` ⬜:
+
+- recuperar la opción pendiente del modal de finalización de venta con nombre visible **`Imprimir factura`**;
+- requisito funcional innegociable: la venta debe tener un cliente asignado; sin cliente la opción no puede ejecutarse;
+- la venta debe seguir cumpliendo las reglas de elegibilidad vigentes de una factura activa;
+- flujo exacto acordado:
+  1. guardar/finalizar la venta;
+  2. mandar a imprimir el ticket según el flujo de finalización;
+  3. crear automáticamente una factura con **solo esa venta recién finalizada**;
+  4. emitir/finalizar inmediatamente esa factura sin pasar por el editor ni la preview;
+  5. materializar/reutilizar su PDF definitivo inmutable;
+  6. abrir el diálogo estándar del sistema para imprimir la factura;
+- reutilizar los casos de uso existentes de borrador/emisión/PDF/impresión; no crear una segunda implementación de facturación;
+- respetar límites post-COMMIT: un fallo posterior de PDF/diálogo no puede deshacer una venta ya confirmada ni una factura ya emitida/numerada;
+- integrar el resultado en cachés/listados de Clientes para que la nueva factura aparezca correctamente cuando se consulte el cliente.
+
+`14K.6B — Regresión integral y cierre Hito 14` ⬜:
 
 - cobertura completa de estados/transiciones/conflictos;
 - numeración global, `facturaInicial` y no reutilización;
@@ -4659,9 +4684,10 @@ PDF DEFINITIVO
 - retry/materialización legacy;
 - impresión/email desde bytes almacenados;
 - anulación y reutilización de ventas;
+- flujo directo Venta → factura → impresión;
 - sincronización entre ventanas y cachés;
 - regresión de ficha, Ventas y Estadísticas;
-- confirmación explícita de cero operaciones TicketBAI;
+- confirmación explícita de cero operaciones TicketBAI desde Clientes/Facturas;
 - cierre completo del Hito 14.
 
 ## 29.12 Archivos clave actuales de Clientes
@@ -4885,27 +4911,39 @@ src/app/modules/clientes/pages/clients/clients.component.html
 # 30. Próximo paso exacto
 
 ```text
-14K.4C — Integración y cierre de impresión/email
+14K.5 — Anulación
 ```
 
 Antes de proponer cambios:
 
-- actualizar y revisar `main`, especialmente `ClientInvoicesComponent`, `ClientsComponent`, `ClienteFacturaPdfService`, `ClienteFacturaPrintService`, `ClienteFacturaEmailService`, contratos/API/IPC/preload y sus tests;
-- partir de que `14K.4A — Impresión` y `14K.4B — Email` ya están funcionalmente implementados, validados y subidos; no reimplementar transportes ni formularios;
-- mantener A4 **vertical** como formato definitivo para nuevas materializaciones; no volver a `landscape`;
-- respetar la inmutabilidad: un PDF ya almacenado no se sustituye por el cambio de orientación ni por ninguna acción de impresión/email;
-- impresión y email deben usar **exclusivamente** `ClienteFacturaPdfService.getOrCreatePdf()`; si existe PDF, usar esos bytes; si falta, permitir recuperación/materialización bajo demanda;
-- impresión debe seguir abriendo el diálogo estándar del sistema y nunca usar la impresora térmica configurada para tickets;
-- email debe seguir usando destinatario inicial `workspace.baseSnapshot.email`, editable solo para el envío y sin mutar la ficha;
-- criterio definitivo de nombres: documento/PDF → `AppData.nombreComercial`; `fromName`, asunto y cuerpo del email → `AppData.nombre`;
-- adjunto `factura-<numero_AÑO>.pdf`;
-- solo facturas `emitida` pueden imprimir/enviar; borradores y anuladas deben quedar bloqueados también por backend/capacidades;
-- probar errores/cancelaciones sin modificar estado comercial;
-- verificar coexistencia con workspace dirty: imprimir/email de una factura histórica emitida no depende de guardar cambios pendientes de la ficha;
+- actualizar y revisar `main`, especialmente `ClienteFacturasRepository`, `ClienteFacturasService`, contratos de factura, `ClientInvoiceEditorComponent`, listado/cache Angular, `factura_venta` y los tests existentes;
+- implementar una transición transaccional exclusiva `emitida → anulada`; borradores ya usan eliminación y una anulada no puede volver a transicionar;
+- fijar `fecha_anulacion` y conservar `numero`, `fecha_emision`, importe, snapshot y PDF definitivo;
+- marcar como históricas/inactivas las relaciones `factura_venta` de esa factura para liberar las ventas según las reglas actuales de elegibilidad;
+- no borrar físicamente ni regenerar el PDF: la factura anulada mantiene exactamente los bytes inmutables que documentaron su emisión;
+- el número consumido nunca se reutiliza;
+- reconciliar la factura anulada en caché/listado sin depender de una lectura post-COMMIT;
+- editor/consulta de anulada debe permanecer readonly y sin acciones de imprimir/email;
 - mantener separación total respecto a TicketBAI;
-- al cerrar `14K.4C`, marcar `14K.4 — Impresión y email` completamente cerrado y pasar a `14K.5 — Anulación`.
+- después de cerrar `14K.5`, continuar con `14K.6 — Integración final con Ventas y cierre`.
 
-Estado funcional ya confirmado antes de este bloque:
+Requisito ya fijado para `14K.6A`:
+
+```text
+Modal Finalizar venta
+→ opción "Imprimir factura"
+→ solo si la venta tiene cliente asignado
+→ guardar/finalizar venta
+→ imprimir ticket
+→ crear factura con solo esa venta
+→ emitir factura
+→ materializar/reutilizar PDF definitivo
+→ abrir diálogo estándar de impresión A4
+```
+
+No implementar esta integración dentro de `14K.5`; queda expresamente reservada para `14K.6A`.
+
+Estado funcional confirmado antes de anulación:
 
 ```text
 PDF final        → A4 vertical, inmutable, PAGADO, sin líneas
@@ -4916,6 +4954,7 @@ Email fromName   → AppData.nombre
 Email asunto     → AppData.nombre
 Email cuerpo     → AppData.nombre
 Cabecera PDF     → AppData.nombreComercial
+Bloqueo email    → integrado con processing() global de la ficha
 ```
 
 ---
@@ -4950,6 +4989,7 @@ Cabecera PDF     → AppData.nombreComercial
 | **2.37** | **06/09/2026** | **`14J — Editor de factura` cerrado ✅, `14K.1 — Emisión transaccional` cerrado ✅ y `14K.2 — Documento y previsualización` cerrado ✅. Editor modal completo con dirty, CRUD y detalle histórico; emisión transaccional con numeración global/no reutilizable; modelo documental común con cálculos enteros; BrowserWindow de preview con preload mínimo, auto-guardado y Facturar; ventas plegables individualmente/globalmente, logo común, `nombreComercial`, `_AÑO`, `PREVISUALIZACIÓN` y transición a `PAGADO`. Siguiente: `14K.3 — PDF definitivo inmutable`.** |
 | **2.38** | **06/09/2026** | **`14K.3 — PDF definitivo inmutable` cerrado ✅. Nuevo renderer A4 horizontal aislado, builder HTML final desde el modelo documental común, logo compartido, filas resumen sin líneas de artículos y `PAGADO`. Storage bajo `files/clientes/facturas` con validación e inmutabilidad `COPYFILE_EXCL`. `ClienteFacturaPdfService.getOrCreatePdf()` reutiliza bytes existentes, materializa bajo demanda y deduplica concurrencia; `materializeAfterEmit()` se dispara post-COMMIT desde editor y preview sin convertir fallos documentales en falsas emisiones fallidas. Siguiente: `14K.4 — Impresión y email`.** |
 | **2.39** | **06/09/2026** | **`14K.4A — Impresión` y `14K.4B — Email` implementados, probados y subidos ✅. Impresión usa el PDF canónico mediante diálogo estándar del sistema, sin impresora térmica. Email reutiliza SMTP/SecretStorage/Nodemailer y adjunta los mismos bytes; formulario con `baseSnapshot.email` editable por envío. Ajuste final: PDF definitivo pasa a A4 vertical; `renderPdf()` sustituye a `renderLandscapePdf()`. Criterio definitivo: cabecera PDF `nombreComercial`; fromName/asunto/cuerpo del email `AppData.nombre`. Siguiente: `14K.4C — Integración y cierre de impresión/email`.** |
+| **2.40** | **06/09/2026** | **`14K.4 — Impresión y email` completamente cerrado ✅. `14K.4C` integra el envío SMTP con el bloqueo global de la ficha mediante `actionProcessingEvent`, libera siempre el bloqueo en éxito/error, conserva el formulario para reintento y coordina acciones del listado. Nuevo requisito reservado para `14K.6A`: opción `Imprimir factura` al finalizar una venta, obligatoriamente con cliente asignado, encadenando venta → ticket → factura de una sola venta → emisión → PDF inmutable → diálogo estándar de impresión. Siguiente: `14K.5 — Anulación`.** |
 
 ---
 
@@ -4959,7 +4999,7 @@ Cabecera PDF     → AppData.nombreComercial
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.39.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.40.
 
 Estado principal:
 - Ventas 12C.1–12C.8 ✅
@@ -5003,7 +5043,7 @@ Estado principal:
       - materializeAfterEmit() post-COMMIT no propagante ✅
       - integración en emisión directa y preview ✅
       - formato definitivo actual: A4 vertical/portrait ✅
-    - 14K.4 Impresión y email 🟦 EN CURSO
+    - 14K.4 Impresión y email ✅ CERRADO
       - 14K.4A Impresión ✅
         - getOrCreatePdf() como única fuente ✅
         - diálogo estándar del sistema ✅
@@ -5018,19 +5058,29 @@ Estado principal:
         - editable por envío sin mutar cliente ✅
         - PDF/cabecera usa nombreComercial ✅
         - fromName/asunto/cuerpo email usan AppData.nombre ✅
-      - 14K.4C Integración/cierre ⬜ SIGUIENTE
-    - 14K.5 Anulación ⬜
-    - 14K.6 Integración y cierre ⬜
+      - 14K.4C Integración/cierre ✅
+        - actionProcessingEvent integra SMTP con processing() global ✅
+        - bloqueo liberado tanto en éxito como en error ✅
+        - formulario permanece disponible para reintento tras fallo ✅
+        - impresión cierra formulario email y limpia feedback ✅
+    - 14K.5 Anulación ⬜ SIGUIENTE
+    - 14K.6 Integración final con Ventas y cierre ⬜
+      - 14K.6A opción "Imprimir factura" al finalizar venta ⬜
+      - requiere cliente asignado ✅ FIJADO
+      - flujo venta → ticket → factura 1 venta → emisión → PDF → imprimir ✅ FIJADO
+      - 14K.6B regresión integral + cierre Hito 14 ⬜
 - Roadmap posterior: 15 Almacén, 16 Compras.
 
 Punto base de repositorio:
-- tomar el main actual validado y subido el 06/09/2026 después de completar impresión, email y el ajuste A4 vertical;
-- todos los tests backend/Electron, frontend, builds, lint y pruebas funcionales de impresión, SMTP y PDF vertical han pasado;
+- tomar el main actual validado y subido el 06/09/2026 después de cerrar completamente `14K.4 — Impresión y email`;
+- todos los tests backend/Electron, frontend, builds, lint y pruebas funcionales de impresión, SMTP, PDF vertical y bloqueo global durante envío han pasado;
 - impresión consume `ClienteFacturaPdfService.getOrCreatePdf()` y abre el diálogo estándar del sistema; nunca usa la impresora térmica de tickets;
 - email consume exactamente los mismos bytes PDF, valida SMTP/secret/destinatario en backend y usa `factura-numero_AÑO.pdf`;
 - el formulario de email vive en Facturas, propone `workspace.baseSnapshot.email` y cualquier cambio afecta solo al envío;
+- `actionProcessingEvent` integra el estado SMTP con `ClientsComponent.processing()`: durante envío la ficha queda bloqueada y se libera siempre al terminar; tras error el formulario queda abierto para reintentar;
 - criterio definitivo: PDF/cabecera → `AppData.nombreComercial`; email fromName/asunto/cuerpo → `AppData.nombre`;
 - el PDF definitivo actual es A4 vertical. Los PDFs ya materializados continúan inmutables y no se sobrescriben por este cambio;
+- requisito pendiente de `14K.6A`: la opción `Imprimir factura` del modal de finalización solo puede utilizarse con cliente asignado y debe crear/emitir/imprimir una factura formada exclusivamente por esa venta;
 - el warning/log `UNIQUE constraint failed: factura_venta.id_venta` durante el test de relaciones históricas de postventa es esperado: el test provoca y captura deliberadamente esa restricción de unicidad.
 
 Reglas críticas generales:
@@ -5075,22 +5125,24 @@ Reglas cerradas de Clientes/Facturas:
 - Email adjunta exactamente esos mismos bytes; destinatario inicial persistido editable solo por envío.
 - Email `fromName`, asunto y cuerpo usan `AppData.nombre`; el PDF usa `AppData.nombreComercial`.
 - Borradores y anuladas no imprimen ni envían email.
+- Durante un envío SMTP, `ClientInvoicesComponent.actionProcessingEvent` integra la operación con `ClientsComponent.processing()`; la ficha y acciones paralelas quedan bloqueadas y el bloqueo se libera siempre en `finally`.
+- Integración pendiente para `14K.6A`: el modal de finalización de venta tendrá la opción `Imprimir factura`, obligatoriamente con cliente asignado, y el flujo será venta finalizada → ticket → factura con esa única venta → emisión → PDF definitivo → diálogo estándar de impresión.
 
 Próximo paso exacto:
-14K.4C — Integración y cierre de impresión/email.
+14K.5 — Anulación.
 
-Para 14K.4C:
-- revisar main actual y no reimplementar impresión/email;
-- hacer regresión conjunta de acciones del listado, estados disabled, feedback, workspace dirty y editor/modal;
-- comprobar recuperación automática de un PDF faltante desde impresión y desde email;
-- comprobar que un PDF existente nunca se regenera ni sobrescribe;
-- verificar cancelación de impresión y errores SMTP/documentales sin mutar la factura;
-- confirmar capacidades: solo emitidas imprimen/envían; borradores/anuladas no;
-- confirmar que ambos caminos usan los bytes inmutables del mismo storage;
-- mantener formato A4 vertical y criterios de nombre ya cerrados;
-- cerrar 14K.4 y solo entonces pasar a 14K.5 Anulación.
+Para 14K.5:
+- revisar main actual y no tocar todavía la integración directa con Ventas;
+- implementar exclusivamente `emitida → anulada` de forma transaccional;
+- conservar número, fecha de emisión, snapshot, importes y PDF definitivo;
+- fijar fecha de anulación y pasar las relaciones `factura_venta` activas a históricas/inactivas;
+- liberar las ventas para futuras facturas según las reglas de elegibilidad actuales;
+- impedir reimpresión/email y edición de anuladas;
+- no reutilizar nunca el número de la factura anulada;
+- reconciliar cachés/listado desde la respuesta post-COMMIT;
+- cerrar 14K.5 y después pasar a 14K.6A `Imprimir factura` desde Finalizar venta.
 ```
 
 ---
 
-**Fin del documento de continuidad v2.39.**
+**Fin del documento de continuidad v2.40.**
