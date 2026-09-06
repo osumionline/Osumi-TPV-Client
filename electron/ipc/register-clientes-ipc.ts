@@ -1,5 +1,6 @@
 import type ClienteFacturasService from '@backend/application/clientes/cliente-facturas.service';
 import type ClientesService from '@backend/application/clientes/clientes.service';
+import type ClienteFacturaPreviewWindow from '@backend/contracts/clientes/cliente-factura-preview-window.interface';
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type ActualizarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/actualizar-cliente-factura-borrador-command.interface';
 import type {
@@ -10,6 +11,7 @@ import type {
   ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type { ClienteFacturaDocumentoConsulta } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
   ClienteFacturaVentaInterface,
@@ -31,6 +33,7 @@ export default function registerClientesIpc(
   getMainWindow: MainWindowProvider,
   clientesService: ClientesService,
   clienteFacturasService: ClienteFacturasService,
+  clienteFacturaPreviewWindow: ClienteFacturaPreviewWindow,
 ): void {
   ipcMain.handle(
     IPC_CHANNELS.clientesGetAll,
@@ -125,6 +128,18 @@ export default function registerClientesIpc(
       assertTrustedSender(event, getMainWindow);
 
       return clienteFacturasService.emitBorrador(command);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.clientesOpenFacturaPreview,
+    async (
+      event,
+      consulta: ClienteFacturaDocumentoConsulta,
+    ): Promise<ClienteFacturaInterface | null> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return clienteFacturaPreviewWindow.open(consulta);
     },
   );
 

@@ -8,6 +8,7 @@ import type {
   ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type { ClienteFacturaDocumentoConsulta } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
   ClienteFacturaVentaInterface,
@@ -58,6 +59,14 @@ export default interface ClientesApi {
    * Emite definitivamente un borrador de factura.
    */
   emitFacturaBorrador(command: EmitirClienteFacturaCommand): Promise<ClienteFacturaInterface>;
+
+  /**
+   * Abre una ventana independiente con la representación
+   * documental interactiva de una factura.
+   */
+  openFacturaPreview(
+    consulta: ClienteFacturaDocumentoConsulta,
+  ): Promise<ClienteFacturaInterface | null>;
 
   /**
    * Obtiene las ventas relacionadas históricamente

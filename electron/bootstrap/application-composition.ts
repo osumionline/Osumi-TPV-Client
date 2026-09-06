@@ -4,6 +4,7 @@ import ApplicationStateService from '@backend/application/application/applicatio
 import ArticulosService from '@backend/application/articulos/articulos.service';
 import CajaService from '@backend/application/caja/caja.service';
 import CategoriasService from '@backend/application/categorias/categorias.service';
+import ClienteFacturaDocumentosService from '@backend/application/clientes/cliente-factura-documentos.service';
 import ClienteFacturasService from '@backend/application/clientes/cliente-facturas.service';
 import ClientesService from '@backend/application/clientes/clientes.service';
 import ConfigurationService from '@backend/application/configuration/configuration.service';
@@ -30,6 +31,8 @@ import VentasTicketsService from '@backend/application/ventas/ventas-tickets.ser
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';
+import type ClienteFacturaDocumentosRepository from '@backend/contracts/clientes/cliente-factura-documentos.repository.interface';
+import type ClienteFacturaPreviewWindow from '@backend/contracts/clientes/cliente-factura-preview-window.interface';
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type ClienteRepository from '@backend/contracts/clientes/cliente.repository.interface';
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
@@ -86,6 +89,7 @@ import TypeOrmVentasPostventaRepository from '@infrastructure/database/typeorm/t
 import TypeOrmVentasTicketBaiRepository from '@infrastructure/database/typeorm/typeorm-ventas-ticket-bai.repository';
 import TypeOrmVentasTicketsRepository from '@infrastructure/database/typeorm/typeorm-ventas-tickets.repository';
 import ElectronAssetUrlBuilder from '@infrastructure/electron/electron-asset-url.builder';
+import ElectronClienteFacturaPreviewWindow from '@infrastructure/electron/electron-cliente-factura-preview-window';
 import ElectronHtmlDocumentRenderer from '@infrastructure/electron/electron-html-document.renderer';
 import ElectronLegacyImportDialog from '@infrastructure/electron/electron-legacy-import-dialog';
 import ElectronLogoStorage from '@infrastructure/electron/electron-logo.storage';
@@ -113,6 +117,7 @@ import registerApplicationIpc from '@ipc/register-application-ipc';
 import registerArticulosIpc from '@ipc/register-articulos-ipc';
 import registerCajaIpc from '@ipc/register-caja-ipc';
 import registerCategoriasIpc from '@ipc/register-categorias-ipc';
+import registerClienteFacturaPreviewIpc from '@ipc/register-cliente-factura-preview-ipc';
 import registerClientesIpc from '@ipc/register-clientes-ipc';
 import registerConfigurationIpc from '@ipc/register-configuration-ipc';
 import registerEmpleadosIpc from '@ipc/register-empleados-ipc';
@@ -264,12 +269,21 @@ export default function createApplicationComposition(
   const clienteRepository: ClienteRepository = new TypeOrmClienteRepository(operationalDatabase);
   const clientesService: ClientesService = new ClientesService(clienteRepository);
 
-  const clienteFacturasRepository: ClienteFacturasRepository = new TypeOrmClienteFacturasRepository(
-    operationalDatabase,
-  );
+  const typeOrmClienteFacturasRepository: TypeOrmClienteFacturasRepository =
+    new TypeOrmClienteFacturasRepository(operationalDatabase);
+
+  const clienteFacturasRepository: ClienteFacturasRepository = typeOrmClienteFacturasRepository;
+  const clienteFacturaDocumentosRepository: ClienteFacturaDocumentosRepository =
+    typeOrmClienteFacturasRepository;
+
   const clienteFacturasService: ClienteFacturasService = new ClienteFacturasService(
     clienteFacturasRepository,
   );
+  const clienteFacturaDocumentosService: ClienteFacturaDocumentosService =
+    new ClienteFacturaDocumentosService(configurationService, clienteFacturaDocumentosRepository);
+
+  const clienteFacturaPreviewWindow: ClienteFacturaPreviewWindow =
+    new ElectronClienteFacturaPreviewWindow(getMainWindow);
 
   const reservasRepository: ReservasRepository = new TypeOrmReservasRepository(operationalDatabase);
   const reservasService: ReservasService = new ReservasService(reservasRepository);
@@ -467,7 +481,17 @@ export default function createApplicationComposition(
   registerMarcasIpc(getMainWindow, marcasService);
   registerProveedoresIpc(getMainWindow, proveedoresService);
   registerEmpleadosIpc(getMainWindow, empleadosService);
-  registerClientesIpc(getMainWindow, clientesService, clienteFacturasService);
+  registerClientesIpc(
+    getMainWindow,
+    clientesService,
+    clienteFacturasService,
+    clienteFacturaPreviewWindow,
+  );
+  registerClienteFacturaPreviewIpc(
+    clienteFacturaPreviewWindow,
+    clienteFacturaDocumentosService,
+    clienteFacturasService,
+  );
   registerCategoriasIpc(getMainWindow, categoriasService);
   registerCajaIpc(getMainWindow, cajaService);
   registerReservasIpc(getMainWindow, reservasService);
