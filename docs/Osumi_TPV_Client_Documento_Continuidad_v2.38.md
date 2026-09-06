@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.37  
+**Versión:** 2.38  
 **Fecha:** 6 de septiembre de 2026  
-**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**. El **Hito 14 — Clientes está en curso 🟦**: `14A–14J` están completamente cerrados y `14K.1–14K.2` también están terminados, validados funcionalmente y subidos. Facturas ya dispone de listado, editor completo, dirty propio, CRUD transaccional de borradores, emisión definitiva con numeración global, modelo documental común y previsualización interactiva en una BrowserWindow independiente. La preview usa el logo común `osumi://assets/logo`, muestra `AppData.nombreComercial`, número provisional `_AÑO`, ventas inicialmente contraídas con controles individuales/globales, marca `PREVISUALIZACIÓN` y acción Facturar; tras emitir pasa a `PAGADO`. El siguiente paso exacto es **`14K.3 — PDF definitivo inmutable`**. Clientes no realiza ni realizará ninguna operación TicketBAI.
+**Estado:** TicketBAI ordinario permanece **cerrado ✅** y `12C.9 — TicketBAI devoluciones/mixtas` continúa **⏸️ bloqueado por Berein**. El **Hito 13 — Artículos está completamente terminado, validado y subido al repositorio ✅**. El **Hito 14 — Clientes está en curso 🟦**: `14A–14J` están completamente cerrados y `14K.1–14K.3` también están terminados, validados y subidos. Facturas ya dispone de listado, editor completo, dirty propio, CRUD transaccional de borradores, emisión definitiva con numeración global, modelo documental común, previsualización interactiva en BrowserWindow independiente y PDF definitivo A4 horizontal materializado de forma inmutable. El PDF final usa el mismo modelo documental, muestra solo filas resumen de ventas/tickets, logo común `osumi://assets/logo`, `AppData.nombreComercial`, número oficial y `PAGADO`; nunca incluye líneas de artículos. La materialización se ejecuta después del COMMIT, se deduplica y un fallo documental no revierte ni falsea la emisión confirmada. El siguiente paso exacto es **`14K.4 — Impresión y email`**. Clientes no realiza ni realizará ninguna operación TicketBAI.
 
 > **Regla crítica de entorno TicketBAI:** el producto usa `production` por defecto. Durante desarrollo/pruebas manuales se usa `app_data.json → ticketBai.environment = "test"` junto con el token TEST correspondiente. No añadir selector de entorno a la UI.
 
@@ -164,8 +164,10 @@ Ventas 12 — Postventa                             🟦
       14K.2B Preview interactiva Electron         ✅
         14K.2B1 Ventana + bridge seguro           ✅
         14K.2B2 Página interactiva                ✅
-    14K.3 PDF definitivo inmutable                ⬜ SIGUIENTE
-    14K.4 Impresión y email                       ⬜
+    14K.3 PDF definitivo inmutable                ✅ CERRADO
+      14K.3A Renderer + HTML + storage             ✅
+      14K.3B Materialización e integración         ✅
+    14K.4 Impresión y email                       ⬜ SIGUIENTE
     14K.5 Anulación                               ⬜
     14K.6 Integración y cierre                    ⬜
 15 Almacén                                        ⬜
@@ -3495,7 +3497,7 @@ Con ello, **todo el Hito 13 — Artículos queda terminado y cerrado ✅**.
 
 El análisis funcional y técnico está cerrado. El módulo conservará el modelo mental útil del TPV legacy, pero se implementará sobre la arquitectura actual y corregirá sus problemas de consultas, estado, precisión monetaria, integridad y documentación.
 
-Esta versión toma como nueva base funcional el `main` validado y subido el 6 de septiembre de 2026, después de cerrar completamente `14J — Editor de factura`, `14K.1 — Emisión transaccional` y `14K.2 — Documento y previsualización`. La última validación funcional incluye la BrowserWindow independiente de preview, auto-guardado previo, emisión desde la propia preview, reconciliación con la ventana principal, ventas desplegables individualmente o en bloque mediante iconos Angular Material, logo común de tickets/facturas y `nombreComercial` en cabecera. El siguiente bloque exacto es `14K.3 — PDF definitivo inmutable`.
+Esta versión toma como nueva base funcional el `main` validado y subido el 6 de septiembre de 2026, después de cerrar completamente `14J — Editor de factura`, `14K.1 — Emisión transaccional`, `14K.2 — Documento y previsualización` y `14K.3 — PDF definitivo inmutable`. La última validación incluye la BrowserWindow independiente de preview, auto-guardado previo, emisión desde la propia preview, reconciliación con la ventana principal, ventas desplegables individualmente o en bloque mediante iconos Angular Material, logo común de tickets/facturas, `nombreComercial` en cabecera y la materialización post-COMMIT del PDF A4 definitivo. El PDF se construye desde el mismo `ClienteFacturaDocumentoInterface`, omite siempre las líneas de artículos, se almacena bajo `files/clientes/facturas/<facturaPublicId>.pdf`, conserva de forma inmutable los primeros bytes válidos y puede recuperarse/materializarse bajo demanda mediante `getOrCreatePdf()`. El siguiente bloque exacto es `14K.4 — Impresión y email`.
 
 ## 29.1 Objetivo y alcance
 
@@ -3625,11 +3627,21 @@ El repositorio nuevo dispone actualmente de:
 - bootstrap Angular específico para la preview, sin `ApplicationStateService`, router ni API completa de la ventana principal;
 - preview interactiva A4 horizontal: tienda a la izquierda, fecha/número/cliente a la derecha, ventas inicialmente contraídas, líneas desplegables individualmente y control global mostrar/ocultar todo;
 - la preview muestra `PREVISUALIZACIÓN` + botón Facturar; al emitir se actualiza en la misma ventana a la representación final y muestra `PAGADO`;
-- al cerrar una preview que emitió, la ventana principal recibe la factura confirmada y actualiza editor/listado sin depender de una recarga secundaria.
+- al cerrar una preview que emitió, la ventana principal recibe la factura confirmada y actualiza editor/listado sin depender de una recarga secundaria;
+- URL del logo documental centralizada en contratos compartidos, manteniendo `osumi://assets/logo` como origen único para tickets, preview y PDF;
+- `ClienteFacturaPdfHtmlBuilder` construye HTML A4 horizontal únicamente para facturas finalizadas y nunca incluye líneas de artículos, aunque existan en el modelo documental;
+- `ElectronA4DocumentRenderer` usa Chromium aislado para imprimir A4 horizontal, espera fuentes/imágenes y rechaza materializar un documento si no puede cargar correctamente sus recursos;
+- `FileClienteFacturaPdfStorage` guarda los PDFs bajo `files/clientes/facturas/<facturaPublicId>.pdf`, valida firma/tamaño/id y no permite sobrescribir unos bytes definitivos ya existentes;
+- inmutabilidad reforzada mediante `COPYFILE_EXCL`: en una carrera de filesystem ganan los primeros bytes válidos y los intentos posteriores conservan ese archivo;
+- `ClienteFacturaPdfService.getOrCreatePdf()` devuelve el PDF almacenado o lo materializa bajo demanda; deduplica peticiones simultáneas de la misma factura dentro del proceso;
+- tras generar/guardar, `getOrCreatePdf()` vuelve a leer el storage y devuelve los bytes canónicos realmente persistidos;
+- `materializeAfterEmit()` absorbe y registra errores documentales post-COMMIT: una factura ya emitida sigue emitida, su número sigue consumido y el PDF puede reintentarse después;
+- las dos rutas de emisión, editor principal y ventana preview, disparan materialización automática en segundo plano después de que SQLite haya confirmado la emisión;
+- la preview conserva primero `markEmitted()` antes de iniciar la materialización PDF, por lo que cerrar la ventana no puede perder el resultado de una emisión ya confirmada;
+- tests de builder, storage y servicio PDF cubren documento final sin líneas, escape HTML, rechazo de borradores, inmutabilidad, firma PDF, deduplicación concurrente y fallo documental post-COMMIT.
 
 Todavía faltan:
 
-- `14K.3` materialización y almacenamiento del PDF definitivo inmutable;
 - `14K.4` impresión y email exclusivamente desde los bytes PDF almacenados;
 - `14K.5` anulación transaccional y liberación histórica de ventas;
 - `14K.6` regresión integral y cierre del Hito 14.
@@ -4547,20 +4559,39 @@ PDF DEFINITIVO
 
 **`14K.2 — Documento y previsualización` queda completamente cerrado ✅.**
 
-#### 14K.3 — PDF definitivo inmutable ⬜ SIGUIENTE
+#### 14K.3 — PDF definitivo inmutable ✅ CERRADO
 
-- construir renderer A4 horizontal específico reutilizando el mismo `ClienteFacturaDocumentoInterface`;
-- conservar la composición visual validada de la preview, pero eliminar toda interacción y toda fila de línea de artículo;
-- cabecera con logo `osumi://assets/logo`, `nombreComercial`, datos de tienda, fecha/número oficial y snapshot del cliente;
-- tabla final únicamente con filas resumen `Ticket Nº ...`;
-- resumen fiscal y total exactamente a partir de los valores ya calculados por backend;
-- mostrar `PAGADO` en el documento definitivo;
-- generar y persistir bytes PDF definitivos después de la emisión;
-- no revertir ni presentar como fallida una emisión cuyo COMMIT ya se confirmó aunque falle la materialización del PDF;
-- almacenar el PDF de forma inmutable y no regenerarlo desde datos vivos en usos posteriores;
-- prever retry de materialización para emitidas sin PDF y materialización inicial bajo demanda para legacy.
+`14K.3A — Renderer + HTML + storage` ✅:
 
-#### 14K.4 — Impresión y email ⬜
+- la URL `osumi://assets/logo` se movió a `electron/contracts/documents/business-logo-url.constant.ts` y el renderer Angular reutiliza esa constante compartida;
+- nuevo contrato `A4DocumentRenderer`, separado del renderer térmico de tickets para no mezclar geometrías ni responsabilidades;
+- `ElectronA4DocumentRenderer` renderiza HTML completo mediante BrowserWindow oculta y `printToPDF()` con `A4 landscape`, fondos y CSS `@page`;
+- el renderer espera fuentes e imágenes antes de imprimir y falla si algún recurso visual obligatorio, incluido el logo, no ha quedado cargado correctamente;
+- nuevo `ClienteFacturaPdfHtmlBuilder` construye la factura final desde `ClienteFacturaDocumentoInterface`, sin recalcular importes;
+- el HTML final muestra logo, `nombreComercial`, datos de tienda, fecha, número oficial, snapshot del cliente, filas resumen de ventas, desglose fiscal, descuento, total y `PAGADO`;
+- las líneas de artículos jamás se insertan en el HTML/PDF definitivo, aunque sigan disponibles en el modelo para la preview interactiva;
+- el builder rechaza borradores y escapa datos persistidos antes de interpolarlos en HTML;
+- nuevo `ClienteFacturaPdfStorage` y `FileClienteFacturaPdfStorage` bajo `files/clientes/facturas`;
+- el storage valida publicId, firma `%PDF-` y tamaño máximo; usa temporales y `COPYFILE_EXCL` para fijar el primer PDF válido sin sobrescribirlo jamás;
+- si otra operación gana una carrera, se validan y conservan los bytes ya existentes como documento canónico;
+- tests específicos verifican HTML final, ausencia de líneas, `PAGADO`, escaping, rechazo de borradores, lectura/escritura PDF, inmutabilidad y protección de rutas.
+
+`14K.3B — Materialización e integración` ✅:
+
+- nuevo `ClienteFacturaPdfService.getOrCreatePdf()` devuelve primero los bytes inmutables ya almacenados y solo renderiza si todavía faltan;
+- las peticiones concurrentes para la misma factura se deduplican mediante `pendingRequests`, evitando renders Chromium duplicados dentro del proceso;
+- tras renderizar y guardar se vuelve a leer el storage para devolver siempre los bytes canónicos que realmente ganaron la materialización;
+- `materializeAfterEmit()` encapsula la materialización post-COMMIT y no propaga errores al caso de uso comercial;
+- tanto la emisión desde la ventana principal como desde la preview disparan la materialización en segundo plano después de recibir la factura emitida confirmada por SQLite;
+- la ruta de preview ejecuta primero `markEmitted()` y solo después inicia la materialización, preservando el resultado de emisión aunque Chromium/filesystem fallen;
+- una factura emitida cuyo PDF no pudo crearse sigue emitida y numerada; una llamada posterior a `getOrCreatePdf()` puede recuperar/materializar el documento sin alterar la factura;
+- composición de aplicación registra el renderer A4, HTML builder, storage y servicio PDF compartidos;
+- batería backend/Electron, build, lint y pruebas funcionales de emisión directa/preview completadas y cambios subidos al repositorio;
+- el mensaje `UNIQUE constraint failed: factura_venta.id_venta` que puede aparecer por stdout durante un test de postventa es un error SQLite provocado deliberadamente y capturado por el test que verifica la unicidad de relación activa; no representa una regresión.
+
+**`14K.3 — PDF definitivo inmutable` queda completamente cerrado ✅.**
+
+#### 14K.4 — Impresión y email ⬜ SIGUIENTE
 
 - acciones exclusivas de facturas emitidas;
 - impresión siempre desde los bytes PDF definitivos almacenados;
@@ -4769,31 +4800,49 @@ src/main.ts
 src/types/osumi-desktop-api.d.ts
 ```
 
+PDF definitivo inmutable:
+
+```text
+electron/contracts/documents/business-logo-url.constant.ts
+electron/backend/contracts/printing/a4-document-renderer.interface.ts
+electron/infrastructure/electron/electron-a4-document.renderer.ts
+electron/backend/contracts/clientes/cliente-factura-pdf-storage.interface.ts
+electron/infrastructure/filesystem/file-cliente-factura-pdf.storage.ts
+electron/backend/application/clientes/cliente-factura-pdf-html.builder.ts
+electron/backend/application/clientes/cliente-factura-pdf.service.ts
+electron/backend/application/clientes/cliente-factura-pdf-html.builder.spec.ts
+electron/backend/application/clientes/cliente-factura-pdf.service.spec.ts
+electron/infrastructure/filesystem/file-cliente-factura-pdf.storage.spec.ts
+electron/bootstrap/application-composition.ts
+electron/ipc/register-clientes-ipc.ts
+electron/ipc/register-cliente-factura-preview-ipc.ts
+```
+
 ---
 
 # 30. Próximo paso exacto
 
 ```text
-14K.3 — PDF definitivo inmutable
+14K.4 — Impresión y email
 ```
 
 Antes de proponer cambios:
 
-- actualizar y revisar `main`, especialmente el builder documental, la BrowserWindow preview, el pipeline PDF/printing existente de tickets y el storage de PDFs;
-- partir de que `14J` y `14K.1–14K.2` están completamente cerrados y no reimplementar sus reglas ni cálculos;
-- reutilizar `ClienteFacturaDocumentoInterface` como única fuente de verdad de importes y snapshot documental;
-- el PDF definitivo debe ser A4 horizontal y reproducir la composición validada, pero **sin controles interactivos y sin líneas de artículos**;
-- imprimir únicamente una fila resumen por venta/ticket, porque el cliente ya conserva los tickets originales para consultar el detalle;
-- mantener logo `osumi://assets/logo`, `AppData.nombreComercial`, número oficial `numero_AÑO` y marca `PAGADO`;
-- generar el PDF únicamente para facturas emitidas; un borrador se representa solo mediante la preview HTML interactiva;
-- materializar el PDF después del COMMIT de emisión: si la generación/storage falla, la emisión sigue siendo válida y debe quedar pendiente de retry, nunca revertirse ni mostrarse falsamente como no emitida;
-- almacenar bytes PDF definitivos de forma inmutable y usarlos más adelante como única fuente para imprimir/email;
-- contemplar facturas legacy emitidas sin PDF mediante materialización inicial bajo demanda;
-- no implementar todavía anulación dentro de `14K.3`; pertenece a `14K.5`;
-- mantener cero operaciones TicketBAI en todo el flujo;
-- respetar las convenciones de código y el resumen de estado antes de cada bloque.
+- actualizar y revisar `main`, especialmente `ClienteFacturaPdfService`, los pipelines actuales de impresión/email de tickets, la lista de Facturas, los contratos `ClientesApi`, IPC/preload y la configuración SMTP;
+- partir de que `14J`, `14K.1`, `14K.2` y `14K.3` están completamente cerrados y no reimplementar emisión, cálculo documental ni renderizado A4;
+- usar **exclusivamente** `ClienteFacturaPdfService.getOrCreatePdf()` como fuente de bytes para imprimir y enviar por email una factura emitida;
+- si los bytes ya existen, usarlos tal cual; si faltan por una factura legacy o por fallo de materialización post-COMMIT, permitir que `getOrCreatePdf()` los materialice una vez antes de la acción documental;
+- imprimir exactamente los bytes canónicos almacenados, sin reconstruir el HTML/PDF desde Angular ni desde datos vivos;
+- email debe adjuntar exactamente esos mismos bytes y nombrar el fichero con el número oficial de factura;
+- destinatario inicial = email actual del cliente, editable para ese envío sin modificar cliente, factura ni PDF;
+- asunto/cuerpo del email de factura usarán `AppData.nombreComercial`, según la decisión funcional ya cerrada para Facturas;
+- impresión/email son acciones exclusivas de facturas `emitida`; borradores y anuladas no deben ofrecerlas ni ejecutarlas;
+- mantener separación total respecto a TicketBAI: imprimir/enviar una factura no cobra, no modifica ventas y no realiza ninguna operación TicketBAI;
+- reutilizar la infraestructura existente de impresión y SMTP cuando encaje, evitando duplicar transportes; crear contratos específicos solo donde la semántica de factura lo exija;
+- contemplar errores de materialización/impresión/email con feedback claro sin alterar el estado comercial de la factura;
+- respetar las convenciones de código y mostrar resumen de progreso antes de cada bloque.
 
-`14K.2` está cerrado. El siguiente trabajo debe convertir el mismo modelo documental ya validado en un artefacto PDF estable e inmutable, sin crear una segunda lógica de cálculo.
+`14K.3` está cerrado. El siguiente trabajo debe conectar los botones documentales ya previstos en el listado con el PDF inmutable, garantizando que impresión y email consumen literalmente los mismos bytes.
 
 ---
 
@@ -4825,6 +4874,7 @@ Antes de proponer cambios:
 | **2.35** | **04/09/2026** | **`14I.0 — Revisión funcional guiada de Facturas` cerrado ✅. Facturas queda definida como agrupación postventa de 1..N ventas ya cobradas y completamente ajena a TicketBAI. Se acuerdan numeración global desde `facturaInicial`, estados Borrador/Finalizada/Anulada, listado con estado explícito, ventas disponibles, borradores editables, emisión transaccional, previsualización facturable, PDF definitivo inmutable, impresión/email desde el PDF y destinatario editable. Anular conserva número/PDF/relaciones históricas, bloquea impresión/email y libera las ventas mediante relaciones inactivas. Plan detallado `14I–14K` cerrado. Siguiente: `14I.1 — Persistencia y relaciones históricas`.** |
 | **2.36** | **05/09/2026** | **`14I — Dominio y listado de facturas` cerrado ✅ y `14J.1–14J.2` cerrados ✅. Esquema con `fecha_anulacion` y relaciones activas/históricas mediante índice único parcial; import legacy adaptado; listado público/cacheado; ventas disponibles con reglas de elegibilidad; creación, actualización y eliminación transaccional de borradores; API/IPC/preload y reconciliación Angular post-COMMIT sin `reload()` obligatorio. Limpieza posterior de tests duplicados en `clientes.service.spec.ts`. Siguiente: `14J.3 — modal Angular del editor de factura`.** |
 | **2.37** | **06/09/2026** | **`14J — Editor de factura` cerrado ✅, `14K.1 — Emisión transaccional` cerrado ✅ y `14K.2 — Documento y previsualización` cerrado ✅. Editor modal completo con dirty, CRUD y detalle histórico; emisión transaccional con numeración global/no reutilizable; modelo documental común con cálculos enteros; BrowserWindow de preview con preload mínimo, auto-guardado y Facturar; ventas plegables individualmente/globalmente, logo común, `nombreComercial`, `_AÑO`, `PREVISUALIZACIÓN` y transición a `PAGADO`. Siguiente: `14K.3 — PDF definitivo inmutable`.** |
+| **2.38** | **06/09/2026** | **`14K.3 — PDF definitivo inmutable` cerrado ✅. Nuevo renderer A4 horizontal aislado, builder HTML final desde el modelo documental común, logo compartido, filas resumen sin líneas de artículos y `PAGADO`. Storage bajo `files/clientes/facturas` con validación e inmutabilidad `COPYFILE_EXCL`. `ClienteFacturaPdfService.getOrCreatePdf()` reutiliza bytes existentes, materializa bajo demanda y deduplica concurrencia; `materializeAfterEmit()` se dispara post-COMMIT desde editor y preview sin convertir fallos documentales en falsas emisiones fallidas. Siguiente: `14K.4 — Impresión y email`.** |
 
 ---
 
@@ -4834,7 +4884,7 @@ Antes de proponer cambios:
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.37.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.38.
 
 Estado principal:
 - Ventas 12C.1–12C.8 ✅
@@ -4866,16 +4916,29 @@ Estado principal:
       - ventas contraídas por defecto; desplegar individual/global ✅
       - logo `osumi://assets/logo` + `nombreComercial` ✅
       - PREVISUALIZACIÓN + Facturar; después PAGADO ✅
-    - 14K.3 PDF definitivo inmutable ⬜ SIGUIENTE
-    - 14K.4 Impresión y email ⬜
+    - 14K.3 PDF definitivo inmutable ✅ CERRADO
+      - constante de logo compartida contratos/Angular ✅
+      - builder HTML A4 desde ClienteFacturaDocumentoInterface ✅
+      - PDF final sin líneas de artículos, solo ventas/tickets ✅
+      - renderer Electron A4 landscape aislado ✅
+      - storage files/clientes/facturas inmutable ✅
+      - COPYFILE_EXCL fija los primeros bytes válidos ✅
+      - getOrCreatePdf() con recuperación bajo demanda ✅
+      - deduplicación de materializaciones concurrentes ✅
+      - materializeAfterEmit() post-COMMIT no propagante ✅
+      - integración en emisión directa y preview ✅
+    - 14K.4 Impresión y email ⬜ SIGUIENTE
     - 14K.5 Anulación ⬜
     - 14K.6 Integración y cierre ⬜
 - Roadmap posterior: 15 Almacén, 16 Compras.
 
 Punto base de repositorio:
-- tomar el main actual validado y subido el 06/09/2026 después del cierre de 14K.2B2 y sus ajustes finales;
-- la última modificación visual propia del usuario sustituye los símbolos mostrar/ocultar por iconos Angular Material, sin cambiar el comportamiento;
-- todos los tests, builds, lint y pruebas funcionales/visuales de 14J y 14K.1–14K.2 han pasado.
+- tomar el main actual validado y subido el 06/09/2026 después del cierre completo de 14K.3B;
+- todos los tests backend/Electron, builds, lint y pruebas funcionales del flujo de emisión han pasado;
+- `14K.3A` incorporó builder HTML final, renderer A4 y storage inmutable;
+- `14K.3B` incorporó `ClienteFacturaPdfService`, deduplicación y materialización automática post-COMMIT desde las dos rutas de emisión;
+- el warning/log `UNIQUE constraint failed: factura_venta.id_venta` durante el test de relaciones históricas de postventa es esperado: el test provoca y captura deliberadamente esa restricción de unicidad;
+- una corrección de test del HTML usa `FACTURA:` respetando mayúsculas y evita fijar la hora exacta cuando el fixture contiene timestamps UTC para no depender del timezone de CI.
 
 Reglas críticas generales:
 - Angular 22 standalone, signals/computed/input/output/inject.
@@ -4907,24 +4970,33 @@ Reglas cerradas de Clientes/Facturas:
 - Preview: logo común, `nombreComercial`, `_AÑO`, `PREVISUALIZACIÓN` y botón Facturar.
 - Facturar desde preview usa exactamente el mismo caso de uso transaccional y pasa la propia ventana a `PAGADO`.
 - PDF definitivo: A4 horizontal, sin interacción y sin líneas de artículos; solo filas resumen de tickets/ventas.
-- PDF definitivo deberá mostrar logo, `nombreComercial`, número oficial y `PAGADO`.
-- Preview y PDF deben consumir el mismo `ClienteFacturaDocumentoInterface`; no recalcular importes en renderer.
-- Impresión/email futuros deben usar exclusivamente los bytes PDF definitivos almacenados.
+- PDF definitivo muestra logo, `nombreComercial`, número oficial y `PAGADO`.
+- Preview y PDF consumen el mismo `ClienteFacturaDocumentoInterface`; no recalcular importes en renderer.
+- `ClienteFacturaPdfHtmlBuilder` solo admite documentos finalizados y escapa datos persistidos.
+- `ElectronA4DocumentRenderer` espera recursos antes de imprimir y genera A4 landscape.
+- PDF definitivo se almacena bajo `files/clientes/facturas/<facturaPublicId>.pdf`.
+- Los primeros bytes PDF válidos son inmutables; nunca se sobrescriben ni se regeneran desde datos vivos si ya existen.
+- `ClienteFacturaPdfService.getOrCreatePdf()` devuelve bytes existentes o materializa bajo demanda; deduplica llamadas simultáneas.
+- La materialización automática ocurre después del COMMIT. Si falla Chromium/filesystem, la factura sigue emitida/numerada y se puede reintentar después.
+- Impresión/email futuros deben usar exclusivamente `getOrCreatePdf()` y los bytes canónicos almacenados.
 
 Próximo paso exacto:
-14K.3 — PDF definitivo inmutable.
+14K.4 — Impresión y email.
 
-Para 14K.3:
-- revisar main actual, el builder documental y el pipeline/storage PDF de tickets antes de proponer cambios;
-- construir renderer A4 horizontal desde ClienteFacturaDocumentoInterface;
-- ocultar siempre las líneas de artículos en PDF;
-- materializar solo facturas emitidas;
-- guardar bytes definitivos de forma inmutable;
-- una emisión ya confirmada nunca se revierte si falla generar/guardar PDF: queda pendiente de retry;
-- contemplar materialización bajo demanda de facturas legacy emitidas sin PDF;
-- no implementar impresión/email/anulación todavía salvo infraestructura mínima estrictamente necesaria para el storage.
+Para 14K.4:
+- revisar main actual, ClienteFacturaPdfService y los pipelines existentes de impresión/email de tickets;
+- conectar las acciones del listado/editor solo para facturas emitidas;
+- impresión siempre desde bytes de `getOrCreatePdf()`, nunca desde HTML o datos vivos;
+- email adjunta exactamente esos mismos bytes;
+- destinatario inicial = email actual del cliente, editable por envío sin mutar cliente/factura;
+- asunto y cuerpo usan `AppData.nombreComercial`;
+- nombre del adjunto basado en `numero_AÑO`;
+- borradores y anuladas no imprimen ni envían;
+- errores documentales/SMTP no modifican el estado de la factura;
+- no implementar todavía la anulación salvo infraestructura mínima estrictamente necesaria.
 ```
 
 ---
 
-**Fin del documento de continuidad v2.37.**
+**Fin del documento de continuidad v2.38.**
+
