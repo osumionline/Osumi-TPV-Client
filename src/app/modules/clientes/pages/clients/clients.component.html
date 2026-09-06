@@ -76,6 +76,7 @@
             @case ('invoices') {
             @if (workspace.clientePublicId; as clientePublicId) {
             <otpv-client-invoices [clientePublicId]="clientePublicId"
+                                  [clienteEmail]="workspace.baseSnapshot.email"
                                   [emailConfigured]="emailConfigured()"
                                   [disabled]="processing()"
                                   [createDisabled]="workspace.dirty || processing()"

@@ -196,6 +196,20 @@
     .client-invoices__no-actions {
         color: var(--disabled-color);
     }
+
+    .client-invoices__email-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .client-invoices__email-context {
+        color: var(--disabled-color);
+
+        strong {
+            color: inherit;
+        }
+    }
 }
 
 @media (max-width: 720px) {

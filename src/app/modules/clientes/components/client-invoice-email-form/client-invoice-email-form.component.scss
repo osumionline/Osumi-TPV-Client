@@ -1,0 +1,48 @@
+:host {
+    display: block;
+}
+
+.invoice-email-form {
+    padding: 1rem;
+    border: 1px solid var(--mat-sys-outline-variant,
+            rgba(0, 0, 0, 0.15));
+    border-radius: 0.75rem;
+    background: var(--mat-sys-surface-container-low,
+            transparent);
+}
+
+.invoice-email-form__header {
+    margin-bottom: 1rem;
+
+    p {
+        margin: 0.25rem 0 0;
+    }
+}
+
+.invoice-email-form__form {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1fr) auto;
+    gap: 0.75rem;
+    align-items: start;
+}
+
+.invoice-email-form__field {
+    width: 100%;
+}
+
+.invoice-email-form__actions {
+    display: flex;
+    gap: 0.5rem;
+    padding-top: 0.25rem;
+}
+
+@media (max-width: 700px) {
+    .invoice-email-form__form {
+        grid-template-columns: 1fr;
+    }
+
+    .invoice-email-form__actions {
+        justify-content: flex-end;
+    }
+}

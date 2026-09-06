@@ -66,7 +66,7 @@ describe('ClienteFacturaEmailService', (): void => {
       fromName: 'Mi comercio',
       fromAddress: 'smtp@example.com',
       to: 'cliente@example.com',
-      subject: 'Mi comercio - Factura 21_2026',
+      subject: 'Empresa fiscal - Factura 21_2026',
       text: 'Adjuntamos la factura 21_2026 de Mi comercio.',
     });
 

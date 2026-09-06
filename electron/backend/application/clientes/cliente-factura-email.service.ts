@@ -71,6 +71,7 @@ export default class ClienteFacturaEmailService {
     const pdf: Uint8Array = await this.pdfProvider.getOrCreatePdf(consulta);
 
     const nombreNegocio: string = this.resolveBusinessName(appData);
+    const nombreAsunto: string = this.resolveSubjectBusinessName(appData);
     const referencia: string = documento.numeroFactura;
 
     const request: EmailSendRequest = {
@@ -78,7 +79,7 @@ export default class ClienteFacturaEmailService {
       fromName: nombreNegocio,
       fromAddress: smtp.user,
       to: destinatario,
-      subject: `${nombreNegocio} - Factura ${referencia}`,
+      subject: `${nombreAsunto} - Factura ${referencia}`,
       text: `Adjuntamos la factura ${referencia} de ${nombreNegocio}.`,
       attachments: [
         {
@@ -197,6 +198,16 @@ export default class ClienteFacturaEmailService {
       return nombreComercial;
     }
 
+    const nombre: string = appData.nombre.trim();
+
+    return nombre === '' ? 'Osumi TPV' : nombre;
+  }
+
+  /**
+   * Obtiene el nombre utilizado en el asunto del
+   * email siguiendo el mismo criterio que los tickets.
+   */
+  private resolveSubjectBusinessName(appData: AppData): string {
     const nombre: string = appData.nombre.trim();
 
     return nombre === '' ? 'Osumi TPV' : nombre;

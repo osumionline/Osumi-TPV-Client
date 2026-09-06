@@ -1,0 +1,65 @@
+<section class="invoice-email-form">
+    <header class="invoice-email-form__header">
+        <div>
+            <strong>
+                Enviar factura por email
+            </strong>
+
+            <p>
+                Introduce la dirección que recibirá
+                el PDF definitivo de la factura.
+            </p>
+        </div>
+    </header>
+
+    <form class="invoice-email-form__form"
+          (submit)="submit($event)">
+        <mat-form-field class="invoice-email-form__field"
+                        appearance="outline">
+            <mat-label>
+                Destinatario
+            </mat-label>
+
+            <input matInput
+                   type="email"
+                   autocomplete="email"
+                   placeholder="cliente@ejemplo.com"
+                   [disabled]="saving()"
+                   [value]="destinatario()"
+                   (input)="onDestinatarioInput($event)">
+
+            <mat-hint>
+                @if (destinatarioInicial().trim() !== '') {
+                Se ha usado el email de la ficha.
+                Puedes cambiarlo solo para este envío.
+                }
+                @else {
+                Esta dirección solo se usará
+                para este envío.
+                }
+            </mat-hint>
+        </mat-form-field>
+
+        <div class="invoice-email-form__actions">
+            <button mat-stroked-button
+                    type="button"
+                    [disabled]="saving()"
+                    (click)="cancel()">
+                Cancelar
+            </button>
+
+            <button mat-flat-button
+                    type="submit"
+                    [disabled]="
+                        saving() ||
+                        !destinatarioValido()
+                    ">
+                <mat-icon>
+                    send
+                </mat-icon>
+
+                {{ saving() ? 'Enviando...' : 'Enviar' }}
+            </button>
+        </div>
+    </form>
+</section>

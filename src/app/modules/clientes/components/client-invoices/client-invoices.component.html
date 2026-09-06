@@ -70,6 +70,20 @@
     </div>
     }
 
+    @if (actionError() !== null) {
+    <div class="client-invoices__message client-invoices__message--error"
+         role="alert">
+        {{ actionError() }}
+    </div>
+    }
+
+    @if (actionInfo() !== null) {
+    <div class="client-invoices__message"
+         role="status">
+        {{ actionInfo() }}
+    </div>
+    }
+
     @if (facturas().length === 0) {
     <div class="client-invoices__state">
         El cliente todavía no tiene facturas.
@@ -111,8 +125,12 @@
                 @for (factura of facturas(); track factura.publicId) {
                 <tr class="client-invoices__row"
                     [class.client-invoices__row--disabled]="disabled()"
-                    [attr.tabindex]="disabled() ? -1 : 0"
-                    [attr.aria-disabled]="disabled()"
+                    [attr.tabindex]="
+                        disabled() || actionInProgress()
+                            ? -1
+                            : 0
+                    "
+                    [attr.aria-disabled]="disabled() || actionInProgress()"
                     [attr.aria-label]="'Consultar factura ' + getFacturaLabel(factura)"
                     (click)="selectFactura(factura)"
                     (keydown)="selectFacturaFromKeyboard($event, factura)">
@@ -161,10 +179,19 @@
                                     'Enviar por email la factura ' +
                                     getFacturaLabel(factura)
                                 "
-                                [disabled]="disabled() || !emailConfigured()"
-                                (click)="emailFactura($event, factura)">
+                                [disabled]="
+                                    disabled() ||
+                                    actionInProgress() ||
+                                    !emailConfigured()
+                                "
+                                (click)="openEmailForm($event, factura)">
                             <mat-icon>
-                                email
+                                {{
+                                    emailSending() &&
+                                    emailFacturaSeleccionada()?.publicId === factura.publicId
+                                        ? 'hourglass_top'
+                                        : 'email'
+                                }}
                             </mat-icon>
                         </button>
                         }
@@ -178,7 +205,7 @@
                                     'Imprimir la factura ' +
                                     getFacturaLabel(factura)
                                 "
-                                [disabled]="disabled()"
+                                [disabled]="actionInProgress() || disabled()"
                                 (click)="printFactura($event, factura)">
                             <mat-icon>
                                 print
@@ -187,8 +214,8 @@
                         }
 
                         @if (
-                            !factura.capacidades.puedeEnviarEmail &&
-                            !factura.capacidades.puedeImprimir
+                        !factura.capacidades.puedeEnviarEmail &&
+                        !factura.capacidades.puedeImprimir
                         ) {
                         <span class="client-invoices__no-actions"
                               aria-label="Sin acciones disponibles">
@@ -201,6 +228,23 @@
             </tbody>
         </table>
     </div>
+
+    @if (emailFacturaSeleccionada(); as facturaEmail) {
+    <div class="client-invoices__email-panel">
+        <div class="client-invoices__email-context">
+            Enviar factura
+
+            <strong>
+                {{ getFacturaLabel(facturaEmail) }}
+            </strong>
+        </div>
+
+        <otpv-client-invoice-email-form [saving]="emailSending()"
+                                        [destinatarioInicial]="clienteEmail()"
+                                        (sendEvent)="sendFacturaEmail($event)"
+                                        (cancelEvent)="cancelEmailForm()" />
+    </div>
+    }
     }
     }
     }

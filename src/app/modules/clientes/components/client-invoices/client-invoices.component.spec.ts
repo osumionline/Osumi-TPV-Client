@@ -1,6 +1,7 @@
 import { signal, type WritableSignal } from '@angular/core';
 import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
+import type ClienteFacturaEmailCommand from '@desktop-contracts/clientes/cliente-factura-email-command.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type ClienteFacturasState from '@model/clientes/cliente-facturas-state.interface';
 import ClientInvoicesComponent from '@modules/clientes/components/client-invoices/client-invoices.component';
@@ -26,6 +27,7 @@ describe('ClientInvoicesComponent', (): void => {
     fixture = TestBed.createComponent(ClientInvoicesComponent);
     fixture.componentRef.setInput('clientePublicId', 'cliente-1');
     fixture.componentRef.setInput('emailConfigured', true);
+    fixture.componentRef.setInput('clienteEmail', 'cliente@example.com');
     fixture.detectChanges();
 
     await fixture.whenStable();
@@ -46,21 +48,15 @@ describe('ClientInvoicesComponent', (): void => {
     expect(element.querySelectorAll('.client-invoices__print-button')).toHaveLength(1);
   });
 
-  it('emite las acciones de su fila sin abrir accidentalmente la factura', (): void => {
+  it('gestiona las acciones de su fila sin abrir accidentalmente la factura', (): void => {
     const element: HTMLElement = fixture.nativeElement as HTMLElement;
     const opened: ClienteFacturaInterface[] = [];
-    const emailed: ClienteFacturaInterface[] = [];
     const printed: ClienteFacturaInterface[] = [];
     const newRequests: boolean[] = [];
 
     fixture.componentInstance.openFacturaEvent.subscribe(
       (factura: ClienteFacturaInterface): void => {
         opened.push(factura);
-      },
-    );
-    fixture.componentInstance.emailFacturaEvent.subscribe(
-      (factura: ClienteFacturaInterface): void => {
-        emailed.push(factura);
       },
     );
     fixture.componentInstance.printFacturaEvent.subscribe(
@@ -89,13 +85,44 @@ describe('ClientInvoicesComponent', (): void => {
     opened.length = 0;
 
     element.querySelector<HTMLButtonElement>('.client-invoices__email-button')?.click();
+
+    expect(fixture.componentInstance.emailFacturaSeleccionada()?.publicId).toBe('factura-emitida');
+
     element.querySelector<HTMLButtonElement>('.client-invoices__print-button')?.click();
+
     element.querySelector<HTMLButtonElement>('.client-invoices__new-button')?.click();
 
     expect(opened).toHaveLength(0);
-    expect(emailed[0]?.publicId).toBe('factura-emitida');
     expect(printed[0]?.publicId).toBe('factura-emitida');
     expect(newRequests).toHaveLength(1);
+  });
+
+  it('envía la factura al destinatario introducido y cierra el formulario', async (): Promise<void> => {
+    const factura: ClienteFacturaInterface = createFacturas()[1]!;
+
+    fixture.componentInstance.openEmailForm(new MouseEvent('click'), factura);
+
+    fixture.detectChanges();
+
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('otpv-client-invoice-email-form'),
+    ).not.toBeNull();
+
+    await fixture.componentInstance.sendFacturaEmail('  otro@example.com  ');
+
+    expect(clientesService.emailCommands).toEqual([
+      {
+        clientePublicId: 'cliente-1',
+        facturaPublicId: 'factura-emitida',
+        destinatario: 'otro@example.com',
+      },
+    ]);
+
+    expect(fixture.componentInstance.emailFacturaSeleccionada()).toBeNull();
+
+    expect(fixture.componentInstance.actionInfo()).toContain('21_2026');
+
+    expect(fixture.componentInstance.actionInfo()).toContain('otro@example.com');
   });
 
   it('permite abrir una factura mediante teclado', (): void => {
@@ -108,9 +135,7 @@ describe('ClientInvoicesComponent', (): void => {
       },
     );
 
-    const row: HTMLElement | null = element.querySelector<HTMLElement>(
-      '.client-invoices__row',
-    );
+    const row: HTMLElement | null = element.querySelector<HTMLElement>('.client-invoices__row');
 
     row?.dispatchEvent(
       new KeyboardEvent('keydown', {
@@ -143,9 +168,7 @@ describe('ClientInvoicesComponent', (): void => {
 
     expect(element.textContent).toContain('Error simulado de facturas.');
 
-    element
-      .querySelector<HTMLButtonElement>('.client-invoices__state--error button')
-      ?.click();
+    element.querySelector<HTMLButtonElement>('.client-invoices__state--error button')?.click();
 
     expect(clientesService.reloadedPublicIds).toEqual(['cliente-1']);
 
@@ -165,12 +188,15 @@ describe('ClientInvoicesComponent', (): void => {
     fixture.detectChanges();
 
     const element: HTMLElement = fixture.nativeElement as HTMLElement;
-    const emailButton: HTMLButtonElement | null =
-      element.querySelector<HTMLButtonElement>('.client-invoices__email-button');
-    const printButton: HTMLButtonElement | null =
-      element.querySelector<HTMLButtonElement>('.client-invoices__print-button');
-    const newButton: HTMLButtonElement | null =
-      element.querySelector<HTMLButtonElement>('.client-invoices__new-button');
+    const emailButton: HTMLButtonElement | null = element.querySelector<HTMLButtonElement>(
+      '.client-invoices__email-button',
+    );
+    const printButton: HTMLButtonElement | null = element.querySelector<HTMLButtonElement>(
+      '.client-invoices__print-button',
+    );
+    const newButton: HTMLButtonElement | null = element.querySelector<HTMLButtonElement>(
+      '.client-invoices__new-button',
+    );
 
     expect(emailButton?.disabled).toBe(true);
     expect(printButton?.disabled).toBe(false);
@@ -191,6 +217,8 @@ class FakeClientesService {
   });
   readonly requestedPublicIds: string[] = [];
   readonly reloadedPublicIds: string[] = [];
+  readonly emailCommands: ClienteFacturaEmailCommand[] = [];
+  emailError: Error | null = null;
 
   /**
    * Devuelve el estado configurado para la prueba.
@@ -215,6 +243,15 @@ class FakeClientesService {
     this.reloadedPublicIds.push(publicId);
 
     return Promise.resolve();
+  }
+
+  /**
+   * Registra un envío de factura simulado.
+   */
+  emailFactura(command: ClienteFacturaEmailCommand): Promise<void> {
+    this.emailCommands.push(command);
+
+    return this.emailError === null ? Promise.resolve() : Promise.reject(this.emailError);
   }
 }
 
