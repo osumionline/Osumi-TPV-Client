@@ -25,6 +25,8 @@ export default class VentaPostCommitService {
     reloadReservas: boolean,
     clientePublicId: string | null,
     imprimirTicket: boolean,
+    ventaPublicId: string | null = null,
+    imprimirFactura: boolean = false,
   ): Promise<readonly string[]> {
     const warnings: string[] = [];
 
@@ -41,6 +43,10 @@ export default class VentaPostCommitService {
 
     if (imprimirTicket) {
       await this.printTicket(idVenta, warnings);
+    }
+
+    if (imprimirFactura) {
+      await this.createAndPrintFactura(ventaPublicId, clientePublicId, warnings);
     }
 
     return warnings;
@@ -117,6 +123,74 @@ export default class VentaPostCommitService {
     } catch (error: unknown) {
       warnings.push(
         `No se ha podido imprimir el ticket. ${getErrorMessage(
+          error,
+          'Se ha producido un error inesperado.',
+        )}`,
+      );
+    }
+  }
+
+  /**
+   * Crea una factura emitida para la venta confirmada
+   * y abre después su diálogo estándar de impresión.
+   *
+   * Ambas operaciones son posteriores al COMMIT de la
+   * venta y sus incidencias se convierten en avisos.
+   */
+  private async createAndPrintFactura(
+    ventaPublicId: string | null,
+    clientePublicId: string | null,
+    warnings: string[],
+  ): Promise<void> {
+    if (clientePublicId === null || clientePublicId.trim() === '') {
+      warnings.push(
+        'No se ha podido crear la factura porque la venta no tiene un cliente persistido asociado.',
+      );
+
+      return;
+    }
+
+    if (ventaPublicId === null || ventaPublicId.trim() === '') {
+      warnings.push(
+        'No se ha podido crear la factura porque la venta guardada no contiene un identificador válido.',
+      );
+
+      return;
+    }
+
+    let facturaPublicId: string;
+    let numeroFactura: string | null;
+
+    try {
+      const factura = await this.clientesService.createFacturaDesdeVenta({
+        clientePublicId,
+        ventaPublicId,
+      });
+
+      facturaPublicId = factura.publicId;
+      numeroFactura = factura.numeroFactura;
+    } catch (error: unknown) {
+      warnings.push(
+        `No se ha podido crear la factura de la venta. ${getErrorMessage(
+          error,
+          'Se ha producido un error inesperado.',
+        )}`,
+      );
+
+      return;
+    }
+
+    try {
+      await this.clientesService.printFactura({
+        clientePublicId,
+        facturaPublicId,
+      });
+    } catch (error: unknown) {
+      const referencia: string =
+        numeroFactura === null ? 'La factura' : `La factura ${numeroFactura}`;
+
+      warnings.push(
+        `${referencia} se ha creado correctamente, pero no se ha podido abrir el diálogo de impresión. ${getErrorMessage(
           error,
           'Se ha producido un error inesperado.',
         )}`,

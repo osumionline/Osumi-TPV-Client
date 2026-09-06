@@ -52,17 +52,14 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
   readonly lineas: InputSignal<readonly VentaLineaEnCurso[]> =
     input.required<readonly VentaLineaEnCurso[]>();
   readonly tiposPago: InputSignal<readonly TipoPago[]> = input.required<readonly TipoPago[]>();
-
   readonly reservaBlockedReason: InputSignal<string | null> = input<string | null>(null);
-
+  readonly facturaBlockedReason: InputSignal<string | null> = input<string | null>(null);
   readonly reservaSaving: InputSignal<boolean> = input<boolean>(false);
   readonly ventaSaving: InputSignal<boolean> = input<boolean>(false);
 
   readonly cancelEvent: OutputEmitterRef<void> = output<void>();
-
   readonly finalizeEvent: OutputEmitterRef<VentaFinalizacionSolicitud> =
     output<VentaFinalizacionSolicitud>();
-
   readonly reservaSinTicketEvent: OutputEmitterRef<void> = output<void>();
   readonly reservaConTicketEvent: OutputEmitterRef<void> = output<void>();
 
@@ -174,12 +171,14 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
       case 'no-imprimir-ticket':
         return finalizacion.completa;
 
+      case 'imprimir-factura':
+        return finalizacion.completa && this.facturaBlockedReason() === null;
+
       case 'reserva':
       case 'reserva-sin-ticket':
         return this.reservaBlockedReason() === null;
 
       case 'ticket-regalo':
-      case 'factura':
       case 'email':
         return false;
     }
@@ -485,7 +484,7 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
       value === 'ticket-regalo' ||
       value === 'reserva' ||
       value === 'reserva-sin-ticket' ||
-      value === 'factura' ||
+      value === 'imprimir-factura' ||
       value === 'email'
     );
   }
@@ -666,7 +665,7 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
    * Produce el snapshot económico definitivo y solicita
    * al workspace la persistencia de la venta.
    */
-  private finalizeVenta(imprimirTicket: boolean): void {
+  private finalizeVenta(imprimirTicket: boolean, imprimirFactura: boolean): void {
     if (this.saving()) {
       return;
     }
@@ -685,6 +684,7 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
       this.finalizeEvent.emit({
         finalizacion: resultado,
         imprimirTicket,
+        imprimirFactura,
       });
     } catch (error: unknown) {
       this.error.set(
@@ -708,13 +708,15 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
 
     switch (this.accion()) {
       case 'imprimir-ticket':
-        this.finalizeVenta(true);
-
+        this.finalizeVenta(true, false);
         return;
 
       case 'no-imprimir-ticket':
-        this.finalizeVenta(false);
+        this.finalizeVenta(false, false);
+        return;
 
+      case 'imprimir-factura':
+        this.finalizeVenta(true, true);
         return;
 
       case 'reserva':
@@ -728,7 +730,6 @@ export default class SaleFinalizationComponent implements AfterViewInit, OnInit 
         return;
 
       case 'ticket-regalo':
-      case 'factura':
       case 'email':
         return;
     }

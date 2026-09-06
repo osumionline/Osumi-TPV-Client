@@ -4,7 +4,7 @@ type VentaFinalizacionAccion =
   | 'ticket-regalo'
   | 'reserva'
   | 'reserva-sin-ticket'
-  | 'factura'
+  | 'imprimir-factura'
   | 'email';
 
 export default VentaFinalizacionAccion;

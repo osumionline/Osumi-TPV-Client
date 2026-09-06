@@ -203,6 +203,35 @@ export default class SaleWorkspaceComponent {
     return null;
   });
 
+  /**
+   * Explica por qué la venta actual no puede convertirse
+   * automáticamente en una factura emitida.
+   *
+   * Backend vuelve a validar autoritativamente estas
+   * condiciones después del COMMIT de la venta.
+   */
+  readonly facturaBlockedReason: Signal<string | null> = computed((): string | null => {
+    const venta: VentaEnCurso = this.ventaView();
+    const clientePublicId: string | null = venta.cliente?.publicId ?? null;
+
+    if (clientePublicId === null) {
+      return 'Para imprimir una factura es obligatorio seleccionar un cliente.';
+    }
+
+    if (venta.totalCents <= 0) {
+      return 'Solo se puede imprimir una factura desde una venta ordinaria de importe positivo.';
+    }
+
+    if (
+      venta.devolucionOrigen !== null ||
+      venta.lineas.some((linea: VentaLineaEnCurso): boolean => linea.esDevolucion)
+    ) {
+      return 'No se puede imprimir una factura desde una devolución o una venta mixta.';
+    }
+
+    return null;
+  });
+
   readonly variosIvaOptionsBps: Signal<readonly number[]> = computed((): readonly number[] => {
     const appData: AppData | null = this.ventasContextService.appData();
 
@@ -999,7 +1028,7 @@ export default class SaleWorkspaceComponent {
     }
 
     const venta: VentaEnCurso = this.venta();
-    const { finalizacion, imprimirTicket } = solicitud;
+    const { finalizacion, imprimirTicket, imprimirFactura } = solicitud;
 
     this.ventaSaving.set(true);
 
@@ -1034,6 +1063,8 @@ export default class SaleWorkspaceComponent {
         venta.tieneReservas,
         venta.cliente?.publicId ?? null,
         imprimirTicket,
+        result.publicId,
+        imprimirFactura,
       );
     } catch (error: unknown) {
       /*

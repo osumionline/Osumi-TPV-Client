@@ -3,4 +3,5 @@ import type { VentaFinalizacionResultado } from '@model/ventas/venta-finalizacio
 export default interface VentaFinalizacionSolicitud {
   readonly finalizacion: VentaFinalizacionResultado;
   readonly imprimirTicket: boolean;
+  readonly imprimirFactura: boolean;
 }

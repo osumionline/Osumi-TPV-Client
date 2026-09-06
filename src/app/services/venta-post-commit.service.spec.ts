@@ -1,4 +1,7 @@
 import { TestBed } from '@angular/core/testing';
+import type { ClienteFacturaDocumentoConsulta } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
+import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
+import type CrearClienteFacturaDesdeVentaCommand from '@desktop-contracts/clientes/crear-cliente-factura-desde-venta-command.interface';
 import ClientesService from '@services/clientes.service';
 import ReservasService from '@services/reservas.service';
 import VentaPostCommitService from '@services/venta-post-commit.service';
@@ -15,7 +18,7 @@ describe('VentaPostCommitService', (): void => {
   beforeEach((): void => {
     executionOrder = [];
 
-    clientesService = new FakeClientesService();
+    clientesService = new FakeClientesService(executionOrder);
     reservasService = new FakeReservasService();
     ticketBaiService = new FakeVentaTicketBaiService(executionOrder);
     documentService = new FakeVentaTicketDocumentService(executionOrder);
@@ -193,6 +196,108 @@ describe('VentaPostCommitService', (): void => {
     expect(documentService.printVentaIds).toEqual([]);
     expect(executionOrder).toEqual(['ticketbai', 'pdf']);
   });
+
+  it('crea e imprime la factura después de imprimir el ticket', async (): Promise<void> => {
+    const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
+
+    const warnings: readonly string[] = await service.run(
+      123,
+      false,
+      'cliente-1',
+      true,
+      'venta-1',
+      true,
+    );
+
+    expect(warnings).toEqual([]);
+
+    expect(clientesService.createFacturaCommands).toEqual([
+      {
+        clientePublicId: 'cliente-1',
+        ventaPublicId: 'venta-1',
+      },
+    ]);
+
+    expect(clientesService.printFacturaConsultas).toEqual([
+      {
+        clientePublicId: 'cliente-1',
+        facturaPublicId: 'factura-1',
+      },
+    ]);
+
+    expect(executionOrder).toEqual(['ticketbai', 'pdf', 'print', 'factura', 'factura-print']);
+  });
+
+  it('continúa creando e imprimiendo la factura aunque falle la impresión del ticket', async (): Promise<void> => {
+    documentService.printError = new Error('Impresora térmica no disponible.');
+
+    const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
+
+    const warnings: readonly string[] = await service.run(
+      123,
+      false,
+      'cliente-1',
+      true,
+      'venta-1',
+      true,
+    );
+
+    expect(warnings).toEqual([
+      'No se ha podido imprimir el ticket. Impresora térmica no disponible.',
+    ]);
+
+    expect(clientesService.createFacturaCommands).toHaveLength(1);
+
+    expect(clientesService.printFacturaConsultas).toHaveLength(1);
+
+    expect(executionOrder).toEqual(['ticketbai', 'pdf', 'print', 'factura', 'factura-print']);
+  });
+
+  it('informa del fallo de factura sin repetir ni invalidar la venta confirmada', async (): Promise<void> => {
+    clientesService.createFacturaError = new Error('La venta ya no está disponible para facturar.');
+
+    const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
+
+    const warnings: readonly string[] = await service.run(
+      123,
+      false,
+      'cliente-1',
+      true,
+      'venta-1',
+      true,
+    );
+
+    expect(warnings).toEqual([
+      'No se ha podido crear la factura de la venta. La venta ya no está disponible para facturar.',
+    ]);
+
+    expect(clientesService.printFacturaConsultas).toEqual([]);
+
+    expect(executionOrder).toEqual(['ticketbai', 'pdf', 'print', 'factura']);
+  });
+
+  it('conserva la factura emitida aunque falle su diálogo de impresión', async (): Promise<void> => {
+    clientesService.printFacturaError = new Error('No hay impresoras disponibles.');
+
+    const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
+
+    const warnings: readonly string[] = await service.run(
+      123,
+      false,
+      'cliente-1',
+      true,
+      'venta-1',
+      true,
+    );
+
+    expect(warnings).toEqual([
+      'La factura 21_2026 se ha creado correctamente, pero no se ha podido abrir el diálogo de impresión. No hay impresoras disponibles.',
+    ]);
+
+    expect(clientesService.createFacturaCommands).toHaveLength(1);
+
+    expect(clientesService.printFacturaConsultas).toHaveLength(1);
+  });
 });
 
 class FakeReservasService {
@@ -272,9 +377,17 @@ class FakeVentaTicketDocumentService {
 
 class FakeClientesService {
   readonly invalidatedPublicIds: string[] = [];
-
+  readonly createFacturaCommands: CrearClienteFacturaDesdeVentaCommand[] = [];
+  readonly printFacturaConsultas: ClienteFacturaDocumentoConsulta[] = [];
   invalidateError: Error | null = null;
+  createFacturaError: Error | null = null;
+  printFacturaError: Error | null = null;
 
+  constructor(private readonly executionOrder: string[]) {}
+
+  /**
+   * Simula la invalidación de estadísticas.
+   */
   invalidateEstadisticas(publicId: string): Promise<void> {
     this.invalidatedPublicIds.push(publicId);
 
@@ -284,4 +397,65 @@ class FakeClientesService {
 
     return Promise.resolve();
   }
+
+  /**
+   * Simula la creación atómica de la factura
+   * emitida asociada a una venta.
+   */
+  createFacturaDesdeVenta(
+    command: CrearClienteFacturaDesdeVentaCommand,
+  ): Promise<ClienteFacturaInterface> {
+    this.createFacturaCommands.push(command);
+    this.executionOrder.push('factura');
+
+    if (this.createFacturaError !== null) {
+      return Promise.reject(this.createFacturaError);
+    }
+
+    return Promise.resolve(createFacturaEmitida());
+  }
+
+  /**
+   * Simula el diálogo estándar de impresión
+   * del PDF definitivo de una factura.
+   */
+  printFactura(consulta: ClienteFacturaDocumentoConsulta): Promise<void> {
+    this.printFacturaConsultas.push(consulta);
+    this.executionOrder.push('factura-print');
+
+    if (this.printFacturaError !== null) {
+      return Promise.reject(this.printFacturaError);
+    }
+
+    return Promise.resolve();
+  }
+}
+
+/**
+ * Crea la factura emitida utilizada por el
+ * postproceso de venta simulado.
+ */
+function createFacturaEmitida(): ClienteFacturaInterface {
+  return {
+    publicId: 'factura-1',
+    serie: '',
+    numero: 21,
+    year: 2026,
+    numeroFactura: '21_2026',
+    estado: 'emitida',
+    fecha: '2026-09-06T21:00:00.000Z',
+    fechaCreacion: '2026-09-06T21:00:00.000Z',
+    fechaEmision: '2026-09-06T21:00:00.000Z',
+    fechaAnulacion: null,
+    importeCents: 1_000,
+    capacidades: {
+      puedeEditar: false,
+      puedeEliminar: false,
+      puedePrevisualizar: false,
+      puedeFacturar: false,
+      puedeImprimir: true,
+      puedeEnviarEmail: true,
+      puedeAnular: true,
+    },
+  };
 }

@@ -384,9 +384,9 @@
                                     Crear reserva sin ticket
                                 </mat-option>
 
-                                <mat-option value="factura"
-                                            disabled>
-                                    Generar factura
+                                <mat-option value="imprimir-factura"
+                                            [disabled]="facturaBlockedReason() !== null">
+                                    Imprimir factura
                                 </mat-option>
 
                                 <mat-option value="email"
