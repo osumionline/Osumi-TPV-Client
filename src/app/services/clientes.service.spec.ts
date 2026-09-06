@@ -8,6 +8,7 @@ import type {
   ClienteEstadisticasGeneralesInterface,
   ClienteEstadisticasInterface,
 } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
+import type { ClienteFacturaDocumentoConsulta } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
   ClienteFacturaVentaInterface,
@@ -53,6 +54,7 @@ describe('ClientesService', (): void => {
   let receivedGeneralStatisticsPublicId: string | null;
   let deactivateError: Error | null;
   let receivedConsumoMensualConsulta: ClienteConsumoMensualConsulta | null;
+  let receivedPrintFacturaConsulta: ClienteFacturaDocumentoConsulta | null;
 
   beforeEach((): void => {
     originalDesktopDescriptor = Object.getOwnPropertyDescriptor(window, 'osumiDesktop');
@@ -80,6 +82,7 @@ describe('ClientesService', (): void => {
     receivedGeneralStatisticsPublicId = null;
     deactivateError = null;
     receivedConsumoMensualConsulta = null;
+    receivedPrintFacturaConsulta = null;
 
     Object.defineProperty(window, 'osumiDesktop', {
       configurable: true,
@@ -134,6 +137,12 @@ describe('ClientesService', (): void => {
             receivedEmitFacturaCommand = command;
 
             return Promise.resolve(emittedFactura);
+          },
+
+          printFactura: (consulta: ClienteFacturaDocumentoConsulta): Promise<void> => {
+            receivedPrintFacturaConsulta = consulta;
+
+            return Promise.resolve();
           },
 
           getFacturaVentas: (
@@ -760,6 +769,20 @@ describe('ClientesService', (): void => {
 
     expect(receivedVentasDisponiblesConsulta).toBe(consulta);
     expect(result).toEqual(createVentasDisponibles());
+    expect(facturasRequestCount).toBe(0);
+  });
+
+  it('solicita la impresión de una factura mediante su API específica', async (): Promise<void> => {
+    const service: ClientesService = new ClientesService();
+    const consulta: ClienteFacturaDocumentoConsulta = {
+      clientePublicId: 'cliente-7',
+      facturaPublicId: 'factura-1',
+    };
+
+    await service.printFactura(consulta);
+
+    expect(receivedPrintFacturaConsulta).toBe(consulta);
+
     expect(facturasRequestCount).toBe(0);
   });
 

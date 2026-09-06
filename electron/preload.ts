@@ -308,6 +308,9 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         consulta,
       ) as Promise<ClienteFacturaInterface | null>,
 
+    printFactura: (consulta: ClienteFacturaDocumentoConsulta): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.clientesPrintFactura, consulta) as Promise<void>,
+
     getFacturaVentas: (
       consulta: ClienteFacturaVentasConsulta,
     ): Promise<readonly ClienteFacturaVentaInterface[]> =>

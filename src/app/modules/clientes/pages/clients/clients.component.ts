@@ -69,10 +69,15 @@ export default class ClientsComponent implements OnInit, OnDestroy {
   readonly saving: WritableSignal<boolean> = signal<boolean>(false);
   readonly deactivating: WritableSignal<boolean> = signal<boolean>(false);
   readonly processing: Signal<boolean> = computed(
-    (): boolean => this.saving() || this.deactivating() || this.invoiceEditorOpen(),
+    (): boolean =>
+      this.saving() ||
+      this.deactivating() ||
+      this.invoiceEditorOpen() ||
+      this.invoiceActionProcessing(),
   );
   readonly saveSuccessful: WritableSignal<boolean> = signal<boolean>(false);
   readonly focusNameRequest: WritableSignal<number> = signal<number>(0);
+  readonly invoiceActionProcessing: WritableSignal<boolean> = signal<boolean>(false);
   readonly clientFormSection: Signal<'data' | 'billing'> = computed((): 'data' | 'billing' =>
     this.clientesService.workspace()?.activeSection === 'billing' ? 'billing' : 'data',
   );
@@ -164,6 +169,41 @@ export default class ClientsComponent implements OnInit, OnDestroy {
   closeFacturaEditor(): void {
     this.invoiceEditorOpen.set(false);
     this.invoiceEditorFactura.set(null);
+  }
+
+  /**
+   * Abre el diálogo estándar de impresión para
+   * el PDF definitivo de la factura seleccionada.
+   */
+  async printFactura(factura: ClienteFacturaInterface): Promise<void> {
+    const workspace: ClienteWorkspace | null = this.clientesService.workspace();
+
+    if (
+      this.processing() ||
+      workspace === null ||
+      workspace.clientePublicId === null ||
+      !factura.capacidades.puedeImprimir
+    ) {
+      return;
+    }
+
+    this.invoiceActionProcessing.set(true);
+
+    try {
+      await this.clientesService.printFactura({
+        clientePublicId: workspace.clientePublicId,
+        facturaPublicId: factura.publicId,
+      });
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido imprimir la factura.'),
+        })
+        .subscribe();
+    } finally {
+      this.invoiceActionProcessing.set(false);
+    }
   }
 
   /**

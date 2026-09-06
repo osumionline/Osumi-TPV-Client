@@ -424,6 +424,14 @@ export default class ClientesService {
   }
 
   /**
+   * Solicita la impresión del PDF definitivo de
+   * una factura sin transportar sus bytes al renderer.
+   */
+  printFactura(consulta: ClienteFacturaDocumentoConsulta): Promise<void> {
+    return window.osumiDesktop.clientes.printFactura(consulta);
+  }
+
+  /**
    * Recupera las ventas históricamente relacionadas
    * con una factura persistida.
    *

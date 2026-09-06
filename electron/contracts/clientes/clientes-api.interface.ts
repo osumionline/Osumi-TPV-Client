@@ -69,6 +69,12 @@ export default interface ClientesApi {
   ): Promise<ClienteFacturaInterface | null>;
 
   /**
+   * Abre el diálogo estándar para imprimir
+   * el PDF definitivo de una factura.
+   */
+  printFactura(consulta: ClienteFacturaDocumentoConsulta): Promise<void>;
+
+  /**
    * Obtiene las ventas relacionadas históricamente
    * con una factura persistida.
    */

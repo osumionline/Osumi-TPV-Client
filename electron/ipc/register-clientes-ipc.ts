@@ -1,4 +1,5 @@
 import type ClienteFacturaPdfService from '@backend/application/clientes/cliente-factura-pdf.service';
+import type ClienteFacturaPrintService from '@backend/application/clientes/cliente-factura-print.service';
 import type ClienteFacturasService from '@backend/application/clientes/cliente-facturas.service';
 import type ClientesService from '@backend/application/clientes/clientes.service';
 import type ClienteFacturaPreviewWindow from '@backend/contracts/clientes/cliente-factura-preview-window.interface';
@@ -36,6 +37,7 @@ export default function registerClientesIpc(
   clienteFacturasService: ClienteFacturasService,
   clienteFacturaPreviewWindow: ClienteFacturaPreviewWindow,
   clienteFacturaPdfService: ClienteFacturaPdfService,
+  clienteFacturaPrintService: ClienteFacturaPrintService,
 ): void {
   ipcMain.handle(
     IPC_CHANNELS.clientesGetAll,
@@ -153,6 +155,15 @@ export default function registerClientesIpc(
       assertTrustedSender(event, getMainWindow);
 
       return clienteFacturaPreviewWindow.open(consulta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.clientesPrintFactura,
+    async (event, consulta: ClienteFacturaDocumentoConsulta): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await clienteFacturaPrintService.print(consulta);
     },
   );
 

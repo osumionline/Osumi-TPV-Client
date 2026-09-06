@@ -7,6 +7,7 @@ import CategoriasService from '@backend/application/categorias/categorias.servic
 import ClienteFacturaDocumentosService from '@backend/application/clientes/cliente-factura-documentos.service';
 import ClienteFacturaPdfHtmlBuilder from '@backend/application/clientes/cliente-factura-pdf-html.builder';
 import ClienteFacturaPdfService from '@backend/application/clientes/cliente-factura-pdf.service';
+import ClienteFacturaPrintService from '@backend/application/clientes/cliente-factura-print.service';
 import ClienteFacturasService from '@backend/application/clientes/cliente-facturas.service';
 import ClientesService from '@backend/application/clientes/clientes.service';
 import ConfigurationService from '@backend/application/configuration/configuration.service';
@@ -49,6 +50,7 @@ import type EmpleadoRepository from '@backend/contracts/empleados/empleado.repos
 import type MarcaRepository from '@backend/contracts/marcas/marca.repository.interface';
 import type A4DocumentRenderer from '@backend/contracts/printing/a4-document-renderer.interface';
 import type HtmlDocumentRenderer from '@backend/contracts/printing/html-document-renderer.interface';
+import type PdfPrintDialog from '@backend/contracts/printing/pdf-print-dialog.interface';
 import type PrinterProvider from '@backend/contracts/printing/printer.provider.interface';
 import type PrintingSettingsRepository from '@backend/contracts/printing/printing-settings.repository.interface';
 import type ProveedorRepository from '@backend/contracts/proveedores/proveedor.repository.interface';
@@ -98,6 +100,7 @@ import ElectronClienteFacturaPreviewWindow from '@infrastructure/electron/electr
 import ElectronHtmlDocumentRenderer from '@infrastructure/electron/electron-html-document.renderer';
 import ElectronLegacyImportDialog from '@infrastructure/electron/electron-legacy-import-dialog';
 import ElectronLogoStorage from '@infrastructure/electron/electron-logo.storage';
+import ElectronPdfPrintDialog from '@infrastructure/electron/electron-pdf-print-dialog';
 import ElectronPrinterProvider from '@infrastructure/electron/electron-printer.provider';
 import { ElectronRuntimeInfoProvider } from '@infrastructure/electron/electron-runtime-info.provider';
 import ElectronSafeStorageSecretStorage from '@infrastructure/electron/electron-safe-storage-secret-storage';
@@ -299,6 +302,12 @@ export default function createApplicationComposition(
     clienteFacturaPdfHtmlBuilder,
     a4DocumentRenderer,
     clienteFacturaPdfStorage,
+  );
+
+  const clienteFacturaPrintDialog: PdfPrintDialog = new ElectronPdfPrintDialog(getMainWindow);
+  const clienteFacturaPrintService: ClienteFacturaPrintService = new ClienteFacturaPrintService(
+    clienteFacturaPdfService,
+    clienteFacturaPrintDialog,
   );
 
   const clienteFacturaPreviewWindow: ClienteFacturaPreviewWindow =
@@ -506,6 +515,7 @@ export default function createApplicationComposition(
     clienteFacturasService,
     clienteFacturaPreviewWindow,
     clienteFacturaPdfService,
+    clienteFacturaPrintService,
   );
 
   registerClienteFacturaPreviewIpc(
