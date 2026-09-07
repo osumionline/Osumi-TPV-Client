@@ -1,0 +1,367 @@
+<section class="inventory">
+    <div class="inventory__filters">
+        <mat-form-field appearance="outline"
+                        subscriptSizing="dynamic">
+            <mat-label>
+                Proveedor
+            </mat-label>
+            <mat-select [value]="idProveedor()"
+                        (selectionChange)="onProveedorChange($event)">
+                <mat-option [value]="null">
+                    Todos
+                </mat-option>
+
+                @for (proveedor of proveedoresService.proveedores(); track proveedor.id) {
+                <mat-option [value]="proveedor.id">
+                    {{ proveedor.nombre }}
+                </mat-option>
+                }
+            </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline"
+                        subscriptSizing="dynamic">
+            <mat-label>
+                Marca
+            </mat-label>
+            <mat-select [value]="idMarca()"
+                        (selectionChange)="onMarcaChange($event)">
+                <mat-option [value]="null">
+                    Todas
+                </mat-option>
+
+                @for (marca of marcasService.marcas(); track marca.id) {
+                <mat-option [value]="marca.id">
+                    {{ marca.nombre }}
+                </mat-option>
+                }
+            </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline"
+                        subscriptSizing="dynamic">
+            <mat-label>
+                Categoría
+            </mat-label>
+            <mat-select [value]="idCategoria()"
+                        (selectionChange)="onCategoriaChange($event)">
+                <mat-option [value]="null">
+                    Todas
+                </mat-option>
+
+                @for (categoria of categoriasService.categoriasPlain(); track categoria.id) {
+                <mat-option [value]="categoria.id">
+                    {{ formatCategoriaOption(categoria) }}
+                </mat-option>
+                }
+            </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline"
+                        subscriptSizing="dynamic"
+                        class="inventory__text-filter">
+            <mat-label>
+                Nombre, localizador, referencia, código o etiqueta
+            </mat-label>
+            <input matInput
+                   type="search"
+                   [value]="texto()"
+                   (input)="onTextoInput($event)">
+        </mat-form-field>
+
+        <mat-slide-toggle [checked]="conDescuento()"
+                          (change)="onDescuentoChange($event)">
+            Con descuento
+        </mat-slide-toggle>
+    </div>
+
+    <div class="inventory__actions">
+        <mat-form-field appearance="outline"
+                        subscriptSizing="dynamic"
+                        class="inventory__columns">
+            <mat-label>
+                Columnas
+            </mat-label>
+            <mat-select multiple
+                        [value]="selectedColumns()"
+                        (selectionChange)="onColumnsChange($event)">
+                @for (column of columnOptions; track column.id) {
+                <mat-option [value]="column.id">
+                    {{ column.label }}
+                </mat-option>
+                }
+            </mat-select>
+        </mat-form-field>
+
+        <div class="inventory__actions-spacer">
+        </div>
+
+        <button mat-stroked-button
+                type="button"
+                disabled>
+            Guardar todos
+        </button>
+
+        <button mat-stroked-button
+                type="button"
+                disabled>
+            Exportar CSV
+        </button>
+
+        <button mat-stroked-button
+                type="button"
+                disabled>
+            Imprimir
+        </button>
+    </div>
+
+    @if (error() !== null) {
+    <div class="inventory__error">
+        <span>
+            {{ error() }}
+        </span>
+
+        <button mat-stroked-button
+                type="button"
+                (click)="retry()">
+            Reintentar
+        </button>
+    </div>
+    } @else {
+    <div class="inventory__table-container">
+        <table mat-table
+               [dataSource]="rows()">
+            <ng-container matColumnDef="localizador">
+                <th mat-header-cell
+                    *matHeaderCellDef>
+                    Localizador
+                </th>
+                <td mat-cell
+                    *matCellDef="let row"
+                    class="inventory__center">
+                    {{ row.localizador }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="proveedor">
+                <th mat-header-cell
+                    *matHeaderCellDef>
+                    Proveedor
+                </th>
+                <td mat-cell
+                    *matCellDef="let row">
+                    {{ row.proveedorNombre ?? '—' }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="marca">
+                <th mat-header-cell
+                    *matHeaderCellDef>
+                    Marca
+                </th>
+                <td mat-cell
+                    *matCellDef="let row">
+                    {{ row.marcaNombre }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="referencia">
+                <th mat-header-cell
+                    *matHeaderCellDef>
+                    Referencia
+                </th>
+                <td mat-cell
+                    *matCellDef="let row">
+                    {{ row.referencia ?? '—' }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="categoria">
+                <th mat-header-cell
+                    *matHeaderCellDef>
+                    Categoría
+                </th>
+                <td mat-cell
+                    *matCellDef="let row"
+                    class="inventory__categories">
+                    {{ formatCategorias(row.idsCategorias) }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="nombre">
+                <th mat-header-cell
+                    *matHeaderCellDef>
+                    Nombre
+                </th>
+                <td mat-cell
+                    *matCellDef="let row"
+                    class="inventory__name">
+                    {{ row.nombre }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="stock">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    class="inventory__right">
+                    Stock
+                </th>
+                <td mat-cell
+                    *matCellDef="let row"
+                    class="inventory__right">
+                    {{ row.stock }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="precioAlbaran">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    class="inventory__right">
+                    Precio albarán
+                </th>
+                <td mat-cell
+                    *matCellDef="let row"
+                    class="inventory__right">
+                    {{ formatMicros(row.precioAlbaranMicros) }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="puc">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    class="inventory__right">
+                    PUC
+                </th>
+                <td mat-cell
+                    *matCellDef="let row"
+                    class="inventory__right">
+                    {{ formatMicros(row.pucMicros) }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="pvp">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    class="inventory__right">
+                    PVP
+                </th>
+                <td mat-cell
+                    *matCellDef="let row"
+                    class="inventory__right">
+                    {{ formatCents(row.pvpCents) }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="margen">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    class="inventory__right">
+                    Margen
+                </th>
+                <td mat-cell
+                    *matCellDef="let row"
+                    class="inventory__right">
+                    {{ formatMargin(row.margenMicroporcentaje) }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="codigoBarras">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    class="inventory__center">
+                    Código de barras
+                </th>
+                <td mat-cell
+                    *matCellDef="let row"
+                    class="inventory__center">
+                    @if (row.tieneCodigoAdicional) {
+                    <span class="inventory__barcode-ok">
+                        ✓
+                    </span>
+                    } @else {
+                    <span>
+                        —
+                    </span>
+                    }
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="opciones">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    class="inventory__center inventory__options">
+                    Opciones
+                </th>
+                <td mat-cell
+                    *matCellDef="let row"
+                    class="inventory__center inventory__options">
+                    @if (row.sinVentasUltimos12Meses) {
+                    <mat-icon class="inventory__sales-warning"
+                              matTooltip="Sin ventas en los últimos 12 meses">
+                        warning_amber
+                    </mat-icon>
+                    } @else {
+                    <span>
+                        —
+                    </span>
+                    }
+                </td>
+            </ng-container>
+
+            <tr mat-header-row
+                *matHeaderRowDef="displayedColumns()">
+            </tr>
+
+            <tr mat-row
+                *matRowDef="let row; columns: displayedColumns()">
+            </tr>
+        </table>
+
+        @if (loading()) {
+        <div class="inventory__loading">
+            Cargando inventario…
+        </div>
+        } @else if (rows().length === 0) {
+        <div class="inventory__empty">
+            No hay artículos que coincidan con los filtros seleccionados.
+        </div>
+        }
+    </div>
+
+    <mat-paginator [length]="totalRows()"
+                   [pageIndex]="pagina() - 1"
+                   [pageSize]="num()"
+                   [pageSizeOptions]="pageSizeOptions"
+                   [showFirstLastButtons]="true"
+                   (page)="onPageChange($event)" />
+
+    <div class="inventory__totals">
+        <div class="inventory__total">
+            <span>
+                Media margen
+            </span>
+            <strong>
+                {{ formatMargin(mediaMargenMicroporcentaje()) }}
+            </strong>
+        </div>
+
+        <div class="inventory__total">
+            <span>
+                Total PUC
+            </span>
+            <strong>
+                {{ formatMicros(totalPucMicros()) }}
+            </strong>
+        </div>
+
+        <div class="inventory__total">
+            <span>
+                Total PVP
+            </span>
+            <strong>
+                {{ formatCents(totalPvpCents()) }}
+            </strong>
+        </div>
+    </div>
+    }
+</section>

@@ -15,14 +15,7 @@
         <div class="warehouse__content">
             @switch (activeSection()) {
             @case ('inventory') {
-            <section class="warehouse__state">
-                <h2>
-                    Inventario
-                </h2>
-                <p>
-                    La gestión de inventario se incorporará en el siguiente bloque.
-                </p>
-            </section>
+            <otpv-inventory />
             }
             @case ('expirations') {
             <section class="warehouse__state">
