@@ -1,3 +1,7 @@
+import type {
+  InventarioConsulta,
+  InventarioResultado,
+} from '@desktop-contracts/almacen/inventario.interface';
 import type ApplicationStateResult from '@desktop-contracts/application/application-state-result.interface';
 import type ArticuloAccesoDirectoCommand from '@desktop-contracts/articulos/articulo-acceso-directo-command.interface';
 import type ArticuloAccesoDirectoInterface from '@desktop-contracts/articulos/articulo-acceso-directo.interface';
@@ -94,6 +98,14 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
   system: Object.freeze({
     getAppInfo: (): Promise<AppInfo> =>
       ipcRenderer.invoke(IPC_CHANNELS.systemGetAppInfo) as Promise<AppInfo>,
+  }),
+
+  almacen: Object.freeze({
+    searchInventario: (consulta: InventarioConsulta): Promise<InventarioResultado> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.almacenSearchInventario,
+        consulta,
+      ) as Promise<InventarioResultado>,
   }),
 
   legacyImport: {

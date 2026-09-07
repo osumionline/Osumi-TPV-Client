@@ -14,7 +14,7 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false",
     "test:watch": "ng test",
-    "test:electron": "node scripts/test-electron.mjs",
+    "test:electron": "set npm_config_allow_scripts=&& node scripts/test-electron.mjs",
     "test:electron:vitest": "vitest run --config electron/vitest.config.ts",
     "lint": "ng lint",
     "rebuild:native": "electron-rebuild -f -w better-sqlite3",
@@ -70,6 +70,8 @@
     "wait-on": "^9.1.0"
   },
   "allowScripts": {
-    "better-sqlite3@12.11.1": true
+    "better-sqlite3": true,
+    "electron-rebuild": true,
+    "@electron/rebuild": true
   }
 }

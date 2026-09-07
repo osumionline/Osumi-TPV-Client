@@ -13,10 +13,12 @@ import type ProveedoresApi from '@desktop-contracts/proveedores/proveedores-api.
 import type ReservasApi from '@desktop-contracts/reservas/reservas-api.interface';
 import type SystemApi from '@desktop-contracts/system/system-api.interface';
 import type VentasApi from '@desktop-contracts/ventas/ventas-api.interface';
+import type AlmacenApi from '@desktop-contracts/almacen/almacen-api.interface';
 
 export default interface OsumiDesktopApi {
   readonly isElectron: true;
   readonly application: ApplicationApi;
+  readonly almacen: AlmacenApi;
   readonly system: SystemApi;
   readonly legacyImport: LegacyImportApi;
   readonly configuration: ConfigurationApi;

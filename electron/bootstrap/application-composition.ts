@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 
+import AlmacenService from '@backend/application/almacen/almacen.service';
 import ApplicationStateService from '@backend/application/application/application-state.service';
 import ArticulosService from '@backend/application/articulos/articulos.service';
 import CajaService from '@backend/application/caja/caja.service';
@@ -32,6 +33,7 @@ import VentasPostventaService from '@backend/application/ventas/ventas-postventa
 import VentasTicketBaiService from '@backend/application/ventas/ventas-ticket-bai.service';
 import VentasTicketEmailService from '@backend/application/ventas/ventas-ticket-email.service';
 import VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
+import type AlmacenRepository from '@backend/contracts/almacen/almacen.repository.interface';
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';
@@ -75,6 +77,7 @@ import NewInstallationDataService from '@infrastructure/database/initial-data/ne
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
 import completeDatabaseSchemaTables from '@infrastructure/database/schema/complete-database-schema.tables';
 import DatabaseSchemaService from '@infrastructure/database/schema/database-schema.service';
+import TypeOrmAlmacenRepository from '@infrastructure/database/typeorm/typeorm-almacen.repository';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import TypeOrmArticulosRepository from '@infrastructure/database/typeorm/typeorm-articulos.repository';
 import TypeOrmCajaRepository from '@infrastructure/database/typeorm/typeorm-caja.repository';
@@ -123,6 +126,7 @@ import YauzlLegacyImportPackageConfigurationReader from '@infrastructure/legacy-
 import YauzlLegacyImportPackageInspector from '@infrastructure/legacy-import/yauzl-legacy-import-package.inspector';
 import NodeScryptPasswordHasher from '@infrastructure/security/node-scrypt-password-hasher';
 import TicketBaiWsTicketBaiClient from '@infrastructure/ticket-bai/ticket-bai-ws.client';
+import registerAlmacenIpc from '@ipc/register-almacen-ipc';
 import registerApplicationIpc from '@ipc/register-application-ipc';
 import registerArticulosIpc from '@ipc/register-articulos-ipc';
 import registerCajaIpc from '@ipc/register-caja-ipc';
@@ -246,6 +250,12 @@ export default function createApplicationComposition(
     imageStagingStorage,
     imageFileStorage,
   );
+
+  /*
+   * Almacén.
+   */
+  const almacenRepository: AlmacenRepository = new TypeOrmAlmacenRepository(operationalDatabase);
+  const almacenService: AlmacenService = new AlmacenService(almacenRepository);
 
   /*
    * Artículos.
@@ -513,6 +523,7 @@ export default function createApplicationComposition(
    * Canales IPC.
    */
   registerApplicationIpc(applicationStateService);
+  registerAlmacenIpc(getMainWindow, almacenService);
   registerArticulosIpc(getMainWindow, articulosService);
   registerFilesIpc(getMainWindow, imageStagingService);
   registerMarcasIpc(getMainWindow, marcasService);
