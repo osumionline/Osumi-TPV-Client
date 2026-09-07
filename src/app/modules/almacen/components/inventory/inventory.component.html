@@ -7,6 +7,7 @@
                 Proveedor
             </mat-label>
             <mat-select [value]="idProveedor()"
+                        [panelWidth]="null"
                         (selectionChange)="onProveedorChange($event)">
                 <mat-option [value]="null">
                     Todos
@@ -26,6 +27,7 @@
                 Marca
             </mat-label>
             <mat-select [value]="idMarca()"
+                        [panelWidth]="null"
                         (selectionChange)="onMarcaChange($event)">
                 <mat-option [value]="null">
                     Todas
@@ -45,6 +47,7 @@
                 Categoría
             </mat-label>
             <mat-select [value]="idCategoria()"
+                        [panelWidth]="null"
                         (selectionChange)="onCategoriaChange($event)">
                 <mat-option [value]="null">
                     Todas
@@ -85,6 +88,7 @@
             </mat-label>
             <mat-select multiple
                         [value]="selectedColumns()"
+                        [panelWidth]="null"
                         (selectionChange)="onColumnsChange($event)">
                 @for (column of columnOptions; track column.id) {
                 <mat-option [value]="column.id">
@@ -134,7 +138,8 @@
     } @else {
     <div class="inventory__table-container">
         <table mat-table
-               [dataSource]="displayRows()">
+               [dataSource]="displayRows()"
+               [trackBy]="trackByArticulo">
             <ng-container matColumnDef="localizador">
                 <th mat-header-cell
                     *matHeaderCellDef>
@@ -232,8 +237,12 @@
                            class="inventory__cell-input inventory__cell-input--stock"
                            [class.inventory__editor--dirty]="row.dirtyFields.includes('stock')"
                            [value]="row.draft.stock"
+                           [attr.data-inventory-row-id]="row.id"
+                           data-inventory-field="stock"
                            (focus)="selectInputContent($event)"
-                           (input)="onStockInput($event, row.id)">
+                           (blur)="onStockBlur($event, row.id)"
+                           (keydown.enter)="onStockEnter($event, row.id)">
+
 
                 </td>
             </ng-container>
@@ -255,10 +264,14 @@
                            [class.inventory__editor--dirty]="row.dirtyFields.includes('precioAlbaran')"
                            [class.inventory__editor--invalid]="hasDecimalError(row.id, 'precioAlbaran')"
                            [attr.title]="getDecimalError(row.id, 'precioAlbaran')"
+                           [attr.data-inventory-row-id]="row.id"
+                           data-inventory-field="precioAlbaran"
                            [value]="getPriceInputValue(row, 'precioAlbaran')"
                            (focus)="onPriceFocus($event, row.id, 'precioAlbaran')"
                            (input)="onPriceInput($event, row, 'precioAlbaran')"
-                           (blur)="onPriceBlur($event, row, 'precioAlbaran')">
+                           (blur)="onPriceBlur($event, row, 'precioAlbaran')"
+                           (keydown.enter)="onPriceEnter($event, row, 'precioAlbaran')">
+
                 </td>
             </ng-container>
 
@@ -279,10 +292,14 @@
                            [class.inventory__editor--dirty]="row.dirtyFields.includes('puc')"
                            [class.inventory__editor--invalid]="hasDecimalError(row.id, 'puc')"
                            [attr.title]="getDecimalError(row.id, 'puc')"
+                           [attr.data-inventory-row-id]="row.id"
+                           data-inventory-field="puc"
                            [value]="getPriceInputValue(row, 'puc')"
                            (focus)="onPriceFocus($event, row.id, 'puc')"
                            (input)="onPriceInput($event, row, 'puc')"
-                           (blur)="onPriceBlur($event, row, 'puc')">
+                           (blur)="onPriceBlur($event, row, 'puc')"
+                           (keydown.enter)="onPriceEnter($event, row, 'puc')">
+
                 </td>
             </ng-container>
 
@@ -303,10 +320,14 @@
                            [class.inventory__editor--dirty]="row.dirtyFields.includes('pvp')"
                            [class.inventory__editor--invalid]="hasDecimalError(row.id, 'pvp')"
                            [attr.title]="getDecimalError(row.id, 'pvp')"
+                           [attr.data-inventory-row-id]="row.id"
+                           data-inventory-field="pvp"
                            [value]="getPriceInputValue(row, 'pvp')"
                            (focus)="onPriceFocus($event, row.id, 'pvp')"
                            (input)="onPriceInput($event, row, 'pvp')"
-                           (blur)="onPriceBlur($event, row, 'pvp')">
+                           (blur)="onPriceBlur($event, row, 'pvp')"
+                           (keydown.enter)="onPriceEnter($event, row, 'pvp')">
+
                 </td>
             </ng-container>
 
@@ -345,8 +366,12 @@
                            class="inventory__cell-input inventory__cell-input--barcode"
                            [class.inventory__editor--dirty]="row.dirtyFields.includes('codigoBarras')"
                            [value]="row.draft.codigoAdicional"
+                           [attr.data-inventory-row-id]="row.id"
+                           data-inventory-field="codigoBarras"
                            (focus)="selectInputContent($event)"
-                           (input)="onBarcodeInput($event, row.id)">
+                           (blur)="onBarcodeBlur($event, row.id)"
+                           (keydown.enter)="onBarcodeEnter($event, row.id)">
+
                     }
                 </td>
             </ng-container>
@@ -380,10 +405,15 @@
                 </td>
             </ng-container>
 
+            <tr mat-header-row
+                *matHeaderRowDef="displayedColumns()">
+            </tr>
+
             <tr mat-row
                 *matRowDef="let row; columns: displayedColumns()"
                 [class.inventory__row--dirty]="row.dirty">
             </tr>
+
         </table>
 
         @if (loading()) {

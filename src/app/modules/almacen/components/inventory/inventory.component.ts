@@ -1,6 +1,7 @@
 import {
   Component,
   computed,
+  ElementRef,
   inject,
   signal,
   type OnDestroy,
@@ -60,6 +61,8 @@ type InventarioDataColumn =
 
 type InventarioDisplayedColumn = InventarioDataColumn | 'opciones';
 
+type InventarioKeyboardField = 'stock' | InventarioPriceField | 'codigoBarras';
+
 interface InventarioColumnOption {
   readonly id: InventarioDataColumn;
   readonly label: string;
@@ -74,6 +77,7 @@ interface InventarioDisplayRow extends InventarioRowInterface {
 interface InventarioDecimalEditorState {
   readonly idArticulo: number;
   readonly field: InventarioPriceField;
+  readonly initialValue: string;
   readonly value: string;
   readonly error: string | null;
 }
@@ -169,6 +173,8 @@ export default class InventoryComponent implements OnInit, OnDestroy {
   readonly categoriasService: CategoriasService = inject(CategoriasService);
   readonly marcasService: MarcasService = inject(MarcasService);
   readonly proveedoresService: ProveedoresService = inject(ProveedoresService);
+  private readonly elementRef: ElementRef<HTMLElement> =
+    inject<ElementRef<HTMLElement>>(ElementRef);
 
   readonly idProveedor: WritableSignal<number | null> = signal<number | null>(null);
   readonly idMarca: WritableSignal<number | null> = signal<number | null>(null);
@@ -642,29 +648,66 @@ export default class InventoryComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Actualiza el stock del draft mientras se edita.
+   * Confirma el stock cuando el editor pierde el foco.
    */
-  onStockInput(event: Event, idArticulo: number): void {
+  onStockBlur(event: FocusEvent, idArticulo: number): void {
     const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
+
+    this.commitStockInput(inputElement, idArticulo);
+  }
+
+  /**
+   * Confirma el stock y avanza a la fila inferior al pulsar Intro.
+   */
+  onStockEnter(event: Event, idArticulo: number): void {
+    event.preventDefault();
+
+    const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
+
+    if (!this.commitStockInput(inputElement, idArticulo)) {
+      return;
+    }
+
+    this.focusNextEditor(idArticulo, 'stock');
+  }
+
+  /**
+   * Valida y aplica el stock escrito por el usuario.
+   */
+  private commitStockInput(inputElement: HTMLInputElement, idArticulo: number): boolean {
+    const entry: InventarioDraftEntry | undefined = this.drafts().get(idArticulo);
+
+    if (entry === undefined) {
+      return false;
+    }
+
     const rawValue: number = inputElement.valueAsNumber;
 
     if (!Number.isFinite(rawValue)) {
-      return;
+      inputElement.value = String(entry.draft.stock);
+
+      return false;
     }
 
     const stock: number = Math.trunc(rawValue);
 
     if (!Number.isSafeInteger(stock)) {
-      return;
+      inputElement.value = String(entry.draft.stock);
+
+      return false;
     }
 
-    if (stock !== rawValue) {
-      inputElement.value = String(stock);
+    inputElement.value = String(stock);
+
+    if (entry.draft.stock === stock) {
+      return true;
     }
 
     this.updateDraft(idArticulo, {
       stock,
     });
+
+    return true;
   }
 
   /**
@@ -676,6 +719,7 @@ export default class InventoryComponent implements OnInit, OnDestroy {
     this.editingDecimalCell.set({
       idArticulo,
       field,
+      initialValue: inputElement.value,
       value: inputElement.value,
       error: null,
     });
@@ -684,7 +728,7 @@ export default class InventoryComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Recalcula el draft mientras se escribe un precio.
+   * Conserva y valida el texto de un precio mientras el usuario escribe.
    */
   onPriceInput(event: Event, row: InventarioDisplayRow, field: InventarioPriceField): void {
     const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
@@ -694,9 +738,15 @@ export default class InventoryComponent implements OnInit, OnDestroy {
       inputElement.value = rawValue;
     }
 
+    const current: InventarioDecimalEditorState | null = this.editingDecimalCell();
+
     this.editingDecimalCell.set({
       idArticulo: row.id,
       field,
+      initialValue:
+        current !== null && current.idArticulo === row.id && current.field === field
+          ? current.initialValue
+          : rawValue,
       value: rawValue,
       error: null,
     });
@@ -705,42 +755,94 @@ export default class InventoryComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (this.parsePriceValue(field, rawValue) === null) {
+      this.setDecimalError(row.id, field, 'El precio no es válido.');
+    }
+  }
+
+  /**
+   * Confirma el precio cuando el editor pierde el foco.
+   */
+  onPriceBlur(event: FocusEvent, row: InventarioDisplayRow, field: InventarioPriceField): void {
+    const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
+
+    this.commitPriceInput(inputElement, row, field);
+    this.editingDecimalCell.set(null);
+  }
+
+  /**
+   * Confirma el precio y avanza a la fila inferior al pulsar Intro.
+   */
+  onPriceEnter(event: Event, row: InventarioDisplayRow, field: InventarioPriceField): void {
+    event.preventDefault();
+
+    const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
+
+    if (!this.commitPriceInput(inputElement, row, field)) {
+      return;
+    }
+
+    this.editingDecimalCell.set(null);
+    this.focusNextEditor(row.id, field);
+  }
+
+  /**
+   * Valida un precio y aplica su cascada si el usuario lo ha modificado.
+   */
+  private commitPriceInput(
+    inputElement: HTMLInputElement,
+    row: InventarioDisplayRow,
+    field: InventarioPriceField,
+  ): boolean {
+    const rawValue: string = this.limitDecimalFraction(inputElement.value, 2);
+    const editor: InventarioDecimalEditorState | null = this.editingDecimalCell();
+
+    if (
+      editor !== null &&
+      editor.idArticulo === row.id &&
+      editor.field === field &&
+      this.sameVisiblePriceValue(rawValue, editor.initialValue)
+    ) {
+      return true;
+    }
+
+    if (isTransientScaledDecimalInput(rawValue)) {
+      this.setDecimalError(row.id, field, 'El precio no es válido.');
+
+      return false;
+    }
+
     const value: number | null = this.parsePriceValue(field, rawValue);
 
     if (value === null) {
       this.setDecimalError(row.id, field, 'El precio no es válido.');
 
-      return;
+      return false;
     }
 
     try {
       this.applyPriceChange(row, field, value);
+
+      return true;
     } catch (error: unknown) {
       this.setDecimalError(
         row.id,
         field,
         getErrorMessage(error, 'No se ha podido recalcular el precio.'),
       );
+
+      return false;
     }
   }
 
   /**
-   * Finaliza la edición y normaliza la representación del precio.
+   * Comprueba si dos textos representan el mismo precio visible.
    */
-  onPriceBlur(event: FocusEvent, row: InventarioDisplayRow, field: InventarioPriceField): void {
-    const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
-    const rawValue: string = this.limitDecimalFraction(inputElement.value, 2);
-    const value: number | null = this.parsePriceValue(field, rawValue);
+  private sameVisiblePriceValue(first: string, second: string): boolean {
+    const firstValue: number | null = parseScaledDecimal(first, 2);
+    const secondValue: number | null = parseScaledDecimal(second, 2);
 
-    if (value !== null) {
-      try {
-        this.applyPriceChange(row, field, value);
-      } catch {
-        // Al salir del campo se recuperará la última representación válida.
-      }
-    }
-
-    this.editingDecimalCell.set(null);
+    return firstValue !== null && secondValue !== null && firstValue === secondValue;
   }
 
   /**
@@ -816,6 +918,10 @@ export default class InventoryComponent implements OnInit, OnDestroy {
     field: InventarioPriceField,
     value: number,
   ): void {
+    if (this.isSamePriceValue(row, field, value)) {
+      return;
+    }
+
     let patch: InventarioDraftPatch;
 
     switch (field) {
@@ -838,6 +944,26 @@ export default class InventoryComponent implements OnInit, OnDestroy {
     }
 
     this.updateDraft(row.id, patch);
+  }
+
+  /**
+   * Comprueba si el precio recibido coincide con el valor actual del draft.
+   */
+  private isSamePriceValue(
+    row: InventarioDisplayRow,
+    field: InventarioPriceField,
+    value: number,
+  ): boolean {
+    switch (field) {
+      case 'precioAlbaran':
+        return row.draft.precioAlbaranMicros === value;
+
+      case 'puc':
+        return row.draft.pucMicros === value;
+
+      case 'pvp':
+        return row.draft.pvpCents === value;
+    }
   }
 
   /**
@@ -874,14 +1000,50 @@ export default class InventoryComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Actualiza el nuevo código adicional preparado para la fila.
+   * Confirma el código adicional al perder el foco.
    */
-  onBarcodeInput(event: Event, idArticulo: number): void {
+  onBarcodeBlur(event: FocusEvent, idArticulo: number): void {
     const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
 
+    this.commitBarcodeInput(inputElement, idArticulo);
+  }
+
+  /**
+   * Confirma el código y avanza al siguiente editor disponible.
+   */
+  onBarcodeEnter(event: Event, idArticulo: number): void {
+    event.preventDefault();
+
+    const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
+
+    if (!this.commitBarcodeInput(inputElement, idArticulo)) {
+      return;
+    }
+
+    this.focusNextEditor(idArticulo, 'codigoBarras');
+  }
+
+  /**
+   * Aplica al draft el código adicional escrito.
+   */
+  private commitBarcodeInput(inputElement: HTMLInputElement, idArticulo: number): boolean {
+    const entry: InventarioDraftEntry | undefined = this.drafts().get(idArticulo);
+
+    if (entry === undefined) {
+      return false;
+    }
+
+    const codigoAdicional: string = inputElement.value;
+
+    if (entry.draft.codigoAdicional === codigoAdicional) {
+      return true;
+    }
+
     this.updateDraft(idArticulo, {
-      codigoAdicional: inputElement.value,
+      codigoAdicional,
     });
+
+    return true;
   }
 
   /**
@@ -1084,5 +1246,54 @@ export default class InventoryComponent implements OnInit, OnDestroy {
       consulta.texto.trim(),
       consulta.conDescuento,
     ]);
+  }
+
+  /**
+   * Conserva la identidad DOM de cada fila aunque cambie su draft.
+   */
+  trackByArticulo(_index: number, row: InventarioDisplayRow): number {
+    return row.id;
+  }
+
+  /**
+   * Tras confirmar una celda, enfoca el mismo editor de la siguiente fila.
+   */
+  private focusNextEditor(idArticulo: number, field: InventarioKeyboardField): void {
+    window.requestAnimationFrame((): void => {
+      if (this.destroyed) {
+        return;
+      }
+
+      const rows: readonly InventarioDisplayRow[] = this.displayRows();
+      const currentIndex: number = rows.findIndex(
+        (row: InventarioDisplayRow): boolean => row.id === idArticulo,
+      );
+
+      if (currentIndex < 0) {
+        return;
+      }
+
+      for (let index: number = currentIndex + 1; index < rows.length; index++) {
+        const nextRow: InventarioDisplayRow | undefined = rows[index];
+
+        if (nextRow === undefined) {
+          continue;
+        }
+
+        const input: HTMLInputElement | null =
+          this.elementRef.nativeElement.querySelector<HTMLInputElement>(
+            `input[data-inventory-row-id="${nextRow.id}"][data-inventory-field="${field}"]`,
+          );
+
+        if (input === null) {
+          continue;
+        }
+
+        input.focus();
+        input.select();
+
+        return;
+      }
+    });
   }
 }
