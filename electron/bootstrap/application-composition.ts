@@ -550,10 +550,8 @@ export default function createApplicationComposition(
    * Canales IPC.
    */
   registerApplicationIpc(applicationStateService);
-  registerApplicationIpc(applicationStateService);
   registerAlmacenIpc(getMainWindow, almacenService, inventarioCsvService, inventarioPrintService);
   registerInventarioPrintIpc(inventarioPrintWindow);
-  registerArticulosIpc(getMainWindow, articulosService);
   registerArticulosIpc(getMainWindow, articulosService);
   registerFilesIpc(getMainWindow, imageStagingService);
   registerMarcasIpc(getMainWindow, marcasService);
