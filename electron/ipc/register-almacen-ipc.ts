@@ -1,4 +1,5 @@
 import type AlmacenService from '@backend/application/almacen/almacen.service';
+import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario-save.interface';
 import type {
   InventarioConsulta,
   InventarioResultado,
@@ -21,6 +22,33 @@ export default function registerAlmacenIpc(
       assertTrustedSender(event, getMainWindow);
 
       return almacenService.searchInventario(consulta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.almacenSaveInventarioRow,
+    async (event, command: InventarioSaveCommand): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await almacenService.saveInventarioRow(command);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.almacenSaveInventarioRows,
+    async (event, commands: readonly InventarioSaveCommand[]): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await almacenService.saveInventarioRows(commands);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.almacenDeactivateArticulo,
+    async (event, idArticulo: number): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await almacenService.deactivateArticulo(idArticulo);
     },
   );
 }

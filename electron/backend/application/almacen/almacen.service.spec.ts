@@ -2,6 +2,7 @@ import AlmacenService from '@backend/application/almacen/almacen.service';
 import type AlmacenRepository from '@backend/contracts/almacen/almacen.repository.interface';
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
 import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario-record.interface';
+import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
 import type {
   InventarioConsulta,
   InventarioResultado,
@@ -10,6 +11,9 @@ import { describe, expect, it } from 'vitest';
 
 class FakeAlmacenRepository implements AlmacenRepository {
   lastQuery: InventarioRepositoryQuery | null = null;
+  lastSavedCommands: readonly InventarioSaveRecord[] | null = null;
+  lastDeactivatedArticuloId: number | null = null;
+
   result: InventarioResultadoRecord = {
     rows: [
       {
@@ -47,6 +51,24 @@ class FakeAlmacenRepository implements AlmacenRepository {
     this.lastQuery = query;
 
     return Promise.resolve(this.result);
+  }
+
+  /**
+   * Conserva las filas recibidas para los tests de persistencia.
+   */
+  saveInventarioRows(commands: readonly InventarioSaveRecord[]): Promise<void> {
+    this.lastSavedCommands = commands;
+
+    return Promise.resolve();
+  }
+
+  /**
+   * Conserva el artículo recibido para los tests de baja.
+   */
+  deactivateArticulo(idArticulo: number): Promise<void> {
+    this.lastDeactivatedArticuloId = idArticulo;
+
+    return Promise.resolve();
   }
 }
 

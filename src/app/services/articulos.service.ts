@@ -10,7 +10,11 @@ import type {
   ArticuloHistoricoResultado,
 } from '@desktop-contracts/articulos/articulo-historico.interface';
 import type { ArticuloInterface } from '@desktop-contracts/articulos/articulo.interface';
-import type { ArticuloDraft, ArticuloDraftPatch } from '@model/articulos/articulo-draft.interface';
+import type {
+  ArticuloCodigoBarrasDraft,
+  ArticuloDraft,
+  ArticuloDraftPatch,
+} from '@model/articulos/articulo-draft.interface';
 import {
   areArticuloDraftsEqual,
   cloneArticuloDraft,
@@ -448,6 +452,27 @@ export default class ArticulosService {
   }
 
   /**
+   * Actualiza las fichas abiertas después de una
+   * persistencia externa realizada desde Inventario.
+   */
+  async sincronizarInventarioPersistido(idsArticulos: readonly number[]): Promise<void> {
+    const ids: readonly number[] = [...new Set<number>(idsArticulos)].filter(
+      (idArticulo: number): boolean => this.findByArticuloId(idArticulo) !== null,
+    );
+
+    for (const idArticulo of ids) {
+      const articulo: ArticuloInterface | null =
+        await window.osumiDesktop.articulos.getById(idArticulo);
+
+      if (articulo === null) {
+        continue;
+      }
+
+      this.reconcileInventarioPersistence(articulo);
+    }
+  }
+
+  /**
    * Elimina los temporales de una ficha nueva que
    * va a ser sustituida por un artículo existente.
    */
@@ -562,5 +587,126 @@ export default class ArticulosService {
           tab.idTemporal === updatedTab.idTemporal ? updatedTab : tab,
         ),
     );
+  }
+
+  /**
+   * Incorpora valores persistidos externamente conservando
+   * posibles cambios locales de la ficha abierta.
+   */
+  private reconcileInventarioPersistence(articulo: ArticuloInterface): void {
+    const tab: ArticuloWorkspaceTab | null = this.findByArticuloId(articulo.id);
+
+    if (tab === null) {
+      return;
+    }
+
+    const persisted: ArticuloDraft = createArticuloDraftFromInterface(articulo);
+
+    const draft: ArticuloDraft = cloneArticuloDraft({
+      ...tab.draft,
+      idsCategorias: this.mergeExternalValue(
+        tab.draft.idsCategorias,
+        tab.baseSnapshot.idsCategorias,
+        persisted.idsCategorias,
+      ),
+      precioAlbaranMicros: this.mergeExternalValue(
+        tab.draft.precioAlbaranMicros,
+        tab.baseSnapshot.precioAlbaranMicros,
+        persisted.precioAlbaranMicros,
+      ),
+      pucMicros: this.mergeExternalValue(
+        tab.draft.pucMicros,
+        tab.baseSnapshot.pucMicros,
+        persisted.pucMicros,
+      ),
+      pvpCents: this.mergeExternalValue(
+        tab.draft.pvpCents,
+        tab.baseSnapshot.pvpCents,
+        persisted.pvpCents,
+      ),
+      margenMicroporcentaje: this.mergeExternalValue(
+        tab.draft.margenMicroporcentaje,
+        tab.baseSnapshot.margenMicroporcentaje,
+        persisted.margenMicroporcentaje,
+      ),
+      stock: this.mergeExternalValue(tab.draft.stock, tab.baseSnapshot.stock, persisted.stock),
+      codigosBarrasAdicionales: this.mergeExternalBarcodes(
+        tab.draft.codigosBarrasAdicionales,
+        tab.baseSnapshot.codigosBarrasAdicionales,
+        persisted.codigosBarrasAdicionales,
+      ),
+    });
+
+    const baseSnapshot: ArticuloDraft = cloneArticuloDraft({
+      ...tab.baseSnapshot,
+      idsCategorias: persisted.idsCategorias,
+      precioAlbaranMicros: persisted.precioAlbaranMicros,
+      pucMicros: persisted.pucMicros,
+      pvpCents: persisted.pvpCents,
+      margenMicroporcentaje: persisted.margenMicroporcentaje,
+      stock: persisted.stock,
+      codigosBarrasAdicionales: persisted.codigosBarrasAdicionales,
+    });
+
+    this.replaceTab({
+      ...tab,
+      draft,
+      baseSnapshot,
+      dirty: !areArticuloDraftsEqual(draft, baseSnapshot),
+    });
+  }
+
+  /**
+   * Sustituye un valor por la versión externa solo
+   * cuando no contenía una edición local pendiente.
+   */
+  private mergeExternalValue<T>(draftValue: T, snapshotValue: T, persistedValue: T): T {
+    return JSON.stringify(draftValue) === JSON.stringify(snapshotValue)
+      ? persistedValue
+      : draftValue;
+  }
+
+  /**
+   * Incorpora códigos añadidos externamente sin eliminar
+   * modificaciones locales pendientes del workspace.
+   */
+  private mergeExternalBarcodes(
+    draft: readonly ArticuloCodigoBarrasDraft[],
+    snapshot: readonly ArticuloCodigoBarrasDraft[],
+    persisted: readonly ArticuloCodigoBarrasDraft[],
+  ): readonly ArticuloCodigoBarrasDraft[] {
+    if (JSON.stringify(draft) === JSON.stringify(snapshot)) {
+      return persisted;
+    }
+
+    const snapshotIds: Set<number> = new Set<number>(
+      snapshot.flatMap((codigo: ArticuloCodigoBarrasDraft): readonly number[] =>
+        codigo.id === null ? [] : [codigo.id],
+      ),
+    );
+
+    const result: ArticuloCodigoBarrasDraft[] = draft.map(
+      (codigo: ArticuloCodigoBarrasDraft): ArticuloCodigoBarrasDraft => ({
+        ...codigo,
+      }),
+    );
+
+    const currentIds: Set<number> = new Set<number>(
+      result.flatMap((codigo: ArticuloCodigoBarrasDraft): readonly number[] =>
+        codigo.id === null ? [] : [codigo.id],
+      ),
+    );
+
+    for (const codigo of persisted) {
+      if (codigo.id === null || snapshotIds.has(codigo.id) || currentIds.has(codigo.id)) {
+        continue;
+      }
+
+      result.push({
+        ...codigo,
+      });
+    }
+
+    return result;
   }
 }

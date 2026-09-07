@@ -102,9 +102,11 @@
                 type="button"
                 matTooltip="Guardar todos"
                 aria-label="Guardar todos"
-                disabled>
+                [disabled]="!hasDirtyRows() || processing()"
+                (click)="saveAll()">
             <mat-icon>save</mat-icon>
         </button>
+
 
         <button mat-icon-button
                 type="button"
@@ -390,9 +392,28 @@
                                 type="button"
                                 matTooltip="Deshacer cambios"
                                 aria-label="Deshacer cambios"
-                                [disabled]="!row.dirty"
+                                [disabled]="!row.dirty || processing()"
                                 (click)="resetRow(row.id)">
                             <mat-icon>restart_alt</mat-icon>
+                        </button>
+
+                        <button mat-icon-button
+                                type="button"
+                                matTooltip="Guardar fila"
+                                aria-label="Guardar fila"
+                                [disabled]="!row.dirty || processing()"
+                                (click)="saveRow(row.id)">
+                            <mat-icon>save</mat-icon>
+                        </button>
+
+                        <button mat-icon-button
+                                type="button"
+                                class="inventory__delete-action"
+                                matTooltip="Dar de baja"
+                                aria-label="Dar de baja"
+                                [disabled]="processing()"
+                                (click)="deactivateRow(row)">
+                            <mat-icon>delete</mat-icon>
                         </button>
 
                         @if (row.sinVentasUltimos12Meses) {

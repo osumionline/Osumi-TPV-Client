@@ -19,6 +19,7 @@ import { MatSelect, type MatSelectChange } from '@angular/material/select';
 import { MatSlideToggle, type MatSlideToggleChange } from '@angular/material/slide-toggle';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltip } from '@angular/material/tooltip';
+import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario-save.interface';
 import type {
   InventarioConsulta,
   InventarioResultado,
@@ -38,8 +39,11 @@ import {
   parseScaledDecimal,
   rescaleScaledInteger,
 } from '@model/articulos/articulo-scaled-decimal.utils';
+import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.interface';
 import type Categoria from '@model/categorias/categoria.model';
+import { DialogService } from '@osumi/angular-tools';
 import AlmacenService from '@services/almacen.service';
+import ArticulosService from '@services/articulos.service';
 import CategoriasService from '@services/categorias.service';
 import MarcasService from '@services/marcas.service';
 import ProveedoresService from '@services/proveedores.service';
@@ -175,6 +179,8 @@ export default class InventoryComponent implements OnInit, OnDestroy {
   readonly proveedoresService: ProveedoresService = inject(ProveedoresService);
   private readonly elementRef: ElementRef<HTMLElement> =
     inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly dialog: DialogService = inject(DialogService);
+  readonly articulosService: ArticulosService = inject(ArticulosService);
 
   readonly idProveedor: WritableSignal<number | null> = signal<number | null>(null);
   readonly idMarca: WritableSignal<number | null> = signal<number | null>(null);
@@ -210,6 +216,14 @@ export default class InventoryComponent implements OnInit, OnDestroy {
   readonly selectedColumns: WritableSignal<readonly InventarioDataColumn[]> = signal<
     readonly InventarioDataColumn[]
   >(INVENTARIO_DEFAULT_COLUMNS);
+
+  readonly processing: WritableSignal<boolean> = signal<boolean>(false);
+
+  readonly hasDirtyRows: Signal<boolean> = computed((): boolean =>
+    [...this.drafts().values()].some(
+      (entry: InventarioDraftEntry): boolean => this.getDirtyFields(entry).length > 0,
+    ),
+  );
 
   readonly displayedColumns: Signal<readonly InventarioDisplayedColumn[]> = computed(
     (): readonly InventarioDisplayedColumn[] => [...this.selectedColumns(), 'opciones'],
@@ -467,6 +481,212 @@ export default class InventoryComponent implements OnInit, OnDestroy {
    */
   formatMargin(value: number): string {
     return `${PERCENTAGE_FORMATTER.format(value / 1_000_000)} %`;
+  }
+
+  /**
+   * Persiste únicamente la fila indicada.
+   */
+  async saveRow(idArticulo: number): Promise<void> {
+    if (this.processing()) {
+      return;
+    }
+
+    const entry: InventarioDraftEntry | undefined = this.drafts().get(idArticulo);
+
+    if (entry === undefined || this.getDirtyFields(entry).length === 0) {
+      return;
+    }
+
+    this.processing.set(true);
+
+    let persisted: boolean = false;
+
+    try {
+      await this.almacenService.saveInventarioRow(this.createSaveCommand(idArticulo, entry));
+
+      persisted = true;
+
+      this.removeDrafts([idArticulo]);
+
+      await this.articulosService.sincronizarInventarioPersistido([idArticulo]);
+
+      await this.loadInventario();
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: persisted ? 'Atención' : 'Error',
+          content: getErrorMessage(
+            error,
+            persisted
+              ? 'El artículo se ha guardado, pero no se ha podido refrescar completamente la aplicación.'
+              : 'No se ha podido guardar el artículo.',
+          ),
+        })
+        .subscribe();
+    } finally {
+      this.processing.set(false);
+    }
+  }
+
+  /**
+   * Persiste atómicamente todas las filas dirty conocidas.
+   */
+  async saveAll(): Promise<void> {
+    if (this.processing()) {
+      return;
+    }
+
+    const dirtyEntries: readonly [number, InventarioDraftEntry][] = [
+      ...this.drafts().entries(),
+    ].filter(
+      (item: [number, InventarioDraftEntry]): boolean => this.getDirtyFields(item[1]).length > 0,
+    );
+
+    if (dirtyEntries.length === 0) {
+      return;
+    }
+
+    const commands: readonly InventarioSaveCommand[] = dirtyEntries.map(
+      ([idArticulo, entry]: [number, InventarioDraftEntry]): InventarioSaveCommand =>
+        this.createSaveCommand(idArticulo, entry),
+    );
+
+    const idsArticulos: readonly number[] = commands.map(
+      (command: InventarioSaveCommand): number => command.idArticulo,
+    );
+
+    this.processing.set(true);
+
+    let persisted: boolean = false;
+
+    try {
+      await this.almacenService.saveInventarioRows(commands);
+
+      persisted = true;
+
+      this.removeDrafts(idsArticulos);
+
+      await this.articulosService.sincronizarInventarioPersistido(idsArticulos);
+
+      await this.loadInventario();
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: persisted ? 'Atención' : 'Error',
+          content: getErrorMessage(
+            error,
+            persisted
+              ? 'Los cambios se han guardado, pero no se ha podido refrescar completamente la aplicación.'
+              : 'No se ha podido guardar el inventario. No se ha aplicado ningún cambio.',
+          ),
+        })
+        .subscribe();
+    } finally {
+      this.processing.set(false);
+    }
+  }
+
+  /**
+   * Solicita confirmación antes de dar de baja una fila.
+   */
+  deactivateRow(row: InventarioDisplayRow): void {
+    if (this.processing()) {
+      return;
+    }
+
+    if (row.dirty) {
+      this.dialog
+        .alert({
+          title: 'Atención',
+          content: 'Guarda o deshaz los cambios de esta fila antes de dar de baja el artículo.',
+        })
+        .subscribe();
+
+      return;
+    }
+
+    const openTab: ArticuloWorkspaceTab | null = this.articulosService.findByArticuloId(row.id);
+
+    if (openTab?.dirty) {
+      this.dialog
+        .alert({
+          title: 'Atención',
+          content:
+            'El artículo tiene cambios pendientes en su ficha de Artículos. Guarda o cancela esos cambios antes de darlo de baja.',
+        })
+        .subscribe();
+
+      return;
+    }
+
+    this.dialog
+      .confirm({
+        title: 'Confirmar baja',
+        content:
+          `¿Estás seguro de querer dar de baja "${row.nombre}"? ` +
+          'El artículo dejará de estar disponible en el TPV, pero su histórico se conservará.',
+      })
+      .subscribe((result: boolean): void => {
+        if (!result) {
+          return;
+        }
+
+        void this.confirmDeactivateRow(row.id);
+      });
+  }
+
+  /**
+   * Ejecuta una baja previamente confirmada.
+   */
+  private async confirmDeactivateRow(idArticulo: number): Promise<void> {
+    if (this.processing()) {
+      return;
+    }
+
+    this.processing.set(true);
+
+    try {
+      await this.almacenService.deactivateArticulo(idArticulo);
+
+      const openTab: ArticuloWorkspaceTab | null =
+        this.articulosService.findByArticuloId(idArticulo);
+
+      if (openTab !== null) {
+        this.articulosService.cerrarTab(openTab.idTemporal);
+      }
+
+      this.removeDrafts([idArticulo]);
+
+      if (this.rows().length === 1 && this.pagina() > 1) {
+        this.pagina.update((pagina: number): number => pagina - 1);
+      }
+
+      await this.loadInventario();
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido dar de baja el artículo.'),
+        })
+        .subscribe();
+    } finally {
+      this.processing.set(false);
+    }
+  }
+
+  /**
+   * Elimina del espacio local los drafts ya persistidos.
+   */
+  private removeDrafts(idsArticulos: readonly number[]): void {
+    const drafts: Map<number, InventarioDraftEntry> = new Map<number, InventarioDraftEntry>(
+      this.drafts(),
+    );
+
+    for (const idArticulo of idsArticulos) {
+      drafts.delete(idArticulo);
+    }
+
+    this.drafts.set(drafts);
   }
 
   /**
@@ -1295,5 +1515,26 @@ export default class InventoryComponent implements OnInit, OnDestroy {
         return;
       }
     });
+  }
+
+  /**
+   * Convierte un draft local en el contrato reducido de persistencia.
+   */
+  private createSaveCommand(
+    idArticulo: number,
+    entry: InventarioDraftEntry,
+  ): InventarioSaveCommand {
+    const codigoAdicional: string = entry.draft.codigoAdicional.trim();
+
+    return {
+      idArticulo,
+      idsCategorias: [...entry.draft.idsCategorias],
+      stock: entry.draft.stock,
+      precioAlbaranMicros: entry.draft.precioAlbaranMicros,
+      pucMicros: entry.draft.pucMicros,
+      pvpCents: entry.draft.pvpCents,
+      margenMicroporcentaje: entry.draft.margenMicroporcentaje,
+      codigoAdicional: codigoAdicional.length === 0 ? null : codigoAdicional,
+    };
   }
 }

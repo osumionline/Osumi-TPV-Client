@@ -4,8 +4,13 @@ import type {
   InventarioResultadoRecord,
   InventarioRowRecord,
 } from '@backend/domain/almacen/inventario-record.interface';
+import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
+import HISTORICO_ARTICULO_TIPO from '@backend/domain/articulos/historico-articulo.constants';
+import { MONEY_SCALE, UNIT_PRICE_SCALE } from '@backend/domain/database/database-schema.constants';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
-import type { DataSource } from 'typeorm';
+import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
+import { randomUUID } from 'node:crypto';
+import type { DataSource, QueryRunner } from 'typeorm';
 
 interface InventarioAggregateDatabaseRow {
   readonly total_rows: number;
@@ -43,6 +48,21 @@ interface InventarioCategoriaDatabaseRow {
 interface InventarioSqlFilter {
   readonly clause: string;
   readonly parameters: (number | string)[];
+}
+
+interface InventarioUpdateDatabaseRow {
+  readonly id: number;
+  readonly localizador: number;
+  readonly acceso_directo: number | null;
+  readonly stock: number;
+  readonly palb_micros: number;
+  readonly puc_micros: number;
+  readonly pvp_cents: number;
+  readonly margen_microporcentaje: number;
+}
+
+interface DatabaseIdRow {
+  readonly id: number;
 }
 
 /**
@@ -168,6 +188,62 @@ export default class TypeOrmAlmacenRepository implements AlmacenRepository {
       totalPucMicros: aggregate.total_puc_micros,
       totalPvpCents: aggregate.total_pvp_cents,
     };
+  }
+
+  /**
+   * Persiste atómicamente todas las filas de Inventario indicadas.
+   */
+  async saveInventarioRows(commands: readonly InventarioSaveRecord[]): Promise<void> {
+    if (commands.length === 0) {
+      return;
+    }
+
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    await runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
+      for (const command of commands) {
+        await this.saveInventarioRow(queryRunner, command);
+      }
+    });
+  }
+
+  /**
+   * Da de baja lógicamente un artículo y todos sus códigos activos.
+   */
+  async deactivateArticulo(idArticulo: number): Promise<void> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    await runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
+      await this.requireActiveArticle(queryRunner, idArticulo);
+
+      const timestamp: string = new Date().toISOString();
+
+      await queryRunner.query(
+        `
+          UPDATE codigo_barras
+          SET
+            deleted_at = ?,
+            updated_at = ?
+          WHERE
+            id_articulo = ?
+            AND deleted_at IS NULL
+        `,
+        [timestamp, timestamp, idArticulo],
+      );
+
+      await queryRunner.query(
+        `
+          UPDATE articulo
+          SET
+            deleted_at = ?,
+            updated_at = ?
+          WHERE
+            id = ?
+            AND deleted_at IS NULL
+        `,
+        [timestamp, timestamp, idArticulo],
+      );
+    });
   }
 
   /**
@@ -323,5 +399,399 @@ export default class TypeOrmAlmacenRepository implements AlmacenRepository {
       tieneCodigoAdicional: row.tiene_codigo_adicional === 1,
       sinVentasUltimos12Meses: row.sin_ventas_ultimos_12_meses === 1,
     };
+  }
+
+  /**
+   * Persiste una fila de Inventario usando el QueryRunner
+   * perteneciente a la transacción global.
+   */
+  private async saveInventarioRow(
+    queryRunner: QueryRunner,
+    command: InventarioSaveRecord,
+  ): Promise<void> {
+    const current: InventarioUpdateDatabaseRow = await this.requireActiveArticle(
+      queryRunner,
+      command.idArticulo,
+    );
+
+    await this.requireActiveCategories(queryRunner, command.idsCategorias);
+
+    if (command.codigoAdicional !== null) {
+      await this.requireAvailableAdditionalBarcode(queryRunner, current, command.codigoAdicional);
+    }
+
+    const timestamp: string = new Date().toISOString();
+
+    const categoriesChanged: boolean = await this.syncCategories(
+      queryRunner,
+      command.idArticulo,
+      command.idsCategorias,
+      timestamp,
+    );
+
+    const scalarChanged: boolean = await this.updateInventarioValues(
+      queryRunner,
+      current,
+      command,
+      timestamp,
+    );
+
+    let barcodeChanged: boolean = false;
+
+    if (command.codigoAdicional !== null) {
+      await this.insertAdditionalBarcode(
+        queryRunner,
+        command.idArticulo,
+        command.codigoAdicional,
+        timestamp,
+      );
+
+      barcodeChanged = true;
+    }
+
+    if (current.stock !== command.stock) {
+      await this.insertManualStockHistory(queryRunner, command, current.stock, timestamp);
+    }
+
+    if (!scalarChanged && (categoriesChanged || barcodeChanged)) {
+      await queryRunner.query(
+        `
+        UPDATE articulo
+        SET updated_at = ?
+        WHERE
+          id = ?
+          AND deleted_at IS NULL
+      `,
+        [timestamp, command.idArticulo],
+      );
+    }
+  }
+
+  /**
+   * Obtiene los campos necesarios de un artículo activo
+   * antes de modificar Inventario.
+   */
+  private async requireActiveArticle(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+  ): Promise<InventarioUpdateDatabaseRow> {
+    const rows: readonly InventarioUpdateDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT
+          id,
+          localizador,
+          acceso_directo,
+          stock,
+          palb_micros,
+          puc_micros,
+          pvp_cents,
+          margen_microporcentaje
+        FROM articulo
+        WHERE
+          id = ?
+          AND deleted_at IS NULL
+        LIMIT 1
+      `,
+      [idArticulo],
+    )) as readonly InventarioUpdateDatabaseRow[];
+
+    const row: InventarioUpdateDatabaseRow | undefined = rows[0];
+
+    if (row === undefined) {
+      throw new Error('El artículo que se intenta actualizar no existe.');
+    }
+
+    return row;
+  }
+
+  /**
+   * Garantiza que todas las categorías seleccionadas continúan activas.
+   */
+  private async requireActiveCategories(
+    queryRunner: QueryRunner,
+    idsCategorias: readonly number[],
+  ): Promise<void> {
+    if (idsCategorias.length === 0) {
+      return;
+    }
+
+    const placeholders: string = idsCategorias.map((): string => '?').join(', ');
+
+    const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+        SELECT id
+        FROM categoria
+        WHERE
+          id IN (${placeholders})
+          AND deleted_at IS NULL
+      `,
+      [...idsCategorias],
+    )) as readonly DatabaseIdRow[];
+
+    if (rows.length !== idsCategorias.length) {
+      throw new Error('Una de las categorías seleccionadas ya no existe.');
+    }
+  }
+
+  /**
+   * Sincroniza las categorías explícitas del artículo.
+   */
+  private async syncCategories(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    idsCategorias: readonly number[],
+    timestamp: string,
+  ): Promise<boolean> {
+    const rows: readonly InventarioCategoriaDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT
+          id_articulo,
+          id_categoria
+        FROM articulo_categoria
+        WHERE id_articulo = ?
+      `,
+      [idArticulo],
+    )) as readonly InventarioCategoriaDatabaseRow[];
+
+    const currentIds: Set<number> = new Set<number>(
+      rows.map((row: InventarioCategoriaDatabaseRow): number => row.id_categoria),
+    );
+    const nextIds: Set<number> = new Set<number>(idsCategorias);
+
+    let changed: boolean = false;
+
+    for (const idCategoria of currentIds) {
+      if (nextIds.has(idCategoria)) {
+        continue;
+      }
+
+      await queryRunner.query(
+        `
+        DELETE FROM articulo_categoria
+        WHERE
+          id_articulo = ?
+          AND id_categoria = ?
+      `,
+        [idArticulo, idCategoria],
+      );
+
+      changed = true;
+    }
+
+    for (const idCategoria of nextIds) {
+      if (currentIds.has(idCategoria)) {
+        continue;
+      }
+
+      await queryRunner.query(
+        `
+        INSERT INTO articulo_categoria (
+          id_articulo,
+          id_categoria,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?)
+      `,
+        [idArticulo, idCategoria, timestamp, timestamp],
+      );
+
+      changed = true;
+    }
+
+    return changed;
+  }
+
+  /**
+   * Actualiza únicamente los campos escalares que realmente han cambiado.
+   */
+  private async updateInventarioValues(
+    queryRunner: QueryRunner,
+    current: InventarioUpdateDatabaseRow,
+    command: InventarioSaveRecord,
+    timestamp: string,
+  ): Promise<boolean> {
+    const assignments: string[] = [];
+    const parameters: (number | string)[] = [];
+
+    if (current.palb_micros !== command.precioAlbaranMicros) {
+      assignments.push('palb_micros = ?');
+      parameters.push(command.precioAlbaranMicros);
+    }
+
+    if (current.puc_micros !== command.pucMicros) {
+      assignments.push('puc_micros = ?');
+      parameters.push(command.pucMicros);
+    }
+
+    if (current.pvp_cents !== command.pvpCents) {
+      assignments.push('pvp_cents = ?');
+      parameters.push(command.pvpCents);
+    }
+
+    if (current.margen_microporcentaje !== command.margenMicroporcentaje) {
+      assignments.push('margen_microporcentaje = ?');
+      parameters.push(command.margenMicroporcentaje);
+    }
+
+    if (current.stock !== command.stock) {
+      assignments.push('stock = ?');
+      parameters.push(command.stock);
+    }
+
+    if (assignments.length === 0) {
+      return false;
+    }
+
+    assignments.push('updated_at = ?');
+    parameters.push(timestamp);
+    parameters.push(command.idArticulo);
+
+    await queryRunner.query(
+      `
+      UPDATE articulo
+      SET
+        ${assignments.join(',\n        ')}
+      WHERE
+        id = ?
+        AND deleted_at IS NULL
+    `,
+      parameters,
+    );
+
+    return true;
+  }
+
+  /**
+   * Comprueba que el nuevo código adicional no provoque
+   * ninguna ambigüedad comercial.
+   */
+  private async requireAvailableAdditionalBarcode(
+    queryRunner: QueryRunner,
+    article: InventarioUpdateDatabaseRow,
+    codigo: string,
+  ): Promise<void> {
+    const existingAdditional: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+        SELECT id
+        FROM codigo_barras
+        WHERE
+          id_articulo = ?
+          AND por_defecto = 0
+          AND deleted_at IS NULL
+        LIMIT 1
+      `,
+      [article.id],
+    )) as readonly DatabaseIdRow[];
+
+    if (existingAdditional.length > 0) {
+      throw new Error('El artículo ya tiene un código de barras adicional.');
+    }
+
+    const numericCode: number | null =
+      /^\d+$/.test(codigo) && Number.isSafeInteger(Number(codigo)) ? Number(codigo) : null;
+
+    if (numericCode === article.localizador || numericCode === article.acceso_directo) {
+      throw new Error(
+        'El código de barras coincide con el localizador o acceso directo del artículo.',
+      );
+    }
+
+    const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+        SELECT cb.id
+        FROM codigo_barras cb
+        WHERE
+          cb.codigo = ?
+          AND cb.deleted_at IS NULL
+
+        UNION ALL
+
+        SELECT a.id
+        FROM articulo a
+        WHERE
+          a.deleted_at IS NULL
+          AND a.id <> ?
+          AND ? IS NOT NULL
+          AND (
+            a.localizador = ?
+            OR a.acceso_directo = ?
+          )
+
+        LIMIT 1
+      `,
+      [codigo, article.id, numericCode, numericCode, numericCode],
+    )) as readonly DatabaseIdRow[];
+
+    if (rows.length > 0) {
+      throw new Error(`El código "${codigo}" ya está siendo utilizado.`);
+    }
+  }
+
+  /**
+   * Inserta el primer código adicional del artículo.
+   */
+  private async insertAdditionalBarcode(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    codigo: string,
+    timestamp: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+      INSERT INTO codigo_barras (
+        public_id,
+        id_articulo,
+        codigo,
+        por_defecto,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, 0, ?, ?)
+    `,
+      [randomUUID(), idArticulo, codigo, timestamp, timestamp],
+    );
+  }
+
+  /**
+   * Registra un cambio manual de stock realizado desde Inventario.
+   */
+  private async insertManualStockHistory(
+    queryRunner: QueryRunner,
+    command: InventarioSaveRecord,
+    previousStock: number,
+    timestamp: string,
+  ): Promise<void> {
+    const pvpMicros: number = (command.pvpCents * UNIT_PRICE_SCALE) / MONEY_SCALE;
+
+    await queryRunner.query(
+      `
+      INSERT INTO historico_articulo (
+        public_id,
+        id_articulo,
+        tipo,
+        stock_previo,
+        diferencia,
+        stock_final,
+        puc_micros,
+        pvp_micros,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+      [
+        randomUUID(),
+        command.idArticulo,
+        HISTORICO_ARTICULO_TIPO.ARTICULO,
+        previousStock,
+        command.stock - previousStock,
+        command.stock,
+        command.pucMicros,
+        pvpMicros,
+        timestamp,
+        timestamp,
+      ],
+    );
   }
 }

@@ -1,3 +1,4 @@
+import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario-save.interface';
 import type {
   InventarioConsulta,
   InventarioResultado,
@@ -106,6 +107,15 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         IPC_CHANNELS.almacenSearchInventario,
         consulta,
       ) as Promise<InventarioResultado>,
+
+    saveInventarioRow: (command: InventarioSaveCommand): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.almacenSaveInventarioRow, command) as Promise<void>,
+
+    saveInventarioRows: (commands: readonly InventarioSaveCommand[]): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.almacenSaveInventarioRows, commands) as Promise<void>,
+
+    deactivateArticulo: (idArticulo: number): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.almacenDeactivateArticulo, idArticulo) as Promise<void>,
   }),
 
   legacyImport: {

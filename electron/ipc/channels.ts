@@ -20,6 +20,9 @@ const IPC_CHANNELS = {
   applicationGetState: 'application:get-state',
 
   almacenSearchInventario: 'almacen:search-inventario',
+  almacenSaveInventarioRow: 'almacen:save-inventario-row',
+  almacenSaveInventarioRows: 'almacen:save-inventario-rows',
+  almacenDeactivateArticulo: 'almacen:deactivate-articulo',
 
   marcasGetAll: 'marcas:get-all',
   marcasCreate: 'marcas:create',

@@ -241,7 +241,7 @@
 
     .inventory__row-actions {
         display: flex;
-        min-width: 78px;
+        min-width: 150px;
         align-items: center;
         justify-content: center;
         gap: 2px;
@@ -250,6 +250,10 @@
             width: 34px;
             height: 34px;
             padding: 5px;
+        }
+
+        .inventory__delete-action {
+            color: var(--color-red);
         }
     }
 }
