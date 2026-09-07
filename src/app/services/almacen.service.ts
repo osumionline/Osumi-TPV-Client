@@ -1,4 +1,8 @@
 import { Service } from '@angular/core';
+import type {
+  InventarioCsvExportResult,
+  InventarioReportConsulta,
+} from '@desktop-contracts/almacen/inventario-report.interface';
 import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario-save.interface';
 import type {
   InventarioConsulta,
@@ -15,6 +19,13 @@ export default class AlmacenService {
    */
   searchInventario(consulta: InventarioConsulta): Promise<InventarioResultado> {
     return window.osumiDesktop.almacen.searchInventario(consulta);
+  }
+
+  /**
+   * Exporta el conjunto persistido filtrado a CSV.
+   */
+  exportInventarioCsv(consulta: InventarioReportConsulta): Promise<InventarioCsvExportResult> {
+    return window.osumiDesktop.almacen.exportInventarioCsv(consulta);
   }
 
   /**

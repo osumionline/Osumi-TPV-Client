@@ -1,9 +1,12 @@
-export interface InventarioConsulta {
+export interface InventarioFilters {
   readonly idProveedor: number | null;
   readonly idMarca: number | null;
   readonly idCategoria: number | null;
   readonly texto: string;
   readonly conDescuento: boolean;
+}
+
+export interface InventarioConsulta extends InventarioFilters {
   readonly pagina: number;
   readonly num: number;
 }

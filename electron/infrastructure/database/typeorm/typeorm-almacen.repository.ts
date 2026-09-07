@@ -1,9 +1,14 @@
 import type AlmacenRepository from '@backend/contracts/almacen/almacen.repository.interface';
+import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-filter-query.interface';
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
 import type {
   InventarioResultadoRecord,
   InventarioRowRecord,
 } from '@backend/domain/almacen/inventario-record.interface';
+import type {
+  InventarioReportRecord,
+  InventarioReportRowRecord,
+} from '@backend/domain/almacen/inventario-report-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
 import HISTORICO_ARTICULO_TIPO from '@backend/domain/articulos/historico-articulo.constants';
 import { MONEY_SCALE, UNIT_PRICE_SCALE } from '@backend/domain/database/database-schema.constants';
@@ -63,6 +68,30 @@ interface InventarioUpdateDatabaseRow {
 
 interface DatabaseIdRow {
   readonly id: number;
+}
+
+interface InventarioReportDatabaseRow {
+  readonly id: number;
+  readonly localizador: number;
+  readonly proveedor_nombre: string | null;
+  readonly marca_nombre: string;
+  readonly referencia: string | null;
+  readonly nombre: string;
+  readonly stock: number;
+  readonly palb_micros: number;
+  readonly puc_micros: number;
+  readonly pvp_cents: number;
+  readonly margen_microporcentaje: number;
+}
+
+interface InventarioReportCategoriaDatabaseRow {
+  readonly id_articulo: number;
+  readonly nombre: string;
+}
+
+interface InventarioReportBarcodeDatabaseRow {
+  readonly id_articulo: number;
+  readonly codigo: string;
 }
 
 /**
@@ -191,6 +220,98 @@ export default class TypeOrmAlmacenRepository implements AlmacenRepository {
   }
 
   /**
+   * Recupera todas las filas persistidas de un conjunto filtrado
+   * para exportación e impresión.
+   */
+  async getInventarioReport(query: InventarioFilterQuery): Promise<InventarioReportRecord> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+    const filter: InventarioSqlFilter = this.buildFilter(query);
+
+    const aggregateRows: readonly InventarioAggregateDatabaseRow[] = (await dataSource.query(
+      `
+      SELECT
+        COUNT(*) AS total_rows,
+        COALESCE(
+          AVG(a.margen_microporcentaje),
+          0
+        ) AS media_margen_microporcentaje,
+        COALESCE(
+          SUM(a.stock * a.puc_micros),
+          0
+        ) AS total_puc_micros,
+        COALESCE(
+          SUM(a.stock * a.pvp_cents),
+          0
+        ) AS total_pvp_cents
+      FROM articulo a
+      WHERE
+        ${filter.clause}
+    `,
+      filter.parameters,
+    )) as readonly InventarioAggregateDatabaseRow[];
+
+    const aggregate: InventarioAggregateDatabaseRow = aggregateRows[0] ?? {
+      total_rows: 0,
+      media_margen_microporcentaje: 0,
+      total_puc_micros: 0,
+      total_pvp_cents: 0,
+    };
+
+    const rows: readonly InventarioReportDatabaseRow[] = (await dataSource.query(
+      `
+      SELECT
+        a.id,
+        a.localizador,
+        p.nombre AS proveedor_nombre,
+        m.nombre AS marca_nombre,
+        a.referencia,
+        a.nombre,
+        a.stock,
+        a.palb_micros,
+        a.puc_micros,
+        a.pvp_cents,
+        a.margen_microporcentaje
+      FROM articulo a
+      INNER JOIN marca m
+        ON m.id = a.id_marca
+      LEFT JOIN proveedor p
+        ON p.id = a.id_proveedor
+      WHERE
+        ${filter.clause}
+      ORDER BY
+        a.localizador,
+        a.id
+    `,
+      filter.parameters,
+    )) as readonly InventarioReportDatabaseRow[];
+
+    const categorias: Map<number, string[]> = await this.findReportCategories(dataSource, filter);
+
+    const codigosBarras: Map<number, string[]> = await this.findReportBarcodes(dataSource, filter);
+
+    return {
+      rows: rows.map((row: InventarioReportDatabaseRow): InventarioReportRowRecord => ({
+        localizador: row.localizador,
+        proveedorNombre: row.proveedor_nombre,
+        marcaNombre: row.marca_nombre,
+        referencia: row.referencia,
+        categorias: categorias.get(row.id) ?? [],
+        nombre: row.nombre,
+        stock: row.stock,
+        precioAlbaranMicros: row.palb_micros,
+        pucMicros: row.puc_micros,
+        pvpCents: row.pvp_cents,
+        margenMicroporcentaje: row.margen_microporcentaje,
+        codigosBarrasAdicionales: codigosBarras.get(row.id) ?? [],
+      })),
+      totalRows: aggregate.total_rows,
+      mediaMargenMicroporcentaje: aggregate.media_margen_microporcentaje,
+      totalPucMicros: aggregate.total_puc_micros,
+      totalPvpCents: aggregate.total_pvp_cents,
+    };
+  }
+
+  /**
    * Persiste atómicamente todas las filas de Inventario indicadas.
    */
   async saveInventarioRows(commands: readonly InventarioSaveRecord[]): Promise<void> {
@@ -247,10 +368,99 @@ export default class TypeOrmAlmacenRepository implements AlmacenRepository {
   }
 
   /**
+   * Obtiene las categorías persistidas de todos los artículos del reporte.
+   */
+  private async findReportCategories(
+    dataSource: DataSource,
+    filter: InventarioSqlFilter,
+  ): Promise<Map<number, string[]>> {
+    const result: Map<number, string[]> = new Map<number, string[]>();
+
+    const rows: readonly InventarioReportCategoriaDatabaseRow[] = (await dataSource.query(
+      `
+      SELECT
+        ac.id_articulo,
+        c.nombre
+      FROM articulo a
+      INNER JOIN articulo_categoria ac
+        ON ac.id_articulo = a.id
+      INNER JOIN categoria c
+        ON c.id = ac.id_categoria
+      WHERE
+        ${filter.clause}
+        AND c.deleted_at IS NULL
+      ORDER BY
+        a.localizador,
+        a.id,
+        c.nombre
+    `,
+      filter.parameters,
+    )) as readonly InventarioReportCategoriaDatabaseRow[];
+
+    for (const row of rows) {
+      const current: string[] | undefined = result.get(row.id_articulo);
+
+      if (current === undefined) {
+        result.set(row.id_articulo, [row.nombre]);
+
+        continue;
+      }
+
+      current.push(row.nombre);
+    }
+
+    return result;
+  }
+
+  /**
+   * Obtiene los códigos adicionales activos de todos los artículos del reporte.
+   */
+  private async findReportBarcodes(
+    dataSource: DataSource,
+    filter: InventarioSqlFilter,
+  ): Promise<Map<number, string[]>> {
+    const result: Map<number, string[]> = new Map<number, string[]>();
+
+    const rows: readonly InventarioReportBarcodeDatabaseRow[] = (await dataSource.query(
+      `
+      SELECT
+        cb.id_articulo,
+        cb.codigo
+      FROM articulo a
+      INNER JOIN codigo_barras cb
+        ON cb.id_articulo = a.id
+      WHERE
+        ${filter.clause}
+        AND cb.por_defecto = 0
+        AND cb.deleted_at IS NULL
+      ORDER BY
+        a.localizador,
+        a.id,
+        cb.id
+    `,
+      filter.parameters,
+    )) as readonly InventarioReportBarcodeDatabaseRow[];
+
+    for (const row of rows) {
+      const current: string[] | undefined = result.get(row.id_articulo);
+
+      if (current === undefined) {
+        result.set(row.id_articulo, [row.codigo]);
+
+        continue;
+      }
+
+      current.push(row.codigo);
+    }
+
+    return result;
+  }
+
+  /**
    * Construye los filtros SQL sin multiplicar las filas
    * de artículo mediante joins de relaciones N:M.
    */
-  private buildFilter(query: InventarioRepositoryQuery): InventarioSqlFilter {
+  private buildFilter(query: InventarioFilterQuery): InventarioSqlFilter {
     const conditions: string[] = ['a.deleted_at IS NULL'];
     const parameters: (number | string)[] = [];
 

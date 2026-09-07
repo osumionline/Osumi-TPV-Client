@@ -23,6 +23,7 @@ const IPC_CHANNELS = {
   almacenSaveInventarioRow: 'almacen:save-inventario-row',
   almacenSaveInventarioRows: 'almacen:save-inventario-rows',
   almacenDeactivateArticulo: 'almacen:deactivate-articulo',
+  almacenExportInventarioCsv: 'almacen:export-inventario-csv',
 
   marcasGetAll: 'marcas:get-all',
   marcasCreate: 'marcas:create',

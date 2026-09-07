@@ -8,11 +8,22 @@ import type {
   InventarioResultado,
 } from '@desktop-contracts/almacen/inventario.interface';
 import { describe, expect, it } from 'vitest';
+import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-filter-query.interface';
+import type { InventarioReportRecord } from '@backend/domain/almacen/inventario-report-record.interface';
 
 class FakeAlmacenRepository implements AlmacenRepository {
   lastQuery: InventarioRepositoryQuery | null = null;
   lastSavedCommands: readonly InventarioSaveRecord[] | null = null;
   lastDeactivatedArticuloId: number | null = null;
+  lastReportQuery: InventarioFilterQuery | null = null;
+
+  reportResult: InventarioReportRecord = {
+    rows: [],
+    totalRows: 0,
+    mediaMargenMicroporcentaje: 0,
+    totalPucMicros: 0,
+    totalPvpCents: 0,
+  };
 
   result: InventarioResultadoRecord = {
     rows: [
@@ -51,6 +62,15 @@ class FakeAlmacenRepository implements AlmacenRepository {
     this.lastQuery = query;
 
     return Promise.resolve(this.result);
+  }
+
+  /**
+   * Devuelve el reporte configurado para los tests.
+   */
+  getInventarioReport(query: InventarioFilterQuery): Promise<InventarioReportRecord> {
+    this.lastReportQuery = query;
+
+    return Promise.resolve(this.reportResult);
   }
 
   /**

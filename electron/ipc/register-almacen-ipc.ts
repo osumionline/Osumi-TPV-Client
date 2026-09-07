@@ -1,4 +1,9 @@
 import type AlmacenService from '@backend/application/almacen/almacen.service';
+import type InventarioCsvService from '@backend/application/almacen/inventario-csv.service';
+import type {
+  InventarioCsvExportResult,
+  InventarioReportConsulta,
+} from '@desktop-contracts/almacen/inventario-report.interface';
 import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario-save.interface';
 import type {
   InventarioConsulta,
@@ -15,6 +20,7 @@ import { ipcMain } from 'electron';
 export default function registerAlmacenIpc(
   getMainWindow: MainWindowProvider,
   almacenService: AlmacenService,
+  inventarioCsvService: InventarioCsvService,
 ): void {
   ipcMain.handle(
     IPC_CHANNELS.almacenSearchInventario,
@@ -22,6 +28,15 @@ export default function registerAlmacenIpc(
       assertTrustedSender(event, getMainWindow);
 
       return almacenService.searchInventario(consulta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.almacenExportInventarioCsv,
+    async (event, consulta: InventarioReportConsulta): Promise<InventarioCsvExportResult> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return inventarioCsvService.export(consulta);
     },
   );
 

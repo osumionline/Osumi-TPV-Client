@@ -107,12 +107,16 @@
             <mat-icon>save</mat-icon>
         </button>
 
-
         <button mat-icon-button
                 type="button"
                 matTooltip="Exportar CSV"
                 aria-label="Exportar CSV"
-                disabled>
+                [disabled]="
+                    processing() ||
+                    totalRows() === 0 ||
+                    selectedColumns().length === 0
+                "
+                (click)="exportCsv()">
             <mat-icon>download</mat-icon>
         </button>
 

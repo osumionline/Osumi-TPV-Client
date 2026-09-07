@@ -1,5 +1,7 @@
+import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-filter-query.interface';
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
 import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario-record.interface';
+import type { InventarioReportRecord } from '@backend/domain/almacen/inventario-report-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
 
 /**
@@ -11,6 +13,11 @@ export default interface AlmacenRepository {
    * correspondientes al conjunto filtrado completo.
    */
   searchInventario(query: InventarioRepositoryQuery): Promise<InventarioResultadoRecord>;
+
+  /**
+   * Recupera el conjunto persistido completo utilizado por los reportes.
+   */
+  getInventarioReport(query: InventarioFilterQuery): Promise<InventarioReportRecord>;
 
   /**
    * Persiste varias filas de Inventario dentro de una única transacción.

@@ -1,3 +1,7 @@
+import type {
+  InventarioCsvExportResult,
+  InventarioReportConsulta,
+} from '@desktop-contracts/almacen/inventario-report.interface';
 import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario-save.interface';
 import type {
   InventarioConsulta,
@@ -12,6 +16,11 @@ export default interface AlmacenApi {
    * Recupera una página filtrada del inventario y sus agregados globales.
    */
   searchInventario(consulta: InventarioConsulta): Promise<InventarioResultado>;
+
+  /**
+   * Exporta a CSV el conjunto persistido filtrado.
+   */
+  exportInventarioCsv(consulta: InventarioReportConsulta): Promise<InventarioCsvExportResult>;
 
   /**
    * Persiste una única fila modificada de Inventario.

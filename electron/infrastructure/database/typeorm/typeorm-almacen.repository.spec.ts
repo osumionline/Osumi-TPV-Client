@@ -167,6 +167,47 @@ describe('TypeOrmAlmacenRepository', (): void => {
 
     expect(result.rows.map((row): number => row.id)).toEqual([2]);
   });
+
+  it('recupera para reportes todas las filas persistidas del filtro', async (): Promise<void> => {
+    const result = await requireRepository().getInventarioReport({
+      idProveedor: null,
+      idMarca: null,
+      idCategoria: null,
+      texto: null,
+      conDescuento: false,
+    });
+
+    expect(result.totalRows).toBe(3);
+    expect(result.rows).toHaveLength(3);
+
+    expect(result.rows[0]).toMatchObject({
+      localizador: 261001,
+      categorias: ['Categoría hija', 'Categoría padre'],
+      codigosBarrasAdicionales: [],
+    });
+
+    expect(result.rows[1]).toMatchObject({
+      localizador: 261002,
+      categorias: ['Categoría hija'],
+      codigosBarrasAdicionales: ['EXTRA-BETA'],
+    });
+
+    expect(result.totalPucMicros).toBe(7_920_000);
+    expect(result.totalPvpCents).toBe(1_200);
+  });
+
+  it('aplica al reporte los mismos filtros de Inventario', async (): Promise<void> => {
+    const result = await requireRepository().getInventarioReport({
+      idProveedor: null,
+      idMarca: null,
+      idCategoria: 2,
+      texto: 'beta',
+      conDescuento: true,
+    });
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]?.localizador).toBe(261002);
+  });
 });
 
 /**

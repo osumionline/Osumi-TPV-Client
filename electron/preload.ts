@@ -1,3 +1,7 @@
+import type {
+  InventarioCsvExportResult,
+  InventarioReportConsulta,
+} from '@desktop-contracts/almacen/inventario-report.interface';
 import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario-save.interface';
 import type {
   InventarioConsulta,
@@ -107,6 +111,12 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         IPC_CHANNELS.almacenSearchInventario,
         consulta,
       ) as Promise<InventarioResultado>,
+
+    exportInventarioCsv: (consulta: InventarioReportConsulta): Promise<InventarioCsvExportResult> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.almacenExportInventarioCsv,
+        consulta,
+      ) as Promise<InventarioCsvExportResult>,
 
     saveInventarioRow: (command: InventarioSaveCommand): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.almacenSaveInventarioRow, command) as Promise<void>,

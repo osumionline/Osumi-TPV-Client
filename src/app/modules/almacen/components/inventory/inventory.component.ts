@@ -19,6 +19,11 @@ import { MatSelect, type MatSelectChange } from '@angular/material/select';
 import { MatSlideToggle, type MatSlideToggleChange } from '@angular/material/slide-toggle';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltip } from '@angular/material/tooltip';
+import type {
+  InventarioCsvExportResult,
+  InventarioReportColumn,
+  InventarioReportConsulta,
+} from '@desktop-contracts/almacen/inventario-report.interface';
 import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario-save.interface';
 import type {
   InventarioConsulta,
@@ -49,19 +54,7 @@ import MarcasService from '@services/marcas.service';
 import ProveedoresService from '@services/proveedores.service';
 import { getErrorMessage } from '@utils/error.utils';
 
-type InventarioDataColumn =
-  | 'localizador'
-  | 'proveedor'
-  | 'marca'
-  | 'referencia'
-  | 'categoria'
-  | 'nombre'
-  | 'stock'
-  | 'precioAlbaran'
-  | 'puc'
-  | 'pvp'
-  | 'margen'
-  | 'codigoBarras';
+type InventarioDataColumn = InventarioReportColumn;
 
 type InventarioDisplayedColumn = InventarioDataColumn | 'opciones';
 
@@ -633,6 +626,44 @@ export default class InventoryComponent implements OnInit, OnDestroy {
 
         void this.confirmDeactivateRow(row.id);
       });
+  }
+
+  /**
+   * Exporta a CSV el snapshot persistido del filtro actual.
+   */
+  async exportCsv(): Promise<void> {
+    if (this.processing() || this.totalRows() === 0 || this.selectedColumns().length === 0) {
+      return;
+    }
+
+    const consulta: InventarioReportConsulta = {
+      idProveedor: this.idProveedor(),
+      idMarca: this.idMarca(),
+      idCategoria: this.idCategoria(),
+      texto: this.texto(),
+      conDescuento: this.conDescuento(),
+      columnas: [...this.selectedColumns()],
+    };
+
+    this.processing.set(true);
+
+    try {
+      const result: InventarioCsvExportResult =
+        await this.almacenService.exportInventarioCsv(consulta);
+
+      if (result === 'cancelled') {
+        return;
+      }
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido exportar el inventario.'),
+        })
+        .subscribe();
+    } finally {
+      this.processing.set(false);
+    }
   }
 
   /**

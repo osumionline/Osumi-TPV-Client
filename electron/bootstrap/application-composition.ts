@@ -1,6 +1,8 @@
 import { join } from 'node:path';
 
 import AlmacenService from '@backend/application/almacen/almacen.service';
+import InventarioCsvBuilder from '@backend/application/almacen/inventario-csv.builder';
+import InventarioCsvService from '@backend/application/almacen/inventario-csv.service';
 import ApplicationStateService from '@backend/application/application/application-state.service';
 import ArticulosService from '@backend/application/articulos/articulos.service';
 import CajaService from '@backend/application/caja/caja.service';
@@ -34,6 +36,7 @@ import VentasTicketBaiService from '@backend/application/ventas/ventas-ticket-ba
 import VentasTicketEmailService from '@backend/application/ventas/ventas-ticket-email.service';
 import VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
 import type AlmacenRepository from '@backend/contracts/almacen/almacen.repository.interface';
+import type InventarioCsvFileSaver from '@backend/contracts/almacen/inventario-csv-file-saver.interface';
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';
@@ -102,6 +105,7 @@ import ElectronA4DocumentRenderer from '@infrastructure/electron/electron-a4-doc
 import ElectronAssetUrlBuilder from '@infrastructure/electron/electron-asset-url.builder';
 import ElectronClienteFacturaPreviewWindow from '@infrastructure/electron/electron-cliente-factura-preview-window';
 import ElectronHtmlDocumentRenderer from '@infrastructure/electron/electron-html-document.renderer';
+import ElectronInventarioCsvFileSaver from '@infrastructure/electron/electron-inventario-csv-file-saver';
 import ElectronLegacyImportDialog from '@infrastructure/electron/electron-legacy-import-dialog';
 import ElectronLogoStorage from '@infrastructure/electron/electron-logo.storage';
 import ElectronPdfPrintDialog from '@infrastructure/electron/electron-pdf-print-dialog';
@@ -256,6 +260,16 @@ export default function createApplicationComposition(
    */
   const almacenRepository: AlmacenRepository = new TypeOrmAlmacenRepository(operationalDatabase);
   const almacenService: AlmacenService = new AlmacenService(almacenRepository);
+  const inventarioCsvBuilder: InventarioCsvBuilder = new InventarioCsvBuilder();
+  const inventarioCsvFileSaver: InventarioCsvFileSaver = new ElectronInventarioCsvFileSaver(
+    getMainWindow,
+  );
+
+  const inventarioCsvService: InventarioCsvService = new InventarioCsvService(
+    almacenService,
+    inventarioCsvBuilder,
+    inventarioCsvFileSaver,
+  );
 
   /*
    * Artículos.
@@ -523,7 +537,7 @@ export default function createApplicationComposition(
    * Canales IPC.
    */
   registerApplicationIpc(applicationStateService);
-  registerAlmacenIpc(getMainWindow, almacenService);
+  registerAlmacenIpc(getMainWindow, almacenService, inventarioCsvService);
   registerArticulosIpc(getMainWindow, articulosService);
   registerFilesIpc(getMainWindow, imageStagingService);
   registerMarcasIpc(getMainWindow, marcasService);

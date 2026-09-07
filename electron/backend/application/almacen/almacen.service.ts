@@ -1,18 +1,45 @@
 import type AlmacenRepository from '@backend/contracts/almacen/almacen.repository.interface';
+import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-filter-query.interface';
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
 import type {
   InventarioResultadoRecord,
   InventarioRowRecord,
 } from '@backend/domain/almacen/inventario-record.interface';
+import type {
+  InventarioReportRecord,
+  InventarioReportRowRecord,
+} from '@backend/domain/almacen/inventario-report-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
+import type {
+  InventarioReportColumn,
+  InventarioReportConsulta,
+  InventarioReportInterface,
+  InventarioReportRowInterface,
+} from '@desktop-contracts/almacen/inventario-report.interface';
 import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario-save.interface';
 import type {
   InventarioConsulta,
+  InventarioFilters,
   InventarioResultado,
   InventarioRowInterface,
 } from '@desktop-contracts/almacen/inventario.interface';
 
 const INVENTARIO_PAGE_SIZES: readonly number[] = [20, 50, 100, 200];
+
+const INVENTARIO_REPORT_COLUMNS: readonly InventarioReportColumn[] = [
+  'localizador',
+  'proveedor',
+  'marca',
+  'referencia',
+  'categoria',
+  'nombre',
+  'stock',
+  'precioAlbaran',
+  'puc',
+  'pvp',
+  'margen',
+  'codigoBarras',
+];
 
 /**
  * Expone los casos de uso del módulo Almacén.
@@ -34,26 +61,7 @@ export default class AlmacenService {
       throw new Error('La consulta de inventario no es válida.');
     }
 
-    const idProveedor: number | null = this.validateOptionalId(
-      consulta.idProveedor,
-      'El proveedor del filtro no es válido.',
-    );
-    const idMarca: number | null = this.validateOptionalId(
-      consulta.idMarca,
-      'La marca del filtro no es válida.',
-    );
-    const idCategoria: number | null = this.validateOptionalId(
-      consulta.idCategoria,
-      'La categoría del filtro no es válida.',
-    );
-
-    if (typeof consulta.texto !== 'string') {
-      throw new Error('El texto de búsqueda de inventario no es válido.');
-    }
-
-    if (typeof consulta.conDescuento !== 'boolean') {
-      throw new Error('El filtro de descuento de inventario no es válido.');
-    }
+    const filter: InventarioFilterQuery = this.mapFilterQuery(consulta);
 
     if (!Number.isSafeInteger(consulta.pagina) || consulta.pagina <= 0) {
       throw new Error('La página de inventario no es válida.');
@@ -69,13 +77,8 @@ export default class AlmacenService {
       throw new Error('El desplazamiento de inventario supera el rango permitido.');
     }
 
-    const texto: string = consulta.texto.trim();
     const repositoryQuery: InventarioRepositoryQuery = {
-      idProveedor,
-      idMarca,
-      idCategoria,
-      texto: texto.length === 0 ? null : texto,
-      conDescuento: consulta.conDescuento,
+      ...filter,
       ventasDesde: this.getVentasDesde(),
       offset,
       limit: consulta.num,
@@ -105,6 +108,40 @@ export default class AlmacenService {
         reBps: row.reBps,
         tieneCodigoAdicional: row.tieneCodigoAdicional,
         sinVentasUltimos12Meses: row.sinVentasUltimos12Meses,
+      })),
+      totalRows: result.totalRows,
+      mediaMargenMicroporcentaje: result.mediaMargenMicroporcentaje,
+      totalPucMicros: result.totalPucMicros,
+      totalPvpCents: result.totalPvpCents,
+    };
+  }
+
+  /**
+   * Recupera un snapshot persistido completo para reportes de Inventario.
+   */
+  async getInventarioReport(
+    consulta: InventarioReportConsulta,
+  ): Promise<InventarioReportInterface> {
+    const filter: InventarioFilterQuery = this.mapFilterQuery(consulta);
+
+    this.validateReportColumns(consulta.columnas);
+
+    const result: InventarioReportRecord = await this.almacenRepository.getInventarioReport(filter);
+
+    return {
+      rows: result.rows.map((row: InventarioReportRowRecord): InventarioReportRowInterface => ({
+        localizador: row.localizador,
+        proveedorNombre: row.proveedorNombre,
+        marcaNombre: row.marcaNombre,
+        referencia: row.referencia,
+        categorias: [...row.categorias],
+        nombre: row.nombre,
+        stock: row.stock,
+        precioAlbaranMicros: row.precioAlbaranMicros,
+        pucMicros: row.pucMicros,
+        pvpCents: row.pvpCents,
+        margenMicroporcentaje: row.margenMicroporcentaje,
+        codigosBarrasAdicionales: [...row.codigosBarrasAdicionales],
       })),
       totalRows: result.totalRows,
       mediaMargenMicroporcentaje: result.mediaMargenMicroporcentaje,
@@ -156,6 +193,76 @@ export default class AlmacenService {
     }
 
     await this.almacenRepository.deactivateArticulo(idArticulo);
+  }
+
+  /**
+   * Valida y normaliza los filtros compartidos de Inventario.
+   */
+  private mapFilterQuery(filters: InventarioFilters): InventarioFilterQuery {
+    if (typeof filters !== 'object' || filters === null) {
+      throw new Error('La consulta de inventario no es válida.');
+    }
+
+    const idProveedor: number | null = this.validateOptionalId(
+      filters.idProveedor,
+      'El proveedor del filtro no es válido.',
+    );
+
+    const idMarca: number | null = this.validateOptionalId(
+      filters.idMarca,
+      'La marca del filtro no es válida.',
+    );
+
+    const idCategoria: number | null = this.validateOptionalId(
+      filters.idCategoria,
+      'La categoría del filtro no es válida.',
+    );
+
+    if (typeof filters.texto !== 'string') {
+      throw new Error('El texto de búsqueda de inventario no es válido.');
+    }
+
+    if (typeof filters.conDescuento !== 'boolean') {
+      throw new Error('El filtro de descuento de inventario no es válido.');
+    }
+
+    const texto: string = filters.texto.trim();
+
+    return {
+      idProveedor,
+      idMarca,
+      idCategoria,
+      texto: texto.length === 0 ? null : texto,
+      conDescuento: filters.conDescuento,
+    };
+  }
+
+  /**
+   * Valida las columnas solicitadas para un reporte.
+   */
+  private validateReportColumns(columnas: readonly InventarioReportColumn[]): void {
+    if (!Array.isArray(columnas) || columnas.length === 0) {
+      throw new Error('Debes seleccionar al menos una columna para exportar.');
+    }
+
+    const uniqueColumns: Set<InventarioReportColumn> = new Set<InventarioReportColumn>();
+
+    for (const column of columnas as readonly unknown[]) {
+      if (
+        typeof column !== 'string' ||
+        !INVENTARIO_REPORT_COLUMNS.includes(column as InventarioReportColumn)
+      ) {
+        throw new Error('Una de las columnas seleccionadas no es válida.');
+      }
+
+      const typedColumn: InventarioReportColumn = column as InventarioReportColumn;
+
+      if (uniqueColumns.has(typedColumn)) {
+        throw new Error('Hay columnas repetidas en el reporte.');
+      }
+
+      uniqueColumns.add(typedColumn);
+    }
   }
 
   /**
