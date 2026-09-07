@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.44  
+**Versión:** 2.45  
 **Fecha:** 7 de septiembre de 2026  
-**Base de continuidad:** `v2.44 + main` una vez este documento se suba al repositorio.
+**Base de continuidad:** `v2.45 + main` una vez este documento se suba al repositorio.
 
 ---
 
@@ -27,12 +27,12 @@ Imprenta
 Por ahora se desarrolla **solo Inventario**.
 
 ```text
-Inventario   → 15A–15G ✅
-Caducidades  → placeholder
+Inventario   → ✅ CERRADO
+Caducidades  → 🟦 PLANIFICADO / SIGUIENTE
 Imprenta     → placeholder
 ```
 
-Ya están cerrados:
+Inventario queda cerrado tras completar:
 
 ```text
 15A Base de Almacén
@@ -42,12 +42,15 @@ Ya están cerrados:
 15E Persistencia
 15F CSV
 15G Vista de impresión
+15H Integración + regresión Inventario
 ```
+
+Durante 15H se añadió blindaje automatizado de persistencia y se corrigió una comparación `null === null` en la validación de códigos adicionales alfanuméricos.
 
 El siguiente bloque exacto es:
 
 ```text
-15H — Integración + regresión Inventario
+15I.1 — Dominio + esquema de Caducidades
 ```
 
 ---
@@ -96,8 +99,15 @@ Ventas 12 — Postventa                             🟦
   15E Persistencia                                ✅
   15F CSV                                         ✅
   15G Vista de impresión                          ✅
-  15H Integración + regresión Inventario          ⬅️ SIGUIENTE
-  15I Caducidades                                 ⬜ PLACEHOLDER
+  15H Integración + regresión Inventario          ✅
+  15I Caducidades                                 🟦 PLANIFICADO
+    15I.1 Dominio + esquema                       ⬅️ SIGUIENTE
+    15I.2 Consulta + filtros + totales            ⬜
+    15I.3 Pantalla principal                      ⬜
+    15I.4 Alta de caducidad                       ⬜
+    15I.5 Baja / reversión                        ⬜
+    15I.6 Informe agrupado                        ⬜
+    15I.7 Impresión + regresión                   ⬜
   15J Imprenta                                    ⬜ PLACEHOLDER
 
 16 Compras                                        ⬜
@@ -512,6 +522,7 @@ Hasta `main` actual quedan cerrados y validados los bloques:
 15E Persistencia                     ✅
 15F CSV                              ✅
 15G Vista de impresión               ✅
+15H Integración + regresión          ✅
 ```
 
 ## 7.1.1 Base y navegación
@@ -843,6 +854,53 @@ Reglas implementadas:
 - autorización de IPC ligada al `webContents.id` de la ventana.
 
 Durante la integración de 15G se corrigieron además dos registros IPC duplicados accidentales en `application-composition.ts` (`registerApplicationIpc` y `registerArticulosIpc`). El composition root vuelve a registrar una única vez cada superficie IPC.
+
+## 7.1.10 Regresión final
+
+15H queda cerrado.
+
+Se añadieron tests de regresión específicos para:
+
+- escritura reducida;
+- categorías;
+- stock negativo;
+- histórico manual de stock;
+- código adicional;
+- unicidad global de códigos;
+- atomicidad real de Guardar todos;
+- rollback;
+- baja lógica;
+- conservación del histórico;
+- validaciones de `AlmacenService`.
+
+Durante esta regresión se detectó un bug real en la validación de códigos alfanuméricos:
+
+```text
+codigo alfanumérico
+→ numericCode = null
+→ acceso_directo = null
+→ null === null
+→ falso positivo de colisión
+```
+
+Se corrigió exigiendo que `numericCode !== null` antes de compararlo con localizador/acceso directo.
+
+Tras la corrección:
+
+```text
+tests Electron       ✅
+build Electron       ✅
+tests Angular        ✅
+build Angular        ✅
+lint                  ✅
+regresión funcional  ✅
+```
+
+Inventario queda oficialmente:
+
+```text
+✅ CERRADO
+```
 
 ---
 
@@ -1797,10 +1855,10 @@ no diálogo automático al abrir
 ## 15H — Integración + regresión Inventario
 
 ```text
-⬅️ SIGUIENTE
+✅ CERRADO
 ```
 
-Validar:
+Validado:
 
 ```text
 filtros combinados
@@ -1930,118 +1988,714 @@ Se explicará funcionalmente en otro bloque.
 - La impresión usa BrowserWindow independiente, preload mínimo e IPC restringido por `webContents.id`.
 - La impresión parte de A4 apaisado y usa el diálogo estándar del sistema.
 
-# 26. Próximo bloque exacto
+# 26. Caducidades — requisitos cerrados
+
+Caducidades es un registro histórico de mercancía retirada por vencimiento y del valor económico perdido por la tienda.
+
+No es la misma funcionalidad que:
 
 ```text
-15H — Integración + regresión Inventario
+articulo.fecha_caducidad
 ```
 
-Este es el último bloque antes de declarar Inventario cerrado.
-
-Objetivo:
+La pestaña registra hechos ya ocurridos:
 
 ```text
-ejecutar regresión integral
-+
-corregir cualquier incidencia encontrada
-+
-cerrar Inventario
+X unidades de este artículo se han retirado
+porque han caducado
 ```
 
-Validar de extremo a extremo:
+Es un CRUD sin actualización:
 
 ```text
-ruta /almacen
-tabs
-carga inicial
-filtros combinados
-categoría exacta
-búsqueda por nombre/localizador/referencia/código/etiqueta
-descuento
-paginación
-selector de columnas
-columnas por defecto
-toolbar compacta
-aviso sin ventas 12 meses
+Create
+Read
+Delete
+```
 
-edición tipo Excel
-focus/select
-blur
-Intro + salto a fila inferior
-dirty
-Reset
-categorías N:M
-stock negativo
-Precio albarán
+No existe edición de registros.
+
+Una entrada incorrecta se elimina y, si procede, se crea otra correctamente.
+
+## 26.1 Modelo histórico / snapshot
+
+Cada caducidad debe conservar un snapshot de todos los datos utilizados por esta funcionalidad en el momento del alta.
+
+Debe conservar al menos:
+
+```text
+id artículo
+localizador
+id marca
+nombre marca
+nombre artículo
+unidades
+PUC unitario
+PVP unitario
+fecha de baja
+```
+
+Además conserva:
+
+```text
+public_id
+created_at
+updated_at
+deleted_at
+```
+
+y puede mantenerse `observaciones` aunque inicialmente no exista UI para editarlo.
+
+El objetivo es que cambios posteriores en:
+
+```text
+nombre artículo
+localizador
+marca
 PUC
 PVP
-Margen
-totales reactivos
-
-Guardar fila
-Guardar todos
-atomicidad / rollback
-histórico manual de stock
-código adicional
-unicidad de código
-baja lógica
-reconciliación con fichas de Artículos
-persistencia tras reinicio
-
-CSV
-filtros
-columnas
-todas las filas
-solo persistido
-cancelación diálogo
-archivo Excel-compatible
-
-impresión
-filtros
-columnas
-todas las filas
-solo persistido
-totales
-BrowserWindow
-botón Imprimir
-diálogo estándar
 ```
 
-Batería completa:
+no alteren el histórico de pérdidas.
 
-```bash
-npm run test:electron
-npm run build:electron
-npm test
-npm run build
-npm run lint
-```
-
-Si la regresión queda limpia:
+Ejemplo:
 
 ```text
-15H ✅
-Inventario ✅ CERRADO
+hoy:
+  artículo = Pienso Adulto
+  PUC      = 8,00 €
+  PVP      = 12,00 €
+
+caducidad registrada
+→ queda congelada con esos valores
+
+dentro de seis meses:
+  nombre cambia
+  PUC = 10,00 €
+  PVP = 15,00 €
+
+registro antiguo
+→ sigue mostrando Pienso Adulto
+→ sigue usando 8,00 € / 12,00 €
 ```
 
-Después de cerrar Inventario:
+La SQLite actual ya dispone de una tabla conceptual `merma_caducidad`, pero durante 15I.1 debe ampliarse para soportar el snapshot completo acordado.
+
+Durante desarrollo pre-estable:
 
 ```text
-Caducidades → sigue placeholder
-Imprenta    → sigue placeholder
+DATABASE_SCHEMA_VERSION = 1
+sin migraciones
 ```
 
-No diseñar esos dos dominios hasta recibir sus requisitos funcionales.
+Si el cambio de esquema resulta incompatible:
+
+```text
+borrar SQLite local
+→ reimportar .otpv
+```
+
+La importación legacy debe revisarse en 15I.1 para construir correctamente los snapshots históricos a partir de los datos realmente disponibles en el exportado.
+
+## 26.2 Fecha
+
+El usuario no introduce una fecha de caducidad.
+
+La fecha funcional es:
+
+```text
+momento en el que se registra la pérdida
+```
+
+Año y mes de filtros/informe corresponden a ese momento.
+
+Para registros nuevos:
+
+```text
+fecha_baja
+≈
+created_at
+```
+
+`fecha_baja` será el timestamp de negocio utilizado para filtros, ordenación y agrupaciones.
+
+## 26.3 Stock e histórico
+
+Crear una caducidad afecta al stock.
+
+Ejemplo:
+
+```text
+stock actual = 10
+caducidad    = 3
+→ stock final = 7
+```
+
+La operación debe ser atómica:
+
+```text
+crear merma_caducidad
++
+restar unidades al stock
++
+crear historico_articulo
+→ COMMIT
+```
+
+Si falla cualquier paso:
+
+```text
+ROLLBACK completo
+```
+
+El histórico debe identificar semánticamente que el movimiento procede de una caducidad.
+
+No reutilizar silenciosamente un tipo incorrecto si existe o debe definirse un tipo específico.
+
+El movimiento registra conceptualmente:
+
+```text
+stock previo
+diferencia negativa
+stock final
+PUC snapshot
+PVP snapshot
+motivo caducidad
+```
+
+Las unidades introducidas deben ser:
+
+```text
+entero
+> 0
+```
+
+No se bloqueará el alta porque las unidades superen el stock actual.
+
+El dominio admite stock negativo y una caducidad puede evidenciar una discrepancia real de inventario.
+
+## 26.4 Eliminación / reversión
+
+Eliminar una caducidad significa corregir un registro incorrecto.
+
+La eliminación será lógica:
+
+```text
+deleted_at != null
+```
+
+No se borra físicamente el histórico de caducidades.
+
+Al eliminar:
+
+```text
+soft-delete caducidad
++
+devolver unidades al stock
++
+crear histórico inverso de stock
+→ misma transacción
+```
+
+Ejemplo:
+
+```text
+stock actual      = 7
+caducidad borrada = 3
+→ stock final     = 10
+```
+
+El histórico inverso usa la semántica de reversión de la caducidad original.
+
+Una caducidad ya eliminada no puede revertirse dos veces.
+
+La reversión debe seguir siendo posible aunque el artículo esté dado de baja lógicamente, ya que la fila del artículo se conserva como histórico.
+
+Tras alta o eliminación se debe reconciliar cualquier ficha abierta del artículo, reutilizando el patrón existente de `ArticulosService` y preservando cambios locales dirty.
+
+## 26.5 Pantalla principal
+
+La pestaña:
+
+```text
+Almacén
+→ Caducidades
+```
+
+deja de ser placeholder.
+
+Barra superior:
+
+```text
+[Año] [Mes] [Marca] [Nombre artículo]
+                        [Añadir caducidad] [Crear informe]
+```
+
+El aspecto debe seguir el lenguaje visual actual de Almacén/Inventario, no copiar literalmente el TPV antiguo.
+
+Filtros:
+
+```text
+Año
+Mes
+Marca
+Nombre artículo
+```
+
+Reglas:
+
+- Año: año de `fecha_baja`.
+- Mes: mes de `fecha_baja`.
+- Marca: usa la identidad histórica del registro.
+- Nombre: busca sobre el nombre snapshot.
+- filtros combinables;
+- consulta en SQLite;
+- no filtrar el dataset completo en Angular.
+
+Mes puede utilizarse con o sin año.
+
+Los filtros disponibles deben permitir seguir accediendo a marcas históricas presentes en caducidades aunque una marca haya sido posteriormente desactivada.
+
+## 26.6 Tabla
+
+Columnas:
+
+```text
+Localizador
+Marca
+Nombre
+Unidades
+PVP
+PUC
+Total PVP
+Opciones
+```
+
+Valores:
+
+```text
+PVP       = precio unitario snapshot
+PUC       = precio unitario snapshot
+Total PVP = unidades × PVP
+```
+
+`Opciones` contiene únicamente:
+
+```text
+Eliminar
+```
+
+No hay edición inline.
+
+Antes de eliminar debe existir confirmación.
+
+Orden por defecto:
+
+```text
+fecha_baja DESC
+id DESC
+```
+
+de forma que los registros más recientes aparezcan primero.
+
+## 26.7 Paginación y totales
+
+La consulta principal será paginada en SQLite.
+
+Tamaños previstos:
+
+```text
+20
+50
+100
+200
+```
+
+Valor inicial recomendado:
+
+```text
+50
+```
+
+Los totales se calculan sobre todo el conjunto filtrado, nunca solo sobre la página visible.
+
+Pie:
+
+```text
+Total unidades
+Total PVP
+Total PUC
+```
+
+Fórmulas:
+
+```text
+Total unidades = Σ unidades
+
+Total PVP =
+Σ (unidades × PVP unitario snapshot)
+
+Total PUC =
+Σ (unidades × PUC unitario snapshot)
+```
+
+Estos totales representan el valor económico histórico perdido.
+
+## 26.8 Modal “Añadir caducidad”
+
+No reutilizar el aspecto visual del modal antiguo.
+
+Crear un modal compacto y coherente con la aplicación actual.
+
+Contenido conceptual:
+
+```text
+Buscar artículo
+↓
+lista de coincidencias
+
+artículo seleccionado
+  localizador
+  marca
+  nombre
+  stock actual
+  PUC actual
+  PVP actual
+
+Unidades [   ]
+
+[Cancelar] [Añadir]
+```
+
+Solo se pueden seleccionar artículos activos.
+
+El buscador debe reutilizar patrones/servicios de búsqueda de artículos existentes siempre que encajen.
+
+Búsqueda recomendada:
+
+```text
+localizador
+nombre
+referencia
+código de barras
+```
+
+Al confirmar:
+
+```text
+leer artículo persistido actual
+→ construir snapshot
+→ crear caducidad
+→ restar stock
+→ histórico
+→ cerrar modal
+→ refrescar lista/totales
+```
+
+No confiar en precios o stock enviados únicamente desde el renderer: el backend debe volver a leer el estado canónico del artículo al persistir.
+
+## 26.9 Informe
+
+Botón:
+
+```text
+Crear informe
+```
+
+Debe respetar exactamente los filtros activos de la pantalla en el momento del clic.
+
+Flujo:
+
+```text
+filtros actuales
+→ consulta agregada persistida
+→ snapshot
+→ BrowserWindow independiente
+```
+
+No agrupar miles de registros en Angular si SQLite puede devolver el agregado directamente.
+
+La jerarquía es:
+
+```text
+Año
+  Mes
+    Marca
+```
+
+Columnas:
+
+```text
+Descripción
+Unidades
+PVP
+PUC
+```
+
+En el informe:
+
+```text
+PVP = valor total perdido de venta
+PUC = valor total perdido de compra
+```
+
+No son precios unitarios.
+
+Cada nivel contiene sus agregados:
+
+```text
+Año
+→ unidades / PVP / PUC del año
+
+Mes
+→ unidades / PVP / PUC del mes
+
+Marca
+→ unidades / PVP / PUC de la marca
+```
+
+Al final:
+
+```text
+Totales generales
+```
+
+Orden:
+
+```text
+años   → más reciente a más antiguo
+meses  → diciembre a enero
+marcas → alfabético
+```
+
+Estado inicial:
+
+```text
+todos los años cerrados
+todos los meses cerrados
+```
+
+Al abrir un año aparecen sus meses.
+
+Al abrir un mes aparecen sus marcas.
+
+El estado expandido/plegado vive únicamente en el renderer de la ventana de informe.
+
+## 26.10 Impresión del informe
+
+La BrowserWindow incluye un botón:
+
+```text
+Imprimir
+```
+
+No lanzar impresión automáticamente.
+
+Al pulsarlo:
+
+```text
+imprimir exactamente el estado visible
+```
+
+Por tanto:
+
+```text
+año cerrado
+→ sus meses no se imprimen
+
+mes cerrado
+→ sus marcas no se imprimen
+```
+
+No crear una segunda representación especial para papel.
+
+La única adaptación de impresión necesaria es evitar que el propio botón `Imprimir` aparezca en la salida.
+
+Usar:
+
+```text
+diálogo estándar del sistema
+```
+
+No usar impresora térmica.
+
+No forzar una maquetación compleja específica de impresión.
+
+## 26.11 Arquitectura prevista
+
+Caducidades tendrá dominio propio dentro de Almacén.
+
+Conceptualmente:
+
+```text
+CaducidadesRepository
+  search()
+  create()
+  deactivate()
+  getFilterOptions()
+  getReport()
+```
+
+o equivalente integrado en `AlmacenRepository` si al revisar `main` resulta más coherente, evitando crear capas artificiales.
+
+La lectura principal debe devolver conceptualmente:
+
+```text
+rows
+totalRows
+totalUnidades
+totalPvpCents
+totalPucMicros
+```
+
+El reporte debe devolver datos ya agrupados:
+
+```text
+years[]
+  months[]
+    brands[]
+```
+
+con sus acumulados.
+
+Alta y baja necesitan transacciones SQLite.
+
+La vista de informe reutilizará el patrón seguro ya establecido por Inventario:
+
+```text
+BrowserWindow independiente
+preload mínimo
+IPC reducido
+snapshot persistido
+```
+
+## 26.12 Mini-hitos
+
+### 15I.1 — Dominio + esquema
+
+```text
+⬅️ SIGUIENTE
+```
+
+- revisar `merma_caducidad` actual;
+- ampliar snapshot histórico;
+- revisar importación legacy;
+- contratos;
+- repository/application base;
+- definir semántica del histórico de stock;
+- tests de esquema/importación;
+- mantener schema version 1.
+
+### 15I.2 — Consulta + filtros + totales
+
+- consulta paginada;
+- año;
+- mes;
+- marca;
+- nombre;
+- opciones de filtros;
+- totales globales filtrados;
+- tests SQL.
+
+### 15I.3 — Pantalla principal
+
+- activar pestaña;
+- filtros;
+- tabla;
+- paginación;
+- totales;
+- loading/error/empty;
+- botón Añadir;
+- botón Informe.
+
+### 15I.4 — Alta de caducidad
+
+- modal nuevo;
+- buscador de artículos;
+- selección;
+- unidades;
+- snapshot backend;
+- decremento stock;
+- histórico;
+- transacción;
+- reconciliación Artículos.
+
+### 15I.5 — Baja / reversión
+
+- confirmación;
+- soft-delete;
+- restaurar stock;
+- histórico inverso;
+- transacción;
+- protección contra doble reversión;
+- reconciliación Artículos.
+
+### 15I.6 — Informe agrupado
+
+- consulta filtrada agregada;
+- Año → Mes → Marca;
+- orden cerrado;
+- totales por nivel;
+- todos cerrados inicialmente;
+- BrowserWindow.
+
+### 15I.7 — Impresión + regresión
+
+- botón Imprimir;
+- diálogo estándar;
+- imprimir estado expandido visible;
+- ocultar botón en papel;
+- tests finales;
+- batería completa;
+- regresión funcional;
+- cerrar Caducidades.
 
 ---
 
-# 27. Prompt de relevo
+# 27. Próximo bloque exacto
+
+```text
+15I.1 — Dominio + esquema de Caducidades
+```
+
+Antes de proponer cambios:
+
+1. revisar `main` actual;
+2. revisar esquema actual de `merma_caducidad`;
+3. revisar cómo se importan actualmente las caducidades legacy;
+4. revisar `historico_articulo` y sus tipos/consumidores;
+5. revisar patrón de transacciones usado en Inventario;
+6. revisar reconciliación con fichas abiertas de Artículos;
+7. mantener `DATABASE_SCHEMA_VERSION = 1`;
+8. no introducir migraciones pre-estable;
+9. no activar todavía UI completa;
+10. añadir tests antes de avanzar a 15I.2.
+
+Resultado esperado:
+
+```text
+modelo histórico definitivo
++
+snapshot completo
++
+contratos
++
+persistencia base preparada
++
+importación legacy compatible
+```
+
+No empezar Imprenta hasta cerrar Caducidades.
+
+---
+
+# 28. Prompt de relevo
 
 Si este chat alcanza el límite, continuar con este contexto:
 
 ```text
 Estamos desarrollando Osumi TPV Client.
-La base de continuidad es el documento v2.44 + el main actual del repositorio.
+La base de continuidad es el documento v2.45 + el main actual del repositorio.
 
 Reglas:
 - revisar main antes de proponer patches;
@@ -2067,7 +2721,11 @@ Estado:
 - 15E Persistencia cerrado.
 - 15F CSV cerrado.
 - 15G Vista de impresión cerrado.
-- siguiente punto exacto: 15H Integración + regresión Inventario.
+- 15H Integración + regresión Inventario cerrado.
+- Inventario oficialmente cerrado.
+- Caducidades funcionalmente definido y dividido en 15I.1–15I.7.
+- Imprenta sigue placeholder.
+- siguiente punto exacto: 15I.1 Dominio + esquema de Caducidades.
 
 Inventario:
 - filtros proveedor, marca, categoría exacta, texto, descuento;
@@ -2099,6 +2757,25 @@ Inventario:
 - impresión = ventana independiente, tabla + 3 totales + botón imprimir + diálogo normal;
 - no usar térmica.
 
+Caducidades — decisiones cerradas:
+- CRUD sin Update.
+- filtros: año de baja, mes de baja, marca histórica, nombre snapshot.
+- tabla: Localizador, Marca, Nombre, Unidades, PVP unitario, PUC unitario, Total PVP, Opciones.
+- totales globales: unidades, Σ unidades×PVP, Σ unidades×PUC.
+- snapshot histórico de artículo/marca/localizador/nombre/PUC/PVP.
+- alta resta stock y crea histórico en una transacción.
+- unidades > 0; se permite superar stock y dejar stock negativo.
+- baja es soft-delete, restaura stock y crea histórico inverso en una transacción.
+- alta/baja reconcilian fichas abiertas de Artículos preservando dirty.
+- informe respeta filtros actuales.
+- informe agrupado Año → Mes → Marca.
+- años desc, meses desc, marcas alfabéticas.
+- años y meses cerrados por defecto.
+- informe en BrowserWindow independiente con snapshot persistido.
+- botón Imprimir; imprime exactamente el estado expandido visible.
+- no impresora térmica; diálogo estándar.
+- Imprenta no se diseña todavía.
+
 Roadmap:
 15A Base Almacén ✅
 15B Dominio + consulta Inventario ✅
@@ -2107,14 +2784,21 @@ Roadmap:
 15E Persistencia ✅
 15F CSV ✅
 15G Vista impresión ✅
-15H Integración + regresión Inventario ⬅️ SIGUIENTE
-15I Caducidades placeholder
+15H Integración + regresión Inventario ✅
+15I Caducidades 🟦 PLANIFICADO
+  15I.1 Dominio + esquema ⬅️ SIGUIENTE
+  15I.2 Consulta + filtros + totales
+  15I.3 Pantalla principal
+  15I.4 Alta
+  15I.5 Baja / reversión
+  15I.6 Informe agrupado
+  15I.7 Impresión + regresión
 15J Imprenta placeholder
 ```
 
 ---
 
-# 28. Historial de continuidad
+# 29. Historial de continuidad
 
 ```text
 v2.36
@@ -2184,4 +2868,24 @@ v2.44
 → preload mínimo e IPC restringido por webContents.id
 → corregidos registros IPC duplicados accidentales en composition root
 → siguiente bloque exacto: 15H Integración + regresión Inventario
+
+v2.45
+→ 15H Integración + regresión Inventario cerrado
+→ tests de persistencia/rollback/baja/códigos reforzados
+→ corregido falso positivo null===null en barcode alfanumérico
+→ Inventario oficialmente CERRADO
+→ requisitos de Caducidades cerrados
+→ snapshot histórico completo de artículo/marca/precios
+→ alta resta stock + histórico de stock
+→ baja lógica restaura stock + histórico inverso
+→ alta/baja atómicas
+→ filtros Año/Mes/Marca/Nombre
+→ tabla con Total PVP por línea
+→ totales globales filtrados
+→ informe respeta filtros y agrupa Año → Mes → Marca
+→ años/meses cerrados por defecto
+→ impresión del estado visible mediante BrowserWindow
+→ Caducidades dividido en 15I.1–15I.7
+→ Imprenta continúa placeholder
+→ siguiente bloque exacto: 15I.1 Dominio + esquema
 ```
