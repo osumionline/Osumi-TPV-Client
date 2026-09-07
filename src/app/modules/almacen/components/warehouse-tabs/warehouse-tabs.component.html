@@ -1,0 +1,11 @@
+<nav class="warehouse-tabs"
+     aria-label="Apartados de Almacén">
+    @for (section of sections; track section.id) {
+    <button type="button"
+            class="warehouse-tabs__item"
+            [class.warehouse-tabs__item--active]="activeSection() === section.id"
+            (click)="selectSection(section.id)">
+        {{ section.label }}
+    </button>
+    }
+</nav>

@@ -57,7 +57,7 @@ export default class HeaderComponent {
       id: 'almacen',
       label: 'Almacén',
       icon: 'warehouse',
-      route: null,
+      route: '/almacen',
     },
     {
       id: 'caja',

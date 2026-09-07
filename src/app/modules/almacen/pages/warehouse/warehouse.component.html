@@ -1,0 +1,50 @@
+<otpv-header selectedOption="almacen"
+             [appName]="appName()" />
+
+<main class="warehouse">
+    <section class="warehouse__panel">
+        <header class="warehouse__toolbar">
+            <h1>
+                ALMACÉN
+            </h1>
+        </header>
+
+        <otpv-warehouse-tabs [activeSection]="activeSection()"
+                             (selectSectionEvent)="selectSection($event)" />
+
+        <div class="warehouse__content">
+            @switch (activeSection()) {
+            @case ('inventory') {
+            <section class="warehouse__state">
+                <h2>
+                    Inventario
+                </h2>
+                <p>
+                    La gestión de inventario se incorporará en el siguiente bloque.
+                </p>
+            </section>
+            }
+            @case ('expirations') {
+            <section class="warehouse__state">
+                <h2>
+                    Caducidades
+                </h2>
+                <p>
+                    Este apartado se desarrollará más adelante.
+                </p>
+            </section>
+            }
+            @case ('printing') {
+            <section class="warehouse__state">
+                <h2>
+                    Imprenta
+                </h2>
+                <p>
+                    Este apartado se desarrollará más adelante.
+                </p>
+            </section>
+            }
+            }
+        </div>
+    </section>
+</main>

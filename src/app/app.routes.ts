@@ -37,6 +37,11 @@ const routes: Routes = [
     loadComponent: () => import('@modules/clientes/pages/clients/clients.component'),
   },
   {
+    path: 'almacen',
+    canActivate: [readyApplicationGuard],
+    loadComponent: () => import('@modules/almacen/pages/warehouse/warehouse.component'),
+  },
+  {
     path: '',
     pathMatch: 'full',
     redirectTo: 'startup',
