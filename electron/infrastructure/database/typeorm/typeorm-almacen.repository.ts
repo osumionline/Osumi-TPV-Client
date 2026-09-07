@@ -901,7 +901,10 @@ export default class TypeOrmAlmacenRepository implements AlmacenRepository {
     const numericCode: number | null =
       /^\d+$/.test(codigo) && Number.isSafeInteger(Number(codigo)) ? Number(codigo) : null;
 
-    if (numericCode === article.localizador || numericCode === article.acceso_directo) {
+    if (
+      numericCode !== null &&
+      (numericCode === article.localizador || numericCode === article.acceso_directo)
+    ) {
       throw new Error(
         'El código de barras coincide con el localizador o acceso directo del artículo.',
       );

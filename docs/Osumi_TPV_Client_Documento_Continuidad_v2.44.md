@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.42  
+**Versión:** 2.44  
 **Fecha:** 7 de septiembre de 2026  
-**Base de continuidad:** `v2.42 + main` una vez este documento se suba al repositorio.
+**Base de continuidad:** `v2.44 + main` una vez este documento se suba al repositorio.
 
 ---
 
@@ -14,11 +14,7 @@ El **Hito 13 — Artículos** está completamente terminado, validado y subido a
 
 El **Hito 14 — Clientes** queda oficialmente **✅ CERRADO** tras completar la regresión integral final. No queda funcionalidad conocida pendiente dentro de este hito.
 
-El siguiente gran bloque es:
-
-```text
-HITO 15 — ALMACÉN
-```
+El **Hito 15 — Almacén** está actualmente **🟦 EN DESARROLLO**.
 
 Se divide funcionalmente en tres pestañas independientes:
 
@@ -28,14 +24,31 @@ Caducidades
 Imprenta
 ```
 
-Por ahora se desarrollará **solo Inventario**.
+Por ahora se desarrolla **solo Inventario**.
 
 ```text
-Caducidades → placeholder
-Imprenta    → placeholder
+Inventario   → 15A–15G ✅
+Caducidades  → placeholder
+Imprenta     → placeholder
 ```
 
-La planificación funcional y técnica de Inventario ya está cerrada y se recoge en este documento.
+Ya están cerrados:
+
+```text
+15A Base de Almacén
+15B Dominio + consulta Inventario
+15C Pantalla Inventario
+15D Drafts inline + cálculos
+15E Persistencia
+15F CSV
+15G Vista de impresión
+```
+
+El siguiente bloque exacto es:
+
+```text
+15H — Integración + regresión Inventario
+```
 
 ---
 
@@ -75,15 +88,15 @@ Ventas 12 — Postventa                             🟦
       14K.6A “Imprimir factura” tras venta        ✅
       14K.6B Regresión integral + cierre          ✅
 
-15 Almacén                                        🟦 PLANIFICADO
-  15A Base de Almacén                             ⬅️ SIGUIENTE
-  15B Dominio + consulta Inventario               ⬜
-  15C Pantalla Inventario                         ⬜
-  15D Drafts inline + cálculos                    ⬜
-  15E Persistencia                                ⬜
-  15F CSV                                         ⬜
-  15G Vista de impresión                          ⬜
-  15H Integración + regresión Inventario          ⬜
+15 Almacén                                        🟦 EN DESARROLLO
+  15A Base de Almacén                             ✅
+  15B Dominio + consulta Inventario               ✅
+  15C Pantalla Inventario                         ✅
+  15D Drafts inline + cálculos                    ✅
+  15E Persistencia                                ✅
+  15F CSV                                         ✅
+  15G Vista de impresión                          ✅
+  15H Integración + regresión Inventario          ⬅️ SIGUIENTE
   15I Caducidades                                 ⬜ PLACEHOLDER
   15J Imprenta                                    ⬜ PLACEHOLDER
 
@@ -487,6 +500,352 @@ Caducidades e Imprenta son dominios independientes y no deben diseñarse todaví
 
 ---
 
+# 7.1 Estado implementado de Inventario
+
+Hasta `main` actual quedan cerrados y validados los bloques:
+
+```text
+15A Base de Almacén                  ✅
+15B Dominio + consulta Inventario    ✅
+15C Pantalla Inventario              ✅
+15D Drafts inline + cálculos         ✅
+15E Persistencia                     ✅
+15F CSV                              ✅
+15G Vista de impresión               ✅
+```
+
+## 7.1.1 Base y navegación
+
+Existe:
+
+```text
+/almacen
+```
+
+con pestañas:
+
+```text
+Inventario
+Caducidades
+Imprenta
+```
+
+`Caducidades` e `Imprenta` continúan únicamente como placeholders.
+
+## 7.1.2 Consulta masiva
+
+Inventario ya consulta SQLite mediante dominio específico de Almacén.
+
+La respuesta contiene:
+
+```text
+rows
+totalRows
+mediaMargenMicroporcentaje
+totalPucMicros
+totalPvpCents
+```
+
+La consulta implementa:
+
+- proveedor;
+- marca;
+- categoría explícita exacta;
+- texto libre;
+- descuento;
+- paginación SQLite;
+- categorías por artículo;
+- existencia de código adicional;
+- aviso sin ventas en 12 meses;
+- agregados globales del conjunto filtrado.
+
+El aviso de 12 meses cuenta únicamente ventas positivas. Una devolución reciente no considera al artículo como vendido.
+
+## 7.1.3 Pantalla
+
+La barra superior está compactada en una única línea en escritorio:
+
+```text
+[Proveedor] [Marca] [Categoría] [Buscar] [X] Con descuento
+                                      [Columnas] [Guardar todos] [CSV] [Imprimir]
+```
+
+Las acciones globales se muestran como botones de icono.
+
+Columnas visibles por defecto:
+
+```text
+Localizador
+Proveedor
+Marca
+Referencia
+Nombre
+Stock
+PUC
+PVP
+Margen
+Código de barras
+Opciones
+```
+
+Desactivadas por defecto, pero seleccionables:
+
+```text
+Categoría
+Precio albarán
+```
+
+`Opciones` continúa siempre visible y fuera del selector.
+
+## 7.1.4 Edición tipo hoja de cálculo
+
+Los campos editables trabajan con:
+
+```text
+snapshot persistido
++
+draft local
+```
+
+En inputs:
+
+```text
+focus
+→ seleccionar todo
+
+escribir
+→ no confirmar todavía
+
+blur
+→ validar
+→ confirmar
+→ recalcular si corresponde
+→ dirty
+
+Intro
+→ validar
+→ confirmar
+→ recalcular
+→ dirty
+→ saltar al mismo campo de la fila inferior
+→ seleccionar todo
+```
+
+Esto se aplica a:
+
+```text
+Stock
+Precio albarán
+PUC
+PVP
+Código adicional
+```
+
+La selección de Categorías se aplica directamente al cambiar la selección.
+
+La tabla conserva la identidad de fila mediante `trackBy` por artículo para evitar pérdida de foco al actualizar drafts.
+
+Los drafts sobreviven al cambio de página y se mantienen asociados al conjunto filtrado correspondiente.
+
+## 7.1.5 Dirty y Reset
+
+Una modificación real produce:
+
+```text
+celda dirty
+→ fila dirty
+→ Reset habilitado
+→ Guardar fila habilitado
+→ Guardar todos habilitado
+```
+
+Los cálculos derivados también pueden marcar dirty:
+
+```text
+PUC / Precio albarán / PVP
+→ Margen derivado dirty si cambia
+```
+
+Entrar y salir de un campo sin modificarlo no genera dirty.
+
+`Reset` restaura toda la fila al snapshot persistido.
+
+## 7.1.6 Totales reactivos
+
+La pantalla utiliza:
+
+```text
+agregados persistidos globales
++
+deltas de drafts del conjunto filtrado
+```
+
+Por tanto:
+
+```text
+Media margen
+Total PUC
+Total PVP
+```
+
+se actualizan al confirmar una edición, sin cargar todo el inventario en Angular.
+
+## 7.1.7 Persistencia
+
+La escritura usa un dominio específico de Almacén y no reutiliza el guardado completo de ficha de Artículos.
+
+Operaciones disponibles:
+
+```text
+Guardar fila
+Guardar todos
+Baja lógica
+Añadir primer código adicional
+```
+
+`Guardar todos` es atómico:
+
+```text
+todas las filas dirty válidas
+→ una transacción
+→ COMMIT
+
+si una falla
+→ ROLLBACK completo
+→ todas continúan dirty
+```
+
+La escritura modifica únicamente los campos necesarios.
+
+Categorías:
+
+```text
+sincronización N:M explícita
+```
+
+Stock:
+
+```text
+actualiza stock
++
+crea histórico manual equivalente al dominio Artículos
+```
+
+Código adicional:
+
+```text
+solo puede añadirse si no existe ya otro adicional activo
++
+se valida unicidad global
++
+se evita colisión con localizador / acceso directo
+```
+
+Baja:
+
+```text
+soft-delete artículo
++
+soft-delete códigos activos
++
+histórico conservado
+```
+
+Tras una persistencia desde Inventario se reconcilian posibles fichas abiertas en `ArticulosService`, preservando cambios locales dirty si existieran.
+
+## 7.1.8 CSV
+
+La exportación CSV está cerrada y reutiliza una consulta de reporte compartida.
+
+Flujo:
+
+```text
+filtros actuales
++
+columnas seleccionadas
+→ snapshot persistido completo
+→ todas las filas filtradas
+→ diálogo nativo Guardar como
+→ CSV
+```
+
+Reglas implementadas:
+
+- no exporta drafts sin guardar;
+- no se limita a la página visible;
+- no incluye `Opciones`;
+- respeta exactamente las columnas seleccionadas y su orden;
+- reutiliza los mismos filtros de Inventario;
+- exporta los códigos adicionales activos reales;
+- usa UTF-8 con BOM;
+- usa `;` como separador;
+- usa coma decimal;
+- protege textos que podrían interpretarse como fórmulas de hoja de cálculo.
+
+La capa de reportes devuelve también:
+
+```text
+totalRows
+mediaMargenMicroporcentaje
+totalPucMicros
+totalPvpCents
+```
+
+aunque los totales no forman parte del CSV. Esa frontera se reutiliza para impresión.
+
+## 7.1.9 Vista de impresión
+
+La vista de impresión está cerrada.
+
+Flujo:
+
+```text
+clic Imprimir
+→ filtros actuales
+→ columnas seleccionadas
+→ getInventarioReport()
+→ snapshot persistido completo
+→ BrowserWindow independiente
+```
+
+La BrowserWindow muestra:
+
+```text
+tabla limpia
++
+todas las filas filtradas
++
+columnas seleccionadas
++
+Media margen
++
+Total PUC
++
+Total PVP
++
+botón Imprimir
+```
+
+Reglas implementadas:
+
+- usa exclusivamente valores persistidos;
+- no conoce drafts;
+- el snapshot queda fijado al abrir la ventana;
+- cambiar después filtros/drafts en la ventana principal no altera la vista abierta;
+- no incluye `Opciones`;
+- no abre automáticamente el diálogo de impresión;
+- el botón propio `Imprimir` abre el diálogo estándar del sistema;
+- configuración inicial A4 apaisado;
+- no usa impresora térmica;
+- cabecera de tabla preparada para repetirse entre páginas;
+- preload mínimo;
+- superficie IPC reducida;
+- autorización de IPC ligada al `webContents.id` de la ventana.
+
+Durante la integración de 15G se corrigieron además dos registros IPC duplicados accidentales en `application-composition.ts` (`registerApplicationIpc` y `registerArticulosIpc`). El composition root vuelve a registrar una única vez cada superficie IPC.
+
+---
+
 # 8. Inventario — objetivo funcional
 
 Inventario es una vista rápida y operativa sobre todo el inventario de la tienda.
@@ -659,6 +1018,15 @@ porque Opciones siempre está visible únicamente en la tabla principal y nunca 
 
 La configuración de columnas es de presentación, no modifica el query funcional de filtros/totales salvo en reportes.
 
+Configuración inicial:
+
+```text
+Categoría        → oculta
+Precio albarán   → oculto
+resto de columnas de datos → visibles
+Opciones         → siempre visible
+```
+
 ---
 
 # 12. Inventario — edición inline
@@ -671,7 +1039,7 @@ snapshot persistido
 draft local
 ```
 
-## 12.1 Foco
+## 12.1 Foco y confirmación
 
 En campos numéricos/textuales editables:
 
@@ -680,17 +1048,41 @@ focus
 → seleccionar todo el contenido
 ```
 
-equivalente funcional a:
+La escritura no modifica el draft en cada pulsación.
 
-```html
-onfocus="this.select()"
+La confirmación se realiza mediante:
+
+```text
+blur
+o
+Intro
 ```
 
-En Angular se implementará de forma adecuada, sin usar inline handlers antiguos.
+Al confirmar:
+
+```text
+validar
+→ actualizar draft
+→ recalcular valores derivados
+→ actualizar dirty
+→ actualizar totales
+```
+
+Al pulsar `Intro`:
+
+```text
+confirmar
+→ saltar al mismo campo editable de la fila inferior
+→ seleccionar todo
+```
+
+El objetivo es reproducir un flujo de trabajo tipo hoja de cálculo para edición rápida de columnas.
+
+En la última fila visible, `Intro` confirma pero no cambia automáticamente de página.
 
 ## 12.2 Dirty
 
-Si una celda cambia:
+Si una celda cambia realmente tras confirmar:
 
 ```text
 celda dirty
@@ -699,6 +1091,8 @@ celda dirty
 → Reset habilitado
 → Guardar habilitado
 ```
+
+Entrar y salir de un editor sin modificar el valor no genera dirty.
 
 ## 12.3 Reset
 
@@ -718,7 +1112,7 @@ Guardar
 
 ## 12.5 Guardar todos
 
-Debe ser atómico:
+Está implementado como operación atómica:
 
 ```text
 todas las filas dirty válidas
@@ -868,9 +1262,9 @@ persistir nuevo stock
 crear histórico manual de stock
 ```
 
-Debe conservarse la semántica ya existente en Artículos para los cambios manuales.
+Está implementada la misma semántica de histórico manual ya existente en Artículos.
 
-Guardar una fila no debe reescribir innecesariamente toda la ficha de artículo.
+Guardar una fila modifica únicamente los campos reducidos de Inventario y no reescribe innecesariamente toda la ficha de artículo.
 
 ---
 
@@ -906,7 +1300,7 @@ input desaparece
 → aparece ✓
 ```
 
-El backend debe volver a respetar la unicidad global de códigos activos.
+El backend respeta la unicidad global de códigos activos y evita también colisiones comerciales con localizador/acceso directo.
 
 ---
 
@@ -993,10 +1387,12 @@ No usar `pvp_descuento` para este total.
 
 ## 19.4 Drafts
 
-En la pantalla principal, los totales se actualizan en tiempo real con los drafts:
+En la pantalla principal, los totales se actualizan con los drafts al confirmar la edición:
 
 ```text
 editar Stock / PUC / PVP
+→ blur o Intro
+→ actualizar draft
 → actualizar inmediatamente
   Media margen
   Total PUC
@@ -1043,12 +1439,12 @@ La UI tendrá selector de resultados por página y navegación.
 Acción global:
 
 ```text
-Exportar a Excel
+Exportar CSV
 ```
 
-El resultado será un archivo CSV.
+Está implementada mediante una consulta de reporte persistida.
 
-Debe usar:
+Usa:
 
 ```text
 mismos filtros actuales
@@ -1056,15 +1452,25 @@ mismos filtros actuales
 solo columnas seleccionadas
 +
 solo valores persistidos
++
+todas las filas filtradas
 ```
 
-No exportar drafts sin guardar.
+No exporta drafts sin guardar.
 
-No exportar columna Opciones.
+No exporta columna `Opciones`.
 
-No limitarse a la página actual si el usuario está filtrando un conjunto mayor.
+No se limita a la página actual.
 
-Debe exportar el conjunto filtrado completo.
+Formato:
+
+```text
+UTF-8 + BOM
+separador ;
+coma decimal
+```
+
+El archivo se guarda mediante diálogo nativo del sistema.
 
 ---
 
@@ -1076,11 +1482,12 @@ Acción global:
 Imprimir
 ```
 
-Flujo cerrado:
+Está implementada con este flujo:
 
 ```text
 clic Imprimir
-→ abrir ventana nueva
+→ obtener snapshot persistido
+→ abrir BrowserWindow independiente
 → tabla limpia
 → columnas seleccionadas
 → filas filtradas persistidas
@@ -1089,11 +1496,19 @@ clic Imprimir
 → diálogo normal del sistema
 ```
 
-No lanzar el diálogo automáticamente al abrir.
+El diálogo no se lanza automáticamente al abrir.
 
-No usar impresora térmica.
+No usa impresora térmica.
 
 La ventana de impresión no replica navegación, filtros ni controles de edición de la aplicación.
+
+La configuración inicial de impresión es:
+
+```text
+A4 apaisado
+```
+
+sin impedir que el usuario cambie opciones en el diálogo estándar.
 
 ## 22.1 Totales de impresión
 
@@ -1120,24 +1535,30 @@ impresión          → muestra persistido
 
 # 23. Arquitectura propuesta para Inventario
 
-No reutilizar directamente el guardado completo de `ArticulosRepository.update()` para cada celda.
+No se reutiliza directamente el guardado completo de `ArticulosRepository.update()`.
 
-Inventario debe tener un dominio específico y reducido.
+Inventario dispone de dominio específico y reducido.
 
-Conceptualmente:
+Estado actual:
 
 ```text
 AlmacenRepository
   searchInventario()
-  saveInventarioRow()
   saveInventarioRows()
   deactivateArticulo()
-  getInventarioReport()
 ```
 
-La lectura debe estar optimizada para tabla masiva.
+La capa application expone además:
 
-La escritura debe modificar únicamente:
+```text
+saveInventarioRow()
+saveInventarioRows()
+deactivateArticulo()
+```
+
+La lectura está optimizada para tabla masiva y evita N+1.
+
+La escritura modifica únicamente:
 
 ```text
 categorías
@@ -1145,16 +1566,29 @@ stock
 precio albarán
 PUC
 PVP
+margen
 código adicional nuevo
 ```
 
 según los cambios reales.
+
+Pendiente para reportes:
+
+```text
+getInventarioReport()
+```
+
+que se abordará con CSV / impresión.
 
 ---
 
 # 24. Hoja de ruta Hito 15
 
 ## 15A — Base de Almacén
+
+```text
+✅ CERRADO
+```
 
 Objetivo:
 
@@ -1180,6 +1614,10 @@ No desarrollar aún lógica de negocio.
 ---
 
 ## 15B — Dominio + consulta Inventario
+
+```text
+✅ CERRADO
+```
 
 Crear:
 
@@ -1214,28 +1652,42 @@ No edición todavía.
 
 ## 15C — Pantalla Inventario
 
-Construir:
+```text
+✅ CERRADO
+```
+
+Implementado:
 
 - filtros;
 - selector columnas;
 - tabla;
 - paginación;
 - totales;
-- estados loading/error/empty.
+- estados loading/error/empty;
+- toolbar compacta en una línea;
+- acciones globales con icon buttons;
+- Categoría y Precio albarán ocultos por defecto.
 
 Los filtros consultan backend.
 
-No filtrar miles de artículos en Angular.
+No se filtran miles de artículos en Angular.
 
 ---
 
 ## 15D — Drafts inline + cálculos
 
-Añadir:
+```text
+✅ CERRADO
+```
+
+Implementado:
 
 - snapshot persistido;
 - draft por fila;
 - selección de input al foco;
+- confirmación por blur / Intro;
+- navegación vertical tipo Excel con Intro;
+- identidad de filas estable mediante trackBy;
 - dirty por celda;
 - dirty por fila;
 - fondo resaltado;
@@ -1254,7 +1706,11 @@ Añadir:
 
 ## 15E — Persistencia
 
-Añadir:
+```text
+✅ CERRADO
+```
+
+Implementado:
 
 ```text
 Guardar fila
@@ -1264,15 +1720,28 @@ Código adicional
 Histórico de stock
 ```
 
-`Guardar todos` atómico.
+`Guardar todos` es atómico.
 
-Reconciliar posibles fichas ya abiertas en `ArticulosService` si es necesario para no dejar datos canónicos incoherentes en memoria.
+La persistencia:
+
+- usa escritura reducida;
+- valida categorías activas;
+- respeta unicidad global de códigos;
+- evita segundo código adicional;
+- conserva stock negativo;
+- genera histórico manual de stock;
+- realiza baja lógica de artículo y códigos;
+- reconcilia posibles fichas abiertas en `ArticulosService` sin sobrescribir cambios locales dirty.
 
 ---
 
 ## 15F — CSV
 
-Crear exportación persistida:
+```text
+✅ CERRADO
+```
+
+Implementado:
 
 ```text
 filtros actuales
@@ -1281,21 +1750,31 @@ columnas seleccionadas
 +
 todas las filas filtradas
 +
+valores persistidos
++
 sin drafts
+→ diálogo nativo Guardar como
+→ CSV UTF-8 con BOM
 ```
 
-Resultado CSV descargable/guardable según patrón desktop que corresponda.
+La consulta de reporte se comparte con 15G.
 
 ---
 
 ## 15G — Vista de impresión
 
-Crear BrowserWindow independiente:
+```text
+✅ CERRADO
+```
+
+Implementado:
 
 ```text
 snapshot persistido
+→ BrowserWindow independiente
 → tabla limpia
 → columnas seleccionadas
+→ todas las filas filtradas
 → Media margen
 → Total PUC
 → Total PVP
@@ -1303,11 +1782,23 @@ snapshot persistido
 → diálogo estándar
 ```
 
-Preload mínimo y superficie IPC reducida.
+La ventana usa preload mínimo, superficie IPC reducida y autorización por `webContents.id`.
+
+Impresión:
+
+```text
+A4 apaisado por defecto
+no térmica
+no diálogo automático al abrir
+```
 
 ---
 
 ## 15H — Integración + regresión Inventario
+
+```text
+⬅️ SIGUIENTE
+```
 
 Validar:
 
@@ -1417,44 +1908,130 @@ Se explicará funcionalmente en otro bloque.
 - Vista impresión tiene botón propio Imprimir.
 - Diálogo de impresión es estándar del sistema.
 - Impresión de Inventario no usa impresora térmica.
-
----
+- Categoría y Precio albarán están ocultos por defecto.
+- La barra superior de Inventario se mantiene compacta en una sola línea en escritorio.
+- Las acciones globales usan botones de icono.
+- Los inputs no confirman en cada pulsación.
+- `blur` confirma una edición.
+- `Intro` confirma y avanza al mismo campo de la fila inferior.
+- Entrar/salir sin cambio no genera dirty.
+- Las filas de tabla mantienen identidad estable por artículo para no perder foco.
+- Los drafts sobreviven a cambios de página.
+- Guardar fila y Guardar todos ya están implementados.
+- Guardar todos es transaccional y sin éxito parcial.
+- El histórico manual de stock conserva la semántica del módulo Artículos.
+- La baja lógica desactiva también códigos activos.
+- La persistencia desde Inventario reconcilia fichas abiertas de Artículos preservando cambios locales pendientes.
+- CSV usa una consulta de reporte persistida compartida con impresión.
+- CSV usa UTF-8 con BOM, `;` y coma decimal.
+- CSV exporta códigos adicionales activos reales, no el check visual.
+- La vista de impresión recibe un snapshot persistido al abrirse.
+- La vista de impresión no cambia aunque después cambien filtros o drafts en la ventana principal.
+- La impresión usa BrowserWindow independiente, preload mínimo e IPC restringido por `webContents.id`.
+- La impresión parte de A4 apaisado y usa el diálogo estándar del sistema.
 
 # 26. Próximo bloque exacto
 
 ```text
-15A — Base de Almacén
+15H — Integración + regresión Inventario
 ```
 
-Antes de proponer cambios:
+Este es el último bloque antes de declarar Inventario cerrado.
 
-1. revisar `main` actual;
-2. revisar router/header actuales;
-3. revisar estructura/patrón de páginas con tabs existentes;
-4. decidir nombres concretos de componentes/ruta siguiendo convenciones actuales;
-5. no implementar aún query de Inventario;
-6. Caducidades e Imprenta solo placeholders.
-
-Resultado esperado de 15A:
+Objetivo:
 
 ```text
-Header → Almacén habilitado
-/alma­cen → página funcional
-Tabs:
-  Inventario
-  Caducidades
-  Imprenta
-
-Inventario → contenedor inicial
-Caducidades → placeholder
-Imprenta → placeholder
+ejecutar regresión integral
++
+corregir cualquier incidencia encontrada
++
+cerrar Inventario
 ```
 
-Después:
+Validar de extremo a extremo:
 
 ```text
-15B — Dominio + consulta Inventario
+ruta /almacen
+tabs
+carga inicial
+filtros combinados
+categoría exacta
+búsqueda por nombre/localizador/referencia/código/etiqueta
+descuento
+paginación
+selector de columnas
+columnas por defecto
+toolbar compacta
+aviso sin ventas 12 meses
+
+edición tipo Excel
+focus/select
+blur
+Intro + salto a fila inferior
+dirty
+Reset
+categorías N:M
+stock negativo
+Precio albarán
+PUC
+PVP
+Margen
+totales reactivos
+
+Guardar fila
+Guardar todos
+atomicidad / rollback
+histórico manual de stock
+código adicional
+unicidad de código
+baja lógica
+reconciliación con fichas de Artículos
+persistencia tras reinicio
+
+CSV
+filtros
+columnas
+todas las filas
+solo persistido
+cancelación diálogo
+archivo Excel-compatible
+
+impresión
+filtros
+columnas
+todas las filas
+solo persistido
+totales
+BrowserWindow
+botón Imprimir
+diálogo estándar
 ```
+
+Batería completa:
+
+```bash
+npm run test:electron
+npm run build:electron
+npm test
+npm run build
+npm run lint
+```
+
+Si la regresión queda limpia:
+
+```text
+15H ✅
+Inventario ✅ CERRADO
+```
+
+Después de cerrar Inventario:
+
+```text
+Caducidades → sigue placeholder
+Imprenta    → sigue placeholder
+```
+
+No diseñar esos dos dominios hasta recibir sus requisitos funcionales.
 
 ---
 
@@ -1464,7 +2041,7 @@ Si este chat alcanza el límite, continuar con este contexto:
 
 ```text
 Estamos desarrollando Osumi TPV Client.
-La base de continuidad es el documento v2.42 + el main actual del repositorio.
+La base de continuidad es el documento v2.44 + el main actual del repositorio.
 
 Reglas:
 - revisar main antes de proponer patches;
@@ -1479,11 +2056,18 @@ Reglas:
 Estado:
 - Hito 13 Artículos cerrado.
 - Hito 14 Clientes completamente cerrado tras regresión integral.
-- siguiente gran hito: 15 Almacén.
+- Hito 15 Almacén en desarrollo.
 - Almacén tiene tres pestañas: Inventario, Caducidades, Imprenta.
 - desarrollar ahora solo Inventario.
 - Caducidades e Imprenta quedan como placeholders.
-- siguiente punto exacto: 15A Base de Almacén.
+- 15A Base Almacén cerrado.
+- 15B Dominio + consulta Inventario cerrado.
+- 15C Pantalla Inventario cerrado.
+- 15D Drafts inline + cálculos cerrado.
+- 15E Persistencia cerrado.
+- 15F CSV cerrado.
+- 15G Vista de impresión cerrado.
+- siguiente punto exacto: 15H Integración + regresión Inventario.
 
 Inventario:
 - filtros proveedor, marca, categoría exacta, texto, descuento;
@@ -1496,6 +2080,10 @@ Inventario:
 - Opciones siempre visible y no exportable/imprimible;
 - categoría N:M explícita, nunca cascada a hijos;
 - dirty por celda/fila, Reset, Guardar fila;
+- edición textual confirmada en blur/Intro;
+- Intro salta al mismo campo de la fila inferior;
+- Categoría y Precio albarán ocultos por defecto;
+- toolbar compacta de una sola línea con acciones icon button;
 - Guardar todos atómico;
 - stock conserva histórico manual;
 - código adicional:
@@ -1512,14 +2100,14 @@ Inventario:
 - no usar térmica.
 
 Roadmap:
-15A Base Almacén
-15B Dominio + consulta Inventario
-15C Pantalla Inventario
-15D Drafts inline + cálculos
-15E Persistencia
-15F CSV
-15G Vista impresión
-15H Integración + regresión Inventario
+15A Base Almacén ✅
+15B Dominio + consulta Inventario ✅
+15C Pantalla Inventario ✅
+15D Drafts inline + cálculos ✅
+15E Persistencia ✅
+15F CSV ✅
+15G Vista impresión ✅
+15H Integración + regresión Inventario ⬅️ SIGUIENTE
 15I Caducidades placeholder
 15J Imprenta placeholder
 ```
@@ -1561,4 +2149,39 @@ v2.42
 → Inventario completamente planificado
 → Caducidades e Imprenta quedan placeholders
 → siguiente bloque exacto: 15A Base de Almacén
+
+v2.43
+→ 15A Base de Almacén cerrado
+→ 15B Dominio + consulta Inventario cerrado
+→ 15C Pantalla Inventario cerrado
+→ toolbar compacta en una línea
+→ Categoría y Precio albarán ocultos por defecto
+→ 15D Drafts inline + cálculos cerrado
+→ confirmación por blur/Intro
+→ navegación vertical tipo Excel con Intro
+→ dirty y Reset validados
+→ totales reactivos con drafts
+→ 15E Persistencia cerrado
+→ Guardar fila y Guardar todos implementados
+→ Guardar todos atómico
+→ histórico manual de stock
+→ código adicional con unicidad global
+→ baja lógica
+→ reconciliación con fichas abiertas de Artículos
+→ siguiente bloque exacto: 15F CSV
+
+v2.44
+→ 15F CSV cerrado
+→ consulta de reportes persistida y reutilizable
+→ CSV con filtros actuales + columnas seleccionadas + todas las filas filtradas
+→ CSV solo usa persistido, nunca drafts
+→ UTF-8 con BOM, separador ; y coma decimal
+→ 15G Vista de impresión cerrada
+→ BrowserWindow independiente con snapshot persistido
+→ columnas seleccionadas + todas las filas filtradas + tres totales
+→ botón Imprimir y diálogo estándar del sistema
+→ A4 apaisado por defecto
+→ preload mínimo e IPC restringido por webContents.id
+→ corregidos registros IPC duplicados accidentales en composition root
+→ siguiente bloque exacto: 15H Integración + regresión Inventario
 ```
