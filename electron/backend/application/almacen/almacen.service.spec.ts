@@ -1,15 +1,16 @@
 import AlmacenService from '@backend/application/almacen/almacen.service';
 import type AlmacenRepository from '@backend/contracts/almacen/almacen.repository.interface';
+import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-filter-query.interface';
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
 import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario-record.interface';
+import type { InventarioReportRecord } from '@backend/domain/almacen/inventario-report-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
+import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario-save.interface';
 import type {
   InventarioConsulta,
   InventarioResultado,
 } from '@desktop-contracts/almacen/inventario.interface';
 import { describe, expect, it } from 'vitest';
-import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-filter-query.interface';
-import type { InventarioReportRecord } from '@backend/domain/almacen/inventario-report-record.interface';
 
 class FakeAlmacenRepository implements AlmacenRepository {
   lastQuery: InventarioRepositoryQuery | null = null;
@@ -191,6 +192,67 @@ describe('AlmacenService', (): void => {
 
     expect(repository.lastQuery).toBeNull();
   });
+
+  it('normaliza una fila antes de persistirla', async (): Promise<void> => {
+    const repository = new FakeAlmacenRepository();
+    const service = createService(repository);
+
+    await service.saveInventarioRow(
+      createSaveCommand({
+        idsCategorias: [7, 2, 7],
+        stock: -3,
+        codigoAdicional: '  EXTRA-25  ',
+      }),
+    );
+
+    expect(repository.lastSavedCommands).toEqual([
+      {
+        idArticulo: 25,
+        idsCategorias: [2, 7],
+        stock: -3,
+        precioAlbaranMicros: 590_000,
+        pucMicros: 744_580,
+        pvpCents: 100,
+        margenMicroporcentaje: 255_420,
+        codigoAdicional: 'EXTRA-25',
+      },
+    ]);
+  });
+
+  it('rechaza artículos repetidos antes de Guardar todos', async (): Promise<void> => {
+    const repository = new FakeAlmacenRepository();
+    const service = createService(repository);
+    const command: InventarioSaveCommand = createSaveCommand();
+
+    await expect(
+      service.saveInventarioRows([
+        command,
+        {
+          ...command,
+        },
+      ]),
+    ).rejects.toThrow('Hay artículos repetidos en el guardado de inventario.');
+
+    expect(repository.lastSavedCommands).toBeNull();
+  });
+
+  it('rechaza columnas repetidas antes de generar un reporte', async (): Promise<void> => {
+    const repository = new FakeAlmacenRepository();
+    const service = createService(repository);
+
+    await expect(
+      service.getInventarioReport({
+        idProveedor: null,
+        idMarca: null,
+        idCategoria: null,
+        texto: '',
+        conDescuento: false,
+        columnas: ['nombre', 'nombre'],
+      }),
+    ).rejects.toThrow('Hay columnas repetidas en el reporte.');
+
+    expect(repository.lastReportQuery).toBeNull();
+  });
 });
 
 /**
@@ -212,6 +274,23 @@ function createConsulta(overrides: Partial<InventarioConsulta> = {}): Inventario
     conDescuento: false,
     pagina: 1,
     num: 20,
+    ...overrides,
+  };
+}
+
+/**
+ * Crea un comando de escritura válido para los tests.
+ */
+function createSaveCommand(overrides: Partial<InventarioSaveCommand> = {}): InventarioSaveCommand {
+  return {
+    idArticulo: 25,
+    idsCategorias: [2, 7],
+    stock: 8,
+    precioAlbaranMicros: 590_000,
+    pucMicros: 744_580,
+    pvpCents: 100,
+    margenMicroporcentaje: 255_420,
+    codigoAdicional: null,
     ...overrides,
   };
 }

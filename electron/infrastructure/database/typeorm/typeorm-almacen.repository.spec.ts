@@ -1,5 +1,6 @@
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
 import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario-record.interface';
+import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
 import TypeOrmAlmacenRepository from '@infrastructure/database/typeorm/typeorm-almacen.repository';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
@@ -207,6 +208,295 @@ describe('TypeOrmAlmacenRepository', (): void => {
 
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0]?.localizador).toBe(261002);
+  });
+
+  it('persiste la escritura reducida con categorías, código e histórico manual de stock', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    const command: InventarioSaveRecord = {
+      idArticulo: 1,
+      idsCategorias: [2],
+      stock: -5,
+      precioAlbaranMicros: 1_100_000,
+      pucMicros: 1_331_000,
+      pvpCents: 250,
+      margenMicroporcentaje: 444_444,
+      codigoAdicional: 'ALFA-EXTRA',
+    };
+
+    await requireRepository().saveInventarioRows([command]);
+
+    const articleRows = (await dataSource.query(
+      `
+      SELECT
+        nombre,
+        stock,
+        palb_micros,
+        puc_micros,
+        pvp_cents,
+        margen_microporcentaje,
+        pvp_descuento_cents
+      FROM articulo
+      WHERE id = 1
+    `,
+    )) as readonly {
+      readonly nombre: string;
+      readonly stock: number;
+      readonly palb_micros: number;
+      readonly puc_micros: number;
+      readonly pvp_cents: number;
+      readonly margen_microporcentaje: number;
+      readonly pvp_descuento_cents: number | null;
+    }[];
+
+    expect(articleRows[0]).toEqual({
+      nombre: 'Artículo Alfa',
+      stock: -5,
+      palb_micros: 1_100_000,
+      puc_micros: 1_331_000,
+      pvp_cents: 250,
+      margen_microporcentaje: 444_444,
+      pvp_descuento_cents: null,
+    });
+
+    const categoryRows = (await dataSource.query(
+      `
+      SELECT id_categoria
+      FROM articulo_categoria
+      WHERE id_articulo = 1
+      ORDER BY id_categoria
+    `,
+    )) as readonly {
+      readonly id_categoria: number;
+    }[];
+
+    expect(categoryRows.map((row): number => row.id_categoria)).toEqual([2]);
+
+    const barcodeRows = (await dataSource.query(
+      `
+      SELECT codigo
+      FROM codigo_barras
+      WHERE
+        id_articulo = 1
+        AND por_defecto = 0
+        AND deleted_at IS NULL
+    `,
+    )) as readonly {
+      readonly codigo: string;
+    }[];
+
+    expect(barcodeRows).toEqual([
+      {
+        codigo: 'ALFA-EXTRA',
+      },
+    ]);
+
+    const historyRows = (await dataSource.query(
+      `
+      SELECT
+        tipo,
+        stock_previo,
+        diferencia,
+        stock_final,
+        puc_micros,
+        pvp_micros
+      FROM historico_articulo
+      WHERE id_articulo = 1
+      ORDER BY id DESC
+      LIMIT 1
+    `,
+    )) as readonly {
+      readonly tipo: number;
+      readonly stock_previo: number;
+      readonly diferencia: number;
+      readonly stock_final: number;
+      readonly puc_micros: number;
+      readonly pvp_micros: number;
+    }[];
+
+    expect(historyRows[0]).toEqual({
+      tipo: 4,
+      stock_previo: 2,
+      diferencia: -7,
+      stock_final: -5,
+      puc_micros: 1_331_000,
+      pvp_micros: 2_500_000,
+    });
+  });
+
+  it('hace rollback completo si una fila falla dentro de Guardar todos', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    const firstCommand: InventarioSaveRecord = {
+      idArticulo: 1,
+      idsCategorias: [2],
+      stock: 20,
+      precioAlbaranMicros: 1_500_000,
+      pucMicros: 1_815_000,
+      pvpCents: 350,
+      margenMicroporcentaje: 500_000,
+      codigoAdicional: null,
+    };
+
+    const invalidSecondCommand: InventarioSaveRecord = {
+      idArticulo: 2,
+      idsCategorias: [2],
+      stock: 3,
+      precioAlbaranMicros: 1_600_000,
+      pucMicros: 2_000_000,
+      pvpCents: 300,
+      margenMicroporcentaje: 333_333,
+      codigoAdicional: 'NUEVO-BETA',
+    };
+
+    await expect(
+      requireRepository().saveInventarioRows([firstCommand, invalidSecondCommand]),
+    ).rejects.toThrow('El artículo ya tiene un código de barras adicional.');
+
+    const articleRows = (await dataSource.query(
+      `
+      SELECT
+        stock,
+        palb_micros,
+        puc_micros,
+        pvp_cents
+      FROM articulo
+      WHERE id = 1
+    `,
+    )) as readonly {
+      readonly stock: number;
+      readonly palb_micros: number;
+      readonly puc_micros: number;
+      readonly pvp_cents: number;
+    }[];
+
+    expect(articleRows[0]).toEqual({
+      stock: 2,
+      palb_micros: 1_000_000,
+      puc_micros: 1_210_000,
+      pvp_cents: 200,
+    });
+
+    const categoryRows = (await dataSource.query(
+      `
+      SELECT id_categoria
+      FROM articulo_categoria
+      WHERE id_articulo = 1
+      ORDER BY id_categoria
+    `,
+    )) as readonly {
+      readonly id_categoria: number;
+    }[];
+
+    expect(categoryRows.map((row): number => row.id_categoria)).toEqual([1, 2]);
+
+    const historyRows = (await dataSource.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM historico_articulo
+      WHERE id_articulo = 1
+    `,
+    )) as readonly {
+      readonly total: number;
+    }[];
+
+    expect(historyRows[0]?.total).toBe(0);
+  });
+
+  it('rechaza un código adicional activo que ya pertenece a otro artículo', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    const command: InventarioSaveRecord = {
+      idArticulo: 1,
+      idsCategorias: [1, 2],
+      stock: 2,
+      precioAlbaranMicros: 1_000_000,
+      pucMicros: 1_210_000,
+      pvpCents: 200,
+      margenMicroporcentaje: 395_000,
+      codigoAdicional: 'EXTRA-BETA',
+    };
+
+    await expect(requireRepository().saveInventarioRows([command])).rejects.toThrow(
+      'El código "EXTRA-BETA" ya está siendo utilizado.',
+    );
+
+    const rows = (await dataSource.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM codigo_barras
+      WHERE
+        id_articulo = 1
+        AND por_defecto = 0
+        AND deleted_at IS NULL
+    `,
+    )) as readonly {
+      readonly total: number;
+    }[];
+
+    expect(rows[0]?.total).toBe(0);
+  });
+
+  it('da de baja artículo y códigos conservando el histórico', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    await requireRepository().saveInventarioRows([
+      {
+        idArticulo: 3,
+        idsCategorias: [1],
+        stock: -4,
+        precioAlbaranMicros: 400_000,
+        pucMicros: 500_000,
+        pvpCents: 100,
+        margenMicroporcentaje: 500_000,
+        codigoAdicional: null,
+      },
+    ]);
+
+    await requireRepository().deactivateArticulo(3);
+
+    const articleRows = (await dataSource.query(
+      `
+      SELECT deleted_at
+      FROM articulo
+      WHERE id = 3
+    `,
+    )) as readonly {
+      readonly deleted_at: string | null;
+    }[];
+
+    expect(articleRows[0]?.deleted_at).not.toBeNull();
+
+    const barcodeRows = (await dataSource.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM codigo_barras
+      WHERE
+        id_articulo = 3
+        AND deleted_at IS NULL
+    `,
+    )) as readonly {
+      readonly total: number;
+    }[];
+
+    expect(barcodeRows[0]?.total).toBe(0);
+
+    const historyRows = (await dataSource.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM historico_articulo
+      WHERE id_articulo = 3
+    `,
+    )) as readonly {
+      readonly total: number;
+    }[];
+
+    expect(historyRows[0]?.total).toBe(1);
+
+    const result: InventarioResultadoRecord =
+      await requireRepository().searchInventario(createQuery());
+
+    expect(result.rows.some((row): boolean => row.id === 3)).toBe(false);
   });
 });
 
@@ -604,6 +894,17 @@ function createQuery(
     limit: 20,
     ...overrides,
   };
+}
+
+/**
+ * Devuelve la conexión SQLite inicializada para el test.
+ */
+async function requireDataSource(): Promise<DataSource> {
+  if (applicationDatabase === null) {
+    throw new Error('La base de datos de Almacén no está inicializada.');
+  }
+
+  return applicationDatabase.connect();
 }
 
 /**
