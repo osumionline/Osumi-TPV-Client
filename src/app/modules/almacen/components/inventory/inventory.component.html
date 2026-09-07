@@ -124,9 +124,15 @@
                 type="button"
                 matTooltip="Imprimir"
                 aria-label="Imprimir"
-                disabled>
+                [disabled]="
+                    processing() ||
+                    totalRows() === 0 ||
+                    selectedColumns().length === 0
+                "
+                (click)="openPrintView()">
             <mat-icon>print</mat-icon>
         </button>
+
     </div>
 
     @if (error() !== null) {

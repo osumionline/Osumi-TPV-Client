@@ -1,0 +1,109 @@
+@if (loading()) {
+<section class="inventory-print-state">
+    Cargando inventario…
+</section>
+} @else if (loadError() !== null) {
+<section class="inventory-print-state inventory-print-state--error">
+    <span>
+        {{ loadError() }}
+    </span>
+
+    <button type="button"
+            (click)="retry()">
+        Reintentar
+    </button>
+</section>
+} @else if (documento(); as currentDocument) {
+<div class="inventory-print">
+    <header class="inventory-print__actions">
+        <div>
+            <strong>
+                Inventario
+            </strong>
+            <span>
+                {{ currentDocument.report.totalRows }} artículos
+            </span>
+        </div>
+
+        <button type="button"
+                [disabled]="processing()"
+                (click)="print()">
+            {{ processing() ? 'IMPRIMIENDO…' : 'IMPRIMIR' }}
+        </button>
+    </header>
+
+    @if (operationError() !== null) {
+    <div class="inventory-print__operation-error">
+        {{ operationError() }}
+    </div>
+    }
+
+    <main class="inventory-print-document">
+        <header class="inventory-print-document__header">
+            <h1>
+                INVENTARIO
+            </h1>
+
+            <span>
+                {{ currentDocument.report.totalRows }}
+                artículos
+            </span>
+        </header>
+
+        <div class="inventory-print-table-container">
+            <table class="inventory-print-table">
+                <thead>
+                    <tr>
+                        @for (column of currentDocument.columnas; track column) {
+                        <th [class.inventory-print-table__right]="isRightAligned(column)">
+                            {{ getColumnLabel(column) }}
+                        </th>
+                        }
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @for (row of currentDocument.report.rows; track $index) {
+                    <tr>
+                        @for (column of currentDocument.columnas; track column) {
+                        <td [class.inventory-print-table__right]="isRightAligned(column)">
+                            {{ formatCell(row, column) }}
+                        </td>
+                        }
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <section class="inventory-print-totals">
+            <div>
+                <span>
+                    Media margen
+                </span>
+                <strong>
+                    {{ formatMargin(currentDocument.report.mediaMargenMicroporcentaje) }}
+                </strong>
+            </div>
+
+            <div>
+                <span>
+                    Total PUC
+                </span>
+                <strong>
+                    {{ formatMicros(currentDocument.report.totalPucMicros) }}
+                </strong>
+            </div>
+
+            <div>
+                <span>
+                    Total PVP
+                </span>
+                <strong>
+                    {{ formatCents(currentDocument.report.totalPvpCents) }}
+                </strong>
+            </div>
+        </section>
+    </main>
+</div>
+}

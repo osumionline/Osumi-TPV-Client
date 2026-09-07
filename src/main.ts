@@ -2,6 +2,7 @@ import { bootstrapApplication } from '@angular/platform-browser';
 
 const WINDOW_QUERY_PARAMETER: string = 'window';
 const FACTURA_PREVIEW_WINDOW: string = 'factura-preview';
+const INVENTARIO_PRINT_WINDOW: string = 'inventario-print';
 
 /**
  * Arranca únicamente la aplicación correspondiente
@@ -20,6 +21,18 @@ async function bootstrap(): Promise<void> {
       ]);
 
     await bootstrapApplication(ClientInvoicePreviewComponent, facturaPreviewConfig);
+
+    return;
+  }
+
+  if (windowType === INVENTARIO_PRINT_WINDOW) {
+    const [{ default: InventoryPrintComponent }, { default: inventarioPrintConfig }] =
+      await Promise.all([
+        import('@modules/almacen/pages/inventory-print/inventory-print.component'),
+        import('@app/inventario-print.config'),
+      ]);
+
+    await bootstrapApplication(InventoryPrintComponent, inventarioPrintConfig);
 
     return;
   }

@@ -29,6 +29,13 @@ export default class AlmacenService {
   }
 
   /**
+   * Abre la vista independiente de impresión de Inventario.
+   */
+  openInventarioPrint(consulta: InventarioReportConsulta): Promise<void> {
+    return window.osumiDesktop.almacen.openInventarioPrint(consulta);
+  }
+
+  /**
    * Persiste una fila modificada de Inventario.
    */
   saveInventarioRow(command: InventarioSaveCommand): Promise<void> {

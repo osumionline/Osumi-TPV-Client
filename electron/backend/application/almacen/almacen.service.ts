@@ -23,6 +23,7 @@ import type {
   InventarioResultado,
   InventarioRowInterface,
 } from '@desktop-contracts/almacen/inventario.interface';
+import type InventarioReportProvider from '@backend/contracts/almacen/inventario-report-provider.interface';
 
 const INVENTARIO_PAGE_SIZES: readonly number[] = [20, 50, 100, 200];
 
@@ -44,7 +45,7 @@ const INVENTARIO_REPORT_COLUMNS: readonly InventarioReportColumn[] = [
 /**
  * Expone los casos de uso del módulo Almacén.
  */
-export default class AlmacenService {
+export default class AlmacenService implements InventarioReportProvider {
   /**
    * Crea el servicio de Almacén.
    */

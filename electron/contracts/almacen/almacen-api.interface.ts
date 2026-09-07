@@ -23,6 +23,11 @@ export default interface AlmacenApi {
   exportInventarioCsv(consulta: InventarioReportConsulta): Promise<InventarioCsvExportResult>;
 
   /**
+   * Abre una vista independiente del inventario persistido.
+   */
+  openInventarioPrint(consulta: InventarioReportConsulta): Promise<void>;
+
+  /**
    * Persiste una única fila modificada de Inventario.
    */
   saveInventarioRow(command: InventarioSaveCommand): Promise<void>;

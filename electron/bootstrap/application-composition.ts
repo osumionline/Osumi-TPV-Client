@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import AlmacenService from '@backend/application/almacen/almacen.service';
 import InventarioCsvBuilder from '@backend/application/almacen/inventario-csv.builder';
 import InventarioCsvService from '@backend/application/almacen/inventario-csv.service';
+import InventarioPrintService from '@backend/application/almacen/inventario-print.service';
 import ApplicationStateService from '@backend/application/application/application-state.service';
 import ArticulosService from '@backend/application/articulos/articulos.service';
 import CajaService from '@backend/application/caja/caja.service';
@@ -37,6 +38,7 @@ import VentasTicketEmailService from '@backend/application/ventas/ventas-ticket-
 import VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
 import type AlmacenRepository from '@backend/contracts/almacen/almacen.repository.interface';
 import type InventarioCsvFileSaver from '@backend/contracts/almacen/inventario-csv-file-saver.interface';
+import type InventarioPrintWindow from '@backend/contracts/almacen/inventario-print-window.interface';
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';
@@ -106,6 +108,7 @@ import ElectronAssetUrlBuilder from '@infrastructure/electron/electron-asset-url
 import ElectronClienteFacturaPreviewWindow from '@infrastructure/electron/electron-cliente-factura-preview-window';
 import ElectronHtmlDocumentRenderer from '@infrastructure/electron/electron-html-document.renderer';
 import ElectronInventarioCsvFileSaver from '@infrastructure/electron/electron-inventario-csv-file-saver';
+import ElectronInventarioPrintWindow from '@infrastructure/electron/electron-inventario-print-window';
 import ElectronLegacyImportDialog from '@infrastructure/electron/electron-legacy-import-dialog';
 import ElectronLogoStorage from '@infrastructure/electron/electron-logo.storage';
 import ElectronPdfPrintDialog from '@infrastructure/electron/electron-pdf-print-dialog';
@@ -140,6 +143,7 @@ import registerClientesIpc from '@ipc/register-clientes-ipc';
 import registerConfigurationIpc from '@ipc/register-configuration-ipc';
 import registerEmpleadosIpc from '@ipc/register-empleados-ipc';
 import registerFilesIpc from '@ipc/register-files-ipc';
+import registerInventarioPrintIpc from '@ipc/register-inventario-print-ipc';
 import registerLegacyImportIpc from '@ipc/register-legacy-import-ipc';
 import registerMarcasIpc from '@ipc/register-marcas-ipc';
 import registerPrintingIpc from '@ipc/register-printing-ipc';
@@ -269,6 +273,15 @@ export default function createApplicationComposition(
     almacenService,
     inventarioCsvBuilder,
     inventarioCsvFileSaver,
+  );
+
+  const inventarioPrintWindow: InventarioPrintWindow = new ElectronInventarioPrintWindow(
+    getMainWindow,
+  );
+
+  const inventarioPrintService: InventarioPrintService = new InventarioPrintService(
+    almacenService,
+    inventarioPrintWindow,
   );
 
   /*
@@ -537,7 +550,10 @@ export default function createApplicationComposition(
    * Canales IPC.
    */
   registerApplicationIpc(applicationStateService);
-  registerAlmacenIpc(getMainWindow, almacenService, inventarioCsvService);
+  registerApplicationIpc(applicationStateService);
+  registerAlmacenIpc(getMainWindow, almacenService, inventarioCsvService, inventarioPrintService);
+  registerInventarioPrintIpc(inventarioPrintWindow);
+  registerArticulosIpc(getMainWindow, articulosService);
   registerArticulosIpc(getMainWindow, articulosService);
   registerFilesIpc(getMainWindow, imageStagingService);
   registerMarcasIpc(getMainWindow, marcasService);

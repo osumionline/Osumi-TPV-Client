@@ -7,5 +7,6 @@ declare global {
   interface Window {
     readonly osumiDesktop: OsumiDesktopApi;
     readonly osumiFacturaPreview: ClienteFacturaPreviewApi;
+    readonly osumiInventarioPrint: InventarioPrintApi;
   }
 }

@@ -118,6 +118,9 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         consulta,
       ) as Promise<InventarioCsvExportResult>,
 
+    openInventarioPrint: (consulta: InventarioReportConsulta): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.almacenOpenInventarioPrint, consulta) as Promise<void>,
+
     saveInventarioRow: (command: InventarioSaveCommand): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.almacenSaveInventarioRow, command) as Promise<void>,
 

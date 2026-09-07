@@ -636,14 +636,7 @@ export default class InventoryComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const consulta: InventarioReportConsulta = {
-      idProveedor: this.idProveedor(),
-      idMarca: this.idMarca(),
-      idCategoria: this.idCategoria(),
-      texto: this.texto(),
-      conDescuento: this.conDescuento(),
-      columnas: [...this.selectedColumns()],
-    };
+    const consulta: InventarioReportConsulta = this.createReportConsulta();
 
     this.processing.set(true);
 
@@ -664,6 +657,49 @@ export default class InventoryComponent implements OnInit, OnDestroy {
     } finally {
       this.processing.set(false);
     }
+  }
+
+  /**
+   * Abre una vista independiente usando exclusivamente
+   * el snapshot persistido del filtro actual.
+   */
+  async openPrintView(): Promise<void> {
+    if (this.processing() || this.totalRows() === 0 || this.selectedColumns().length === 0) {
+      return;
+    }
+
+    this.processing.set(true);
+
+    try {
+      await this.almacenService.openInventarioPrint(this.createReportConsulta());
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(
+            error,
+            'No se ha podido abrir la vista de impresión del inventario.',
+          ),
+        })
+        .subscribe();
+    } finally {
+      this.processing.set(false);
+    }
+  }
+
+  /**
+   * Construye la consulta común utilizada por
+   * CSV y la vista de impresión.
+   */
+  private createReportConsulta(): InventarioReportConsulta {
+    return {
+      idProveedor: this.idProveedor(),
+      idMarca: this.idMarca(),
+      idCategoria: this.idCategoria(),
+      texto: this.texto(),
+      conDescuento: this.conDescuento(),
+      columnas: [...this.selectedColumns()],
+    };
   }
 
   /**

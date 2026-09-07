@@ -7,6 +7,7 @@ const buildOptions = {
     main: 'electron/main.ts',
     preload: 'electron/preload.ts',
     'factura-preview-preload': 'electron/factura-preview-preload.ts',
+    'inventario-print-preload': 'electron/inventario-print-preload.ts',
     'legacy-import-worker': 'electron/workers/legacy-import-worker.ts',
   },
 

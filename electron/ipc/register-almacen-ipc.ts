@@ -1,5 +1,6 @@
 import type AlmacenService from '@backend/application/almacen/almacen.service';
 import type InventarioCsvService from '@backend/application/almacen/inventario-csv.service';
+import type InventarioPrintService from '@backend/application/almacen/inventario-print.service';
 import type {
   InventarioCsvExportResult,
   InventarioReportConsulta,
@@ -21,6 +22,7 @@ export default function registerAlmacenIpc(
   getMainWindow: MainWindowProvider,
   almacenService: AlmacenService,
   inventarioCsvService: InventarioCsvService,
+  inventarioPrintService: InventarioPrintService,
 ): void {
   ipcMain.handle(
     IPC_CHANNELS.almacenSearchInventario,
@@ -37,6 +39,15 @@ export default function registerAlmacenIpc(
       assertTrustedSender(event, getMainWindow);
 
       return inventarioCsvService.export(consulta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.almacenOpenInventarioPrint,
+    async (event, consulta: InventarioReportConsulta): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await inventarioPrintService.open(consulta);
     },
   );
 
