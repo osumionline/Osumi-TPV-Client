@@ -1,7 +1,8 @@
 <section class="inventory">
-    <div class="inventory__filters">
+    <div class="inventory__toolbar">
         <mat-form-field appearance="outline"
-                        subscriptSizing="dynamic">
+                        subscriptSizing="dynamic"
+                        class="inventory__compact-field inventory__filter-provider">
             <mat-label>
                 Proveedor
             </mat-label>
@@ -10,7 +11,6 @@
                 <mat-option [value]="null">
                     Todos
                 </mat-option>
-
                 @for (proveedor of proveedoresService.proveedores(); track proveedor.id) {
                 <mat-option [value]="proveedor.id">
                     {{ proveedor.nombre }}
@@ -20,7 +20,8 @@
         </mat-form-field>
 
         <mat-form-field appearance="outline"
-                        subscriptSizing="dynamic">
+                        subscriptSizing="dynamic"
+                        class="inventory__compact-field inventory__filter-brand">
             <mat-label>
                 Marca
             </mat-label>
@@ -29,7 +30,6 @@
                 <mat-option [value]="null">
                     Todas
                 </mat-option>
-
                 @for (marca of marcasService.marcas(); track marca.id) {
                 <mat-option [value]="marca.id">
                     {{ marca.nombre }}
@@ -39,7 +39,8 @@
         </mat-form-field>
 
         <mat-form-field appearance="outline"
-                        subscriptSizing="dynamic">
+                        subscriptSizing="dynamic"
+                        class="inventory__compact-field inventory__filter-category">
             <mat-label>
                 Categoría
             </mat-label>
@@ -48,7 +49,6 @@
                 <mat-option [value]="null">
                     Todas
                 </mat-option>
-
                 @for (categoria of categoriasService.categoriasPlain(); track categoria.id) {
                 <mat-option [value]="categoria.id">
                     {{ formatCategoriaOption(categoria) }}
@@ -59,9 +59,9 @@
 
         <mat-form-field appearance="outline"
                         subscriptSizing="dynamic"
-                        class="inventory__text-filter">
+                        class="inventory__compact-field inventory__text-filter">
             <mat-label>
-                Nombre, localizador, referencia, código o etiqueta
+                Buscar
             </mat-label>
             <input matInput
                    type="search"
@@ -73,12 +73,13 @@
                           (change)="onDescuentoChange($event)">
             Con descuento
         </mat-slide-toggle>
-    </div>
 
-    <div class="inventory__actions">
+        <div class="inventory__toolbar-spacer"></div>
+
         <mat-form-field appearance="outline"
                         subscriptSizing="dynamic"
-                        class="inventory__columns">
+                        class="inventory__compact-field inventory__columns">
+
             <mat-label>
                 Columnas
             </mat-label>
@@ -93,25 +94,28 @@
             </mat-select>
         </mat-form-field>
 
-        <div class="inventory__actions-spacer">
-        </div>
-
-        <button mat-stroked-button
+        <button mat-icon-button
                 type="button"
+                matTooltip="Guardar todos"
+                aria-label="Guardar todos"
                 disabled>
-            Guardar todos
+            <mat-icon>save</mat-icon>
         </button>
 
-        <button mat-stroked-button
+        <button mat-icon-button
                 type="button"
+                matTooltip="Exportar CSV"
+                aria-label="Exportar CSV"
                 disabled>
-            Exportar CSV
+            <mat-icon>download</mat-icon>
         </button>
 
-        <button mat-stroked-button
+        <button mat-icon-button
                 type="button"
+                matTooltip="Imprimir"
+                aria-label="Imprimir"
                 disabled>
-            Imprimir
+            <mat-icon>print</mat-icon>
         </button>
     </div>
 
@@ -130,7 +134,7 @@
     } @else {
     <div class="inventory__table-container">
         <table mat-table
-               [dataSource]="rows()">
+               [dataSource]="displayRows()">
             <ng-container matColumnDef="localizador">
                 <th mat-header-cell
                     *matHeaderCellDef>
@@ -183,8 +187,21 @@
                 </th>
                 <td mat-cell
                     *matCellDef="let row"
-                    class="inventory__categories">
-                    {{ formatCategorias(row.idsCategorias) }}
+                    class="inventory__categories"
+                    [class.inventory__cell--dirty]="row.dirtyFields.includes('categoria')">
+                    <mat-form-field appearance="outline"
+                                    subscriptSizing="dynamic"
+                                    class="inventory__cell-select">
+                        <mat-select multiple
+                                    [value]="row.draft.idsCategorias"
+                                    (selectionChange)="onRowCategoriasChange($event, row.id)">
+                            @for (categoria of categoriasService.categoriasPlain(); track categoria.id) {
+                            <mat-option [value]="categoria.id">
+                                {{ formatCategoriaOption(categoria) }}
+                            </mat-option>
+                            }
+                        </mat-select>
+                    </mat-form-field>
                 </td>
             </ng-container>
 
@@ -208,8 +225,16 @@
                 </th>
                 <td mat-cell
                     *matCellDef="let row"
+                    [class.inventory__cell--dirty]="row.dirtyFields.includes('stock')"
                     class="inventory__right">
-                    {{ row.stock }}
+                    <input type="number"
+                           step="1"
+                           class="inventory__cell-input inventory__cell-input--stock"
+                           [class.inventory__editor--dirty]="row.dirtyFields.includes('stock')"
+                           [value]="row.draft.stock"
+                           (focus)="selectInputContent($event)"
+                           (input)="onStockInput($event, row.id)">
+
                 </td>
             </ng-container>
 
@@ -221,8 +246,19 @@
                 </th>
                 <td mat-cell
                     *matCellDef="let row"
+                    [class.inventory__cell--dirty]="row.dirtyFields.includes('precioAlbaran')"
                     class="inventory__right">
-                    {{ formatMicros(row.precioAlbaranMicros) }}
+                    <input type="text"
+                           inputmode="decimal"
+                           autocomplete="off"
+                           class="inventory__cell-input inventory__cell-input--money"
+                           [class.inventory__editor--dirty]="row.dirtyFields.includes('precioAlbaran')"
+                           [class.inventory__editor--invalid]="hasDecimalError(row.id, 'precioAlbaran')"
+                           [attr.title]="getDecimalError(row.id, 'precioAlbaran')"
+                           [value]="getPriceInputValue(row, 'precioAlbaran')"
+                           (focus)="onPriceFocus($event, row.id, 'precioAlbaran')"
+                           (input)="onPriceInput($event, row, 'precioAlbaran')"
+                           (blur)="onPriceBlur($event, row, 'precioAlbaran')">
                 </td>
             </ng-container>
 
@@ -234,8 +270,19 @@
                 </th>
                 <td mat-cell
                     *matCellDef="let row"
+                    [class.inventory__cell--dirty]="row.dirtyFields.includes('puc')"
                     class="inventory__right">
-                    {{ formatMicros(row.pucMicros) }}
+                    <input type="text"
+                           inputmode="decimal"
+                           autocomplete="off"
+                           class="inventory__cell-input inventory__cell-input--money"
+                           [class.inventory__editor--dirty]="row.dirtyFields.includes('puc')"
+                           [class.inventory__editor--invalid]="hasDecimalError(row.id, 'puc')"
+                           [attr.title]="getDecimalError(row.id, 'puc')"
+                           [value]="getPriceInputValue(row, 'puc')"
+                           (focus)="onPriceFocus($event, row.id, 'puc')"
+                           (input)="onPriceInput($event, row, 'puc')"
+                           (blur)="onPriceBlur($event, row, 'puc')">
                 </td>
             </ng-container>
 
@@ -247,8 +294,19 @@
                 </th>
                 <td mat-cell
                     *matCellDef="let row"
+                    [class.inventory__cell--dirty]="row.dirtyFields.includes('pvp')"
                     class="inventory__right">
-                    {{ formatCents(row.pvpCents) }}
+                    <input type="text"
+                           inputmode="decimal"
+                           autocomplete="off"
+                           class="inventory__cell-input inventory__cell-input--money"
+                           [class.inventory__editor--dirty]="row.dirtyFields.includes('pvp')"
+                           [class.inventory__editor--invalid]="hasDecimalError(row.id, 'pvp')"
+                           [attr.title]="getDecimalError(row.id, 'pvp')"
+                           [value]="getPriceInputValue(row, 'pvp')"
+                           (focus)="onPriceFocus($event, row.id, 'pvp')"
+                           (input)="onPriceInput($event, row, 'pvp')"
+                           (blur)="onPriceBlur($event, row, 'pvp')">
                 </td>
             </ng-container>
 
@@ -260,8 +318,9 @@
                 </th>
                 <td mat-cell
                     *matCellDef="let row"
+                    [class.inventory__cell--dirty]="row.dirtyFields.includes('margen')"
                     class="inventory__right">
-                    {{ formatMargin(row.margenMicroporcentaje) }}
+                    {{ formatMargin(row.draft.margenMicroporcentaje) }}
                 </td>
             </ng-container>
 
@@ -273,15 +332,21 @@
                 </th>
                 <td mat-cell
                     *matCellDef="let row"
+                    [class.inventory__cell--dirty]="row.dirtyFields.includes('codigoBarras')"
                     class="inventory__center">
                     @if (row.tieneCodigoAdicional) {
-                    <span class="inventory__barcode-ok">
+                    <span class="inventory__barcode-ok"
+                          matTooltip="El artículo ya tiene un código adicional">
                         ✓
                     </span>
                     } @else {
-                    <span>
-                        —
-                    </span>
+                    <input type="text"
+                           autocomplete="off"
+                           class="inventory__cell-input inventory__cell-input--barcode"
+                           [class.inventory__editor--dirty]="row.dirtyFields.includes('codigoBarras')"
+                           [value]="row.draft.codigoAdicional"
+                           (focus)="selectInputContent($event)"
+                           (input)="onBarcodeInput($event, row.id)">
                     }
                 </td>
             </ng-container>
@@ -295,25 +360,29 @@
                 <td mat-cell
                     *matCellDef="let row"
                     class="inventory__center inventory__options">
-                    @if (row.sinVentasUltimos12Meses) {
-                    <mat-icon class="inventory__sales-warning"
-                              matTooltip="Sin ventas en los últimos 12 meses">
-                        warning_amber
-                    </mat-icon>
-                    } @else {
-                    <span>
-                        —
-                    </span>
-                    }
+                    <div class="inventory__row-actions">
+                        <button mat-icon-button
+                                type="button"
+                                matTooltip="Deshacer cambios"
+                                aria-label="Deshacer cambios"
+                                [disabled]="!row.dirty"
+                                (click)="resetRow(row.id)">
+                            <mat-icon>restart_alt</mat-icon>
+                        </button>
+
+                        @if (row.sinVentasUltimos12Meses) {
+                        <mat-icon class="inventory__sales-warning"
+                                  matTooltip="Sin ventas en los últimos 12 meses">
+                            warning_amber
+                        </mat-icon>
+                        }
+                    </div>
                 </td>
             </ng-container>
 
-            <tr mat-header-row
-                *matHeaderRowDef="displayedColumns()">
-            </tr>
-
             <tr mat-row
-                *matRowDef="let row; columns: displayedColumns()">
+                *matRowDef="let row; columns: displayedColumns()"
+                [class.inventory__row--dirty]="row.dirty">
             </tr>
         </table>
 
@@ -341,7 +410,7 @@
                 Media margen
             </span>
             <strong>
-                {{ formatMargin(mediaMargenMicroporcentaje()) }}
+                {{ formatMargin(liveMediaMargenMicroporcentaje()) }}
             </strong>
         </div>
 
@@ -350,7 +419,7 @@
                 Total PUC
             </span>
             <strong>
-                {{ formatMicros(totalPucMicros()) }}
+                {{ formatMicros(liveTotalPucMicros()) }}
             </strong>
         </div>
 
@@ -359,7 +428,7 @@
                 Total PVP
             </span>
             <strong>
-                {{ formatCents(totalPvpCents()) }}
+                {{ formatCents(liveTotalPvpCents()) }}
             </strong>
         </div>
     </div>

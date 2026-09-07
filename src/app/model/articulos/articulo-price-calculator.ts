@@ -251,6 +251,31 @@ export default class ArticuloPriceCalculator {
   }
 
   /**
+   * Calcula el PUC a partir del Precio albarán y la fiscalidad.
+   */
+  static calcularPucDesdePrecioAlbaran(
+    precioAlbaranMicros: number,
+    ivaBps: number,
+    reBps: number,
+  ): number {
+    return this.calcularPuc(precioAlbaranMicros, ivaBps, reBps);
+  }
+
+  /**
+   * Calcula el Precio albarán inverso a partir del PUC y la fiscalidad.
+   */
+  static calcularPrecioAlbaranDesdePuc(pucMicros: number, ivaBps: number, reBps: number): number {
+    return this.calcularPrecioAlbaran(pucMicros, ivaBps, reBps);
+  }
+
+  /**
+   * Calcula el margen sobre PVP a partir de PUC y PVP.
+   */
+  static calcularMargenDesdePucYPvp(pucMicros: number, pvpCents: number): number {
+    return this.calcularMargen(pucMicros, pvpCents);
+  }
+
+  /**
    * Calcula el PUC aplicando IVA y RE al Precio albarán.
    */
   private static calcularPuc(precioAlbaranMicros: number, ivaBps: number, reBps: number): number {

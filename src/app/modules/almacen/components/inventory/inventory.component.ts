@@ -8,7 +8,7 @@ import {
   type Signal,
   type WritableSignal,
 } from '@angular/core';
-import { MatButton } from '@angular/material/button';
+import { MatButton, MatIconButton } from '@angular/material/button';
 import { MatOption } from '@angular/material/core';
 import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
@@ -23,8 +23,18 @@ import type {
   InventarioResultado,
   InventarioRowInterface,
 } from '@desktop-contracts/almacen/inventario.interface';
+import type {
+  InventarioDirtyField,
+  InventarioDraftEntry,
+  InventarioDraftPatch,
+  InventarioDraftValues,
+  InventarioPriceField,
+} from '@model/almacen/inventario-draft.interface';
+import InventarioPriceCalculator from '@model/almacen/inventario-price-calculator';
 import {
   formatScaledDecimal,
+  isTransientScaledDecimalInput,
+  parseScaledDecimal,
   rescaleScaledInteger,
 } from '@model/articulos/articulo-scaled-decimal.utils';
 import type Categoria from '@model/categorias/categoria.model';
@@ -53,6 +63,19 @@ type InventarioDisplayedColumn = InventarioDataColumn | 'opciones';
 interface InventarioColumnOption {
   readonly id: InventarioDataColumn;
   readonly label: string;
+}
+
+interface InventarioDisplayRow extends InventarioRowInterface {
+  readonly draft: InventarioDraftValues;
+  readonly dirtyFields: readonly InventarioDirtyField[];
+  readonly dirty: boolean;
+}
+
+interface InventarioDecimalEditorState {
+  readonly idArticulo: number;
+  readonly field: InventarioPriceField;
+  readonly value: string;
+  readonly error: string | null;
 }
 
 const INVENTARIO_COLUMN_OPTIONS: readonly InventarioColumnOption[] = [
@@ -106,6 +129,12 @@ const INVENTARIO_COLUMN_OPTIONS: readonly InventarioColumnOption[] = [
   },
 ];
 
+const INVENTARIO_DEFAULT_COLUMNS: readonly InventarioDataColumn[] =
+  INVENTARIO_COLUMN_OPTIONS.filter(
+    (option: InventarioColumnOption): boolean =>
+      option.id !== 'categoria' && option.id !== 'precioAlbaran',
+  ).map((option: InventarioColumnOption): InventarioDataColumn => option.id);
+
 const TEXT_SEARCH_DELAY_MS: number = 300;
 
 const PERCENTAGE_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
@@ -124,6 +153,7 @@ const PERCENTAGE_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
     MatButton,
     MatFormField,
     MatIcon,
+    MatIconButton,
     MatInput,
     MatLabel,
     MatOption,
@@ -158,17 +188,22 @@ export default class InventoryComponent implements OnInit, OnDestroy {
   readonly totalPucMicros: WritableSignal<number> = signal<number>(0);
   readonly totalPvpCents: WritableSignal<number> = signal<number>(0);
 
+  readonly drafts: WritableSignal<ReadonlyMap<number, InventarioDraftEntry>> = signal<
+    ReadonlyMap<number, InventarioDraftEntry>
+  >(new Map<number, InventarioDraftEntry>());
+
+  readonly activeResultFilterKey: WritableSignal<string | null> = signal<string | null>(null);
+
+  readonly editingDecimalCell: WritableSignal<InventarioDecimalEditorState | null> =
+    signal<InventarioDecimalEditorState | null>(null);
+
   readonly loading: WritableSignal<boolean> = signal<boolean>(true);
   readonly error: WritableSignal<string | null> = signal<string | null>(null);
 
   readonly columnOptions: readonly InventarioColumnOption[] = INVENTARIO_COLUMN_OPTIONS;
   readonly selectedColumns: WritableSignal<readonly InventarioDataColumn[]> = signal<
     readonly InventarioDataColumn[]
-  >(
-    INVENTARIO_COLUMN_OPTIONS.map(
-      (option: InventarioColumnOption): InventarioDataColumn => option.id,
-    ),
-  );
+  >(INVENTARIO_DEFAULT_COLUMNS);
 
   readonly displayedColumns: Signal<readonly InventarioDisplayedColumn[]> = computed(
     (): readonly InventarioDisplayedColumn[] => [...this.selectedColumns(), 'opciones'],
@@ -187,6 +222,64 @@ export default class InventoryComponent implements OnInit, OnDestroy {
       return result;
     },
   );
+
+  readonly displayRows: Signal<readonly InventarioDisplayRow[]> = computed(
+    (): readonly InventarioDisplayRow[] => {
+      const drafts: ReadonlyMap<number, InventarioDraftEntry> = this.drafts();
+
+      return this.rows().map((row: InventarioRowInterface): InventarioDisplayRow => {
+        const entry: InventarioDraftEntry | undefined = drafts.get(row.id);
+        const draft: InventarioDraftValues = entry?.draft ?? this.createDraftValues(row);
+        const dirtyFields: readonly InventarioDirtyField[] =
+          entry === undefined ? [] : this.getDirtyFields(entry);
+
+        return {
+          ...row,
+          draft,
+          dirtyFields,
+          dirty: dirtyFields.length > 0,
+        };
+      });
+    },
+  );
+
+  readonly liveMediaMargenMicroporcentaje: Signal<number> = computed((): number => {
+    const totalRows: number = this.totalRows();
+
+    if (totalRows === 0) {
+      return 0;
+    }
+
+    let marginSum: number = this.mediaMargenMicroporcentaje() * totalRows;
+
+    for (const entry of this.getDraftEntriesForCurrentResult()) {
+      marginSum += entry.draft.margenMicroporcentaje - entry.snapshot.margenMicroporcentaje;
+    }
+
+    return marginSum / totalRows;
+  });
+
+  readonly liveTotalPucMicros: Signal<number> = computed((): number => {
+    let total: number = this.totalPucMicros();
+
+    for (const entry of this.getDraftEntriesForCurrentResult()) {
+      total +=
+        entry.draft.stock * entry.draft.pucMicros - entry.snapshot.stock * entry.snapshot.pucMicros;
+    }
+
+    return total;
+  });
+
+  readonly liveTotalPvpCents: Signal<number> = computed((): number => {
+    let total: number = this.totalPvpCents();
+
+    for (const entry of this.getDraftEntriesForCurrentResult()) {
+      total +=
+        entry.draft.stock * entry.draft.pvpCents - entry.snapshot.stock * entry.snapshot.pvpCents;
+    }
+
+    return total;
+  });
 
   private requestSequence: number = 0;
   private textSearchTimeoutId: number | null = null;
@@ -422,6 +515,7 @@ export default class InventoryComponent implements OnInit, OnDestroy {
       pagina: this.pagina(),
       num: this.num(),
     };
+    const filterKey: string = this.buildFilterKey(consulta);
 
     try {
       const result: InventarioResultado = await this.almacenService.searchInventario(consulta);
@@ -430,7 +524,9 @@ export default class InventoryComponent implements OnInit, OnDestroy {
         return;
       }
 
+      this.reconcileDrafts(result.rows, filterKey);
       this.rows.set(result.rows);
+      this.activeResultFilterKey.set(filterKey);
       this.totalRows.set(result.totalRows);
       this.mediaMargenMicroporcentaje.set(result.mediaMargenMicroporcentaje);
       this.totalPucMicros.set(result.totalPucMicros);
@@ -496,6 +592,7 @@ export default class InventoryComponent implements OnInit, OnDestroy {
     this.mediaMargenMicroporcentaje.set(0);
     this.totalPucMicros.set(0);
     this.totalPvpCents.set(0);
+    this.activeResultFilterKey.set(null);
   }
 
   /**
@@ -508,5 +605,484 @@ export default class InventoryComponent implements OnInit, OnDestroy {
 
     window.clearTimeout(this.textSearchTimeoutId);
     this.textSearchTimeoutId = null;
+  }
+
+  /**
+   * Actualiza las categorías explícitas del draft.
+   */
+  onRowCategoriasChange(event: MatSelectChange, idArticulo: number): void {
+    const value: unknown = event.value;
+
+    if (!Array.isArray(value)) {
+      return;
+    }
+
+    const idsCategorias: number[] = value
+      .filter(
+        (id: unknown): id is number => typeof id === 'number' && Number.isSafeInteger(id) && id > 0,
+      )
+      .filter(
+        (id: number, index: number, values: readonly number[]): boolean =>
+          values.indexOf(id) === index,
+      )
+      .sort((a: number, b: number): number => a - b);
+
+    this.updateDraft(idArticulo, {
+      idsCategorias,
+    });
+  }
+
+  /**
+   * Selecciona todo el contenido de un input al recibir foco.
+   */
+  selectInputContent(event: FocusEvent): void {
+    const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
+
+    inputElement.select();
+  }
+
+  /**
+   * Actualiza el stock del draft mientras se edita.
+   */
+  onStockInput(event: Event, idArticulo: number): void {
+    const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
+    const rawValue: number = inputElement.valueAsNumber;
+
+    if (!Number.isFinite(rawValue)) {
+      return;
+    }
+
+    const stock: number = Math.trunc(rawValue);
+
+    if (!Number.isSafeInteger(stock)) {
+      return;
+    }
+
+    if (stock !== rawValue) {
+      inputElement.value = String(stock);
+    }
+
+    this.updateDraft(idArticulo, {
+      stock,
+    });
+  }
+
+  /**
+   * Inicia la edición de un precio y selecciona todo su contenido.
+   */
+  onPriceFocus(event: FocusEvent, idArticulo: number, field: InventarioPriceField): void {
+    const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
+
+    this.editingDecimalCell.set({
+      idArticulo,
+      field,
+      value: inputElement.value,
+      error: null,
+    });
+
+    inputElement.select();
+  }
+
+  /**
+   * Recalcula el draft mientras se escribe un precio.
+   */
+  onPriceInput(event: Event, row: InventarioDisplayRow, field: InventarioPriceField): void {
+    const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
+    const rawValue: string = this.limitDecimalFraction(inputElement.value, 2);
+
+    if (rawValue !== inputElement.value) {
+      inputElement.value = rawValue;
+    }
+
+    this.editingDecimalCell.set({
+      idArticulo: row.id,
+      field,
+      value: rawValue,
+      error: null,
+    });
+
+    if (isTransientScaledDecimalInput(rawValue)) {
+      return;
+    }
+
+    const value: number | null = this.parsePriceValue(field, rawValue);
+
+    if (value === null) {
+      this.setDecimalError(row.id, field, 'El precio no es válido.');
+
+      return;
+    }
+
+    try {
+      this.applyPriceChange(row, field, value);
+    } catch (error: unknown) {
+      this.setDecimalError(
+        row.id,
+        field,
+        getErrorMessage(error, 'No se ha podido recalcular el precio.'),
+      );
+    }
+  }
+
+  /**
+   * Finaliza la edición y normaliza la representación del precio.
+   */
+  onPriceBlur(event: FocusEvent, row: InventarioDisplayRow, field: InventarioPriceField): void {
+    const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
+    const rawValue: string = this.limitDecimalFraction(inputElement.value, 2);
+    const value: number | null = this.parsePriceValue(field, rawValue);
+
+    if (value !== null) {
+      try {
+        this.applyPriceChange(row, field, value);
+      } catch {
+        // Al salir del campo se recuperará la última representación válida.
+      }
+    }
+
+    this.editingDecimalCell.set(null);
+  }
+
+  /**
+   * Obtiene el texto que debe mostrar un editor de precio.
+   */
+  getPriceInputValue(row: InventarioDisplayRow, field: InventarioPriceField): string {
+    const editingCell: InventarioDecimalEditorState | null = this.editingDecimalCell();
+
+    if (editingCell !== null && editingCell.idArticulo === row.id && editingCell.field === field) {
+      return editingCell.value;
+    }
+
+    switch (field) {
+      case 'precioAlbaran':
+        return formatScaledDecimal(rescaleScaledInteger(row.draft.precioAlbaranMicros, 6, 2), 2, 2);
+
+      case 'puc':
+        return formatScaledDecimal(rescaleScaledInteger(row.draft.pucMicros, 6, 2), 2, 2);
+
+      case 'pvp':
+        return formatScaledDecimal(row.draft.pvpCents, 2, 2);
+    }
+  }
+
+  /**
+   * Indica si el editor decimal actual contiene un error.
+   */
+  hasDecimalError(idArticulo: number, field: InventarioPriceField): boolean {
+    const editingCell: InventarioDecimalEditorState | null = this.editingDecimalCell();
+
+    return (
+      editingCell !== null &&
+      editingCell.idArticulo === idArticulo &&
+      editingCell.field === field &&
+      editingCell.error !== null
+    );
+  }
+
+  /**
+   * Obtiene el error del editor decimal actual.
+   */
+  getDecimalError(idArticulo: number, field: InventarioPriceField): string | null {
+    const editingCell: InventarioDecimalEditorState | null = this.editingDecimalCell();
+
+    if (
+      editingCell === null ||
+      editingCell.idArticulo !== idArticulo ||
+      editingCell.field !== field
+    ) {
+      return null;
+    }
+
+    return editingCell.error;
+  }
+  /**
+   * Convierte el texto monetario a la escala interna correspondiente.
+   */
+  private parsePriceValue(field: InventarioPriceField, value: string): number | null {
+    const scaledValue: number | null = parseScaledDecimal(value, 2);
+
+    if (scaledValue === null || scaledValue < 0) {
+      return null;
+    }
+
+    return field === 'pvp' ? scaledValue : rescaleScaledInteger(scaledValue, 2, 6);
+  }
+
+  /**
+   * Aplica la cascada de cálculo correspondiente al precio editado.
+   */
+  private applyPriceChange(
+    row: InventarioDisplayRow,
+    field: InventarioPriceField,
+    value: number,
+  ): void {
+    let patch: InventarioDraftPatch;
+
+    switch (field) {
+      case 'precioAlbaran':
+        patch = InventarioPriceCalculator.actualizarPrecioAlbaran(
+          row.draft,
+          row.ivaBps,
+          row.reBps,
+          value,
+        );
+        break;
+
+      case 'puc':
+        patch = InventarioPriceCalculator.actualizarPuc(row.draft, row.ivaBps, row.reBps, value);
+        break;
+
+      case 'pvp':
+        patch = InventarioPriceCalculator.actualizarPvp(row.draft, value);
+        break;
+    }
+
+    this.updateDraft(row.id, patch);
+  }
+
+  /**
+   * Limita visualmente un decimal a la precisión utilizada por Inventario.
+   */
+  private limitDecimalFraction(value: string, maxFractionDigits: number): string {
+    const match: RegExpMatchArray | null = value.match(/^([+-]?\d*)([.,])(\d*)$/);
+
+    if (match === null || match[3].length <= maxFractionDigits) {
+      return value;
+    }
+
+    return `${match[1]}${match[2]}${match[3].slice(0, maxFractionDigits)}`;
+  }
+
+  /**
+   * Establece un error sobre el editor decimal activo.
+   */
+  private setDecimalError(idArticulo: number, field: InventarioPriceField, error: string): void {
+    const editingCell: InventarioDecimalEditorState | null = this.editingDecimalCell();
+
+    if (
+      editingCell === null ||
+      editingCell.idArticulo !== idArticulo ||
+      editingCell.field !== field
+    ) {
+      return;
+    }
+
+    this.editingDecimalCell.set({
+      ...editingCell,
+      error,
+    });
+  }
+
+  /**
+   * Actualiza el nuevo código adicional preparado para la fila.
+   */
+  onBarcodeInput(event: Event, idArticulo: number): void {
+    const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
+
+    this.updateDraft(idArticulo, {
+      codigoAdicional: inputElement.value,
+    });
+  }
+
+  /**
+   * Restaura una fila completa a su snapshot persistido.
+   */
+  resetRow(idArticulo: number): void {
+    const entry: InventarioDraftEntry | undefined = this.drafts().get(idArticulo);
+
+    if (entry === undefined) {
+      return;
+    }
+
+    const drafts: Map<number, InventarioDraftEntry> = new Map<number, InventarioDraftEntry>(
+      this.drafts(),
+    );
+
+    drafts.set(idArticulo, {
+      ...entry,
+      draft: this.cloneDraftValues(entry.snapshot),
+    });
+
+    this.drafts.set(drafts);
+
+    const editingCell: InventarioDecimalEditorState | null = this.editingDecimalCell();
+
+    if (editingCell?.idArticulo === idArticulo) {
+      this.editingDecimalCell.set(null);
+    }
+  }
+
+  /**
+   * Crea los valores editables iniciales a partir de una fila persistida.
+   */
+  private createDraftValues(row: InventarioRowInterface): InventarioDraftValues {
+    return {
+      idsCategorias: [...row.idsCategorias].sort((a: number, b: number): number => a - b),
+      stock: row.stock,
+      precioAlbaranMicros: row.precioAlbaranMicros,
+      pucMicros: row.pucMicros,
+      pvpCents: row.pvpCents,
+      margenMicroporcentaje: row.margenMicroporcentaje,
+      codigoAdicional: '',
+    };
+  }
+
+  /**
+   * Copia los valores editables sin compartir arrays.
+   */
+  private cloneDraftValues(values: InventarioDraftValues): InventarioDraftValues {
+    return {
+      ...values,
+      idsCategorias: [...values.idsCategorias],
+    };
+  }
+
+  /**
+   * Incorpora las filas recién cargadas al espacio local de drafts.
+   */
+  private reconcileDrafts(rows: readonly InventarioRowInterface[], filterKey: string): void {
+    const drafts: Map<number, InventarioDraftEntry> = new Map<number, InventarioDraftEntry>(
+      this.drafts(),
+    );
+
+    for (const row of rows) {
+      const current: InventarioDraftEntry | undefined = drafts.get(row.id);
+      const persistedValues: InventarioDraftValues = this.createDraftValues(row);
+
+      if (current === undefined) {
+        drafts.set(row.id, {
+          snapshot: persistedValues,
+          draft: this.cloneDraftValues(persistedValues),
+          filterKeys: [filterKey],
+        });
+
+        continue;
+      }
+
+      const filterKeys: readonly string[] = current.filterKeys.includes(filterKey)
+        ? current.filterKeys
+        : [...current.filterKeys, filterKey];
+
+      if (this.getDirtyFields(current).length === 0) {
+        drafts.set(row.id, {
+          snapshot: persistedValues,
+          draft: this.cloneDraftValues(persistedValues),
+          filterKeys,
+        });
+
+        continue;
+      }
+
+      drafts.set(row.id, {
+        ...current,
+        filterKeys,
+      });
+    }
+
+    this.drafts.set(drafts);
+  }
+
+  /**
+   * Aplica un cambio parcial a una fila local.
+   */
+  private updateDraft(idArticulo: number, patch: InventarioDraftPatch): void {
+    const current: InventarioDraftEntry | undefined = this.drafts().get(idArticulo);
+
+    if (current === undefined) {
+      return;
+    }
+
+    const drafts: Map<number, InventarioDraftEntry> = new Map<number, InventarioDraftEntry>(
+      this.drafts(),
+    );
+
+    drafts.set(idArticulo, {
+      ...current,
+      draft: {
+        ...current.draft,
+        ...patch,
+        idsCategorias:
+          patch.idsCategorias === undefined
+            ? current.draft.idsCategorias
+            : [...patch.idsCategorias],
+      },
+    });
+
+    this.drafts.set(drafts);
+  }
+
+  /**
+   * Obtiene las celdas modificadas de una fila.
+   */
+  private getDirtyFields(entry: InventarioDraftEntry): readonly InventarioDirtyField[] {
+    const dirty: InventarioDirtyField[] = [];
+
+    if (!this.sameIds(entry.snapshot.idsCategorias, entry.draft.idsCategorias)) {
+      dirty.push('categoria');
+    }
+
+    if (entry.snapshot.stock !== entry.draft.stock) {
+      dirty.push('stock');
+    }
+
+    if (entry.snapshot.precioAlbaranMicros !== entry.draft.precioAlbaranMicros) {
+      dirty.push('precioAlbaran');
+    }
+
+    if (entry.snapshot.pucMicros !== entry.draft.pucMicros) {
+      dirty.push('puc');
+    }
+
+    if (entry.snapshot.pvpCents !== entry.draft.pvpCents) {
+      dirty.push('pvp');
+    }
+
+    if (entry.snapshot.margenMicroporcentaje !== entry.draft.margenMicroporcentaje) {
+      dirty.push('margen');
+    }
+
+    if (entry.draft.codigoAdicional.trim().length > 0) {
+      dirty.push('codigoBarras');
+    }
+
+    return dirty;
+  }
+
+  /**
+   * Compara dos selecciones de categorías normalizadas.
+   */
+  private sameIds(first: readonly number[], second: readonly number[]): boolean {
+    return (
+      first.length === second.length &&
+      first.every((id: number, index: number): boolean => id === second[index])
+    );
+  }
+
+  /**
+   * Obtiene los drafts conocidos como pertenecientes al filtro mostrado.
+   */
+  private getDraftEntriesForCurrentResult(): readonly InventarioDraftEntry[] {
+    const filterKey: string | null = this.activeResultFilterKey();
+
+    if (filterKey === null) {
+      return [];
+    }
+
+    return [...this.drafts().values()].filter((entry: InventarioDraftEntry): boolean =>
+      entry.filterKeys.includes(filterKey),
+    );
+  }
+
+  /**
+   * Crea una clave estable para identificar el conjunto filtrado.
+   */
+  private buildFilterKey(consulta: InventarioConsulta): string {
+    return JSON.stringify([
+      consulta.idProveedor,
+      consulta.idMarca,
+      consulta.idCategoria,
+      consulta.texto.trim(),
+      consulta.conDescuento,
+    ]);
   }
 }
