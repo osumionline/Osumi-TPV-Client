@@ -695,7 +695,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
       id_marca_snapshot: 1,
       marca_nombre_snapshot: 'Marca Uno',
       articulo_nombre_snapshot: 'Artículo Alfa',
-      unidades: 3,
+      unidades: 2,
       puc_micros: 1_210_000,
       pvp_cents: 200,
       fecha_baja: '2026-09-08T10:00:00.000Z',
