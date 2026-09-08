@@ -10,4 +10,9 @@ export default interface CaducidadReportWindow {
    * Obtiene el documento únicamente para el renderer autorizado.
    */
   getDocumento(senderWebContentsId: number): CaducidadReportInterface;
+
+  /**
+   * Abre el diálogo estándar de impresión desde el renderer autorizado.
+   */
+  print(senderWebContentsId: number): Promise<void>;
 }

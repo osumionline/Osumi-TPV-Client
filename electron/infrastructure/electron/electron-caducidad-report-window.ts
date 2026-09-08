@@ -99,6 +99,50 @@ export default class ElectronCaducidadReportWindow implements CaducidadReportWin
   }
 
   /**
+   * Abre el diálogo estándar de impresión del sistema
+   * para el estado actualmente visible del informe.
+   */
+  async print(senderWebContentsId: number): Promise<void> {
+    const browserWindow: BrowserWindow = this.requireAuthorizedWindow(senderWebContentsId);
+
+    await new Promise<void>((resolve: () => void, reject: (reason: Error) => void): void => {
+      browserWindow.webContents.print(
+        {
+          silent: false,
+          printBackground: true,
+          pageSize: 'A4',
+          margins: {
+            marginType: 'default',
+          },
+        },
+        (success: boolean, failureReason: string): void => {
+          if (success) {
+            resolve();
+
+            return;
+          }
+
+          const reason: string = failureReason.trim();
+
+          if (reason.toLowerCase().includes('cancel')) {
+            resolve();
+
+            return;
+          }
+
+          reject(
+            new Error(
+              reason.length === 0
+                ? 'No se ha podido imprimir el informe de caducidades.'
+                : `No se ha podido imprimir el informe de caducidades: ${reason}`,
+            ),
+          );
+        },
+      );
+    });
+  }
+
+  /**
    * Comprueba que el IPC procede exactamente de la ventana activa.
    */
   private requireAuthorizedWindow(senderWebContentsId: number): BrowserWindow {

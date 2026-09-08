@@ -32,7 +32,7 @@ const IPC_CHANNELS = {
   almacenDeactivateCaducidad: 'almacen:deactivate-caducidad',
   almacenOpenCaducidadReport: 'almacen:open-caducidad-report',
   caducidadReportGetDocumento: 'caducidad-report:get-documento',
-
+  caducidadReportPrint: 'caducidad-report:print',
   inventarioPrintGetDocumento: 'inventario-print:get-documento',
   inventarioPrintPrint: 'inventario-print:print',
 

@@ -11,4 +11,8 @@ export default function registerCaducidadReportIpc(reportWindow: CaducidadReport
     IPC_CHANNELS.caducidadReportGetDocumento,
     async (event): Promise<CaducidadReportInterface> => reportWindow.getDocumento(event.sender.id),
   );
+
+  ipcMain.handle(IPC_CHANNELS.caducidadReportPrint, async (event): Promise<void> => {
+    await reportWindow.print(event.sender.id);
+  });
 }

@@ -8,6 +8,8 @@ const reportApi: CaducidadReportApi = Object.freeze({
     ipcRenderer.invoke(
       IPC_CHANNELS.caducidadReportGetDocumento,
     ) as Promise<CaducidadReportInterface>,
+  print: (): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.caducidadReportPrint) as Promise<void>,
 });
 
 contextBridge.exposeInMainWorld('osumiCaducidadReport', reportApi);

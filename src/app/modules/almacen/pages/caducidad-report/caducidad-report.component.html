@@ -24,7 +24,20 @@
                     Informe histórico agrupado
                 </span>
             </div>
+
+            <button class="caducidad-report-document__print"
+                    type="button"
+                    [disabled]="processing()"
+                    (click)="print()">
+                {{ processing() ? 'IMPRIMIENDO…' : 'IMPRIMIR' }}
+            </button>
         </header>
+
+        @if (operationError() !== null) {
+        <div class="caducidad-report__operation-error">
+            {{ operationError() }}
+        </div>
+        }
 
         <div class="caducidad-report-table-container">
             <table class="caducidad-report-table">

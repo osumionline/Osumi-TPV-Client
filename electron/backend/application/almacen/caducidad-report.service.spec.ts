@@ -72,6 +72,13 @@ class FakeCaducidadReportWindow implements CaducidadReportWindow {
 
     return this.lastDocumento;
   }
+
+  /**
+   * Simula la impresión de la ventana.
+   */
+  print(): Promise<void> {
+    return Promise.resolve();
+  }
 }
 
 describe('CaducidadReportService', (): void => {

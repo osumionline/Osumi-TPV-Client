@@ -41,6 +41,8 @@ export default class CaducidadReportComponent implements OnInit {
     signal<CaducidadReportInterface | null>(null);
   readonly loading: WritableSignal<boolean> = signal<boolean>(true);
   readonly loadError: WritableSignal<string | null> = signal<string | null>(null);
+  readonly processing: WritableSignal<boolean> = signal<boolean>(false);
+  readonly operationError: WritableSignal<string | null> = signal<string | null>(null);
   readonly expandedYears: WritableSignal<ReadonlySet<number>> = signal<ReadonlySet<number>>(
     new Set<number>(),
   );
@@ -60,6 +62,29 @@ export default class CaducidadReportComponent implements OnInit {
    */
   retry(): void {
     void this.loadDocumento();
+  }
+
+  /**
+   * Abre el diálogo estándar para imprimir
+   * exactamente el estado visible del informe.
+   */
+  async print(): Promise<void> {
+    if (this.documento() === null || this.processing()) {
+      return;
+    }
+
+    this.processing.set(true);
+    this.operationError.set(null);
+
+    try {
+      await window.osumiCaducidadReport.print();
+    } catch (error: unknown) {
+      this.operationError.set(
+        getErrorMessage(error, 'No se ha podido imprimir el informe de caducidades.'),
+      );
+    } finally {
+      this.processing.set(false);
+    }
   }
 
   /**
@@ -141,6 +166,7 @@ export default class CaducidadReportComponent implements OnInit {
   private async loadDocumento(): Promise<void> {
     this.loading.set(true);
     this.loadError.set(null);
+    this.operationError.set(null);
 
     try {
       const documento: CaducidadReportInterface = await window.osumiCaducidadReport.getDocumento();
