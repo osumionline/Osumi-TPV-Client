@@ -85,8 +85,8 @@ const CADUCIDAD_COLUMNS: readonly string[] = [
   'marca',
   'nombre',
   'unidades',
-  'pvp',
   'puc',
+  'pvp',
   'totalPvp',
   'opciones',
 ];
