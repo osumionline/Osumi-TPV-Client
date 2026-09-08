@@ -4,6 +4,10 @@ import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidad-
 import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-filter-query.interface';
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
 import type {
+  CaducidadArticuloSearchRecord,
+  CaducidadCreateRecord,
+} from '@backend/domain/almacen/caducidad-create-record.interface';
+import type {
   CaducidadFilterOptionsRecord,
   CaducidadMarcaFilterRecord,
   CaducidadResultadoRecord,
@@ -136,6 +140,17 @@ interface CaducidadBrandDatabaseRow {
 interface CaducidadSqlFilter {
   readonly clause: string;
   readonly parameters: (number | string)[];
+}
+
+interface CaducidadArticuloDatabaseRow {
+  readonly id: number;
+  readonly localizador: number;
+  readonly id_marca: number;
+  readonly marca_nombre: string;
+  readonly nombre: string;
+  readonly stock: number;
+  readonly puc_micros: number;
+  readonly pvp_cents: number;
 }
 
 /**
@@ -290,6 +305,90 @@ export default class TypeOrmAlmacenRepository implements AlmacenRepository {
         nombre: row.nombre,
       })),
     };
+  }
+
+  /**
+   * Busca artículos activos utilizando sus identificadores
+   * comerciales habituales.
+   */
+  async searchCaducidadArticulos(texto: string): Promise<readonly CaducidadArticuloSearchRecord[]> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const pattern: string = `%${this.escapeLike(texto)}%`;
+
+    const rows: readonly CaducidadArticuloDatabaseRow[] = (await dataSource.query(
+      `
+          SELECT
+            a.id,
+            a.localizador,
+            a.id_marca,
+            m.nombre AS marca_nombre,
+            a.nombre,
+            a.stock,
+            a.puc_micros,
+            a.pvp_cents
+          FROM articulo a
+          INNER JOIN marca m
+            ON m.id = a.id_marca
+          WHERE
+            a.deleted_at IS NULL
+            AND (
+              CAST(a.localizador AS TEXT)
+                LIKE ?
+                ESCAPE '\\'
+              OR a.nombre
+                COLLATE NOCASE
+                LIKE ?
+                ESCAPE '\\'
+              OR COALESCE(
+                a.referencia,
+                ''
+              )
+                COLLATE NOCASE
+                LIKE ?
+                ESCAPE '\\'
+              OR EXISTS (
+                SELECT 1
+                FROM codigo_barras cb
+                WHERE
+                  cb.id_articulo = a.id
+                  AND cb.deleted_at IS NULL
+                  AND cb.codigo
+                    COLLATE NOCASE
+                    LIKE ?
+                    ESCAPE '\\'
+              )
+            )
+          ORDER BY
+            a.nombre COLLATE NOCASE,
+            a.localizador,
+            a.id
+          LIMIT 25
+        `,
+      [pattern, pattern, pattern, pattern],
+    )) as readonly CaducidadArticuloDatabaseRow[];
+
+    return rows.map((row: CaducidadArticuloDatabaseRow): CaducidadArticuloSearchRecord => ({
+      id: row.id,
+      localizador: row.localizador,
+      marcaNombre: row.marca_nombre,
+      nombre: row.nombre,
+      stock: row.stock,
+      pucMicros: row.puc_micros,
+      pvpCents: row.pvp_cents,
+    }));
+  }
+
+  /**
+   * Registra una caducidad, actualiza el stock y crea
+   * su histórico dentro de una única transacción.
+   */
+  async createCaducidad(command: CaducidadCreateRecord): Promise<void> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    await runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
+      await this.createCaducidadTransaction(queryRunner, command);
+    });
   }
 
   /**
@@ -554,6 +653,221 @@ export default class TypeOrmAlmacenRepository implements AlmacenRepository {
         [timestamp, timestamp, idArticulo],
       );
     });
+  }
+
+  /**
+   * Ejecuta todos los pasos necesarios para registrar
+   * una caducidad dentro de la transacción activa.
+   */
+  private async createCaducidadTransaction(
+    queryRunner: QueryRunner,
+    command: CaducidadCreateRecord,
+  ): Promise<void> {
+    const article: CaducidadArticuloDatabaseRow = await this.requireCaducidadArticulo(
+      queryRunner,
+      command.idArticulo,
+    );
+
+    const stockFinal: number = article.stock - command.unidades;
+
+    if (!Number.isSafeInteger(stockFinal)) {
+      throw new Error('El stock resultante supera el rango permitido.');
+    }
+
+    const publicId: string = randomUUID();
+
+    await queryRunner.query(
+      `
+      INSERT INTO merma_caducidad (
+        public_id,
+        id_articulo,
+        localizador_snapshot,
+        id_marca_snapshot,
+        marca_nombre_snapshot,
+        articulo_nombre_snapshot,
+        unidades,
+        puc_micros,
+        pvp_cents,
+        fecha_baja,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?
+      )
+    `,
+      [
+        publicId,
+        article.id,
+        article.localizador,
+        article.id_marca,
+        article.marca_nombre,
+        article.nombre,
+        command.unidades,
+        article.puc_micros,
+        article.pvp_cents,
+        command.fechaBaja,
+        command.fechaBaja,
+        command.fechaBaja,
+      ],
+    );
+
+    const idRows: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+        SELECT id
+        FROM merma_caducidad
+        WHERE public_id = ?
+        LIMIT 1
+      `,
+      [publicId],
+    )) as readonly DatabaseIdRow[];
+
+    const idCaducidad: number | undefined = idRows[0]?.id;
+
+    if (idCaducidad === undefined) {
+      throw new Error('No se ha podido identificar la caducidad creada.');
+    }
+
+    await queryRunner.query(
+      `
+      UPDATE articulo
+      SET
+        stock = ?,
+        updated_at = ?
+      WHERE
+        id = ?
+        AND deleted_at IS NULL
+    `,
+      [stockFinal, command.fechaBaja, article.id],
+    );
+
+    await this.insertCaducidadStockHistory(
+      queryRunner,
+      article.id,
+      idCaducidad,
+      article.stock,
+      -command.unidades,
+      stockFinal,
+      article.puc_micros,
+      article.pvp_cents,
+      command.fechaBaja,
+    );
+  }
+
+  /**
+   * Recupera dentro de la transacción el estado canónico
+   * del artículo que va a contabilizarse como caducado.
+   */
+  private async requireCaducidadArticulo(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+  ): Promise<CaducidadArticuloDatabaseRow> {
+    const rows: readonly CaducidadArticuloDatabaseRow[] = (await queryRunner.query(
+      `
+          SELECT
+            a.id,
+            a.localizador,
+            a.id_marca,
+            m.nombre AS marca_nombre,
+            a.nombre,
+            a.stock,
+            a.puc_micros,
+            a.pvp_cents
+          FROM articulo a
+          INNER JOIN marca m
+            ON m.id = a.id_marca
+          WHERE
+            a.id = ?
+            AND a.deleted_at IS NULL
+          LIMIT 1
+        `,
+      [idArticulo],
+    )) as readonly CaducidadArticuloDatabaseRow[];
+
+    const article: CaducidadArticuloDatabaseRow | undefined = rows[0];
+
+    if (article === undefined) {
+      throw new Error('El artículo seleccionado ya no está disponible.');
+    }
+
+    return article;
+  }
+
+  /**
+   * Registra un movimiento de stock asociado
+   * explícitamente a una caducidad.
+   */
+  private async insertCaducidadStockHistory(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    idCaducidad: number,
+    stockPrevio: number,
+    diferencia: number,
+    stockFinal: number,
+    pucMicros: number,
+    pvpCents: number,
+    timestamp: string,
+  ): Promise<void> {
+    const pvpMicros: number = (pvpCents * UNIT_PRICE_SCALE) / MONEY_SCALE;
+
+    if (!Number.isSafeInteger(pvpMicros)) {
+      throw new Error('El PVP de la caducidad supera el rango permitido.');
+    }
+
+    await queryRunner.query(
+      `
+      INSERT INTO historico_articulo (
+        public_id,
+        id_articulo,
+        tipo,
+        stock_previo,
+        diferencia,
+        stock_final,
+        id_merma_caducidad,
+        puc_micros,
+        pvp_micros,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?
+      )
+    `,
+      [
+        randomUUID(),
+        idArticulo,
+        HISTORICO_ARTICULO_TIPO.CADUCIDAD,
+        stockPrevio,
+        diferencia,
+        stockFinal,
+        idCaducidad,
+        pucMicros,
+        pvpMicros,
+        timestamp,
+        timestamp,
+      ],
+    );
   }
 
   /**

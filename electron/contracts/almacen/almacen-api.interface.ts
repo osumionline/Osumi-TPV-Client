@@ -1,4 +1,8 @@
 import type {
+  CaducidadArticuloSearchInterface,
+  CaducidadCreateCommand,
+} from '@desktop-contracts/almacen/caducidad-create.interface';
+import type {
   CaducidadConsulta,
   CaducidadFilterOptionsInterface,
   CaducidadResultado,
@@ -58,4 +62,14 @@ export default interface AlmacenApi {
    * filtrar caducidades.
    */
   getCaducidadFilterOptions(): Promise<CaducidadFilterOptionsInterface>;
+
+  /**
+   * Busca artículos activos para una nueva caducidad.
+   */
+  searchCaducidadArticulos(texto: string): Promise<readonly CaducidadArticuloSearchInterface[]>;
+
+  /**
+   * Registra una nueva pérdida por caducidad.
+   */
+  createCaducidad(command: CaducidadCreateCommand): Promise<void>;
 }

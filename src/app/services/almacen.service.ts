@@ -1,5 +1,14 @@
 import { Service } from '@angular/core';
 import type {
+  CaducidadArticuloSearchInterface,
+  CaducidadCreateCommand,
+} from '@desktop-contracts/almacen/caducidad-create.interface';
+import type {
+  CaducidadConsulta,
+  CaducidadFilterOptionsInterface,
+  CaducidadResultado,
+} from '@desktop-contracts/almacen/caducidad.interface';
+import type {
   InventarioCsvExportResult,
   InventarioReportConsulta,
 } from '@desktop-contracts/almacen/inventario-report.interface';
@@ -8,11 +17,6 @@ import type {
   InventarioConsulta,
   InventarioResultado,
 } from '@desktop-contracts/almacen/inventario.interface';
-import type {
-  CaducidadConsulta,
-  CaducidadFilterOptionsInterface,
-  CaducidadResultado,
-} from '@desktop-contracts/almacen/caducidad.interface';
 
 /**
  * Expone al frontend los casos de uso del módulo Almacén.
@@ -74,5 +78,19 @@ export default class AlmacenService {
    */
   getCaducidadFilterOptions(): Promise<CaducidadFilterOptionsInterface> {
     return window.osumiDesktop.almacen.getCaducidadFilterOptions();
+  }
+
+  /**
+   * Busca artículos activos para registrar una caducidad.
+   */
+  searchCaducidadArticulos(texto: string): Promise<readonly CaducidadArticuloSearchInterface[]> {
+    return window.osumiDesktop.almacen.searchCaducidadArticulos(texto);
+  }
+
+  /**
+   * Registra una nueva pérdida por caducidad.
+   */
+  createCaducidad(command: CaducidadCreateCommand): Promise<void> {
+    return window.osumiDesktop.almacen.createCaducidad(command);
   }
 }

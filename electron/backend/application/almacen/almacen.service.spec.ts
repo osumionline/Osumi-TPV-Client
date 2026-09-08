@@ -4,12 +4,20 @@ import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidad-
 import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-filter-query.interface';
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
 import type {
+  CaducidadArticuloSearchRecord,
+  CaducidadCreateRecord,
+} from '@backend/domain/almacen/caducidad-create-record.interface';
+import type {
   CaducidadFilterOptionsRecord,
   CaducidadResultadoRecord,
 } from '@backend/domain/almacen/caducidad-record.interface';
 import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario-record.interface';
 import type { InventarioReportRecord } from '@backend/domain/almacen/inventario-report-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
+import type {
+  CaducidadArticuloSearchInterface,
+  CaducidadCreateCommand,
+} from '@desktop-contracts/almacen/caducidad-create.interface';
 import type {
   CaducidadFilterOptionsInterface,
   CaducidadResultado,
@@ -100,6 +108,21 @@ class FakeAlmacenRepository implements AlmacenRepository {
     ],
   };
 
+  lastCaducidadArticleSearch: string | null = null;
+  lastCreatedCaducidad: CaducidadCreateRecord | null = null;
+
+  caducidadArticleSearchResult: readonly CaducidadArticuloSearchRecord[] = [
+    {
+      id: 25,
+      localizador: 261234,
+      marcaNombre: 'Marca de prueba',
+      nombre: 'Artículo de prueba',
+      stock: 8,
+      pucMicros: 744_580,
+      pvpCents: 100,
+    },
+  ];
+
   /**
    * Devuelve el resultado configurado y conserva la consulta recibida.
    */
@@ -151,6 +174,24 @@ class FakeAlmacenRepository implements AlmacenRepository {
    */
   getCaducidadFilterOptions(): Promise<CaducidadFilterOptionsRecord> {
     return Promise.resolve(this.caducidadFilterOptions);
+  }
+
+  /**
+   * Devuelve los artículos configurados para el buscador.
+   */
+  searchCaducidadArticulos(texto: string): Promise<readonly CaducidadArticuloSearchRecord[]> {
+    this.lastCaducidadArticleSearch = texto;
+
+    return Promise.resolve(this.caducidadArticleSearchResult);
+  }
+
+  /**
+   * Conserva el alta recibida para los tests.
+   */
+  createCaducidad(command: CaducidadCreateRecord): Promise<void> {
+    this.lastCreatedCaducidad = command;
+
+    return Promise.resolve();
   }
 }
 
@@ -417,6 +458,70 @@ describe('AlmacenService', (): void => {
         },
       ],
     });
+  });
+
+  it('normaliza la búsqueda de artículos para Caducidades', async (): Promise<void> => {
+    const repository = new FakeAlmacenRepository();
+    const service = createService(repository);
+
+    const result: readonly CaducidadArticuloSearchInterface[] =
+      await service.searchCaducidadArticulos('  artículo  ');
+
+    expect(repository.lastCaducidadArticleSearch).toBe('artículo');
+
+    expect(result).toEqual([
+      {
+        id: 25,
+        localizador: 261234,
+        marcaNombre: 'Marca de prueba',
+        nombre: 'Artículo de prueba',
+        stock: 8,
+        pucMicros: 744_580,
+        pvpCents: 100,
+      },
+    ]);
+  });
+
+  it('no consulta el repository con una búsqueda vacía de Caducidades', async (): Promise<void> => {
+    const repository = new FakeAlmacenRepository();
+    const service = createService(repository);
+
+    const result = await service.searchCaducidadArticulos('   ');
+
+    expect(result).toEqual([]);
+    expect(repository.lastCaducidadArticleSearch).toBeNull();
+  });
+
+  it('normaliza el alta de una caducidad con la fecha actual', async (): Promise<void> => {
+    const repository = new FakeAlmacenRepository();
+    const service = createService(repository);
+
+    const command: CaducidadCreateCommand = {
+      idArticulo: 25,
+      unidades: 3,
+    };
+
+    await service.createCaducidad(command);
+
+    expect(repository.lastCreatedCaducidad).toEqual({
+      idArticulo: 25,
+      unidades: 3,
+      fechaBaja: '2026-09-07T08:00:00.000Z',
+    });
+  });
+
+  it('rechaza unidades de caducidad no positivas', async (): Promise<void> => {
+    const repository = new FakeAlmacenRepository();
+    const service = createService(repository);
+
+    await expect(
+      service.createCaducidad({
+        idArticulo: 25,
+        unidades: 0,
+      }),
+    ).rejects.toThrow('Las unidades deben ser un entero mayor que cero.');
+
+    expect(repository.lastCreatedCaducidad).toBeNull();
   });
 });
 

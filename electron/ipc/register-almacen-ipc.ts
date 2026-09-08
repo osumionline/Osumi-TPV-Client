@@ -2,6 +2,10 @@ import type AlmacenService from '@backend/application/almacen/almacen.service';
 import type InventarioCsvService from '@backend/application/almacen/inventario-csv.service';
 import type InventarioPrintService from '@backend/application/almacen/inventario-print.service';
 import type {
+  CaducidadArticuloSearchInterface,
+  CaducidadCreateCommand,
+} from '@desktop-contracts/almacen/caducidad-create.interface';
+import type {
   CaducidadConsulta,
   CaducidadFilterOptionsInterface,
   CaducidadResultado,
@@ -98,6 +102,24 @@ export default function registerAlmacenIpc(
       assertTrustedSender(event, getMainWindow);
 
       return almacenService.getCaducidadFilterOptions();
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.almacenSearchCaducidadArticulos,
+    async (event, texto: string): Promise<readonly CaducidadArticuloSearchInterface[]> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return almacenService.searchCaducidadArticulos(texto);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.almacenCreateCaducidad,
+    async (event, command: CaducidadCreateCommand): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await almacenService.createCaducidad(command);
     },
   );
 }

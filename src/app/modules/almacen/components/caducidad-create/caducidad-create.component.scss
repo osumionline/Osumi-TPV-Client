@@ -1,0 +1,202 @@
+:host {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+}
+
+.caducidad-create__backdrop {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    place-items: center;
+    padding: 24px;
+    background-color: rgb(0 0 0 / 45%);
+}
+
+.caducidad-create__dialog {
+    display: flex;
+    width: min(760px, calc(100vw - 48px));
+    max-height: min(820px, calc(100vh - 48px));
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 8px;
+    background-color: var(--color-white);
+    box-shadow: 0 12px 36px rgb(0 0 0 / 28%);
+}
+
+.caducidad-create__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--separator-color);
+
+    h2 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 500;
+    }
+
+    span {
+        display: block;
+        margin-top: 3px;
+        font-size: 12px;
+        opacity: 0.65;
+    }
+}
+
+.caducidad-create__body {
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.caducidad-create__search {
+    width: 100%;
+}
+
+.caducidad-create__results {
+    max-height: 260px;
+    margin-top: 12px;
+    overflow-y: auto;
+    border: 1px solid var(--separator-color);
+    border-radius: 6px;
+}
+
+.caducidad-create__result {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 12px;
+    border: 0;
+    border-bottom: 1px solid var(--separator-color);
+    background-color: var(--color-white);
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:last-child {
+        border-bottom: 0;
+    }
+
+    &:hover:not(:disabled) {
+        background-color: var(--color-very-light-grey);
+    }
+
+    &:disabled {
+        cursor: default;
+    }
+}
+
+.caducidad-create__result--selected {
+    outline: 2px solid var(--main-color);
+    outline-offset: -2px;
+}
+
+.caducidad-create__result-main {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+
+    strong,
+    small {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    small {
+        opacity: 0.65;
+    }
+}
+
+.caducidad-create__state {
+    padding: 28px 16px;
+    text-align: center;
+    opacity: 0.65;
+}
+
+.caducidad-create__state--error,
+.caducidad-create__save-error {
+    color: var(--color-red);
+    opacity: 1;
+}
+
+.caducidad-create__selection {
+    margin-top: 18px;
+    padding: 16px;
+    border: 1px solid var(--separator-color);
+    border-radius: 6px;
+}
+
+.caducidad-create__selection-title {
+    margin-bottom: 8px;
+    font-size: 11px;
+    text-transform: uppercase;
+    opacity: 0.6;
+}
+
+.caducidad-create__selection-name {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    span {
+        font-size: 12px;
+        opacity: 0.65;
+    }
+}
+
+.caducidad-create__summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 14px;
+
+    >div {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        padding: 9px 10px;
+        border: 1px solid var(--separator-color);
+        border-radius: 4px;
+    }
+
+    span {
+        font-size: 11px;
+        opacity: 0.65;
+    }
+}
+
+.caducidad-create__units {
+    width: 180px;
+    margin-top: 16px;
+}
+
+.caducidad-create__save-error {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-red);
+    border-radius: 4px;
+}
+
+.caducidad-create__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--separator-color);
+}
+
+@media (max-width: 600px) {
+    .caducidad-create__summary {
+        grid-template-columns: 1fr;
+    }
+
+    .caducidad-create__units {
+        width: 100%;
+    }
+}

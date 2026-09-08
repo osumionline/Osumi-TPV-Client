@@ -5,6 +5,10 @@ import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-fi
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
 import type InventarioReportProvider from '@backend/contracts/almacen/inventario-report-provider.interface';
 import type {
+  CaducidadArticuloSearchRecord,
+  CaducidadCreateRecord,
+} from '@backend/domain/almacen/caducidad-create-record.interface';
+import type {
   CaducidadFilterOptionsRecord,
   CaducidadMarcaFilterRecord,
   CaducidadResultadoRecord,
@@ -19,6 +23,10 @@ import type {
   InventarioReportRowRecord,
 } from '@backend/domain/almacen/inventario-report-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
+import type {
+  CaducidadArticuloSearchInterface,
+  CaducidadCreateCommand,
+} from '@desktop-contracts/almacen/caducidad-create.interface';
 import type {
   CaducidadConsulta,
   CaducidadFilterOptionsInterface,
@@ -71,6 +79,72 @@ export default class AlmacenService implements InventarioReportProvider {
     private readonly almacenRepository: AlmacenRepository,
     private readonly currentDateProvider: () => Date = (): Date => new Date(),
   ) {}
+
+  /**
+   * Busca artículos activos candidatos a registrar
+   * una pérdida por caducidad.
+   */
+  async searchCaducidadArticulos(
+    texto: string,
+  ): Promise<readonly CaducidadArticuloSearchInterface[]> {
+    if (typeof texto !== 'string') {
+      throw new Error('El texto de búsqueda de artículos no es válido.');
+    }
+
+    const normalizedText: string = texto.trim();
+
+    if (normalizedText.length === 0) {
+      return [];
+    }
+
+    if (normalizedText.length > 200) {
+      throw new Error('El texto de búsqueda de artículos es demasiado largo.');
+    }
+
+    const rows: readonly CaducidadArticuloSearchRecord[] =
+      await this.almacenRepository.searchCaducidadArticulos(normalizedText);
+
+    return rows.map((row: CaducidadArticuloSearchRecord): CaducidadArticuloSearchInterface => ({
+      id: row.id,
+      localizador: row.localizador,
+      marcaNombre: row.marcaNombre,
+      nombre: row.nombre,
+      stock: row.stock,
+      pucMicros: row.pucMicros,
+      pvpCents: row.pvpCents,
+    }));
+  }
+
+  /**
+   * Valida y registra una nueva caducidad.
+   */
+  async createCaducidad(command: CaducidadCreateCommand): Promise<void> {
+    if (typeof command !== 'object' || command === null) {
+      throw new Error('La caducidad indicada no es válida.');
+    }
+
+    if (!Number.isSafeInteger(command.idArticulo) || command.idArticulo <= 0) {
+      throw new Error('El artículo seleccionado no es válido.');
+    }
+
+    if (!Number.isSafeInteger(command.unidades) || command.unidades <= 0) {
+      throw new Error('Las unidades deben ser un entero mayor que cero.');
+    }
+
+    const currentDate: Date = this.currentDateProvider();
+
+    if (!Number.isFinite(currentDate.getTime())) {
+      throw new Error('No se ha podido determinar la fecha de la caducidad.');
+    }
+
+    const record: CaducidadCreateRecord = {
+      idArticulo: command.idArticulo,
+      unidades: command.unidades,
+      fechaBaja: currentDate.toISOString(),
+    };
+
+    await this.almacenRepository.createCaducidad(record);
+  }
 
   /**
    * Valida y ejecuta una consulta paginada de

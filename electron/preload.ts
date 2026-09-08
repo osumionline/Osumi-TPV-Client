@@ -1,4 +1,8 @@
 import type {
+  CaducidadArticuloSearchInterface,
+  CaducidadCreateCommand,
+} from '@desktop-contracts/almacen/caducidad-create.interface';
+import type {
   CaducidadConsulta,
   CaducidadFilterOptionsInterface,
   CaducidadResultado,
@@ -145,6 +149,16 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
       ipcRenderer.invoke(
         IPC_CHANNELS.almacenGetCaducidadFilterOptions,
       ) as Promise<CaducidadFilterOptionsInterface>,
+
+    searchCaducidadArticulos: (
+      texto: string,
+    ): Promise<readonly CaducidadArticuloSearchInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.almacenSearchCaducidadArticulos, texto) as Promise<
+        readonly CaducidadArticuloSearchInterface[]
+      >,
+
+    createCaducidad: (command: CaducidadCreateCommand): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.almacenCreateCaducidad, command) as Promise<void>,
   }),
 
   legacyImport: {

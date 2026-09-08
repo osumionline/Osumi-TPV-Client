@@ -15,13 +15,17 @@ import { MatPaginator, type PageEvent } from '@angular/material/paginator';
 import { MatSelect, type MatSelectChange } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltip } from '@angular/material/tooltip';
+import type { CaducidadCreateCommand } from '@desktop-contracts/almacen/caducidad-create.interface';
 import type {
   CaducidadConsulta,
   CaducidadFilterOptionsInterface,
   CaducidadResultado,
   CaducidadRowInterface,
 } from '@desktop-contracts/almacen/caducidad.interface';
+import CaducidadCreateComponent from '@modules/almacen/components/caducidad-create/caducidad-create.component';
+import { DialogService } from '@osumi/angular-tools';
 import AlmacenService from '@services/almacen.service';
+import ArticulosService from '@services/articulos.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 interface CaducidadMonthOption {
@@ -112,6 +116,7 @@ const INTEGER_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
   templateUrl: './caducidades.component.html',
   styleUrl: './caducidades.component.scss',
   imports: [
+    CaducidadCreateComponent,
     MatButton,
     MatFormField,
     MatIcon,
@@ -127,6 +132,8 @@ const INTEGER_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
 })
 export default class CaducidadesComponent implements OnInit, OnDestroy {
   readonly almacenService: AlmacenService = inject(AlmacenService);
+  readonly articulosService: ArticulosService = inject(ArticulosService);
+  private readonly dialog: DialogService = inject(DialogService);
 
   readonly anio: WritableSignal<number | null> = signal<number | null>(null);
   readonly mes: WritableSignal<number | null> = signal<number | null>(null);
@@ -134,6 +141,9 @@ export default class CaducidadesComponent implements OnInit, OnDestroy {
   readonly nombre: WritableSignal<string> = signal<string>('');
   readonly pagina: WritableSignal<number> = signal<number>(1);
   readonly num: WritableSignal<number> = signal<number>(50);
+  readonly createOpen: WritableSignal<boolean> = signal<boolean>(false);
+  readonly createSaving: WritableSignal<boolean> = signal<boolean>(false);
+  readonly createError: WritableSignal<string | null> = signal<string | null>(null);
 
   readonly pageSizeOptions: readonly number[] = [20, 50, 100, 200];
 
@@ -281,6 +291,71 @@ export default class CaducidadesComponent implements OnInit, OnDestroy {
    */
   formatMicros(value: number): string {
     return CURRENCY_FORMATTER.format(value / 1_000_000);
+  }
+
+  /**
+   * Abre el formulario de una nueva caducidad.
+   */
+  openCreate(): void {
+    if (this.createSaving()) {
+      return;
+    }
+
+    this.createError.set(null);
+    this.createOpen.set(true);
+  }
+
+  /**
+   * Cierra el formulario de alta.
+   */
+  closeCreate(): void {
+    if (this.createSaving()) {
+      return;
+    }
+
+    this.createError.set(null);
+    this.createOpen.set(false);
+  }
+
+  /**
+   * Registra la caducidad y refresca los datos
+   * canónicos afectados.
+   */
+  async createCaducidad(command: CaducidadCreateCommand): Promise<void> {
+    if (this.createSaving()) {
+      return;
+    }
+
+    this.createSaving.set(true);
+    this.createError.set(null);
+
+    try {
+      await this.almacenService.createCaducidad(command);
+
+      this.createOpen.set(false);
+
+      try {
+        await this.articulosService.sincronizarInventarioPersistido([command.idArticulo]);
+      } catch (error: unknown) {
+        this.dialog
+          .alert({
+            title: 'Atención',
+            content: getErrorMessage(
+              error,
+              'La caducidad se ha guardado, pero no se ha podido actualizar completamente la ficha abierta del artículo.',
+            ),
+          })
+          .subscribe();
+      }
+
+      this.pagina.set(1);
+
+      await this.initialize();
+    } catch (error: unknown) {
+      this.createError.set(getErrorMessage(error, 'No se ha podido registrar la caducidad.'));
+    } finally {
+      this.createSaving.set(false);
+    }
   }
 
   /**

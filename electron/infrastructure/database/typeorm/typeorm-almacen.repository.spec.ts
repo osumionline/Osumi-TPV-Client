@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DataSource } from 'typeorm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { CaducidadCreateRecord } from '@backend/domain/almacen/caducidad-create-record.interface';
 
 let tempDirectory: string | null = null;
 let applicationDatabase: TypeOrmApplicationDatabase | null = null;
@@ -607,6 +608,192 @@ describe('TypeOrmAlmacenRepository', (): void => {
         nombre: 'Marca Uno',
       },
     ]);
+  });
+
+  it('busca artículos activos para una nueva caducidad', async (): Promise<void> => {
+    const byName = await requireRepository().searchCaducidadArticulos('beta');
+
+    expect(byName).toEqual([
+      {
+        id: 2,
+        localizador: 261002,
+        marcaNombre: 'Marca Dos',
+        nombre: 'Artículo Beta',
+        stock: 3,
+        pucMicros: 2_000_000,
+        pvpCents: 300,
+      },
+    ]);
+
+    expect((await requireRepository().searchCaducidadArticulos('REF-A'))[0]?.id).toBe(1);
+
+    expect((await requireRepository().searchCaducidadArticulos('EXTRA-BETA'))[0]?.id).toBe(2);
+
+    expect(await requireRepository().searchCaducidadArticulos('REF-DELETED')).toEqual([]);
+  });
+
+  it('crea una caducidad con snapshot y movimiento de stock asociado', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    const command: CaducidadCreateRecord = {
+      idArticulo: 1,
+      unidades: 3,
+      fechaBaja: '2026-09-08T10:00:00.000Z',
+    };
+
+    await requireRepository().createCaducidad(command);
+
+    const expirationRows = (await dataSource.query(
+      `
+        SELECT
+          id,
+          id_articulo,
+          localizador_snapshot,
+          id_marca_snapshot,
+          marca_nombre_snapshot,
+          articulo_nombre_snapshot,
+          unidades,
+          puc_micros,
+          pvp_cents,
+          fecha_baja
+        FROM merma_caducidad
+        WHERE fecha_baja = ?
+      `,
+      [command.fechaBaja],
+    )) as readonly {
+      readonly id: number;
+      readonly id_articulo: number;
+      readonly localizador_snapshot: number;
+      readonly id_marca_snapshot: number;
+      readonly marca_nombre_snapshot: string;
+      readonly articulo_nombre_snapshot: string;
+      readonly unidades: number;
+      readonly puc_micros: number;
+      readonly pvp_cents: number;
+      readonly fecha_baja: string;
+    }[];
+
+    expect(expirationRows).toHaveLength(1);
+
+    expect(expirationRows[0]).toMatchObject({
+      id_articulo: 1,
+      localizador_snapshot: 261001,
+      id_marca_snapshot: 1,
+      marca_nombre_snapshot: 'Marca Uno',
+      articulo_nombre_snapshot: 'Artículo Alfa',
+      unidades: 3,
+      puc_micros: 1_210_000,
+      pvp_cents: 200,
+      fecha_baja: '2026-09-08T10:00:00.000Z',
+    });
+
+    const articleRows = (await dataSource.query(
+      `
+        SELECT stock
+        FROM articulo
+        WHERE id = 1
+      `,
+    )) as readonly {
+      readonly stock: number;
+    }[];
+
+    expect(articleRows[0]?.stock).toBe(-1);
+
+    const historyRows = (await dataSource.query(
+      `
+        SELECT
+          tipo,
+          stock_previo,
+          diferencia,
+          stock_final,
+          id_merma_caducidad,
+          puc_micros,
+          pvp_micros
+        FROM historico_articulo
+        WHERE tipo = 7
+      `,
+    )) as readonly {
+      readonly tipo: number;
+      readonly stock_previo: number;
+      readonly diferencia: number;
+      readonly stock_final: number;
+      readonly id_merma_caducidad: number;
+      readonly puc_micros: number;
+      readonly pvp_micros: number;
+    }[];
+
+    expect(historyRows).toEqual([
+      {
+        tipo: 7,
+        stock_previo: 2,
+        diferencia: -3,
+        stock_final: -1,
+        id_merma_caducidad: expirationRows[0]?.id,
+        puc_micros: 1_210_000,
+        pvp_micros: 2_000_000,
+      },
+    ]);
+  });
+
+  it('hace rollback completo si falla el histórico de una caducidad', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    await dataSource.query(`
+    CREATE TRIGGER
+      fail_caducidad_history
+    BEFORE INSERT
+      ON historico_articulo
+    WHEN NEW.tipo = 7
+    BEGIN
+      SELECT RAISE(
+        ABORT,
+        'forced caducidad history failure'
+      );
+    END
+  `);
+
+    await expect(
+      requireRepository().createCaducidad({
+        idArticulo: 1,
+        unidades: 3,
+        fechaBaja: '2026-09-08T11:00:00.000Z',
+      }),
+    ).rejects.toThrow();
+
+    const expirationRows = (await dataSource.query(
+      `
+        SELECT COUNT(*) AS total
+        FROM merma_caducidad
+      `,
+    )) as readonly {
+      readonly total: number;
+    }[];
+
+    expect(expirationRows[0]?.total).toBe(4);
+
+    const articleRows = (await dataSource.query(
+      `
+        SELECT stock
+        FROM articulo
+        WHERE id = 1
+      `,
+    )) as readonly {
+      readonly stock: number;
+    }[];
+
+    expect(articleRows[0]?.stock).toBe(2);
+
+    const historyRows = (await dataSource.query(
+      `
+        SELECT COUNT(*) AS total
+        FROM historico_articulo
+        WHERE tipo = 7
+      `,
+    )) as readonly {
+      readonly total: number;
+    }[];
+
+    expect(historyRows[0]?.total).toBe(0);
   });
 });
 

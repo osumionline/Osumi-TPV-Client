@@ -1,0 +1,184 @@
+<div class="caducidad-create__backdrop"
+     (click)="close()">
+    <section class="caducidad-create__dialog"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="caducidad-create-title"
+             (click)="$event.stopPropagation()">
+        <header class="caducidad-create__header">
+            <div>
+                <h2 id="caducidad-create-title">
+                    Añadir caducidad
+                </h2>
+
+                <span>
+                    Selecciona el artículo y las unidades retiradas.
+                </span>
+            </div>
+
+            <button mat-icon-button
+                    type="button"
+                    aria-label="Cerrar"
+                    [disabled]="saving()"
+                    (click)="close()">
+                <mat-icon>
+                    close
+                </mat-icon>
+            </button>
+        </header>
+
+        <div class="caducidad-create__body">
+            <mat-form-field appearance="outline"
+                            subscriptSizing="dynamic"
+                            class="caducidad-create__search">
+                <mat-label>
+                    Buscar artículo
+                </mat-label>
+
+                <input matInput
+                       type="search"
+                       autocomplete="off"
+                       autofocus
+                       placeholder="Nombre, localizador, referencia o código de barras"
+                       [disabled]="saving()"
+                       [value]="query()"
+                       (input)="onSearchInput($event)">
+            </mat-form-field>
+
+            <div class="caducidad-create__results">
+                @if (query().trim().length === 0) {
+                <div class="caducidad-create__state">
+                    Escribe para buscar un artículo.
+                </div>
+                } @else if (searchLoading()) {
+                <div class="caducidad-create__state">
+                    Buscando artículos…
+                </div>
+                } @else if (searchError() !== null) {
+                <div class="caducidad-create__state caducidad-create__state--error">
+                    {{ searchError() }}
+                </div>
+                } @else if (results().length === 0) {
+                <div class="caducidad-create__state">
+                    No se han encontrado artículos.
+                </div>
+                } @else {
+                @for (article of results(); track article.id) {
+                <button type="button"
+                        class="caducidad-create__result"
+                        [class.caducidad-create__result--selected]="selectedArticle()?.id === article.id"
+                        [disabled]="saving()"
+                        (click)="selectArticle(article)">
+                    <span class="caducidad-create__result-main">
+                        <strong>
+                            {{ article.nombre }}
+                        </strong>
+
+                        <small>
+                            {{ article.localizador }} · {{ article.marcaNombre }}
+                        </small>
+                    </span>
+
+                    <span>
+                        Stock {{ article.stock }}
+                    </span>
+                </button>
+                }
+                }
+            </div>
+
+            @if (selectedArticle(); as article) {
+            <section class="caducidad-create__selection">
+                <div class="caducidad-create__selection-title">
+                    Artículo seleccionado
+                </div>
+
+                <div class="caducidad-create__selection-name">
+                    <strong>
+                        {{ article.nombre }}
+                    </strong>
+
+                    <span>
+                        {{ article.localizador }} · {{ article.marcaNombre }}
+                    </span>
+                </div>
+
+                <div class="caducidad-create__summary">
+                    <div>
+                        <span>
+                            Stock actual
+                        </span>
+
+                        <strong>
+                            {{ article.stock }}
+                        </strong>
+                    </div>
+
+                    <div>
+                        <span>
+                            PUC
+                        </span>
+
+                        <strong>
+                            {{ formatMicros(article.pucMicros) }}
+                        </strong>
+                    </div>
+
+                    <div>
+                        <span>
+                            PVP
+                        </span>
+
+                        <strong>
+                            {{ formatCents(article.pvpCents) }}
+                        </strong>
+                    </div>
+                </div>
+
+                <mat-form-field appearance="outline"
+                                subscriptSizing="dynamic"
+                                class="caducidad-create__units">
+                    <mat-label>
+                        Unidades caducadas
+                    </mat-label>
+
+                    <input matInput
+                           type="number"
+                           min="1"
+                           step="1"
+                           [disabled]="saving()"
+                           [value]="unidades()"
+                           (input)="onUnitsInput($event)"
+                           (keydown.enter)="submit()">
+                </mat-form-field>
+            </section>
+            }
+
+            @if (error() !== null) {
+            <div class="caducidad-create__save-error">
+                {{ error() }}
+            </div>
+            }
+        </div>
+
+        <footer class="caducidad-create__footer">
+            <button mat-stroked-button
+                    type="button"
+                    [disabled]="saving()"
+                    (click)="close()">
+                Cancelar
+            </button>
+
+            <button mat-flat-button
+                    type="button"
+                    [disabled]="!canSubmit()"
+                    (click)="submit()">
+                <mat-icon>
+                    add
+                </mat-icon>
+
+                {{ saving() ? 'Añadiendo…' : 'Añadir caducidad' }}
+            </button>
+        </footer>
+    </section>
+</div>

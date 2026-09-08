@@ -86,11 +86,11 @@
 
         <button mat-flat-button
                 type="button"
-                disabled>
+                [disabled]="loading() || createSaving()"
+                (click)="openCreate()">
             <mat-icon>
                 add
             </mat-icon>
-
             Añadir caducidad
         </button>
 
@@ -100,7 +100,6 @@
             <mat-icon>
                 description
             </mat-icon>
-
             Crear informe
         </button>
     </div>
@@ -301,3 +300,10 @@
     </div>
     }
 </section>
+
+@if (createOpen()) {
+<otpv-caducidad-create [saving]="createSaving()"
+                       [error]="createError()"
+                       (createEvent)="createCaducidad($event)"
+                       (closeEvent)="closeCreate()" />
+}
