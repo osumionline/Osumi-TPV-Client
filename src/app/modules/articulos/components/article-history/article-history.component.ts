@@ -122,6 +122,9 @@ export default class ArticleHistoryComponent implements OnInit {
       case 6:
         return 'Inventario (múltiple)';
 
+      case 7:
+        return 'Caducidad';
+
       default:
         return `Tipo ${tipo}`;
     }

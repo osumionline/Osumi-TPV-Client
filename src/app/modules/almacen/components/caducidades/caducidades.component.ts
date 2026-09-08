@@ -144,6 +144,7 @@ export default class CaducidadesComponent implements OnInit, OnDestroy {
   readonly createOpen: WritableSignal<boolean> = signal<boolean>(false);
   readonly createSaving: WritableSignal<boolean> = signal<boolean>(false);
   readonly createError: WritableSignal<string | null> = signal<string | null>(null);
+  readonly deactivatingCaducidadId: WritableSignal<number | null> = signal<number | null>(null);
 
   readonly pageSizeOptions: readonly number[] = [20, 50, 100, 200];
 
@@ -297,7 +298,7 @@ export default class CaducidadesComponent implements OnInit, OnDestroy {
    * Abre el formulario de una nueva caducidad.
    */
   openCreate(): void {
-    if (this.createSaving()) {
+    if (this.createSaving() || this.deactivatingCaducidadId() !== null) {
       return;
     }
 
@@ -355,6 +356,76 @@ export default class CaducidadesComponent implements OnInit, OnDestroy {
       this.createError.set(getErrorMessage(error, 'No se ha podido registrar la caducidad.'));
     } finally {
       this.createSaving.set(false);
+    }
+  }
+
+  /**
+   * Solicita confirmación antes de revertir una caducidad.
+   */
+  deactivateCaducidad(row: CaducidadRowInterface): void {
+    if (this.loading() || this.createSaving() || this.deactivatingCaducidadId() !== null) {
+      return;
+    }
+
+    this.dialog
+      .confirm({
+        title: 'Eliminar caducidad',
+        content:
+          `¿Estás seguro de querer eliminar la caducidad de "${row.nombre}"? ` +
+          `Se devolverán ${this.formatInteger(row.unidades)} unidades al stock del artículo ` +
+          'y se conservará el histórico de la reversión.',
+      })
+      .subscribe((result: boolean): void => {
+        if (!result) {
+          return;
+        }
+
+        void this.confirmDeactivateCaducidad(row);
+      });
+  }
+
+  /**
+   * Ejecuta una reversión previamente confirmada y
+   * sincroniza el estado canónico del artículo.
+   */
+  private async confirmDeactivateCaducidad(row: CaducidadRowInterface): Promise<void> {
+    if (this.createSaving() || this.deactivatingCaducidadId() !== null) {
+      return;
+    }
+
+    this.deactivatingCaducidadId.set(row.id);
+
+    try {
+      await this.almacenService.deactivateCaducidad(row.id);
+
+      try {
+        await this.articulosService.sincronizarInventarioPersistido([row.idArticulo]);
+      } catch (error: unknown) {
+        this.dialog
+          .alert({
+            title: 'Atención',
+            content: getErrorMessage(
+              error,
+              'La caducidad se ha eliminado, pero no se ha podido actualizar completamente la ficha abierta del artículo.',
+            ),
+          })
+          .subscribe();
+      }
+
+      if (this.rows().length === 1 && this.pagina() > 1) {
+        this.pagina.update((pagina: number): number => pagina - 1);
+      }
+
+      await this.initialize();
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido eliminar la caducidad.'),
+        })
+        .subscribe();
+    } finally {
+      this.deactivatingCaducidadId.set(null);
     }
   }
 

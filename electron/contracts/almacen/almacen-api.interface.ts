@@ -72,4 +72,9 @@ export default interface AlmacenApi {
    * Registra una nueva pérdida por caducidad.
    */
   createCaducidad(command: CaducidadCreateCommand): Promise<void>;
+
+  /**
+   * Revierte una pérdida por caducidad.
+   */
+  deactivateCaducidad(idCaducidad: number): Promise<void>;
 }

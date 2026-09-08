@@ -122,4 +122,13 @@ export default function registerAlmacenIpc(
       await almacenService.createCaducidad(command);
     },
   );
+
+  ipcMain.handle(
+    IPC_CHANNELS.almacenDeactivateCaducidad,
+    async (event, idCaducidad: number): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await almacenService.deactivateCaducidad(idCaducidad);
+    },
+  );
 }

@@ -93,4 +93,11 @@ export default class AlmacenService {
   createCaducidad(command: CaducidadCreateCommand): Promise<void> {
     return window.osumiDesktop.almacen.createCaducidad(command);
   }
+
+  /**
+   * Revierte una pérdida por caducidad.
+   */
+  deactivateCaducidad(idCaducidad: number): Promise<void> {
+    return window.osumiDesktop.almacen.deactivateCaducidad(idCaducidad);
+  }
 }

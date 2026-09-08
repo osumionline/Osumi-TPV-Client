@@ -60,4 +60,9 @@ export default interface AlmacenRepository {
    * Registra atómicamente una nueva pérdida por caducidad.
    */
   createCaducidad(command: CaducidadCreateRecord): Promise<void>;
+
+  /**
+   * Revierte atómicamente una pérdida por caducidad.
+   */
+  deactivateCaducidad(idCaducidad: number): Promise<void>;
 }

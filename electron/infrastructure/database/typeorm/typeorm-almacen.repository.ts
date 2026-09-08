@@ -153,6 +153,16 @@ interface CaducidadArticuloDatabaseRow {
   readonly pvp_cents: number;
 }
 
+interface CaducidadDeactivateDatabaseRow {
+  readonly id: number;
+  readonly id_articulo: number;
+  readonly unidades: number;
+  readonly puc_micros: number;
+  readonly pvp_cents: number;
+  readonly deleted_at: string | null;
+  readonly stock: number;
+}
+
 /**
  * Obtiene desde SQLite los datos de gestión del módulo Almacén.
  */
@@ -393,7 +403,20 @@ export default class TypeOrmAlmacenRepository implements AlmacenRepository {
   }
 
   /**
+   * Revierte una caducidad, restaura el stock y registra
+   * el movimiento inverso dentro de una única transacción.
+   */
+  async deactivateCaducidad(idCaducidad: number): Promise<void> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    await runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
+      await this.deactivateCaducidadTransaction(queryRunner, idCaducidad);
+    });
+  }
+
+  /**
    * Recupera la página solicitada y los agregados
+
    * correspondientes al conjunto filtrado completo.
    */
   async searchInventario(query: InventarioRepositoryQuery): Promise<InventarioResultadoRecord> {
@@ -768,6 +791,104 @@ export default class TypeOrmAlmacenRepository implements AlmacenRepository {
       article.pvp_cents,
       command.fechaBaja,
     );
+  }
+
+  /**
+   * Ejecuta todos los pasos necesarios para revertir
+   * una caducidad dentro de la transacción activa.
+   */
+  private async deactivateCaducidadTransaction(
+    queryRunner: QueryRunner,
+    idCaducidad: number,
+  ): Promise<void> {
+    const caducidad: CaducidadDeactivateDatabaseRow = await this.requireCaducidadForDeactivation(
+      queryRunner,
+      idCaducidad,
+    );
+
+    const stockFinal: number = caducidad.stock + caducidad.unidades;
+
+    if (!Number.isSafeInteger(stockFinal)) {
+      throw new Error('El stock resultante supera el rango permitido.');
+    }
+
+    const timestamp: string = new Date().toISOString();
+
+    await queryRunner.query(
+      `
+        UPDATE articulo
+        SET
+          stock = ?,
+          updated_at = ?
+        WHERE id = ?
+      `,
+      [stockFinal, timestamp, caducidad.id_articulo],
+    );
+
+    await this.insertCaducidadStockHistory(
+      queryRunner,
+      caducidad.id_articulo,
+      caducidad.id,
+      caducidad.stock,
+      caducidad.unidades,
+      stockFinal,
+      caducidad.puc_micros,
+      caducidad.pvp_cents,
+      timestamp,
+    );
+
+    await queryRunner.query(
+      `
+        UPDATE merma_caducidad
+        SET
+          deleted_at = ?,
+          updated_at = ?
+        WHERE
+          id = ?
+          AND deleted_at IS NULL
+      `,
+      [timestamp, timestamp, caducidad.id],
+    );
+  }
+
+  /**
+   * Recupera una caducidad junto al stock canónico actual
+   * del artículo asociado, aunque este esté dado de baja.
+   */
+  private async requireCaducidadForDeactivation(
+    queryRunner: QueryRunner,
+    idCaducidad: number,
+  ): Promise<CaducidadDeactivateDatabaseRow> {
+    const rows: readonly CaducidadDeactivateDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT
+          mc.id,
+          mc.id_articulo,
+          mc.unidades,
+          mc.puc_micros,
+          mc.pvp_cents,
+          mc.deleted_at,
+          a.stock
+        FROM merma_caducidad mc
+        INNER JOIN articulo a
+          ON a.id = mc.id_articulo
+        WHERE mc.id = ?
+        LIMIT 1
+      `,
+      [idCaducidad],
+    )) as readonly CaducidadDeactivateDatabaseRow[];
+
+    const caducidad: CaducidadDeactivateDatabaseRow | undefined = rows[0];
+
+    if (caducidad === undefined) {
+      throw new Error('La caducidad indicada no existe.');
+    }
+
+    if (caducidad.deleted_at !== null) {
+      throw new Error('La caducidad indicada ya ha sido eliminada.');
+    }
+
+    return caducidad;
   }
 
   /**

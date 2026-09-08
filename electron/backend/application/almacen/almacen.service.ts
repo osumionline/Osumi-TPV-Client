@@ -147,6 +147,17 @@ export default class AlmacenService implements InventarioReportProvider {
   }
 
   /**
+   * Valida y revierte una pérdida por caducidad.
+   */
+  async deactivateCaducidad(idCaducidad: number): Promise<void> {
+    if (!Number.isSafeInteger(idCaducidad) || idCaducidad <= 0) {
+      throw new Error('El identificador de la caducidad no es válido.');
+    }
+
+    await this.almacenRepository.deactivateCaducidad(idCaducidad);
+  }
+
+  /**
    * Valida y ejecuta una consulta paginada de
    * Caducidades.
    */

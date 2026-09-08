@@ -159,6 +159,8 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
 
     createCaducidad: (command: CaducidadCreateCommand): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.almacenCreateCaducidad, command) as Promise<void>,
+    deactivateCaducidad: (idCaducidad: number): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.almacenDeactivateCaducidad, idCaducidad) as Promise<void>,
   }),
 
   legacyImport: {

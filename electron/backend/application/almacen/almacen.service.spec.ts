@@ -110,6 +110,7 @@ class FakeAlmacenRepository implements AlmacenRepository {
 
   lastCaducidadArticleSearch: string | null = null;
   lastCreatedCaducidad: CaducidadCreateRecord | null = null;
+  lastDeactivatedCaducidadId: number | null = null;
 
   caducidadArticleSearchResult: readonly CaducidadArticuloSearchRecord[] = [
     {
@@ -190,6 +191,15 @@ class FakeAlmacenRepository implements AlmacenRepository {
    */
   createCaducidad(command: CaducidadCreateRecord): Promise<void> {
     this.lastCreatedCaducidad = command;
+
+    return Promise.resolve();
+  }
+
+  /**
+   * Conserva la caducidad recibida para los tests de reversión.
+   */
+  deactivateCaducidad(idCaducidad: number): Promise<void> {
+    this.lastDeactivatedCaducidadId = idCaducidad;
 
     return Promise.resolve();
   }
@@ -522,6 +532,26 @@ describe('AlmacenService', (): void => {
     ).rejects.toThrow('Las unidades deben ser un entero mayor que cero.');
 
     expect(repository.lastCreatedCaducidad).toBeNull();
+  });
+
+  it('valida y delega la reversión de una caducidad', async (): Promise<void> => {
+    const repository = new FakeAlmacenRepository();
+    const service = createService(repository);
+
+    await service.deactivateCaducidad(8);
+
+    expect(repository.lastDeactivatedCaducidadId).toBe(8);
+  });
+
+  it('rechaza identificadores de caducidad no válidos al revertir', async (): Promise<void> => {
+    const repository = new FakeAlmacenRepository();
+    const service = createService(repository);
+
+    await expect(service.deactivateCaducidad(0)).rejects.toThrow(
+      'El identificador de la caducidad no es válido.',
+    );
+
+    expect(repository.lastDeactivatedCaducidadId).toBeNull();
   });
 });
 

@@ -917,6 +917,213 @@ describe('TypeOrmAlmacenRepository', (): void => {
 
     expect(historyRows[0]?.total).toBe(0);
   });
+
+  it('revierte una caducidad restaurando stock y usando sus precios snapshot', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    await requireRepository().deactivateCaducidad(1);
+
+    const expirationRows = (await dataSource.query(
+      `
+        SELECT
+          deleted_at,
+          updated_at
+        FROM merma_caducidad
+        WHERE id = 1
+      `,
+    )) as readonly {
+      readonly deleted_at: string | null;
+      readonly updated_at: string | null;
+    }[];
+
+    expect(expirationRows[0]?.deleted_at).not.toBeNull();
+    expect(expirationRows[0]?.updated_at).not.toBeNull();
+
+    const articleRows = (await dataSource.query(
+      `
+        SELECT stock
+        FROM articulo
+        WHERE id = 1
+      `,
+    )) as readonly {
+      readonly stock: number;
+    }[];
+
+    expect(articleRows[0]?.stock).toBe(4);
+
+    const historyRows = (await dataSource.query(
+      `
+        SELECT
+          tipo,
+          stock_previo,
+          diferencia,
+          stock_final,
+          id_merma_caducidad,
+          puc_micros,
+          pvp_micros
+        FROM historico_articulo
+        WHERE
+          tipo = 7
+          AND id_merma_caducidad = 1
+      `,
+    )) as readonly {
+      readonly tipo: number;
+      readonly stock_previo: number;
+      readonly diferencia: number;
+      readonly stock_final: number;
+      readonly id_merma_caducidad: number;
+      readonly puc_micros: number;
+      readonly pvp_micros: number;
+    }[];
+
+    expect(historyRows).toEqual([
+      {
+        tipo: 7,
+        stock_previo: 2,
+        diferencia: 2,
+        stock_final: 4,
+        id_merma_caducidad: 1,
+        puc_micros: 1_000_000,
+        pvp_micros: 2_000_000,
+      },
+    ]);
+  });
+
+  it('permite revertir una caducidad aunque el artículo esté dado de baja', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    await dataSource.query(
+      `
+        UPDATE articulo
+        SET deleted_at = '2026-09-08T14:00:00.000Z'
+        WHERE id = 2
+      `,
+    );
+
+    await requireRepository().deactivateCaducidad(2);
+
+    const articleRows = (await dataSource.query(
+      `
+        SELECT
+          stock,
+          deleted_at
+        FROM articulo
+        WHERE id = 2
+      `,
+    )) as readonly {
+      readonly stock: number;
+      readonly deleted_at: string | null;
+    }[];
+
+    expect(articleRows[0]).toEqual({
+      stock: 6,
+      deleted_at: '2026-09-08T14:00:00.000Z',
+    });
+
+    const expirationRows = (await dataSource.query(
+      `
+        SELECT deleted_at
+        FROM merma_caducidad
+        WHERE id = 2
+      `,
+    )) as readonly {
+      readonly deleted_at: string | null;
+    }[];
+
+    expect(expirationRows[0]?.deleted_at).not.toBeNull();
+  });
+
+  it('rechaza revertir una caducidad que ya está eliminada', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    await expect(requireRepository().deactivateCaducidad(4)).rejects.toThrow(
+      'La caducidad indicada ya ha sido eliminada.',
+    );
+
+    const articleRows = (await dataSource.query(
+      `
+        SELECT stock
+        FROM articulo
+        WHERE id = 3
+      `,
+    )) as readonly {
+      readonly stock: number;
+    }[];
+
+    expect(articleRows[0]?.stock).toBe(-1);
+
+    const historyRows = (await dataSource.query(
+      `
+        SELECT COUNT(*) AS total
+        FROM historico_articulo
+        WHERE
+          tipo = 7
+          AND id_merma_caducidad = 4
+      `,
+    )) as readonly {
+      readonly total: number;
+    }[];
+
+    expect(historyRows[0]?.total).toBe(0);
+  });
+
+  it('hace rollback completo si falla el histórico al revertir una caducidad', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    await dataSource.query(`
+      CREATE TRIGGER
+        fail_caducidad_reversal_history
+      BEFORE INSERT
+        ON historico_articulo
+      WHEN NEW.tipo = 7
+      BEGIN
+        SELECT RAISE(
+          ABORT,
+          'forced caducidad reversal history failure'
+        );
+      END
+    `);
+
+    await expect(requireRepository().deactivateCaducidad(1)).rejects.toThrow();
+
+    const expirationRows = (await dataSource.query(
+      `
+        SELECT deleted_at
+        FROM merma_caducidad
+        WHERE id = 1
+      `,
+    )) as readonly {
+      readonly deleted_at: string | null;
+    }[];
+
+    expect(expirationRows[0]?.deleted_at).toBeNull();
+
+    const articleRows = (await dataSource.query(
+      `
+        SELECT stock
+        FROM articulo
+        WHERE id = 1
+      `,
+    )) as readonly {
+      readonly stock: number;
+    }[];
+
+    expect(articleRows[0]?.stock).toBe(2);
+
+    const historyRows = (await dataSource.query(
+      `
+        SELECT COUNT(*) AS total
+        FROM historico_articulo
+        WHERE
+          tipo = 7
+          AND id_merma_caducidad = 1
+      `,
+    )) as readonly {
+      readonly total: number;
+    }[];
+
+    expect(historyRows[0]?.total).toBe(0);
+  });
 });
 
 /**

@@ -29,6 +29,7 @@ const IPC_CHANNELS = {
   almacenGetCaducidadFilterOptions: 'almacen:get-caducidad-filter-options',
   almacenSearchCaducidadArticulos: 'almacen:search-caducidad-articulos',
   almacenCreateCaducidad: 'almacen:create-caducidad',
+  almacenDeactivateCaducidad: 'almacen:deactivate-caducidad',
 
   inventarioPrintGetDocumento: 'inventario-print:get-documento',
   inventarioPrintPrint: 'inventario-print:print',

@@ -86,7 +86,7 @@
 
         <button mat-flat-button
                 type="button"
-                [disabled]="loading() || createSaving()"
+                [disabled]="loading() || createSaving() || deactivatingCaducidadId() !== null"
                 (click)="openCreate()">
             <mat-icon>
                 add
@@ -232,7 +232,8 @@
                             type="button"
                             matTooltip="Eliminar caducidad"
                             aria-label="Eliminar caducidad"
-                            disabled>
+                            [disabled]="loading() || createSaving() || deactivatingCaducidadId() !== null"
+                            (click)="deactivateCaducidad(row)">
                         <mat-icon>
                             delete
                         </mat-icon>
