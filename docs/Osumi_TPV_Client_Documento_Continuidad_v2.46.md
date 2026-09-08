@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.45  
-**Fecha:** 7 de septiembre de 2026  
-**Base de continuidad:** `v2.45 + main` una vez este documento se suba al repositorio.
+**Versión:** 2.46  
+**Fecha:** 8 de septiembre de 2026  
+**Base de continuidad:** `v2.46 + main` una vez este documento se suba al repositorio.
 
 ---
 
@@ -24,11 +24,11 @@ Caducidades
 Imprenta
 ```
 
-Por ahora se desarrolla **solo Inventario**.
+Inventario queda cerrado y el desarrollo activo ha pasado a **Caducidades**.
 
 ```text
 Inventario   → ✅ CERRADO
-Caducidades  → 🟦 PLANIFICADO / SIGUIENTE
+Caducidades  → 🟦 EN DESARROLLO
 Imprenta     → placeholder
 ```
 
@@ -47,10 +47,20 @@ Inventario queda cerrado tras completar:
 
 Durante 15H se añadió blindaje automatizado de persistencia y se corrigió una comparación `null === null` en la validación de códigos adicionales alfanuméricos.
 
-El siguiente bloque exacto es:
+Caducidades ya tiene cerrados:
 
 ```text
-15I.1 — Dominio + esquema de Caducidades
+15I.1 Dominio + esquema
+15I.2 Consulta + filtros + totales
+15I.3 Pantalla principal
+```
+
+El alta `15I.4` está implementada de extremo a extremo, pero permanece **abierta en fase de ajustes funcionales/UX** tras la primera prueba real.
+
+El siguiente punto exacto es:
+
+```text
+15I.4 — Ajustes y cierre del alta de Caducidades
 ```
 
 ---
@@ -100,11 +110,11 @@ Ventas 12 — Postventa                             🟦
   15F CSV                                         ✅
   15G Vista de impresión                          ✅
   15H Integración + regresión Inventario          ✅
-  15I Caducidades                                 🟦 PLANIFICADO
-    15I.1 Dominio + esquema                       ⬅️ SIGUIENTE
-    15I.2 Consulta + filtros + totales            ⬜
-    15I.3 Pantalla principal                      ⬜
-    15I.4 Alta de caducidad                       ⬜
+  15I Caducidades                                 🟦 EN DESARROLLO
+    15I.1 Dominio + esquema                       ✅
+    15I.2 Consulta + filtros + totales            ✅
+    15I.3 Pantalla principal                      ✅
+    15I.4 Alta de caducidad                       🟦 AJUSTES
     15I.5 Baja / reversión                        ⬜
     15I.6 Informe agrupado                        ⬜
     15I.7 Impresión + regresión                   ⬜
@@ -1988,6 +1998,223 @@ Se explicará funcionalmente en otro bloque.
 - La impresión usa BrowserWindow independiente, preload mínimo e IPC restringido por `webContents.id`.
 - La impresión parte de A4 apaisado y usa el diálogo estándar del sistema.
 
+# 25.1 Caducidades — estado implementado hasta v2.46
+
+## 25.1.1 15I.1 — Dominio + esquema ✅
+
+Cerrado y validado.
+
+`merma_caducidad` conserva snapshot histórico de:
+
+```text
+id artículo
+localizador
+id marca
+nombre marca
+nombre artículo
+unidades
+PUC
+PVP
+fecha de baja
+```
+
+Se mantiene:
+
+```text
+DATABASE_SCHEMA_VERSION = 1
+sin migraciones pre-release
+```
+
+La importación legacy se corrigió para enriquecer las caducidades que ya importaba `LegacyImportCatalogImporter`, evitando una segunda importación duplicada.
+
+Para caducidades legacy:
+
+```text
+PUC / PVP / fecha
+→ históricos reales del origen
+
+localizador / marca / nombre
+→ mejor snapshot reconstruible desde el catálogo importado
+```
+
+La importación legacy:
+
+```text
+NO resta stock
+NO crea historico_articulo tipo 7
+```
+
+porque el stock del `.otpv` ya representa el estado real del TPV antiguo.
+
+Se añadió:
+
+```text
+HISTORICO_ARTICULO_TIPO.CADUCIDAD = 7
+```
+
+para las caducidades nuevas del cliente.
+
+## 25.1.2 15I.2 — Consulta + filtros + totales ✅
+
+Cerrado y validado.
+
+Lectura disponible de extremo a extremo:
+
+```text
+SQLite
+→ TypeOrmAlmacenRepository
+→ AlmacenService
+→ IPC
+→ preload
+→ AlmacenService Angular
+```
+
+Operaciones:
+
+```text
+searchCaducidades()
+getCaducidadFilterOptions()
+```
+
+Filtros:
+
+```text
+Año
+Mes
+Marca histórica
+Nombre snapshot
+```
+
+Reglas:
+
+- Año/Mes usan `fecha_baja`.
+- Mes puede utilizarse sin Año.
+- Marca filtra por `id_marca_snapshot`.
+- Nombre busca sobre `articulo_nombre_snapshot`.
+- Las marcas históricas continúan disponibles aunque ya no existan/estén activas en el catálogo actual.
+- La página y los agregados se consultan por separado.
+- No existe N+1.
+
+Resultado:
+
+```text
+rows
+totalRows
+totalUnidades
+totalPvpCents
+totalPucMicros
+```
+
+## 25.1.3 15I.3 — Pantalla principal ✅
+
+Cerrado y validado.
+
+La pestaña real:
+
+```text
+Almacén → Caducidades
+```
+
+ya muestra:
+
+```text
+[Año] [Mes] [Marca] [Nombre]
+                     [Añadir caducidad] [Crear informe]
+
+Localizador | Marca | Nombre | Unidades | PVP | PUC | Total PVP | Opciones
+```
+
+Incluye:
+
+- filtros remotos;
+- debounce en Nombre;
+- paginación 20/50/100/200;
+- 50 filas por defecto;
+- loading/error/empty;
+- totales globales filtrados;
+- orden por fecha más reciente;
+- botón Añadir visible;
+- botón Crear informe todavía deshabilitado;
+- opción Eliminar todavía deshabilitada.
+
+## 25.1.4 15I.4 — Alta de caducidad 🟦 AJUSTES
+
+La arquitectura de alta ya está implementada de extremo a extremo.
+
+Contrato renderer:
+
+```text
+idArticulo
+unidades
+```
+
+El renderer no envía snapshots ni precios canónicos.
+
+El backend relee el artículo dentro de la transacción y crea:
+
+```text
+merma_caducidad con snapshot
++
+stock -= unidades
++
+historico_articulo tipo 7
+→ COMMIT
+```
+
+El histórico queda vinculado mediante:
+
+```text
+id_merma_caducidad
+```
+
+El alta permite que, partiendo de stock positivo, las unidades registradas superen el stock actual y el resultado sea negativo. Esta decisión anterior se mantiene mientras no se cambie explícitamente.
+
+Existe buscador específico por:
+
+```text
+localizador
+nombre
+referencia
+código de barras
+```
+
+y modal nuevo con selección de artículo, stock, PUC, PVP y unidades.
+
+También se reconcilian fichas abiertas de Artículos usando el mecanismo ya existente y preservando cambios locales dirty.
+
+### Ajustes pendientes detectados en la primera prueba real
+
+Antes de cerrar 15I.4 hay que corregir:
+
+```text
+1. Autofocus real al abrir el modal
+   → el foco debe quedar inmediatamente en Buscar artículo.
+
+2. Candidatos de búsqueda
+   → no mostrar artículos con stock = 0.
+   → no mostrar artículos con stock < 0.
+   → la búsqueda debe devolver únicamente stock > 0.
+
+3. Validación backend
+   → no basta con ocultarlos en UI.
+   → al confirmar, el backend debe releer el artículo y rechazar el alta
+     si en ese momento stock <= 0.
+   → evita altas inválidas por datos obsoletos o concurrencia.
+
+4. Layout de artículo seleccionado
+   → compactar los cuatro controles:
+     Stock actual | PUC | PVP | Unidades caducadas
+   → deben entrar en una sola línea en escritorio.
+
+5. Mantener la regla ya acordada:
+   artículo con stock positivo puede registrar más unidades que stock
+   y dejar el stock final negativo.
+```
+
+No avanzar a 15I.5 hasta validar estos ajustes y cerrar 15I.4.
+
+---
+
 # 26. Caducidades — requisitos cerrados
 
 Caducidades es un registro histórico de mercancía retirada por vencimiento y del valor económico perdido por la tienda.
@@ -2170,9 +2397,25 @@ entero
 > 0
 ```
 
-No se bloqueará el alta porque las unidades superen el stock actual.
+Solo pueden iniciarse nuevas caducidades sobre artículos cuyo stock canónico actual sea:
 
-El dominio admite stock negativo y una caducidad puede evidenciar una discrepancia real de inventario.
+```text
+stock > 0
+```
+
+Los artículos con stock `0` o negativo no deben aparecer como candidatos y el backend debe volver a validar esta condición al confirmar.
+
+Una vez seleccionado un artículo con stock positivo, no se bloqueará el alta porque las unidades superen el stock actual.
+
+Por tanto:
+
+```text
+stock inicial > 0
+unidades caducadas > stock inicial
+→ stock final negativo permitido
+```
+
+El dominio admite ese resultado negativo porque una caducidad puede evidenciar una discrepancia real de inventario.
 
 ## 26.4 Eliminación / reversión
 
@@ -2358,16 +2601,23 @@ artículo seleccionado
   localizador
   marca
   nombre
-  stock actual
-  PUC actual
-  PVP actual
 
-Unidades [   ]
+[Stock actual] [PUC actual] [PVP actual] [Unidades]
 
 [Cancelar] [Añadir]
 ```
 
-Solo se pueden seleccionar artículos activos.
+Al abrirse el modal:
+
+```text
+focus inmediato → Buscar artículo
+```
+
+Solo se pueden seleccionar artículos activos con:
+
+```text
+stock > 0
+```
 
 El buscador debe reutilizar patrones/servicios de búsqueda de artículos existentes siempre que encajen.
 
@@ -2384,6 +2634,8 @@ Al confirmar:
 
 ```text
 leer artículo persistido actual
+→ comprobar que sigue activo
+→ comprobar que stock > 0
 → construir snapshot
 → crear caducidad
 → restar stock
@@ -2574,7 +2826,7 @@ snapshot persistido
 ### 15I.1 — Dominio + esquema
 
 ```text
-⬅️ SIGUIENTE
+✅ CERRADO
 ```
 
 - revisar `merma_caducidad` actual;
@@ -2588,6 +2840,10 @@ snapshot persistido
 
 ### 15I.2 — Consulta + filtros + totales
 
+```text
+✅ CERRADO
+```
+
 - consulta paginada;
 - año;
 - mes;
@@ -2598,6 +2854,10 @@ snapshot persistido
 - tests SQL.
 
 ### 15I.3 — Pantalla principal
+
+```text
+✅ CERRADO
+```
 
 - activar pestaña;
 - filtros;
@@ -2610,15 +2870,29 @@ snapshot persistido
 
 ### 15I.4 — Alta de caducidad
 
+```text
+🟦 EN AJUSTES
+```
+
+Implementado:
+
 - modal nuevo;
 - buscador de artículos;
 - selección;
 - unidades;
 - snapshot backend;
 - decremento stock;
-- histórico;
+- histórico tipo 7;
 - transacción;
 - reconciliación Artículos.
+
+Pendiente antes de cerrar:
+
+- autofocus real en buscador;
+- filtrar candidatos a `stock > 0`;
+- rechazo backend si el stock canónico es `<= 0`;
+- compactar Stock / PUC / PVP / Unidades en una sola fila;
+- regresión funcional del alta.
 
 ### 15I.5 — Baja / reversión
 
@@ -2655,34 +2929,45 @@ snapshot persistido
 # 27. Próximo bloque exacto
 
 ```text
-15I.1 — Dominio + esquema de Caducidades
+15I.4 — Ajustes y cierre del alta de Caducidades
 ```
 
 Antes de proponer cambios:
 
 1. revisar `main` actual;
-2. revisar esquema actual de `merma_caducidad`;
-3. revisar cómo se importan actualmente las caducidades legacy;
-4. revisar `historico_articulo` y sus tipos/consumidores;
-5. revisar patrón de transacciones usado en Inventario;
-6. revisar reconciliación con fichas abiertas de Artículos;
-7. mantener `DATABASE_SCHEMA_VERSION = 1`;
-8. no introducir migraciones pre-estable;
-9. no activar todavía UI completa;
-10. añadir tests antes de avanzar a 15I.2.
+2. revisar el modal `caducidad-create`;
+3. aplicar autofocus programático fiable al buscador;
+4. modificar el buscador SQL para exigir `a.stock > 0`;
+5. modificar la lectura canónica de alta para exigir `stock > 0`;
+6. mantener la posibilidad de que `unidades > stock` si el stock inicial es positivo;
+7. compactar Stock / PUC / PVP / Unidades en una sola fila de escritorio;
+8. mantener responsive razonable;
+9. añadir/ajustar tests repository/service para el rechazo de stock cero/negativo;
+10. ejecutar batería completa y prueba funcional.
 
 Resultado esperado:
 
 ```text
-modelo histórico definitivo
-+
-snapshot completo
-+
-contratos
-+
-persistencia base preparada
-+
-importación legacy compatible
+abrir modal
+→ foco en buscador
+
+buscar
+→ solo artículos activos con stock > 0
+
+confirmar
+→ backend relee artículo
+→ si stock <= 0: rechazo
+→ si stock > 0: alta transaccional
+
+selección
+→ Stock | PUC | PVP | Unidades en una línea
+```
+
+Si queda validado:
+
+```text
+15I.4 ✅
+→ siguiente: 15I.5 Baja / reversión
 ```
 
 No empezar Imprenta hasta cerrar Caducidades.
@@ -2695,7 +2980,7 @@ Si este chat alcanza el límite, continuar con este contexto:
 
 ```text
 Estamos desarrollando Osumi TPV Client.
-La base de continuidad es el documento v2.45 + el main actual del repositorio.
+La base de continuidad es el documento v2.46 + el main actual del repositorio.
 
 Reglas:
 - revisar main antes de proponer patches;
@@ -2712,8 +2997,9 @@ Estado:
 - Hito 14 Clientes completamente cerrado tras regresión integral.
 - Hito 15 Almacén en desarrollo.
 - Almacén tiene tres pestañas: Inventario, Caducidades, Imprenta.
-- desarrollar ahora solo Inventario.
-- Caducidades e Imprenta quedan como placeholders.
+- Inventario está cerrado.
+- desarrollar ahora Caducidades.
+- Imprenta sigue placeholder.
 - 15A Base Almacén cerrado.
 - 15B Dominio + consulta Inventario cerrado.
 - 15C Pantalla Inventario cerrado.
@@ -2724,8 +3010,12 @@ Estado:
 - 15H Integración + regresión Inventario cerrado.
 - Inventario oficialmente cerrado.
 - Caducidades funcionalmente definido y dividido en 15I.1–15I.7.
+- 15I.1 Dominio + esquema cerrado.
+- 15I.2 Consulta + filtros + totales cerrado.
+- 15I.3 Pantalla principal cerrado.
+- 15I.4 Alta implementada pero abierta en ajustes.
 - Imprenta sigue placeholder.
-- siguiente punto exacto: 15I.1 Dominio + esquema de Caducidades.
+- siguiente punto exacto: 15I.4 ajustes y cierre del alta.
 
 Inventario:
 - filtros proveedor, marca, categoría exacta, texto, descuento;
@@ -2757,15 +3047,24 @@ Inventario:
 - impresión = ventana independiente, tabla + 3 totales + botón imprimir + diálogo normal;
 - no usar térmica.
 
-Caducidades — decisiones cerradas:
+Caducidades — estado y decisiones:
 - CRUD sin Update.
+- 15I.1 esquema/snapshot/importación legacy ✅.
+- 15I.2 consulta/filtros/totales ✅.
+- 15I.3 pantalla principal ✅.
+- 15I.4 alta 🟦 ajustes pendientes.
 - filtros: año de baja, mes de baja, marca histórica, nombre snapshot.
 - tabla: Localizador, Marca, Nombre, Unidades, PVP unitario, PUC unitario, Total PVP, Opciones.
 - totales globales: unidades, Σ unidades×PVP, Σ unidades×PUC.
 - snapshot histórico de artículo/marca/localizador/nombre/PUC/PVP.
-- alta resta stock y crea histórico en una transacción.
-- unidades > 0; se permite superar stock y dejar stock negativo.
-- baja es soft-delete, restaura stock y crea histórico inverso en una transacción.
+- legacy importa caducidades sin restar stock ni inventar histórico tipo 7.
+- nuevas altas: snapshot + stock -= unidades + histórico tipo 7, todo transaccional.
+- candidatos de alta deben ser activos y stock > 0.
+- backend debe releer y rechazar si stock <= 0 al confirmar.
+- si el stock inicial es > 0, se mantiene permitido que unidades > stock y el stock final resulte negativo.
+- modal: autofocus en Buscar artículo.
+- modal selección: Stock | PUC | PVP | Unidades deben caber en una sola fila de escritorio.
+- baja será soft-delete, restaurará stock y creará histórico inverso en una transacción.
 - alta/baja reconcilian fichas abiertas de Artículos preservando dirty.
 - informe respeta filtros actuales.
 - informe agrupado Año → Mes → Marca.
@@ -2785,11 +3084,11 @@ Roadmap:
 15F CSV ✅
 15G Vista impresión ✅
 15H Integración + regresión Inventario ✅
-15I Caducidades 🟦 PLANIFICADO
-  15I.1 Dominio + esquema ⬅️ SIGUIENTE
-  15I.2 Consulta + filtros + totales
-  15I.3 Pantalla principal
-  15I.4 Alta
+15I Caducidades 🟦 EN DESARROLLO
+  15I.1 Dominio + esquema ✅
+  15I.2 Consulta + filtros + totales ✅
+  15I.3 Pantalla principal ✅
+  15I.4 Alta 🟦 AJUSTES ← SIGUIENTE
   15I.5 Baja / reversión
   15I.6 Informe agrupado
   15I.7 Impresión + regresión
@@ -2888,4 +3187,25 @@ v2.45
 → Caducidades dividido en 15I.1–15I.7
 → Imprenta continúa placeholder
 → siguiente bloque exacto: 15I.1 Dominio + esquema
+
+v2.46
+→ 15I.1 Dominio + esquema cerrado
+→ snapshot completo en merma_caducidad
+→ importación legacy corregida sobre LegacyImportCatalogImporter existente
+→ legacy no modifica stock ni crea histórico tipo 7
+→ 15I.2 Consulta + filtros + totales cerrado
+→ lectura histórica paginada + agregados globales
+→ filtros Año/Mes/Marca histórica/Nombre snapshot
+→ 15I.3 Pantalla principal cerrada
+→ pestaña Caducidades real con filtros, tabla, paginación y totales
+→ 15I.4 Alta implementada de extremo a extremo pero NO cerrada
+→ alta = snapshot + decremento stock + histórico tipo 7 + transacción
+→ reconciliación con fichas abiertas de Artículos
+→ primera prueba real del modal detecta ajustes pendientes
+→ autofocus inmediato en buscador pendiente
+→ candidatos deben limitarse a stock > 0
+→ backend debe rechazar alta si stock canónico <= 0
+→ mantener permitido unidades > stock si el stock inicial es positivo
+→ compactar Stock/PUC/PVP/Unidades en una sola fila
+→ siguiente punto exacto: ajustes y cierre de 15I.4
 ```
