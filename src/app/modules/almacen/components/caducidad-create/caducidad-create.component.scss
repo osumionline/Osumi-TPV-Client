@@ -11,9 +11,22 @@
     place-items: center;
     padding: 24px;
     background-color: rgb(0 0 0 / 45%);
+    position: relative;
+}
+
+.caducidad-create__backdrop-dismiss {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: default;
 }
 
 .caducidad-create__dialog {
+    position: relative;
+    z-index: 1;
     display: flex;
     width: min(760px, calc(100vw - 48px));
     max-height: min(820px, calc(100vh - 48px));
@@ -178,6 +191,13 @@
 .caducidad-create__units {
     width: 100%;
     min-width: 0;
+}
+
+.caducidad-create__units-error {
+    grid-column: 1 / -1;
+    margin-top: -4px;
+    font-size: 12px;
+    color: var(--color-red);
 }
 
 .caducidad-create__save-error {

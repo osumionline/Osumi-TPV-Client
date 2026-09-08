@@ -1,10 +1,16 @@
-<div class="caducidad-create__backdrop"
-     (click)="close()">
+<div class="caducidad-create__backdrop">
+    <button type="button"
+            class="caducidad-create__backdrop-dismiss"
+            aria-label="Cerrar ventana de añadir caducidad"
+            [disabled]="saving()"
+            (click)="close()">
+    </button>
+
     <section class="caducidad-create__dialog"
              role="dialog"
              aria-modal="true"
-             aria-labelledby="caducidad-create-title"
-             (click)="$event.stopPropagation()">
+             aria-labelledby="caducidad-create-title">
+
         <header class="caducidad-create__header">
             <div>
                 <h2 id="caducidad-create-title">
@@ -144,12 +150,18 @@
                         <input matInput
                                type="number"
                                min="1"
+                               [max]="article.stock"
                                step="1"
                                [disabled]="saving()"
                                [value]="unidades()"
                                (input)="onUnitsInput($event)"
                                (keydown.enter)="submit()">
                     </mat-form-field>
+                    @if (unitsExceedStock()) {
+                    <span class="caducidad-create__units-error">
+                        No puedes indicar más unidades que el stock disponible.
+                    </span>
+                    }
                 </div>
             </section>
             }

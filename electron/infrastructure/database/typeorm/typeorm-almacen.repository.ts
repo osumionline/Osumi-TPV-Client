@@ -669,6 +669,10 @@ export default class TypeOrmAlmacenRepository implements AlmacenRepository {
       command.idArticulo,
     );
 
+    if (command.unidades > article.stock) {
+      throw new Error('No se pueden registrar más unidades caducadas que el stock disponible.');
+    }
+
     const stockFinal: number = article.stock - command.unidades;
 
     if (!Number.isSafeInteger(stockFinal)) {

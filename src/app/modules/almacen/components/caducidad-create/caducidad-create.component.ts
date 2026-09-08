@@ -65,6 +65,23 @@ export default class CaducidadCreateComponent implements AfterViewInit, OnDestro
   readonly canSubmit: Signal<boolean> = computed(
     (): boolean => !this.saving() && this.selectedArticle() !== null && this.parseUnits() !== null,
   );
+  readonly unitsExceedStock: Signal<boolean> = computed((): boolean => {
+    const article: CaducidadArticuloSearchInterface | null = this.selectedArticle();
+
+    if (article === null) {
+      return false;
+    }
+
+    const value: string = this.unidades().trim();
+
+    if (!/^\d+$/.test(value)) {
+      return false;
+    }
+
+    const unidades: number = Number(value);
+
+    return Number.isSafeInteger(unidades) && unidades > article.stock;
+  });
 
   private searchTimeoutId: number | null = null;
   private searchSequence: number = 0;
@@ -224,18 +241,22 @@ export default class CaducidadCreateComponent implements AfterViewInit, OnDestro
   }
 
   /**
-   * Convierte el texto de unidades en un entero positivo.
+   * Convierte las unidades en un entero positivo que no
+   * supere el stock actualmente mostrado del artículo.
    */
   private parseUnits(): number | null {
+    const article: CaducidadArticuloSearchInterface | null = this.selectedArticle();
     const value: string = this.unidades().trim();
 
-    if (!/^\d+$/.test(value)) {
+    if (article === null || !/^\d+$/.test(value)) {
       return null;
     }
 
     const unidades: number = Number(value);
 
-    return Number.isSafeInteger(unidades) && unidades > 0 ? unidades : null;
+    return Number.isSafeInteger(unidades) && unidades > 0 && unidades <= article.stock
+      ? unidades
+      : null;
   }
 
   /**

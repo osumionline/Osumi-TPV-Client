@@ -651,7 +651,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
 
     const command: CaducidadCreateRecord = {
       idArticulo: 1,
-      unidades: 3,
+      unidades: 2,
       fechaBaja: '2026-09-08T10:00:00.000Z',
     };
 
@@ -711,7 +711,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
       readonly stock: number;
     }[];
 
-    expect(articleRows[0]?.stock).toBe(-1);
+    expect(articleRows[0]?.stock).toBe(0);
 
     const historyRows = (await dataSource.query(
       `
@@ -740,8 +740,8 @@ describe('TypeOrmAlmacenRepository', (): void => {
       {
         tipo: 7,
         stock_previo: 2,
-        diferencia: -3,
-        stock_final: -1,
+        diferencia: -2,
+        stock_final: 0,
         id_merma_caducidad: expirationRows[0]?.id,
         puc_micros: 1_210_000,
         pvp_micros: 2_000_000,
@@ -867,6 +867,55 @@ describe('TypeOrmAlmacenRepository', (): void => {
     ).rejects.toThrow(
       'El artículo seleccionado no tiene stock disponible para registrar una caducidad.',
     );
+  });
+
+  it('rechaza una caducidad que supera el stock disponible', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    await expect(
+      requireRepository().createCaducidad({
+        idArticulo: 1,
+        unidades: 3,
+        fechaBaja: '2026-09-08T13:00:00.000Z',
+      }),
+    ).rejects.toThrow('No se pueden registrar más unidades caducadas que el stock disponible.');
+
+    const articleRows = (await dataSource.query(
+      `
+        SELECT stock
+        FROM articulo
+        WHERE id = 1
+      `,
+    )) as readonly {
+      readonly stock: number;
+    }[];
+
+    expect(articleRows[0]?.stock).toBe(2);
+
+    const expirationRows = (await dataSource.query(
+      `
+        SELECT COUNT(*) AS total
+        FROM merma_caducidad
+        WHERE fecha_baja =
+          '2026-09-08T13:00:00.000Z'
+      `,
+    )) as readonly {
+      readonly total: number;
+    }[];
+
+    expect(expirationRows[0]?.total).toBe(0);
+
+    const historyRows = (await dataSource.query(
+      `
+        SELECT COUNT(*) AS total
+        FROM historico_articulo
+        WHERE tipo = 7
+      `,
+    )) as readonly {
+      readonly total: number;
+    }[];
+
+    expect(historyRows[0]?.total).toBe(0);
   });
 });
 
