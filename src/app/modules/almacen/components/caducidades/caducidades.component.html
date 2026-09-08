@@ -1,0 +1,303 @@
+<section class="caducidades">
+    <div class="caducidades__toolbar">
+        <mat-form-field appearance="outline"
+                        subscriptSizing="dynamic"
+                        class="caducidades__compact-field caducidades__filter-year">
+            <mat-label>
+                Año
+            </mat-label>
+
+            <mat-select [value]="anio()"
+                        [disabled]="loading()"
+                        (selectionChange)="onAnioChange($event)">
+                <mat-option [value]="null">
+                    Todos
+                </mat-option>
+
+                @for (option of filterOptions().anios; track option) {
+                <mat-option [value]="option">
+                    {{ option }}
+                </mat-option>
+                }
+            </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline"
+                        subscriptSizing="dynamic"
+                        class="caducidades__compact-field caducidades__filter-month">
+            <mat-label>
+                Mes
+            </mat-label>
+
+            <mat-select [value]="mes()"
+                        [disabled]="loading()"
+                        (selectionChange)="onMesChange($event)">
+                <mat-option [value]="null">
+                    Todos
+                </mat-option>
+
+                @for (option of monthOptions; track option.value) {
+                <mat-option [value]="option.value">
+                    {{ option.label }}
+                </mat-option>
+                }
+            </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline"
+                        subscriptSizing="dynamic"
+                        class="caducidades__compact-field caducidades__filter-brand">
+            <mat-label>
+                Marca
+            </mat-label>
+
+            <mat-select [value]="idMarca()"
+                        [disabled]="loading()"
+                        [panelWidth]="null"
+                        (selectionChange)="onMarcaChange($event)">
+                <mat-option [value]="null">
+                    Todas
+                </mat-option>
+
+                @for (marca of filterOptions().marcas; track marca.idMarca) {
+                <mat-option [value]="marca.idMarca">
+                    {{ marca.nombre }}
+                </mat-option>
+                }
+            </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline"
+                        subscriptSizing="dynamic"
+                        class="caducidades__compact-field caducidades__filter-name">
+            <mat-label>
+                Nombre
+            </mat-label>
+
+            <input matInput
+                   type="search"
+                   autocomplete="off"
+                   [disabled]="loading()"
+                   [value]="nombre()"
+                   (input)="onNombreInput($event)">
+        </mat-form-field>
+
+        <div class="caducidades__toolbar-spacer"></div>
+
+        <button mat-flat-button
+                type="button"
+                disabled>
+            <mat-icon>
+                add
+            </mat-icon>
+
+            Añadir caducidad
+        </button>
+
+        <button mat-stroked-button
+                type="button"
+                disabled>
+            <mat-icon>
+                description
+            </mat-icon>
+
+            Crear informe
+        </button>
+    </div>
+
+    @if (error() !== null) {
+    <div class="caducidades__error">
+        <span>
+            {{ error() }}
+        </span>
+
+        <button mat-stroked-button
+                type="button"
+                (click)="retry()">
+            Reintentar
+        </button>
+    </div>
+    } @else {
+    <div class="caducidades__table-container">
+        <table mat-table
+               [dataSource]="rows()"
+               [trackBy]="trackByCaducidad">
+            <ng-container matColumnDef="localizador">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    class="caducidades__center">
+                    Localizador
+                </th>
+
+                <td mat-cell
+                    *matCellDef="let row"
+                    class="caducidades__center">
+                    {{ row.localizador }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="marca">
+                <th mat-header-cell
+                    *matHeaderCellDef>
+                    Marca
+                </th>
+
+                <td mat-cell
+                    *matCellDef="let row">
+                    {{ row.marcaNombre }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="nombre">
+                <th mat-header-cell
+                    *matHeaderCellDef>
+                    Nombre
+                </th>
+
+                <td mat-cell
+                    *matCellDef="let row"
+                    class="caducidades__name">
+                    {{ row.nombre }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="unidades">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    class="caducidades__right">
+                    Unidades
+                </th>
+
+                <td mat-cell
+                    *matCellDef="let row"
+                    class="caducidades__right">
+                    {{ formatInteger(row.unidades) }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="pvp">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    class="caducidades__right">
+                    PVP
+                </th>
+
+                <td mat-cell
+                    *matCellDef="let row"
+                    class="caducidades__right">
+                    {{ formatCents(row.pvpCents) }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="puc">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    class="caducidades__right">
+                    PUC
+                </th>
+
+                <td mat-cell
+                    *matCellDef="let row"
+                    class="caducidades__right">
+                    {{ formatMicros(row.pucMicros) }}
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="totalPvp">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    class="caducidades__right">
+                    Total PVP
+                </th>
+
+                <td mat-cell
+                    *matCellDef="let row"
+                    class="caducidades__right">
+                    <strong>
+                        {{ formatCents(row.totalPvpCents) }}
+                    </strong>
+                </td>
+            </ng-container>
+
+            <ng-container matColumnDef="opciones">
+                <th mat-header-cell
+                    *matHeaderCellDef
+                    class="caducidades__center caducidades__options">
+                    Opciones
+                </th>
+
+                <td mat-cell
+                    *matCellDef="let row"
+                    class="caducidades__center caducidades__options">
+                    <button mat-icon-button
+                            type="button"
+                            matTooltip="Eliminar caducidad"
+                            aria-label="Eliminar caducidad"
+                            disabled>
+                        <mat-icon>
+                            delete
+                        </mat-icon>
+                    </button>
+                </td>
+            </ng-container>
+
+            <tr mat-header-row
+                *matHeaderRowDef="displayedColumns">
+            </tr>
+
+            <tr mat-row
+                *matRowDef="let row; columns: displayedColumns">
+            </tr>
+        </table>
+
+        @if (loading()) {
+        <div class="caducidades__loading">
+            Cargando caducidades…
+        </div>
+        } @else if (rows().length === 0) {
+        <div class="caducidades__empty">
+            No hay caducidades que coincidan con los filtros seleccionados.
+        </div>
+        }
+    </div>
+
+    <mat-paginator [length]="totalRows()"
+                   [pageIndex]="pagina() - 1"
+                   [pageSize]="num()"
+                   [pageSizeOptions]="pageSizeOptions"
+                   [showFirstLastButtons]="true"
+                   (page)="onPageChange($event)" />
+
+    <div class="caducidades__totals">
+        <div class="caducidades__total">
+            <span>
+                Total unidades
+            </span>
+
+            <strong>
+                {{ formatInteger(totalUnidades()) }}
+            </strong>
+        </div>
+
+        <div class="caducidades__total">
+            <span>
+                Total PVP
+            </span>
+
+            <strong>
+                {{ formatCents(totalPvpCents()) }}
+            </strong>
+        </div>
+
+        <div class="caducidades__total">
+            <span>
+                Total PUC
+            </span>
+
+            <strong>
+                {{ formatMicros(totalPucMicros()) }}
+            </strong>
+        </div>
+    </div>
+    }
+</section>

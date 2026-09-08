@@ -1,0 +1,192 @@
+:host {
+    display: block;
+    height: 100%;
+}
+
+.caducidades {
+    display: flex;
+    width: 100%;
+    min-height: 100%;
+    flex-direction: column;
+    padding: 18px 24px 24px;
+
+    .caducidades__toolbar {
+        display: flex;
+        width: 100%;
+        gap: 8px;
+        align-items: center;
+        white-space: nowrap;
+
+        .caducidades__compact-field {
+            flex: 0 0 auto;
+            font-size: 13px;
+            --mat-form-field-container-height: 40px;
+            --mat-form-field-container-vertical-padding: 8px;
+        }
+
+        .caducidades__filter-year {
+            width: 110px;
+        }
+
+        .caducidades__filter-month {
+            width: 135px;
+        }
+
+        .caducidades__filter-brand {
+            width: 180px;
+        }
+
+        .caducidades__filter-name {
+            width: 280px;
+            flex: 0 0 280px;
+        }
+
+        .caducidades__toolbar-spacer {
+            min-width: 16px;
+            flex: 1 1 auto;
+        }
+
+        button {
+            flex: 0 0 auto;
+        }
+    }
+
+    .caducidades__table-container {
+        position: relative;
+        width: 100%;
+        min-height: 120px;
+        margin-top: 16px;
+        overflow-x: auto;
+        border: 1px solid var(--separator-color);
+        border-radius: 6px;
+        background-color: var(--color-white);
+
+        table {
+            width: 100%;
+            min-width: 900px;
+            margin: 0;
+        }
+
+        th.mat-mdc-header-cell {
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        td.mat-mdc-cell,
+        th.mat-mdc-header-cell {
+            padding-right: 14px;
+            padding-left: 14px;
+        }
+    }
+
+    .caducidades__name {
+        min-width: 280px;
+    }
+
+    .caducidades__center {
+        text-align: center;
+    }
+
+    .caducidades__right {
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    .caducidades__options {
+        width: 76px;
+        min-width: 76px;
+
+        button {
+            color: var(--color-red);
+        }
+    }
+
+    .caducidades__loading {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        min-height: 120px;
+        place-items: center;
+        background-color: rgb(255 255 255 / 78%);
+        font-size: 13px;
+    }
+
+    .caducidades__empty {
+        padding: 40px 20px;
+        border-top: 1px solid var(--separator-color);
+        text-align: center;
+        opacity: 0.6;
+    }
+
+    .caducidades__error {
+        display: flex;
+        min-height: 160px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        margin-top: 16px;
+        padding: 24px;
+        border: 1px solid var(--separator-color);
+        border-radius: 6px;
+        color: var(--color-red);
+        text-align: center;
+    }
+
+    mat-paginator {
+        margin-top: 6px;
+    }
+
+    .caducidades__totals {
+        display: flex;
+        justify-content: flex-end;
+        gap: 16px;
+        margin-top: 12px;
+    }
+
+    .caducidades__total {
+        display: flex;
+        min-width: 170px;
+        flex-direction: column;
+        gap: 4px;
+        padding: 10px 14px;
+        border: 1px solid var(--separator-color);
+        border-radius: 6px;
+        text-align: right;
+
+        span {
+            font-size: 12px;
+            opacity: 0.65;
+        }
+
+        strong {
+            font-size: 16px;
+        }
+    }
+}
+
+@media (max-width: 900px) {
+    .caducidades {
+        padding: 16px 18px 24px;
+
+        .caducidades__toolbar {
+            flex-wrap: wrap;
+        }
+
+        .caducidades__toolbar-spacer {
+            display: none;
+        }
+    }
+}
+
+@media (max-width: 700px) {
+    .caducidades {
+        .caducidades__totals {
+            flex-direction: column;
+        }
+
+        .caducidades__total {
+            width: 100%;
+        }
+    }
+}

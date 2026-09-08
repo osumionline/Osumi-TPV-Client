@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import HeaderComponent from '@app/components/header/header.component';
 import type AlmacenSection from '@model/almacen/almacen-section.type';
+import CaducidadesComponent from '@modules/almacen/components/caducidades/caducidades.component';
 import InventoryComponent from '@modules/almacen/components/inventory/inventory.component';
 import WarehouseTabsComponent from '@modules/almacen/components/warehouse-tabs/warehouse-tabs.component';
 import { DialogService } from '@osumi/angular-tools';
@@ -22,7 +23,7 @@ import { getErrorMessage } from '@utils/error.utils';
   selector: 'otpv-warehouse',
   templateUrl: './warehouse.component.html',
   styleUrl: './warehouse.component.scss',
-  imports: [HeaderComponent, WarehouseTabsComponent, InventoryComponent],
+  imports: [HeaderComponent, WarehouseTabsComponent, InventoryComponent, CaducidadesComponent],
 })
 export default class WarehouseComponent implements OnInit {
   private readonly dialog: DialogService = inject(DialogService);
