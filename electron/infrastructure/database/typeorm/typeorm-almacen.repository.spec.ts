@@ -1,5 +1,6 @@
 import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidad-query.interface';
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
+import type { CaducidadCreateRecord } from '@backend/domain/almacen/caducidad-create-record.interface';
 import type {
   CaducidadFilterOptionsRecord,
   CaducidadResultadoRecord,
@@ -15,7 +16,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DataSource } from 'typeorm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { CaducidadCreateRecord } from '@backend/domain/almacen/caducidad-create-record.interface';
 
 let tempDirectory: string | null = null;
 let applicationDatabase: TypeOrmApplicationDatabase | null = null;
@@ -630,6 +630,20 @@ describe('TypeOrmAlmacenRepository', (): void => {
     expect((await requireRepository().searchCaducidadArticulos('EXTRA-BETA'))[0]?.id).toBe(2);
 
     expect(await requireRepository().searchCaducidadArticulos('REF-DELETED')).toEqual([]);
+
+    expect(await requireRepository().searchCaducidadArticulos('gamma')).toEqual([]);
+
+    const dataSource: DataSource = await requireDataSource();
+
+    await dataSource.query(
+      `
+        UPDATE articulo
+        SET stock = 0
+        WHERE id = 2
+      `,
+    );
+
+    expect(await requireRepository().searchCaducidadArticulos('beta')).toEqual([]);
   });
 
   it('crea una caducidad con snapshot y movimiento de stock asociado', async (): Promise<void> => {
@@ -794,6 +808,65 @@ describe('TypeOrmAlmacenRepository', (): void => {
     }[];
 
     expect(historyRows[0]?.total).toBe(0);
+  });
+
+  it('rechaza crear una caducidad si el artículo ya no tiene stock positivo', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    await expect(
+      requireRepository().createCaducidad({
+        idArticulo: 3,
+        unidades: 1,
+        fechaBaja: '2026-09-08T12:00:00.000Z',
+      }),
+    ).rejects.toThrow(
+      'El artículo seleccionado no tiene stock disponible para registrar una caducidad.',
+    );
+
+    const expirationRows = (await dataSource.query(
+      `
+        SELECT COUNT(*) AS total
+        FROM merma_caducidad
+        WHERE
+          id_articulo = 3
+          AND fecha_baja =
+            '2026-09-08T12:00:00.000Z'
+      `,
+    )) as readonly {
+      readonly total: number;
+    }[];
+
+    expect(expirationRows[0]?.total).toBe(0);
+
+    const articleRows = (await dataSource.query(
+      `
+        SELECT stock
+        FROM articulo
+        WHERE id = 3
+      `,
+    )) as readonly {
+      readonly stock: number;
+    }[];
+
+    expect(articleRows[0]?.stock).toBe(-1);
+
+    await dataSource.query(
+      `
+        UPDATE articulo
+        SET stock = 0
+        WHERE id = 3
+      `,
+    );
+
+    await expect(
+      requireRepository().createCaducidad({
+        idArticulo: 3,
+        unidades: 1,
+        fechaBaja: '2026-09-08T12:01:00.000Z',
+      }),
+    ).rejects.toThrow(
+      'El artículo seleccionado no tiene stock disponible para registrar una caducidad.',
+    );
   });
 });
 

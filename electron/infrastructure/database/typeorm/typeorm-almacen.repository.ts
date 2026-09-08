@@ -308,8 +308,8 @@ export default class TypeOrmAlmacenRepository implements AlmacenRepository {
   }
 
   /**
-   * Busca artículos activos utilizando sus identificadores
-   * comerciales habituales.
+   * Busca artículos activos con stock positivo utilizando
+   * sus identificadores comerciales habituales.
    */
   async searchCaducidadArticulos(texto: string): Promise<readonly CaducidadArticuloSearchRecord[]> {
     const dataSource: DataSource = await this.applicationDatabase.connect();
@@ -332,6 +332,7 @@ export default class TypeOrmAlmacenRepository implements AlmacenRepository {
             ON m.id = a.id_marca
           WHERE
             a.deleted_at IS NULL
+            AND a.stock > 0
             AND (
               CAST(a.localizador AS TEXT)
                 LIKE ?
@@ -799,6 +800,12 @@ export default class TypeOrmAlmacenRepository implements AlmacenRepository {
 
     if (article === undefined) {
       throw new Error('El artículo seleccionado ya no está disponible.');
+    }
+
+    if (article.stock <= 0) {
+      throw new Error(
+        'El artículo seleccionado no tiene stock disponible para registrar una caducidad.',
+      );
     }
 
     return article;

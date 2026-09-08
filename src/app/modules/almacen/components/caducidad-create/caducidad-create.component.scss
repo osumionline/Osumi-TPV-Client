@@ -152,15 +152,19 @@
 
 .caducidad-create__summary {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4,
+            minmax(0, 1fr));
     gap: 8px;
+    align-items: stretch;
     margin-top: 14px;
 
     >div {
         display: flex;
+        min-width: 0;
         flex-direction: column;
+        justify-content: center;
         gap: 3px;
-        padding: 9px 10px;
+        padding: 8px 10px;
         border: 1px solid var(--separator-color);
         border-radius: 4px;
     }
@@ -172,8 +176,8 @@
 }
 
 .caducidad-create__units {
-    width: 180px;
-    margin-top: 16px;
+    width: 100%;
+    min-width: 0;
 }
 
 .caducidad-create__save-error {
@@ -191,12 +195,15 @@
     border-top: 1px solid var(--separator-color);
 }
 
-@media (max-width: 600px) {
+@media (max-width: 700px) {
+    .caducidad-create__summary {
+        grid-template-columns: repeat(2,
+                minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 480px) {
     .caducidad-create__summary {
         grid-template-columns: 1fr;
-    }
-
-    .caducidad-create__units {
-        width: 100%;
     }
 }

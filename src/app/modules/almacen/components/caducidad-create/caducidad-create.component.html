@@ -35,10 +35,10 @@
                     Buscar artículo
                 </mat-label>
 
-                <input matInput
+                <input #searchInput
+                       matInput
                        type="search"
                        autocomplete="off"
-                       autofocus
                        placeholder="Nombre, localizador, referencia o código de barras"
                        [disabled]="saving()"
                        [value]="query()"
@@ -133,24 +133,24 @@
                             {{ formatCents(article.pvpCents) }}
                         </strong>
                     </div>
+
+                    <mat-form-field appearance="outline"
+                                    subscriptSizing="dynamic"
+                                    class="caducidad-create__units">
+                        <mat-label>
+                            Unidades caducadas
+                        </mat-label>
+
+                        <input matInput
+                               type="number"
+                               min="1"
+                               step="1"
+                               [disabled]="saving()"
+                               [value]="unidades()"
+                               (input)="onUnitsInput($event)"
+                               (keydown.enter)="submit()">
+                    </mat-form-field>
                 </div>
-
-                <mat-form-field appearance="outline"
-                                subscriptSizing="dynamic"
-                                class="caducidad-create__units">
-                    <mat-label>
-                        Unidades caducadas
-                    </mat-label>
-
-                    <input matInput
-                           type="number"
-                           min="1"
-                           step="1"
-                           [disabled]="saving()"
-                           [value]="unidades()"
-                           (input)="onUnitsInput($event)"
-                           (keydown.enter)="submit()">
-                </mat-form-field>
             </section>
             }
 

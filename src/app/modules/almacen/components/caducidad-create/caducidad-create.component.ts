@@ -1,10 +1,13 @@
 import {
   Component,
   computed,
+  ElementRef,
   inject,
   input,
   output,
   signal,
+  viewChild,
+  type AfterViewInit,
   type OnDestroy,
   type Signal,
   type WritableSignal,
@@ -39,13 +42,15 @@ const CURRENCY_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
   styleUrl: './caducidad-create.component.scss',
   imports: [MatButton, MatFormField, MatIcon, MatIconButton, MatInput, MatLabel],
 })
-export default class CaducidadCreateComponent implements OnDestroy {
+export default class CaducidadCreateComponent implements AfterViewInit, OnDestroy {
+  readonly almacenService: AlmacenService = inject(AlmacenService);
+
   readonly saving = input<boolean>(false);
   readonly error = input<string | null>(null);
   readonly createEvent = output<CaducidadCreateCommand>();
   readonly closeEvent = output<void>();
 
-  readonly almacenService: AlmacenService = inject(AlmacenService);
+  private readonly searchInput = viewChild.required<ElementRef<HTMLInputElement>>('searchInput');
 
   readonly query: WritableSignal<string> = signal<string>('');
   readonly results: WritableSignal<readonly CaducidadArticuloSearchInterface[]> = signal<
@@ -64,6 +69,23 @@ export default class CaducidadCreateComponent implements OnDestroy {
   private searchTimeoutId: number | null = null;
   private searchSequence: number = 0;
   private destroyed: boolean = false;
+
+  /**
+   * Sitúa el foco en el buscador cuando el modal
+   * termina de renderizarse.
+   */
+  ngAfterViewInit(): void {
+    window.requestAnimationFrame((): void => {
+      if (this.destroyed) {
+        return;
+      }
+
+      const inputElement: HTMLInputElement = this.searchInput().nativeElement;
+
+      inputElement.focus();
+      inputElement.select();
+    });
+  }
 
   /**
    * Cancela búsquedas pendientes al cerrar el modal.
