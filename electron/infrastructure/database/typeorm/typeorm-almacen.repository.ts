@@ -14,6 +14,12 @@ import type {
   CaducidadRowRecord,
 } from '@backend/domain/almacen/caducidad-record.interface';
 import type {
+  CaducidadReportAnioRecord,
+  CaducidadReportMarcaRecord,
+  CaducidadReportMesRecord,
+  CaducidadReportRecord,
+} from '@backend/domain/almacen/caducidad-report-record.interface';
+import type {
   InventarioResultadoRecord,
   InventarioRowRecord,
 } from '@backend/domain/almacen/inventario-record.interface';
@@ -142,6 +148,30 @@ interface CaducidadSqlFilter {
   readonly parameters: (number | string)[];
 }
 
+interface CaducidadReportDatabaseRow {
+  readonly anio: number;
+  readonly mes: number;
+  readonly id_marca: number;
+  readonly marca_nombre: string;
+  readonly unidades: number;
+  readonly total_pvp_cents: number;
+  readonly total_puc_micros: number;
+}
+interface CaducidadReportMonthAccumulator {
+  readonly mes: number;
+  unidades: number;
+  totalPvpCents: number;
+  totalPucMicros: number;
+  readonly marcas: CaducidadReportMarcaRecord[];
+}
+interface CaducidadReportYearAccumulator {
+  readonly anio: number;
+  unidades: number;
+  totalPvpCents: number;
+  totalPucMicros: number;
+  readonly meses: CaducidadReportMonthAccumulator[];
+}
+
 interface CaducidadArticuloDatabaseRow {
   readonly id: number;
   readonly localizador: number;
@@ -250,6 +280,163 @@ export default class TypeOrmAlmacenRepository implements AlmacenRepository {
       totalUnidades: aggregate.total_unidades,
       totalPvpCents: aggregate.total_pvp_cents,
       totalPucMicros: aggregate.total_puc_micros,
+    };
+  }
+
+  /**
+   * Recupera las caducidades filtradas ya agrupadas
+   * por año, mes y marca histórica.
+   */
+  async getCaducidadReport(query: CaducidadFilterQuery): Promise<CaducidadReportRecord> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+    const filter: CaducidadSqlFilter = this.buildCaducidadFilter(query);
+
+    const rows: readonly CaducidadReportDatabaseRow[] = (await dataSource.query(
+      `
+        WITH filtered AS (
+          SELECT
+            mc.id,
+            CAST(
+              substr(
+                mc.fecha_baja,
+                1,
+                4
+              ) AS INTEGER
+            ) AS anio,
+            CAST(
+              substr(
+                mc.fecha_baja,
+                6,
+                2
+              ) AS INTEGER
+            ) AS mes,
+            mc.id_marca_snapshot AS id_marca,
+            mc.marca_nombre_snapshot,
+            mc.unidades,
+            mc.pvp_cents,
+            mc.puc_micros,
+            mc.fecha_baja
+          FROM merma_caducidad mc
+          WHERE
+            ${filter.clause}
+        ),
+        grouped AS (
+          SELECT
+            anio,
+            mes,
+            id_marca,
+            SUM(unidades) AS unidades,
+            SUM(
+              unidades * pvp_cents
+            ) AS total_pvp_cents,
+            SUM(
+              unidades * puc_micros
+            ) AS total_puc_micros
+          FROM filtered
+          GROUP BY
+            anio,
+            mes,
+            id_marca
+        )
+        SELECT
+          g.anio,
+          g.mes,
+          g.id_marca,
+          (
+            SELECT
+              f.marca_nombre_snapshot
+            FROM filtered f
+            WHERE
+              f.anio = g.anio
+              AND f.mes = g.mes
+              AND f.id_marca = g.id_marca
+            ORDER BY
+              f.fecha_baja DESC,
+              f.id DESC
+            LIMIT 1
+          ) AS marca_nombre,
+          g.unidades,
+          g.total_pvp_cents,
+          g.total_puc_micros
+        FROM grouped g
+        ORDER BY
+          g.anio DESC,
+          g.mes DESC,
+          marca_nombre COLLATE NOCASE,
+          g.id_marca
+      `,
+      filter.parameters,
+    )) as readonly CaducidadReportDatabaseRow[];
+
+    const anios: CaducidadReportYearAccumulator[] = [];
+    let currentYear: CaducidadReportYearAccumulator | null = null;
+    let currentMonth: CaducidadReportMonthAccumulator | null = null;
+    let totalUnidades: number = 0;
+    let totalPvpCents: number = 0;
+    let totalPucMicros: number = 0;
+
+    for (const row of rows) {
+      if (currentYear === null || currentYear.anio !== row.anio) {
+        currentYear = {
+          anio: row.anio,
+          unidades: 0,
+          totalPvpCents: 0,
+          totalPucMicros: 0,
+          meses: [],
+        };
+        anios.push(currentYear);
+        currentMonth = null;
+      }
+
+      if (currentMonth === null || currentMonth.mes !== row.mes) {
+        currentMonth = {
+          mes: row.mes,
+          unidades: 0,
+          totalPvpCents: 0,
+          totalPucMicros: 0,
+          marcas: [],
+        };
+        currentYear.meses.push(currentMonth);
+      }
+
+      currentMonth.marcas.push({
+        idMarca: row.id_marca,
+        nombre: row.marca_nombre,
+        unidades: row.unidades,
+        totalPvpCents: row.total_pvp_cents,
+        totalPucMicros: row.total_puc_micros,
+      });
+
+      currentMonth.unidades += row.unidades;
+      currentMonth.totalPvpCents += row.total_pvp_cents;
+      currentMonth.totalPucMicros += row.total_puc_micros;
+
+      currentYear.unidades += row.unidades;
+      currentYear.totalPvpCents += row.total_pvp_cents;
+      currentYear.totalPucMicros += row.total_puc_micros;
+
+      totalUnidades += row.unidades;
+      totalPvpCents += row.total_pvp_cents;
+      totalPucMicros += row.total_puc_micros;
+    }
+
+    return {
+      anios: anios.map((anio: CaducidadReportYearAccumulator): CaducidadReportAnioRecord => ({
+        anio: anio.anio,
+        unidades: anio.unidades,
+        totalPvpCents: anio.totalPvpCents,
+        totalPucMicros: anio.totalPucMicros,
+        meses: anio.meses.map((mes: CaducidadReportMonthAccumulator): CaducidadReportMesRecord => ({
+          mes: mes.mes,
+          unidades: mes.unidades,
+          totalPvpCents: mes.totalPvpCents,
+          totalPucMicros: mes.totalPucMicros,
+          marcas: [...mes.marcas],
+        })),
+      })),
+      totalUnidades,
+      totalPvpCents,
+      totalPucMicros,
     };
   }
 

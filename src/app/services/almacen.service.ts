@@ -3,6 +3,7 @@ import type {
   CaducidadArticuloSearchInterface,
   CaducidadCreateCommand,
 } from '@desktop-contracts/almacen/caducidad-create.interface';
+import type { CaducidadReportConsulta } from '@desktop-contracts/almacen/caducidad-report.interface';
 import type {
   CaducidadConsulta,
   CaducidadFilterOptionsInterface,
@@ -99,5 +100,12 @@ export default class AlmacenService {
    */
   deactivateCaducidad(idCaducidad: number): Promise<void> {
     return window.osumiDesktop.almacen.deactivateCaducidad(idCaducidad);
+  }
+
+  /**
+   * Abre el informe agregado de Caducidades.
+   */
+  openCaducidadReport(consulta: CaducidadReportConsulta): Promise<void> {
+    return window.osumiDesktop.almacen.openCaducidadReport(consulta);
   }
 }

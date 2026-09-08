@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 
 import AlmacenService from '@backend/application/almacen/almacen.service';
+import CaducidadReportService from '@backend/application/almacen/caducidad-report.service';
 import InventarioCsvBuilder from '@backend/application/almacen/inventario-csv.builder';
 import InventarioCsvService from '@backend/application/almacen/inventario-csv.service';
 import InventarioPrintService from '@backend/application/almacen/inventario-print.service';
@@ -37,6 +38,7 @@ import VentasTicketBaiService from '@backend/application/ventas/ventas-ticket-ba
 import VentasTicketEmailService from '@backend/application/ventas/ventas-ticket-email.service';
 import VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
 import type AlmacenRepository from '@backend/contracts/almacen/almacen.repository.interface';
+import type CaducidadReportWindow from '@backend/contracts/almacen/caducidad-report-window.interface';
 import type InventarioCsvFileSaver from '@backend/contracts/almacen/inventario-csv-file-saver.interface';
 import type InventarioPrintWindow from '@backend/contracts/almacen/inventario-print-window.interface';
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
@@ -105,6 +107,7 @@ import TypeOrmVentasTicketBaiRepository from '@infrastructure/database/typeorm/t
 import TypeOrmVentasTicketsRepository from '@infrastructure/database/typeorm/typeorm-ventas-tickets.repository';
 import ElectronA4DocumentRenderer from '@infrastructure/electron/electron-a4-document.renderer';
 import ElectronAssetUrlBuilder from '@infrastructure/electron/electron-asset-url.builder';
+import ElectronCaducidadReportWindow from '@infrastructure/electron/electron-caducidad-report-window';
 import ElectronClienteFacturaPreviewWindow from '@infrastructure/electron/electron-cliente-factura-preview-window';
 import ElectronHtmlDocumentRenderer from '@infrastructure/electron/electron-html-document.renderer';
 import ElectronInventarioCsvFileSaver from '@infrastructure/electron/electron-inventario-csv-file-saver';
@@ -136,6 +139,7 @@ import TicketBaiWsTicketBaiClient from '@infrastructure/ticket-bai/ticket-bai-ws
 import registerAlmacenIpc from '@ipc/register-almacen-ipc';
 import registerApplicationIpc from '@ipc/register-application-ipc';
 import registerArticulosIpc from '@ipc/register-articulos-ipc';
+import registerCaducidadReportIpc from '@ipc/register-caducidad-report-ipc';
 import registerCajaIpc from '@ipc/register-caja-ipc';
 import registerCategoriasIpc from '@ipc/register-categorias-ipc';
 import registerClienteFacturaPreviewIpc from '@ipc/register-cliente-factura-preview-ipc';
@@ -282,6 +286,14 @@ export default function createApplicationComposition(
   const inventarioPrintService: InventarioPrintService = new InventarioPrintService(
     almacenService,
     inventarioPrintWindow,
+  );
+
+  const caducidadReportWindow: CaducidadReportWindow = new ElectronCaducidadReportWindow(
+    getMainWindow,
+  );
+  const caducidadReportService: CaducidadReportService = new CaducidadReportService(
+    almacenService,
+    caducidadReportWindow,
   );
 
   /*
@@ -550,8 +562,15 @@ export default function createApplicationComposition(
    * Canales IPC.
    */
   registerApplicationIpc(applicationStateService);
-  registerAlmacenIpc(getMainWindow, almacenService, inventarioCsvService, inventarioPrintService);
+  registerAlmacenIpc(
+    getMainWindow,
+    almacenService,
+    inventarioCsvService,
+    inventarioPrintService,
+    caducidadReportService,
+  );
   registerInventarioPrintIpc(inventarioPrintWindow);
+  registerCaducidadReportIpc(caducidadReportWindow);
   registerArticulosIpc(getMainWindow, articulosService);
   registerFilesIpc(getMainWindow, imageStagingService);
   registerMarcasIpc(getMainWindow, marcasService);

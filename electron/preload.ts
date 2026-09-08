@@ -2,6 +2,7 @@ import type {
   CaducidadArticuloSearchInterface,
   CaducidadCreateCommand,
 } from '@desktop-contracts/almacen/caducidad-create.interface';
+import type { CaducidadReportConsulta } from '@desktop-contracts/almacen/caducidad-report.interface';
 import type {
   CaducidadConsulta,
   CaducidadFilterOptionsInterface,
@@ -161,6 +162,8 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
       ipcRenderer.invoke(IPC_CHANNELS.almacenCreateCaducidad, command) as Promise<void>,
     deactivateCaducidad: (idCaducidad: number): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.almacenDeactivateCaducidad, idCaducidad) as Promise<void>,
+    openCaducidadReport: (consulta: CaducidadReportConsulta): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.almacenOpenCaducidadReport, consulta) as Promise<void>,
   }),
 
   legacyImport: {

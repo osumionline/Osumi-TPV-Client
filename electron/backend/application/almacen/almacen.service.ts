@@ -1,6 +1,7 @@
 import type AlmacenRepository from '@backend/contracts/almacen/almacen.repository.interface';
 import type CaducidadFilterQuery from '@backend/contracts/almacen/caducidad-filter-query.interface';
 import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidad-query.interface';
+import type CaducidadReportProvider from '@backend/contracts/almacen/caducidad-report-provider.interface';
 import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-filter-query.interface';
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
 import type InventarioReportProvider from '@backend/contracts/almacen/inventario-report-provider.interface';
@@ -15,6 +16,12 @@ import type {
   CaducidadRowRecord,
 } from '@backend/domain/almacen/caducidad-record.interface';
 import type {
+  CaducidadReportAnioRecord,
+  CaducidadReportMarcaRecord,
+  CaducidadReportMesRecord,
+  CaducidadReportRecord,
+} from '@backend/domain/almacen/caducidad-report-record.interface';
+import type {
   InventarioResultadoRecord,
   InventarioRowRecord,
 } from '@backend/domain/almacen/inventario-record.interface';
@@ -27,6 +34,13 @@ import type {
   CaducidadArticuloSearchInterface,
   CaducidadCreateCommand,
 } from '@desktop-contracts/almacen/caducidad-create.interface';
+import type {
+  CaducidadReportAnioInterface,
+  CaducidadReportConsulta,
+  CaducidadReportInterface,
+  CaducidadReportMarcaInterface,
+  CaducidadReportMesInterface,
+} from '@desktop-contracts/almacen/caducidad-report.interface';
 import type {
   CaducidadConsulta,
   CaducidadFilterOptionsInterface,
@@ -71,7 +85,7 @@ const CADUCIDAD_PAGE_SIZES: readonly number[] = [20, 50, 100, 200];
 /**
  * Expone los casos de uso del módulo Almacén.
  */
-export default class AlmacenService implements InventarioReportProvider {
+export default class AlmacenService implements CaducidadReportProvider, InventarioReportProvider {
   /**
    * Crea el servicio de Almacén.
    */
@@ -207,6 +221,42 @@ export default class AlmacenService implements InventarioReportProvider {
         fechaBaja: row.fechaBaja,
       })),
       totalRows: result.totalRows,
+      totalUnidades: result.totalUnidades,
+      totalPvpCents: result.totalPvpCents,
+      totalPucMicros: result.totalPucMicros,
+    };
+  }
+
+  /**
+   * Valida los filtros y recupera el informe agregado
+   * persistido de Caducidades.
+   */
+  async getCaducidadReport(consulta: CaducidadReportConsulta): Promise<CaducidadReportInterface> {
+    const query: CaducidadFilterQuery = this.mapCaducidadFilterQuery(consulta);
+    const result: CaducidadReportRecord = await this.almacenRepository.getCaducidadReport(query);
+
+    return {
+      anios: result.anios.map((anio: CaducidadReportAnioRecord): CaducidadReportAnioInterface => ({
+        anio: anio.anio,
+        unidades: anio.unidades,
+        totalPvpCents: anio.totalPvpCents,
+        totalPucMicros: anio.totalPucMicros,
+        meses: anio.meses.map((mes: CaducidadReportMesRecord): CaducidadReportMesInterface => ({
+          mes: mes.mes,
+          unidades: mes.unidades,
+          totalPvpCents: mes.totalPvpCents,
+          totalPucMicros: mes.totalPucMicros,
+          marcas: mes.marcas.map(
+            (marca: CaducidadReportMarcaRecord): CaducidadReportMarcaInterface => ({
+              idMarca: marca.idMarca,
+              nombre: marca.nombre,
+              unidades: marca.unidades,
+              totalPvpCents: marca.totalPvpCents,
+              totalPucMicros: marca.totalPucMicros,
+            }),
+          ),
+        })),
+      })),
       totalUnidades: result.totalUnidades,
       totalPvpCents: result.totalPvpCents,
       totalPucMicros: result.totalPucMicros,

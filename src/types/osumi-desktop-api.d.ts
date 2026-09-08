@@ -8,5 +8,6 @@ declare global {
     readonly osumiDesktop: OsumiDesktopApi;
     readonly osumiFacturaPreview: ClienteFacturaPreviewApi;
     readonly osumiInventarioPrint: InventarioPrintApi;
+    readonly osumiCaducidadReport: CaducidadReportApi;
   }
 }

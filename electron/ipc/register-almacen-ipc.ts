@@ -1,10 +1,12 @@
 import type AlmacenService from '@backend/application/almacen/almacen.service';
+import type CaducidadReportService from '@backend/application/almacen/caducidad-report.service';
 import type InventarioCsvService from '@backend/application/almacen/inventario-csv.service';
 import type InventarioPrintService from '@backend/application/almacen/inventario-print.service';
 import type {
   CaducidadArticuloSearchInterface,
   CaducidadCreateCommand,
 } from '@desktop-contracts/almacen/caducidad-create.interface';
+import type { CaducidadReportConsulta } from '@desktop-contracts/almacen/caducidad-report.interface';
 import type {
   CaducidadConsulta,
   CaducidadFilterOptionsInterface,
@@ -32,6 +34,7 @@ export default function registerAlmacenIpc(
   almacenService: AlmacenService,
   inventarioCsvService: InventarioCsvService,
   inventarioPrintService: InventarioPrintService,
+  caducidadReportService: CaducidadReportService,
 ): void {
   ipcMain.handle(
     IPC_CHANNELS.almacenSearchInventario,
@@ -129,6 +132,15 @@ export default function registerAlmacenIpc(
       assertTrustedSender(event, getMainWindow);
 
       await almacenService.deactivateCaducidad(idCaducidad);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.almacenOpenCaducidadReport,
+    async (event, consulta: CaducidadReportConsulta): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await caducidadReportService.open(consulta);
     },
   );
 }

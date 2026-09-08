@@ -1,3 +1,4 @@
+import type CaducidadFilterQuery from '@backend/contracts/almacen/caducidad-filter-query.interface';
 import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidad-query.interface';
 import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-filter-query.interface';
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
@@ -9,6 +10,7 @@ import type {
   CaducidadFilterOptionsRecord,
   CaducidadResultadoRecord,
 } from '@backend/domain/almacen/caducidad-record.interface';
+import type { CaducidadReportRecord } from '@backend/domain/almacen/caducidad-report-record.interface';
 import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario-record.interface';
 import type { InventarioReportRecord } from '@backend/domain/almacen/inventario-report-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
@@ -43,6 +45,12 @@ export default interface AlmacenRepository {
    * correspondientes al conjunto filtrado completo.
    */
   searchCaducidades(query: CaducidadRepositoryQuery): Promise<CaducidadResultadoRecord>;
+
+  /**
+   * Recupera el informe histórico agregado del
+   * conjunto filtrado de Caducidades.
+   */
+  getCaducidadReport(query: CaducidadFilterQuery): Promise<CaducidadReportRecord>;
 
   /**
    * Recupera las opciones históricas disponibles para
