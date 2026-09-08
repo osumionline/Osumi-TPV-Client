@@ -27,6 +27,14 @@ interface MaximumIdRow {
   readonly maximumId: number;
 }
 
+interface ImportedExpirationArticleSnapshotRow {
+  readonly id: number;
+  readonly localizador: number;
+  readonly id_marca: number;
+  readonly articulo_nombre: string;
+  readonly marca_nombre: string;
+}
+
 export default class LegacyImportCatalogImporter implements LegacyImportPhaseImporter {
   constructor(
     private readonly catalogReader: LegacyImportCatalogReader,
@@ -147,7 +155,14 @@ export default class LegacyImportCatalogImporter implements LegacyImportPhaseImp
         'Importando el histórico de caducidades…',
       );
 
-      await this.insertExpirations(queryRunner, normalizedCatalog.expirations);
+      const expirationArticleSnapshots: ReadonlyMap<number, ImportedExpirationArticleSnapshotRow> =
+        await this.readExpirationArticleSnapshots(queryRunner);
+
+      await this.insertExpirations(
+        queryRunner,
+        normalizedCatalog.expirations,
+        expirationArticleSnapshots,
+      );
 
       await queryRunner.commitTransaction();
 
@@ -442,45 +457,104 @@ export default class LegacyImportCatalogImporter implements LegacyImportPhaseImp
     }
   }
 
+  /**
+   * Obtiene el estado normalizado de artículos y marcas
+   * para completar snapshots de caducidades legacy.
+   */
+  private async readExpirationArticleSnapshots(
+    queryRunner: QueryRunner,
+  ): Promise<ReadonlyMap<number, ImportedExpirationArticleSnapshotRow>> {
+    const rows: readonly ImportedExpirationArticleSnapshotRow[] = (await queryRunner.query(
+      `
+          SELECT
+            a.id,
+            a.localizador,
+            a.id_marca,
+            a.nombre AS articulo_nombre,
+            m.nombre AS marca_nombre
+          FROM articulo a
+          INNER JOIN marca m
+            ON m.id = a.id_marca
+        `,
+    )) as readonly ImportedExpirationArticleSnapshotRow[];
+
+    return new Map<number, ImportedExpirationArticleSnapshotRow>(
+      rows.map(
+        (
+          row: ImportedExpirationArticleSnapshotRow,
+        ): [number, ImportedExpirationArticleSnapshotRow] => [row.id, row],
+      ),
+    );
+  }
+
+  /**
+   * Importa las caducidades legacy conservando precios
+   * históricos y reconstruyendo el mejor snapshot posible.
+   */
   private async insertExpirations(
     queryRunner: QueryRunner,
-
     expirations: readonly LegacyImportNormalizedExpiration[],
+    articleSnapshots: ReadonlyMap<number, ImportedExpirationArticleSnapshotRow>,
   ): Promise<void> {
     for (const expiration of expirations) {
+      const snapshot: ImportedExpirationArticleSnapshotRow | undefined = articleSnapshots.get(
+        expiration.articleId,
+      );
+
+      if (snapshot === undefined) {
+        throw new Error(
+          [
+            `La caducidad ${expiration.id}`,
+            `referencia el artículo inexistente ${expiration.articleId}.`,
+          ].join(' '),
+        );
+      }
+
       await queryRunner.query(
         `
-          INSERT INTO merma_caducidad (
-            id,
-            public_id,
-            id_articulo,
-            unidades,
-            puc_micros,
-            pvp_cents,
-            fecha_baja,
-            observaciones,
-            created_at,
-            updated_at,
-            deleted_at
-          )
-          VALUES (
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            NULL,
-            ?,
-            ?,
-            NULL
-          )
-        `,
+        INSERT INTO merma_caducidad (
+          id,
+          public_id,
+          id_articulo,
+          localizador_snapshot,
+          id_marca_snapshot,
+          marca_nombre_snapshot,
+          articulo_nombre_snapshot,
+          unidades,
+          puc_micros,
+          pvp_cents,
+          fecha_baja,
+          observaciones,
+          created_at,
+          updated_at,
+          deleted_at
+        )
+        VALUES (
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          NULL,
+          ?,
+          ?,
+          NULL
+        )
+      `,
         [
           expiration.id,
           expiration.publicId,
           expiration.articleId,
+          snapshot.localizador,
+          snapshot.id_marca,
+          snapshot.marca_nombre,
+          snapshot.articulo_nombre,
           expiration.units,
           expiration.purchasePriceMicros,
           expiration.salePriceCents,
