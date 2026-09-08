@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.47  
+**Versión:** 2.48  
 **Fecha:** 8 de septiembre de 2026  
-**Base de continuidad:** `v2.47 + main` una vez este documento se suba al repositorio.
+**Base de continuidad:** `v2.48 + main` una vez este documento se suba al repositorio.
 
 ---
 
@@ -24,12 +24,12 @@ Caducidades
 Imprenta
 ```
 
-Inventario queda cerrado y el desarrollo activo ha pasado a **Caducidades**.
+Estado actual:
 
 ```text
 Inventario   → ✅ CERRADO
-Caducidades  → 🟦 EN DESARROLLO
-Imprenta     → placeholder
+Caducidades  → ✅ CERRADO
+Imprenta     → 🟦 SIGUIENTE BLOQUE
 ```
 
 Inventario queda cerrado tras completar:
@@ -45,23 +45,29 @@ Inventario queda cerrado tras completar:
 15H Integración + regresión Inventario
 ```
 
-Durante 15H se añadió blindaje automatizado de persistencia y se corrigió una comparación `null === null` en la validación de códigos adicionales alfanuméricos.
-
-Caducidades ya tiene cerrados:
+Caducidades queda también completamente cerrado tras completar:
 
 ```text
 15I.1 Dominio + esquema
 15I.2 Consulta + filtros + totales
 15I.3 Pantalla principal
+15I.4 Alta de caducidad
+15I.5 Baja / reversión
+15I.6 Informe agrupado
+15I.7 Impresión + regresión
 ```
 
-El alta `15I.4` queda **✅ CERRADA** tras completar los ajustes funcionales, de validación, accesibilidad y UX detectados en la primera prueba real.
+Durante `15I.5` se añadió la reversión transaccional de una caducidad, restaurando stock y creando histórico inverso tipo 7. La vista de histórico de Artículos se actualizó para mostrar `Caducidad` en lugar de `Tipo 7`.
+
+Durante `15I.6–15I.7` se añadió el informe histórico agrupado `Año → Mes → Marca` en BrowserWindow independiente, con snapshot persistido, estado expandido local e impresión exacta del estado visible mediante diálogo estándar.
 
 El siguiente punto exacto es:
 
 ```text
-15I.5 — Baja / reversión de Caducidades
+15J.1 — Base de Imprenta + búsqueda de artículos
 ```
+
+La funcionalidad de Imprenta ya está definida y planificada como diseñador efímero de una única página A4 de etiquetas. Se considera inicialmente una **versión beta**, pendiente de ajustes físicos cuando se pruebe con impresora y hojas reales de etiquetas.
 
 ---
 
@@ -110,15 +116,20 @@ Ventas 12 — Postventa                             🟦
   15F CSV                                         ✅
   15G Vista de impresión                          ✅
   15H Integración + regresión Inventario          ✅
-  15I Caducidades                                 🟦 EN DESARROLLO
+  15I Caducidades                                 ✅ CERRADO
     15I.1 Dominio + esquema                       ✅
     15I.2 Consulta + filtros + totales            ✅
     15I.3 Pantalla principal                      ✅
     15I.4 Alta de caducidad                       ✅
-    15I.5 Baja / reversión                        ⬅️ SIGUIENTE
-    15I.6 Informe agrupado                        ⬜
-    15I.7 Impresión + regresión                   ⬜
-  15J Imprenta                                    ⬜ PLACEHOLDER
+    15I.5 Baja / reversión                        ✅
+    15I.6 Informe agrupado                        ✅
+    15I.7 Impresión + regresión                   ✅
+  15J Imprenta                                    🟦 EN DESARROLLO
+    15J.1 Base + búsqueda                         ⬅️ SIGUIENTE
+    15J.2 Diseñador efímero                       ⬜
+    15J.3 Previsualización + capacidad            ⬜
+    15J.4 Snapshot + ventana de impresión         ⬜
+    15J.5 Impresión + regresión beta              ⬜
 
 16 Compras                                        ⬜
 
@@ -508,15 +519,15 @@ Caducidades
 Imprenta
 ```
 
-Por ahora:
+Estado actual:
 
 ```text
-Inventario   → desarrollo completo
-Caducidades  → placeholder
-Imprenta     → placeholder
+Inventario   → ✅ CERRADO
+Caducidades  → ✅ CERRADO
+Imprenta     → 🟦 EN DESARROLLO / PLANIFICADA
 ```
 
-Caducidades e Imprenta son dominios independientes y no deben diseñarse todavía.
+Los tres dominios se mantienen independientes dentro de Almacén. Inventario y Caducidades no deben reabrirse sin un requisito nuevo. El desarrollo activo pasa a Imprenta.
 
 ---
 
@@ -551,7 +562,7 @@ Caducidades
 Imprenta
 ```
 
-`Caducidades` e `Imprenta` continúan únicamente como placeholders.
+`Inventario` y `Caducidades` son pestañas funcionales cerradas. `Imprenta` es el siguiente dominio activo.
 
 ## 7.1.2 Consulta masiva
 
@@ -1669,7 +1680,7 @@ crear tabs:
   Imprenta
 ```
 
-Estado funcional:
+Estado funcional **al cerrar 15A**:
 
 ```text
 Inventario   → contenedor inicial
@@ -1677,7 +1688,7 @@ Caducidades  → placeholder
 Imprenta     → placeholder
 ```
 
-No desarrollar aún lógica de negocio.
+En aquel mini-hito todavía no se desarrolló lógica de negocio; el estado actual de cada pestaña se recoge al inicio de este documento.
 
 ---
 
@@ -1909,30 +1920,58 @@ Inventario ✅ CERRADO
 ## 15I — Caducidades
 
 ```text
-PLACEHOLDER
+✅ CERRADO
 ```
 
-No diseñar todavía.
+Implementado y validado de extremo a extremo:
 
-Se explicará funcionalmente en otro bloque.
+```text
+snapshot histórico
+consulta + filtros + totales
+alta transaccional
+baja / reversión transaccional
+histórico tipo 7
+informe Año → Mes → Marca
+BrowserWindow independiente
+impresión del estado visible
+regresión integral
+```
 
 ---
 
 ## 15J — Imprenta
 
 ```text
-PLACEHOLDER
+🟦 EN DESARROLLO / PLANIFICADA
 ```
 
-No diseñar todavía.
+Objetivo:
 
-Se explicará funcionalmente en otro bloque.
+```text
+diseñar una única página A4 de etiquetas
+→ artículos + huecos
+→ previsualización
+→ snapshot canónico
+→ BrowserWindow independiente
+→ diálogo estándar de impresión
+```
+
+La primera versión se considera beta hasta poder validarla con impresora y hojas físicas reales.
+
+Roadmap cerrado:
+
+```text
+15J.1 Base + búsqueda
+15J.2 Diseñador efímero
+15J.3 Previsualización + capacidad
+15J.4 Snapshot + ventana de impresión
+15J.5 Impresión + regresión beta
+```
 
 ---
 
 # 25. Decisiones de Inventario que no deben reabrirse sin requisito nuevo
 
-- Caducidades e Imprenta son placeholders por ahora.
 - Categorías son N:M explícitas.
 - Nunca seleccionar automáticamente categorías hijas.
 - Opciones siempre visible.
@@ -1998,7 +2037,7 @@ Se explicará funcionalmente en otro bloque.
 - La impresión usa BrowserWindow independiente, preload mínimo e IPC restringido por `webContents.id`.
 - La impresión parte de A4 apaisado y usa el diálogo estándar del sistema.
 
-# 25.1 Caducidades — estado implementado hasta v2.46
+# 25.1 Caducidades — estado implementado hasta v2.48
 
 ## 25.1.1 15I.1 — Dominio + esquema ✅
 
@@ -2250,6 +2289,102 @@ También se reconcilian fichas abiertas de Artículos usando el mecanismo existe
 
 ```text
 ✅ CERRADO
+```
+
+
+## 25.1.5 15I.5 — Baja / reversión ✅
+
+Cerrado y validado.
+
+Eliminar una caducidad realiza:
+
+```text
+confirmación
+→ localizar caducidad activa
+→ stock += unidades
+→ histórico tipo 7 con diferencia positiva
+→ soft-delete merma_caducidad
+→ COMMIT
+```
+
+Reglas cerradas:
+
+- no existe `DELETE` físico;
+- una caducidad ya eliminada no puede revertirse de nuevo;
+- la reversión funciona aunque el artículo esté dado de baja lógica;
+- PUC/PVP del histórico inverso proceden del snapshot de la caducidad original;
+- el histórico queda vinculado por `id_merma_caducidad`;
+- cualquier fallo provoca rollback completo;
+- se reconcilian fichas abiertas de Artículos preservando cambios locales dirty.
+
+La vista de histórico de Artículos reconoce:
+
+```text
+HISTORICO_ARTICULO_TIPO.CADUCIDAD = 7
+→ “Caducidad”
+```
+
+por lo que ya no aparece `Tipo 7`.
+
+## 25.1.6 15I.6 — Informe agrupado ✅
+
+Cerrado y validado.
+
+El botón `Crear informe` usa exactamente los filtros visibles en el momento del clic y obtiene desde SQLite un snapshot persistido agrupado:
+
+```text
+Año DESC
+  Mes DESC
+    Marca A-Z
+```
+
+Cada nivel contiene:
+
+```text
+Unidades
+PVP total perdido
+PUC total perdido
+```
+
+La BrowserWindow es independiente y utiliza:
+
+```text
+preload mínimo
+IPC reducido
+autorización por webContents.id
+snapshot inmutable
+```
+
+Todos los años y meses comienzan cerrados. El estado expandido vive exclusivamente en el renderer de la ventana.
+
+## 25.1.7 15I.7 — Impresión + regresión ✅
+
+Cerrado y validado.
+
+La ventana del informe incorpora botón `Imprimir` y utiliza el diálogo estándar del sistema.
+
+Regla principal:
+
+```text
+se imprime exactamente el DOM visible
+```
+
+Por tanto:
+
+```text
+año cerrado → no imprime sus meses
+mes cerrado → no imprime sus marcas
+```
+
+El propio botón de impresión se oculta mediante CSS de impresión.
+
+No usa impresora térmica y cancelar el diálogo no se trata como error.
+
+Tras la batería completa y la regresión funcional:
+
+```text
+15I.7 ✅
+15I — CADUCIDADES ✅ CERRADO
 ```
 
 ---
@@ -2888,29 +3023,11 @@ snapshot persistido
 ✅ CERRADO
 ```
 
-- revisar `merma_caducidad` actual;
-- ampliar snapshot histórico;
-- revisar importación legacy;
-- contratos;
-- repository/application base;
-- definir semántica del histórico de stock;
-- tests de esquema/importación;
-- mantener schema version 1.
-
 ### 15I.2 — Consulta + filtros + totales
 
 ```text
 ✅ CERRADO
 ```
-
-- consulta paginada;
-- año;
-- mes;
-- marca;
-- nombre;
-- opciones de filtros;
-- totales globales filtrados;
-- tests SQL.
 
 ### 15I.3 — Pantalla principal
 
@@ -2918,147 +3035,664 @@ snapshot persistido
 ✅ CERRADO
 ```
 
-- activar pestaña;
-- filtros;
-- tabla;
-- paginación;
-- totales;
-- loading/error/empty;
-- botón Añadir;
-- botón Informe.
-
 ### 15I.4 — Alta de caducidad
 
 ```text
 ✅ CERRADO
 ```
 
-Implementado y validado:
-
-- modal nuevo;
-- autofocus real en buscador;
-- buscador por localizador/nombre/referencia/código;
-- solo artículos activos con `stock > 0`;
-- validación backend del stock canónico;
-- selección;
-- `1 <= unidades <= stock`;
-- Stock / PUC / PVP / Unidades en una sola fila en escritorio;
-- snapshot backend;
-- decremento stock;
-- histórico tipo 7;
-- transacción;
-- rollback;
-- reconciliación Artículos;
-- accesibilidad del backdrop;
-- lint limpio.
-
 ### 15I.5 — Baja / reversión
+
+```text
+✅ CERRADO
+```
+
+Implementado:
 
 - confirmación;
 - soft-delete;
-- restaurar stock;
-- histórico inverso;
-- transacción;
+- restauración de stock;
+- histórico inverso tipo 7;
+- PUC/PVP snapshot;
+- transacción y rollback;
 - protección contra doble reversión;
+- reversión incluso con artículo soft-deleted;
 - reconciliación Artículos.
 
 ### 15I.6 — Informe agrupado
 
+```text
+✅ CERRADO
+```
+
+Implementado:
+
 - consulta filtrada agregada;
 - Año → Mes → Marca;
-- orden cerrado;
-- totales por nivel;
-- todos cerrados inicialmente;
-- BrowserWindow.
+- años y meses descendentes;
+- marcas alfabéticas;
+- totales por nivel y generales;
+- niveles cerrados inicialmente;
+- BrowserWindow segura con snapshot persistido.
 
 ### 15I.7 — Impresión + regresión
 
+```text
+✅ CERRADO
+```
+
+Implementado:
+
 - botón Imprimir;
 - diálogo estándar;
-- imprimir estado expandido visible;
-- ocultar botón en papel;
-- tests finales;
+- impresión del estado expandido visible;
+- botón oculto en papel;
+- cancelación sin error;
 - batería completa;
-- regresión funcional;
-- cerrar Caducidades.
+- regresión funcional final.
+
+Caducidades queda oficialmente:
+
+```text
+✅ CERRADO
+```
 
 ---
 
-# 27. Próximo bloque exacto
+# 27. Imprenta — requisitos cerrados y plan
+
+Imprenta es un diseñador efímero para preparar una única hoja A4 de etiquetas adhesivas.
+
+No crea históricos ni persiste composiciones/configuración en SQLite.
+
+Flujo conceptual:
 
 ```text
-15I.5 — Baja / reversión de Caducidades
+entrar en Imprenta
+→ buscar artículos
+→ construir lista de artículos/huecos
+→ ordenar y ajustar cantidades
+→ configurar hoja
+→ previsualizar
+→ Imprimir
+→ backend relee artículos persistidos
+→ snapshot
+→ BrowserWindow independiente
+→ botón Imprimir
+→ diálogo estándar
+```
+
+La primera versión se considera **beta** hasta poder probar físicamente distintas impresoras y hojas de etiquetas.
+
+## 27.1 Distribución de la pantalla
+
+La pestaña se divide en tres áreas:
+
+```text
+Izquierda  → Buscador
+Centro     → Elementos seleccionados
+Derecha    → Previsualización + configuración + acciones
+```
+
+El diseño debe seguir el lenguaje visual actual de Osumi TPV Client y usar la aplicación antigua únicamente como referencia funcional.
+
+## 27.2 Buscador de artículos
+
+Campo superior de texto con búsqueda remota por:
+
+```text
+nombre
+localizador
+códigos de barras activos
+```
+
+Reglas:
+
+- solo artículos activos;
+- debounce de búsqueda;
+- seleccionar un resultado lo añade inmediatamente a la lista central;
+- un artículo ya seleccionado no vuelve a aparecer en resultados;
+- un mismo artículo solo puede existir una vez como elemento de la lista;
+- el buscador debe devolver únicamente los datos necesarios para esta funcionalidad.
+
+La infraestructura actual ya dispone de patrones de búsqueda de artículos reutilizables. Imprenta tendrá una consulta coherente con Almacén en lugar de acoplar su UI al dominio de Ventas.
+
+## 27.3 Lista central / diseño efímero
+
+El estado de la composición vive únicamente en Angular.
+
+Cada elemento es uno de:
+
+```text
+Artículo
+Hueco
+```
+
+### Artículo
+
+Muestra:
+
+```text
+handle de arrastre
+nombre
+marca, si existe
+cantidad
+eliminar
+```
+
+Cantidad:
+
+```text
+entero >= 1
+```
+
+Cada artículo se repite en la previsualización tantas veces como indique su cantidad.
+
+El elemento completo se mueve como un bloque al reordenarlo.
+
+Eliminar artículo:
+
+```text
+requiere confirmación
+```
+
+### Hueco
+
+Botón superior:
+
+```text
+Hueco
+```
+
+Cada pulsación añade exactamente un único elemento vacío.
+
+Reglas:
+
+- cada hueco ocupa una celda;
+- cada hueco es reordenable;
+- para varios huecos se pulsa varias veces;
+- eliminar un hueco no requiere confirmación;
+- en la previsualización puede identificarse visualmente como `HUECO`;
+- en la salida final se imprime como celda completamente vacía.
+
+## 27.4 Reordenación
+
+Usar Angular CDK Drag & Drop.
+
+El proyecto ya incluye `@angular/cdk`.
+
+La lista ordenada es la fuente de verdad de la secuencia de impresión.
+
+Ejemplo:
+
+```text
+Artículo A × 2
+Hueco
+Artículo B × 3
+```
+
+se aplana como:
+
+```text
+A | A | vacío | B | B | B
+```
+
+## 27.5 Configuración de página
+
+Formato fijo:
+
+```text
+A4
+```
+
+Valores iniciales:
+
+```text
+Filas        = 5
+Columnas     = 4
+Orientación  = Vertical
+Mostrar PVP  = Sí
+```
+
+Límites configurables mediante constantes:
+
+```text
+MAX_FILAS    = 10
+MAX_COLUMNAS = 10
+```
+
+Los valores deben ser enteros positivos.
+
+Orientaciones:
+
+```text
+Vertical
+Horizontal
+```
+
+Cambiar orientación:
+
+```text
+NO intercambia filas y columnas
+solo cambia la geometría A4 disponible
+```
+
+## 27.6 Capacidad
+
+Capacidad de la única página:
+
+```text
+capacidad = filas × columnas
+```
+
+Ocupación:
+
+```text
+Σ cantidades de artículos
++
+número de huecos
+```
+
+No existen páginas automáticas adicionales.
+
+Si el usuario quiere más etiquetas:
+
+```text
+imprime otra tirada
+o
+limpia la lista y crea otro diseño
+```
+
+Al aumentar cantidades, no se debe permitir superar la capacidad vigente.
+
+Si el usuario reduce filas/columnas y la composición existente deja de caber:
+
+```text
+conservar la composición
+→ mostrar error visible
+→ deshabilitar Imprimir
+→ usuario corrige configuración o contenido
+```
+
+Nunca eliminar automáticamente elementos para hacerlos caber.
+
+La previsualización siempre representa una única hoja con `filas × columnas` celdas.
+
+## 27.7 Acción Limpiar
+
+Debe existir una acción:
+
+```text
+Limpiar
+```
+
+Su efecto es exclusivamente:
+
+```text
+vaciar artículos + huecos
+```
+
+Debe conservar:
+
+```text
+filas
+columnas
+orientación
+Mostrar PVP
+```
+
+Esto permite preparar rápidamente una nueva tirada manteniendo la misma hoja/configuración.
+
+Imprimir no limpia automáticamente el diseño.
+
+## 27.8 Previsualización
+
+La parte derecha representa proporcionalmente una única hoja A4.
+
+La cuadrícula usa:
+
+```text
+filas
+columnas
+orientación
+```
+
+Para esta primera versión beta:
+
+```text
+sin márgenes configurables
+sin gutters configurables
+sin plantillas físicas por fabricante
+```
+
+La cuadrícula ocupa conceptualmente todo el ancho y alto de A4.
+
+La calibración física se revisará tras pruebas con impresora y hojas reales, ya que algunas impresoras pueden imponer áreas no imprimibles.
+
+Celdas no utilizadas al final de la hoja permanecen vacías.
+
+## 27.9 Etiqueta
+
+Cada etiqueta de artículo contiene:
+
+```text
+QR del localizador
+Nombre
+Marca, solo si existe
+PVP, solo si Mostrar PVP = Sí
+```
+
+El PVP utilizado es el PVP normal persistido (`pvpCents`), no el precio de descuento.
+
+Propuesta inicial de composición:
+
+```text
+┌─────────────────────────────┐
+│ ┌──────────┐  NOMBRE DEL    │
+│ │          │  ARTÍCULO      │
+│ │    QR    │                │
+│ │          │  Marca         │
+│ └──────────┘                │
+│                    16,20 €  │
+└─────────────────────────────┘
+```
+
+Criterios visuales:
+
+- QR a la izquierda, aproximadamente 35–40 % del ancho disponible;
+- nombre destacado y legible;
+- marca secundaria y omitida completamente si está vacía;
+- PVP destacado en la zona inferior derecha cuando esté activo;
+- si PVP está desactivado, no reservar artificialmente su espacio;
+- adaptación sencilla de tamaños al espacio de cada celda.
+
+La previsualización y la salida final deben reutilizar la misma representación de etiqueta para minimizar diferencias WYSIWYG.
+
+El proyecto ya dispone de `angularx-qrcode`, por lo que no se necesita introducir otra dependencia para generar QR. Preferencia inicial: SVG para conservar nitidez de impresión.
+
+## 27.10 Datos canónicos al imprimir
+
+La composición del renderer es efímera y puede conservar temporalmente datos de presentación para previsualizar.
+
+Sin embargo, al pulsar Imprimir:
+
+```text
+renderer envía:
+  orden de elementos
+  ids de artículos
+  cantidades
+  huecos
+  filas
+  columnas
+  orientación
+  mostrarPvp
+```
+
+El backend debe volver a leer los artículos persistidos seleccionados antes de crear el documento definitivo.
+
+Datos canónicos de etiqueta:
+
+```text
+localizador
+nombre
+marca actual
+PVP actual
+```
+
+No confiar en nombre/marca/PVP enviados por el renderer como fuente definitiva.
+
+Si un artículo ya no existe o ya no está activo en ese momento:
+
+```text
+rechazar preparación de la impresión
+→ no abrir documento parcial
+→ informar al usuario
+```
+
+La salida final es un snapshot. Cambios posteriores en el diseñador o en los artículos no modifican una ventana de impresión ya abierta.
+
+## 27.11 BrowserWindow de impresión
+
+Flujo:
+
+```text
+Diseñador válido
+→ snapshot canónico
+→ BrowserWindow independiente
+→ una única página A4
+→ botón Imprimir
+```
+
+La ventana debe reutilizar el patrón seguro ya establecido por Inventario/Caducidades:
+
+```text
+preload mínimo
+contextIsolation
+sandbox
+IPC reducido
+autorización por webContents.id
+```
+
+No lanzar el diálogo automáticamente al abrir.
+
+El botón de la BrowserWindow abre:
+
+```text
+diálogo estándar del sistema
+```
+
+No usar impresora térmica.
+
+Configuración inicial de impresión:
+
+```text
+pageSize = A4
+landscape = orientación === Horizontal
+márgenes = ninguno / mínima adaptación beta
+```
+
+La impresión contiene exactamente una página.
+
+El propio botón `Imprimir` no aparece en papel.
+
+## 27.12 Persistencia
+
+Imprenta no necesita nuevas tablas ni cambios de esquema.
+
+No persistir:
+
+```text
+lista seleccionada
+huecos
+cantidades
+filas
+columnas
+orientación
+mostrar PVP
+```
+
+Por tanto:
+
+```text
+DATABASE_SCHEMA_VERSION = 1
+```
+
+permanece sin cambios.
+
+## 27.13 Arquitectura prevista
+
+Conceptualmente:
+
+```text
+AlmacenRepository / dominio Imprenta
+  searchImprentaArticulos()
+  getImprentaPrintDocument()
+```
+
+o equivalente coherente con el `main` real al implementar.
+
+Renderer principal:
+
+```text
+ImprentaComponent
+  búsqueda
+  estado efímero
+  drag & drop
+  cantidades
+  capacidad
+  preview
+```
+
+Presentación compartida:
+
+```text
+ImprentaLabelComponent
+```
+
+para intentar reutilizar el mismo marcado/estilo en preview y documento final.
+
+Salida:
+
+```text
+ImprentaPrintService
+ImprentaPrintWindow
+preload específico
+IPC específico
+renderer específico
+```
+
+No duplicar fórmulas ni datos canónicos si pueden centralizarse.
+
+## 27.14 Mini-hitos
+
+### 15J.1 — Base + búsqueda
+
+```text
+⬅️ SIGUIENTE
+```
+
+- activar contenido real de la pestaña Imprenta;
+- contratos públicos/backend;
+- consulta ligera de artículos activos;
+- búsqueda por nombre/localizador/códigos activos;
+- exclusión de artículos ya seleccionados;
+- IPC/preload/service Angular;
+- tests de consulta.
+
+### 15J.2 — Diseñador efímero
+
+```text
+⬜
+```
+
+- estructura visual de tres áreas;
+- lista central;
+- añadir artículos;
+- cantidad;
+- añadir/eliminar huecos;
+- confirmación al eliminar artículo;
+- `Limpiar` conservando configuración;
+- Drag & Drop por bloques.
+
+### 15J.3 — Previsualización + capacidad
+
+```text
+⬜
+```
+
+- constantes 10×10;
+- defaults 5×4;
+- vertical/horizontal;
+- Mostrar PVP;
+- cálculo de capacidad/ocupación;
+- validación de cantidades;
+- estado inválido tras reducir capacidad;
+- error visible + Imprimir deshabilitado;
+- cuadrícula A4;
+- QR + nombre + marca + PVP;
+- representación de huecos;
+- componente de etiqueta reutilizable.
+
+### 15J.4 — Snapshot + ventana de impresión
+
+```text
+⬜
+```
+
+- command con ids/orden/cantidades/huecos/configuración;
+- relectura canónica de artículos;
+- rechazo de artículos inactivos/desaparecidos;
+- snapshot inmutable;
+- BrowserWindow independiente;
+- preload mínimo;
+- IPC reducido/autorizado;
+- una única página A4.
+
+### 15J.5 — Impresión + regresión beta
+
+```text
+⬜
+```
+
+- botón Imprimir en BrowserWindow;
+- diálogo estándar;
+- orientación aplicada a Electron/print CSS;
+- ocultar controles en papel;
+- verificar una única página;
+- tests finales;
+- batería completa;
+- regresión funcional;
+- cierre funcional beta de Imprenta;
+- dejar pendiente calibración física con impresora/hojas reales si fuese necesaria.
+
+---
+
+# 28. Próximo bloque exacto
+
+```text
+15J.1 — Base de Imprenta + búsqueda de artículos
 ```
 
 Objetivo:
 
 ```text
-Eliminar registro incorrecto
-→ soft-delete caducidad
-→ restaurar unidades al stock
-→ crear histórico inverso tipo 7
-→ misma transacción
+activar Imprenta real
++
+definir contratos
++
+búsqueda remota ligera
++
+excluir artículos ya seleccionados
 ```
 
 Antes de proponer cambios:
 
 1. revisar `main` actual;
-2. revisar `createCaducidad()` y helpers transaccionales;
-3. reutilizar `id_merma_caducidad` para vincular la reversión;
-4. localizar la caducidad activa por id;
-5. impedir doble reversión;
-6. permitir reversión aunque el artículo esté soft-deleted, ya que su fila histórica permanece;
-7. restaurar `stock += unidades`;
-8. crear histórico tipo 7 con diferencia positiva;
-9. usar PUC/PVP snapshot de la caducidad original para el histórico inverso;
-10. soft-delete de `merma_caducidad`, nunca DELETE físico;
-11. confirmar desde UI antes de ejecutar;
-12. reconciliar ficha abierta del artículo preservando dirty;
-13. refrescar página/totales/filtros tras éxito;
-14. tests de atomicidad/rollback/doble reversión;
-15. batería completa.
+2. revisar la pestaña/contenedor actual de Almacén;
+3. revisar `searchCaducidadArticulos()` como patrón del dominio Almacén;
+4. revisar `ArticleSearchComponent` / `VentasArticulosService` solo como referencia de UX y búsqueda existente, evitando acoplar Imprenta a Ventas;
+5. definir contrato mínimo de resultado: id, localizador, nombre, marca y PVP;
+6. buscar exclusivamente artículos activos;
+7. buscar por nombre, localizador y códigos de barras activos;
+8. excluir ids ya seleccionados sin desperdiciar el límite de resultados;
+9. añadir IPC/preload/API/service necesarios;
+10. activar la base visual de la pestaña sin desarrollar todavía drag & drop, preview o impresión;
+11. añadir tests SQL/application;
+12. ejecutar batería Electron del bloque.
 
-Semántica esperada:
+No empezar `15J.2` hasta que `15J.1` haya sido aplicado, probado y confirmado por el usuario.
 
-```text
-caducidad activa
-unidades = 3
-stock actual = 7
-
-Eliminar
-→ confirmar
-→ stock final = 10
-→ caducidad.deleted_at != null
-→ histórico tipo 7
-   diferencia = +3
-→ COMMIT
-```
-
-Si ya está eliminada:
-
-```text
-rechazar
-→ no tocar stock
-→ no crear otro histórico
-```
-
-Después:
-
-```text
-15I.6 — Informe agrupado Año → Mes → Marca
-```
-
-No empezar Imprenta hasta cerrar Caducidades.
+No reabrir Inventario ni Caducidades salvo requisito nuevo.
 
 ---
 
-# 28. Prompt de relevo
+# 29. Prompt de relevo
 
 Si este chat alcanza el límite, continuar con este contexto:
 
 ```text
 Estamos desarrollando Osumi TPV Client.
-La base de continuidad es el documento v2.47 + el main actual del repositorio.
+La base de continuidad es el documento v2.48 + el main actual del repositorio.
 
 Reglas:
 - revisar main antes de proponer patches;
@@ -3072,112 +3706,81 @@ Reglas:
 
 Estado:
 - Hito 13 Artículos cerrado.
-- Hito 14 Clientes completamente cerrado tras regresión integral.
+- Hito 14 Clientes cerrado.
 - Hito 15 Almacén en desarrollo.
-- Almacén tiene tres pestañas: Inventario, Caducidades, Imprenta.
-- Inventario está cerrado.
-- desarrollar ahora Caducidades.
-- Imprenta sigue placeholder.
-- 15A Base Almacén cerrado.
-- 15B Dominio + consulta Inventario cerrado.
-- 15C Pantalla Inventario cerrado.
-- 15D Drafts inline + cálculos cerrado.
-- 15E Persistencia cerrado.
-- 15F CSV cerrado.
-- 15G Vista de impresión cerrado.
-- 15H Integración + regresión Inventario cerrado.
-- Inventario oficialmente cerrado.
-- Caducidades funcionalmente definido y dividido en 15I.1–15I.7.
-- 15I.1 Dominio + esquema cerrado.
-- 15I.2 Consulta + filtros + totales cerrado.
-- 15I.3 Pantalla principal cerrado.
-- 15I.4 Alta cerrado.
-- Imprenta sigue placeholder.
-- siguiente punto exacto: 15I.5 Baja / reversión de Caducidades.
+- Inventario ✅ cerrado.
+- Caducidades ✅ cerrado tras 15I.1–15I.7.
+- Imprenta es el siguiente dominio activo.
+- siguiente punto exacto: 15J.1 Base de Imprenta + búsqueda de artículos.
 
-Inventario:
-- filtros proveedor, marca, categoría exacta, texto, descuento;
-- búsqueda por nombre/localizador/referencia/códigos/etiquetas;
-- columnas:
-  Localizador, Proveedor, Marca, Referencia, Categoría, Nombre,
-  Stock, Precio albarán, PUC, PVP, Margen, Código barras, Opciones;
-- editables:
-  Categoría, Stock, Precio albarán, PUC, PVP, Código barras;
-- Opciones siempre visible y no exportable/imprimible;
-- categoría N:M explícita, nunca cascada a hijos;
-- dirty por celda/fila, Reset, Guardar fila;
-- edición textual confirmada en blur/Intro;
-- Intro salta al mismo campo de la fila inferior;
-- Categoría y Precio albarán ocultos por defecto;
-- toolbar compacta de una sola línea con acciones icon button;
-- Guardar todos atómico;
-- stock conserva histórico manual;
-- código adicional:
-  input si solo default, check si ya existe adicional;
-- sin ventas 12 meses → triángulo amarillo;
-- precio albarán cambia PUC+margen, no PVP;
-- PUC cambia precio albarán+margen, no PVP;
-- PVP cambia margen, no los otros;
-- totales pantalla reactivos con drafts:
-  Media margen, Total PUC, Total PVP;
-- CSV e impresión usan solo persistido;
-- CSV = todas las filas filtradas + columnas seleccionadas;
-- impresión = ventana independiente, tabla + 3 totales + botón imprimir + diálogo normal;
-- no usar térmica.
+Caducidades — cierre:
+- alta = snapshot + stock -= unidades + histórico tipo 7, transaccional;
+- 1 <= unidades <= stock canónico;
+- baja = soft-delete + stock += unidades + histórico inverso tipo 7, transaccional;
+- la reversión funciona aunque el artículo esté soft-deleted;
+- doble reversión rechazada;
+- histórico muestra “Caducidad”, no “Tipo 7”;
+- informe respeta filtros activos y agrupa Año → Mes → Marca;
+- años desc, meses desc, marcas alfabéticas;
+- todos los niveles cerrados inicialmente;
+- BrowserWindow independiente con snapshot persistido;
+- impresión = estado visible exacto + diálogo estándar;
+- Caducidades oficialmente cerrado.
 
-Caducidades — estado y decisiones:
-- CRUD sin Update.
-- 15I.1 esquema/snapshot/importación legacy ✅.
-- 15I.2 consulta/filtros/totales ✅.
-- 15I.3 pantalla principal ✅.
-- 15I.4 alta ✅ cerrada.
-- filtros: año de baja, mes de baja, marca histórica, nombre snapshot.
-- tabla: Localizador, Marca, Nombre, Unidades, PVP unitario, PUC unitario, Total PVP, Opciones.
-- totales globales: unidades, Σ unidades×PVP, Σ unidades×PUC.
-- snapshot histórico de artículo/marca/localizador/nombre/PUC/PVP.
-- legacy importa caducidades sin restar stock ni inventar histórico tipo 7.
-- nuevas altas: snapshot + stock -= unidades + histórico tipo 7, todo transaccional.
-- candidatos de alta deben ser activos y stock > 0.
-- backend relee y rechaza si stock <= 0 al confirmar.
-- regla definitiva: 1 <= unidades <= stock canónico disponible.
-- una caducidad nueva no puede provocar stock negativo.
-- modal: autofocus real en Buscar artículo.
-- modal selección: Stock | PUC | PVP | Unidades en una sola fila de escritorio.
-- backdrop accesible mediante botón real; lint Angular limpio.
-- baja será soft-delete, restaurará stock y creará histórico inverso en una transacción.
-- alta/baja reconcilian fichas abiertas de Artículos preservando dirty.
-- informe respeta filtros actuales.
-- informe agrupado Año → Mes → Marca.
-- años desc, meses desc, marcas alfabéticas.
-- años y meses cerrados por defecto.
-- informe en BrowserWindow independiente con snapshot persistido.
-- botón Imprimir; imprime exactamente el estado expandido visible.
-- no impresora térmica; diálogo estándar.
-- Imprenta no se diseña todavía.
+Imprenta — requisitos cerrados:
+- diseñador efímero de una sola página A4;
+- tres áreas: búsqueda / seleccionados / preview;
+- búsqueda por nombre, localizador y códigos de barras;
+- solo artículos activos;
+- un artículo ya seleccionado no aparece en resultados;
+- un artículo solo puede estar una vez en la lista;
+- lista con Artículo o Hueco;
+- artículo: handle, nombre, marca, cantidad, eliminar con confirmación;
+- hueco: una celda por pulsación, reordenable, eliminación sin confirmación;
+- elementos reordenables con Angular CDK Drag & Drop;
+- cantidad de artículo entero >= 1;
+- el bloque completo se mueve con todas sus repeticiones;
+- defaults: 5 filas, 4 columnas, vertical, PVP visible;
+- máximo filas = 10 y máximo columnas = 10 mediante constantes fáciles de cambiar;
+- capacidad = filas × columnas;
+- ocupación = suma cantidades + huecos;
+- una única página, nunca paginar automáticamente;
+- al aumentar cantidades no superar capacidad actual;
+- si reducir filas/columnas deja overflow: conservar diseño + error + Imprimir deshabilitado;
+- nunca borrar elementos automáticamente;
+- orientación vertical/horizontal no intercambia filas/columnas;
+- Limpiar vacía lista pero conserva filas/columnas/orientación/PVP;
+- Imprimir no limpia la lista;
+- preview ocupa conceptualmente todo A4 en esta beta;
+- sin márgenes/gutters/plantillas físicas configurables todavía;
+- etiqueta = QR(localizador) + nombre + marca opcional + PVP opcional;
+- PVP = pvpCents persistido, no descuento;
+- propuesta visual: QR izquierda 35–40 %, textos derecha, PVP destacado abajo;
+- si no hay marca, omitirla sin hueco artificial;
+- usar representación compartida preview/print;
+- angularx-qrcode ya está disponible; preferencia inicial SVG;
+- al preparar impresión backend relee datos canónicos actuales del artículo;
+- renderer no es fuente canónica de nombre/marca/PVP;
+- artículo inactivo/desaparecido al imprimir → rechazar, sin documento parcial;
+- BrowserWindow final independiente, snapshot inmutable, preload mínimo, IPC restringido;
+- botón Imprimir en la ventana final → diálogo estándar;
+- A4 vertical/horizontal según configuración;
+- no térmica;
+- primera versión considerada beta hasta prueba física real.
 
-Roadmap:
-15A Base Almacén ✅
-15B Dominio + consulta Inventario ✅
-15C Pantalla Inventario ✅
-15D Drafts inline + cálculos ✅
-15E Persistencia ✅
-15F CSV ✅
-15G Vista impresión ✅
-15H Integración + regresión Inventario ✅
-15I Caducidades 🟦 EN DESARROLLO
-  15I.1 Dominio + esquema ✅
-  15I.2 Consulta + filtros + totales ✅
-  15I.3 Pantalla principal ✅
-  15I.4 Alta ✅
-  15I.5 Baja / reversión ⬅️ SIGUIENTE
-  15I.6 Informe agrupado
-  15I.7 Impresión + regresión
-15J Imprenta placeholder
+Roadmap Imprenta:
+15J.1 Base + búsqueda                         ⬅️ SIGUIENTE
+15J.2 Diseñador efímero                      ⬜
+15J.3 Previsualización + capacidad           ⬜
+15J.4 Snapshot + ventana de impresión        ⬜
+15J.5 Impresión + regresión beta             ⬜
+
+No reabrir Inventario/Caducidades sin requisito nuevo.
 ```
 
 ---
 
-# 29. Historial de continuidad
+# 30. Historial de continuidad
 
 ```text
 v2.36
@@ -3305,4 +3908,34 @@ v2.47
 → alta mantiene transacción snapshot + stock + histórico tipo 7
 → puerto Angular de desarrollo cambiado de 4200 a 4500
 → siguiente punto exacto: 15I.5 Baja / reversión
+
+
+v2.48
+→ 15I.5 Baja / reversión de Caducidades cerrada
+→ soft-delete + restauración de stock + histórico inverso tipo 7
+→ doble reversión bloqueada
+→ reversión permitida aunque artículo esté soft-deleted
+→ PUC/PVP del histórico inverso desde snapshot original
+→ histórico de Artículos muestra “Caducidad” en lugar de “Tipo 7”
+→ 15I.6 Informe agrupado cerrado
+→ filtros actuales + SQLite agregado Año → Mes → Marca
+→ años/meses descendentes, marcas alfabéticas
+→ BrowserWindow independiente con snapshot persistido
+→ niveles cerrados inicialmente
+→ 15I.7 Impresión + regresión cerrada
+→ imprimir exactamente estado expandido visible
+→ diálogo estándar, no térmica, cancelación sin error
+→ Caducidades oficialmente CERRADO
+→ Imprenta definida funcionalmente como diseñador efímero A4 de una sola página
+→ tres áreas: buscador, seleccionados y previsualización
+→ artículos únicos + huecos + cantidades + drag & drop
+→ defaults 5×4, vertical, PVP sí; máximos 10×10 configurables
+→ capacidad estricta de una página; overflow tras reducir configuración invalida impresión sin borrar diseño
+→ Limpiar vacía contenido y conserva configuración
+→ QR del localizador + nombre + marca opcional + PVP opcional
+→ backend releerá datos canónicos al preparar la impresión
+→ BrowserWindow final segura con diálogo estándar
+→ primera versión Imprenta considerada beta hasta validación física
+→ roadmap 15J.1–15J.5 cerrado
+→ siguiente punto exacto: 15J.1 Base de Imprenta + búsqueda de artículos
 ```
