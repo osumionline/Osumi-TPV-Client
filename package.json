@@ -7,7 +7,7 @@
     "start": "ng serve",
     "typecheck:electron": "tsc -p electron/tsconfig.json",
     "build:electron": "npm run typecheck:electron && node scripts/build-electron.mjs",
-    "start:desktop": "npm run build:electron && concurrently -k -n ANGULAR,ELECTRON \"npm run start\" \"wait-on http://localhost:4200 && cross-env OSUMI_TPV_RENDERER_URL=http://localhost:4200 electron .\"",
+    "start:desktop": "npm run build:electron && concurrently -k -n ANGULAR,ELECTRON \"npm run start\" \"wait-on http://localhost:4500 && cross-env OSUMI_TPV_RENDERER_URL=http://localhost:4500 electron .\"",
     "start:desktop:prod": "npm run build:desktop && electron .",
     "build": "ng build",
     "build:desktop": "npm run build -- --base-href ./ && npm run build:electron",

@@ -63,6 +63,10 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "port": 4500,
+            "buildTarget": "osumi-tpv-client:build"
+          },
           "configurations": {
             "production": {
               "buildTarget": "osumi-tpv-client:build:production"
