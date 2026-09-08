@@ -1,0 +1,146 @@
+:host {
+    display: block;
+    min-height: 100vh;
+    background-color: var(--bg-color);
+    color: var(--color-black);
+}
+
+.caducidad-report-state {
+    display: flex;
+    min-height: 100vh;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 32px;
+    background-color: var(--color-white);
+    text-align: center;
+
+    button {
+        padding: 8px 18px;
+        border: 1px solid var(--separator-color);
+        border-radius: 20px;
+        background-color: var(--color-white);
+        cursor: pointer;
+    }
+}
+
+.caducidad-report-state--error {
+    color: var(--color-red);
+}
+
+.caducidad-report {
+    min-height: 100vh;
+    padding: 18px;
+}
+
+.caducidad-report-document {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px;
+    background-color: var(--color-white);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 18%);
+}
+
+.caducidad-report-document__header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+
+    h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 500;
+    }
+
+    span {
+        display: block;
+        margin-top: 4px;
+        font-size: 13px;
+        opacity: 0.65;
+    }
+}
+
+.caducidad-report-table-container {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.caducidad-report-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+
+    th,
+    td {
+        padding: 8px 10px;
+        border: 1px solid var(--separator-color);
+        vertical-align: middle;
+    }
+
+    thead th {
+        background-color: var(--color-very-light-grey);
+        font-weight: 600;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    tfoot th {
+        background-color: var(--color-very-light-grey);
+        font-weight: 700;
+        text-align: left;
+    }
+}
+
+.caducidad-report-table__right {
+    text-align: right !important;
+    white-space: nowrap;
+}
+
+.caducidad-report-table__year {
+    background-color: var(--color-very-light-grey);
+}
+
+.caducidad-report-table__month {
+    background-color: var(--color-white);
+}
+
+.caducidad-report-table__brand {
+    background-color: var(--color-white);
+}
+
+.caducidad-report-table__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.caducidad-report-table__toggle--month {
+    padding-left: 24px;
+}
+
+.caducidad-report-table__chevron {
+    display: inline-block;
+    width: 14px;
+    font-size: 10px;
+    text-align: center;
+}
+
+.caducidad-report-table__brand-name {
+    display: inline-block;
+    padding-left: 54px;
+}
+
+.caducidad-report-table__empty {
+    padding: 32px !important;
+    text-align: center;
+    opacity: 0.65;
+}

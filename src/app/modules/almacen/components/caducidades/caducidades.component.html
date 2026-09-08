@@ -86,7 +86,7 @@
 
         <button mat-flat-button
                 type="button"
-                [disabled]="loading() || createSaving() || deactivatingCaducidadId() !== null"
+                [disabled]="loading() || createSaving() || deactivatingCaducidadId() !== null || reportOpening()"
                 (click)="openCreate()">
             <mat-icon>
                 add
@@ -96,7 +96,8 @@
 
         <button mat-stroked-button
                 type="button"
-                disabled>
+                [disabled]="loading() || createSaving() || deactivatingCaducidadId() !== null || reportOpening()"
+                (click)="openReport()">
             <mat-icon>
                 description
             </mat-icon>
@@ -232,7 +233,7 @@
                             type="button"
                             matTooltip="Eliminar caducidad"
                             aria-label="Eliminar caducidad"
-                            [disabled]="loading() || createSaving() || deactivatingCaducidadId() !== null"
+                            [disabled]="loading() || createSaving() || deactivatingCaducidadId() !== null || reportOpening()"
                             (click)="deactivateCaducidad(row)">
                         <mat-icon>
                             delete

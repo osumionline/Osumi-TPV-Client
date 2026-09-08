@@ -1,5 +1,6 @@
 import AlmacenService from '@backend/application/almacen/almacen.service';
 import type AlmacenRepository from '@backend/contracts/almacen/almacen.repository.interface';
+import type CaducidadFilterQuery from '@backend/contracts/almacen/caducidad-filter-query.interface';
 import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidad-query.interface';
 import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-filter-query.interface';
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
@@ -11,6 +12,7 @@ import type {
   CaducidadFilterOptionsRecord,
   CaducidadResultadoRecord,
 } from '@backend/domain/almacen/caducidad-record.interface';
+import type { CaducidadReportRecord } from '@backend/domain/almacen/caducidad-report-record.interface';
 import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario-record.interface';
 import type { InventarioReportRecord } from '@backend/domain/almacen/inventario-report-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
@@ -18,6 +20,10 @@ import type {
   CaducidadArticuloSearchInterface,
   CaducidadCreateCommand,
 } from '@desktop-contracts/almacen/caducidad-create.interface';
+import type {
+  CaducidadReportConsulta,
+  CaducidadReportInterface,
+} from '@desktop-contracts/almacen/caducidad-report.interface';
 import type {
   CaducidadFilterOptionsInterface,
   CaducidadResultado,
@@ -74,6 +80,37 @@ class FakeAlmacenRepository implements AlmacenRepository {
   };
 
   lastCaducidadQuery: CaducidadRepositoryQuery | null = null;
+  lastCaducidadReportQuery: CaducidadFilterQuery | null = null;
+  caducidadReportResult: CaducidadReportRecord = {
+    anios: [
+      {
+        anio: 2025,
+        unidades: 3,
+        totalPvpCents: 5070,
+        totalPucMicros: 35_760_000,
+        meses: [
+          {
+            mes: 12,
+            unidades: 3,
+            totalPvpCents: 5070,
+            totalPucMicros: 35_760_000,
+            marcas: [
+              {
+                idMarca: 3,
+                nombre: 'Marca de prueba',
+                unidades: 3,
+                totalPvpCents: 5070,
+                totalPucMicros: 35_760_000,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    totalUnidades: 3,
+    totalPvpCents: 5070,
+    totalPucMicros: 35_760_000,
+  };
 
   caducidadResult: CaducidadResultadoRecord = {
     rows: [
@@ -168,6 +205,16 @@ class FakeAlmacenRepository implements AlmacenRepository {
     this.lastCaducidadQuery = query;
 
     return Promise.resolve(this.caducidadResult);
+  }
+
+  /**
+   * Devuelve el informe configurado y conserva
+   * los filtros recibidos.
+   */
+  getCaducidadReport(query: CaducidadFilterQuery): Promise<CaducidadReportRecord> {
+    this.lastCaducidadReportQuery = query;
+
+    return Promise.resolve(this.caducidadReportResult);
   }
 
   /**
@@ -552,6 +599,57 @@ describe('AlmacenService', (): void => {
     );
 
     expect(repository.lastDeactivatedCaducidadId).toBeNull();
+  });
+
+  it('normaliza los filtros antes de crear el informe de Caducidades', async (): Promise<void> => {
+    const repository = new FakeAlmacenRepository();
+    const service = createService(repository);
+    const consulta: CaducidadReportConsulta = {
+      anio: 2025,
+      mes: 12,
+      idMarca: 3,
+      nombre: '  pienso adulto  ',
+    };
+
+    const result: CaducidadReportInterface = await service.getCaducidadReport(consulta);
+
+    expect(repository.lastCaducidadReportQuery).toEqual({
+      anio: 2025,
+      mes: 12,
+      idMarca: 3,
+      nombre: 'pienso adulto',
+    });
+
+    expect(result).toEqual({
+      anios: [
+        {
+          anio: 2025,
+          unidades: 3,
+          totalPvpCents: 5070,
+          totalPucMicros: 35_760_000,
+          meses: [
+            {
+              mes: 12,
+              unidades: 3,
+              totalPvpCents: 5070,
+              totalPucMicros: 35_760_000,
+              marcas: [
+                {
+                  idMarca: 3,
+                  nombre: 'Marca de prueba',
+                  unidades: 3,
+                  totalPvpCents: 5070,
+                  totalPucMicros: 35_760_000,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      totalUnidades: 3,
+      totalPvpCents: 5070,
+      totalPucMicros: 35_760_000,
+    });
   });
 });
 

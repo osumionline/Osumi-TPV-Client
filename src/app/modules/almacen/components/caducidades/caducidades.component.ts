@@ -16,6 +16,7 @@ import { MatSelect, type MatSelectChange } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltip } from '@angular/material/tooltip';
 import type { CaducidadCreateCommand } from '@desktop-contracts/almacen/caducidad-create.interface';
+import type { CaducidadReportConsulta } from '@desktop-contracts/almacen/caducidad-report.interface';
 import type {
   CaducidadConsulta,
   CaducidadFilterOptionsInterface,
@@ -145,9 +146,9 @@ export default class CaducidadesComponent implements OnInit, OnDestroy {
   readonly createSaving: WritableSignal<boolean> = signal<boolean>(false);
   readonly createError: WritableSignal<string | null> = signal<string | null>(null);
   readonly deactivatingCaducidadId: WritableSignal<number | null> = signal<number | null>(null);
+  readonly reportOpening: WritableSignal<boolean> = signal<boolean>(false);
 
   readonly pageSizeOptions: readonly number[] = [20, 50, 100, 200];
-
   readonly monthOptions: readonly CaducidadMonthOption[] = CADUCIDAD_MONTH_OPTIONS;
   readonly displayedColumns: readonly string[] = CADUCIDAD_COLUMNS;
 
@@ -298,7 +299,7 @@ export default class CaducidadesComponent implements OnInit, OnDestroy {
    * Abre el formulario de una nueva caducidad.
    */
   openCreate(): void {
-    if (this.createSaving() || this.deactivatingCaducidadId() !== null) {
+    if (this.createSaving() || this.deactivatingCaducidadId() !== null || this.reportOpening()) {
       return;
     }
 
@@ -360,10 +361,45 @@ export default class CaducidadesComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Abre el informe usando exactamente los filtros
+   * activos en el momento del clic.
+   */
+  async openReport(): Promise<void> {
+    if (
+      this.loading() ||
+      this.createSaving() ||
+      this.deactivatingCaducidadId() !== null ||
+      this.reportOpening()
+    ) {
+      return;
+    }
+
+    this.reportOpening.set(true);
+
+    try {
+      await this.almacenService.openCaducidadReport(this.createReportConsulta());
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido crear el informe de caducidades.'),
+        })
+        .subscribe();
+    } finally {
+      this.reportOpening.set(false);
+    }
+  }
+
+  /**
    * Solicita confirmación antes de revertir una caducidad.
    */
   deactivateCaducidad(row: CaducidadRowInterface): void {
-    if (this.loading() || this.createSaving() || this.deactivatingCaducidadId() !== null) {
+    if (
+      this.loading() ||
+      this.createSaving() ||
+      this.deactivatingCaducidadId() !== null ||
+      this.reportOpening()
+    ) {
       return;
     }
 
@@ -499,6 +535,19 @@ export default class CaducidadesComponent implements OnInit, OnDestroy {
         this.loading.set(false);
       }
     }
+  }
+
+  /**
+   * Construye los filtros del informe a partir
+   * del estado visible actual.
+   */
+  private createReportConsulta(): CaducidadReportConsulta {
+    return {
+      anio: this.anio(),
+      mes: this.mes(),
+      idMarca: this.idMarca(),
+      nombre: this.nombre(),
+    };
   }
 
   /**

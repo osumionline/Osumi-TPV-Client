@@ -1,3 +1,4 @@
+import type CaducidadFilterQuery from '@backend/contracts/almacen/caducidad-filter-query.interface';
 import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidad-query.interface';
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
 import type { CaducidadCreateRecord } from '@backend/domain/almacen/caducidad-create-record.interface';
@@ -5,6 +6,7 @@ import type {
   CaducidadFilterOptionsRecord,
   CaducidadResultadoRecord,
 } from '@backend/domain/almacen/caducidad-record.interface';
+import type { CaducidadReportRecord } from '@backend/domain/almacen/caducidad-report-record.interface';
 import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
@@ -1124,6 +1126,163 @@ describe('TypeOrmAlmacenRepository', (): void => {
 
     expect(historyRows[0]?.total).toBe(0);
   });
+
+  it('crea el informe Año → Mes → Marca con sus agregados y orden cerrado', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    await dataSource.query(`
+      INSERT INTO merma_caducidad (
+        id,
+        public_id,
+        id_articulo,
+        localizador_snapshot,
+        id_marca_snapshot,
+        marca_nombre_snapshot,
+        articulo_nombre_snapshot,
+        unidades,
+        puc_micros,
+        pvp_cents,
+        fecha_baja,
+        deleted_at
+      )
+      VALUES (
+        5,
+        'expiration-beta-august',
+        2,
+        240721,
+        2,
+        'Marca Dos',
+        'Artículo Beta agosto',
+        1,
+        1500000,
+        150,
+        '2026-08-15T10:00:00.000Z',
+        NULL
+      )
+    `);
+
+    const result: CaducidadReportRecord = await requireRepository().getCaducidadReport(
+      createCaducidadReportQuery(),
+    );
+
+    expect(result.anios.map((anio): number => anio.anio)).toEqual([2026, 2025]);
+
+    expect(result.anios[0]).toEqual({
+      anio: 2026,
+      unidades: 6,
+      totalPvpCents: 1450,
+      totalPucMicros: 9_500_000,
+      meses: [
+        {
+          mes: 8,
+          unidades: 3,
+          totalPvpCents: 550,
+          totalPucMicros: 3_500_000,
+          marcas: [
+            {
+              idMarca: 2,
+              nombre: 'Marca Dos',
+              unidades: 1,
+              totalPvpCents: 150,
+              totalPucMicros: 1_500_000,
+            },
+            {
+              idMarca: 1,
+              nombre: 'Marca Uno',
+              unidades: 2,
+              totalPvpCents: 400,
+              totalPucMicros: 2_000_000,
+            },
+          ],
+        },
+        {
+          mes: 7,
+          unidades: 3,
+          totalPvpCents: 900,
+          totalPucMicros: 6_000_000,
+          marcas: [
+            {
+              idMarca: 2,
+              nombre: 'Marca Dos',
+              unidades: 3,
+              totalPvpCents: 900,
+              totalPucMicros: 6_000_000,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(result.anios[1]).toEqual({
+      anio: 2025,
+      unidades: 4,
+      totalPvpCents: 400,
+      totalPucMicros: 2_000_000,
+      meses: [
+        {
+          mes: 12,
+          unidades: 4,
+          totalPvpCents: 400,
+          totalPucMicros: 2_000_000,
+          marcas: [
+            {
+              idMarca: 9,
+              nombre: 'Marca Histórica',
+              unidades: 4,
+              totalPvpCents: 400,
+              totalPucMicros: 2_000_000,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(result.totalUnidades).toBe(10);
+    expect(result.totalPvpCents).toBe(1850);
+    expect(result.totalPucMicros).toBe(11_500_000);
+  });
+
+  it('aplica al informe exactamente los filtros históricos de Caducidades', async (): Promise<void> => {
+    const result: CaducidadReportRecord = await requireRepository().getCaducidadReport(
+      createCaducidadReportQuery({
+        anio: 2026,
+        mes: 7,
+        idMarca: 2,
+        nombre: 'Beta',
+      }),
+    );
+
+    expect(result).toEqual({
+      anios: [
+        {
+          anio: 2026,
+          unidades: 3,
+          totalPvpCents: 900,
+          totalPucMicros: 6_000_000,
+          meses: [
+            {
+              mes: 7,
+              unidades: 3,
+              totalPvpCents: 900,
+              totalPucMicros: 6_000_000,
+              marcas: [
+                {
+                  idMarca: 2,
+                  nombre: 'Marca Dos',
+                  unidades: 3,
+                  totalPvpCents: 900,
+                  totalPucMicros: 6_000_000,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      totalUnidades: 3,
+      totalPvpCents: 900,
+      totalPucMicros: 6_000_000,
+    });
+  });
 });
 
 /**
@@ -1616,6 +1775,21 @@ function createCaducidadQuery(
     nombre: null,
     offset: 0,
     limit: 50,
+    ...overrides,
+  };
+}
+
+/**
+ * Crea los filtros válidos para un informe de Caducidades.
+ */
+function createCaducidadReportQuery(
+  overrides: Partial<CaducidadFilterQuery> = {},
+): CaducidadFilterQuery {
+  return {
+    anio: null,
+    mes: null,
+    idMarca: null,
+    nombre: null,
     ...overrides,
   };
 }

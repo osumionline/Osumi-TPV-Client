@@ -1,0 +1,156 @@
+@if (loading()) {
+<section class="caducidad-report-state">
+    Cargando informe de caducidades…
+</section>
+} @else if (loadError() !== null) {
+<section class="caducidad-report-state caducidad-report-state--error">
+    <span>
+        {{ loadError() }}
+    </span>
+    <button type="button"
+            (click)="retry()">
+        Reintentar
+    </button>
+</section>
+} @else if (documento(); as currentDocument) {
+<div class="caducidad-report">
+    <main class="caducidad-report-document">
+        <header class="caducidad-report-document__header">
+            <div>
+                <h1>
+                    CADUCIDADES
+                </h1>
+                <span>
+                    Informe histórico agrupado
+                </span>
+            </div>
+        </header>
+
+        <div class="caducidad-report-table-container">
+            <table class="caducidad-report-table">
+                <thead>
+                    <tr>
+                        <th>
+                            Descripción
+                        </th>
+                        <th class="caducidad-report-table__right">
+                            Unidades
+                        </th>
+                        <th class="caducidad-report-table__right">
+                            PVP
+                        </th>
+                        <th class="caducidad-report-table__right">
+                            PUC
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (anio of currentDocument.anios; track anio.anio) {
+                    <tr class="caducidad-report-table__year">
+                        <td>
+                            <button class="caducidad-report-table__toggle"
+                                    type="button"
+                                    [attr.aria-expanded]="isYearExpanded(anio.anio)"
+                                    (click)="toggleYear(anio.anio)">
+                                <span class="caducidad-report-table__chevron">
+                                    {{ isYearExpanded(anio.anio) ? '▼' : '▶' }}
+                                </span>
+                                <strong>
+                                    {{ anio.anio }}
+                                </strong>
+                            </button>
+                        </td>
+                        <td class="caducidad-report-table__right">
+                            <strong>
+                                {{ formatInteger(anio.unidades) }}
+                            </strong>
+                        </td>
+                        <td class="caducidad-report-table__right">
+                            <strong>
+                                {{ formatCents(anio.totalPvpCents) }}
+                            </strong>
+                        </td>
+                        <td class="caducidad-report-table__right">
+                            <strong>
+                                {{ formatMicros(anio.totalPucMicros) }}
+                            </strong>
+                        </td>
+                    </tr>
+
+                    @if (isYearExpanded(anio.anio)) {
+                    @for (mes of anio.meses; track mes.mes) {
+                    <tr class="caducidad-report-table__month">
+                        <td>
+                            <button class="caducidad-report-table__toggle caducidad-report-table__toggle--month"
+                                    type="button"
+                                    [attr.aria-expanded]="isMonthExpanded(anio.anio, mes.mes)"
+                                    (click)="toggleMonth(anio.anio, mes.mes)">
+                                <span class="caducidad-report-table__chevron">
+                                    {{ isMonthExpanded(anio.anio, mes.mes) ? '▼' : '▶' }}
+                                </span>
+                                {{ formatMonth(mes.mes) }}
+                            </button>
+                        </td>
+                        <td class="caducidad-report-table__right">
+                            {{ formatInteger(mes.unidades) }}
+                        </td>
+                        <td class="caducidad-report-table__right">
+                            {{ formatCents(mes.totalPvpCents) }}
+                        </td>
+                        <td class="caducidad-report-table__right">
+                            {{ formatMicros(mes.totalPucMicros) }}
+                        </td>
+                    </tr>
+
+                    @if (isMonthExpanded(anio.anio, mes.mes)) {
+                    @for (marca of mes.marcas; track marca.idMarca) {
+                    <tr class="caducidad-report-table__brand">
+                        <td>
+                            <span class="caducidad-report-table__brand-name">
+                                {{ marca.nombre }}
+                            </span>
+                        </td>
+                        <td class="caducidad-report-table__right">
+                            {{ formatInteger(marca.unidades) }}
+                        </td>
+                        <td class="caducidad-report-table__right">
+                            {{ formatCents(marca.totalPvpCents) }}
+                        </td>
+                        <td class="caducidad-report-table__right">
+                            {{ formatMicros(marca.totalPucMicros) }}
+                        </td>
+                    </tr>
+                    }
+                    }
+                    }
+                    }
+                    } @empty {
+                    <tr>
+                        <td colspan="4"
+                            class="caducidad-report-table__empty">
+                            No hay caducidades que coincidan con los filtros seleccionados.
+                        </td>
+                    </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th>
+                            TOTAL GENERAL
+                        </th>
+                        <th class="caducidad-report-table__right">
+                            {{ formatInteger(currentDocument.totalUnidades) }}
+                        </th>
+                        <th class="caducidad-report-table__right">
+                            {{ formatCents(currentDocument.totalPvpCents) }}
+                        </th>
+                        <th class="caducidad-report-table__right">
+                            {{ formatMicros(currentDocument.totalPucMicros) }}
+                        </th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </main>
+</div>
+}
