@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.46  
+**Versión:** 2.47  
 **Fecha:** 8 de septiembre de 2026  
-**Base de continuidad:** `v2.46 + main` una vez este documento se suba al repositorio.
+**Base de continuidad:** `v2.47 + main` una vez este documento se suba al repositorio.
 
 ---
 
@@ -55,12 +55,12 @@ Caducidades ya tiene cerrados:
 15I.3 Pantalla principal
 ```
 
-El alta `15I.4` está implementada de extremo a extremo, pero permanece **abierta en fase de ajustes funcionales/UX** tras la primera prueba real.
+El alta `15I.4` queda **✅ CERRADA** tras completar los ajustes funcionales, de validación, accesibilidad y UX detectados en la primera prueba real.
 
 El siguiente punto exacto es:
 
 ```text
-15I.4 — Ajustes y cierre del alta de Caducidades
+15I.5 — Baja / reversión de Caducidades
 ```
 
 ---
@@ -114,8 +114,8 @@ Ventas 12 — Postventa                             🟦
     15I.1 Dominio + esquema                       ✅
     15I.2 Consulta + filtros + totales            ✅
     15I.3 Pantalla principal                      ✅
-    15I.4 Alta de caducidad                       🟦 AJUSTES
-    15I.5 Baja / reversión                        ⬜
+    15I.4 Alta de caducidad                       ✅
+    15I.5 Baja / reversión                        ⬅️ SIGUIENTE
     15I.6 Informe agrupado                        ⬜
     15I.7 Impresión + regresión                   ⬜
   15J Imprenta                                    ⬜ PLACEHOLDER
@@ -2137,9 +2137,11 @@ Incluye:
 - botón Crear informe todavía deshabilitado;
 - opción Eliminar todavía deshabilitada.
 
-## 25.1.4 15I.4 — Alta de caducidad 🟦 AJUSTES
+## 25.1.4 15I.4 — Alta de caducidad ✅
 
-La arquitectura de alta ya está implementada de extremo a extremo.
+Cerrado y validado.
+
+La arquitectura de alta está implementada de extremo a extremo.
 
 Contrato renderer:
 
@@ -2167,8 +2169,6 @@ El histórico queda vinculado mediante:
 id_merma_caducidad
 ```
 
-El alta permite que, partiendo de stock positivo, las unidades registradas superen el stock actual y el resultado sea negativo. Esta decisión anterior se mantiene mientras no se cambie explícitamente.
-
 Existe buscador específico por:
 
 ```text
@@ -2178,40 +2178,79 @@ referencia
 código de barras
 ```
 
-y modal nuevo con selección de artículo, stock, PUC, PVP y unidades.
-
-También se reconcilian fichas abiertas de Artículos usando el mecanismo ya existente y preservando cambios locales dirty.
-
-### Ajustes pendientes detectados en la primera prueba real
-
-Antes de cerrar 15I.4 hay que corregir:
+Solo devuelve artículos:
 
 ```text
-1. Autofocus real al abrir el modal
-   → el foco debe quedar inmediatamente en Buscar artículo.
-
-2. Candidatos de búsqueda
-   → no mostrar artículos con stock = 0.
-   → no mostrar artículos con stock < 0.
-   → la búsqueda debe devolver únicamente stock > 0.
-
-3. Validación backend
-   → no basta con ocultarlos en UI.
-   → al confirmar, el backend debe releer el artículo y rechazar el alta
-     si en ese momento stock <= 0.
-   → evita altas inválidas por datos obsoletos o concurrencia.
-
-4. Layout de artículo seleccionado
-   → compactar los cuatro controles:
-     Stock actual | PUC | PVP | Unidades caducadas
-   → deben entrar en una sola línea en escritorio.
-
-5. Mantener la regla ya acordada:
-   artículo con stock positivo puede registrar más unidades que stock
-   y dejar el stock final negativo.
+activos
++
+stock > 0
 ```
 
-No avanzar a 15I.5 hasta validar estos ajustes y cerrar 15I.4.
+La misma condición se vuelve a comprobar en backend al confirmar, leyendo el stock canónico dentro de la transacción.
+
+Regla definitiva de unidades:
+
+```text
+1 <= unidades <= stock disponible
+```
+
+Por tanto una nueva caducidad no puede provocar por sí misma stock negativo.
+
+Ejemplos:
+
+```text
+stock 5
+unidades 5
+→ permitido
+→ stock final 0
+
+stock 5
+unidades 6
+→ rechazado
+→ no caducidad
+→ no histórico
+→ stock intacto
+```
+
+El modal nuevo queda cerrado con:
+
+- autofocus programático real al abrir en `Buscar artículo`;
+- resultados limitados a artículos con stock positivo;
+- selección clara del artículo;
+- Stock / PUC / PVP / Unidades en una sola fila en escritorio;
+- validación visual si las unidades superan el stock;
+- botón Añadir deshabilitado mientras el valor sea inválido;
+- responsive en resoluciones menores;
+- backdrop accesible implementado mediante botón real, sin handlers `click` sobre elementos no interactivos;
+- lint Angular limpio.
+
+El alta:
+
+```text
+relee artículo canónico
+→ valida activo
+→ valida stock > 0
+→ valida unidades <= stock
+→ snapshot
+→ INSERT merma_caducidad
+→ UPDATE stock
+→ INSERT historico_articulo tipo 7
+→ COMMIT
+```
+
+Si falla cualquier paso:
+
+```text
+ROLLBACK completo
+```
+
+También se reconcilian fichas abiertas de Artículos usando el mecanismo existente y preservando cambios locales dirty.
+
+15I.4 queda oficialmente:
+
+```text
+✅ CERRADO
+```
 
 ---
 
@@ -2405,17 +2444,28 @@ stock > 0
 
 Los artículos con stock `0` o negativo no deben aparecer como candidatos y el backend debe volver a validar esta condición al confirmar.
 
-Una vez seleccionado un artículo con stock positivo, no se bloqueará el alta porque las unidades superen el stock actual.
+Regla definitiva de unidades:
+
+```text
+1 <= unidades <= stock canónico disponible
+```
+
+No se permite registrar más unidades caducadas que las realmente disponibles.
 
 Por tanto:
 
 ```text
-stock inicial > 0
-unidades caducadas > stock inicial
-→ stock final negativo permitido
+stock inicial = 5
+unidades = 5
+→ permitido
+→ stock final = 0
+
+stock inicial = 5
+unidades = 6
+→ rechazado
 ```
 
-El dominio admite ese resultado negativo porque una caducidad puede evidenciar una discrepancia real de inventario.
+El stock negativo sigue siendo válido en el dominio general de artículos, pero una nueva caducidad no puede ser la operación que lo provoque.
 
 ## 26.4 Eliminación / reversión
 
@@ -2619,6 +2669,14 @@ Solo se pueden seleccionar artículos activos con:
 stock > 0
 ```
 
+El campo Unidades debe cumplir:
+
+```text
+1 <= unidades <= stock mostrado
+```
+
+y el backend vuelve a validar esta relación contra el stock canónico al guardar.
+
 El buscador debe reutilizar patrones/servicios de búsqueda de artículos existentes siempre que encajen.
 
 Búsqueda recomendada:
@@ -2636,6 +2694,7 @@ Al confirmar:
 leer artículo persistido actual
 → comprobar que sigue activo
 → comprobar que stock > 0
+→ comprobar unidades <= stock
 → construir snapshot
 → crear caducidad
 → restar stock
@@ -2871,28 +2930,27 @@ snapshot persistido
 ### 15I.4 — Alta de caducidad
 
 ```text
-🟦 EN AJUSTES
+✅ CERRADO
 ```
 
-Implementado:
+Implementado y validado:
 
 - modal nuevo;
-- buscador de artículos;
+- autofocus real en buscador;
+- buscador por localizador/nombre/referencia/código;
+- solo artículos activos con `stock > 0`;
+- validación backend del stock canónico;
 - selección;
-- unidades;
+- `1 <= unidades <= stock`;
+- Stock / PUC / PVP / Unidades en una sola fila en escritorio;
 - snapshot backend;
 - decremento stock;
 - histórico tipo 7;
 - transacción;
-- reconciliación Artículos.
-
-Pendiente antes de cerrar:
-
-- autofocus real en buscador;
-- filtrar candidatos a `stock > 0`;
-- rechazo backend si el stock canónico es `<= 0`;
-- compactar Stock / PUC / PVP / Unidades en una sola fila;
-- regresión funcional del alta.
+- rollback;
+- reconciliación Artículos;
+- accesibilidad del backdrop;
+- lint limpio.
 
 ### 15I.5 — Baja / reversión
 
@@ -2929,45 +2987,65 @@ Pendiente antes de cerrar:
 # 27. Próximo bloque exacto
 
 ```text
-15I.4 — Ajustes y cierre del alta de Caducidades
+15I.5 — Baja / reversión de Caducidades
+```
+
+Objetivo:
+
+```text
+Eliminar registro incorrecto
+→ soft-delete caducidad
+→ restaurar unidades al stock
+→ crear histórico inverso tipo 7
+→ misma transacción
 ```
 
 Antes de proponer cambios:
 
 1. revisar `main` actual;
-2. revisar el modal `caducidad-create`;
-3. aplicar autofocus programático fiable al buscador;
-4. modificar el buscador SQL para exigir `a.stock > 0`;
-5. modificar la lectura canónica de alta para exigir `stock > 0`;
-6. mantener la posibilidad de que `unidades > stock` si el stock inicial es positivo;
-7. compactar Stock / PUC / PVP / Unidades en una sola fila de escritorio;
-8. mantener responsive razonable;
-9. añadir/ajustar tests repository/service para el rechazo de stock cero/negativo;
-10. ejecutar batería completa y prueba funcional.
+2. revisar `createCaducidad()` y helpers transaccionales;
+3. reutilizar `id_merma_caducidad` para vincular la reversión;
+4. localizar la caducidad activa por id;
+5. impedir doble reversión;
+6. permitir reversión aunque el artículo esté soft-deleted, ya que su fila histórica permanece;
+7. restaurar `stock += unidades`;
+8. crear histórico tipo 7 con diferencia positiva;
+9. usar PUC/PVP snapshot de la caducidad original para el histórico inverso;
+10. soft-delete de `merma_caducidad`, nunca DELETE físico;
+11. confirmar desde UI antes de ejecutar;
+12. reconciliar ficha abierta del artículo preservando dirty;
+13. refrescar página/totales/filtros tras éxito;
+14. tests de atomicidad/rollback/doble reversión;
+15. batería completa.
 
-Resultado esperado:
+Semántica esperada:
 
 ```text
-abrir modal
-→ foco en buscador
+caducidad activa
+unidades = 3
+stock actual = 7
 
-buscar
-→ solo artículos activos con stock > 0
-
-confirmar
-→ backend relee artículo
-→ si stock <= 0: rechazo
-→ si stock > 0: alta transaccional
-
-selección
-→ Stock | PUC | PVP | Unidades en una línea
+Eliminar
+→ confirmar
+→ stock final = 10
+→ caducidad.deleted_at != null
+→ histórico tipo 7
+   diferencia = +3
+→ COMMIT
 ```
 
-Si queda validado:
+Si ya está eliminada:
 
 ```text
-15I.4 ✅
-→ siguiente: 15I.5 Baja / reversión
+rechazar
+→ no tocar stock
+→ no crear otro histórico
+```
+
+Después:
+
+```text
+15I.6 — Informe agrupado Año → Mes → Marca
 ```
 
 No empezar Imprenta hasta cerrar Caducidades.
@@ -2980,7 +3058,7 @@ Si este chat alcanza el límite, continuar con este contexto:
 
 ```text
 Estamos desarrollando Osumi TPV Client.
-La base de continuidad es el documento v2.46 + el main actual del repositorio.
+La base de continuidad es el documento v2.47 + el main actual del repositorio.
 
 Reglas:
 - revisar main antes de proponer patches;
@@ -3013,9 +3091,9 @@ Estado:
 - 15I.1 Dominio + esquema cerrado.
 - 15I.2 Consulta + filtros + totales cerrado.
 - 15I.3 Pantalla principal cerrado.
-- 15I.4 Alta implementada pero abierta en ajustes.
+- 15I.4 Alta cerrado.
 - Imprenta sigue placeholder.
-- siguiente punto exacto: 15I.4 ajustes y cierre del alta.
+- siguiente punto exacto: 15I.5 Baja / reversión de Caducidades.
 
 Inventario:
 - filtros proveedor, marca, categoría exacta, texto, descuento;
@@ -3052,7 +3130,7 @@ Caducidades — estado y decisiones:
 - 15I.1 esquema/snapshot/importación legacy ✅.
 - 15I.2 consulta/filtros/totales ✅.
 - 15I.3 pantalla principal ✅.
-- 15I.4 alta 🟦 ajustes pendientes.
+- 15I.4 alta ✅ cerrada.
 - filtros: año de baja, mes de baja, marca histórica, nombre snapshot.
 - tabla: Localizador, Marca, Nombre, Unidades, PVP unitario, PUC unitario, Total PVP, Opciones.
 - totales globales: unidades, Σ unidades×PVP, Σ unidades×PUC.
@@ -3060,10 +3138,12 @@ Caducidades — estado y decisiones:
 - legacy importa caducidades sin restar stock ni inventar histórico tipo 7.
 - nuevas altas: snapshot + stock -= unidades + histórico tipo 7, todo transaccional.
 - candidatos de alta deben ser activos y stock > 0.
-- backend debe releer y rechazar si stock <= 0 al confirmar.
-- si el stock inicial es > 0, se mantiene permitido que unidades > stock y el stock final resulte negativo.
-- modal: autofocus en Buscar artículo.
-- modal selección: Stock | PUC | PVP | Unidades deben caber en una sola fila de escritorio.
+- backend relee y rechaza si stock <= 0 al confirmar.
+- regla definitiva: 1 <= unidades <= stock canónico disponible.
+- una caducidad nueva no puede provocar stock negativo.
+- modal: autofocus real en Buscar artículo.
+- modal selección: Stock | PUC | PVP | Unidades en una sola fila de escritorio.
+- backdrop accesible mediante botón real; lint Angular limpio.
 - baja será soft-delete, restaurará stock y creará histórico inverso en una transacción.
 - alta/baja reconcilian fichas abiertas de Artículos preservando dirty.
 - informe respeta filtros actuales.
@@ -3088,8 +3168,8 @@ Roadmap:
   15I.1 Dominio + esquema ✅
   15I.2 Consulta + filtros + totales ✅
   15I.3 Pantalla principal ✅
-  15I.4 Alta 🟦 AJUSTES ← SIGUIENTE
-  15I.5 Baja / reversión
+  15I.4 Alta ✅
+  15I.5 Baja / reversión ⬅️ SIGUIENTE
   15I.6 Informe agrupado
   15I.7 Impresión + regresión
 15J Imprenta placeholder
@@ -3208,4 +3288,21 @@ v2.46
 → mantener permitido unidades > stock si el stock inicial es positivo
 → compactar Stock/PUC/PVP/Unidades en una sola fila
 → siguiente punto exacto: ajustes y cierre de 15I.4
+
+v2.47
+→ 15I.4 Alta de caducidad cerrado
+→ autofocus programático real en Buscar artículo
+→ buscador limitado a artículos activos con stock > 0
+→ validación backend del stock canónico al confirmar
+→ regla definitiva 1 <= unidades <= stock
+→ caducidad nueva no puede provocar stock negativo
+→ Stock / PUC / PVP / Unidades en una sola fila en escritorio
+→ validación visual de exceso de unidades
+→ backdrop accesible mediante botón real
+→ lint Angular limpio
+→ tests de alta actualizados a stock final no negativo
+→ test específico de exceso de stock
+→ alta mantiene transacción snapshot + stock + histórico tipo 7
+→ puerto Angular de desarrollo cambiado de 4200 a 4500
+→ siguiente punto exacto: 15I.5 Baja / reversión
 ```
