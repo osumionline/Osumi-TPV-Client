@@ -1,4 +1,9 @@
+import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidad-query.interface';
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
+import type {
+  CaducidadFilterOptionsRecord,
+  CaducidadResultadoRecord,
+} from '@backend/domain/almacen/caducidad-record.interface';
 import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
@@ -28,6 +33,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
 
     await createSchema(dataSource);
     await seedInventario(dataSource);
+    await seedCaducidades(dataSource);
 
     repository = new TypeOrmAlmacenRepository(applicationDatabase);
   });
@@ -498,6 +504,110 @@ describe('TypeOrmAlmacenRepository', (): void => {
 
     expect(result.rows.some((row): boolean => row.id === 3)).toBe(false);
   });
+
+  it('recupera caducidades históricas con agregados globales', async (): Promise<void> => {
+    const result: CaducidadResultadoRecord =
+      await requireRepository().searchCaducidades(createCaducidadQuery());
+
+    expect(result.totalRows).toBe(3);
+    expect(result.rows).toHaveLength(3);
+
+    expect(result.rows[0]).toEqual({
+      id: 1,
+      publicId: 'expiration-alpha',
+      idArticulo: 1,
+      localizador: 240719,
+      idMarca: 1,
+      marcaNombre: 'Marca Uno',
+      nombre: 'Artículo Alfa histórico',
+      unidades: 2,
+      pvpCents: 200,
+      pucMicros: 1_000_000,
+      totalPvpCents: 400,
+      fechaBaja: '2026-08-20T10:00:00.000Z',
+    });
+
+    expect(result.totalUnidades).toBe(9);
+    expect(result.totalPvpCents).toBe(1700);
+    expect(result.totalPucMicros).toBe(10_000_000);
+  });
+
+  it('pagina Caducidades sin limitar sus totales globales', async (): Promise<void> => {
+    const result: CaducidadResultadoRecord = await requireRepository().searchCaducidades(
+      createCaducidadQuery({
+        offset: 1,
+        limit: 1,
+      }),
+    );
+
+    expect(result.totalRows).toBe(3);
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]?.id).toBe(2);
+
+    expect(result.totalUnidades).toBe(9);
+    expect(result.totalPvpCents).toBe(1700);
+    expect(result.totalPucMicros).toBe(10_000_000);
+  });
+
+  it('filtra Caducidades por año y mes de baja', async (): Promise<void> => {
+    const december2025 = await requireRepository().searchCaducidades(
+      createCaducidadQuery({
+        anio: 2025,
+        mes: 12,
+      }),
+    );
+
+    expect(december2025.rows.map((row): number => row.id)).toEqual([3]);
+
+    const julyEveryYear = await requireRepository().searchCaducidades(
+      createCaducidadQuery({
+        mes: 7,
+      }),
+    );
+
+    expect(julyEveryYear.rows.map((row): number => row.id)).toEqual([2]);
+  });
+
+  it('filtra sobre marca y nombre históricos sin depender del artículo actual', async (): Promise<void> => {
+    const byBrand = await requireRepository().searchCaducidades(
+      createCaducidadQuery({
+        idMarca: 9,
+      }),
+    );
+
+    expect(byBrand.rows).toHaveLength(1);
+    expect(byBrand.rows[0]?.marcaNombre).toBe('Marca Histórica');
+
+    const byName = await requireRepository().searchCaducidades(
+      createCaducidadQuery({
+        nombre: 'legacy',
+      }),
+    );
+
+    expect(byName.rows.map((row): number => row.id)).toEqual([3]);
+  });
+
+  it('recupera años y marcas presentes en el histórico activo', async (): Promise<void> => {
+    const result: CaducidadFilterOptionsRecord =
+      await requireRepository().getCaducidadFilterOptions();
+
+    expect(result.anios).toEqual([2026, 2025]);
+
+    expect(result.marcas).toEqual([
+      {
+        idMarca: 2,
+        nombre: 'Marca Dos',
+      },
+      {
+        idMarca: 9,
+        nombre: 'Marca Histórica',
+      },
+      {
+        idMarca: 1,
+        nombre: 'Marca Uno',
+      },
+    ]);
+  });
 });
 
 /**
@@ -706,6 +816,86 @@ async function seedInventario(dataSource: DataSource): Promise<void> {
 }
 
 /**
+ * Inserta pérdidas históricas representativas para
+ * probar filtros, snapshots y agregados.
+ */
+async function seedCaducidades(dataSource: DataSource): Promise<void> {
+  await dataSource.query(`
+    INSERT INTO merma_caducidad (
+      id,
+      public_id,
+      id_articulo,
+      localizador_snapshot,
+      id_marca_snapshot,
+      marca_nombre_snapshot,
+      articulo_nombre_snapshot,
+      unidades,
+      puc_micros,
+      pvp_cents,
+      fecha_baja,
+      deleted_at
+    )
+    VALUES
+      (
+        1,
+        'expiration-alpha',
+        1,
+        240719,
+        1,
+        'Marca Uno',
+        'Artículo Alfa histórico',
+        2,
+        1000000,
+        200,
+        '2026-08-20T10:00:00.000Z',
+        NULL
+      ),
+      (
+        2,
+        'expiration-beta',
+        2,
+        240720,
+        2,
+        'Marca Dos',
+        'Artículo Beta histórico',
+        3,
+        2000000,
+        300,
+        '2026-07-10T10:00:00.000Z',
+        NULL
+      ),
+      (
+        3,
+        'expiration-legacy',
+        1,
+        230001,
+        9,
+        'Marca Histórica',
+        'Artículo Legacy',
+        4,
+        500000,
+        100,
+        '2025-12-05 10:30:00',
+        NULL
+      ),
+      (
+        4,
+        'expiration-deleted',
+        3,
+        261003,
+        1,
+        'Marca Uno',
+        'Caducidad eliminada',
+        10,
+        999000000,
+        99900,
+        '2026-09-01T10:00:00.000Z',
+        '2026-09-02T10:00:00.000Z'
+      )
+  `);
+}
+
+/**
  * Inserta ventas recientes, antiguas y devoluciones
  * para validar el aviso de doce meses.
  */
@@ -892,6 +1082,24 @@ function createQuery(
     ventasDesde: '2025-09-07T08:00:00.000Z',
     offset: 0,
     limit: 20,
+    ...overrides,
+  };
+}
+
+/**
+ * Crea una consulta de Caducidades válida para
+ * los tests de integración.
+ */
+function createCaducidadQuery(
+  overrides: Partial<CaducidadRepositoryQuery> = {},
+): CaducidadRepositoryQuery {
+  return {
+    anio: null,
+    mes: null,
+    idMarca: null,
+    nombre: null,
+    offset: 0,
+    limit: 50,
     ...overrides,
   };
 }

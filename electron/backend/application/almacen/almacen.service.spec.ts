@@ -1,10 +1,19 @@
 import AlmacenService from '@backend/application/almacen/almacen.service';
 import type AlmacenRepository from '@backend/contracts/almacen/almacen.repository.interface';
+import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidad-query.interface';
 import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-filter-query.interface';
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
+import type {
+  CaducidadFilterOptionsRecord,
+  CaducidadResultadoRecord,
+} from '@backend/domain/almacen/caducidad-record.interface';
 import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario-record.interface';
 import type { InventarioReportRecord } from '@backend/domain/almacen/inventario-report-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
+import type {
+  CaducidadFilterOptionsInterface,
+  CaducidadResultado,
+} from '@desktop-contracts/almacen/caducidad.interface';
 import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario-save.interface';
 import type {
   InventarioConsulta,
@@ -56,6 +65,41 @@ class FakeAlmacenRepository implements AlmacenRepository {
     totalPvpCents: 800,
   };
 
+  lastCaducidadQuery: CaducidadRepositoryQuery | null = null;
+
+  caducidadResult: CaducidadResultadoRecord = {
+    rows: [
+      {
+        id: 8,
+        publicId: 'expiration-public-id',
+        idArticulo: 25,
+        localizador: 261234,
+        idMarca: 3,
+        marcaNombre: 'Marca de prueba',
+        nombre: 'Artículo histórico',
+        unidades: 3,
+        pvpCents: 1690,
+        pucMicros: 11_920_000,
+        totalPvpCents: 5070,
+        fechaBaja: '2025-12-05T10:30:00.000Z',
+      },
+    ],
+    totalRows: 1,
+    totalUnidades: 3,
+    totalPvpCents: 5070,
+    totalPucMicros: 35_760_000,
+  };
+
+  caducidadFilterOptions: CaducidadFilterOptionsRecord = {
+    anios: [2026, 2025],
+    marcas: [
+      {
+        idMarca: 3,
+        nombre: 'Marca de prueba',
+      },
+    ],
+  };
+
   /**
    * Devuelve el resultado configurado y conserva la consulta recibida.
    */
@@ -90,6 +134,23 @@ class FakeAlmacenRepository implements AlmacenRepository {
     this.lastDeactivatedArticuloId = idArticulo;
 
     return Promise.resolve();
+  }
+
+  /**
+   * Devuelve las caducidades configuradas y conserva
+   * la consulta recibida.
+   */
+  searchCaducidades(query: CaducidadRepositoryQuery): Promise<CaducidadResultadoRecord> {
+    this.lastCaducidadQuery = query;
+
+    return Promise.resolve(this.caducidadResult);
+  }
+
+  /**
+   * Devuelve las opciones históricas configuradas.
+   */
+  getCaducidadFilterOptions(): Promise<CaducidadFilterOptionsRecord> {
+    return Promise.resolve(this.caducidadFilterOptions);
   }
 }
 
@@ -252,6 +313,110 @@ describe('AlmacenService', (): void => {
     ).rejects.toThrow('Hay columnas repetidas en el reporte.');
 
     expect(repository.lastReportQuery).toBeNull();
+  });
+
+  it('normaliza filtros y paginación de Caducidades', async (): Promise<void> => {
+    const repository = new FakeAlmacenRepository();
+    const service = createService(repository);
+
+    const result: CaducidadResultado = await service.searchCaducidades({
+      anio: 2025,
+      mes: 12,
+      idMarca: 3,
+      nombre: '  pienso adulto  ',
+      pagina: 3,
+      num: 50,
+    });
+
+    expect(repository.lastCaducidadQuery).toEqual({
+      anio: 2025,
+      mes: 12,
+      idMarca: 3,
+      nombre: 'pienso adulto',
+      offset: 100,
+      limit: 50,
+    });
+
+    expect(result).toEqual({
+      rows: [
+        {
+          id: 8,
+          publicId: 'expiration-public-id',
+          idArticulo: 25,
+          localizador: 261234,
+          idMarca: 3,
+          marcaNombre: 'Marca de prueba',
+          nombre: 'Artículo histórico',
+          unidades: 3,
+          pvpCents: 1690,
+          pucMicros: 11_920_000,
+          totalPvpCents: 5070,
+          fechaBaja: '2025-12-05T10:30:00.000Z',
+        },
+      ],
+      totalRows: 1,
+      totalUnidades: 3,
+      totalPvpCents: 5070,
+      totalPucMicros: 35_760_000,
+    });
+  });
+
+  it('permite filtrar por mes sin indicar año', async (): Promise<void> => {
+    const repository = new FakeAlmacenRepository();
+    const service = createService(repository);
+
+    await service.searchCaducidades({
+      anio: null,
+      mes: 7,
+      idMarca: null,
+      nombre: '',
+      pagina: 1,
+      num: 20,
+    });
+
+    expect(repository.lastCaducidadQuery).toEqual({
+      anio: null,
+      mes: 7,
+      idMarca: null,
+      nombre: null,
+      offset: 0,
+      limit: 20,
+    });
+  });
+
+  it('rechaza un mes de Caducidades no válido', async (): Promise<void> => {
+    const repository = new FakeAlmacenRepository();
+    const service = createService(repository);
+
+    await expect(
+      service.searchCaducidades({
+        anio: 2025,
+        mes: 13,
+        idMarca: null,
+        nombre: '',
+        pagina: 1,
+        num: 50,
+      }),
+    ).rejects.toThrow('El mes del filtro de caducidades no es válido.');
+
+    expect(repository.lastCaducidadQuery).toBeNull();
+  });
+
+  it('expone las opciones históricas de Caducidades', async (): Promise<void> => {
+    const repository = new FakeAlmacenRepository();
+    const service = createService(repository);
+
+    const result: CaducidadFilterOptionsInterface = await service.getCaducidadFilterOptions();
+
+    expect(result).toEqual({
+      anios: [2026, 2025],
+      marcas: [
+        {
+          idMarca: 3,
+          nombre: 'Marca de prueba',
+        },
+      ],
+    });
   });
 });
 

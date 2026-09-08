@@ -1,4 +1,9 @@
 import type {
+  CaducidadConsulta,
+  CaducidadFilterOptionsInterface,
+  CaducidadResultado,
+} from '@desktop-contracts/almacen/caducidad.interface';
+import type {
   InventarioCsvExportResult,
   InventarioReportConsulta,
 } from '@desktop-contracts/almacen/inventario-report.interface';
@@ -41,4 +46,16 @@ export default interface AlmacenApi {
    * Da de baja lógicamente un artículo desde Inventario.
    */
   deactivateArticulo(idArticulo: number): Promise<void>;
+
+  /**
+   * Recupera una página filtrada de caducidades
+   * y sus totales globales.
+   */
+  searchCaducidades(consulta: CaducidadConsulta): Promise<CaducidadResultado>;
+
+  /**
+   * Recupera años y marcas disponibles para
+   * filtrar caducidades.
+   */
+  getCaducidadFilterOptions(): Promise<CaducidadFilterOptionsInterface>;
 }

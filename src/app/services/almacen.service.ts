@@ -8,6 +8,11 @@ import type {
   InventarioConsulta,
   InventarioResultado,
 } from '@desktop-contracts/almacen/inventario.interface';
+import type {
+  CaducidadConsulta,
+  CaducidadFilterOptionsInterface,
+  CaducidadResultado,
+} from '@desktop-contracts/almacen/caducidad.interface';
 
 /**
  * Expone al frontend los casos de uso del módulo Almacén.
@@ -54,5 +59,20 @@ export default class AlmacenService {
    */
   deactivateArticulo(idArticulo: number): Promise<void> {
     return window.osumiDesktop.almacen.deactivateArticulo(idArticulo);
+  }
+
+  /**
+   * Recupera una página persistida de Caducidades.
+   */
+  searchCaducidades(consulta: CaducidadConsulta): Promise<CaducidadResultado> {
+    return window.osumiDesktop.almacen.searchCaducidades(consulta);
+  }
+
+  /**
+   * Recupera las opciones históricas disponibles
+   * para sus filtros.
+   */
+  getCaducidadFilterOptions(): Promise<CaducidadFilterOptionsInterface> {
+    return window.osumiDesktop.almacen.getCaducidadFilterOptions();
   }
 }

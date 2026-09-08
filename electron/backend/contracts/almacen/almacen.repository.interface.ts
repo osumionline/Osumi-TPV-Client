@@ -3,6 +3,11 @@ import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventari
 import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario-record.interface';
 import type { InventarioReportRecord } from '@backend/domain/almacen/inventario-report-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
+import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidad-query.interface';
+import type {
+  CaducidadFilterOptionsRecord,
+  CaducidadResultadoRecord,
+} from '@backend/domain/almacen/caducidad-record.interface';
 
 /**
  * Define el acceso a los datos operativos del módulo Almacén.
@@ -28,4 +33,16 @@ export default interface AlmacenRepository {
    * Da de baja un artículo y sus códigos activos.
    */
   deactivateArticulo(idArticulo: number): Promise<void>;
+
+  /**
+   * Recupera una página de caducidades y los totales
+   * correspondientes al conjunto filtrado completo.
+   */
+  searchCaducidades(query: CaducidadRepositoryQuery): Promise<CaducidadResultadoRecord>;
+
+  /**
+   * Recupera las opciones históricas disponibles para
+   * los filtros de Caducidades.
+   */
+  getCaducidadFilterOptions(): Promise<CaducidadFilterOptionsRecord>;
 }

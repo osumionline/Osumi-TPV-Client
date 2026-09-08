@@ -1,6 +1,15 @@
 import type AlmacenRepository from '@backend/contracts/almacen/almacen.repository.interface';
+import type CaducidadFilterQuery from '@backend/contracts/almacen/caducidad-filter-query.interface';
+import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidad-query.interface';
 import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-filter-query.interface';
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
+import type InventarioReportProvider from '@backend/contracts/almacen/inventario-report-provider.interface';
+import type {
+  CaducidadFilterOptionsRecord,
+  CaducidadMarcaFilterRecord,
+  CaducidadResultadoRecord,
+  CaducidadRowRecord,
+} from '@backend/domain/almacen/caducidad-record.interface';
 import type {
   InventarioResultadoRecord,
   InventarioRowRecord,
@@ -10,6 +19,14 @@ import type {
   InventarioReportRowRecord,
 } from '@backend/domain/almacen/inventario-report-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
+import type {
+  CaducidadConsulta,
+  CaducidadFilterOptionsInterface,
+  CaducidadFilters,
+  CaducidadMarcaFilterInterface,
+  CaducidadResultado,
+  CaducidadRowInterface,
+} from '@desktop-contracts/almacen/caducidad.interface';
 import type {
   InventarioReportColumn,
   InventarioReportConsulta,
@@ -23,7 +40,6 @@ import type {
   InventarioResultado,
   InventarioRowInterface,
 } from '@desktop-contracts/almacen/inventario.interface';
-import type InventarioReportProvider from '@backend/contracts/almacen/inventario-report-provider.interface';
 
 const INVENTARIO_PAGE_SIZES: readonly number[] = [20, 50, 100, 200];
 
@@ -42,6 +58,8 @@ const INVENTARIO_REPORT_COLUMNS: readonly InventarioReportColumn[] = [
   'codigoBarras',
 ];
 
+const CADUCIDAD_PAGE_SIZES: readonly number[] = [20, 50, 100, 200];
+
 /**
  * Expone los casos de uso del módulo Almacén.
  */
@@ -53,6 +71,81 @@ export default class AlmacenService implements InventarioReportProvider {
     private readonly almacenRepository: AlmacenRepository,
     private readonly currentDateProvider: () => Date = (): Date => new Date(),
   ) {}
+
+  /**
+   * Valida y ejecuta una consulta paginada de
+   * Caducidades.
+   */
+  async searchCaducidades(consulta: CaducidadConsulta): Promise<CaducidadResultado> {
+    if (typeof consulta !== 'object' || consulta === null) {
+      throw new Error('La consulta de caducidades no es válida.');
+    }
+
+    const filter: CaducidadFilterQuery = this.mapCaducidadFilterQuery(consulta);
+
+    if (!Number.isSafeInteger(consulta.pagina) || consulta.pagina <= 0) {
+      throw new Error('La página de caducidades no es válida.');
+    }
+
+    if (!CADUCIDAD_PAGE_SIZES.includes(consulta.num)) {
+      throw new Error('El tamaño de página de caducidades no es válido.');
+    }
+
+    const offset: number = (consulta.pagina - 1) * consulta.num;
+
+    if (!Number.isSafeInteger(offset)) {
+      throw new Error('El desplazamiento de caducidades supera el rango permitido.');
+    }
+
+    const repositoryQuery: CaducidadRepositoryQuery = {
+      ...filter,
+      offset,
+      limit: consulta.num,
+    };
+
+    const result: CaducidadResultadoRecord =
+      await this.almacenRepository.searchCaducidades(repositoryQuery);
+
+    return {
+      rows: result.rows.map((row: CaducidadRowRecord): CaducidadRowInterface => ({
+        id: row.id,
+        publicId: row.publicId,
+        idArticulo: row.idArticulo,
+        localizador: row.localizador,
+        idMarca: row.idMarca,
+        marcaNombre: row.marcaNombre,
+        nombre: row.nombre,
+        unidades: row.unidades,
+        pvpCents: row.pvpCents,
+        pucMicros: row.pucMicros,
+        totalPvpCents: row.totalPvpCents,
+        fechaBaja: row.fechaBaja,
+      })),
+      totalRows: result.totalRows,
+      totalUnidades: result.totalUnidades,
+      totalPvpCents: result.totalPvpCents,
+      totalPucMicros: result.totalPucMicros,
+    };
+  }
+
+  /**
+   * Recupera las opciones históricas disponibles para
+   * los filtros de Caducidades.
+   */
+  async getCaducidadFilterOptions(): Promise<CaducidadFilterOptionsInterface> {
+    const result: CaducidadFilterOptionsRecord =
+      await this.almacenRepository.getCaducidadFilterOptions();
+
+    return {
+      anios: [...result.anios],
+      marcas: result.marcas.map(
+        (marca: CaducidadMarcaFilterRecord): CaducidadMarcaFilterInterface => ({
+          idMarca: marca.idMarca,
+          nombre: marca.nombre,
+        }),
+      ),
+    };
+  }
 
   /**
    * Valida y ejecuta una consulta paginada de Inventario.
@@ -194,6 +287,64 @@ export default class AlmacenService implements InventarioReportProvider {
     }
 
     await this.almacenRepository.deactivateArticulo(idArticulo);
+  }
+
+  /**
+   * Valida y normaliza los filtros compartidos
+   * de Caducidades.
+   */
+  private mapCaducidadFilterQuery(filters: CaducidadFilters): CaducidadFilterQuery {
+    if (typeof filters !== 'object' || filters === null) {
+      throw new Error('La consulta de caducidades no es válida.');
+    }
+
+    let anio: number | null = null;
+
+    if (filters.anio !== null) {
+      if (
+        typeof filters.anio !== 'number' ||
+        !Number.isSafeInteger(filters.anio) ||
+        filters.anio < 1 ||
+        filters.anio > 9999
+      ) {
+        throw new Error('El año del filtro de caducidades no es válido.');
+      }
+
+      anio = filters.anio;
+    }
+
+    let mes: number | null = null;
+
+    if (filters.mes !== null) {
+      if (
+        typeof filters.mes !== 'number' ||
+        !Number.isSafeInteger(filters.mes) ||
+        filters.mes < 1 ||
+        filters.mes > 12
+      ) {
+        throw new Error('El mes del filtro de caducidades no es válido.');
+      }
+
+      mes = filters.mes;
+    }
+
+    const idMarca: number | null = this.validateOptionalId(
+      filters.idMarca,
+      'La marca del filtro de caducidades no es válida.',
+    );
+
+    if (typeof filters.nombre !== 'string') {
+      throw new Error('El nombre del filtro de caducidades no es válido.');
+    }
+
+    const nombre: string = filters.nombre.trim();
+
+    return {
+      anio,
+      mes,
+      idMarca,
+      nombre: nombre.length === 0 ? null : nombre,
+    };
   }
 
   /**

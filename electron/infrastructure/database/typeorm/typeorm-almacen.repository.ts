@@ -1,6 +1,14 @@
 import type AlmacenRepository from '@backend/contracts/almacen/almacen.repository.interface';
+import type CaducidadFilterQuery from '@backend/contracts/almacen/caducidad-filter-query.interface';
+import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidad-query.interface';
 import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-filter-query.interface';
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
+import type {
+  CaducidadFilterOptionsRecord,
+  CaducidadMarcaFilterRecord,
+  CaducidadResultadoRecord,
+  CaducidadRowRecord,
+} from '@backend/domain/almacen/caducidad-record.interface';
 import type {
   InventarioResultadoRecord,
   InventarioRowRecord,
@@ -94,6 +102,42 @@ interface InventarioReportBarcodeDatabaseRow {
   readonly codigo: string;
 }
 
+interface CaducidadAggregateDatabaseRow {
+  readonly total_rows: number;
+  readonly total_unidades: number;
+  readonly total_pvp_cents: number;
+  readonly total_puc_micros: number;
+}
+
+interface CaducidadDatabaseRow {
+  readonly id: number;
+  readonly public_id: string;
+  readonly id_articulo: number;
+  readonly localizador_snapshot: number;
+  readonly id_marca_snapshot: number;
+  readonly marca_nombre_snapshot: string;
+  readonly articulo_nombre_snapshot: string;
+  readonly unidades: number;
+  readonly pvp_cents: number;
+  readonly puc_micros: number;
+  readonly total_pvp_cents: number;
+  readonly fecha_baja: string;
+}
+
+interface CaducidadYearDatabaseRow {
+  readonly anio: number;
+}
+
+interface CaducidadBrandDatabaseRow {
+  readonly id_marca: number;
+  readonly nombre: string;
+}
+
+interface CaducidadSqlFilter {
+  readonly clause: string;
+  readonly parameters: (number | string)[];
+}
+
 /**
  * Obtiene desde SQLite los datos de gestión del módulo Almacén.
  */
@@ -102,6 +146,151 @@ export default class TypeOrmAlmacenRepository implements AlmacenRepository {
    * Crea el repository sobre la base de datos principal.
    */
   constructor(private readonly applicationDatabase: TypeOrmApplicationDatabase) {}
+
+  /**
+   * Recupera una página de caducidades usando siempre
+   * los valores históricos congelados en cada registro.
+   */
+  async searchCaducidades(query: CaducidadRepositoryQuery): Promise<CaducidadResultadoRecord> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const filter: CaducidadSqlFilter = this.buildCaducidadFilter(query);
+
+    const aggregateRows: readonly CaducidadAggregateDatabaseRow[] = (await dataSource.query(
+      `
+          SELECT
+            COUNT(*) AS total_rows,
+            COALESCE(
+              SUM(mc.unidades),
+              0
+            ) AS total_unidades,
+            COALESCE(
+              SUM(
+                mc.unidades * mc.pvp_cents
+              ),
+              0
+            ) AS total_pvp_cents,
+            COALESCE(
+              SUM(
+                mc.unidades * mc.puc_micros
+              ),
+              0
+            ) AS total_puc_micros
+          FROM merma_caducidad mc
+          WHERE
+            ${filter.clause}
+        `,
+      filter.parameters,
+    )) as readonly CaducidadAggregateDatabaseRow[];
+
+    const aggregate: CaducidadAggregateDatabaseRow = aggregateRows[0] ?? {
+      total_rows: 0,
+      total_unidades: 0,
+      total_pvp_cents: 0,
+      total_puc_micros: 0,
+    };
+
+    const rows: readonly CaducidadDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT
+          mc.id,
+          mc.public_id,
+          mc.id_articulo,
+          mc.localizador_snapshot,
+          mc.id_marca_snapshot,
+          mc.marca_nombre_snapshot,
+          mc.articulo_nombre_snapshot,
+          mc.unidades,
+          mc.pvp_cents,
+          mc.puc_micros,
+          (
+            mc.unidades * mc.pvp_cents
+          ) AS total_pvp_cents,
+          mc.fecha_baja
+        FROM merma_caducidad mc
+        WHERE
+          ${filter.clause}
+        ORDER BY
+          mc.fecha_baja DESC,
+          mc.id DESC
+        LIMIT ?
+        OFFSET ?
+      `,
+      [...filter.parameters, query.limit, query.offset],
+    )) as readonly CaducidadDatabaseRow[];
+
+    return {
+      rows: rows.map((row: CaducidadDatabaseRow): CaducidadRowRecord => this.mapCaducidadRow(row)),
+      totalRows: aggregate.total_rows,
+      totalUnidades: aggregate.total_unidades,
+      totalPvpCents: aggregate.total_pvp_cents,
+      totalPucMicros: aggregate.total_puc_micros,
+    };
+  }
+
+  /**
+   * Recupera años y marcas realmente presentes en
+   * las caducidades activas.
+   */
+  async getCaducidadFilterOptions(): Promise<CaducidadFilterOptionsRecord> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const yearRows: readonly CaducidadYearDatabaseRow[] = (await dataSource.query(
+      `
+          SELECT DISTINCT
+            CAST(
+              substr(
+                fecha_baja,
+                1,
+                4
+              ) AS INTEGER
+            ) AS anio
+          FROM merma_caducidad
+          WHERE
+            deleted_at IS NULL
+            AND length(fecha_baja) >= 4
+          ORDER BY
+            anio DESC
+        `,
+    )) as readonly CaducidadYearDatabaseRow[];
+
+    const brandRows: readonly CaducidadBrandDatabaseRow[] = (await dataSource.query(
+      `
+          SELECT
+            mc.id_marca_snapshot AS id_marca,
+            (
+              SELECT
+                mc_nombre.marca_nombre_snapshot
+              FROM merma_caducidad mc_nombre
+              WHERE
+                mc_nombre.deleted_at IS NULL
+                AND
+                mc_nombre.id_marca_snapshot =
+                  mc.id_marca_snapshot
+              ORDER BY
+                mc_nombre.fecha_baja DESC,
+                mc_nombre.id DESC
+              LIMIT 1
+            ) AS nombre
+          FROM merma_caducidad mc
+          WHERE
+            mc.deleted_at IS NULL
+          GROUP BY
+            mc.id_marca_snapshot
+          ORDER BY
+            nombre COLLATE NOCASE,
+            id_marca
+        `,
+    )) as readonly CaducidadBrandDatabaseRow[];
+
+    return {
+      anios: yearRows.map((row: CaducidadYearDatabaseRow): number => row.anio),
+      marcas: brandRows.map((row: CaducidadBrandDatabaseRow): CaducidadMarcaFilterRecord => ({
+        idMarca: row.id_marca,
+        nombre: row.nombre,
+      })),
+    };
+  }
 
   /**
    * Recupera la página solicitada y los agregados
@@ -457,6 +646,48 @@ export default class TypeOrmAlmacenRepository implements AlmacenRepository {
   }
 
   /**
+   * Construye los filtros de Caducidades exclusivamente
+   * sobre los valores históricos del registro.
+   */
+  private buildCaducidadFilter(query: CaducidadFilterQuery): CaducidadSqlFilter {
+    const conditions: string[] = ['mc.deleted_at IS NULL'];
+    const parameters: (number | string)[] = [];
+
+    if (query.anio !== null) {
+      conditions.push('CAST(substr(mc.fecha_baja, 1, 4) AS INTEGER) = ?');
+      parameters.push(query.anio);
+    }
+
+    if (query.mes !== null) {
+      conditions.push('CAST(substr(mc.fecha_baja, 6, 2) AS INTEGER) = ?');
+      parameters.push(query.mes);
+    }
+
+    if (query.idMarca !== null) {
+      conditions.push('mc.id_marca_snapshot = ?');
+      parameters.push(query.idMarca);
+    }
+
+    if (query.nombre !== null) {
+      const pattern: string = `%${this.escapeLike(query.nombre)}%`;
+
+      conditions.push(`
+      mc.articulo_nombre_snapshot
+        COLLATE NOCASE
+        LIKE ?
+        ESCAPE '\\'
+    `);
+
+      parameters.push(pattern);
+    }
+
+    return {
+      clause: conditions.join('\n          AND '),
+      parameters,
+    };
+  }
+
+  /**
    * Construye los filtros SQL sin multiplicar las filas
    * de artículo mediante joins de relaciones N:M.
    */
@@ -579,6 +810,27 @@ export default class TypeOrmAlmacenRepository implements AlmacenRepository {
    */
   private escapeLike(value: string): string {
     return value.replace(/[\\%_]/g, '\\$&');
+  }
+
+  /**
+   * Convierte una fila SQLite al record histórico
+   * de Caducidades.
+   */
+  private mapCaducidadRow(row: CaducidadDatabaseRow): CaducidadRowRecord {
+    return {
+      id: row.id,
+      publicId: row.public_id,
+      idArticulo: row.id_articulo,
+      localizador: row.localizador_snapshot,
+      idMarca: row.id_marca_snapshot,
+      marcaNombre: row.marca_nombre_snapshot,
+      nombre: row.articulo_nombre_snapshot,
+      unidades: row.unidades,
+      pvpCents: row.pvp_cents,
+      pucMicros: row.puc_micros,
+      totalPvpCents: row.total_pvp_cents,
+      fechaBaja: row.fecha_baja,
+    };
   }
 
   /**
