@@ -16,7 +16,9 @@ const statements: readonly string[] = [
        * comentario del dump antiguo no coincide con
        * los valores reales encontrados.
        *
-       * El paquete contiene valores del 1 al 6.
+       * El paquete legacy contiene valores del 1 al 6.
+       * Los tipos propios del cliente nuevo se asignan
+       * a partir del valor 7.
        */
       tipo INTEGER NOT NULL
         CHECK (

@@ -847,6 +847,41 @@ const statements: readonly string[] = [
 
       id_articulo INTEGER NOT NULL,
 
+      /*
+       * Snapshot histórico del artículo en el momento
+       * de contabilizar la pérdida.
+       *
+       * No debe depender de cambios posteriores en la
+       * ficha del artículo o de su marca.
+       */
+      localizador_snapshot INTEGER NOT NULL
+        CHECK (
+          localizador_snapshot >= 0
+        ),
+
+      id_marca_snapshot INTEGER NOT NULL
+        CHECK (
+          id_marca_snapshot > 0
+        ),
+
+      marca_nombre_snapshot TEXT NOT NULL
+        COLLATE NOCASE
+        CHECK (
+          marca_nombre_snapshot =
+            trim(marca_nombre_snapshot)
+          AND length(marca_nombre_snapshot)
+            BETWEEN 1 AND 200
+        ),
+
+      articulo_nombre_snapshot TEXT NOT NULL
+        COLLATE NOCASE
+        CHECK (
+          articulo_nombre_snapshot =
+            trim(articulo_nombre_snapshot)
+          AND length(articulo_nombre_snapshot)
+            BETWEEN 1 AND 200
+        ),
+
       unidades INTEGER NOT NULL
         CHECK (
           unidades > 0
@@ -913,6 +948,16 @@ const statements: readonly string[] = [
     CREATE INDEX
       idx_merma_caducidad_fecha_activa
     ON merma_caducidad (
+      fecha_baja
+    )
+    WHERE deleted_at IS NULL
+  `,
+
+  `
+    CREATE INDEX
+      idx_merma_caducidad_marca_fecha_activa
+    ON merma_caducidad (
+      id_marca_snapshot,
       fecha_baja
     )
     WHERE deleted_at IS NULL

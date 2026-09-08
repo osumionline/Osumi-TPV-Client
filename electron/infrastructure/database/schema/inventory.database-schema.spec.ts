@@ -29,4 +29,29 @@ describe('inventoryDatabaseSchema', (): void => {
     );
     expect(completeDatabaseSchemaTables).toContain('articulo_categoria');
   });
+
+  it('conserva en caducidades un snapshot histórico independiente del artículo actual', (): void => {
+    const expirationStatement: string | undefined = inventoryDatabaseSchema.statements.find(
+      (statement: string): boolean => statement.includes('CREATE TABLE merma_caducidad ('),
+    );
+
+    const brandIndexStatement: string | undefined = inventoryDatabaseSchema.statements.find(
+      (statement: string): boolean => statement.includes('idx_merma_caducidad_marca_fecha_activa'),
+    );
+
+    expect(expirationStatement).toBeDefined();
+    expect(brandIndexStatement).toBeDefined();
+
+    const normalizedStatement: string = (expirationStatement ?? '').replace(/\s+/g, ' ').trim();
+
+    expect(normalizedStatement).toContain('localizador_snapshot INTEGER NOT NULL');
+    expect(normalizedStatement).toContain('id_marca_snapshot INTEGER NOT NULL');
+    expect(normalizedStatement).toContain('marca_nombre_snapshot TEXT NOT NULL');
+    expect(normalizedStatement).toContain('articulo_nombre_snapshot TEXT NOT NULL');
+    expect(normalizedStatement).toContain('puc_micros INTEGER NOT NULL');
+    expect(normalizedStatement).toContain('pvp_cents INTEGER NOT NULL');
+    expect(normalizedStatement).toContain('fecha_baja TEXT NOT NULL');
+
+    expect(normalizedStatement).not.toContain('FOREIGN KEY ( id_marca_snapshot )');
+  });
 });

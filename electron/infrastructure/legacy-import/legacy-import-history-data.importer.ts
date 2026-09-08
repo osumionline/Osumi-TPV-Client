@@ -11,71 +11,65 @@ import type { QueryRunner } from 'typeorm';
 
 interface LegacyArticleHistoryRow {
   readonly id: number;
-
   readonly articleId: number;
-
   readonly type: number;
-
   readonly previousStock: number;
-
   readonly difference: number;
-
   readonly finalStock: number;
-
   readonly saleId: number | null;
-
   readonly orderId: number | null;
-
   readonly purchasePrice: number;
-
   readonly salePrice: number;
-
   readonly createdAt: string;
-
   readonly updatedAt: string;
+}
+
+interface LegacyExpirationLossRow {
+  readonly id: number;
+  readonly articleId: number;
+  readonly units: number;
+  readonly purchasePrice: number;
+  readonly salePrice: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+interface ImportedExpirationArticleSnapshotRow {
+  readonly id: number;
+  readonly localizador: number;
+  readonly id_marca: number;
+  readonly articulo_nombre: string;
+  readonly marca_nombre: string;
 }
 
 interface LegacyWarehouseHistoryRow {
   readonly id: number;
-
   readonly year: number;
-
   readonly month: number;
-
   readonly day: number;
-
   readonly totalPurchasePrice: number;
-
   readonly totalSalePrice: number;
-
   readonly averageMargin: number;
-
   readonly createdAt: string | null;
-
   readonly updatedAt: string | null;
 }
 
 interface NormalizedWarehouseHistoryRow {
   readonly source: LegacyWarehouseHistoryRow;
-
   readonly date: string;
-
   readonly createdAt: string;
-
   readonly updatedAt: string;
 }
 
 interface MutableHistoryDataState {
+  readonly expirationLosses: LegacyExpirationLossRow[];
   readonly articleHistory: LegacyArticleHistoryRow[];
-
   readonly warehouseHistory: LegacyWarehouseHistoryRow[];
 }
 
 interface MutableImportCounters {
   importedRows: number;
-
   skippedRows: number;
-
   warningCount: number;
 }
 
@@ -85,7 +79,11 @@ interface IdRow {
 
 type ReferenceTable = 'articulo' | 'venta' | 'pedido';
 
-const HISTORY_DATA_TABLES: readonly string[] = ['historico_articulo', 'historico_almacen'];
+const HISTORY_DATA_TABLES: readonly string[] = [
+  'caducidad',
+  'historico_articulo',
+  'historico_almacen',
+];
 
 export default class LegacyImportHistoryDataImporter implements LegacyImportPhaseImporter {
   constructor(
@@ -105,7 +103,7 @@ export default class LegacyImportHistoryDataImporter implements LegacyImportPhas
       progressListener,
       'reading-history-data',
       99,
-      'Leyendo el histórico de artículos y almacén…',
+      'Leyendo caducidades e históricos de artículos y almacén…',
     );
 
     const state: MutableHistoryDataState = this.createState();
@@ -134,12 +132,23 @@ export default class LegacyImportHistoryDataImporter implements LegacyImportPhas
 
       const orderIds: ReadonlySet<number> = await this.readIdSet(queryRunner, 'pedido');
 
+      const expirationArticleSnapshots: ReadonlyMap<number, ImportedExpirationArticleSnapshotRow> =
+        await this.readExpirationArticleSnapshots(queryRunner);
+
       this.reportProgress(
         command,
         progressListener,
         'importing-article-history',
         99,
-        'Importando los movimientos históricos de stock…',
+        'Importando caducidades y movimientos históricos de stock…',
+      );
+
+      await this.insertExpirationLosses(
+        queryRunner,
+        command,
+        state.expirationLosses,
+        expirationArticleSnapshots,
+        counters,
       );
 
       await this.insertArticleHistory(
@@ -175,7 +184,10 @@ export default class LegacyImportHistoryDataImporter implements LegacyImportPhas
       }
 
       throw new Error(
-        ['No se han podido importar', 'los históricos de artículos y almacén.'].join(' '),
+        [
+          'No se han podido importar',
+          'las caducidades ni los históricos de artículos y almacén.',
+        ].join(' '),
         {
           cause: error,
         },
@@ -183,8 +195,13 @@ export default class LegacyImportHistoryDataImporter implements LegacyImportPhas
     }
   }
 
+  /**
+   * Crea el estado mutable utilizado durante la lectura
+   * del histórico legacy.
+   */
   private createState(): MutableHistoryDataState {
     return {
+      expirationLosses: [],
       articleHistory: [],
       warehouseHistory: [],
     };
@@ -201,7 +218,30 @@ export default class LegacyImportHistoryDataImporter implements LegacyImportPhas
         state.warehouseHistory.push(this.readWarehouseHistory(insert));
 
         return;
+
+      case 'caducidad':
+        state.expirationLosses.push(this.readExpirationLoss(insert));
+
+        return;
     }
+  }
+
+  /**
+   * Convierte una caducidad legacy en su representación
+   * intermedia para la importación.
+   */
+  private readExpirationLoss(insert: LegacySqlInsert): LegacyExpirationLossRow {
+    const createdAt: string = this.valueReader.getRequiredText(insert, 'created_at');
+
+    return {
+      id: this.valueReader.getRequiredInteger(insert, 'id'),
+      articleId: this.valueReader.getRequiredInteger(insert, 'id_articulo'),
+      units: this.valueReader.getRequiredInteger(insert, 'unidades'),
+      purchasePrice: this.valueReader.getRequiredNumber(insert, 'puc'),
+      salePrice: this.valueReader.getRequiredNumber(insert, 'pvp'),
+      createdAt,
+      updatedAt: this.valueReader.getOptionalText(insert, 'updated_at') ?? createdAt,
+    };
   }
 
   private readArticleHistory(insert: LegacySqlInsert): LegacyArticleHistoryRow {
@@ -235,6 +275,110 @@ export default class LegacyImportHistoryDataImporter implements LegacyImportPhas
       createdAt: this.valueReader.getOptionalText(insert, 'created_at'),
       updatedAt: this.valueReader.getOptionalText(insert, 'updated_at'),
     };
+  }
+
+  /**
+   * Importa las caducidades legacy reconstruyendo el
+   * snapshot histórico máximo que permite el origen.
+   */
+  private async insertExpirationLosses(
+    queryRunner: QueryRunner,
+    command: LegacyImportExecutionCommand,
+    rows: readonly LegacyExpirationLossRow[],
+    articleSnapshots: ReadonlyMap<number, ImportedExpirationArticleSnapshotRow>,
+    counters: MutableImportCounters,
+  ): Promise<void> {
+    const insertedIds: Set<number> = new Set<number>();
+
+    const sortedRows: readonly LegacyExpirationLossRow[] = [...rows].sort(
+      (first: LegacyExpirationLossRow, second: LegacyExpirationLossRow): number =>
+        first.id - second.id,
+    );
+
+    for (const row of sortedRows) {
+      if (insertedIds.has(row.id)) {
+        throw new Error(
+          ['La tabla caducidad', `contiene el identificador duplicado ${row.id}.`].join(' '),
+        );
+      }
+
+      if (row.units <= 0) {
+        throw new Error([`La caducidad ${row.id}`, 'debe contener al menos una unidad.'].join(' '));
+      }
+
+      const snapshot: ImportedExpirationArticleSnapshotRow | undefined = articleSnapshots.get(
+        row.articleId,
+      );
+
+      if (snapshot === undefined) {
+        throw new Error(
+          [`La caducidad ${row.id}`, `referencia el artículo inexistente ${row.articleId}.`].join(
+            ' ',
+          ),
+        );
+      }
+
+      const purchasePrice: number = this.normalizeNonNegativeNumber(row.purchasePrice, counters);
+
+      const salePrice: number = this.normalizeNonNegativeNumber(row.salePrice, counters);
+
+      await queryRunner.query(
+        `
+        INSERT INTO merma_caducidad (
+          id,
+          public_id,
+          id_articulo,
+          localizador_snapshot,
+          id_marca_snapshot,
+          marca_nombre_snapshot,
+          articulo_nombre_snapshot,
+          unidades,
+          puc_micros,
+          pvp_cents,
+          fecha_baja,
+          observaciones,
+          created_at,
+          updated_at,
+          deleted_at
+        )
+        VALUES (
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          NULL,
+          ?,
+          ?,
+          NULL
+        )
+      `,
+        [
+          row.id,
+          this.publicIdFactory.create(command.sourceHash, 'caducidad', row.id),
+          row.articleId,
+          snapshot.localizador,
+          snapshot.id_marca,
+          snapshot.marca_nombre,
+          snapshot.articulo_nombre,
+          row.units,
+          this.numberConverter.toMicros(purchasePrice, `caducidad ${row.id}.puc`),
+          this.numberConverter.toCents(salePrice, `caducidad ${row.id}.pvp`),
+          row.createdAt,
+          row.createdAt,
+          row.updatedAt,
+        ],
+      );
+
+      insertedIds.add(row.id);
+      counters.importedRows++;
+    }
   }
 
   private async insertArticleHistory(
@@ -564,6 +708,36 @@ export default class LegacyImportHistoryDataImporter implements LegacyImportPhas
     counters.warningCount++;
 
     return 0;
+  }
+
+  /**
+   * Obtiene el estado de artículo y marca disponible
+   * para reconstruir snapshots de caducidades legacy.
+   */
+  private async readExpirationArticleSnapshots(
+    queryRunner: QueryRunner,
+  ): Promise<ReadonlyMap<number, ImportedExpirationArticleSnapshotRow>> {
+    const rows: readonly ImportedExpirationArticleSnapshotRow[] = (await queryRunner.query(
+      `
+          SELECT
+            a.id,
+            a.localizador,
+            a.id_marca,
+            a.nombre AS articulo_nombre,
+            m.nombre AS marca_nombre
+          FROM articulo a
+          INNER JOIN marca m
+            ON m.id = a.id_marca
+        `,
+    )) as readonly ImportedExpirationArticleSnapshotRow[];
+
+    return new Map<number, ImportedExpirationArticleSnapshotRow>(
+      rows.map(
+        (
+          row: ImportedExpirationArticleSnapshotRow,
+        ): [number, ImportedExpirationArticleSnapshotRow] => [row.id, row],
+      ),
+    );
   }
 
   private async readIdSet(
