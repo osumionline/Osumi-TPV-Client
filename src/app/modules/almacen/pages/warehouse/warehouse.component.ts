@@ -9,10 +9,10 @@ import {
 } from '@angular/core';
 import HeaderComponent from '@app/components/header/header.component';
 import type AlmacenSection from '@model/almacen/almacen-section.type';
-import CaducidadesComponent from '@modules/almacen/components/caducidades/caducidades.component';
-import ImprentaComponent from '@modules/almacen/components/imprenta/imprenta.component';
-import InventoryComponent from '@modules/almacen/components/inventory/inventory.component';
+import CaducidadesComponent from '@modules/almacen/caducidades/components/caducidades/caducidades.component';
 import WarehouseTabsComponent from '@modules/almacen/components/warehouse-tabs/warehouse-tabs.component';
+import ImprentaComponent from '@modules/almacen/imprenta/components/imprenta/imprenta.component';
+import InventoryComponent from '@modules/almacen/inventario/components/inventory/inventory.component';
 import { DialogService } from '@osumi/angular-tools';
 import AppDataService from '@services/app-data.service';
 import { getErrorMessage } from '@utils/error.utils';

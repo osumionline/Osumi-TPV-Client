@@ -30,7 +30,7 @@ async function bootstrap(): Promise<void> {
   if (windowType === INVENTARIO_PRINT_WINDOW) {
     const [{ default: InventoryPrintComponent }, { default: inventarioPrintConfig }] =
       await Promise.all([
-        import('@modules/almacen/pages/inventory-print/inventory-print.component'),
+        import('@modules/almacen/inventario/pages/inventory-print/inventory-print.component'),
         import('@app/inventario-print.config'),
       ]);
 
@@ -42,7 +42,7 @@ async function bootstrap(): Promise<void> {
   if (windowType === CADUCIDAD_REPORT_WINDOW) {
     const [{ default: CaducidadReportComponent }, { default: caducidadReportConfig }] =
       await Promise.all([
-        import('@modules/almacen/pages/caducidad-report/caducidad-report.component'),
+        import('@modules/almacen/caducidades/pages/caducidad-report/caducidad-report.component'),
         import('@app/caducidad-report.config'),
       ]);
 
@@ -54,7 +54,7 @@ async function bootstrap(): Promise<void> {
   if (windowType === IMPRENTA_PRINT_WINDOW) {
     const [{ default: ImprentaPrintComponent }, { default: imprentaPrintConfig }] =
       await Promise.all([
-        import('@modules/almacen/pages/imprenta-print/imprenta-print.component'),
+        import('@modules/almacen/imprenta/pages/imprenta-print/imprenta-print.component'),
         import('@app/imprenta-print.config'),
       ]);
 

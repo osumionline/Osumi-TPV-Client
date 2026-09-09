@@ -3,7 +3,7 @@ import type AlmacenSection from '@model/almacen/almacen-section.type';
 import {
   WAREHOUSE_SECTIONS,
   type WarehouseSectionDefinition,
-} from './warehouse-tabs.component.private';
+} from '@modules/almacen/components/warehouse-tabs/warehouse-tabs.component.private';
 
 /**
  * Muestra las secciones disponibles del módulo de Almacén.

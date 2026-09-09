@@ -1,8 +1,8 @@
 import type {
   InventarioDraftPatch,
   InventarioDraftValues,
-} from '@model/almacen/inventario-draft.interface';
-import InventarioPriceCalculator from '@model/almacen/inventario-price-calculator';
+} from '@model/almacen/inventario/inventario-draft.interface';
+import InventarioPriceCalculator from '@model/almacen/inventario/inventario-price-calculator';
 import { describe, expect, it } from 'vitest';
 
 describe('InventarioPriceCalculator', (): void => {

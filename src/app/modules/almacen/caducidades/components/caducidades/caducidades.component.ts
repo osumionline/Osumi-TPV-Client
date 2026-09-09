@@ -25,13 +25,16 @@ import type {
   CaducidadRowInterface,
 } from '@desktop-contracts/almacen/caducidades/caducidad.interface';
 import { PAGE_SIZE_OPTIONS } from '@desktop-contracts/shared/pagination.constants';
-import CaducidadCreateComponent from '@modules/almacen/components/caducidad-create/caducidad-create.component';
+import CaducidadCreateComponent from '@modules/almacen/caducidades/components/caducidad-create/caducidad-create.component';
+import {
+  CADUCIDAD_COLUMNS,
+  TEXT_SEARCH_DELAY_MS,
+} from '@modules/almacen/caducidades/components/caducidades/caducidades.component.private';
 import { DialogService } from '@osumi/angular-tools';
 import AlmacenService from '@services/almacen.service';
 import ArticulosService from '@services/articulos.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatEuros, formatInteger as formatIntegerValue } from '@utils/format.utils';
-import { CADUCIDAD_COLUMNS, TEXT_SEARCH_DELAY_MS } from './caducidades.component.private';
 
 /**
  * Muestra y filtra el histórico de pérdidas por caducidad.

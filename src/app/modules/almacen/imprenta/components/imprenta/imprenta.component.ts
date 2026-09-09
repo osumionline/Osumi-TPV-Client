@@ -33,13 +33,16 @@ import {
   type ImprentaPrintCommand,
   type ImprentaPrintItemCommand,
 } from '@desktop-contracts/almacen/imprenta/imprenta-print.interface';
-import ImprentaDesignItem from '@model/almacen/imprenta-design-item.interface';
+import ImprentaDesignItem from '@model/almacen/imprenta/imprenta-design-item.interface';
+import {
+  SEARCH_DELAY_MS,
+  type ImprentaPreviewSlot,
+} from '@modules/almacen/imprenta/components/imprenta/imprenta.component.private';
 import { DialogService } from '@osumi/angular-tools';
 import AlmacenService from '@services/almacen.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatEuros } from '@utils/format.utils';
 import { QRCodeComponent } from 'angularx-qrcode';
-import { SEARCH_DELAY_MS, type ImprentaPreviewSlot } from './imprenta.component.private';
 
 /**
  * Contenedor del diseñador efímero de etiquetas de Imprenta.

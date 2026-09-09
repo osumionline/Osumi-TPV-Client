@@ -1,7 +1,7 @@
 import type {
   InventarioDraftPatch,
   InventarioDraftValues,
-} from '@model/almacen/inventario-draft.interface';
+} from '@model/almacen/inventario/inventario-draft.interface';
 import ArticuloPriceCalculator from '@model/articulos/articulo-price-calculator';
 
 /**

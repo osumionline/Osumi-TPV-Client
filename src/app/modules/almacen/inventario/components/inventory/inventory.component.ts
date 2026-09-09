@@ -36,8 +36,8 @@ import type {
   InventarioDraftPatch,
   InventarioDraftValues,
   InventarioPriceField,
-} from '@model/almacen/inventario-draft.interface';
-import InventarioPriceCalculator from '@model/almacen/inventario-price-calculator';
+} from '@model/almacen/inventario/inventario-draft.interface';
+import InventarioPriceCalculator from '@model/almacen/inventario/inventario-price-calculator';
 import {
   formatScaledDecimal,
   isTransientScaledDecimalInput,
@@ -46,14 +46,6 @@ import {
 } from '@model/articulos/articulo-scaled-decimal.utils';
 import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.interface';
 import type Categoria from '@model/categorias/categoria.model';
-import { DialogService } from '@osumi/angular-tools';
-import AlmacenService from '@services/almacen.service';
-import ArticulosService from '@services/articulos.service';
-import CategoriasService from '@services/categorias.service';
-import MarcasService from '@services/marcas.service';
-import ProveedoresService from '@services/proveedores.service';
-import { getErrorMessage } from '@utils/error.utils';
-import { formatDecimal } from '@utils/format.utils';
 import {
   INVENTARIO_COLUMN_OPTIONS,
   INVENTARIO_DEFAULT_COLUMNS,
@@ -64,7 +56,15 @@ import {
   type InventarioDisplayedColumn,
   type InventarioDisplayRow,
   type InventarioKeyboardField,
-} from './inventory.component.private';
+} from '@modules/almacen/inventario/components/inventory/inventory.component.private';
+import { DialogService } from '@osumi/angular-tools';
+import AlmacenService from '@services/almacen.service';
+import ArticulosService from '@services/articulos.service';
+import CategoriasService from '@services/categorias.service';
+import MarcasService from '@services/marcas.service';
+import ProveedoresService from '@services/proveedores.service';
+import { getErrorMessage } from '@utils/error.utils';
+import { formatDecimal } from '@utils/format.utils';
 
 /**
  * Muestra y filtra el inventario persistido del almacén.

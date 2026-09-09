@@ -4,7 +4,7 @@ import type {
   InventarioDirtyField,
   InventarioDraftValues,
   InventarioPriceField,
-} from '@model/almacen/inventario-draft.interface';
+} from '@model/almacen/inventario/inventario-draft.interface';
 
 export type InventarioDataColumn = InventarioReportColumn;
 

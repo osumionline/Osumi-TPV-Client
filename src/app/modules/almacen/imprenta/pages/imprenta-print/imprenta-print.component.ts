@@ -7,10 +7,10 @@ import {
   type WritableSignal,
 } from '@angular/core';
 import type { ImprentaPrintDocumentoInterface } from '@desktop-contracts/almacen/imprenta/imprenta-print.interface';
+import MM_TO_PX from '@modules/almacen/imprenta/pages/imprenta-print/imprenta-print.component.private';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatEuros } from '@utils/format.utils';
 import { QRCodeComponent } from 'angularx-qrcode';
-import MM_TO_PX from './imprenta-print.component.private';
 
 /**
  * Renderer exclusivo de la hoja definitiva de etiquetas.

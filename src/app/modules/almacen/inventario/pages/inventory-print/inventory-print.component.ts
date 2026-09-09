@@ -4,9 +4,9 @@ import type {
   InventarioReportColumn,
   InventarioReportRowInterface,
 } from '@desktop-contracts/almacen/inventario/inventario-report.interface';
+import RIGHT_ALIGNED_COLUMNS from '@modules/almacen/inventario/pages/inventory-print/inventory-print.component.private';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatDecimal, formatEuros } from '@utils/format.utils';
-import RIGHT_ALIGNED_COLUMNS from './inventory-print.component.private';
 
 /**
  * Renderer exclusivo de la vista imprimible de Inventario.
