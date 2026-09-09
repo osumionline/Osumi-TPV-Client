@@ -37,6 +37,53 @@
     overflow: auto;
 }
 
+.imprenta-print__toolbar {
+    display: flex;
+    max-width: 297mm;
+    margin: 0 auto 16px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.imprenta-print__toolbar-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+
+    strong {
+        font-size: 16px;
+    }
+
+    span {
+        font-size: 12px;
+        opacity: 0.65;
+    }
+}
+
+.imprenta-print__print-button {
+    padding: 9px 24px;
+    border: 0;
+    border-radius: 22px;
+    background-color: var(--main-color);
+    color: var(--color-white);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: default;
+    }
+}
+
+.imprenta-print__operation-error {
+    max-width: 297mm;
+    margin: 0 auto 16px;
+    padding: 10px 14px;
+    border: 1px solid var(--color-red);
+    color: var(--color-red);
+}
+
 .imprenta-print__page {
     display: grid;
     width: 210mm;
@@ -153,5 +200,33 @@
 
     .imprenta-print__price {
         font-size: 2mm;
+    }
+}
+
+@page {
+    margin: 0;
+}
+
+@media print {
+    :host {
+        min-height: 0;
+        background-color: var(--color-white);
+    }
+
+    .imprenta-print {
+        min-width: 0;
+        min-height: 0;
+        padding: 0;
+        overflow: visible;
+    }
+
+    .imprenta-print__toolbar,
+    .imprenta-print__operation-error {
+        display: none !important;
+    }
+
+    .imprenta-print__page {
+        margin: 0;
+        box-shadow: none;
     }
 }

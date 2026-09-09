@@ -10,4 +10,10 @@ export default interface ImprentaPrintWindow {
    * Obtiene el snapshot únicamente para el renderer autorizado.
    */
   getDocumento(senderWebContentsId: number): ImprentaPrintDocumentoInterface;
+
+  /**
+   * Abre el diálogo estándar de impresión desde
+   * la BrowserWindow autorizada.
+   */
+  print(senderWebContentsId: number): Promise<void>;
 }

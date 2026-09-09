@@ -100,6 +100,57 @@ export default class ElectronImprentaPrintWindow implements ImprentaPrintWindow 
   }
 
   /**
+   * Abre el diálogo estándar de impresión usando
+   * la geometría A4 del snapshot canónico actual.
+   */
+  async print(senderWebContentsId: number): Promise<void> {
+    const browserWindow: BrowserWindow = this.requireAuthorizedWindow(senderWebContentsId);
+    const documento: ImprentaPrintDocumentoInterface | null = this.documento;
+
+    if (documento === null) {
+      throw new Error('No hay una hoja de Imprenta disponible.');
+    }
+
+    await new Promise<void>((resolve: () => void, reject: (reason: Error) => void): void => {
+      browserWindow.webContents.print(
+        {
+          silent: false,
+          printBackground: true,
+          pageSize: 'A4',
+          landscape: documento.orientacion === 'landscape',
+          scaleFactor: 100,
+          margins: {
+            marginType: 'none',
+          },
+        },
+        (success: boolean, failureReason: string): void => {
+          if (success) {
+            resolve();
+
+            return;
+          }
+
+          const reason: string = failureReason.trim();
+
+          if (reason.toLowerCase().includes('cancel')) {
+            resolve();
+
+            return;
+          }
+
+          reject(
+            new Error(
+              reason.length === 0
+                ? 'No se ha podido imprimir la hoja de etiquetas.'
+                : `No se ha podido imprimir la hoja de etiquetas: ${reason}`,
+            ),
+          );
+        },
+      );
+    });
+  }
+
+  /**
    * Comprueba que el IPC procede exactamente
    * de la BrowserWindow activa de Imprenta.
    */

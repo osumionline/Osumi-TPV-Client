@@ -5,4 +5,9 @@ export default interface ImprentaPrintApi {
    * Obtiene el snapshot asignado exclusivamente a esta ventana.
    */
   getDocumento(): Promise<ImprentaPrintDocumentoInterface>;
+
+  /**
+   * Abre el diálogo estándar de impresión del sistema.
+   */
+  print(): Promise<void>;
 }

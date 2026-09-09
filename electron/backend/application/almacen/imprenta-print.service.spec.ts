@@ -66,6 +66,13 @@ class FakeImprentaPrintWindow implements ImprentaPrintWindow {
 
     return this.lastDocumento;
   }
+
+  /**
+   * Simula la impresión de la BrowserWindow.
+   */
+  print(): Promise<void> {
+    return Promise.resolve();
+  }
 }
 
 describe('ImprentaPrintService', (): void => {

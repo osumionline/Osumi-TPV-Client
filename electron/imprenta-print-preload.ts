@@ -8,6 +8,7 @@ const printApi: ImprentaPrintApi = Object.freeze({
     ipcRenderer.invoke(
       IPC_CHANNELS.imprentaPrintGetDocumento,
     ) as Promise<ImprentaPrintDocumentoInterface>,
+  print: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.imprentaPrintPrint) as Promise<void>,
 });
 
 contextBridge.exposeInMainWorld('osumiImprentaPrint', printApi);

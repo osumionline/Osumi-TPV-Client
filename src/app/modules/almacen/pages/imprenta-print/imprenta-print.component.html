@@ -15,6 +15,32 @@
 </section>
 } @else if (documento(); as currentDocument) {
 <div class="imprenta-print">
+    <header class="imprenta-print__toolbar">
+        <div class="imprenta-print__toolbar-info">
+            <strong>
+                Hoja A4
+            </strong>
+            <span>
+                {{ currentDocument.filas }} × {{ currentDocument.columnas }}
+                ·
+                {{ currentDocument.orientacion === 'portrait' ? 'Vertical' : 'Horizontal' }}
+            </span>
+        </div>
+
+        <button class="imprenta-print__print-button"
+                type="button"
+                [disabled]="processing()"
+                (click)="print()">
+            {{ processing() ? 'IMPRIMIENDO…' : 'IMPRIMIR' }}
+        </button>
+    </header>
+
+    @if (operationError() !== null) {
+    <div class="imprenta-print__operation-error">
+        {{ operationError() }}
+    </div>
+    }
+
     <main class="imprenta-print__page"
           [class.imprenta-print__page--landscape]="currentDocument.orientacion === 'landscape'"
           [class.imprenta-print__page--dense]="dense()"

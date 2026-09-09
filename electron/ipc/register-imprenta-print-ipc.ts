@@ -13,4 +13,8 @@ export default function registerImprentaPrintIpc(printWindow: ImprentaPrintWindo
     async (event): Promise<ImprentaPrintDocumentoInterface> =>
       printWindow.getDocumento(event.sender.id),
   );
+
+  ipcMain.handle(IPC_CHANNELS.imprentaPrintPrint, async (event): Promise<void> => {
+    await printWindow.print(event.sender.id);
+  });
 }

@@ -34,6 +34,7 @@ const IPC_CHANNELS = {
   almacenSearchImprentaArticulos: 'almacen:search-imprenta-articulos',
   almacenOpenImprentaPrint: 'almacen:open-imprenta-print',
   imprentaPrintGetDocumento: 'imprenta-print:get-documento',
+  imprentaPrintPrint: 'imprenta-print:print',
   caducidadReportGetDocumento: 'caducidad-report:get-documento',
   caducidadReportPrint: 'caducidad-report:print',
   inventarioPrintGetDocumento: 'inventario-print:get-documento',

@@ -33,6 +33,8 @@ export default class ImprentaPrintComponent implements OnInit {
     signal<ImprentaPrintDocumentoInterface | null>(null);
   readonly loading: WritableSignal<boolean> = signal<boolean>(true);
   readonly loadError: WritableSignal<string | null> = signal<string | null>(null);
+  readonly processing: WritableSignal<boolean> = signal<boolean>(false);
+  readonly operationError: WritableSignal<string | null> = signal<string | null>(null);
   readonly qrWidth: Signal<number> = computed((): number => this.calculateQrWidth());
   readonly dense: Signal<boolean> = computed((): boolean => {
     const documento: ImprentaPrintDocumentoInterface | null = this.documento();
@@ -60,6 +62,29 @@ export default class ImprentaPrintComponent implements OnInit {
   }
 
   /**
+   * Abre el diálogo estándar de impresión para
+   * la hoja canónica actualmente mostrada.
+   */
+  async print(): Promise<void> {
+    if (this.documento() === null || this.processing()) {
+      return;
+    }
+
+    this.processing.set(true);
+    this.operationError.set(null);
+
+    try {
+      await window.osumiImprentaPrint.print();
+    } catch (error: unknown) {
+      this.operationError.set(
+        getErrorMessage(error, 'No se ha podido imprimir la hoja de etiquetas.'),
+      );
+    } finally {
+      this.processing.set(false);
+    }
+  }
+
+  /**
    * Formatea un importe almacenado en céntimos.
    */
   formatCents(value: number): string {
@@ -80,6 +105,7 @@ export default class ImprentaPrintComponent implements OnInit {
   private async loadDocumento(): Promise<void> {
     this.loading.set(true);
     this.loadError.set(null);
+    this.operationError.set(null);
 
     try {
       this.documento.set(await window.osumiImprentaPrint.getDocumento());
