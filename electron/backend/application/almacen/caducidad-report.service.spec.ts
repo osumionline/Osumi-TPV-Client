@@ -1,10 +1,10 @@
 import CaducidadReportService from '@backend/application/almacen/caducidad-report.service';
-import type CaducidadReportProvider from '@backend/contracts/almacen/caducidad-report-provider.interface';
-import type CaducidadReportWindow from '@backend/contracts/almacen/caducidad-report-window.interface';
+import type CaducidadReportProvider from '@backend/contracts/almacen/caducidades/caducidad-report-provider.interface';
+import type CaducidadReportWindow from '@backend/contracts/almacen/caducidades/caducidad-report-window.interface';
 import type {
   CaducidadReportConsulta,
   CaducidadReportInterface,
-} from '@desktop-contracts/almacen/caducidad-report.interface';
+} from '@desktop-contracts/almacen/caducidades/caducidad-report.interface';
 import { describe, expect, it } from 'vitest';
 
 class FakeCaducidadReportProvider implements CaducidadReportProvider {

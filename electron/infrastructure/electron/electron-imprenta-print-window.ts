@@ -1,5 +1,5 @@
-import type ImprentaPrintWindow from '@backend/contracts/almacen/imprenta-print-window.interface';
-import type { ImprentaPrintDocumentoInterface } from '@desktop-contracts/almacen/imprenta-print.interface';
+import type ImprentaPrintWindow from '@backend/contracts/almacen/imprenta/imprenta-print-window.interface';
+import type { ImprentaPrintDocumentoInterface } from '@desktop-contracts/almacen/imprenta/imprenta-print.interface';
 import { getRendererAssetsDirectory } from '@infrastructure/electron/main-window';
 import { BrowserWindow } from 'electron';
 import { join } from 'node:path';

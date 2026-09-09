@@ -1,4 +1,4 @@
-import type { ImprentaPrintDocumentoInterface } from '@desktop-contracts/almacen/imprenta-print.interface';
+import type { ImprentaPrintDocumentoInterface } from '@desktop-contracts/almacen/imprenta/imprenta-print.interface';
 
 export default interface ImprentaPrintWindow {
   /**

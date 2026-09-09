@@ -19,7 +19,7 @@ import { MatInput } from '@angular/material/input';
 import type {
   CaducidadArticuloSearchInterface,
   CaducidadCreateCommand,
-} from '@desktop-contracts/almacen/caducidad-create.interface';
+} from '@desktop-contracts/almacen/caducidades/caducidad-create.interface';
 import AlmacenService from '@services/almacen.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatEuros } from '@utils/format.utils';

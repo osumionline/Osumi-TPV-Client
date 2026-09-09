@@ -2,7 +2,7 @@ import type {
   InventarioReportColumn,
   InventarioReportInterface,
   InventarioReportRowInterface,
-} from '@desktop-contracts/almacen/inventario-report.interface';
+} from '@desktop-contracts/almacen/inventario/inventario-report.interface';
 
 interface InventarioCsvColumnDefinition {
   readonly label: string;

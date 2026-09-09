@@ -1,9 +1,9 @@
 import { Component, signal, type OnInit, type WritableSignal } from '@angular/core';
-import type InventarioPrintDocumentoInterface from '@desktop-contracts/almacen/inventario-print.interface';
+import type InventarioPrintDocumentoInterface from '@desktop-contracts/almacen/inventario/inventario-print.interface';
 import type {
   InventarioReportColumn,
   InventarioReportRowInterface,
-} from '@desktop-contracts/almacen/inventario-report.interface';
+} from '@desktop-contracts/almacen/inventario/inventario-report.interface';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatDecimal, formatEuros } from '@utils/format.utils';
 import RIGHT_ALIGNED_COLUMNS from './inventory-print.component.private';

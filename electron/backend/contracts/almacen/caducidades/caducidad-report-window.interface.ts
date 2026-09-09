@@ -1,4 +1,4 @@
-import type { CaducidadReportInterface } from '@desktop-contracts/almacen/caducidad-report.interface';
+import type { CaducidadReportInterface } from '@desktop-contracts/almacen/caducidades/caducidad-report.interface';
 
 export default interface CaducidadReportWindow {
   /**

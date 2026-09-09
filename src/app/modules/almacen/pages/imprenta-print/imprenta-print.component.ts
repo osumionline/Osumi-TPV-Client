@@ -6,7 +6,7 @@ import {
   type Signal,
   type WritableSignal,
 } from '@angular/core';
-import type { ImprentaPrintDocumentoInterface } from '@desktop-contracts/almacen/imprenta-print.interface';
+import type { ImprentaPrintDocumentoInterface } from '@desktop-contracts/almacen/imprenta/imprenta-print.interface';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatEuros } from '@utils/format.utils';
 import { QRCodeComponent } from 'angularx-qrcode';

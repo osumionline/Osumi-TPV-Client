@@ -22,13 +22,13 @@ import { MatTooltip } from '@angular/material/tooltip';
 import type {
   InventarioCsvExportResult,
   InventarioReportConsulta,
-} from '@desktop-contracts/almacen/inventario-report.interface';
-import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario-save.interface';
+} from '@desktop-contracts/almacen/inventario/inventario-report.interface';
+import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario/inventario-save.interface';
 import type {
   InventarioConsulta,
   InventarioResultado,
   InventarioRowInterface,
-} from '@desktop-contracts/almacen/inventario.interface';
+} from '@desktop-contracts/almacen/inventario/inventario.interface';
 import { PAGE_SIZE_OPTIONS } from '@desktop-contracts/shared/pagination.constants';
 import type {
   InventarioDirtyField,

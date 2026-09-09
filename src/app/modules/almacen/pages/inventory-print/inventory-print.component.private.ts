@@ -1,4 +1,4 @@
-import type { InventarioReportColumn } from '@desktop-contracts/almacen/inventario-report.interface';
+import type { InventarioReportColumn } from '@desktop-contracts/almacen/inventario/inventario-report.interface';
 
 const RIGHT_ALIGNED_COLUMNS: readonly InventarioReportColumn[] = [
   'stock',

@@ -21,7 +21,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { MatTooltip } from '@angular/material/tooltip';
-import type { ImprentaArticuloSearchInterface } from '@desktop-contracts/almacen/imprenta-articulo.interface';
+import type { ImprentaArticuloSearchInterface } from '@desktop-contracts/almacen/imprenta/imprenta-articulo.interface';
 import {
   IMPRENTA_DEFAULT_COLUMNS,
   IMPRENTA_DEFAULT_ORIENTATION,
@@ -32,7 +32,7 @@ import {
   type ImprentaOrientation,
   type ImprentaPrintCommand,
   type ImprentaPrintItemCommand,
-} from '@desktop-contracts/almacen/imprenta-print.interface';
+} from '@desktop-contracts/almacen/imprenta/imprenta-print.interface';
 import ImprentaDesignItem from '@model/almacen/imprenta-design-item.interface';
 import { DialogService } from '@osumi/angular-tools';
 import AlmacenService from '@services/almacen.service';

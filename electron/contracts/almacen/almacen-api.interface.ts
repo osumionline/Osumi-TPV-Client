@@ -1,27 +1,27 @@
 import type {
   CaducidadArticuloSearchInterface,
   CaducidadCreateCommand,
-} from '@desktop-contracts/almacen/caducidad-create.interface';
-import type { CaducidadReportConsulta } from '@desktop-contracts/almacen/caducidad-report.interface';
+} from '@desktop-contracts/almacen/caducidades/caducidad-create.interface';
+import type { CaducidadReportConsulta } from '@desktop-contracts/almacen/caducidades/caducidad-report.interface';
 import type {
   CaducidadConsulta,
   CaducidadFilterOptionsInterface,
   CaducidadResultado,
-} from '@desktop-contracts/almacen/caducidad.interface';
+} from '@desktop-contracts/almacen/caducidades/caducidad.interface';
 import type {
   ImprentaArticuloSearchConsulta,
   ImprentaArticuloSearchInterface,
-} from '@desktop-contracts/almacen/imprenta-articulo.interface';
-import type { ImprentaPrintCommand } from '@desktop-contracts/almacen/imprenta-print.interface';
+} from '@desktop-contracts/almacen/imprenta/imprenta-articulo.interface';
+import type { ImprentaPrintCommand } from '@desktop-contracts/almacen/imprenta/imprenta-print.interface';
 import type {
   InventarioCsvExportResult,
   InventarioReportConsulta,
-} from '@desktop-contracts/almacen/inventario-report.interface';
-import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario-save.interface';
+} from '@desktop-contracts/almacen/inventario/inventario-report.interface';
+import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario/inventario-save.interface';
 import type {
   InventarioConsulta,
   InventarioResultado,
-} from '@desktop-contracts/almacen/inventario.interface';
+} from '@desktop-contracts/almacen/inventario/inventario.interface';
 
 /**
  * Expone los casos de uso disponibles del módulo Almacén.

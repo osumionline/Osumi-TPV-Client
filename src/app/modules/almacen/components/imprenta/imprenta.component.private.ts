@@ -1,4 +1,4 @@
-import type { ImprentaArticuloSearchInterface } from '@desktop-contracts/almacen/imprenta-articulo.interface';
+import type { ImprentaArticuloSearchInterface } from '@desktop-contracts/almacen/imprenta/imprenta-articulo.interface';
 
 export const SEARCH_DELAY_MS: number = 250;
 

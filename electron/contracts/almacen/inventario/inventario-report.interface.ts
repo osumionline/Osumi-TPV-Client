@@ -1,4 +1,4 @@
-import type { InventarioFilters } from '@desktop-contracts/almacen/inventario.interface';
+import type { InventarioFilters } from '@desktop-contracts/almacen/inventario/inventario.interface';
 
 export type InventarioReportColumn =
   | 'localizador'

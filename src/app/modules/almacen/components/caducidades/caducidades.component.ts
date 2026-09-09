@@ -16,14 +16,14 @@ import { MatSelect, type MatSelectChange } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MONTH_OPTIONS, type MonthOption } from '@constants/date.constants';
-import type { CaducidadCreateCommand } from '@desktop-contracts/almacen/caducidad-create.interface';
-import type { CaducidadReportConsulta } from '@desktop-contracts/almacen/caducidad-report.interface';
+import type { CaducidadCreateCommand } from '@desktop-contracts/almacen/caducidades/caducidad-create.interface';
+import type { CaducidadReportConsulta } from '@desktop-contracts/almacen/caducidades/caducidad-report.interface';
 import type {
   CaducidadConsulta,
   CaducidadFilterOptionsInterface,
   CaducidadResultado,
   CaducidadRowInterface,
-} from '@desktop-contracts/almacen/caducidad.interface';
+} from '@desktop-contracts/almacen/caducidades/caducidad.interface';
 import { PAGE_SIZE_OPTIONS } from '@desktop-contracts/shared/pagination.constants';
 import CaducidadCreateComponent from '@modules/almacen/components/caducidad-create/caducidad-create.component';
 import { DialogService } from '@osumi/angular-tools';

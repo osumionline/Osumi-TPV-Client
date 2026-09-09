@@ -1,4 +1,4 @@
-import type { CaducidadFilters } from '@desktop-contracts/almacen/caducidad.interface';
+import type { CaducidadFilters } from '@desktop-contracts/almacen/caducidades/caducidad.interface';
 
 export type CaducidadReportConsulta = CaducidadFilters;
 

@@ -1,46 +1,46 @@
 import AlmacenService from '@backend/application/almacen/almacen.service';
 import type AlmacenRepository from '@backend/contracts/almacen/almacen.repository.interface';
-import type CaducidadFilterQuery from '@backend/contracts/almacen/caducidad-filter-query.interface';
-import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidad-query.interface';
-import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-filter-query.interface';
-import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
+import type CaducidadFilterQuery from '@backend/contracts/almacen/caducidades/caducidad-filter-query.interface';
+import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidades/caducidad-query.interface';
+import type InventarioFilterQuery from '@backend/contracts/almacen/inventario/inventario-filter-query.interface';
+import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario/inventario-query.interface';
 import type {
   CaducidadArticuloSearchRecord,
   CaducidadCreateRecord,
-} from '@backend/domain/almacen/caducidad-create-record.interface';
+} from '@backend/domain/almacen/caducidades/caducidad-create-record.interface';
 import type {
   CaducidadFilterOptionsRecord,
   CaducidadResultadoRecord,
-} from '@backend/domain/almacen/caducidad-record.interface';
-import type { CaducidadReportRecord } from '@backend/domain/almacen/caducidad-report-record.interface';
-import type ImprentaArticuloSearchRecord from '@backend/domain/almacen/imprenta-articulo-search-record.interface';
-import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario-record.interface';
-import type { InventarioReportRecord } from '@backend/domain/almacen/inventario-report-record.interface';
-import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
+} from '@backend/domain/almacen/caducidades/caducidad-record.interface';
+import type { CaducidadReportRecord } from '@backend/domain/almacen/caducidades/caducidad-report-record.interface';
+import type ImprentaArticuloSearchRecord from '@backend/domain/almacen/imprenta/imprenta-articulo-search-record.interface';
+import type ImprentaPrintArticuloRecord from '@backend/domain/almacen/imprenta/imprenta-print-articulo-record.interface';
+import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario/inventario-record.interface';
+import type { InventarioReportRecord } from '@backend/domain/almacen/inventario/inventario-report-record.interface';
+import type InventarioSaveRecord from '@backend/domain/almacen/inventario/inventario-save-record.interface';
 import type {
   CaducidadArticuloSearchInterface,
   CaducidadCreateCommand,
-} from '@desktop-contracts/almacen/caducidad-create.interface';
+} from '@desktop-contracts/almacen/caducidades/caducidad-create.interface';
 import type {
   CaducidadReportConsulta,
   CaducidadReportInterface,
-} from '@desktop-contracts/almacen/caducidad-report.interface';
+} from '@desktop-contracts/almacen/caducidades/caducidad-report.interface';
 import type {
   CaducidadFilterOptionsInterface,
   CaducidadResultado,
-} from '@desktop-contracts/almacen/caducidad.interface';
+} from '@desktop-contracts/almacen/caducidades/caducidad.interface';
 import type {
   ImprentaArticuloSearchConsulta,
   ImprentaArticuloSearchInterface,
-} from '@desktop-contracts/almacen/imprenta-articulo.interface';
-import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario-save.interface';
+} from '@desktop-contracts/almacen/imprenta/imprenta-articulo.interface';
+import type { ImprentaPrintArticuloInterface } from '@desktop-contracts/almacen/imprenta/imprenta-print.interface';
+import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario/inventario-save.interface';
 import type {
   InventarioConsulta,
   InventarioResultado,
-} from '@desktop-contracts/almacen/inventario.interface';
+} from '@desktop-contracts/almacen/inventario/inventario.interface';
 import { describe, expect, it } from 'vitest';
-import type ImprentaPrintArticuloRecord from '@backend/domain/almacen/imprenta-print-articulo-record.interface';
-import type { ImprentaPrintArticuloInterface } from '@desktop-contracts/almacen/imprenta-print.interface';
 
 class FakeAlmacenRepository implements AlmacenRepository {
   lastQuery: InventarioRepositoryQuery | null = null;

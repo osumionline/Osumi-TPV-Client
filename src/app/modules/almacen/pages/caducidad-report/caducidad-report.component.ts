@@ -1,5 +1,5 @@
 import { Component, signal, type OnInit, type WritableSignal } from '@angular/core';
-import type { CaducidadReportInterface } from '@desktop-contracts/almacen/caducidad-report.interface';
+import type { CaducidadReportInterface } from '@desktop-contracts/almacen/caducidades/caducidad-report.interface';
 import { formatMonthName } from '@utils/date.utils';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatEuros, formatInteger as formatIntegerValue } from '@utils/format.utils';

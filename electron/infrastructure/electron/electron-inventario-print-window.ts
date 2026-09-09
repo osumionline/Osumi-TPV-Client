@@ -1,5 +1,5 @@
-import type InventarioPrintWindow from '@backend/contracts/almacen/inventario-print-window.interface';
-import type InventarioPrintDocumentoInterface from '@desktop-contracts/almacen/inventario-print.interface';
+import type InventarioPrintWindow from '@backend/contracts/almacen/inventario/inventario-print-window.interface';
+import type InventarioPrintDocumentoInterface from '@desktop-contracts/almacen/inventario/inventario-print.interface';
 import { getRendererAssetsDirectory } from '@infrastructure/electron/main-window';
 import { BrowserWindow } from 'electron';
 import { join } from 'node:path';

@@ -1,5 +1,5 @@
-import type CaducidadReportWindow from '@backend/contracts/almacen/caducidad-report-window.interface';
-import type { CaducidadReportInterface } from '@desktop-contracts/almacen/caducidad-report.interface';
+import type CaducidadReportWindow from '@backend/contracts/almacen/caducidades/caducidad-report-window.interface';
+import type { CaducidadReportInterface } from '@desktop-contracts/almacen/caducidades/caducidad-report.interface';
 import { getRendererAssetsDirectory } from '@infrastructure/electron/main-window';
 import { BrowserWindow } from 'electron';
 import { join } from 'node:path';

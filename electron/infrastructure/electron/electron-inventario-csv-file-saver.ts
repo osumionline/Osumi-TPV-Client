@@ -1,4 +1,4 @@
-import type InventarioCsvFileSaver from '@backend/contracts/almacen/inventario-csv-file-saver.interface';
+import type InventarioCsvFileSaver from '@backend/contracts/almacen/inventario/inventario-csv-file-saver.interface';
 import type { BrowserWindow, SaveDialogOptions, SaveDialogReturnValue } from 'electron';
 import { dialog } from 'electron';
 import { writeFile } from 'node:fs/promises';

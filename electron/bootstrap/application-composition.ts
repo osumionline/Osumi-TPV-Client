@@ -39,10 +39,10 @@ import VentasTicketBaiService from '@backend/application/ventas/ventas-ticket-ba
 import VentasTicketEmailService from '@backend/application/ventas/ventas-ticket-email.service';
 import VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
 import type AlmacenRepository from '@backend/contracts/almacen/almacen.repository.interface';
-import type CaducidadReportWindow from '@backend/contracts/almacen/caducidad-report-window.interface';
-import type ImprentaPrintWindow from '@backend/contracts/almacen/imprenta-print-window.interface';
-import type InventarioCsvFileSaver from '@backend/contracts/almacen/inventario-csv-file-saver.interface';
-import type InventarioPrintWindow from '@backend/contracts/almacen/inventario-print-window.interface';
+import type CaducidadReportWindow from '@backend/contracts/almacen/caducidades/caducidad-report-window.interface';
+import type ImprentaPrintWindow from '@backend/contracts/almacen/imprenta/imprenta-print-window.interface';
+import type InventarioCsvFileSaver from '@backend/contracts/almacen/inventario/inventario-csv-file-saver.interface';
+import type InventarioPrintWindow from '@backend/contracts/almacen/inventario/inventario-print-window.interface';
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';

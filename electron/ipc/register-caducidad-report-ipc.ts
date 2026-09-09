@@ -1,5 +1,5 @@
-import type CaducidadReportWindow from '@backend/contracts/almacen/caducidad-report-window.interface';
-import type { CaducidadReportInterface } from '@desktop-contracts/almacen/caducidad-report.interface';
+import type CaducidadReportWindow from '@backend/contracts/almacen/caducidades/caducidad-report-window.interface';
+import type { CaducidadReportInterface } from '@desktop-contracts/almacen/caducidades/caducidad-report.interface';
 import IPC_CHANNELS from '@ipc/channels';
 import { ipcMain } from 'electron';
 

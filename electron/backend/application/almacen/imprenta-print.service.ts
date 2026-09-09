@@ -1,5 +1,5 @@
-import type ImprentaPrintProvider from '@backend/contracts/almacen/imprenta-print-provider.interface';
-import type ImprentaPrintWindow from '@backend/contracts/almacen/imprenta-print-window.interface';
+import type ImprentaPrintProvider from '@backend/contracts/almacen/imprenta/imprenta-print-provider.interface';
+import type ImprentaPrintWindow from '@backend/contracts/almacen/imprenta/imprenta-print-window.interface';
 import {
   IMPRENTA_MAX_COLUMNS,
   IMPRENTA_MAX_ROWS,
@@ -9,7 +9,7 @@ import {
   type ImprentaPrintDocumentoInterface,
   type ImprentaPrintItemCommand,
   type ImprentaPrintSlotInterface,
-} from '@desktop-contracts/almacen/imprenta-print.interface';
+} from '@desktop-contracts/almacen/imprenta/imprenta-print.interface';
 
 /**
  * Valida un diseño de etiquetas, relee sus artículos

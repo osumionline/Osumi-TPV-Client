@@ -1,5 +1,5 @@
-import type ImprentaPrintApi from '@desktop-contracts/almacen/imprenta-print-api.interface';
-import type { ImprentaPrintDocumentoInterface } from '@desktop-contracts/almacen/imprenta-print.interface';
+import type ImprentaPrintApi from '@desktop-contracts/almacen/imprenta/imprenta-print-api.interface';
+import type { ImprentaPrintDocumentoInterface } from '@desktop-contracts/almacen/imprenta/imprenta-print.interface';
 import IPC_CHANNELS from '@ipc/channels';
 import { contextBridge, ipcRenderer } from 'electron';
 

@@ -1,35 +1,35 @@
 import type AlmacenRepository from '@backend/contracts/almacen/almacen.repository.interface';
-import type CaducidadFilterQuery from '@backend/contracts/almacen/caducidad-filter-query.interface';
-import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidad-query.interface';
-import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-filter-query.interface';
-import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
+import type CaducidadFilterQuery from '@backend/contracts/almacen/caducidades/caducidad-filter-query.interface';
+import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidades/caducidad-query.interface';
+import type InventarioFilterQuery from '@backend/contracts/almacen/inventario/inventario-filter-query.interface';
+import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario/inventario-query.interface';
 import type {
   CaducidadArticuloSearchRecord,
   CaducidadCreateRecord,
-} from '@backend/domain/almacen/caducidad-create-record.interface';
+} from '@backend/domain/almacen/caducidades/caducidad-create-record.interface';
 import type {
   CaducidadFilterOptionsRecord,
   CaducidadMarcaFilterRecord,
   CaducidadResultadoRecord,
   CaducidadRowRecord,
-} from '@backend/domain/almacen/caducidad-record.interface';
+} from '@backend/domain/almacen/caducidades/caducidad-record.interface';
 import type {
   CaducidadReportAnioRecord,
   CaducidadReportMarcaRecord,
   CaducidadReportMesRecord,
   CaducidadReportRecord,
-} from '@backend/domain/almacen/caducidad-report-record.interface';
-import type ImprentaArticuloSearchRecord from '@backend/domain/almacen/imprenta-articulo-search-record.interface';
-import type ImprentaPrintArticuloRecord from '@backend/domain/almacen/imprenta-print-articulo-record.interface';
+} from '@backend/domain/almacen/caducidades/caducidad-report-record.interface';
+import type ImprentaArticuloSearchRecord from '@backend/domain/almacen/imprenta/imprenta-articulo-search-record.interface';
+import type ImprentaPrintArticuloRecord from '@backend/domain/almacen/imprenta/imprenta-print-articulo-record.interface';
 import type {
   InventarioResultadoRecord,
   InventarioRowRecord,
-} from '@backend/domain/almacen/inventario-record.interface';
+} from '@backend/domain/almacen/inventario/inventario-record.interface';
 import type {
   InventarioReportRecord,
   InventarioReportRowRecord,
-} from '@backend/domain/almacen/inventario-report-record.interface';
-import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
+} from '@backend/domain/almacen/inventario/inventario-report-record.interface';
+import type InventarioSaveRecord from '@backend/domain/almacen/inventario/inventario-save-record.interface';
 import HISTORICO_ARTICULO_TIPO from '@backend/domain/articulos/historico-articulo.constants';
 import { MONEY_SCALE, UNIT_PRICE_SCALE } from '@backend/domain/database/database-schema.constants';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';

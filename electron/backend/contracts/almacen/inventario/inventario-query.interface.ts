@@ -1,4 +1,4 @@
-import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-filter-query.interface';
+import type InventarioFilterQuery from '@backend/contracts/almacen/inventario/inventario-filter-query.interface';
 
 export default interface InventarioRepositoryQuery extends InventarioFilterQuery {
   readonly ventasDesde: string;

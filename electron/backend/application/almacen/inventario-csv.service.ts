@@ -1,11 +1,11 @@
 import type AlmacenService from '@backend/application/almacen/almacen.service';
 import type InventarioCsvBuilder from '@backend/application/almacen/inventario-csv.builder';
-import type InventarioCsvFileSaver from '@backend/contracts/almacen/inventario-csv-file-saver.interface';
+import type InventarioCsvFileSaver from '@backend/contracts/almacen/inventario/inventario-csv-file-saver.interface';
 import type {
   InventarioCsvExportResult,
   InventarioReportConsulta,
   InventarioReportInterface,
-} from '@desktop-contracts/almacen/inventario-report.interface';
+} from '@desktop-contracts/almacen/inventario/inventario-report.interface';
 
 /**
  * Coordina la generación y guardado de exportaciones CSV de Inventario.

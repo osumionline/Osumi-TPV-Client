@@ -1,15 +1,15 @@
-import type CaducidadFilterQuery from '@backend/contracts/almacen/caducidad-filter-query.interface';
-import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidad-query.interface';
-import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
-import type { CaducidadCreateRecord } from '@backend/domain/almacen/caducidad-create-record.interface';
+import type CaducidadFilterQuery from '@backend/contracts/almacen/caducidades/caducidad-filter-query.interface';
+import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidades/caducidad-query.interface';
+import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario/inventario-query.interface';
+import type { CaducidadCreateRecord } from '@backend/domain/almacen/caducidades/caducidad-create-record.interface';
 import type {
   CaducidadFilterOptionsRecord,
   CaducidadResultadoRecord,
-} from '@backend/domain/almacen/caducidad-record.interface';
-import type { CaducidadReportRecord } from '@backend/domain/almacen/caducidad-report-record.interface';
-import type ImprentaArticuloSearchRecord from '@backend/domain/almacen/imprenta-articulo-search-record.interface';
-import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario-record.interface';
-import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
+} from '@backend/domain/almacen/caducidades/caducidad-record.interface';
+import type { CaducidadReportRecord } from '@backend/domain/almacen/caducidades/caducidad-report-record.interface';
+import type ImprentaArticuloSearchRecord from '@backend/domain/almacen/imprenta/imprenta-articulo-search-record.interface';
+import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario/inventario-record.interface';
+import type InventarioSaveRecord from '@backend/domain/almacen/inventario/inventario-save-record.interface';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
 import TypeOrmAlmacenRepository from '@infrastructure/database/typeorm/typeorm-almacen.repository';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';

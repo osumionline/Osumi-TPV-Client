@@ -1,5 +1,5 @@
-import type InventarioPrintApi from '@desktop-contracts/almacen/inventario-print-api.interface';
-import type InventarioPrintDocumentoInterface from '@desktop-contracts/almacen/inventario-print.interface';
+import type InventarioPrintApi from '@desktop-contracts/almacen/inventario/inventario-print-api.interface';
+import type InventarioPrintDocumentoInterface from '@desktop-contracts/almacen/inventario/inventario-print.interface';
 import IPC_CHANNELS from '@ipc/channels';
 import { contextBridge, ipcRenderer } from 'electron';
 

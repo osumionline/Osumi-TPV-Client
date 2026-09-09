@@ -1,11 +1,11 @@
 import ImprentaPrintService from '@backend/application/almacen/imprenta-print.service';
-import type ImprentaPrintProvider from '@backend/contracts/almacen/imprenta-print-provider.interface';
-import type ImprentaPrintWindow from '@backend/contracts/almacen/imprenta-print-window.interface';
+import type ImprentaPrintProvider from '@backend/contracts/almacen/imprenta/imprenta-print-provider.interface';
+import type ImprentaPrintWindow from '@backend/contracts/almacen/imprenta/imprenta-print-window.interface';
 import type {
   ImprentaPrintArticuloInterface,
   ImprentaPrintCommand,
   ImprentaPrintDocumentoInterface,
-} from '@desktop-contracts/almacen/imprenta-print.interface';
+} from '@desktop-contracts/almacen/imprenta/imprenta-print.interface';
 import { describe, expect, it } from 'vitest';
 
 class FakeImprentaPrintProvider implements ImprentaPrintProvider {

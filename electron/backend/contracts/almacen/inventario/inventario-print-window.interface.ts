@@ -1,4 +1,4 @@
-import type InventarioPrintDocumentoInterface from '@desktop-contracts/almacen/inventario-print.interface';
+import type InventarioPrintDocumentoInterface from '@desktop-contracts/almacen/inventario/inventario-print.interface';
 
 export default interface InventarioPrintWindow {
   /**

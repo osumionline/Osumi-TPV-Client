@@ -1,5 +1,5 @@
-import type { InventarioReportColumn } from '@desktop-contracts/almacen/inventario-report.interface';
-import type { InventarioRowInterface } from '@desktop-contracts/almacen/inventario.interface';
+import type { InventarioReportColumn } from '@desktop-contracts/almacen/inventario/inventario-report.interface';
+import type { InventarioRowInterface } from '@desktop-contracts/almacen/inventario/inventario.interface';
 import type {
   InventarioDirtyField,
   InventarioDraftValues,

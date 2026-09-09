@@ -1,7 +1,7 @@
 import type {
   InventarioReportConsulta,
   InventarioReportInterface,
-} from '@desktop-contracts/almacen/inventario-report.interface';
+} from '@desktop-contracts/almacen/inventario/inventario-report.interface';
 
 export default interface InventarioReportProvider {
   /**
