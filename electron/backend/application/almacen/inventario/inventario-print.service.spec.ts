@@ -1,4 +1,4 @@
-import InventarioPrintService from '@backend/application/almacen/inventario-print.service';
+import InventarioPrintService from '@backend/application/almacen/inventario/inventario-print.service';
 import type InventarioPrintWindow from '@backend/contracts/almacen/inventario/inventario-print-window.interface';
 import type InventarioReportProvider from '@backend/contracts/almacen/inventario/inventario-report-provider.interface';
 import type InventarioPrintDocumentoInterface from '@desktop-contracts/almacen/inventario/inventario-print.interface';

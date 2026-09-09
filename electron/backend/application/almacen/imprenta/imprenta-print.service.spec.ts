@@ -1,4 +1,4 @@
-import ImprentaPrintService from '@backend/application/almacen/imprenta-print.service';
+import ImprentaPrintService from '@backend/application/almacen/imprenta/imprenta-print.service';
 import type ImprentaPrintProvider from '@backend/contracts/almacen/imprenta/imprenta-print-provider.interface';
 import type ImprentaPrintWindow from '@backend/contracts/almacen/imprenta/imprenta-print-window.interface';
 import type {

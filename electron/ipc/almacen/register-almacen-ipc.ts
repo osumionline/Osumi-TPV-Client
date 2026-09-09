@@ -1,8 +1,10 @@
-import type AlmacenService from '@backend/application/almacen/almacen.service';
-import type CaducidadReportService from '@backend/application/almacen/caducidad-report.service';
-import type ImprentaPrintService from '@backend/application/almacen/imprenta-print.service';
-import type InventarioCsvService from '@backend/application/almacen/inventario-csv.service';
-import type InventarioPrintService from '@backend/application/almacen/inventario-print.service';
+import type CaducidadReportService from '@backend/application/almacen/caducidades/caducidad-report.service';
+import type CaducidadesService from '@backend/application/almacen/caducidades/caducidades.service';
+import type ImprentaPrintService from '@backend/application/almacen/imprenta/imprenta-print.service';
+import type ImprentaService from '@backend/application/almacen/imprenta/imprenta.service';
+import type InventarioCsvService from '@backend/application/almacen/inventario/inventario-csv.service';
+import type InventarioPrintService from '@backend/application/almacen/inventario/inventario-print.service';
+import type InventarioService from '@backend/application/almacen/inventario/inventario.service';
 import type {
   CaducidadArticuloSearchInterface,
   CaducidadCreateCommand,
@@ -37,7 +39,9 @@ import { ipcMain } from 'electron';
  */
 export default function registerAlmacenIpc(
   getMainWindow: MainWindowProvider,
-  almacenService: AlmacenService,
+  inventarioService: InventarioService,
+  caducidadesService: CaducidadesService,
+  imprentaService: ImprentaService,
   inventarioCsvService: InventarioCsvService,
   inventarioPrintService: InventarioPrintService,
   caducidadReportService: CaducidadReportService,
@@ -48,7 +52,7 @@ export default function registerAlmacenIpc(
     async (event, consulta: InventarioConsulta): Promise<InventarioResultado> => {
       assertTrustedSender(event, getMainWindow);
 
-      return almacenService.searchInventario(consulta);
+      return inventarioService.searchInventario(consulta);
     },
   );
 
@@ -75,7 +79,7 @@ export default function registerAlmacenIpc(
     async (event, command: InventarioSaveCommand): Promise<void> => {
       assertTrustedSender(event, getMainWindow);
 
-      await almacenService.saveInventarioRow(command);
+      await inventarioService.saveInventarioRow(command);
     },
   );
 
@@ -84,7 +88,7 @@ export default function registerAlmacenIpc(
     async (event, commands: readonly InventarioSaveCommand[]): Promise<void> => {
       assertTrustedSender(event, getMainWindow);
 
-      await almacenService.saveInventarioRows(commands);
+      await inventarioService.saveInventarioRows(commands);
     },
   );
 
@@ -93,7 +97,7 @@ export default function registerAlmacenIpc(
     async (event, idArticulo: number): Promise<void> => {
       assertTrustedSender(event, getMainWindow);
 
-      await almacenService.deactivateArticulo(idArticulo);
+      await inventarioService.deactivateArticulo(idArticulo);
     },
   );
 
@@ -102,7 +106,7 @@ export default function registerAlmacenIpc(
     async (event, consulta: CaducidadConsulta): Promise<CaducidadResultado> => {
       assertTrustedSender(event, getMainWindow);
 
-      return almacenService.searchCaducidades(consulta);
+      return caducidadesService.searchCaducidades(consulta);
     },
   );
 
@@ -111,7 +115,7 @@ export default function registerAlmacenIpc(
     async (event): Promise<CaducidadFilterOptionsInterface> => {
       assertTrustedSender(event, getMainWindow);
 
-      return almacenService.getCaducidadFilterOptions();
+      return caducidadesService.getCaducidadFilterOptions();
     },
   );
 
@@ -120,7 +124,7 @@ export default function registerAlmacenIpc(
     async (event, texto: string): Promise<readonly CaducidadArticuloSearchInterface[]> => {
       assertTrustedSender(event, getMainWindow);
 
-      return almacenService.searchCaducidadArticulos(texto);
+      return caducidadesService.searchCaducidadArticulos(texto);
     },
   );
 
@@ -129,7 +133,7 @@ export default function registerAlmacenIpc(
     async (event, command: CaducidadCreateCommand): Promise<void> => {
       assertTrustedSender(event, getMainWindow);
 
-      await almacenService.createCaducidad(command);
+      await caducidadesService.createCaducidad(command);
     },
   );
 
@@ -138,7 +142,7 @@ export default function registerAlmacenIpc(
     async (event, idCaducidad: number): Promise<void> => {
       assertTrustedSender(event, getMainWindow);
 
-      await almacenService.deactivateCaducidad(idCaducidad);
+      await caducidadesService.deactivateCaducidad(idCaducidad);
     },
   );
 
@@ -159,7 +163,7 @@ export default function registerAlmacenIpc(
     ): Promise<readonly ImprentaArticuloSearchInterface[]> => {
       assertTrustedSender(event, getMainWindow);
 
-      return almacenService.searchImprentaArticulos(consulta);
+      return imprentaService.searchImprentaArticulos(consulta);
     },
   );
 

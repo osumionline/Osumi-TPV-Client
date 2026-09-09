@@ -1,4 +1,4 @@
-import CaducidadReportService from '@backend/application/almacen/caducidad-report.service';
+import CaducidadReportService from '@backend/application/almacen/caducidades/caducidad-report.service';
 import type CaducidadReportProvider from '@backend/contracts/almacen/caducidades/caducidad-report-provider.interface';
 import type CaducidadReportWindow from '@backend/contracts/almacen/caducidades/caducidad-report-window.interface';
 import type {

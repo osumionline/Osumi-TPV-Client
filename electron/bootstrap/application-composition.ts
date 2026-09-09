@@ -1,11 +1,11 @@
-import { join } from 'node:path';
-
-import AlmacenService from '@backend/application/almacen/almacen.service';
-import CaducidadReportService from '@backend/application/almacen/caducidad-report.service';
-import ImprentaPrintService from '@backend/application/almacen/imprenta-print.service';
-import InventarioCsvBuilder from '@backend/application/almacen/inventario-csv.builder';
-import InventarioCsvService from '@backend/application/almacen/inventario-csv.service';
-import InventarioPrintService from '@backend/application/almacen/inventario-print.service';
+import CaducidadReportService from '@backend/application/almacen/caducidades/caducidad-report.service';
+import CaducidadesService from '@backend/application/almacen/caducidades/caducidades.service';
+import ImprentaPrintService from '@backend/application/almacen/imprenta/imprenta-print.service';
+import ImprentaService from '@backend/application/almacen/imprenta/imprenta.service';
+import InventarioCsvBuilder from '@backend/application/almacen/inventario/inventario-csv.builder';
+import InventarioCsvService from '@backend/application/almacen/inventario/inventario-csv.service';
+import InventarioPrintService from '@backend/application/almacen/inventario/inventario-print.service';
+import InventarioService from '@backend/application/almacen/inventario/inventario.service';
 import ApplicationStateService from '@backend/application/application/application-state.service';
 import ArticulosService from '@backend/application/articulos/articulos.service';
 import CajaService from '@backend/application/caja/caja.service';
@@ -159,6 +159,7 @@ import registerProveedoresIpc from '@ipc/register-proveedores-ipc';
 import registerReservasIpc from '@ipc/register-reservas-ipc';
 import { registerSystemIpc } from '@ipc/register-system-ipc';
 import registerVentasIpc from '@ipc/register-ventas-ipc';
+import { join } from 'node:path';
 
 /**
  * Construye el grafo de dependencias de la aplicación,
@@ -271,14 +272,17 @@ export default function createApplicationComposition(
    * Almacén.
    */
   const almacenRepository: AlmacenRepository = new TypeOrmAlmacenRepository(operationalDatabase);
-  const almacenService: AlmacenService = new AlmacenService(almacenRepository);
+  const inventarioService: InventarioService = new InventarioService(almacenRepository);
+  const caducidadesService: CaducidadesService = new CaducidadesService(almacenRepository);
+  const imprentaService: ImprentaService = new ImprentaService(almacenRepository);
+
   const inventarioCsvBuilder: InventarioCsvBuilder = new InventarioCsvBuilder();
   const inventarioCsvFileSaver: InventarioCsvFileSaver = new ElectronInventarioCsvFileSaver(
     getMainWindow,
   );
 
   const inventarioCsvService: InventarioCsvService = new InventarioCsvService(
-    almacenService,
+    inventarioService,
     inventarioCsvBuilder,
     inventarioCsvFileSaver,
   );
@@ -288,7 +292,7 @@ export default function createApplicationComposition(
   );
 
   const inventarioPrintService: InventarioPrintService = new InventarioPrintService(
-    almacenService,
+    inventarioService,
     inventarioPrintWindow,
   );
 
@@ -296,13 +300,13 @@ export default function createApplicationComposition(
     getMainWindow,
   );
   const caducidadReportService: CaducidadReportService = new CaducidadReportService(
-    almacenService,
+    caducidadesService,
     caducidadReportWindow,
   );
 
   const imprentaPrintWindow: ImprentaPrintWindow = new ElectronImprentaPrintWindow(getMainWindow);
   const imprentaPrintService: ImprentaPrintService = new ImprentaPrintService(
-    almacenService,
+    imprentaService,
     imprentaPrintWindow,
   );
 
@@ -574,7 +578,9 @@ export default function createApplicationComposition(
   registerApplicationIpc(applicationStateService);
   registerAlmacenIpc(
     getMainWindow,
-    almacenService,
+    inventarioService,
+    caducidadesService,
+    imprentaService,
     inventarioCsvService,
     inventarioPrintService,
     caducidadReportService,

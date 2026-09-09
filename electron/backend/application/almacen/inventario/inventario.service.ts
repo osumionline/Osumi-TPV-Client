@@ -1,0 +1,351 @@
+import validateOptionalId from '@backend/application/almacen/validate-optional-id';
+import type InventarioFilterQuery from '@backend/contracts/almacen/inventario/inventario-filter-query.interface';
+import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario/inventario-query.interface';
+import type InventarioReportProvider from '@backend/contracts/almacen/inventario/inventario-report-provider.interface';
+import type InventarioRepository from '@backend/contracts/almacen/inventario/inventario.repository.interface';
+import type {
+  InventarioResultadoRecord,
+  InventarioRowRecord,
+} from '@backend/domain/almacen/inventario/inventario-record.interface';
+import type {
+  InventarioReportRecord,
+  InventarioReportRowRecord,
+} from '@backend/domain/almacen/inventario/inventario-report-record.interface';
+import type InventarioSaveRecord from '@backend/domain/almacen/inventario/inventario-save-record.interface';
+import type {
+  InventarioReportColumn,
+  InventarioReportConsulta,
+  InventarioReportInterface,
+  InventarioReportRowInterface,
+} from '@desktop-contracts/almacen/inventario/inventario-report.interface';
+import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario/inventario-save.interface';
+import type {
+  InventarioConsulta,
+  InventarioFilters,
+  InventarioResultado,
+  InventarioRowInterface,
+} from '@desktop-contracts/almacen/inventario/inventario.interface';
+import { PAGE_SIZE_OPTIONS } from '@desktop-contracts/shared/pagination.constants';
+import INVENTARIO_REPORT_COLUMNS from './inventario.service.private';
+
+/**
+ * Expone los casos de uso propios de Inventario.
+ */
+export default class InventarioService implements InventarioReportProvider {
+  /**
+   * Crea el servicio de Inventario.
+   */
+  constructor(
+    private readonly inventarioRepository: InventarioRepository,
+    private readonly currentDateProvider: () => Date = (): Date => new Date(),
+  ) {}
+
+  /**
+   * Valida y ejecuta una consulta paginada de Inventario.
+   */
+  async searchInventario(consulta: InventarioConsulta): Promise<InventarioResultado> {
+    if (typeof consulta !== 'object' || consulta === null) {
+      throw new Error('La consulta de inventario no es válida.');
+    }
+
+    const filter: InventarioFilterQuery = this.mapFilterQuery(consulta);
+
+    if (!Number.isSafeInteger(consulta.pagina) || consulta.pagina <= 0) {
+      throw new Error('La página de inventario no es válida.');
+    }
+    if (!PAGE_SIZE_OPTIONS.includes(consulta.num)) {
+      throw new Error('El tamaño de página de inventario no es válido.');
+    }
+
+    const offset: number = (consulta.pagina - 1) * consulta.num;
+
+    if (!Number.isSafeInteger(offset)) {
+      throw new Error('El desplazamiento de inventario supera el rango permitido.');
+    }
+
+    const repositoryQuery: InventarioRepositoryQuery = {
+      ...filter,
+      ventasDesde: this.getVentasDesde(),
+      offset,
+      limit: consulta.num,
+    };
+
+    const result: InventarioResultadoRecord =
+      await this.inventarioRepository.searchInventario(repositoryQuery);
+
+    return {
+      rows: result.rows.map((row: InventarioRowRecord): InventarioRowInterface => ({
+        id: row.id,
+        publicId: row.publicId,
+        localizador: row.localizador,
+        idProveedor: row.idProveedor,
+        proveedorNombre: row.proveedorNombre,
+        idMarca: row.idMarca,
+        marcaNombre: row.marcaNombre,
+        referencia: row.referencia,
+        idsCategorias: [...row.idsCategorias],
+        nombre: row.nombre,
+        stock: row.stock,
+        precioAlbaranMicros: row.precioAlbaranMicros,
+        pucMicros: row.pucMicros,
+        pvpCents: row.pvpCents,
+        margenMicroporcentaje: row.margenMicroporcentaje,
+        ivaBps: row.ivaBps,
+        reBps: row.reBps,
+        tieneCodigoAdicional: row.tieneCodigoAdicional,
+        sinVentasUltimos12Meses: row.sinVentasUltimos12Meses,
+      })),
+      totalRows: result.totalRows,
+      mediaMargenMicroporcentaje: result.mediaMargenMicroporcentaje,
+      totalPucMicros: result.totalPucMicros,
+      totalPvpCents: result.totalPvpCents,
+    };
+  }
+
+  /**
+   * Recupera un snapshot persistido completo
+   * para reportes de Inventario.
+   */
+  async getInventarioReport(
+    consulta: InventarioReportConsulta,
+  ): Promise<InventarioReportInterface> {
+    const filter: InventarioFilterQuery = this.mapFilterQuery(consulta);
+
+    this.validateReportColumns(consulta.columnas);
+
+    const result: InventarioReportRecord =
+      await this.inventarioRepository.getInventarioReport(filter);
+
+    return {
+      rows: result.rows.map((row: InventarioReportRowRecord): InventarioReportRowInterface => ({
+        localizador: row.localizador,
+        proveedorNombre: row.proveedorNombre,
+        marcaNombre: row.marcaNombre,
+        referencia: row.referencia,
+        categorias: [...row.categorias],
+        nombre: row.nombre,
+        stock: row.stock,
+        precioAlbaranMicros: row.precioAlbaranMicros,
+        pucMicros: row.pucMicros,
+        pvpCents: row.pvpCents,
+        margenMicroporcentaje: row.margenMicroporcentaje,
+        codigosBarrasAdicionales: [...row.codigosBarrasAdicionales],
+      })),
+      totalRows: result.totalRows,
+      mediaMargenMicroporcentaje: result.mediaMargenMicroporcentaje,
+      totalPucMicros: result.totalPucMicros,
+      totalPvpCents: result.totalPvpCents,
+    };
+  }
+
+  /**
+   * Persiste una única fila modificada de Inventario.
+   */
+  async saveInventarioRow(command: InventarioSaveCommand): Promise<void> {
+    const record: InventarioSaveRecord = this.mapSaveRecord(command);
+
+    await this.inventarioRepository.saveInventarioRows([record]);
+  }
+
+  /**
+   * Persiste todas las filas indicadas dentro
+   * de una única transacción.
+   */
+  async saveInventarioRows(commands: readonly InventarioSaveCommand[]): Promise<void> {
+    if (!Array.isArray(commands) || commands.length === 0) {
+      throw new Error('No hay filas de inventario para guardar.');
+    }
+
+    const records: readonly InventarioSaveRecord[] = commands.map(
+      (command: InventarioSaveCommand): InventarioSaveRecord => this.mapSaveRecord(command),
+    );
+
+    const ids: Set<number> = new Set<number>();
+
+    for (const record of records) {
+      if (ids.has(record.idArticulo)) {
+        throw new Error('Hay artículos repetidos en el guardado de inventario.');
+      }
+
+      ids.add(record.idArticulo);
+    }
+
+    await this.inventarioRepository.saveInventarioRows(records);
+  }
+
+  /**
+   * Da de baja lógicamente un artículo desde Inventario.
+   */
+  async deactivateArticulo(idArticulo: number): Promise<void> {
+    if (!Number.isSafeInteger(idArticulo) || idArticulo <= 0) {
+      throw new Error('El identificador del artículo no es válido.');
+    }
+
+    await this.inventarioRepository.deactivateArticulo(idArticulo);
+  }
+
+  /**
+   * Valida y normaliza los filtros compartidos de Inventario.
+   */
+  private mapFilterQuery(filters: InventarioFilters): InventarioFilterQuery {
+    if (typeof filters !== 'object' || filters === null) {
+      throw new Error('La consulta de inventario no es válida.');
+    }
+
+    const idProveedor: number | null = validateOptionalId(
+      filters.idProveedor,
+      'El proveedor del filtro no es válido.',
+    );
+    const idMarca: number | null = validateOptionalId(
+      filters.idMarca,
+      'La marca del filtro no es válida.',
+    );
+    const idCategoria: number | null = validateOptionalId(
+      filters.idCategoria,
+      'La categoría del filtro no es válida.',
+    );
+
+    if (typeof filters.texto !== 'string') {
+      throw new Error('El texto de búsqueda de inventario no es válido.');
+    }
+    if (typeof filters.conDescuento !== 'boolean') {
+      throw new Error('El filtro de descuento de inventario no es válido.');
+    }
+
+    const texto: string = filters.texto.trim();
+
+    return {
+      idProveedor,
+      idMarca,
+      idCategoria,
+      texto: texto.length === 0 ? null : texto,
+      conDescuento: filters.conDescuento,
+    };
+  }
+
+  /**
+   * Valida las columnas solicitadas para un reporte.
+   */
+  private validateReportColumns(columnas: readonly InventarioReportColumn[]): void {
+    if (!Array.isArray(columnas) || columnas.length === 0) {
+      throw new Error('Debes seleccionar al menos una columna para exportar.');
+    }
+
+    const uniqueColumns: Set<InventarioReportColumn> = new Set<InventarioReportColumn>();
+
+    for (const column of columnas as readonly unknown[]) {
+      if (
+        typeof column !== 'string' ||
+        !INVENTARIO_REPORT_COLUMNS.includes(column as InventarioReportColumn)
+      ) {
+        throw new Error('Una de las columnas seleccionadas no es válida.');
+      }
+
+      const typedColumn: InventarioReportColumn = column as InventarioReportColumn;
+
+      if (uniqueColumns.has(typedColumn)) {
+        throw new Error('Hay columnas repetidas en el reporte.');
+      }
+
+      uniqueColumns.add(typedColumn);
+    }
+  }
+
+  /**
+   * Calcula el inicio del período móvil
+   * de los últimos doce meses.
+   */
+  private getVentasDesde(): string {
+    const currentDate: Date = this.currentDateProvider();
+
+    if (!Number.isFinite(currentDate.getTime())) {
+      throw new Error('No se ha podido determinar la fecha actual.');
+    }
+
+    const ventasDesde: Date = new Date(currentDate.getTime());
+
+    ventasDesde.setUTCMonth(ventasDesde.getUTCMonth() - 12);
+
+    return ventasDesde.toISOString();
+  }
+
+  /**
+   * Valida y normaliza una fila editable de Inventario.
+   */
+  private mapSaveRecord(command: InventarioSaveCommand): InventarioSaveRecord {
+    if (typeof command !== 'object' || command === null) {
+      throw new Error('La fila de inventario no es válida.');
+    }
+
+    if (!Number.isSafeInteger(command.idArticulo) || command.idArticulo <= 0) {
+      throw new Error('El identificador del artículo no es válido.');
+    }
+    if (!Array.isArray(command.idsCategorias)) {
+      throw new Error('Las categorías del artículo no son válidas.');
+    }
+
+    const idsCategorias: number[] = [];
+
+    for (const value of command.idsCategorias as readonly unknown[]) {
+      if (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0) {
+        throw new Error('Una de las categorías seleccionadas no es válida.');
+      }
+
+      if (!idsCategorias.includes(value)) {
+        idsCategorias.push(value);
+      }
+    }
+
+    idsCategorias.sort((a: number, b: number): number => a - b);
+
+    if (!Number.isSafeInteger(command.stock)) {
+      throw new Error('El stock no es válido.');
+    }
+
+    this.validateNonNegativeInteger(command.precioAlbaranMicros, 'El Precio albarán no es válido.');
+    this.validateNonNegativeInteger(command.pucMicros, 'El PUC no es válido.');
+    this.validateNonNegativeInteger(command.pvpCents, 'El PVP no es válido.');
+
+    if (!Number.isSafeInteger(command.margenMicroporcentaje)) {
+      throw new Error('El margen no es válido.');
+    }
+
+    let codigoAdicional: string | null = null;
+
+    if (command.codigoAdicional !== null) {
+      if (typeof command.codigoAdicional !== 'string') {
+        throw new Error('El código de barras no es válido.');
+      }
+
+      const codigo: string = command.codigoAdicional.trim();
+
+      if (codigo.length > 0) {
+        if (codigo.length > 100) {
+          throw new Error('El código de barras no puede superar los 100 caracteres.');
+        }
+
+        codigoAdicional = codigo;
+      }
+    }
+
+    return {
+      idArticulo: command.idArticulo,
+      idsCategorias,
+      stock: command.stock,
+      precioAlbaranMicros: command.precioAlbaranMicros,
+      pucMicros: command.pucMicros,
+      pvpCents: command.pvpCents,
+      margenMicroporcentaje: command.margenMicroporcentaje,
+      codigoAdicional,
+    };
+  }
+
+  /**
+   * Valida un entero monetario positivo o cero.
+   */
+  private validateNonNegativeInteger(value: unknown, message: string): void {
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+      throw new Error(message);
+    }
+  }
+}

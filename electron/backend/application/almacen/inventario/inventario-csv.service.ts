@@ -1,6 +1,6 @@
-import type AlmacenService from '@backend/application/almacen/almacen.service';
-import type InventarioCsvBuilder from '@backend/application/almacen/inventario-csv.builder';
+import type InventarioCsvBuilder from '@backend/application/almacen/inventario/inventario-csv.builder';
 import type InventarioCsvFileSaver from '@backend/contracts/almacen/inventario/inventario-csv-file-saver.interface';
+import type InventarioReportProvider from '@backend/contracts/almacen/inventario/inventario-report-provider.interface';
 import type {
   InventarioCsvExportResult,
   InventarioReportConsulta,
@@ -12,7 +12,7 @@ import type {
  */
 export default class InventarioCsvService {
   constructor(
-    private readonly almacenService: AlmacenService,
+    private readonly reportProvider: InventarioReportProvider,
     private readonly csvBuilder: InventarioCsvBuilder,
     private readonly fileSaver: InventarioCsvFileSaver,
     private readonly currentDateProvider: () => Date = (): Date => new Date(),
@@ -23,7 +23,7 @@ export default class InventarioCsvService {
    */
   async export(consulta: InventarioReportConsulta): Promise<InventarioCsvExportResult> {
     const report: InventarioReportInterface =
-      await this.almacenService.getInventarioReport(consulta);
+      await this.reportProvider.getInventarioReport(consulta);
 
     const content: string = this.csvBuilder.build(report, consulta.columnas);
 
