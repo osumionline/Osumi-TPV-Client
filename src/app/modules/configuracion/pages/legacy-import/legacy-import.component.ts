@@ -32,6 +32,7 @@ import LegacyImportStartResult from '@desktop-contracts/legacy-import/legacy-imp
 import LegacyImportConflictResolutionComponent from '@modules/configuracion/components/legacy-import-conflict-resolution/legacy-import-conflict-resolution.component';
 import DesktopLegacyImportService from '@services/desktop-legacy-import.service';
 import { getErrorMessage } from '@utils/error.utils';
+import { formatInteger as formatIntegerValue } from '@utils/format.utils';
 
 @Component({
   selector: 'otpv-legacy-import',
@@ -56,22 +57,16 @@ export default class LegacyImportComponent {
     DesktopLegacyImportService,
   );
   private readonly destroyRef: DestroyRef = inject(DestroyRef);
-
   private readonly injector: Injector = inject(Injector);
 
   private readonly pageTop: Signal<ElementRef<HTMLElement> | undefined> =
     viewChild<ElementRef<HTMLElement>>('pageTop');
-
   private readonly validatedDecisions: Signal<ElementRef<HTMLElement> | undefined> =
     viewChild<ElementRef<HTMLElement>>('validatedDecisions');
-
   private readonly importExecution: Signal<ElementRef<HTMLElement> | undefined> =
     viewChild<ElementRef<HTMLElement>>('importExecution');
-
   private readonly importResultSection: Signal<ElementRef<HTMLElement> | undefined> =
     viewChild<ElementRef<HTMLElement>>('importResultSection');
-
-  private readonly integerFormatter: Intl.NumberFormat = new Intl.NumberFormat('es-ES');
 
   private readonly dateFormatter: Intl.DateTimeFormat = new Intl.DateTimeFormat('es-ES', {
     dateStyle: 'medium',
@@ -80,16 +75,11 @@ export default class LegacyImportComponent {
 
   readonly selectedPackage: WritableSignal<LegacyImportPackageSummary | null> =
     signal<LegacyImportPackageSummary | null>(null);
-
   readonly analysisReport: WritableSignal<LegacyImportAnalysisReport | null> =
     signal<LegacyImportAnalysisReport | null>(null);
-
   readonly selecting: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly analyzing: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly selectionError: WritableSignal<string | null> = signal<string | null>(null);
-
   readonly analysisError: WritableSignal<string | null> = signal<string | null>(null);
 
   readonly automaticIssues: Signal<readonly LegacyImportAnalysisIssue[]> = computed(
@@ -98,7 +88,6 @@ export default class LegacyImportComponent {
         (issue: LegacyImportAnalysisIssue): boolean => issue.kind === 'automatic-repair',
       ) ?? [],
   );
-
   readonly reviewIssues: Signal<readonly LegacyImportAnalysisIssue[]> = computed(
     (): readonly LegacyImportAnalysisIssue[] =>
       this.analysisReport()?.issues.filter(
@@ -107,26 +96,18 @@ export default class LegacyImportComponent {
   );
 
   readonly resolvingConflicts: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly reviewDecisions: WritableSignal<readonly LegacyImportReviewDecision[]> = signal<
     readonly LegacyImportReviewDecision[]
   >([]);
-
   readonly savingReviewDecisions: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly reviewSubmissionError: WritableSignal<string | null> = signal<string | null>(null);
-
   readonly preparationResult: WritableSignal<LegacyImportPreparationResult | null> =
     signal<LegacyImportPreparationResult | null>(null);
-
   readonly importing: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly importProgress: WritableSignal<LegacyImportProgress | null> =
     signal<LegacyImportProgress | null>(null);
-
   readonly importResult: WritableSignal<LegacyImportStartResult | null> =
     signal<LegacyImportStartResult | null>(null);
-
   readonly importError: WritableSignal<string | null> = signal<string | null>(null);
 
   constructor() {
@@ -262,7 +243,7 @@ export default class LegacyImportComponent {
   }
 
   formatInteger(value: number): string {
-    return this.integerFormatter.format(value);
+    return formatIntegerValue(value);
   }
 
   finishImport(): void {

@@ -12,6 +12,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatRadioButton, MatRadioGroup } from '@angular/material/radio';
 import type { LegacyImportReviewConflict } from '@desktop-contracts/legacy-import/legacy-import-review-conflict.type';
 import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-import/legacy-import-review-decision.type';
+import { formatEuros } from '@utils/format.utils';
 
 @Component({
   selector: 'otpv-legacy-import-conflict-resolution',
@@ -33,20 +34,13 @@ export default class LegacyImportConflictResolutionComponent {
   readonly conflicts = input.required<readonly LegacyImportReviewConflict[]>();
 
   readonly completed = output<readonly LegacyImportReviewDecision[]>();
-
   readonly cancelled = output<void>();
 
   private readonly decisions: WritableSignal<Readonly<Record<string, LegacyImportReviewDecision>>> =
     signal<Readonly<Record<string, LegacyImportReviewDecision>>>({});
 
-  private readonly currencyFormatter: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency: 'EUR',
-  });
-
   readonly allResolved: Signal<boolean> = computed((): boolean => {
     const currentDecisions: Readonly<Record<string, LegacyImportReviewDecision>> = this.decisions();
-
     const currentConflicts: readonly LegacyImportReviewConflict[] = this.conflicts();
 
     return (
@@ -162,7 +156,7 @@ export default class LegacyImportConflictResolutionComponent {
   }
 
   formatCurrency(value: number): string {
-    return this.currencyFormatter.format(value);
+    return formatEuros(value);
   }
 
   cancel(): void {
