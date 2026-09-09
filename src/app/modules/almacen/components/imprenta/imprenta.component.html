@@ -42,7 +42,9 @@
             </div>
             } @else {
             @for (article of results(); track article.id) {
-            <div class="imprenta__result">
+            <button class="imprenta__result"
+                    type="button"
+                    (click)="selectArticle(article)">
                 <span class="imprenta__result-main">
                     <strong>
                         {{ article.nombre }}
@@ -58,22 +60,129 @@
                 <strong class="imprenta__result-price">
                     {{ formatCents(article.pvpCents) }}
                 </strong>
-            </div>
+            </button>
             }
             }
         </div>
     </section>
 
     <section class="imprenta__column">
-        <header class="imprenta__column-header">
-            <h2>
-                Seleccionados
-            </h2>
+        <header class="imprenta__column-header imprenta__column-header--actions">
+            <div>
+                <h2>
+                    Seleccionados
+                </h2>
+                <span>
+                    {{ totalDesignSlots() }} posiciones
+                </span>
+            </div>
+
+            <div class="imprenta__column-actions">
+                <button mat-stroked-button
+                        type="button"
+                        (click)="addGap()">
+                    <mat-icon>
+                        add
+                    </mat-icon>
+                    Hueco
+                </button>
+
+                <button mat-stroked-button
+                        type="button"
+                        [disabled]="designItems().length === 0"
+                        (click)="clearDesign()">
+                    <mat-icon>
+                        delete_sweep
+                    </mat-icon>
+                    Limpiar
+                </button>
+            </div>
         </header>
 
+        @if (designItems().length === 0) {
         <div class="imprenta__state">
-            La selección de artículos se incorpora en el siguiente bloque.
+            Selecciona artículos o añade un hueco para comenzar el diseño.
         </div>
+        } @else {
+        <div class="imprenta__selected-list"
+             cdkDropList
+             (cdkDropListDropped)="dropDesignItem($event)">
+            @for (item of designItems(); track item.id) {
+            <div class="imprenta__selected-item"
+                 [class.imprenta__selected-item--gap]="item.articulo === null"
+                 cdkDrag>
+                <button mat-icon-button
+                        type="button"
+                        cdkDragHandle
+                        matTooltip="Arrastrar para reordenar"
+                        aria-label="Arrastrar para reordenar">
+                    <mat-icon>
+                        drag_indicator
+                    </mat-icon>
+                </button>
+
+                @if (item.articulo; as article) {
+                <div class="imprenta__selected-info">
+                    <strong>
+                        {{ article.nombre }}
+                    </strong>
+
+                    @if (article.marcaNombre !== null && article.marcaNombre.length > 0) {
+                    <small>
+                        {{ article.marcaNombre }}
+                    </small>
+                    }
+                </div>
+
+                <label class="imprenta__quantity">
+                    <span>
+                        Etiquetas
+                    </span>
+                    <input type="number"
+                           min="1"
+                           step="1"
+                           inputmode="numeric"
+                           [value]="item.cantidad"
+                           (change)="onQuantityChange($event, item)">
+                </label>
+
+                <button mat-icon-button
+                        type="button"
+                        matTooltip="Quitar artículo"
+                        aria-label="Quitar artículo"
+                        (click)="removeItem(item)">
+                    <mat-icon>
+                        delete
+                    </mat-icon>
+                </button>
+                } @else {
+                <div class="imprenta__selected-info">
+                    <strong>
+                        Hueco
+                    </strong>
+                    <small>
+                        Una celda vacía
+                    </small>
+                </div>
+
+                <span class="imprenta__gap-value">
+                    1 hueco
+                </span>
+
+                <button mat-icon-button
+                        type="button"
+                        matTooltip="Quitar hueco"
+                        aria-label="Quitar hueco"
+                        (click)="removeItem(item)">
+                    <mat-icon>
+                        close
+                    </mat-icon>
+                </button>
+                }
+            </div>
+            }
+        </div>
+        }
     </section>
 
     <section class="imprenta__column imprenta__preview-column">
