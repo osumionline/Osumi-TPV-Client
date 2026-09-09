@@ -44,6 +44,7 @@
             @for (article of results(); track article.id) {
             <button class="imprenta__result"
                     type="button"
+                    [disabled]="!canAddDesignItem()"
                     (click)="selectArticle(article)">
                 <span class="imprenta__result-main">
                     <strong>
@@ -72,14 +73,15 @@
                 <h2>
                     Seleccionados
                 </h2>
-                <span>
-                    {{ totalDesignSlots() }} posiciones
+                <span [class.imprenta__capacity-error]="capacityExceeded()">
+                    {{ totalDesignSlots() }} / {{ capacity() }} posiciones
                 </span>
             </div>
 
             <div class="imprenta__column-actions">
                 <button mat-stroked-button
                         type="button"
+                        [disabled]="!canAddDesignItem()"
                         (click)="addGap()">
                     <mat-icon>
                         add
@@ -140,6 +142,7 @@
                     </span>
                     <input type="number"
                            min="1"
+                           [max]="maxQuantityForItem(item)"
                            step="1"
                            inputmode="numeric"
                            [value]="item.cantidad"
@@ -190,10 +193,134 @@
             <h2>
                 Previsualización
             </h2>
+            <span>
+                Hoja A4
+            </span>
         </header>
 
-        <div class="imprenta__state">
-            La hoja de etiquetas se mostrará aquí.
+        <div class="imprenta__page-container">
+            <div class="imprenta__page"
+                 [class.imprenta__page--landscape]="orientation() === 'landscape'"
+                 [class.imprenta__page--invalid]="capacityExceeded()"
+                 [class.imprenta__page--dense]="densePreview()"
+                 [class.imprenta__page--very-dense]="veryDensePreview()"
+                 [style.grid-template-columns]="'repeat(' + columns() + ', minmax(0, 1fr))'"
+                 [style.grid-template-rows]="'repeat(' + rows() + ', minmax(0, 1fr))'">
+                @for (slot of previewSlots(); track slot.id) {
+                <div class="imprenta__preview-cell"
+                     [class.imprenta__preview-cell--gap]="slot.tipo === 'hueco'"
+                     [class.imprenta__preview-cell--free]="slot.tipo === 'libre'">
+                    @if (slot.articulo; as article) {
+                    <div class="imprenta__label">
+                        <qrcode class="imprenta__label-qr"
+                                [qrdata]="formatQrData(article.localizador)"
+                                [width]="previewQrWidth()"
+                                [elementType]="'svg'"
+                                [errorCorrectionLevel]="'M'"
+                                [ariaLabel]="'QR del localizador ' + article.localizador" />
+
+                        <div class="imprenta__label-content">
+                            <strong class="imprenta__label-name">
+                                {{ article.nombre }}
+                            </strong>
+
+                            @if (article.marcaNombre !== null && article.marcaNombre.length > 0) {
+                            <span class="imprenta__label-brand">
+                                {{ article.marcaNombre }}
+                            </span>
+                            }
+
+                            @if (showPvp()) {
+                            <strong class="imprenta__label-price">
+                                {{ formatCents(article.pvpCents) }}
+                            </strong>
+                            }
+                        </div>
+                    </div>
+                    } @else if (slot.tipo === 'hueco') {
+                    <span class="imprenta__preview-guide">
+                        HUECO
+                    </span>
+                    } @else {
+                    <span class="imprenta__preview-guide imprenta__preview-guide--free">
+                        LIBRE
+                    </span>
+                    }
+                </div>
+                }
+            </div>
         </div>
+
+        <div class="imprenta__configuration">
+            <mat-form-field appearance="outline"
+                            subscriptSizing="dynamic">
+                <mat-label>
+                    Filas
+                </mat-label>
+                <input matInput
+                       type="number"
+                       min="1"
+                       [max]="maxRows"
+                       step="1"
+                       inputmode="numeric"
+                       [value]="rows()"
+                       (change)="onRowsChange($event)">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline"
+                            subscriptSizing="dynamic">
+                <mat-label>
+                    Columnas
+                </mat-label>
+                <input matInput
+                       type="number"
+                       min="1"
+                       [max]="maxColumns"
+                       step="1"
+                       inputmode="numeric"
+                       [value]="columns()"
+                       (change)="onColumnsChange($event)">
+            </mat-form-field>
+
+            <div class="imprenta__orientation">
+                <span>
+                    Orientación
+                </span>
+
+                <mat-button-toggle-group aria-label="Orientación de la hoja"
+                                         [value]="orientation()"
+                                         (change)="setOrientation($event.value)">
+                    <mat-button-toggle value="portrait">
+                        Vertical
+                    </mat-button-toggle>
+
+                    <mat-button-toggle value="landscape">
+                        Horizontal
+                    </mat-button-toggle>
+                </mat-button-toggle-group>
+            </div>
+
+            <mat-slide-toggle [checked]="showPvp()"
+                              (change)="setShowPvp($event.checked)">
+                Mostrar PVP
+            </mat-slide-toggle>
+        </div>
+
+        @if (capacityError(); as error) {
+        <div class="imprenta__configuration-error">
+            <mat-icon>
+                warning
+            </mat-icon>
+            <span>
+                {{ error }}
+            </span>
+        </div>
+        } @else {
+        <div class="imprenta__configuration-summary">
+            {{ totalDesignSlots() }} de {{ capacity() }} posiciones ocupadas
+            ·
+            {{ remainingCapacity() }} libres
+        </div>
+        }
     </section>
 </section>

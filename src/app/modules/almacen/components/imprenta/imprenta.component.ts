@@ -24,8 +24,26 @@ import ImprentaDesignItem from '@model/almacen/imprenta-design-item.interface';
 import { DialogService } from '@osumi/angular-tools';
 import AlmacenService from '@services/almacen.service';
 import { getErrorMessage } from '@utils/error.utils';
+import { MatButtonToggle, MatButtonToggleGroup } from '@angular/material/button-toggle';
+import { MatSlideToggle } from '@angular/material/slide-toggle';
+import { QRCodeComponent } from 'angularx-qrcode';
 
 const SEARCH_DELAY_MS: number = 250;
+const DEFAULT_PRINT_ROWS: number = 5;
+const DEFAULT_PRINT_COLUMNS: number = 4;
+const MAX_PRINT_ROWS: number = 10;
+const MAX_PRINT_COLUMNS: number = 10;
+const DEFAULT_PRINT_ORIENTATION: ImprentaOrientation = 'portrait';
+const DEFAULT_SHOW_PVP: boolean = true;
+
+type ImprentaOrientation = 'portrait' | 'landscape';
+type ImprentaPreviewSlotType = 'articulo' | 'hueco' | 'libre';
+
+interface ImprentaPreviewSlot {
+  readonly id: string;
+  readonly tipo: ImprentaPreviewSlotType;
+  readonly articulo: ImprentaArticuloSearchInterface | null;
+}
 
 const CURRENCY_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
   style: 'currency',
@@ -46,12 +64,16 @@ const CURRENCY_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
     CdkDragHandle,
     CdkDropList,
     MatButton,
+    MatButtonToggle,
+    MatButtonToggleGroup,
     MatFormField,
     MatIcon,
     MatIconButton,
     MatInput,
     MatLabel,
+    MatSlideToggle,
     MatTooltip,
+    QRCodeComponent,
   ],
 })
 export default class ImprentaComponent implements OnDestroy {
@@ -76,6 +98,48 @@ export default class ImprentaComponent implements OnDestroy {
       (total: number, item: ImprentaDesignItem): number => total + item.cantidad,
       0,
     ),
+  );
+  readonly rows: WritableSignal<number> = signal<number>(DEFAULT_PRINT_ROWS);
+  readonly columns: WritableSignal<number> = signal<number>(DEFAULT_PRINT_COLUMNS);
+  readonly orientation: WritableSignal<ImprentaOrientation> =
+    signal<ImprentaOrientation>(DEFAULT_PRINT_ORIENTATION);
+  readonly showPvp: WritableSignal<boolean> = signal<boolean>(DEFAULT_SHOW_PVP);
+  readonly maxRows: number = MAX_PRINT_ROWS;
+  readonly maxColumns: number = MAX_PRINT_COLUMNS;
+  readonly capacity: Signal<number> = computed((): number => this.rows() * this.columns());
+  readonly remainingCapacity: Signal<number> = computed((): number =>
+    Math.max(0, this.capacity() - this.totalDesignSlots()),
+  );
+  readonly capacityExceeded: Signal<boolean> = computed(
+    (): boolean => this.totalDesignSlots() > this.capacity(),
+  );
+  readonly canAddDesignItem: Signal<boolean> = computed(
+    (): boolean => !this.capacityExceeded() && this.totalDesignSlots() < this.capacity(),
+  );
+  readonly capacityError: Signal<string | null> = computed((): string | null => {
+    const total: number = this.totalDesignSlots();
+    const capacity: number = this.capacity();
+
+    if (total <= capacity) {
+      return null;
+    }
+
+    const excess: number = total - capacity;
+
+    return (
+      `El diseño ocupa ${total} posiciones, pero la hoja solo admite ${capacity}. ` +
+      `Sobran ${excess} ${excess === 1 ? 'posición' : 'posiciones'}.`
+    );
+  });
+  readonly previewSlots: Signal<readonly ImprentaPreviewSlot[]> = computed(
+    (): readonly ImprentaPreviewSlot[] => this.createPreviewSlots(),
+  );
+  readonly previewQrWidth: Signal<number> = computed((): number => this.calculatePreviewQrWidth());
+  readonly densePreview: Signal<boolean> = computed(
+    (): boolean => Math.max(this.rows(), this.columns()) >= 7,
+  );
+  readonly veryDensePreview: Signal<boolean> = computed(
+    (): boolean => Math.max(this.rows(), this.columns()) >= 9,
   );
   private searchTimeoutId: number | null = null;
   private searchSequence: number = 0;
@@ -122,7 +186,7 @@ export default class ImprentaComponent implements OnDestroy {
    * inicial y lo retira de los resultados visibles.
    */
   selectArticle(article: ImprentaArticuloSearchInterface): void {
-    if (this.selectedArticleIds().includes(article.id)) {
+    if (this.selectedArticleIds().includes(article.id) || !this.canAddDesignItem()) {
       return;
     }
 
@@ -153,6 +217,10 @@ export default class ImprentaComponent implements OnDestroy {
    * Añade una única posición vacía al diseño.
    */
   addGap(): void {
+    if (!this.canAddDesignItem()) {
+      return;
+    }
+
     const item: ImprentaDesignItem = {
       id: `hueco-${this.nextGapId++}`,
       tipo: 'hueco',
@@ -182,8 +250,15 @@ export default class ImprentaComponent implements OnDestroy {
 
       return;
     }
-
     if (value === item.cantidad) {
+      return;
+    }
+
+    const nextTotal: number = this.totalDesignSlots() - item.cantidad + value;
+
+    if (nextTotal > this.capacity() && value > item.cantidad) {
+      inputElement.value = String(item.cantidad);
+
       return;
     }
 
@@ -197,6 +272,48 @@ export default class ImprentaComponent implements OnDestroy {
           : current,
       ),
     );
+  }
+
+  /**
+   * Calcula la cantidad máxima que puede ocupar
+   * un artículo con la configuración actual.
+   */
+  maxQuantityForItem(item: ImprentaDesignItem): number {
+    const usedByOthers: number = this.totalDesignSlots() - item.cantidad;
+
+    return Math.max(1, this.capacity() - usedByOthers);
+  }
+
+  /**
+   * Confirma el número de filas de la hoja.
+   */
+  onRowsChange(event: Event): void {
+    this.updateDimension(event, this.rows, MAX_PRINT_ROWS);
+  }
+
+  /**
+   * Confirma el número de columnas de la hoja.
+   */
+  onColumnsChange(event: Event): void {
+    this.updateDimension(event, this.columns, MAX_PRINT_COLUMNS);
+  }
+
+  /**
+   * Cambia la orientación de la hoja A4.
+   */
+  setOrientation(value: unknown): void {
+    if (value !== 'portrait' && value !== 'landscape') {
+      return;
+    }
+
+    this.orientation.set(value);
+  }
+
+  /**
+   * Activa o desactiva el PVP en las etiquetas.
+   */
+  setShowPvp(value: boolean): void {
+    this.showPvp.set(value);
   }
 
   /**
@@ -305,6 +422,13 @@ export default class ImprentaComponent implements OnDestroy {
   }
 
   /**
+   * Convierte el localizador al contenido textual del QR.
+   */
+  formatQrData(localizador: number): string {
+    return String(localizador);
+  }
+
+  /**
    * Ejecuta una búsqueda remota y descarta respuestas obsoletas.
    */
   private async search(texto: string): Promise<void> {
@@ -351,5 +475,76 @@ export default class ImprentaComponent implements OnDestroy {
 
     window.clearTimeout(this.searchTimeoutId);
     this.searchTimeoutId = null;
+  }
+
+  /**
+   * Valida y confirma una dimensión entera de la hoja.
+   */
+  private updateDimension(event: Event, target: WritableSignal<number>, maximum: number): void {
+    const inputElement: HTMLInputElement = event.currentTarget as HTMLInputElement;
+    const previousValue: number = target();
+    const value: number = Number(inputElement.value);
+
+    if (!Number.isSafeInteger(value) || value < 1 || value > maximum) {
+      inputElement.value = String(previousValue);
+
+      return;
+    }
+
+    target.set(value);
+  }
+
+  /**
+   * Expande artículos y huecos a las posiciones
+   * físicas visibles de la hoja.
+   */
+  private createPreviewSlots(): readonly ImprentaPreviewSlot[] {
+    const occupiedSlots: ImprentaPreviewSlot[] = [];
+
+    for (const item of this.designItems()) {
+      if (item.articulo === null) {
+        occupiedSlots.push({
+          id: item.id,
+          tipo: 'hueco',
+          articulo: null,
+        });
+
+        continue;
+      }
+
+      for (let index: number = 0; index < item.cantidad; index++) {
+        occupiedSlots.push({
+          id: `${item.id}-${index}`,
+          tipo: 'articulo',
+          articulo: item.articulo,
+        });
+      }
+    }
+
+    const visibleSlots: ImprentaPreviewSlot[] = occupiedSlots.slice(0, this.capacity());
+
+    while (visibleSlots.length < this.capacity()) {
+      visibleSlots.push({
+        id: `libre-${visibleSlots.length}`,
+        tipo: 'libre',
+        articulo: null,
+      });
+    }
+
+    return visibleSlots;
+  }
+
+  /**
+   * Calcula un QR conservador para que la
+   * previsualización siga funcionando en rejillas densas.
+   */
+  private calculatePreviewQrWidth(): number {
+    const previewWidth: number = 400;
+    const previewHeight: number =
+      this.orientation() === 'portrait' ? previewWidth * (297 / 210) : previewWidth * (210 / 297);
+    const cellWidth: number = previewWidth / this.columns();
+    const cellHeight: number = previewHeight / this.rows();
+
+    return Math.max(16, Math.min(56, Math.floor(Math.min(cellWidth * 0.36, cellHeight * 0.7))));
   }
 }
