@@ -30,6 +30,7 @@ import type {
   InventarioResultado,
   InventarioRowInterface,
 } from '@desktop-contracts/almacen/inventario.interface';
+import { PAGE_SIZE_OPTIONS } from '@desktop-contracts/shared/pagination.constants';
 import type {
   InventarioDirtyField,
   InventarioDraftEntry,
@@ -183,7 +184,7 @@ export default class InventoryComponent implements OnInit, OnDestroy {
 
   readonly pagina: WritableSignal<number> = signal<number>(1);
   readonly num: WritableSignal<number> = signal<number>(20);
-  readonly pageSizeOptions: readonly number[] = [20, 50, 100, 200];
+  readonly pageSizeOptions: readonly number[] = PAGE_SIZE_OPTIONS;
 
   readonly rows: WritableSignal<readonly InventarioRowInterface[]> = signal<
     readonly InventarioRowInterface[]

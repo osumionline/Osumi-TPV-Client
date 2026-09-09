@@ -1,4 +1,8 @@
-import { formatIsoDateToSpanishDate } from '@utils/date.utils';
+import {
+  formatIsoDateToSpanishDate,
+  formatMonthName,
+  formatShortMonthName,
+} from '@utils/date.utils';
 
 describe('date.utils', (): void => {
   it('formatea una fecha YYYY-MM-DD', (): void => {
@@ -21,5 +25,24 @@ describe('date.utils', (): void => {
 
   it('devuelve sin modificar un valor no reconocible', (): void => {
     expect(formatIsoDateToSpanishDate('fecha desconocida')).toBe('fecha desconocida');
+  });
+
+  it('obtiene los nombres completos de los meses', (): void => {
+    expect(formatMonthName(1)).toBe('Enero');
+    expect(formatMonthName(6)).toBe('Junio');
+    expect(formatMonthName(12)).toBe('Diciembre');
+  });
+
+  it('obtiene las abreviaturas de los meses', (): void => {
+    expect(formatShortMonthName(1)).toBe('Ene');
+    expect(formatShortMonthName(8)).toBe('Ago');
+    expect(formatShortMonthName(12)).toBe('Dic');
+  });
+
+  it('mantiene un fallback explícito para meses desconocidos', (): void => {
+    expect(formatMonthName(0)).toBe('Mes 0');
+    expect(formatMonthName(13)).toBe('Mes 13');
+    expect(formatShortMonthName(0)).toBe('0');
+    expect(formatShortMonthName(13)).toBe('13');
   });
 });

@@ -1,21 +1,7 @@
 import { Component, signal, type OnInit, type WritableSignal } from '@angular/core';
 import type { CaducidadReportInterface } from '@desktop-contracts/almacen/caducidad-report.interface';
+import { formatMonthName } from '@utils/date.utils';
 import { getErrorMessage } from '@utils/error.utils';
-
-const MONTH_NAMES: readonly string[] = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
-];
 
 const CURRENCY_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
   style: 'currency',
@@ -136,7 +122,7 @@ export default class CaducidadReportComponent implements OnInit {
    * Devuelve el nombre visible de un mes.
    */
   formatMonth(mes: number): string {
-    return MONTH_NAMES[mes - 1] ?? `Mes ${mes}`;
+    return formatMonthName(mes);
   }
 
   /**

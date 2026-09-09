@@ -12,6 +12,7 @@ import {
 import { MatButton } from '@angular/material/button';
 import { MatOption } from '@angular/material/core';
 import { MatSelect, type MatSelectChange } from '@angular/material/select';
+import { MONTH_OPTIONS, type MonthOption } from '@constants/date.constants';
 import type {
   ArticuloEstadisticasPoint,
   ArticuloEstadisticasResultado,
@@ -20,6 +21,7 @@ import type {
 import { rescaleScaledInteger } from '@model/articulos/articulo-scaled-decimal.utils';
 import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.interface';
 import ArticulosService from '@services/articulos.service';
+import { formatShortMonthName } from '@utils/date.utils';
 import { getErrorMessage } from '@utils/error.utils';
 import { BarChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent } from 'echarts/components';
@@ -27,77 +29,6 @@ import type { EChartsCoreOption } from 'echarts/core';
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { NgxEchartsDirective, provideEchartsCore } from 'ngx-echarts';
-
-interface MonthOption {
-  readonly value: number;
-  readonly label: string;
-}
-
-const MONTHS: readonly MonthOption[] = [
-  {
-    value: 1,
-    label: 'Enero',
-  },
-  {
-    value: 2,
-    label: 'Febrero',
-  },
-  {
-    value: 3,
-    label: 'Marzo',
-  },
-  {
-    value: 4,
-    label: 'Abril',
-  },
-  {
-    value: 5,
-    label: 'Mayo',
-  },
-  {
-    value: 6,
-    label: 'Junio',
-  },
-  {
-    value: 7,
-    label: 'Julio',
-  },
-  {
-    value: 8,
-    label: 'Agosto',
-  },
-  {
-    value: 9,
-    label: 'Septiembre',
-  },
-  {
-    value: 10,
-    label: 'Octubre',
-  },
-  {
-    value: 11,
-    label: 'Noviembre',
-  },
-  {
-    value: 12,
-    label: 'Diciembre',
-  },
-];
-
-const SHORT_MONTHS: readonly string[] = [
-  'Ene',
-  'Feb',
-  'Mar',
-  'Abr',
-  'May',
-  'Jun',
-  'Jul',
-  'Ago',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dic',
-];
 
 const UNITS_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
   maximumFractionDigits: 0,
@@ -148,7 +79,7 @@ export default class ArticleStatisticsComponent implements OnInit {
 
   readonly error: WritableSignal<string | null> = signal<string | null>(null);
 
-  readonly months: readonly MonthOption[] = MONTHS;
+  readonly months: readonly MonthOption[] = MONTH_OPTIONS;
 
   readonly yearOptions: Signal<readonly number[]> = computed((): readonly number[] => {
     const years: Set<number> = new Set<number>(this.result()?.availableYears ?? []);
@@ -370,7 +301,7 @@ export default class ArticleStatisticsComponent implements OnInit {
    * Convierte un punto temporal en su etiqueta de eje.
    */
   private formatPointLabel(point: ArticuloEstadisticasPoint): string {
-    const shortMonth: string = SHORT_MONTHS[point.month - 1] ?? String(point.month);
+    const shortMonth: string = formatShortMonthName(point.month);
 
     if (point.day !== null) {
       return `${point.day} ${shortMonth}`;

@@ -70,8 +70,7 @@ import type {
   InventarioResultado,
   InventarioRowInterface,
 } from '@desktop-contracts/almacen/inventario.interface';
-
-const INVENTARIO_PAGE_SIZES: readonly number[] = [20, 50, 100, 200];
+import { PAGE_SIZE_OPTIONS } from '@desktop-contracts/shared/pagination.constants';
 
 const INVENTARIO_REPORT_COLUMNS: readonly InventarioReportColumn[] = [
   'localizador',
@@ -87,8 +86,6 @@ const INVENTARIO_REPORT_COLUMNS: readonly InventarioReportColumn[] = [
   'margen',
   'codigoBarras',
 ];
-
-const CADUCIDAD_PAGE_SIZES: readonly number[] = [20, 50, 100, 200];
 
 /**
  * Expone los casos de uso del módulo Almacén.
@@ -267,7 +264,7 @@ export default class AlmacenService
       throw new Error('La página de caducidades no es válida.');
     }
 
-    if (!CADUCIDAD_PAGE_SIZES.includes(consulta.num)) {
+    if (!PAGE_SIZE_OPTIONS.includes(consulta.num)) {
       throw new Error('El tamaño de página de caducidades no es válido.');
     }
 
@@ -377,7 +374,7 @@ export default class AlmacenService
       throw new Error('La página de inventario no es válida.');
     }
 
-    if (!INVENTARIO_PAGE_SIZES.includes(consulta.num)) {
+    if (!PAGE_SIZE_OPTIONS.includes(consulta.num)) {
       throw new Error('El tamaño de página de inventario no es válido.');
     }
 

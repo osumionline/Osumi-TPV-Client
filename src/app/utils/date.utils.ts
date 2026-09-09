@@ -1,3 +1,5 @@
+import { MONTH_OPTIONS, type MonthOption } from '@constants/date.constants';
+
 /**
  * Formatea una fecha cuyo valor comienza por YYYY-MM-DD
  * al formato DD/MM/YYYY.
@@ -16,4 +18,22 @@ export function formatIsoDateToSpanishDate(value: string): string {
   }
 
   return `${match[3]}/${match[2]}/${match[1]}`;
+}
+
+/**
+ * Obtiene el nombre completo de un mes.
+ */
+export function formatMonthName(month: number): string {
+  const option: MonthOption | undefined = MONTH_OPTIONS[month - 1];
+
+  return option?.label ?? `Mes ${month}`;
+}
+
+/**
+ * Obtiene la abreviatura de un mes.
+ */
+export function formatShortMonthName(month: number): string {
+  const option: MonthOption | undefined = MONTH_OPTIONS[month - 1];
+
+  return option?.shortLabel ?? String(month);
 }

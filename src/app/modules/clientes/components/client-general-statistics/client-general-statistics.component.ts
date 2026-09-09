@@ -20,22 +20,8 @@ import ClientMonthlyConsumptionComponent from '@modules/clientes/components/clie
 import IsoDateToSpanishPipe from '@pipes/iso-date-to-spanish.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
 import ClientesService from '@services/clientes.service';
+import { formatMonthName } from '@utils/date.utils';
 import { getErrorMessage } from '@utils/error.utils';
-
-const MONTH_NAMES: readonly string[] = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
-];
 
 const MARGIN_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
   minimumFractionDigits: 2,
@@ -100,7 +86,7 @@ export default class ClientGeneralStatisticsComponent implements OnInit, OnDestr
    * Obtiene el nombre en español de un mes.
    */
   getMonthName(month: number): string {
-    return MONTH_NAMES[month - 1] ?? `Mes ${month}`;
+    return formatMonthName(month);
   }
 
   /**

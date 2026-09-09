@@ -15,6 +15,7 @@ import { MatPaginator, type PageEvent } from '@angular/material/paginator';
 import { MatSelect, type MatSelectChange } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltip } from '@angular/material/tooltip';
+import { MONTH_OPTIONS, type MonthOption } from '@constants/date.constants';
 import type { CaducidadCreateCommand } from '@desktop-contracts/almacen/caducidad-create.interface';
 import type { CaducidadReportConsulta } from '@desktop-contracts/almacen/caducidad-report.interface';
 import type {
@@ -23,67 +24,12 @@ import type {
   CaducidadResultado,
   CaducidadRowInterface,
 } from '@desktop-contracts/almacen/caducidad.interface';
+import { PAGE_SIZE_OPTIONS } from '@desktop-contracts/shared/pagination.constants';
 import CaducidadCreateComponent from '@modules/almacen/components/caducidad-create/caducidad-create.component';
 import { DialogService } from '@osumi/angular-tools';
 import AlmacenService from '@services/almacen.service';
 import ArticulosService from '@services/articulos.service';
 import { getErrorMessage } from '@utils/error.utils';
-
-interface CaducidadMonthOption {
-  readonly value: number;
-  readonly label: string;
-}
-
-const CADUCIDAD_MONTH_OPTIONS: readonly CaducidadMonthOption[] = [
-  {
-    value: 1,
-    label: 'Enero',
-  },
-  {
-    value: 2,
-    label: 'Febrero',
-  },
-  {
-    value: 3,
-    label: 'Marzo',
-  },
-  {
-    value: 4,
-    label: 'Abril',
-  },
-  {
-    value: 5,
-    label: 'Mayo',
-  },
-  {
-    value: 6,
-    label: 'Junio',
-  },
-  {
-    value: 7,
-    label: 'Julio',
-  },
-  {
-    value: 8,
-    label: 'Agosto',
-  },
-  {
-    value: 9,
-    label: 'Septiembre',
-  },
-  {
-    value: 10,
-    label: 'Octubre',
-  },
-  {
-    value: 11,
-    label: 'Noviembre',
-  },
-  {
-    value: 12,
-    label: 'Diciembre',
-  },
-];
 
 const CADUCIDAD_COLUMNS: readonly string[] = [
   'localizador',
@@ -148,8 +94,8 @@ export default class CaducidadesComponent implements OnInit, OnDestroy {
   readonly deactivatingCaducidadId: WritableSignal<number | null> = signal<number | null>(null);
   readonly reportOpening: WritableSignal<boolean> = signal<boolean>(false);
 
-  readonly pageSizeOptions: readonly number[] = [20, 50, 100, 200];
-  readonly monthOptions: readonly CaducidadMonthOption[] = CADUCIDAD_MONTH_OPTIONS;
+  readonly pageSizeOptions: readonly number[] = PAGE_SIZE_OPTIONS;
+  readonly monthOptions: readonly MonthOption[] = MONTH_OPTIONS;
   readonly displayedColumns: readonly string[] = CADUCIDAD_COLUMNS;
 
   readonly filterOptions: WritableSignal<CaducidadFilterOptionsInterface> =
