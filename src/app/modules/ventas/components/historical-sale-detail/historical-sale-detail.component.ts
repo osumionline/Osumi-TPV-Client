@@ -14,11 +14,10 @@ import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import type { VentaHistoricoDetalle } from '@desktop-contracts/ventas/venta-historico.interface';
 import type TipoPago from '@model/tipos-pago/tipo-pago.model';
+import type HistoricalSaleDetailMode from '@modules/ventas/components/historical-sale-detail/historical-sale-detail.component.private';
 import HistoricalSaleEmailFormComponent from '@modules/ventas/components/historical-sale-email-form/historical-sale-email-form.component';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
-
-type HistoricalSaleDetailMode = 'postventa' | 'readonly';
 
 /**
  * Representa el detalle histórico ya resuelto de una venta.

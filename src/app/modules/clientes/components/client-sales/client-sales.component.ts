@@ -18,6 +18,10 @@ import type {
   VentaHistoricoResumen,
   VentasHistoricoResultado,
 } from '@desktop-contracts/ventas/venta-historico.interface';
+import type {
+  ClientSaleOperation,
+  ClientSalesPeriod,
+} from '@modules/clientes/components/client-sales/client-sales.component.private';
 import HistoricalSaleDetailComponent from '@modules/ventas/components/historical-sale-detail/historical-sale-detail.component';
 import HistoricalSaleEmailFormComponent from '@modules/ventas/components/historical-sale-email-form/historical-sale-email-form.component';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
@@ -25,18 +29,6 @@ import VentaTicketDocumentService from '@services/venta-ticket-document.service'
 import VentaTicketEmailService from '@services/venta-ticket-email.service';
 import VentasHistoricoService from '@services/ventas-historico.service';
 import { getErrorMessage } from '@utils/error.utils';
-
-interface ClientSalesPeriod {
-  readonly desde: string;
-  readonly hasta: string;
-}
-
-type ClientSaleOperationType = 'reprint' | 'email';
-
-interface ClientSaleOperation {
-  readonly type: ClientSaleOperationType;
-  readonly ventaId: number;
-}
 
 /**
  * Muestra las ventas históricas asociadas a un cliente persistido.

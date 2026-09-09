@@ -25,10 +25,11 @@ import {
   areClienteFormModelsEqual,
   cloneClienteFormModel,
 } from '@model/clientes/cliente-form.utils';
+import type {
+  ClientFormInvalidSection,
+  ClientFormSection,
+} from '@modules/clientes/components/client-form/client-form.component.private';
 import ProvinciasService from '@services/provincias.service';
-
-type ClientFormSection = 'all' | 'data' | 'billing';
-type ClientFormInvalidSection = 'data' | 'billing';
 
 @Component({
   selector: 'otpv-client-form',

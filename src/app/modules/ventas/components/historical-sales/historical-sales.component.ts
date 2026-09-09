@@ -26,6 +26,10 @@ import type {
 import type Cliente from '@model/clientes/cliente.model';
 import ClientSelectorComponent from '@modules/ventas/components/client-selector/client-selector.component';
 import HistoricalSaleDetailComponent from '@modules/ventas/components/historical-sale-detail/historical-sale-detail.component';
+import type {
+  HistoricalSalesFilterMode,
+  HistoricalSalesTab,
+} from '@modules/ventas/components/historical-sales/historical-sales.component.private';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import ClienteProteccionDatosPrintService from '@services/cliente-proteccion-datos-print.service';
 import ClientesService from '@services/clientes.service';
@@ -36,10 +40,6 @@ import VentasContextService from '@services/ventas-context.service';
 import VentasHistoricoService from '@services/ventas-historico.service';
 import VentasPostventaService from '@services/ventas-postventa.service';
 import { getErrorMessage } from '@utils/error.utils';
-
-type HistoricalSalesTab = 'ventas' | 'salidas-caja';
-
-type HistoricalSalesFilterMode = 'fecha' | 'rango';
 
 /**
  * Muestra el Histórico disponible desde el workspace de Ventas.

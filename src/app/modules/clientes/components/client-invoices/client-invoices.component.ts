@@ -22,15 +22,10 @@ import type {
 } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type ClienteFacturasState from '@model/clientes/cliente-facturas-state.interface';
 import ClientInvoiceEmailFormComponent from '@modules/clientes/components/client-invoice-email-form/client-invoice-email-form.component';
+import ESTADO_LABELS from '@modules/clientes/components/client-invoices/client-invoices.component.private';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import ClientesService from '@services/clientes.service';
 import { getErrorMessage } from '@utils/error.utils';
-
-const ESTADO_LABELS: Readonly<Record<ClienteFacturaEstado, string>> = {
-  borrador: 'Borrador',
-  emitida: 'Emitida',
-  anulada: 'Anulada',
-};
 
 /**
  * Muestra las facturas asociadas a un cliente persistido.

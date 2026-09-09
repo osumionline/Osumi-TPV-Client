@@ -32,6 +32,12 @@ import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.i
 import type Categoria from '@model/categorias/categoria.model';
 import type Marca from '@model/marcas/marca.model';
 import type Proveedor from '@model/proveedores/proveedor.model';
+import type {
+  ArticleDecimalField,
+  ArticleFiscalOption,
+  ArticleIntegerField,
+  ArticlePriceField,
+} from '@modules/articulos/components/article-general/article-general.component.private';
 import ArticleMarginSuggestionsComponent from '@modules/articulos/components/article-margin-suggestions/article-margin-suggestions.component';
 import BrandQuickCreateComponent from '@modules/articulos/components/brand-quick-create/brand-quick-create.component';
 import ProviderQuickCreateComponent from '@modules/articulos/components/provider-quick-create/provider-quick-create.component';
@@ -41,19 +47,6 @@ import CategoriasService from '@services/categorias.service';
 import MarcasService from '@services/marcas.service';
 import ProveedoresService from '@services/proveedores.service';
 import { getErrorMessage } from '@utils/error.utils';
-
-type ArticleIntegerField = 'stock' | 'stockMin' | 'stockMax' | 'loteOptimo';
-
-type ArticlePriceField =
-  'precioAlbaran' | 'puc' | 'margen' | 'pvp' | 'margenDescuento' | 'pvpDescuento';
-
-type ArticleDecimalField = ArticlePriceField | 'descuento';
-
-interface ArticleFiscalOption {
-  readonly key: string;
-  readonly ivaBps: number;
-  readonly reBps: number;
-}
 
 /**
  * Edita los datos generales de una ficha de artículo.

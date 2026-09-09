@@ -44,6 +44,7 @@ import type {
   ArticuloFotoInterface,
   ArticuloInterface,
 } from '@desktop-contracts/articulos/articulo.interface';
+import { PAGE_SIZE_OPTIONS } from '@desktop-contracts/shared/pagination.constants';
 
 /**
  * Expone los casos de uso del módulo Artículos.
@@ -107,7 +108,7 @@ export default class ArticulosService {
       throw new Error('La página del histórico no es válida.');
     }
 
-    if (![20, 50, 100, 200].includes(consulta.num)) {
+    if (!PAGE_SIZE_OPTIONS.includes(consulta.num)) {
       throw new Error('El tamaño de página del histórico no es válido.');
     }
 

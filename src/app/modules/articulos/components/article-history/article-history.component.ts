@@ -17,6 +17,7 @@ import type {
   ArticuloHistoricoSortDirection,
   ArticuloHistoricoSortField,
 } from '@desktop-contracts/articulos/articulo-historico.interface';
+import { PAGE_SIZE_OPTIONS } from '@desktop-contracts/shared/pagination.constants';
 import {
   formatScaledDecimal,
   rescaleScaledInteger,
@@ -63,7 +64,7 @@ export default class ArticleHistoryComponent implements OnInit {
     'idVenta',
     'idPedido',
   ];
-  readonly pageSizeOptions: number[] = [20, 50, 100, 200];
+  readonly pageSizeOptions: readonly number[] = PAGE_SIZE_OPTIONS;
 
   /**
    * Carga la primera página cuando el artículo ya está persistido.
