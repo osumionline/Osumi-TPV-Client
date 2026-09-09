@@ -39,6 +39,8 @@ import type {
   InventarioResultado,
 } from '@desktop-contracts/almacen/inventario.interface';
 import { describe, expect, it } from 'vitest';
+import type ImprentaPrintArticuloRecord from '@backend/domain/almacen/imprenta-print-articulo-record.interface';
+import type { ImprentaPrintArticuloInterface } from '@desktop-contracts/almacen/imprenta-print.interface';
 
 class FakeAlmacenRepository implements AlmacenRepository {
   lastQuery: InventarioRepositoryQuery | null = null;
@@ -180,6 +182,17 @@ class FakeAlmacenRepository implements AlmacenRepository {
     },
   ];
 
+  lastImprentaPrintIds: readonly number[] | null = null;
+  imprentaPrintArticleResult: readonly ImprentaPrintArticuloRecord[] = [
+    {
+      idArticulo: 25,
+      localizador: 261234,
+      marcaNombre: 'Marca de prueba',
+      nombre: 'Artículo de prueba actualizado',
+      pvpCents: 1790,
+    },
+  ];
+
   /**
    * Devuelve el resultado configurado y conserva la consulta recibida.
    */
@@ -284,6 +297,18 @@ class FakeAlmacenRepository implements AlmacenRepository {
     };
 
     return Promise.resolve(this.imprentaArticleSearchResult);
+  }
+
+  /**
+   * Devuelve los artículos canónicos configurados
+   * y conserva los identificadores solicitados.
+   */
+  getImprentaPrintArticulos(
+    idsArticulos: readonly number[],
+  ): Promise<readonly ImprentaPrintArticuloRecord[]> {
+    this.lastImprentaPrintIds = [...idsArticulos];
+
+    return Promise.resolve(this.imprentaPrintArticleResult);
   }
 }
 
@@ -739,6 +764,25 @@ describe('AlmacenService', (): void => {
     ).rejects.toThrow('Uno de los artículos excluidos de Imprenta no es válido.');
 
     expect(repository.lastImprentaArticleSearch).toBeNull();
+  });
+
+  it('expone los datos canónicos actuales para la hoja de Imprenta', async (): Promise<void> => {
+    const repository = new FakeAlmacenRepository();
+    const service = createService(repository);
+
+    const result: readonly ImprentaPrintArticuloInterface[] =
+      await service.getImprentaPrintArticulos([25]);
+
+    expect(repository.lastImprentaPrintIds).toEqual([25]);
+    expect(result).toEqual([
+      {
+        idArticulo: 25,
+        localizador: 261234,
+        marcaNombre: 'Marca de prueba',
+        nombre: 'Artículo de prueba actualizado',
+        pvpCents: 1790,
+      },
+    ]);
   });
 });
 

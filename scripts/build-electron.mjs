@@ -9,6 +9,7 @@ const buildOptions = {
     'factura-preview-preload': 'electron/factura-preview-preload.ts',
     'inventario-print-preload': 'electron/inventario-print-preload.ts',
     'caducidad-report-preload': 'electron/caducidad-report-preload.ts',
+    'imprenta-print-preload': 'electron/imprenta-print-preload.ts',
     'legacy-import-worker': 'electron/workers/legacy-import-worker.ts',
   },
 

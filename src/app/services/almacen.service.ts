@@ -13,6 +13,7 @@ import type {
   ImprentaArticuloSearchConsulta,
   ImprentaArticuloSearchInterface,
 } from '@desktop-contracts/almacen/imprenta-articulo.interface';
+import type { ImprentaPrintCommand } from '@desktop-contracts/almacen/imprenta-print.interface';
 import type {
   InventarioCsvExportResult,
   InventarioReportConsulta,
@@ -120,5 +121,12 @@ export default class AlmacenService {
     consulta: ImprentaArticuloSearchConsulta,
   ): Promise<readonly ImprentaArticuloSearchInterface[]> {
     return window.osumiDesktop.almacen.searchImprentaArticulos(consulta);
+  }
+
+  /**
+   * Materializa y abre la hoja definitiva de Imprenta.
+   */
+  openImprentaPrint(command: ImprentaPrintCommand): Promise<void> {
+    return window.osumiDesktop.almacen.openImprentaPrint(command);
   }
 }

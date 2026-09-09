@@ -1,5 +1,6 @@
 import type AlmacenService from '@backend/application/almacen/almacen.service';
 import type CaducidadReportService from '@backend/application/almacen/caducidad-report.service';
+import type ImprentaPrintService from '@backend/application/almacen/imprenta-print.service';
 import type InventarioCsvService from '@backend/application/almacen/inventario-csv.service';
 import type InventarioPrintService from '@backend/application/almacen/inventario-print.service';
 import type {
@@ -16,6 +17,7 @@ import type {
   ImprentaArticuloSearchConsulta,
   ImprentaArticuloSearchInterface,
 } from '@desktop-contracts/almacen/imprenta-articulo.interface';
+import type { ImprentaPrintCommand } from '@desktop-contracts/almacen/imprenta-print.interface';
 import type {
   InventarioCsvExportResult,
   InventarioReportConsulta,
@@ -39,6 +41,7 @@ export default function registerAlmacenIpc(
   inventarioCsvService: InventarioCsvService,
   inventarioPrintService: InventarioPrintService,
   caducidadReportService: CaducidadReportService,
+  imprentaPrintService: ImprentaPrintService,
 ): void {
   ipcMain.handle(
     IPC_CHANNELS.almacenSearchInventario,
@@ -157,6 +160,15 @@ export default function registerAlmacenIpc(
       assertTrustedSender(event, getMainWindow);
 
       return almacenService.searchImprentaArticulos(consulta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.almacenOpenImprentaPrint,
+    async (event, command: ImprentaPrintCommand): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await imprentaPrintService.open(command);
     },
   );
 }

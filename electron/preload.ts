@@ -12,6 +12,7 @@ import type {
   ImprentaArticuloSearchConsulta,
   ImprentaArticuloSearchInterface,
 } from '@desktop-contracts/almacen/imprenta-articulo.interface';
+import type { ImprentaPrintCommand } from '@desktop-contracts/almacen/imprenta-print.interface';
 import type {
   InventarioCsvExportResult,
   InventarioReportConsulta,
@@ -174,6 +175,8 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
       ipcRenderer.invoke(IPC_CHANNELS.almacenSearchImprentaArticulos, consulta) as Promise<
         readonly ImprentaArticuloSearchInterface[]
       >,
+    openImprentaPrint: (command: ImprentaPrintCommand): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.almacenOpenImprentaPrint, command) as Promise<void>,
   }),
 
   legacyImport: {

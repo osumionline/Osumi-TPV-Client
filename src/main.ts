@@ -4,6 +4,7 @@ const WINDOW_QUERY_PARAMETER: string = 'window';
 const FACTURA_PREVIEW_WINDOW: string = 'factura-preview';
 const INVENTARIO_PRINT_WINDOW: string = 'inventario-print';
 const CADUCIDAD_REPORT_WINDOW: string = 'caducidad-report';
+const IMPRENTA_PRINT_WINDOW: string = 'imprenta-print';
 
 /**
  * Arranca únicamente la aplicación correspondiente
@@ -46,6 +47,18 @@ async function bootstrap(): Promise<void> {
       ]);
 
     await bootstrapApplication(CaducidadReportComponent, caducidadReportConfig);
+
+    return;
+  }
+
+  if (windowType === IMPRENTA_PRINT_WINDOW) {
+    const [{ default: ImprentaPrintComponent }, { default: imprentaPrintConfig }] =
+      await Promise.all([
+        import('@modules/almacen/pages/imprenta-print/imprenta-print.component'),
+        import('@app/imprenta-print.config'),
+      ]);
+
+    await bootstrapApplication(ImprentaPrintComponent, imprentaPrintConfig);
 
     return;
   }

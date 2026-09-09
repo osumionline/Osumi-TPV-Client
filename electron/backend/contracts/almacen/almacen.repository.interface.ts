@@ -12,6 +12,7 @@ import type {
 } from '@backend/domain/almacen/caducidad-record.interface';
 import type { CaducidadReportRecord } from '@backend/domain/almacen/caducidad-report-record.interface';
 import type ImprentaArticuloSearchRecord from '@backend/domain/almacen/imprenta-articulo-search-record.interface';
+import type ImprentaPrintArticuloRecord from '@backend/domain/almacen/imprenta-print-articulo-record.interface';
 import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario-record.interface';
 import type { InventarioReportRecord } from '@backend/domain/almacen/inventario-report-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
@@ -83,4 +84,12 @@ export default interface AlmacenRepository {
     texto: string,
     idsArticulosExcluidos: readonly number[],
   ): Promise<readonly ImprentaArticuloSearchRecord[]>;
+
+  /**
+   * Recupera el estado persistido actual de los artículos
+   * que van a materializarse en una hoja de etiquetas.
+   */
+  getImprentaPrintArticulos(
+    idsArticulos: readonly number[],
+  ): Promise<readonly ImprentaPrintArticuloRecord[]>;
 }

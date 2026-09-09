@@ -1,0 +1,58 @@
+@if (loading()) {
+<section class="imprenta-print__state">
+    Preparando hoja de etiquetas…
+</section>
+} @else if (loadError() !== null) {
+<section class="imprenta-print__state imprenta-print__state--error">
+    <span>
+        {{ loadError() }}
+    </span>
+
+    <button type="button"
+            (click)="retry()">
+        Reintentar
+    </button>
+</section>
+} @else if (documento(); as currentDocument) {
+<div class="imprenta-print">
+    <main class="imprenta-print__page"
+          [class.imprenta-print__page--landscape]="currentDocument.orientacion === 'landscape'"
+          [class.imprenta-print__page--dense]="dense()"
+          [class.imprenta-print__page--very-dense]="veryDense()"
+          [style.grid-template-columns]="'repeat(' + currentDocument.columnas + ', minmax(0, 1fr))'"
+          [style.grid-template-rows]="'repeat(' + currentDocument.filas + ', minmax(0, 1fr))'">
+        @for (slot of currentDocument.slots; track $index) {
+        <div class="imprenta-print__cell">
+            @if (slot.articulo; as article) {
+            <div class="imprenta-print__label">
+                <qrcode class="imprenta-print__qr"
+                        [qrdata]="formatQrData(article.localizador)"
+                        [width]="qrWidth()"
+                        [elementType]="'svg'"
+                        [errorCorrectionLevel]="'M'"
+                        [ariaLabel]="'QR del localizador ' + article.localizador" />
+
+                <div class="imprenta-print__content">
+                    <strong class="imprenta-print__name">
+                        {{ article.nombre }}
+                    </strong>
+
+                    @if (article.marcaNombre !== null && article.marcaNombre.length > 0) {
+                    <span class="imprenta-print__brand">
+                        {{ article.marcaNombre }}
+                    </span>
+                    }
+
+                    @if (currentDocument.mostrarPvp) {
+                    <strong class="imprenta-print__price">
+                        {{ formatCents(article.pvpCents) }}
+                    </strong>
+                    }
+                </div>
+            </div>
+            }
+        </div>
+        }
+    </main>
+</div>
+}

@@ -2,6 +2,7 @@ import type AlmacenRepository from '@backend/contracts/almacen/almacen.repositor
 import type CaducidadFilterQuery from '@backend/contracts/almacen/caducidad-filter-query.interface';
 import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidad-query.interface';
 import type CaducidadReportProvider from '@backend/contracts/almacen/caducidad-report-provider.interface';
+import type ImprentaPrintProvider from '@backend/contracts/almacen/imprenta-print-provider.interface';
 import type InventarioFilterQuery from '@backend/contracts/almacen/inventario-filter-query.interface';
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario-query.interface';
 import type InventarioReportProvider from '@backend/contracts/almacen/inventario-report-provider.interface';
@@ -22,6 +23,7 @@ import type {
   CaducidadReportRecord,
 } from '@backend/domain/almacen/caducidad-report-record.interface';
 import type ImprentaArticuloSearchRecord from '@backend/domain/almacen/imprenta-articulo-search-record.interface';
+import type ImprentaPrintArticuloRecord from '@backend/domain/almacen/imprenta-print-articulo-record.interface';
 import type {
   InventarioResultadoRecord,
   InventarioRowRecord,
@@ -54,6 +56,7 @@ import type {
   ImprentaArticuloSearchConsulta,
   ImprentaArticuloSearchInterface,
 } from '@desktop-contracts/almacen/imprenta-articulo.interface';
+import type { ImprentaPrintArticuloInterface } from '@desktop-contracts/almacen/imprenta-print.interface';
 import type {
   InventarioReportColumn,
   InventarioReportConsulta,
@@ -90,7 +93,9 @@ const CADUCIDAD_PAGE_SIZES: readonly number[] = [20, 50, 100, 200];
 /**
  * Expone los casos de uso del módulo Almacén.
  */
-export default class AlmacenService implements CaducidadReportProvider, InventarioReportProvider {
+export default class AlmacenService
+  implements CaducidadReportProvider, ImprentaPrintProvider, InventarioReportProvider
+{
   /**
    * Crea el servicio de Almacén.
    */
@@ -221,6 +226,25 @@ export default class AlmacenService implements CaducidadReportProvider, Inventar
 
     return rows.map((row: ImprentaArticuloSearchRecord): ImprentaArticuloSearchInterface => ({
       id: row.id,
+      localizador: row.localizador,
+      marcaNombre: row.marcaNombre,
+      nombre: row.nombre,
+      pvpCents: row.pvpCents,
+    }));
+  }
+
+  /**
+   * Recupera los valores persistidos actuales utilizados
+   * por el documento definitivo de Imprenta.
+   */
+  async getImprentaPrintArticulos(
+    idsArticulos: readonly number[],
+  ): Promise<readonly ImprentaPrintArticuloInterface[]> {
+    const rows: readonly ImprentaPrintArticuloRecord[] =
+      await this.almacenRepository.getImprentaPrintArticulos(idsArticulos);
+
+    return rows.map((row: ImprentaPrintArticuloRecord): ImprentaPrintArticuloInterface => ({
+      idArticulo: row.idArticulo,
       localizador: row.localizador,
       marcaNombre: row.marcaNombre,
       nombre: row.nombre,

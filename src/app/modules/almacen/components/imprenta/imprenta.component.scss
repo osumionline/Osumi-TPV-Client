@@ -428,6 +428,27 @@
     }
 }
 
+.imprenta__finish {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.imprenta__finish-error {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-red);
+    font-size: 12px;
+
+    mat-icon {
+        flex: 0 0 auto;
+    }
+}
+
 .imprenta__capacity-error {
     color: var(--color-red);
     opacity: 1 !important;

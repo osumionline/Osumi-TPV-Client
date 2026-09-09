@@ -322,5 +322,27 @@
             {{ remainingCapacity() }} libres
         </div>
         }
+        <div class="imprenta__finish">
+            @if (finishError() !== null) {
+            <div class="imprenta__finish-error">
+                <mat-icon>
+                    error
+                </mat-icon>
+                <span>
+                    {{ finishError() }}
+                </span>
+            </div>
+            }
+
+            <button mat-flat-button
+                    type="button"
+                    [disabled]="!canFinish()"
+                    (click)="finishDesign()">
+                <mat-icon>
+                    open_in_new
+                </mat-icon>
+                {{ finishOpening() ? 'Preparando…' : 'Terminar' }}
+            </button>
+        </div>
     </section>
 </section>

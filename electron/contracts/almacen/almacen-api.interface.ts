@@ -12,6 +12,7 @@ import type {
   ImprentaArticuloSearchConsulta,
   ImprentaArticuloSearchInterface,
 } from '@desktop-contracts/almacen/imprenta-articulo.interface';
+import type { ImprentaPrintCommand } from '@desktop-contracts/almacen/imprenta-print.interface';
 import type {
   InventarioCsvExportResult,
   InventarioReportConsulta,
@@ -94,4 +95,9 @@ export default interface AlmacenApi {
   searchImprentaArticulos(
     consulta: ImprentaArticuloSearchConsulta,
   ): Promise<readonly ImprentaArticuloSearchInterface[]>;
+
+  /**
+   * Materializa y abre una hoja canónica de etiquetas.
+   */
+  openImprentaPrint(command: ImprentaPrintCommand): Promise<void>;
 }

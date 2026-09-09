@@ -27,16 +27,20 @@ import { getErrorMessage } from '@utils/error.utils';
 import { MatButtonToggle, MatButtonToggleGroup } from '@angular/material/button-toggle';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { QRCodeComponent } from 'angularx-qrcode';
+import {
+  IMPRENTA_DEFAULT_COLUMNS,
+  IMPRENTA_DEFAULT_ORIENTATION,
+  IMPRENTA_DEFAULT_ROWS,
+  IMPRENTA_DEFAULT_SHOW_PVP,
+  IMPRENTA_MAX_COLUMNS,
+  IMPRENTA_MAX_ROWS,
+  type ImprentaOrientation,
+  type ImprentaPrintCommand,
+  type ImprentaPrintItemCommand,
+} from '@desktop-contracts/almacen/imprenta-print.interface';
 
 const SEARCH_DELAY_MS: number = 250;
-const DEFAULT_PRINT_ROWS: number = 5;
-const DEFAULT_PRINT_COLUMNS: number = 4;
-const MAX_PRINT_ROWS: number = 10;
-const MAX_PRINT_COLUMNS: number = 10;
-const DEFAULT_PRINT_ORIENTATION: ImprentaOrientation = 'portrait';
-const DEFAULT_SHOW_PVP: boolean = true;
 
-type ImprentaOrientation = 'portrait' | 'landscape';
 type ImprentaPreviewSlotType = 'articulo' | 'hueco' | 'libre';
 
 interface ImprentaPreviewSlot {
@@ -99,13 +103,27 @@ export default class ImprentaComponent implements OnDestroy {
       0,
     ),
   );
-  readonly rows: WritableSignal<number> = signal<number>(DEFAULT_PRINT_ROWS);
-  readonly columns: WritableSignal<number> = signal<number>(DEFAULT_PRINT_COLUMNS);
-  readonly orientation: WritableSignal<ImprentaOrientation> =
-    signal<ImprentaOrientation>(DEFAULT_PRINT_ORIENTATION);
-  readonly showPvp: WritableSignal<boolean> = signal<boolean>(DEFAULT_SHOW_PVP);
-  readonly maxRows: number = MAX_PRINT_ROWS;
-  readonly maxColumns: number = MAX_PRINT_COLUMNS;
+  readonly rows: WritableSignal<number> = signal<number>(IMPRENTA_DEFAULT_ROWS);
+  readonly columns: WritableSignal<number> = signal<number>(IMPRENTA_DEFAULT_COLUMNS);
+  readonly orientation: WritableSignal<ImprentaOrientation> = signal<ImprentaOrientation>(
+    IMPRENTA_DEFAULT_ORIENTATION,
+  );
+  readonly showPvp: WritableSignal<boolean> = signal<boolean>(IMPRENTA_DEFAULT_SHOW_PVP);
+  readonly finishOpening: WritableSignal<boolean> = signal<boolean>(false);
+  readonly finishError: WritableSignal<string | null> = signal<string | null>(null);
+  readonly hasArticle: Signal<boolean> = computed((): boolean =>
+    this.designItems().some((item: ImprentaDesignItem): boolean => item.articulo !== null),
+  );
+  readonly canFinish: Signal<boolean> = computed(
+    (): boolean =>
+      this.hasArticle() &&
+      this.designItems().length > 0 &&
+      !this.capacityExceeded() &&
+      !this.finishOpening(),
+  );
+  readonly maxRows: number = IMPRENTA_MAX_ROWS;
+  readonly maxColumns: number = IMPRENTA_MAX_COLUMNS;
+
   readonly capacity: Signal<number> = computed((): number => this.rows() * this.columns());
   readonly remainingCapacity: Signal<number> = computed((): number =>
     Math.max(0, this.capacity() - this.totalDesignSlots()),
@@ -288,14 +306,14 @@ export default class ImprentaComponent implements OnDestroy {
    * Confirma el número de filas de la hoja.
    */
   onRowsChange(event: Event): void {
-    this.updateDimension(event, this.rows, MAX_PRINT_ROWS);
+    this.updateDimension(event, this.rows, IMPRENTA_MAX_ROWS);
   }
 
   /**
    * Confirma el número de columnas de la hoja.
    */
   onColumnsChange(event: Event): void {
-    this.updateDimension(event, this.columns, MAX_PRINT_COLUMNS);
+    this.updateDimension(event, this.columns, IMPRENTA_MAX_COLUMNS);
   }
 
   /**
@@ -426,6 +444,50 @@ export default class ImprentaComponent implements OnDestroy {
    */
   formatQrData(localizador: number): string {
     return String(localizador);
+  }
+
+  /**
+   * Construye el comando mínimo del diseño y abre
+   * su snapshot canónico en una ventana independiente.
+   */
+  async finishDesign(): Promise<void> {
+    if (!this.canFinish()) {
+      return;
+    }
+
+    this.finishOpening.set(true);
+    this.finishError.set(null);
+
+    try {
+      const items: readonly ImprentaPrintItemCommand[] = this.designItems().map(
+        (item: ImprentaDesignItem): ImprentaPrintItemCommand =>
+          item.articulo === null
+            ? {
+                tipo: 'hueco',
+              }
+            : {
+                tipo: 'articulo',
+                idArticulo: item.articulo.id,
+                cantidad: item.cantidad,
+              },
+      );
+
+      const command: ImprentaPrintCommand = {
+        filas: this.rows(),
+        columnas: this.columns(),
+        orientacion: this.orientation(),
+        mostrarPvp: this.showPvp(),
+        items,
+      };
+
+      await this.almacenService.openImprentaPrint(command);
+    } catch (error: unknown) {
+      this.finishError.set(
+        getErrorMessage(error, 'No se ha podido preparar la hoja de etiquetas.'),
+      );
+    } finally {
+      this.finishOpening.set(false);
+    }
   }
 
   /**

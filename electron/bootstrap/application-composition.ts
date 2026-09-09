@@ -2,6 +2,7 @@ import { join } from 'node:path';
 
 import AlmacenService from '@backend/application/almacen/almacen.service';
 import CaducidadReportService from '@backend/application/almacen/caducidad-report.service';
+import ImprentaPrintService from '@backend/application/almacen/imprenta-print.service';
 import InventarioCsvBuilder from '@backend/application/almacen/inventario-csv.builder';
 import InventarioCsvService from '@backend/application/almacen/inventario-csv.service';
 import InventarioPrintService from '@backend/application/almacen/inventario-print.service';
@@ -39,6 +40,7 @@ import VentasTicketEmailService from '@backend/application/ventas/ventas-ticket-
 import VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
 import type AlmacenRepository from '@backend/contracts/almacen/almacen.repository.interface';
 import type CaducidadReportWindow from '@backend/contracts/almacen/caducidad-report-window.interface';
+import type ImprentaPrintWindow from '@backend/contracts/almacen/imprenta-print-window.interface';
 import type InventarioCsvFileSaver from '@backend/contracts/almacen/inventario-csv-file-saver.interface';
 import type InventarioPrintWindow from '@backend/contracts/almacen/inventario-print-window.interface';
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
@@ -110,6 +112,7 @@ import ElectronAssetUrlBuilder from '@infrastructure/electron/electron-asset-url
 import ElectronCaducidadReportWindow from '@infrastructure/electron/electron-caducidad-report-window';
 import ElectronClienteFacturaPreviewWindow from '@infrastructure/electron/electron-cliente-factura-preview-window';
 import ElectronHtmlDocumentRenderer from '@infrastructure/electron/electron-html-document.renderer';
+import ElectronImprentaPrintWindow from '@infrastructure/electron/electron-imprenta-print-window';
 import ElectronInventarioCsvFileSaver from '@infrastructure/electron/electron-inventario-csv-file-saver';
 import ElectronInventarioPrintWindow from '@infrastructure/electron/electron-inventario-print-window';
 import ElectronLegacyImportDialog from '@infrastructure/electron/electron-legacy-import-dialog';
@@ -147,6 +150,7 @@ import registerClientesIpc from '@ipc/register-clientes-ipc';
 import registerConfigurationIpc from '@ipc/register-configuration-ipc';
 import registerEmpleadosIpc from '@ipc/register-empleados-ipc';
 import registerFilesIpc from '@ipc/register-files-ipc';
+import registerImprentaPrintIpc from '@ipc/register-imprenta-print-ipc';
 import registerInventarioPrintIpc from '@ipc/register-inventario-print-ipc';
 import registerLegacyImportIpc from '@ipc/register-legacy-import-ipc';
 import registerMarcasIpc from '@ipc/register-marcas-ipc';
@@ -294,6 +298,12 @@ export default function createApplicationComposition(
   const caducidadReportService: CaducidadReportService = new CaducidadReportService(
     almacenService,
     caducidadReportWindow,
+  );
+
+  const imprentaPrintWindow: ImprentaPrintWindow = new ElectronImprentaPrintWindow(getMainWindow);
+  const imprentaPrintService: ImprentaPrintService = new ImprentaPrintService(
+    almacenService,
+    imprentaPrintWindow,
   );
 
   /*
@@ -568,9 +578,11 @@ export default function createApplicationComposition(
     inventarioCsvService,
     inventarioPrintService,
     caducidadReportService,
+    imprentaPrintService,
   );
   registerInventarioPrintIpc(inventarioPrintWindow);
   registerCaducidadReportIpc(caducidadReportWindow);
+  registerImprentaPrintIpc(imprentaPrintWindow);
   registerArticulosIpc(getMainWindow, articulosService);
   registerFilesIpc(getMainWindow, imageStagingService);
   registerMarcasIpc(getMainWindow, marcasService);
