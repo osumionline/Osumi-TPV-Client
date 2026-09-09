@@ -6,10 +6,10 @@ const buildOptions = {
   entryPoints: {
     main: 'electron/main.ts',
     preload: 'electron/preload.ts',
-    'factura-preview-preload': 'electron/factura-preview-preload.ts',
-    'inventario-print-preload': 'electron/inventario-print-preload.ts',
-    'caducidad-report-preload': 'electron/caducidad-report-preload.ts',
-    'imprenta-print-preload': 'electron/imprenta-print-preload.ts',
+    'factura-preview-preload': 'electron/preloads/factura-preview-preload.ts',
+    'inventario-print-preload': 'electron/preloads/inventario-print-preload.ts',
+    'caducidad-report-preload': 'electron/preloads/caducidad-report-preload.ts',
+    'imprenta-print-preload': 'electron/preloads/imprenta-print-preload.ts',
     'legacy-import-worker': 'electron/workers/legacy-import-worker.ts',
   },
 
