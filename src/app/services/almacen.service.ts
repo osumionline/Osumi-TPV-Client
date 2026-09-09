@@ -10,6 +10,10 @@ import type {
   CaducidadResultado,
 } from '@desktop-contracts/almacen/caducidad.interface';
 import type {
+  ImprentaArticuloSearchConsulta,
+  ImprentaArticuloSearchInterface,
+} from '@desktop-contracts/almacen/imprenta-articulo.interface';
+import type {
   InventarioCsvExportResult,
   InventarioReportConsulta,
 } from '@desktop-contracts/almacen/inventario-report.interface';
@@ -107,5 +111,14 @@ export default class AlmacenService {
    */
   openCaducidadReport(consulta: CaducidadReportConsulta): Promise<void> {
     return window.osumiDesktop.almacen.openCaducidadReport(consulta);
+  }
+
+  /**
+   * Busca artículos activos para el diseñador de Imprenta.
+   */
+  searchImprentaArticulos(
+    consulta: ImprentaArticuloSearchConsulta,
+  ): Promise<readonly ImprentaArticuloSearchInterface[]> {
+    return window.osumiDesktop.almacen.searchImprentaArticulos(consulta);
   }
 }

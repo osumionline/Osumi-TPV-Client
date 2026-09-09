@@ -13,6 +13,10 @@ import type {
   CaducidadResultado,
 } from '@desktop-contracts/almacen/caducidad.interface';
 import type {
+  ImprentaArticuloSearchConsulta,
+  ImprentaArticuloSearchInterface,
+} from '@desktop-contracts/almacen/imprenta-articulo.interface';
+import type {
   InventarioCsvExportResult,
   InventarioReportConsulta,
 } from '@desktop-contracts/almacen/inventario-report.interface';
@@ -141,6 +145,18 @@ export default function registerAlmacenIpc(
       assertTrustedSender(event, getMainWindow);
 
       await caducidadReportService.open(consulta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.almacenSearchImprentaArticulos,
+    async (
+      event,
+      consulta: ImprentaArticuloSearchConsulta,
+    ): Promise<readonly ImprentaArticuloSearchInterface[]> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return almacenService.searchImprentaArticulos(consulta);
     },
   );
 }

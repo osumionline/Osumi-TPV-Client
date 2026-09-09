@@ -1,0 +1,90 @@
+<section class="imprenta">
+    <section class="imprenta__column imprenta__search-column">
+        <header class="imprenta__column-header">
+            <h2>
+                Buscar artículos
+            </h2>
+            <span>
+                Nombre, localizador o código de barras
+            </span>
+        </header>
+
+        <mat-form-field appearance="outline"
+                        subscriptSizing="dynamic"
+                        class="imprenta__search">
+            <mat-label>
+                Buscar artículo
+            </mat-label>
+            <input matInput
+                   type="search"
+                   autocomplete="off"
+                   placeholder="Nombre, localizador o código de barras"
+                   [value]="query()"
+                   (input)="onSearchInput($event)">
+        </mat-form-field>
+
+        <div class="imprenta__results">
+            @if (query().trim().length === 0) {
+            <div class="imprenta__state">
+                Escribe para buscar un artículo.
+            </div>
+            } @else if (searchLoading()) {
+            <div class="imprenta__state">
+                Buscando artículos…
+            </div>
+            } @else if (searchError() !== null) {
+            <div class="imprenta__state imprenta__state--error">
+                {{ searchError() }}
+            </div>
+            } @else if (results().length === 0) {
+            <div class="imprenta__state">
+                No se han encontrado artículos.
+            </div>
+            } @else {
+            @for (article of results(); track article.id) {
+            <div class="imprenta__result">
+                <span class="imprenta__result-main">
+                    <strong>
+                        {{ article.nombre }}
+                    </strong>
+                    <small>
+                        {{ article.localizador }}
+                        @if (article.marcaNombre !== null && article.marcaNombre.length > 0) {
+                        · {{ article.marcaNombre }}
+                        }
+                    </small>
+                </span>
+
+                <strong class="imprenta__result-price">
+                    {{ formatCents(article.pvpCents) }}
+                </strong>
+            </div>
+            }
+            }
+        </div>
+    </section>
+
+    <section class="imprenta__column">
+        <header class="imprenta__column-header">
+            <h2>
+                Seleccionados
+            </h2>
+        </header>
+
+        <div class="imprenta__state">
+            La selección de artículos se incorpora en el siguiente bloque.
+        </div>
+    </section>
+
+    <section class="imprenta__column imprenta__preview-column">
+        <header class="imprenta__column-header">
+            <h2>
+                Previsualización
+            </h2>
+        </header>
+
+        <div class="imprenta__state">
+            La hoja de etiquetas se mostrará aquí.
+        </div>
+    </section>
+</section>

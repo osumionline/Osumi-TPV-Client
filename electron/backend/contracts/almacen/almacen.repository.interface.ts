@@ -11,6 +11,7 @@ import type {
   CaducidadResultadoRecord,
 } from '@backend/domain/almacen/caducidad-record.interface';
 import type { CaducidadReportRecord } from '@backend/domain/almacen/caducidad-report-record.interface';
+import type ImprentaArticuloSearchRecord from '@backend/domain/almacen/imprenta-articulo-search-record.interface';
 import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario-record.interface';
 import type { InventarioReportRecord } from '@backend/domain/almacen/inventario-report-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
@@ -73,4 +74,13 @@ export default interface AlmacenRepository {
    * Revierte atómicamente una pérdida por caducidad.
    */
   deactivateCaducidad(idCaducidad: number): Promise<void>;
+
+  /**
+   * Busca artículos activos para el diseñador de Imprenta,
+   * excluyendo los que ya formen parte del diseño.
+   */
+  searchImprentaArticulos(
+    texto: string,
+    idsArticulosExcluidos: readonly number[],
+  ): Promise<readonly ImprentaArticuloSearchRecord[]>;
 }

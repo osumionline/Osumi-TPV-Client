@@ -9,6 +9,10 @@ import type {
   CaducidadResultado,
 } from '@desktop-contracts/almacen/caducidad.interface';
 import type {
+  ImprentaArticuloSearchConsulta,
+  ImprentaArticuloSearchInterface,
+} from '@desktop-contracts/almacen/imprenta-articulo.interface';
+import type {
   InventarioCsvExportResult,
   InventarioReportConsulta,
 } from '@desktop-contracts/almacen/inventario-report.interface';
@@ -164,6 +168,12 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
       ipcRenderer.invoke(IPC_CHANNELS.almacenDeactivateCaducidad, idCaducidad) as Promise<void>,
     openCaducidadReport: (consulta: CaducidadReportConsulta): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.almacenOpenCaducidadReport, consulta) as Promise<void>,
+    searchImprentaArticulos: (
+      consulta: ImprentaArticuloSearchConsulta,
+    ): Promise<readonly ImprentaArticuloSearchInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.almacenSearchImprentaArticulos, consulta) as Promise<
+        readonly ImprentaArticuloSearchInterface[]
+      >,
   }),
 
   legacyImport: {

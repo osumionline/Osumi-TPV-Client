@@ -13,6 +13,7 @@ import type {
   CaducidadResultadoRecord,
 } from '@backend/domain/almacen/caducidad-record.interface';
 import type { CaducidadReportRecord } from '@backend/domain/almacen/caducidad-report-record.interface';
+import type ImprentaArticuloSearchRecord from '@backend/domain/almacen/imprenta-articulo-search-record.interface';
 import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario-record.interface';
 import type { InventarioReportRecord } from '@backend/domain/almacen/inventario-report-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
@@ -28,6 +29,10 @@ import type {
   CaducidadFilterOptionsInterface,
   CaducidadResultado,
 } from '@desktop-contracts/almacen/caducidad.interface';
+import type {
+  ImprentaArticuloSearchConsulta,
+  ImprentaArticuloSearchInterface,
+} from '@desktop-contracts/almacen/imprenta-articulo.interface';
 import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario-save.interface';
 import type {
   InventarioConsulta,
@@ -161,6 +166,20 @@ class FakeAlmacenRepository implements AlmacenRepository {
     },
   ];
 
+  lastImprentaArticleSearch: {
+    readonly texto: string;
+    readonly idsArticulosExcluidos: readonly number[];
+  } | null = null;
+  imprentaArticleSearchResult: readonly ImprentaArticuloSearchRecord[] = [
+    {
+      id: 25,
+      localizador: 261234,
+      marcaNombre: 'Marca de prueba',
+      nombre: 'Artículo de prueba',
+      pvpCents: 1690,
+    },
+  ];
+
   /**
    * Devuelve el resultado configurado y conserva la consulta recibida.
    */
@@ -249,6 +268,22 @@ class FakeAlmacenRepository implements AlmacenRepository {
     this.lastDeactivatedCaducidadId = idCaducidad;
 
     return Promise.resolve();
+  }
+
+  /**
+   * Devuelve los artículos configurados para Imprenta
+   * y conserva los criterios recibidos.
+   */
+  searchImprentaArticulos(
+    texto: string,
+    idsArticulosExcluidos: readonly number[],
+  ): Promise<readonly ImprentaArticuloSearchRecord[]> {
+    this.lastImprentaArticleSearch = {
+      texto,
+      idsArticulosExcluidos: [...idsArticulosExcluidos],
+    };
+
+    return Promise.resolve(this.imprentaArticleSearchResult);
   }
 }
 
@@ -650,6 +685,60 @@ describe('AlmacenService', (): void => {
       totalPvpCents: 5070,
       totalPucMicros: 35_760_000,
     });
+  });
+
+  it('normaliza la búsqueda y exclusiones de artículos de Imprenta', async (): Promise<void> => {
+    const repository = new FakeAlmacenRepository();
+    const service = createService(repository);
+    const consulta: ImprentaArticuloSearchConsulta = {
+      texto: '  artículo  ',
+      idsArticulosExcluidos: [9, 3, 9],
+    };
+
+    const result: readonly ImprentaArticuloSearchInterface[] =
+      await service.searchImprentaArticulos(consulta);
+
+    expect(repository.lastImprentaArticleSearch).toEqual({
+      texto: 'artículo',
+      idsArticulosExcluidos: [3, 9],
+    });
+    expect(result).toEqual([
+      {
+        id: 25,
+        localizador: 261234,
+        marcaNombre: 'Marca de prueba',
+        nombre: 'Artículo de prueba',
+        pvpCents: 1690,
+      },
+    ]);
+  });
+
+  it('no consulta el repository con una búsqueda vacía de Imprenta', async (): Promise<void> => {
+    const repository = new FakeAlmacenRepository();
+    const service = createService(repository);
+
+    const result: readonly ImprentaArticuloSearchInterface[] =
+      await service.searchImprentaArticulos({
+        texto: '   ',
+        idsArticulosExcluidos: [],
+      });
+
+    expect(result).toEqual([]);
+    expect(repository.lastImprentaArticleSearch).toBeNull();
+  });
+
+  it('rechaza identificadores excluidos no válidos en Imprenta', async (): Promise<void> => {
+    const repository = new FakeAlmacenRepository();
+    const service = createService(repository);
+
+    await expect(
+      service.searchImprentaArticulos({
+        texto: 'artículo',
+        idsArticulosExcluidos: [0],
+      }),
+    ).rejects.toThrow('Uno de los artículos excluidos de Imprenta no es válido.');
+
+    expect(repository.lastImprentaArticleSearch).toBeNull();
   });
 });
 

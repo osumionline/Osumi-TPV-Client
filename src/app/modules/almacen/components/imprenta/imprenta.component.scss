@@ -1,0 +1,122 @@
+:host {
+    display: block;
+    min-height: 100%;
+}
+
+.imprenta {
+    display: grid;
+    grid-template-columns: minmax(280px, 0.8fr) minmax(300px, 0.9fr) minmax(420px, 1.5fr);
+    gap: 20px;
+    min-height: 100%;
+    padding: 20px;
+}
+
+.imprenta__column {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    border: 1px solid var(--separator-color);
+    border-radius: 8px;
+    background-color: var(--color-white);
+}
+
+.imprenta__column-header {
+    h2 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 500;
+    }
+
+    span {
+        display: block;
+        margin-top: 4px;
+        font-size: 12px;
+        opacity: 0.65;
+    }
+}
+
+.imprenta__search {
+    width: 100%;
+}
+
+.imprenta__results {
+    display: flex;
+    max-height: calc(100vh - 310px);
+    min-height: 260px;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.imprenta__result {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 8px;
+    border-bottom: 1px solid var(--separator-color);
+}
+
+.imprenta__result-main {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 3px;
+
+    strong,
+    small {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    small {
+        opacity: 0.65;
+    }
+}
+
+.imprenta__result-price {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.imprenta__state {
+    display: flex;
+    min-height: 120px;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    text-align: center;
+    opacity: 0.65;
+}
+
+.imprenta__state--error {
+    color: var(--color-red);
+    opacity: 1;
+}
+
+.imprenta__preview-column {
+    min-height: 500px;
+}
+
+@media (max-width: 1200px) {
+    .imprenta {
+        grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr);
+    }
+
+    .imprenta__preview-column {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 800px) {
+    .imprenta {
+        grid-template-columns: 1fr;
+    }
+
+    .imprenta__preview-column {
+        grid-column: auto;
+    }
+}

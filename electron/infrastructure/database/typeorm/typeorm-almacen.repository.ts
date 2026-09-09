@@ -19,6 +19,7 @@ import type {
   CaducidadReportMesRecord,
   CaducidadReportRecord,
 } from '@backend/domain/almacen/caducidad-report-record.interface';
+import type ImprentaArticuloSearchRecord from '@backend/domain/almacen/imprenta-articulo-search-record.interface';
 import type {
   InventarioResultadoRecord,
   InventarioRowRecord,
@@ -191,6 +192,14 @@ interface CaducidadDeactivateDatabaseRow {
   readonly pvp_cents: number;
   readonly deleted_at: string | null;
   readonly stock: number;
+}
+
+interface ImprentaArticuloDatabaseRow {
+  readonly id: number;
+  readonly localizador: number;
+  readonly marca_nombre: string | null;
+  readonly nombre: string;
+  readonly pvp_cents: number;
 }
 
 /**
@@ -599,6 +608,73 @@ export default class TypeOrmAlmacenRepository implements AlmacenRepository {
     await runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
       await this.deactivateCaducidadTransaction(queryRunner, idCaducidad);
     });
+  }
+
+  /**
+   * Busca artículos activos para Imprenta por nombre,
+   * localizador o cualquiera de sus códigos de barras.
+   */
+  async searchImprentaArticulos(
+    texto: string,
+    idsArticulosExcluidos: readonly number[],
+  ): Promise<readonly ImprentaArticuloSearchRecord[]> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+    const pattern: string = `%${this.escapeLike(texto)}%`;
+    const exclusionClause: string =
+      idsArticulosExcluidos.length === 0
+        ? ''
+        : `AND a.id NOT IN (${idsArticulosExcluidos.map((): string => '?').join(', ')})`;
+
+    const rows: readonly ImprentaArticuloDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT
+          a.id,
+          a.localizador,
+          m.nombre AS marca_nombre,
+          a.nombre,
+          a.pvp_cents
+        FROM articulo a
+        LEFT JOIN marca m
+          ON m.id = a.id_marca
+        WHERE
+          a.deleted_at IS NULL
+          AND (
+            CAST(a.localizador AS TEXT)
+              LIKE ?
+              ESCAPE '\\'
+            OR a.nombre
+              COLLATE NOCASE
+              LIKE ?
+              ESCAPE '\\'
+            OR EXISTS (
+              SELECT 1
+              FROM codigo_barras cb
+              WHERE
+                cb.id_articulo = a.id
+                AND cb.deleted_at IS NULL
+                AND cb.codigo
+                  COLLATE NOCASE
+                  LIKE ?
+                  ESCAPE '\\'
+            )
+          )
+          ${exclusionClause}
+        ORDER BY
+          a.nombre COLLATE NOCASE,
+          a.localizador,
+          a.id
+        LIMIT 25
+      `,
+      [pattern, pattern, pattern, ...idsArticulosExcluidos],
+    )) as readonly ImprentaArticuloDatabaseRow[];
+
+    return rows.map((row: ImprentaArticuloDatabaseRow): ImprentaArticuloSearchRecord => ({
+      id: row.id,
+      localizador: row.localizador,
+      marcaNombre: row.marca_nombre,
+      nombre: row.nombre,
+      pvpCents: row.pvp_cents,
+    }));
   }
 
   /**

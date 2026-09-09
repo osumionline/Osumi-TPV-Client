@@ -7,6 +7,7 @@ import type {
   CaducidadResultadoRecord,
 } from '@backend/domain/almacen/caducidad-record.interface';
 import type { CaducidadReportRecord } from '@backend/domain/almacen/caducidad-report-record.interface';
+import type ImprentaArticuloSearchRecord from '@backend/domain/almacen/imprenta-articulo-search-record.interface';
 import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario-save-record.interface';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
@@ -1282,6 +1283,51 @@ describe('TypeOrmAlmacenRepository', (): void => {
       totalPvpCents: 900,
       totalPucMicros: 6_000_000,
     });
+  });
+
+  it('busca artículos activos para Imprenta por nombre, localizador y códigos', async (): Promise<void> => {
+    const currentRepository: TypeOrmAlmacenRepository = requireRepository();
+
+    const byName: readonly ImprentaArticuloSearchRecord[] =
+      await currentRepository.searchImprentaArticulos('beta', []);
+    expect(byName).toEqual([
+      {
+        id: 2,
+        localizador: 261002,
+        marcaNombre: 'Marca Dos',
+        nombre: 'Artículo Beta',
+        pvpCents: 300,
+      },
+    ]);
+
+    const byLocator: readonly ImprentaArticuloSearchRecord[] =
+      await currentRepository.searchImprentaArticulos('261003', []);
+    expect(byLocator.map((row: ImprentaArticuloSearchRecord): number => row.id)).toEqual([3]);
+
+    const byBarcode: readonly ImprentaArticuloSearchRecord[] =
+      await currentRepository.searchImprentaArticulos('EXTRA-BETA', []);
+    expect(byBarcode.map((row: ImprentaArticuloSearchRecord): number => row.id)).toEqual([2]);
+  });
+
+  it('no restringe Imprenta por stock y excluye artículos antes de devolver resultados', async (): Promise<void> => {
+    const currentRepository: TypeOrmAlmacenRepository = requireRepository();
+
+    const negativeStock: readonly ImprentaArticuloSearchRecord[] =
+      await currentRepository.searchImprentaArticulos('gamma', []);
+
+    expect(negativeStock.map((row: ImprentaArticuloSearchRecord): number => row.id)).toEqual([3]);
+
+    const excluded: readonly ImprentaArticuloSearchRecord[] =
+      await currentRepository.searchImprentaArticulos('beta', [2]);
+
+    expect(excluded).toEqual([]);
+  });
+
+  it('no busca por referencia ni devuelve artículos dados de baja en Imprenta', async (): Promise<void> => {
+    const currentRepository: TypeOrmAlmacenRepository = requireRepository();
+
+    expect(await currentRepository.searchImprentaArticulos('REF-A', [])).toEqual([]);
+    expect(await currentRepository.searchImprentaArticulos('eliminado', [])).toEqual([]);
   });
 });
 
