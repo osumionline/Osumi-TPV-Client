@@ -21,7 +21,6 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTooltip } from '@angular/material/tooltip';
 import type {
   InventarioCsvExportResult,
-  InventarioReportColumn,
   InventarioReportConsulta,
 } from '@desktop-contracts/almacen/inventario-report.interface';
 import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario-save.interface';
@@ -55,90 +54,17 @@ import MarcasService from '@services/marcas.service';
 import ProveedoresService from '@services/proveedores.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatDecimal } from '@utils/format.utils';
-
-type InventarioDataColumn = InventarioReportColumn;
-
-type InventarioDisplayedColumn = InventarioDataColumn | 'opciones';
-
-type InventarioKeyboardField = 'stock' | InventarioPriceField | 'codigoBarras';
-
-interface InventarioColumnOption {
-  readonly id: InventarioDataColumn;
-  readonly label: string;
-}
-
-interface InventarioDisplayRow extends InventarioRowInterface {
-  readonly draft: InventarioDraftValues;
-  readonly dirtyFields: readonly InventarioDirtyField[];
-  readonly dirty: boolean;
-}
-
-interface InventarioDecimalEditorState {
-  readonly idArticulo: number;
-  readonly field: InventarioPriceField;
-  readonly initialValue: string;
-  readonly value: string;
-  readonly error: string | null;
-}
-
-const INVENTARIO_COLUMN_OPTIONS: readonly InventarioColumnOption[] = [
-  {
-    id: 'localizador',
-    label: 'Localizador',
-  },
-  {
-    id: 'proveedor',
-    label: 'Proveedor',
-  },
-  {
-    id: 'marca',
-    label: 'Marca',
-  },
-  {
-    id: 'referencia',
-    label: 'Referencia',
-  },
-  {
-    id: 'categoria',
-    label: 'Categoría',
-  },
-  {
-    id: 'nombre',
-    label: 'Nombre',
-  },
-  {
-    id: 'stock',
-    label: 'Stock',
-  },
-  {
-    id: 'precioAlbaran',
-    label: 'Precio albarán',
-  },
-  {
-    id: 'puc',
-    label: 'PUC',
-  },
-  {
-    id: 'pvp',
-    label: 'PVP',
-  },
-  {
-    id: 'margen',
-    label: 'Margen',
-  },
-  {
-    id: 'codigoBarras',
-    label: 'Código de barras',
-  },
-];
-
-const INVENTARIO_DEFAULT_COLUMNS: readonly InventarioDataColumn[] =
-  INVENTARIO_COLUMN_OPTIONS.filter(
-    (option: InventarioColumnOption): boolean =>
-      option.id !== 'categoria' && option.id !== 'precioAlbaran',
-  ).map((option: InventarioColumnOption): InventarioDataColumn => option.id);
-
-const TEXT_SEARCH_DELAY_MS: number = 300;
+import {
+  INVENTARIO_COLUMN_OPTIONS,
+  INVENTARIO_DEFAULT_COLUMNS,
+  TEXT_SEARCH_DELAY_MS,
+  type InventarioColumnOption,
+  type InventarioDataColumn,
+  type InventarioDecimalEditorState,
+  type InventarioDisplayedColumn,
+  type InventarioDisplayRow,
+  type InventarioKeyboardField,
+} from './inventory.component.private';
 
 /**
  * Muestra y filtra el inventario persistido del almacén.

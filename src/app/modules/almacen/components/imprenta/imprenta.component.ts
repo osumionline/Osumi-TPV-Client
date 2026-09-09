@@ -39,16 +39,7 @@ import AlmacenService from '@services/almacen.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatEuros } from '@utils/format.utils';
 import { QRCodeComponent } from 'angularx-qrcode';
-
-const SEARCH_DELAY_MS: number = 250;
-
-type ImprentaPreviewSlotType = 'articulo' | 'hueco' | 'libre';
-
-interface ImprentaPreviewSlot {
-  readonly id: string;
-  readonly tipo: ImprentaPreviewSlotType;
-  readonly articulo: ImprentaArticuloSearchInterface | null;
-}
+import { SEARCH_DELAY_MS, type ImprentaPreviewSlot } from './imprenta.component.private';
 
 /**
  * Contenedor del diseñador efímero de etiquetas de Imprenta.

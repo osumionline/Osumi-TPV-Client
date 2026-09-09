@@ -23,8 +23,7 @@ import type {
 import AlmacenService from '@services/almacen.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatEuros } from '@utils/format.utils';
-
-const SEARCH_DELAY_MS: number = 250;
+import SEARCH_DELAY_MS from './caducidad-create.component.private';
 
 /**
  * Permite seleccionar un artículo y registrar

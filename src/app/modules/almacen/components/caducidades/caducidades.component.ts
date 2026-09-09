@@ -31,19 +31,7 @@ import AlmacenService from '@services/almacen.service';
 import ArticulosService from '@services/articulos.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatEuros, formatInteger as formatIntegerValue } from '@utils/format.utils';
-
-const CADUCIDAD_COLUMNS: readonly string[] = [
-  'localizador',
-  'marca',
-  'nombre',
-  'unidades',
-  'puc',
-  'pvp',
-  'totalPvp',
-  'opciones',
-];
-
-const TEXT_SEARCH_DELAY_MS: number = 300;
+import { CADUCIDAD_COLUMNS, TEXT_SEARCH_DELAY_MS } from './caducidades.component.private';
 
 /**
  * Muestra y filtra el histórico de pérdidas por caducidad.

@@ -1,25 +1,9 @@
 import { Component, input, output, type InputSignal, type OutputEmitterRef } from '@angular/core';
 import type AlmacenSection from '@model/almacen/almacen-section.type';
-
-interface WarehouseSectionDefinition {
-  readonly id: AlmacenSection;
-  readonly label: string;
-}
-
-const WAREHOUSE_SECTIONS: readonly WarehouseSectionDefinition[] = [
-  {
-    id: 'inventory',
-    label: 'INVENTARIO',
-  },
-  {
-    id: 'expirations',
-    label: 'CADUCIDADES',
-  },
-  {
-    id: 'printing',
-    label: 'IMPRENTA',
-  },
-];
+import {
+  WAREHOUSE_SECTIONS,
+  type WarehouseSectionDefinition,
+} from './warehouse-tabs.component.private';
 
 /**
  * Muestra las secciones disponibles del módulo de Almacén.

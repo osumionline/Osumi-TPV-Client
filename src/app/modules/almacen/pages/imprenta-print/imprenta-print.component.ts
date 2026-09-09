@@ -10,8 +10,7 @@ import type { ImprentaPrintDocumentoInterface } from '@desktop-contracts/almacen
 import { getErrorMessage } from '@utils/error.utils';
 import { formatEuros } from '@utils/format.utils';
 import { QRCodeComponent } from 'angularx-qrcode';
-
-const MM_TO_PX: number = 96 / 25.4;
+import MM_TO_PX from './imprenta-print.component.private';
 
 /**
  * Renderer exclusivo de la hoja definitiva de etiquetas.

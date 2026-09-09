@@ -6,14 +6,7 @@ import type {
 } from '@desktop-contracts/almacen/inventario-report.interface';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatDecimal, formatEuros } from '@utils/format.utils';
-
-const RIGHT_ALIGNED_COLUMNS: readonly InventarioReportColumn[] = [
-  'stock',
-  'precioAlbaran',
-  'puc',
-  'pvp',
-  'margen',
-];
+import RIGHT_ALIGNED_COLUMNS from './inventory-print.component.private';
 
 /**
  * Renderer exclusivo de la vista imprimible de Inventario.
