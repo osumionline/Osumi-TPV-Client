@@ -29,14 +29,18 @@ class FakeImprentaPrintProvider implements ImprentaPrintProvider {
 
   /**
    * Conserva los identificadores solicitados y devuelve
-   * los artículos canónicos configurados para el test.
+   * únicamente los artículos canónicos correspondientes.
    */
   getImprentaPrintArticulos(
     idsArticulos: readonly number[],
   ): Promise<readonly ImprentaPrintArticuloInterface[]> {
     this.lastIdsArticulos = [...idsArticulos];
 
-    return Promise.resolve(this.result);
+    return Promise.resolve(
+      this.result.filter((article: ImprentaPrintArticuloInterface): boolean =>
+        idsArticulos.includes(article.idArticulo),
+      ),
+    );
   }
 }
 
