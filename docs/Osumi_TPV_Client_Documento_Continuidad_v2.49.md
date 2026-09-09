@@ -1,8 +1,8 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.48  
-**Fecha:** 8 de septiembre de 2026  
-**Base de continuidad:** `v2.48 + main` una vez este documento se suba al repositorio.
+**Versión:** 2.49  
+**Fecha:** 9 de septiembre de 2026  
+**Base de continuidad:** `v2.49 + main` una vez este documento se suba al repositorio.
 
 ---
 
@@ -14,7 +14,7 @@ El **Hito 13 — Artículos** está completamente terminado, validado y subido a
 
 El **Hito 14 — Clientes** queda oficialmente **✅ CERRADO** tras completar la regresión integral final. No queda funcionalidad conocida pendiente dentro de este hito.
 
-El **Hito 15 — Almacén** está actualmente **🟦 EN DESARROLLO**.
+El **Hito 15 — Almacén** queda oficialmente **✅ CERRADO** tras completar Inventario, Caducidades e Imprenta y ejecutar la regresión funcional final de los tres subapartados.
 
 Se divide funcionalmente en tres pestañas independientes:
 
@@ -24,12 +24,12 @@ Caducidades
 Imprenta
 ```
 
-Estado actual:
+Estado definitivo:
 
 ```text
 Inventario   → ✅ CERRADO
 Caducidades  → ✅ CERRADO
-Imprenta     → 🟦 SIGUIENTE BLOQUE
+Imprenta     → ✅ CERRADO (beta física)
 ```
 
 Inventario queda cerrado tras completar:
@@ -61,13 +61,15 @@ Durante `15I.5` se añadió la reversión transaccional de una caducidad, restau
 
 Durante `15I.6–15I.7` se añadió el informe histórico agrupado `Año → Mes → Marca` en BrowserWindow independiente, con snapshot persistido, estado expandido local e impresión exacta del estado visible mediante diálogo estándar.
 
+Antes de iniciar el **Hito 16 — Compras** se abre una **pausa técnica de refactorización y orden arquitectónico**. Su objetivo es convertir lo aprendido en Almacén en una convención reutilizable para Compras y siguientes desarrollos.
+
 El siguiente punto exacto es:
 
 ```text
-15J.1 — Base de Imprenta + búsqueda de artículos
+REF.1 — Constantes y utilidades compartidas
 ```
 
-La funcionalidad de Imprenta ya está definida y planificada como diseñador efímero de una única página A4 de etiquetas. Se considera inicialmente una **versión beta**, pendiente de ajustes físicos cuando se pruebe con impresora y hojas reales de etiquetas.
+Imprenta queda funcionalmente cerrada como diseñador efímero de una única página A4 de etiquetas. Se mantiene la consideración **beta física** únicamente para futuros ajustes de márgenes/calibración cuando se pruebe con impresora y hojas reales.
 
 ---
 
@@ -107,7 +109,7 @@ Ventas 12 — Postventa                             🟦
       14K.6A “Imprimir factura” tras venta        ✅
       14K.6B Regresión integral + cierre          ✅
 
-15 Almacén                                        🟦 EN DESARROLLO
+15 Almacén                                        ✅ HITO CERRADO
   15A Base de Almacén                             ✅
   15B Dominio + consulta Inventario               ✅
   15C Pantalla Inventario                         ✅
@@ -124,12 +126,20 @@ Ventas 12 — Postventa                             🟦
     15I.5 Baja / reversión                        ✅
     15I.6 Informe agrupado                        ✅
     15I.7 Impresión + regresión                   ✅
-  15J Imprenta                                    🟦 EN DESARROLLO
-    15J.1 Base + búsqueda                         ⬅️ SIGUIENTE
-    15J.2 Diseñador efímero                       ⬜
-    15J.3 Previsualización + capacidad            ⬜
-    15J.4 Snapshot + ventana de impresión         ⬜
-    15J.5 Impresión + regresión beta              ⬜
+  15J Imprenta                                    ✅ CERRADO
+    15J.1 Base + búsqueda                         ✅
+    15J.2 Diseñador efímero                       ✅
+    15J.3 Previsualización + capacidad            ✅
+    15J.4 Snapshot + ventana de impresión         ✅
+    15J.5 Impresión + regresión beta              ✅
+
+REF Pausa técnica pre-Hito 16                    🟦 EN DESARROLLO
+  REF.1 Constantes y utilidades compartidas       ⬅️ SIGUIENTE
+  REF.2 Convención *.private.ts                   ⬜
+  REF.3 Reorganización estructural de Almacén     ⬜
+  REF.4 Backend por subdominio                    ⬜
+  REF.5 Revisión de hotspots                      ⬜
+  REF.6 Cierre + convención arquitectónica        ⬜
 
 16 Compras                                        ⬜
 
@@ -519,15 +529,15 @@ Caducidades
 Imprenta
 ```
 
-Estado actual:
+Estado definitivo:
 
 ```text
 Inventario   → ✅ CERRADO
 Caducidades  → ✅ CERRADO
-Imprenta     → 🟦 EN DESARROLLO / PLANIFICADA
+Imprenta     → ✅ CERRADO (beta física)
 ```
 
-Los tres dominios se mantienen independientes dentro de Almacén. Inventario y Caducidades no deben reabrirse sin un requisito nuevo. El desarrollo activo pasa a Imprenta.
+Los tres dominios quedan funcionalmente cerrados. No deben reabrirse sin un requisito nuevo. La única deuda explícita de Imprenta es la calibración física opcional cuando existan pruebas con impresora/hojas reales; no bloquea el cierre del hito.
 
 ---
 
@@ -562,7 +572,7 @@ Caducidades
 Imprenta
 ```
 
-`Inventario` y `Caducidades` son pestañas funcionales cerradas. `Imprenta` es el siguiente dominio activo.
+`Inventario`, `Caducidades` e `Imprenta` son pestañas funcionales cerradas. El Hito 15 no tiene subapartados activos.
 
 ## 7.1.2 Consulta masiva
 
@@ -1942,31 +1952,34 @@ regresión integral
 ## 15J — Imprenta
 
 ```text
-🟦 EN DESARROLLO / PLANIFICADA
+✅ CERRADO
 ```
 
-Objetivo:
+Implementado y validado de extremo a extremo:
 
 ```text
-diseñar una única página A4 de etiquetas
-→ artículos + huecos
-→ previsualización
-→ snapshot canónico
-→ BrowserWindow independiente
-→ diálogo estándar de impresión
+búsqueda de artículos
+artículos + cantidades + huecos
+drag & drop
+previsualización A4
+capacidad de una única página
+snapshot canónico
+BrowserWindow independiente
+diálogo estándar de impresión
+regresión integral
 ```
 
-La primera versión se considera beta hasta poder validarla con impresora y hojas físicas reales.
-
-Roadmap cerrado:
+Mini-hitos cerrados:
 
 ```text
-15J.1 Base + búsqueda
-15J.2 Diseñador efímero
-15J.3 Previsualización + capacidad
-15J.4 Snapshot + ventana de impresión
-15J.5 Impresión + regresión beta
+15J.1 Base + búsqueda                         ✅
+15J.2 Diseñador efímero                      ✅
+15J.3 Previsualización + capacidad           ✅
+15J.4 Snapshot + ventana de impresión        ✅
+15J.5 Impresión + regresión beta             ✅
 ```
+
+La funcionalidad queda cerrada. Solo permanece como pendiente no bloqueante la calibración física futura con impresora y hojas reales, si fuese necesaria.
 
 ---
 
@@ -3099,13 +3112,13 @@ Caducidades queda oficialmente:
 
 ---
 
-# 27. Imprenta — requisitos cerrados y plan
+# 27. Imprenta — implementación final ✅ CERRADA
 
 Imprenta es un diseñador efímero para preparar una única hoja A4 de etiquetas adhesivas.
 
 No crea históricos ni persiste composiciones/configuración en SQLite.
 
-Flujo conceptual:
+Flujo definitivo:
 
 ```text
 entrar en Imprenta
@@ -3114,9 +3127,9 @@ entrar en Imprenta
 → ordenar y ajustar cantidades
 → configurar hoja
 → previsualizar
-→ Imprimir
-→ backend relee artículos persistidos
-→ snapshot
+→ Terminar
+→ backend valida y relee artículos persistidos
+→ snapshot canónico inmutable
 → BrowserWindow independiente
 → botón Imprimir
 → diálogo estándar
@@ -3414,7 +3427,7 @@ El proyecto ya dispone de `angularx-qrcode`, por lo que no se necesita introduci
 
 La composición del renderer es efímera y puede conservar temporalmente datos de presentación para previsualizar.
 
-Sin embargo, al pulsar Imprimir:
+Sin embargo, al pulsar Terminar:
 
 ```text
 renderer envía:
@@ -3519,17 +3532,40 @@ DATABASE_SCHEMA_VERSION = 1
 
 permanece sin cambios.
 
-## 27.13 Arquitectura prevista
+## 27.13 Arquitectura implementada
 
-Conceptualmente:
+La implementación final mantiene una API agregada de Almacén y añade piezas específicas de Imprenta.
+
+Contratos compartidos principales:
 
 ```text
-AlmacenRepository / dominio Imprenta
-  searchImprentaArticulos()
-  getImprentaPrintDocument()
+electron/contracts/almacen/imprenta-articulo.interface.ts
+electron/contracts/almacen/imprenta-print.interface.ts
+electron/contracts/almacen/imprenta-print-api.interface.ts
 ```
 
-o equivalente coherente con el `main` real al implementar.
+Backend/application:
+
+```text
+AlmacenService
+  searchImprentaArticulos()
+  getImprentaPrintArticulos()
+
+ImprentaPrintService
+  valida command
+  relee datos canónicos
+  expande cantidades/huecos
+  rellena slots libres
+  crea snapshot de una sola página
+```
+
+Persistencia actual:
+
+```text
+AlmacenRepository / TypeOrmAlmacenRepository
+  searchImprentaArticulos()
+  getImprentaPrintArticulos()
+```
 
 Renderer principal:
 
@@ -3537,152 +3573,171 @@ Renderer principal:
 ImprentaComponent
   búsqueda
   estado efímero
-  drag & drop
+  selección única
   cantidades
+  huecos
+  drag & drop
+  configuración
   capacidad
-  preview
+  preview A4
+  acción Terminar
 ```
 
-Presentación compartida:
+Salida independiente:
 
 ```text
-ImprentaLabelComponent
-```
-
-para intentar reutilizar el mismo marcado/estilo en preview y documento final.
-
-Salida:
-
-```text
+ElectronImprentaPrintWindow
 ImprentaPrintService
-ImprentaPrintWindow
-preload específico
-IPC específico
-renderer específico
+imprenta-print-preload
+register-imprenta-print-ipc
+ImprentaPrintComponent
 ```
 
-No duplicar fórmulas ni datos canónicos si pueden centralizarse.
+Seguridad/aislamiento:
+
+```text
+contextIsolation = true
+nodeIntegration = false
+sandbox = true
+preload mínimo
+IPC autorizado por webContents.id
+```
+
+La BrowserWindow mantiene el snapshot en main process. El renderer de impresión solo puede obtener ese snapshot e iniciar la impresión estándar.
+
+No se creó un componente visual compartido de etiqueta entre diseñador y ventana final; ambos renderers mantienen representaciones equivalentes adaptadas a su contexto. Este hecho no afecta al comportamiento cerrado y puede revisarse únicamente si aparece una necesidad real.
 
 ## 27.14 Mini-hitos
 
-### 15J.1 — Base + búsqueda
+### 15J.1 — Base + búsqueda ✅
 
-```text
-⬅️ SIGUIENTE
-```
+Implementado:
 
-- activar contenido real de la pestaña Imprenta;
-- contratos públicos/backend;
-- consulta ligera de artículos activos;
-- búsqueda por nombre/localizador/códigos activos;
-- exclusión de artículos ya seleccionados;
-- IPC/preload/service Angular;
-- tests de consulta.
+- pestaña Imprenta real;
+- búsqueda por nombre, localizador y códigos de barras activos;
+- artículos activos sin restricción de stock;
+- exclusión backend de artículos ya seleccionados antes del límite de resultados;
+- contratos/IPC/preload/service Angular;
+- debounce + descarte de respuestas obsoletas;
+- tests SQL/application.
 
-### 15J.2 — Diseñador efímero
+### 15J.2 — Diseñador efímero ✅
 
-```text
-⬜
-```
+Implementado:
 
-- estructura visual de tres áreas;
-- lista central;
-- añadir artículos;
-- cantidad;
-- añadir/eliminar huecos;
-- confirmación al eliminar artículo;
-- `Limpiar` conservando configuración;
-- Drag & Drop por bloques.
+- selección única de artículos;
+- cantidad inicial 1 y edición de cantidad;
+- Hueco individual;
+- Angular CDK Drag & Drop;
+- artículo movido como bloque;
+- eliminación de artículo con confirmación;
+- eliminación de Hueco inmediata;
+- Limpiar vacía lista y conserva configuración;
+- estado 100 % efímero en Angular.
 
-### 15J.3 — Previsualización + capacidad
+### 15J.3 — Previsualización + capacidad ✅
 
-```text
-⬜
-```
+Implementado:
 
-- constantes 10×10;
-- defaults 5×4;
-- vertical/horizontal;
-- Mostrar PVP;
-- cálculo de capacidad/ocupación;
-- validación de cantidades;
-- estado inválido tras reducir capacidad;
-- error visible + Imprimir deshabilitado;
-- cuadrícula A4;
-- QR + nombre + marca + PVP;
-- representación de huecos;
-- componente de etiqueta reutilizable.
+- defaults 5×4, vertical y PVP visible;
+- máximos 10×10 mediante constantes;
+- A4 vertical/horizontal sin intercambio automático de filas/columnas;
+- capacidad estricta de una sola página;
+- si reducir dimensiones provoca overflow, el diseño se conserva y queda inválido;
+- nuevas cantidades/huecos no pueden superar capacidad válida;
+- QR del localizador;
+- nombre, marca opcional y PVP opcional;
+- preview con slots de artículo, HUECO y LIBRE;
+- Limpiar conserva toda la configuración.
 
-### 15J.4 — Snapshot + ventana de impresión
+### 15J.4 — Snapshot + BrowserWindow ✅
 
-```text
-⬜
-```
+Implementado:
 
-- command con ids/orden/cantidades/huecos/configuración;
-- relectura canónica de artículos;
-- rechazo de artículos inactivos/desaparecidos;
-- snapshot inmutable;
+- command mínimo con ids/cantidades/huecos/configuración;
+- validación completa en backend;
+- relectura canónica de localizador/nombre/marca/PVP;
+- artículo inactivo/desaparecido aborta toda la preparación;
+- duplicados/overflow/dimensiones/orientación inválida rechazados;
+- snapshot inmutable de exactamente `filas × columnas` slots;
 - BrowserWindow independiente;
-- preload mínimo;
-- IPC reducido/autorizado;
-- una única página A4.
+- preload mínimo e IPC por `webContents.id`;
+- cambios posteriores del diseñador no alteran la ventana abierta.
 
-### 15J.5 — Impresión + regresión beta
+### 15J.5 — Impresión + regresión beta ✅
 
-```text
-⬜
-```
+Implementado y validado:
 
 - botón Imprimir en BrowserWindow;
-- diálogo estándar;
-- orientación aplicada a Electron/print CSS;
-- ocultar controles en papel;
-- verificar una única página;
-- tests finales;
-- batería completa;
-- regresión funcional;
-- cierre funcional beta de Imprenta;
-- dejar pendiente calibración física con impresora/hojas reales si fuese necesaria.
+- `webContents.print()` con diálogo estándar;
+- A4 explícito;
+- orientación tomada del snapshot canónico;
+- `scaleFactor = 100`;
+- márgenes lógicos `none` para la beta;
+- cancelación del diálogo sin error;
+- controles ocultos mediante `@media print`;
+- huecos/libres completamente blancos en papel;
+- batería completa y regresión funcional final.
+
+Resultado:
+
+```text
+15J — IMPRENTA ✅ CERRADO
+HITO 15 — ALMACÉN ✅ CERRADO
+```
+
+Pendiente no bloqueante:
+
+```text
+calibración física futura con impresora/hojas reales
+```
 
 ---
 
 # 28. Próximo bloque exacto
 
-```text
-15J.1 — Base de Imprenta + búsqueda de artículos
-```
+Antes del Hito 16 se ejecuta una pausa técnica de refactorización.
 
-Objetivo:
+Siguiente punto exacto:
 
 ```text
-activar Imprenta real
-+
-definir contratos
-+
-búsqueda remota ligera
-+
-excluir artículos ya seleccionados
+REF.1 — Constantes y utilidades compartidas
 ```
 
-Antes de proponer cambios:
+Objetivo global de la pausa:
+
+```text
+reducir duplicaciones reales
++
+separar declaraciones privadas de clases
++
+ordenar Almacén por subdominios
++
+dividir backend Almacén en services/repositories específicos
++
+dejar convenciones como plantilla de Compras
+```
+
+No introducir funcionalidad nueva ni cambios de esquema durante este bloque.
+
+Regla de trabajo:
+
+```text
+0 cambios de comportamiento
+0 cambios de esquema
+0 migraciones
+```
+
+Antes de proponer patches de `REF.1`:
 
 1. revisar `main` actual;
-2. revisar la pestaña/contenedor actual de Almacén;
-3. revisar `searchCaducidadArticulos()` como patrón del dominio Almacén;
-4. revisar `ArticleSearchComponent` / `VentasArticulosService` solo como referencia de UX y búsqueda existente, evitando acoplar Imprenta a Ventas;
-5. definir contrato mínimo de resultado: id, localizador, nombre, marca y PVP;
-6. buscar exclusivamente artículos activos;
-7. buscar por nombre, localizador y códigos de barras activos;
-8. excluir ids ya seleccionados sin desperdiciar el límite de resultados;
-9. añadir IPC/preload/API/service necesarios;
-10. activar la base visual de la pestaña sin desarrollar todavía drag & drop, preview o impresión;
-11. añadir tests SQL/application;
-12. ejecutar batería Electron del bloque.
-
-No empezar `15J.2` hasta que `15J.1` haya sido aplicado, probado y confirmado por el usuario.
-
-No reabrir Inventario ni Caducidades salvo requisito nuevo.
+2. localizar todas las definiciones repetidas de meses y paginación;
+3. localizar formatters duplicados que tengan semántica realmente común;
+4. distinguir global/shared frente a defaults locales;
+5. evitar globalizar constantes solo porque coincidan dos veces;
+6. aplicar el lote completo;
+7. ejecutar batería adecuada;
+8. no avanzar a `REF.2` sin confirmación del usuario.
 
 ---
 
@@ -3692,7 +3747,7 @@ Si este chat alcanza el límite, continuar con este contexto:
 
 ```text
 Estamos desarrollando Osumi TPV Client.
-La base de continuidad es el documento v2.48 + el main actual del repositorio.
+La base de continuidad es el documento v2.49 + el main actual del repositorio.
 
 Reglas:
 - revisar main antes de proponer patches;
@@ -3705,82 +3760,452 @@ Reglas:
 - DATABASE_SCHEMA_VERSION sigue en 1 y no hay migraciones pre-release.
 
 Estado:
-- Hito 13 Artículos cerrado.
-- Hito 14 Clientes cerrado.
-- Hito 15 Almacén en desarrollo.
+- Hito 13 Artículos ✅ cerrado.
+- Hito 14 Clientes ✅ cerrado.
+- Hito 15 Almacén ✅ cerrado.
 - Inventario ✅ cerrado.
-- Caducidades ✅ cerrado tras 15I.1–15I.7.
-- Imprenta es el siguiente dominio activo.
-- siguiente punto exacto: 15J.1 Base de Imprenta + búsqueda de artículos.
+- Caducidades ✅ cerrado.
+- Imprenta ✅ cerrado funcionalmente; beta física únicamente para futura calibración.
+- Hito 16 Compras todavía no iniciado.
+- bloque activo: pausa técnica de refactorización pre-Hito 16.
+- siguiente punto exacto: REF.1 Constantes y utilidades compartidas.
 
-Caducidades — cierre:
-- alta = snapshot + stock -= unidades + histórico tipo 7, transaccional;
-- 1 <= unidades <= stock canónico;
-- baja = soft-delete + stock += unidades + histórico inverso tipo 7, transaccional;
-- la reversión funciona aunque el artículo esté soft-deleted;
-- doble reversión rechazada;
-- histórico muestra “Caducidad”, no “Tipo 7”;
-- informe respeta filtros activos y agrupa Año → Mes → Marca;
-- años desc, meses desc, marcas alfabéticas;
-- todos los niveles cerrados inicialmente;
-- BrowserWindow independiente con snapshot persistido;
-- impresión = estado visible exacto + diálogo estándar;
-- Caducidades oficialmente cerrado.
-
-Imprenta — requisitos cerrados:
+Imprenta — cierre:
 - diseñador efímero de una sola página A4;
-- tres áreas: búsqueda / seleccionados / preview;
-- búsqueda por nombre, localizador y códigos de barras;
-- solo artículos activos;
-- un artículo ya seleccionado no aparece en resultados;
-- un artículo solo puede estar una vez en la lista;
-- lista con Artículo o Hueco;
-- artículo: handle, nombre, marca, cantidad, eliminar con confirmación;
-- hueco: una celda por pulsación, reordenable, eliminación sin confirmación;
-- elementos reordenables con Angular CDK Drag & Drop;
-- cantidad de artículo entero >= 1;
-- el bloque completo se mueve con todas sus repeticiones;
-- defaults: 5 filas, 4 columnas, vertical, PVP visible;
-- máximo filas = 10 y máximo columnas = 10 mediante constantes fáciles de cambiar;
-- capacidad = filas × columnas;
-- ocupación = suma cantidades + huecos;
-- una única página, nunca paginar automáticamente;
-- al aumentar cantidades no superar capacidad actual;
-- si reducir filas/columnas deja overflow: conservar diseño + error + Imprimir deshabilitado;
-- nunca borrar elementos automáticamente;
-- orientación vertical/horizontal no intercambia filas/columnas;
-- Limpiar vacía lista pero conserva filas/columnas/orientación/PVP;
-- Imprimir no limpia la lista;
-- preview ocupa conceptualmente todo A4 en esta beta;
-- sin márgenes/gutters/plantillas físicas configurables todavía;
-- etiqueta = QR(localizador) + nombre + marca opcional + PVP opcional;
-- PVP = pvpCents persistido, no descuento;
-- propuesta visual: QR izquierda 35–40 %, textos derecha, PVP destacado abajo;
-- si no hay marca, omitirla sin hueco artificial;
-- usar representación compartida preview/print;
-- angularx-qrcode ya está disponible; preferencia inicial SVG;
-- al preparar impresión backend relee datos canónicos actuales del artículo;
-- renderer no es fuente canónica de nombre/marca/PVP;
-- artículo inactivo/desaparecido al imprimir → rechazar, sin documento parcial;
-- BrowserWindow final independiente, snapshot inmutable, preload mínimo, IPC restringido;
-- botón Imprimir en la ventana final → diálogo estándar;
-- A4 vertical/horizontal según configuración;
-- no térmica;
-- primera versión considerada beta hasta prueba física real.
+- búsqueda por nombre/localizador/códigos activos;
+- artículos únicos + cantidades + huecos + drag & drop;
+- defaults 5×4, vertical, PVP sí; máximos 10×10;
+- capacidad estricta de una página;
+- overflow por reducción de filas/columnas conserva diseño y bloquea Terminar;
+- preview QR(localizador)+nombre+marca opcional+PVP opcional;
+- Terminar envía solo ids/cantidades/huecos/configuración;
+- backend relee datos persistidos actuales;
+- snapshot inmutable;
+- BrowserWindow independiente, preload mínimo, IPC por webContents.id;
+- impresión A4 estándar, no térmica;
+- cancelación del diálogo no es error;
+- Hito 15 cerrado.
 
-Roadmap Imprenta:
-15J.1 Base + búsqueda                         ⬅️ SIGUIENTE
-15J.2 Diseñador efímero                      ⬜
-15J.3 Previsualización + capacidad           ⬜
-15J.4 Snapshot + ventana de impresión        ⬜
-15J.5 Impresión + regresión beta             ⬜
+Auditoría técnica cerrada antes de v2.49:
+- meses repetidos en varios componentes/informes;
+- paginación estándar [20,50,100,200] repetida en frontend y backend;
+- Intl.NumberFormat y otros formatters repetidos;
+- muchas interfaces/types/constantes privadas incrustadas antes de clases;
+- electron/contracts/almacen, backend/contracts/almacen y backend/domain/almacen necesitan subcarpetas Inventario/Caducidades/Imprenta;
+- TypeOrmAlmacenRepository ~1900 líneas y mezcla los tres subdominios;
+- AlmacenService backend ~700 líneas y mezcla providers/lógica de los tres subdominios;
+- InventoryComponent ~1500 líneas: aplicar *.private.ts ahora, pero no dividirlo funcionalmente todavía;
+- application-composition y preload pueden ser grandes por naturaleza y no se dividen solo por tamaño.
 
-No reabrir Inventario/Caducidades sin requisito nuevo.
+Convenciones nuevas acordadas:
+1. Global/shared solo con reutilización semántica real.
+2. Si algo solo sirve al archivo X → X.private.ts.
+3. *.private.ts puede contener interfaces, types, constantes, maps/tablas y helpers puros exclusivos.
+4. No mover métodos de clase solo para adelgazar archivos.
+5. Crear carpeta de subdominio cuando exista un subdominio real con varias piezas relacionadas.
+6. Las fachadas comunes permanecen en la raíz.
+7. No crear carpetas de un solo archivo sin necesidad real.
+8. API agregada no implica mega-service/mega-repository.
+9. Tamaño es señal, no regla.
+10. Compras y nuevos desarrollos deben nacer ya bajo estas convenciones.
+
+Roadmap pausa técnica:
+REF.1 Constantes y utilidades compartidas       ← SIGUIENTE
+REF.2 Convención *.private.ts
+REF.3 Reorganización estructural de Almacén
+REF.4 Backend por subdominio
+REF.5 Revisión de hotspots
+REF.6 Cierre + convención arquitectónica
+
+Split backend acordado para REF.4:
+- InventarioRepository / TypeOrmInventarioRepository / InventarioService
+- CaducidadesRepository / TypeOrmCaducidadesRepository / CaducidadesService
+- ImprentaRepository / TypeOrmImprentaRepository / ImprentaService
+- mantener AlmacenApi como fachada agregada del renderer
+- mantener compatibilidad funcional del IPC público
+
+No iniciar Hito 16 Compras hasta cerrar la pausa técnica.
 ```
 
 ---
 
-# 30. Historial de continuidad
+# 30. Pausa técnica pre-Hito 16 — auditoría y roadmap
+
+Antes de comenzar Compras se realiza un refactor estructural sin cambios funcionales.
+
+Objetivos:
+
+```text
+eliminar duplicaciones semánticas reales
+ordenar declaraciones privadas
+organizar Almacén por subdominios
+separar mega-services / mega-repositories
+convertir el resultado en plantilla arquitectónica para Compras
+```
+
+## 30.1 Principios
+
+Durante toda la pausa:
+
+```text
+0 funcionalidad nueva
+0 cambios de comportamiento intencionados
+0 cambios de esquema
+0 migraciones
+DATABASE_SCHEMA_VERSION = 1
+```
+
+Cada lote termina con tests/build/lint y validación funcional cuando corresponda.
+
+## 30.2 Hallazgo — meses
+
+Existen listas de meses repetidas en distintos componentes e informes, incluyendo variantes con nombre largo y abreviatura.
+
+Crear una fuente canónica compartida con datos equivalentes a:
+
+```text
+value
+label
+shortLabel
+```
+
+Destino previsto:
+
+```text
+src/app/constants/date.constants.ts
+```
+
+No mantener arrays manuales independientes de meses largos/cortos/opciones.
+
+## 30.3 Hallazgo — paginación
+
+La lista estándar:
+
+```text
+20, 50, 100, 200
+```
+
+está repetida en frontend y backend de Almacén.
+
+Al ser una regla usada por Angular y Electron, debe vivir en contratos compartidos, previsiblemente:
+
+```text
+electron/contracts/shared/pagination.constants.ts
+```
+
+Los defaults siguen siendo locales por pantalla:
+
+```text
+Inventario  → 20
+Caducidades → 50
+```
+
+## 30.4 Hallazgo — formatters
+
+Hay múltiples `Intl.NumberFormat` equivalentes para EUR, enteros y decimales.
+
+Criterio:
+
+```text
+conversión monetaria de dominio → money.utils.ts
+formato visual genérico          → format.utils.ts o equivalente
+```
+
+No crear una constante global por cada formatter si una función común expresa mejor la intención.
+
+## 30.5 Convención `*.private.ts`
+
+Nueva regla arquitectónica:
+
+```text
+foo.component.ts
+foo.component.private.ts
+foo.component.html
+foo.component.scss
+```
+
+También aplica a services/repositories cuando proceda:
+
+```text
+typeorm-inventario.repository.ts
+typeorm-inventario.repository.private.ts
+```
+
+Puede contener:
+
+- interfaces internas;
+- types internos;
+- constantes exclusivas del consumidor;
+- maps/tablas estáticas;
+- configuración estática;
+- helpers puros exclusivos del archivo principal.
+
+No debe contener métodos extraídos únicamente para reducir líneas de la clase.
+
+Regla de promoción:
+
+```text
+1 consumidor                  → *.private.ts
+varios dentro del dominio     → shared del dominio
+concepto genérico aplicación  → constants/utils/shared contract
+```
+
+## 30.6 Reorganización por subdominios
+
+### Contratos públicos Electron
+
+Objetivo:
+
+```text
+electron/contracts/almacen/
+  almacen-api.interface.ts
+
+  inventario/
+    ...
+
+  caducidades/
+    ...
+
+  imprenta/
+    ...
+```
+
+`almacen-api.interface.ts` permanece en raíz por ser fachada agregada.
+
+### Backend contracts/domain/application
+
+Aplicar el mismo principio:
+
+```text
+electron/backend/contracts/almacen/
+  inventario/
+  caducidades/
+  imprenta/
+
+electron/backend/domain/almacen/
+  inventario/
+  caducidades/
+  imprenta/
+
+electron/backend/application/almacen/
+  inventario/
+  caducidades/
+  imprenta/
+```
+
+No crear carpetas solo por número de archivos; crear cuando exista subdominio real con varias piezas relacionadas.
+
+### Angular Almacén
+
+Objetivo aproximado:
+
+```text
+src/app/modules/almacen/
+  components/
+    warehouse-tabs/
+  pages/
+    warehouse/
+
+  inventario/
+    components/
+    pages/
+
+  caducidades/
+    components/
+    pages/
+
+  imprenta/
+    components/
+    pages/
+```
+
+No renombrar componentes solo por homogeneizar idioma si no aporta valor.
+
+### IPC / Electron adapters / preloads
+
+Agrupar Almacén cuando existan varias piezas, evitando una carpeta por archivo:
+
+```text
+electron/ipc/almacen/
+  register-almacen-ipc.ts
+  register-inventario-print-ipc.ts
+  register-caducidad-report-ipc.ts
+  register-imprenta-print-ipc.ts
+
+electron/infrastructure/electron/almacen/
+  electron-inventario-csv-file-saver.ts
+  electron-inventario-print-window.ts
+  electron-caducidad-report-window.ts
+  electron-imprenta-print-window.ts
+
+electron/preloads/
+  factura-preview-preload.ts
+  inventario-print-preload.ts
+  caducidad-report-preload.ts
+  imprenta-print-preload.ts
+```
+
+El `preload.ts` principal permanece como fachada única por ahora.
+
+## 30.7 Split backend acordado
+
+La auditoría detecta que `TypeOrmAlmacenRepository` y `AlmacenService` ya mezclan tres subdominios claros.
+
+Se acuerda un split real, no solo mover privados.
+
+Objetivo conceptual:
+
+```text
+InventarioRepository
+CaducidadesRepository
+ImprentaRepository
+```
+
+Implementaciones:
+
+```text
+TypeOrmInventarioRepository
+TypeOrmCaducidadesRepository
+TypeOrmImprentaRepository
+```
+
+Servicios:
+
+```text
+InventarioService
+CaducidadesService
+ImprentaService
+```
+
+Relaciones:
+
+```text
+InventarioService   → InventarioRepository
+CaducidadesService  → CaducidadesRepository
+ImprentaService     → ImprentaRepository
+```
+
+Se mantiene:
+
+```text
+AlmacenApi
+```
+
+como fachada agregada del renderer y se mantiene compatible la superficie funcional del IPC.
+
+Un helper SQLite auténticamente compartido puede promocionarse a utilidad TypeORM común; no duplicarlo entre repositories.
+
+## 30.8 Hotspots detectados
+
+Principales señales de tamaño/responsabilidad observadas en la auditoría:
+
+```text
+TypeOrmAlmacenRepository  ≈ 1900 líneas → separar por subdominio
+InventoryComponent        ≈ 1500 líneas → *.private.ts ahora; no dividir flujo todavía
+AlmacenService backend    ≈ 700 líneas  → separar por subdominio
+historical-sales          ≈ 900 líneas  → deuda registrada, no tocar ahora
+ventas.service            ≈ 640 líneas  → no tocar ahora
+application-composition   ≈ 590 líneas  → mantener por ahora
+caducidades.component     ≈ 590 líneas  → *.private.ts
+imprenta.component        ≈ 580 líneas  → *.private.ts
+preload.ts                ≈ 520 líneas  → mantener fachada por ahora
+```
+
+El tamaño es una señal, no una regla. Solo se divide cuando hay responsabilidades/subdominios claros.
+
+No reorganizar retrospectivamente todo Ventas/Clientes en esta pausa. El patrón nuevo se aplica completamente a Almacén y se usa en Compras/nuevos desarrollos.
+
+## 30.9 Roadmap definitivo
+
+### REF.1 — Constantes y utilidades compartidas
+
+```text
+⬅️ SIGUIENTE
+```
+
+- meses;
+- paginación;
+- formatters;
+- eliminar duplicaciones confirmadas;
+- conservar defaults específicos donde corresponda;
+- batería completa.
+
+### REF.2 — Convención `*.private.ts`
+
+```text
+⬜
+```
+
+- Inventory;
+- Caducidades;
+- Imprenta;
+- ventanas/reportes de Almacén donde proceda;
+- estadísticas/casos claros detectados;
+- no extraer métodos por adelgazar;
+- batería completa.
+
+### REF.3 — Reorganización estructural de Almacén
+
+```text
+⬜
+```
+
+- `electron/contracts`;
+- backend contracts/domain/application;
+- módulo Angular;
+- IPC;
+- adapters Electron;
+- preloads;
+- actualizar imports/build aliases si procede;
+- sin cambio funcional;
+- batería completa.
+
+### REF.4 — Backend por subdominio
+
+```text
+⬜
+```
+
+- `InventarioRepository`;
+- `CaducidadesRepository`;
+- `ImprentaRepository`;
+- TypeORM independiente por subdominio;
+- `InventarioService`;
+- `CaducidadesService`;
+- `ImprentaService`;
+- mantener `AlmacenApi` como fachada;
+- mantener IPC funcionalmente compatible;
+- tests específicos + batería completa + regresión Almacén.
+
+### REF.5 — Revisión de hotspots tras el refactor
+
+```text
+⬜
+```
+
+- reevaluar `InventoryComponent`;
+- reevaluar `application-composition`;
+- reevaluar `preload`;
+- comprobar si quedan separaciones claras;
+- no dividir por dividir.
+
+### REF.6 — Cierre y convención arquitectónica
+
+```text
+⬜
+```
+
+- batería integral;
+- regresión Inventario;
+- regresión Caducidades;
+- regresión Imprenta;
+- documentar convenciones definitivas;
+- cerrar pausa técnica;
+- dejar Hito 16 Compras listo para iniciar bajo la nueva plantilla.
+
+---
+
+# 31. Historial de continuidad
 
 ```text
 v2.36
@@ -3938,4 +4363,28 @@ v2.48
 → primera versión Imprenta considerada beta hasta validación física
 → roadmap 15J.1–15J.5 cerrado
 → siguiente punto exacto: 15J.1 Base de Imprenta + búsqueda de artículos
+
+v2.49
+→ Hito 15 Almacén oficialmente CERRADO
+→ 15J.1–15J.5 Imprenta cerrados y validados
+→ búsqueda por nombre/localizador/códigos, artículos únicos y sin restricción de stock
+→ diseñador efímero con cantidades, huecos y drag & drop
+→ preview A4 5×4 por defecto, máximos 10×10, vertical/horizontal y PVP opcional
+→ capacidad estricta de una página y overflow no destructivo
+→ Terminar crea command mínimo y backend relee datos canónicos persistidos
+→ snapshot inmutable + BrowserWindow segura + preload/IPC mínimos
+→ impresión A4 mediante diálogo estándar, cancelación sin error
+→ Imprenta queda beta solo para futura calibración física no bloqueante
+→ Hito 16 Compras todavía no iniciado
+→ se abre pausa técnica pre-Hito 16
+→ auditoría detecta duplicación de meses, paginación y formatters
+→ se adopta convención *.private.ts
+→ se acuerda reorganización por subdominios Inventario/Caducidades/Imprenta
+→ se acuerda split real de AlmacenService y AlmacenRepository en services/repositories específicos
+→ AlmacenApi se mantiene como fachada agregada
+→ TypeOrmAlmacenRepository e InventoryComponent quedan identificados como hotspots principales
+→ no reorganizar retrospectivamente todo el histórico; aplicar patrón a Almacén y futuros desarrollos
+→ roadmap REF.1–REF.6 cerrado
+→ siguiente punto exacto: REF.1 Constantes y utilidades compartidas
+
 ```
