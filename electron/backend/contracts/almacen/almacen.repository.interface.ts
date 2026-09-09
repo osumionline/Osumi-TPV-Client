@@ -1,95 +1,13 @@
-import type CaducidadFilterQuery from '@backend/contracts/almacen/caducidades/caducidad-filter-query.interface';
-import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidades/caducidad-query.interface';
-import type InventarioFilterQuery from '@backend/contracts/almacen/inventario/inventario-filter-query.interface';
-import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario/inventario-query.interface';
-import type {
-  CaducidadArticuloSearchRecord,
-  CaducidadCreateRecord,
-} from '@backend/domain/almacen/caducidades/caducidad-create-record.interface';
-import type {
-  CaducidadFilterOptionsRecord,
-  CaducidadResultadoRecord,
-} from '@backend/domain/almacen/caducidades/caducidad-record.interface';
-import type { CaducidadReportRecord } from '@backend/domain/almacen/caducidades/caducidad-report-record.interface';
-import type ImprentaArticuloSearchRecord from '@backend/domain/almacen/imprenta/imprenta-articulo-search-record.interface';
-import type ImprentaPrintArticuloRecord from '@backend/domain/almacen/imprenta/imprenta-print-articulo-record.interface';
-import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario/inventario-record.interface';
-import type { InventarioReportRecord } from '@backend/domain/almacen/inventario/inventario-report-record.interface';
-import type InventarioSaveRecord from '@backend/domain/almacen/inventario/inventario-save-record.interface';
+import type CaducidadesRepository from '@backend/contracts/almacen/caducidades/caducidades.repository.interface';
+import type ImprentaRepository from '@backend/contracts/almacen/imprenta/imprenta.repository.interface';
+import type InventarioRepository from '@backend/contracts/almacen/inventario/inventario.repository.interface';
 
 /**
- * Define el acceso a los datos operativos del módulo Almacén.
+ * Fachada transitoria que agrupa los repositories
+ * de los tres subdominios de Almacén.
+ *
+ * Se eliminará cuando los servicios de aplicación
+ * queden separados por subdominio.
  */
-export default interface AlmacenRepository {
-  /**
-   * Recupera una página de Inventario y los agregados
-   * correspondientes al conjunto filtrado completo.
-   */
-  searchInventario(query: InventarioRepositoryQuery): Promise<InventarioResultadoRecord>;
-
-  /**
-   * Recupera el conjunto persistido completo utilizado por los reportes.
-   */
-  getInventarioReport(query: InventarioFilterQuery): Promise<InventarioReportRecord>;
-
-  /**
-   * Persiste varias filas de Inventario dentro de una única transacción.
-   */
-  saveInventarioRows(commands: readonly InventarioSaveRecord[]): Promise<void>;
-
-  /**
-   * Da de baja un artículo y sus códigos activos.
-   */
-  deactivateArticulo(idArticulo: number): Promise<void>;
-
-  /**
-   * Recupera una página de caducidades y los totales
-   * correspondientes al conjunto filtrado completo.
-   */
-  searchCaducidades(query: CaducidadRepositoryQuery): Promise<CaducidadResultadoRecord>;
-
-  /**
-   * Recupera el informe histórico agregado del
-   * conjunto filtrado de Caducidades.
-   */
-  getCaducidadReport(query: CaducidadFilterQuery): Promise<CaducidadReportRecord>;
-
-  /**
-   * Recupera las opciones históricas disponibles para
-   * los filtros de Caducidades.
-   */
-  getCaducidadFilterOptions(): Promise<CaducidadFilterOptionsRecord>;
-
-  /**
-   * Busca artículos activos disponibles para registrar
-   * una pérdida por caducidad.
-   */
-  searchCaducidadArticulos(texto: string): Promise<readonly CaducidadArticuloSearchRecord[]>;
-
-  /**
-   * Registra atómicamente una nueva pérdida por caducidad.
-   */
-  createCaducidad(command: CaducidadCreateRecord): Promise<void>;
-
-  /**
-   * Revierte atómicamente una pérdida por caducidad.
-   */
-  deactivateCaducidad(idCaducidad: number): Promise<void>;
-
-  /**
-   * Busca artículos activos para el diseñador de Imprenta,
-   * excluyendo los que ya formen parte del diseño.
-   */
-  searchImprentaArticulos(
-    texto: string,
-    idsArticulosExcluidos: readonly number[],
-  ): Promise<readonly ImprentaArticuloSearchRecord[]>;
-
-  /**
-   * Recupera el estado persistido actual de los artículos
-   * que van a materializarse en una hoja de etiquetas.
-   */
-  getImprentaPrintArticulos(
-    idsArticulos: readonly number[],
-  ): Promise<readonly ImprentaPrintArticuloRecord[]>;
-}
+export default interface AlmacenRepository
+  extends InventarioRepository, CaducidadesRepository, ImprentaRepository {}
