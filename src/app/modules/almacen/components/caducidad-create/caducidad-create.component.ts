@@ -22,15 +22,9 @@ import type {
 } from '@desktop-contracts/almacen/caducidad-create.interface';
 import AlmacenService from '@services/almacen.service';
 import { getErrorMessage } from '@utils/error.utils';
+import { formatEuros } from '@utils/format.utils';
 
 const SEARCH_DELAY_MS: number = 250;
-
-const CURRENCY_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
-  style: 'currency',
-  currency: 'EUR',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
 
 /**
  * Permite seleccionar un artículo y registrar
@@ -198,14 +192,14 @@ export default class CaducidadCreateComponent implements AfterViewInit, OnDestro
    * Formatea microeuros para presentación.
    */
   formatMicros(value: number): string {
-    return CURRENCY_FORMATTER.format(value / 1_000_000);
+    return formatEuros(value / 1_000_000);
   }
 
   /**
    * Formatea céntimos para presentación.
    */
   formatCents(value: number): string {
-    return CURRENCY_FORMATTER.format(value / 100);
+    return formatEuros(value / 100);
   }
 
   /**

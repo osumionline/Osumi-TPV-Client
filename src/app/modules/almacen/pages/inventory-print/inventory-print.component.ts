@@ -5,18 +5,7 @@ import type {
   InventarioReportRowInterface,
 } from '@desktop-contracts/almacen/inventario-report.interface';
 import { getErrorMessage } from '@utils/error.utils';
-
-const CURRENCY_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
-  style: 'currency',
-  currency: 'EUR',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-const PERCENTAGE_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+import { formatDecimal, formatEuros } from '@utils/format.utils';
 
 const RIGHT_ALIGNED_COLUMNS: readonly InventarioReportColumn[] = [
   'stock',
@@ -183,21 +172,21 @@ export default class InventoryPrintComponent implements OnInit {
    * Formatea un importe almacenado en microeuros.
    */
   formatMicros(value: number): string {
-    return CURRENCY_FORMATTER.format(value / 1_000_000);
+    return formatEuros(value / 1_000_000);
   }
 
   /**
    * Formatea un importe almacenado en céntimos.
    */
   formatCents(value: number): string {
-    return CURRENCY_FORMATTER.format(value / 100);
+    return formatEuros(value / 100);
   }
 
   /**
    * Formatea un porcentaje almacenado en millonésimas.
    */
   formatMargin(value: number): string {
-    return `${PERCENTAGE_FORMATTER.format(value / 1_000_000)} %`;
+    return `${formatDecimal(value / 1_000_000)} %`;
   }
 
   /**
