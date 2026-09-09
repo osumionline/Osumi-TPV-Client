@@ -15,18 +15,13 @@ import {
   type WritableSignal,
 } from '@angular/core';
 import { MatButton, MatIconButton } from '@angular/material/button';
+import { MatButtonToggle, MatButtonToggleGroup } from '@angular/material/button-toggle';
 import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
+import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { MatTooltip } from '@angular/material/tooltip';
 import type { ImprentaArticuloSearchInterface } from '@desktop-contracts/almacen/imprenta-articulo.interface';
-import ImprentaDesignItem from '@model/almacen/imprenta-design-item.interface';
-import { DialogService } from '@osumi/angular-tools';
-import AlmacenService from '@services/almacen.service';
-import { getErrorMessage } from '@utils/error.utils';
-import { MatButtonToggle, MatButtonToggleGroup } from '@angular/material/button-toggle';
-import { MatSlideToggle } from '@angular/material/slide-toggle';
-import { QRCodeComponent } from 'angularx-qrcode';
 import {
   IMPRENTA_DEFAULT_COLUMNS,
   IMPRENTA_DEFAULT_ORIENTATION,
@@ -38,6 +33,12 @@ import {
   type ImprentaPrintCommand,
   type ImprentaPrintItemCommand,
 } from '@desktop-contracts/almacen/imprenta-print.interface';
+import ImprentaDesignItem from '@model/almacen/imprenta-design-item.interface';
+import { DialogService } from '@osumi/angular-tools';
+import AlmacenService from '@services/almacen.service';
+import { getErrorMessage } from '@utils/error.utils';
+import { formatEuros } from '@utils/format.utils';
+import { QRCodeComponent } from 'angularx-qrcode';
 
 const SEARCH_DELAY_MS: number = 250;
 
@@ -48,13 +49,6 @@ interface ImprentaPreviewSlot {
   readonly tipo: ImprentaPreviewSlotType;
   readonly articulo: ImprentaArticuloSearchInterface | null;
 }
-
-const CURRENCY_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
-  style: 'currency',
-  currency: 'EUR',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
 
 /**
  * Contenedor del diseñador efímero de etiquetas de Imprenta.
@@ -436,7 +430,7 @@ export default class ImprentaComponent implements OnDestroy {
    * Formatea un PVP almacenado en céntimos.
    */
   formatCents(value: number): string {
-    return CURRENCY_FORMATTER.format(value / 100);
+    return formatEuros(value / 100);
   }
 
   /**

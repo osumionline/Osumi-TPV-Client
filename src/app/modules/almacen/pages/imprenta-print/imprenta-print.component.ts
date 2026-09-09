@@ -8,14 +8,8 @@ import {
 } from '@angular/core';
 import type { ImprentaPrintDocumentoInterface } from '@desktop-contracts/almacen/imprenta-print.interface';
 import { getErrorMessage } from '@utils/error.utils';
+import { formatEuros } from '@utils/format.utils';
 import { QRCodeComponent } from 'angularx-qrcode';
-
-const CURRENCY_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
-  style: 'currency',
-  currency: 'EUR',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
 
 const MM_TO_PX: number = 96 / 25.4;
 
@@ -88,7 +82,7 @@ export default class ImprentaPrintComponent implements OnInit {
    * Formatea un importe almacenado en céntimos.
    */
   formatCents(value: number): string {
-    return CURRENCY_FORMATTER.format(value / 100);
+    return formatEuros(value / 100);
   }
 
   /**

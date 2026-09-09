@@ -22,11 +22,7 @@ import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
 import ClientesService from '@services/clientes.service';
 import { formatMonthName } from '@utils/date.utils';
 import { getErrorMessage } from '@utils/error.utils';
-
-const MARGIN_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+import { formatDecimal } from '@utils/format.utils';
 
 /**
  * Muestra las estadísticas históricas generales
@@ -97,7 +93,7 @@ export default class ClientGeneralStatisticsComponent implements OnInit, OnDestr
       return '—';
     }
 
-    return `${MARGIN_FORMATTER.format(margenMicroporcentaje / 1_000_000)} %`;
+    return `${formatDecimal(margenMicroporcentaje / 1_000_000)} %`;
   }
 
   /**

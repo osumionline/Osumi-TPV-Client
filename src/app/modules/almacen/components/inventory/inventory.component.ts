@@ -54,6 +54,7 @@ import CategoriasService from '@services/categorias.service';
 import MarcasService from '@services/marcas.service';
 import ProveedoresService from '@services/proveedores.service';
 import { getErrorMessage } from '@utils/error.utils';
+import { formatDecimal } from '@utils/format.utils';
 
 type InventarioDataColumn = InventarioReportColumn;
 
@@ -138,11 +139,6 @@ const INVENTARIO_DEFAULT_COLUMNS: readonly InventarioDataColumn[] =
   ).map((option: InventarioColumnOption): InventarioDataColumn => option.id);
 
 const TEXT_SEARCH_DELAY_MS: number = 300;
-
-const PERCENTAGE_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
 
 /**
  * Muestra y filtra el inventario persistido del almacén.
@@ -474,7 +470,7 @@ export default class InventoryComponent implements OnInit, OnDestroy {
    * una media no entera aunque los márgenes individuales sí lo sean.
    */
   formatMargin(value: number): string {
-    return `${PERCENTAGE_FORMATTER.format(value / 1_000_000)} %`;
+    return `${formatDecimal(value / 1_000_000)} %`;
   }
 
   /**

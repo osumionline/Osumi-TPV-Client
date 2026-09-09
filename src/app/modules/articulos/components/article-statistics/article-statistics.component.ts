@@ -23,23 +23,13 @@ import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.i
 import ArticulosService from '@services/articulos.service';
 import { formatShortMonthName } from '@utils/date.utils';
 import { getErrorMessage } from '@utils/error.utils';
+import { formatEuros, formatInteger } from '@utils/format.utils';
 import { BarChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent } from 'echarts/components';
 import type { EChartsCoreOption } from 'echarts/core';
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { NgxEchartsDirective, provideEchartsCore } from 'ngx-echarts';
-
-const UNITS_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
-  maximumFractionDigits: 0,
-});
-
-const CURRENCY_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
-  style: 'currency',
-  currency: 'EUR',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
 
 echarts.use([BarChart, GridComponent, TooltipComponent, CanvasRenderer]);
 
@@ -181,10 +171,10 @@ export default class ArticleStatisticsComponent implements OnInit {
     }
 
     if (result.tipo === 'importe') {
-      return CURRENCY_FORMATTER.format(this.microsToEuros(result.total));
+      return formatEuros(this.microsToEuros(result.total));
     }
 
-    return `${UNITS_FORMATTER.format(result.total)} unidades`;
+    return `${formatInteger(result.total)} unidades`;
   }
 
   /**
@@ -349,9 +339,9 @@ export default class ArticleStatisticsComponent implements OnInit {
     }
 
     if (this.tipo() === 'importe') {
-      return CURRENCY_FORMATTER.format(value);
+      return formatEuros(value);
     }
 
-    return `${UNITS_FORMATTER.format(value)} unidades`;
+    return `${formatInteger(value)} unidades`;
   }
 }

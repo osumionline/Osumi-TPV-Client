@@ -30,6 +30,7 @@ import { DialogService } from '@osumi/angular-tools';
 import AlmacenService from '@services/almacen.service';
 import ArticulosService from '@services/articulos.service';
 import { getErrorMessage } from '@utils/error.utils';
+import { formatEuros, formatInteger as formatIntegerValue } from '@utils/format.utils';
 
 const CADUCIDAD_COLUMNS: readonly string[] = [
   'localizador',
@@ -43,17 +44,6 @@ const CADUCIDAD_COLUMNS: readonly string[] = [
 ];
 
 const TEXT_SEARCH_DELAY_MS: number = 300;
-
-const CURRENCY_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
-  style: 'currency',
-  currency: 'EUR',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-const INTEGER_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
-  maximumFractionDigits: 0,
-});
 
 /**
  * Muestra y filtra el histórico de pérdidas por caducidad.
@@ -224,21 +214,21 @@ export default class CaducidadesComponent implements OnInit, OnDestroy {
    * Formatea un número entero para presentación.
    */
   formatInteger(value: number): string {
-    return INTEGER_FORMATTER.format(value);
+    return formatIntegerValue(value);
   }
 
   /**
    * Formatea un importe almacenado en céntimos.
    */
   formatCents(value: number): string {
-    return CURRENCY_FORMATTER.format(value / 100);
+    return formatEuros(value / 100);
   }
 
   /**
    * Formatea un importe almacenado en microeuros.
    */
   formatMicros(value: number): string {
-    return CURRENCY_FORMATTER.format(value / 1_000_000);
+    return formatEuros(value / 1_000_000);
   }
 
   /**

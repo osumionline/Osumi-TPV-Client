@@ -21,6 +21,7 @@ import type {
 import ClientesService from '@services/clientes.service';
 import { formatShortMonthName } from '@utils/date.utils';
 import { getErrorMessage } from '@utils/error.utils';
+import { formatEuros } from '@utils/format.utils';
 import { microsToEuros } from '@utils/money.utils';
 import { BarChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent } from 'echarts/components';
@@ -28,13 +29,6 @@ import type { EChartsCoreOption } from 'echarts/core';
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { NgxEchartsDirective, provideEchartsCore } from 'ngx-echarts';
-
-const CURRENCY_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
-  style: 'currency',
-  currency: 'EUR',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
 
 echarts.use([BarChart, GridComponent, TooltipComponent, CanvasRenderer]);
 
@@ -162,7 +156,7 @@ export default class ClientMonthlyConsumptionComponent implements OnInit, OnDest
       return '—';
     }
 
-    return CURRENCY_FORMATTER.format(microsToEuros(result.totalMicros));
+    return formatEuros(microsToEuros(result.totalMicros));
   }
 
   /**
@@ -289,6 +283,6 @@ export default class ClientMonthlyConsumptionComponent implements OnInit, OnDest
       return '';
     }
 
-    return CURRENCY_FORMATTER.format(value);
+    return formatEuros(value);
   }
 }
