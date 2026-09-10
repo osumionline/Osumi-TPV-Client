@@ -19,6 +19,7 @@ import { MatSelect, type MatSelectChange } from '@angular/material/select';
 import { MatSlideToggle, type MatSlideToggleChange } from '@angular/material/slide-toggle';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltip } from '@angular/material/tooltip';
+import { Router } from '@angular/router';
 import type {
   InventarioCsvExportResult,
   InventarioReportConsulta,
@@ -39,6 +40,7 @@ import type {
   InventarioPriceField,
 } from '@model/almacen/inventario/inventario-draft.interface';
 import InventarioPriceCalculator from '@model/almacen/inventario/inventario-price-calculator';
+import type InventarioWorkspaceState from '@model/almacen/inventario/inventario-workspace.interface';
 import {
   formatScaledDecimal,
   isTransientScaledDecimalInput,
@@ -59,6 +61,7 @@ import {
   type InventarioKeyboardField,
 } from '@modules/almacen/inventario/components/inventory/inventory.component.private';
 import { DialogService } from '@osumi/angular-tools';
+import AlmacenWorkspaceService from '@services/almacen-workspace.service';
 import AlmacenService from '@services/almacen.service';
 import ArticulosService from '@services/articulos.service';
 import CategoriasService from '@services/categorias.service';
@@ -98,15 +101,28 @@ export default class InventoryComponent implements OnInit, OnDestroy {
     inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly dialog: DialogService = inject(DialogService);
   readonly articulosService: ArticulosService = inject(ArticulosService);
+  private readonly router: Router = inject(Router);
+  private readonly almacenWorkspaceService: AlmacenWorkspaceService =
+    inject(AlmacenWorkspaceService);
 
-  readonly idProveedor: WritableSignal<number | null> = signal<number | null>(null);
-  readonly idMarca: WritableSignal<number | null> = signal<number | null>(null);
-  readonly idCategoria: WritableSignal<number | null> = signal<number | null>(null);
-  readonly texto: WritableSignal<string> = signal<string>('');
-  readonly conDescuento: WritableSignal<boolean> = signal<boolean>(false);
+  private readonly initialWorkspaceState: InventarioWorkspaceState | null =
+    this.almacenWorkspaceService.getInventarioState();
 
-  readonly pagina: WritableSignal<number> = signal<number>(1);
-  readonly num: WritableSignal<number> = signal<number>(20);
+  readonly idProveedor: WritableSignal<number | null> = signal<number | null>(
+    this.initialWorkspaceState?.idProveedor ?? null,
+  );
+  readonly idMarca: WritableSignal<number | null> = signal<number | null>(
+    this.initialWorkspaceState?.idMarca ?? null,
+  );
+  readonly idCategoria: WritableSignal<number | null> = signal<number | null>(
+    this.initialWorkspaceState?.idCategoria ?? null,
+  );
+  readonly texto: WritableSignal<string> = signal<string>(this.initialWorkspaceState?.texto ?? '');
+  readonly conDescuento: WritableSignal<boolean> = signal<boolean>(
+    this.initialWorkspaceState?.conDescuento ?? false,
+  );
+  readonly pagina: WritableSignal<number> = signal<number>(this.initialWorkspaceState?.pagina ?? 1);
+  readonly num: WritableSignal<number> = signal<number>(this.initialWorkspaceState?.num ?? 20);
   readonly pageSizeOptions: readonly number[] = PAGE_SIZE_OPTIONS;
 
   readonly rows: WritableSignal<readonly InventarioRowInterface[]> = signal<
@@ -119,7 +135,7 @@ export default class InventoryComponent implements OnInit, OnDestroy {
 
   readonly drafts: WritableSignal<ReadonlyMap<number, InventarioDraftEntry>> = signal<
     ReadonlyMap<number, InventarioDraftEntry>
-  >(new Map<number, InventarioDraftEntry>());
+  >(this.initialWorkspaceState?.drafts ?? new Map<number, InventarioDraftEntry>());
 
   readonly activeResultFilterKey: WritableSignal<string | null> = signal<string | null>(null);
 
@@ -132,9 +148,10 @@ export default class InventoryComponent implements OnInit, OnDestroy {
   readonly columnOptions: readonly InventarioColumnOption[] = INVENTARIO_COLUMN_OPTIONS;
   readonly selectedColumns: WritableSignal<readonly InventarioDataColumn[]> = signal<
     readonly InventarioDataColumn[]
-  >(INVENTARIO_DEFAULT_COLUMNS);
+  >([...(this.initialWorkspaceState?.selectedColumns ?? INVENTARIO_DEFAULT_COLUMNS)]);
 
   readonly processing: WritableSignal<boolean> = signal<boolean>(false);
+  readonly openingArticle: WritableSignal<boolean> = signal<boolean>(false);
 
   readonly hasDirtyRows: Signal<boolean> = computed((): boolean =>
     [...this.drafts().values()].some(
@@ -244,6 +261,8 @@ export default class InventoryComponent implements OnInit, OnDestroy {
    * Cancela temporizadores y respuestas pendientes al destruir el componente.
    */
   ngOnDestroy(): void {
+    this.persistWorkspaceState();
+
     this.destroyed = true;
     this.requestSequence++;
     this.clearTextSearchTimeout();
@@ -624,6 +643,64 @@ export default class InventoryComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Abre la ficha de Artículos asociada a una fila de Inventario.
+   */
+  async openArticulo(row: InventarioDisplayRow): Promise<void> {
+    if (this.openingArticle() || this.processing()) {
+      return;
+    }
+
+    if (row.dirty) {
+      this.dialog
+        .alert({
+          title: 'Atención',
+          content: 'Guarda o deshaz los cambios de esta fila antes de abrir su ficha de Artículos.',
+        })
+        .subscribe();
+
+      return;
+    }
+
+    this.openingArticle.set(true);
+
+    try {
+      const tab = await this.articulosService.cargarPorId(row.id);
+
+      if (tab === null) {
+        this.dialog
+          .alert({
+            title: 'Atención',
+            content: 'El artículo ya no está disponible.',
+          })
+          .subscribe();
+
+        return;
+      }
+
+      /*
+       * Conservamos explícitamente el workspace antes
+       * de abandonar el módulo.
+       */
+      this.persistWorkspaceState();
+
+      const navigated: boolean = await this.router.navigate(['/articulos']);
+
+      if (!navigated) {
+        throw new Error('No se ha podido abrir el módulo de Artículos.');
+      }
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido abrir la ficha del artículo.'),
+        })
+        .subscribe();
+    } finally {
+      this.openingArticle.set(false);
+    }
+  }
+
+  /**
    * Construye la consulta común utilizada por
    * CSV y la vista de impresión.
    */
@@ -675,6 +752,24 @@ export default class InventoryComponent implements OnInit, OnDestroy {
     } finally {
       this.processing.set(false);
     }
+  }
+
+  /**
+   * Conserva filtros, paginación, columnas y drafts
+   * para la siguiente instancia de Inventario.
+   */
+  private persistWorkspaceState(): void {
+    this.almacenWorkspaceService.setInventarioState({
+      idProveedor: this.idProveedor(),
+      idMarca: this.idMarca(),
+      idCategoria: this.idCategoria(),
+      texto: this.texto(),
+      conDescuento: this.conDescuento(),
+      pagina: this.pagina(),
+      num: this.num(),
+      selectedColumns: [...this.selectedColumns()],
+      drafts: this.drafts(),
+    });
   }
 
   /**

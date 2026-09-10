@@ -230,7 +230,12 @@
                 <td mat-cell
                     *matCellDef="let row"
                     class="inventory__name">
-                    {{ row.nombre }}
+                    <button class="inventory__article-name"
+                            type="button"
+                            [disabled]="openingArticle()"
+                            (click)="openArticulo(row)">
+                        {{ row.nombre }}
+                    </button>
                 </td>
             </ng-container>
 

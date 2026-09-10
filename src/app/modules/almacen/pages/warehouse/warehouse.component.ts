@@ -1,12 +1,4 @@
-import {
-  Component,
-  computed,
-  inject,
-  signal,
-  type OnInit,
-  type Signal,
-  type WritableSignal,
-} from '@angular/core';
+import { Component, computed, inject, type OnInit, type Signal } from '@angular/core';
 import HeaderComponent from '@app/components/header/header.component';
 import type AlmacenSection from '@model/almacen/almacen-section.type';
 import CaducidadesComponent from '@modules/almacen/caducidades/components/caducidades/caducidades.component';
@@ -14,9 +6,9 @@ import WarehouseTabsComponent from '@modules/almacen/components/warehouse-tabs/w
 import ImprentaComponent from '@modules/almacen/imprenta/components/imprenta/imprenta.component';
 import InventoryComponent from '@modules/almacen/inventario/components/inventory/inventory.component';
 import { DialogService } from '@osumi/angular-tools';
+import AlmacenWorkspaceService from '@services/almacen-workspace.service';
 import AppDataService from '@services/app-data.service';
 import { getErrorMessage } from '@utils/error.utils';
-
 /**
  * Página principal del módulo de Almacén.
  */
@@ -34,9 +26,11 @@ import { getErrorMessage } from '@utils/error.utils';
 })
 export default class WarehouseComponent implements OnInit {
   private readonly dialog: DialogService = inject(DialogService);
-  readonly appDataService: AppDataService = inject(AppDataService);
+  private readonly almacenWorkspaceService: AlmacenWorkspaceService =
+    inject(AlmacenWorkspaceService);
 
-  readonly activeSection: WritableSignal<AlmacenSection> = signal<AlmacenSection>('inventory');
+  readonly appDataService: AppDataService = inject(AppDataService);
+  readonly activeSection: Signal<AlmacenSection> = this.almacenWorkspaceService.activeSection;
 
   readonly appName: Signal<string> = computed((): string => {
     const appData = this.appDataService.appData();
@@ -54,7 +48,7 @@ export default class WarehouseComponent implements OnInit {
    * Cambia la sección activa del módulo.
    */
   selectSection(section: AlmacenSection): void {
-    this.activeSection.set(section);
+    this.almacenWorkspaceService.setActiveSection(section);
   }
 
   /**

@@ -92,6 +92,27 @@
         min-width: 220px;
     }
 
+    .inventory__article-name {
+        padding: 0;
+        border: 0;
+        background-color: transparent;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+
+        &:hover {
+            color: var(--main-color);
+            text-decoration: underline;
+        }
+
+        &:disabled {
+            cursor: wait;
+            opacity: 0.65;
+            text-decoration: none;
+        }
+    }
+
     .inventory__categories {
         min-width: 220px;
         max-width: 320px;
