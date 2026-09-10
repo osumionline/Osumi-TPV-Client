@@ -1,0 +1,25 @@
+<otpv-header selectedOption="compras"
+             [appName]="appName()" />
+
+<main class="purchase-order">
+    <section class="purchase-order__panel">
+        <header class="purchase-order__toolbar">
+            <button mat-icon-button
+                    type="button"
+                    routerLink="/compras"
+                    aria-label="Volver a Pedidos">
+                <mat-icon>
+                    arrow_back
+                </mat-icon>
+            </button>
+
+            <h1>
+                {{ title }}
+            </h1>
+        </header>
+
+        <div class="purchase-order__placeholder">
+            La ficha de Pedido se implementará en el siguiente mini-hito.
+        </div>
+    </section>
+</main>

@@ -1,0 +1,475 @@
+<section class="orders">
+    <article class="orders__block">
+        <header class="orders__block-header">
+            <h2>
+                Pedidos guardados
+            </h2>
+
+            <button mat-flat-button
+                    type="button"
+                    (click)="openNewPedido()">
+                <mat-icon>
+                    add_circle_outline
+                </mat-icon>
+                Nuevo pedido
+            </button>
+
+            <div class="orders__header-spacer"></div>
+
+            <button mat-icon-button
+                    type="button"
+                    matTooltip="Filtrar resultados"
+                    aria-label="Filtrar pedidos guardados"
+                    class="orders__filter-button"
+                    [class.orders__filter-button--active]="guardadosFiltered()"
+                    (click)="toggleGuardadosFilters()">
+                <mat-icon>
+                    filter_list
+                </mat-icon>
+            </button>
+
+            @if (showGuardadosFilters()) {
+            <form class="orders__filters-panel"
+                  (submit)="applyGuardadosFilters($event)">
+                <div class="orders__filters-grid">
+                    <mat-form-field appearance="outline"
+                                    subscriptSizing="dynamic">
+                        <mat-label>Fecha desde</mat-label>
+                        <input matInput
+                               type="date"
+                               [value]="guardadosState().fechaDesde"
+                               (input)="onGuardadosFilterInput('fechaDesde', $event)">
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline"
+                                    subscriptSizing="dynamic">
+                        <mat-label>Fecha hasta</mat-label>
+                        <input matInput
+                               type="date"
+                               [value]="guardadosState().fechaHasta"
+                               (input)="onGuardadosFilterInput('fechaHasta', $event)">
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline"
+                                    subscriptSizing="dynamic">
+                        <mat-label>Proveedor</mat-label>
+                        <mat-select [value]="guardadosState().idProveedor"
+                                    [disabled]="filterOptionsLoading()"
+                                    [panelWidth]="null"
+                                    (selectionChange)="onGuardadosProveedorChange($event)">
+                            <mat-option [value]="null">
+                                Todos
+                            </mat-option>
+                            @for (proveedor of filterOptions().proveedores;
+                            track proveedor.idProveedor) {
+                            <mat-option [value]="proveedor.idProveedor">
+                                {{ proveedor.nombre }}
+                            </mat-option>
+                            }
+                        </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline"
+                                    subscriptSizing="dynamic">
+                        <mat-label>Albarán</mat-label>
+                        <input matInput
+                               type="search"
+                               autocomplete="off"
+                               [value]="guardadosState().numero"
+                               (input)="onGuardadosFilterInput('numero', $event)">
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline"
+                                    subscriptSizing="dynamic">
+                        <mat-label>Importe desde (€)</mat-label>
+                        <input matInput
+                               type="number"
+                               min="0"
+                               step="0.01"
+                               [value]="guardadosState().importeDesde"
+                               (input)="onGuardadosFilterInput('importeDesde', $event)">
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline"
+                                    subscriptSizing="dynamic">
+                        <mat-label>Importe hasta (€)</mat-label>
+                        <input matInput
+                               type="number"
+                               min="0"
+                               step="0.01"
+                               [value]="guardadosState().importeHasta"
+                               (input)="onGuardadosFilterInput('importeHasta', $event)">
+                    </mat-form-field>
+                </div>
+
+                <div class="orders__filter-actions">
+                    <button mat-flat-button
+                            type="submit">
+                        <mat-icon>search</mat-icon>
+                        Filtrar
+                    </button>
+
+                    @if (guardadosFiltered()) {
+                    <button mat-stroked-button
+                            type="button"
+                            (click)="clearGuardadosFilters()">
+                        <mat-icon>filter_list_off</mat-icon>
+                        Quitar filtros
+                    </button>
+                    }
+                </div>
+            </form>
+            }
+        </header>
+
+        @if (guardadosError() !== null) {
+        <div class="orders__error">
+            <span>{{ guardadosError() }}</span>
+            <button mat-stroked-button
+                    type="button"
+                    (click)="retryGuardados()">
+                Reintentar
+            </button>
+        </div>
+        } @else {
+        <div class="orders__table-container">
+            <table mat-table
+                   [dataSource]="guardadosRows()"
+                   [trackBy]="trackByPedido">
+                <ng-container matColumnDef="fechaPedido">
+                    <th mat-header-cell
+                        *matHeaderCellDef>
+                        Fecha pedido
+                    </th>
+                    <td mat-cell
+                        *matCellDef="let row">
+                        {{ formatDate(row.fechaPedido) }}
+                    </td>
+                </ng-container>
+
+                <ng-container matColumnDef="proveedor">
+                    <th mat-header-cell
+                        *matHeaderCellDef>
+                        Proveedor
+                    </th>
+                    <td mat-cell
+                        *matCellDef="let row">
+                        {{ row.proveedorNombre }}
+                        @if (row.observaciones) {
+                        <mat-icon class="orders__info-icon"
+                                  [matTooltip]="row.observaciones">
+                            info_outline
+                        </mat-icon>
+                        }
+                    </td>
+                </ng-container>
+
+                <ng-container matColumnDef="tipo">
+                    <th mat-header-cell
+                        *matHeaderCellDef>
+                        Tipo
+                    </th>
+                    <td mat-cell
+                        *matCellDef="let row">
+                        {{ formatTipo(row) }}
+                    </td>
+                </ng-container>
+
+                <ng-container matColumnDef="importe">
+                    <th mat-header-cell
+                        *matHeaderCellDef
+                        class="orders__right">
+                        Importe
+                    </th>
+                    <td mat-cell
+                        *matCellDef="let row"
+                        class="orders__right">
+                        {{ formatMicros(row.importeMicros) }}
+                    </td>
+                </ng-container>
+
+                <tr mat-header-row
+                    *matHeaderRowDef="guardadosColumns">
+                </tr>
+                <tr mat-row
+                    *matRowDef="let row; columns: guardadosColumns"
+                    class="orders__row"
+                    tabindex="0"
+                    [attr.aria-label]="'Abrir pedido ' + row.id"
+                    (click)="openPedido(row.id)"
+                    (keydown.enter)="openPedido(row.id)">
+                </tr>
+            </table>
+
+            @if (guardadosLoading()) {
+            <div class="orders__loading">
+                Cargando pedidos…
+            </div>
+            } @else if (guardadosRows().length === 0) {
+            <div class="orders__empty">
+                No se ha encontrado ningún pedido guardado.
+            </div>
+            }
+        </div>
+
+        <mat-paginator [length]="guardadosTotalRows()"
+                       [pageIndex]="guardadosState().pagina - 1"
+                       [pageSize]="guardadosState().num"
+                       [pageSizeOptions]="pageSizeOptions"
+                       [showFirstLastButtons]="true"
+                       (page)="onGuardadosPageChange($event)" />
+        }
+    </article>
+
+    <article class="orders__block">
+        <header class="orders__block-header">
+            <h2>
+                Pedidos recepcionados
+            </h2>
+
+            <div class="orders__header-spacer"></div>
+
+            <button mat-icon-button
+                    type="button"
+                    matTooltip="Filtrar resultados"
+                    aria-label="Filtrar pedidos recepcionados"
+                    class="orders__filter-button"
+                    [class.orders__filter-button--active]="recepcionadosFiltered()"
+                    (click)="toggleRecepcionadosFilters()">
+                <mat-icon>
+                    filter_list
+                </mat-icon>
+            </button>
+
+            @if (showRecepcionadosFilters()) {
+            <form class="orders__filters-panel"
+                  (submit)="applyRecepcionadosFilters($event)">
+                <div class="orders__filters-grid">
+                    <mat-form-field appearance="outline"
+                                    subscriptSizing="dynamic">
+                        <mat-label>Fecha desde</mat-label>
+                        <input matInput
+                               type="date"
+                               [value]="recepcionadosState().fechaDesde"
+                               (input)="onRecepcionadosFilterInput('fechaDesde', $event)">
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline"
+                                    subscriptSizing="dynamic">
+                        <mat-label>Fecha hasta</mat-label>
+                        <input matInput
+                               type="date"
+                               [value]="recepcionadosState().fechaHasta"
+                               (input)="onRecepcionadosFilterInput('fechaHasta', $event)">
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline"
+                                    subscriptSizing="dynamic">
+                        <mat-label>Proveedor</mat-label>
+                        <mat-select [value]="recepcionadosState().idProveedor"
+                                    [disabled]="filterOptionsLoading()"
+                                    [panelWidth]="null"
+                                    (selectionChange)="onRecepcionadosProveedorChange($event)">
+                            <mat-option [value]="null">
+                                Todos
+                            </mat-option>
+                            @for (proveedor of filterOptions().proveedores;
+                            track proveedor.idProveedor) {
+                            <mat-option [value]="proveedor.idProveedor">
+                                {{ proveedor.nombre }}
+                            </mat-option>
+                            }
+                        </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline"
+                                    subscriptSizing="dynamic">
+                        <mat-label>Albarán</mat-label>
+                        <input matInput
+                               type="search"
+                               autocomplete="off"
+                               [value]="recepcionadosState().numero"
+                               (input)="onRecepcionadosFilterInput('numero', $event)">
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline"
+                                    subscriptSizing="dynamic">
+                        <mat-label>Importe desde (€)</mat-label>
+                        <input matInput
+                               type="number"
+                               min="0"
+                               step="0.01"
+                               [value]="recepcionadosState().importeDesde"
+                               (input)="onRecepcionadosFilterInput('importeDesde', $event)">
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline"
+                                    subscriptSizing="dynamic">
+                        <mat-label>Importe hasta (€)</mat-label>
+                        <input matInput
+                               type="number"
+                               min="0"
+                               step="0.01"
+                               [value]="recepcionadosState().importeHasta"
+                               (input)="onRecepcionadosFilterInput('importeHasta', $event)">
+                    </mat-form-field>
+                </div>
+
+                <div class="orders__filter-actions">
+                    <button mat-flat-button
+                            type="submit">
+                        <mat-icon>search</mat-icon>
+                        Filtrar
+                    </button>
+
+                    @if (recepcionadosFiltered()) {
+                    <button mat-stroked-button
+                            type="button"
+                            (click)="clearRecepcionadosFilters()">
+                        <mat-icon>filter_list_off</mat-icon>
+                        Quitar filtros
+                    </button>
+                    }
+                </div>
+            </form>
+            }
+        </header>
+
+        @if (recepcionadosError() !== null) {
+        <div class="orders__error">
+            <span>{{ recepcionadosError() }}</span>
+            <button mat-stroked-button
+                    type="button"
+                    (click)="retryRecepcionados()">
+                Reintentar
+            </button>
+        </div>
+        } @else {
+        <div class="orders__table-container orders__table-container--received">
+            <table mat-table
+                   [dataSource]="recepcionadosRows()"
+                   [trackBy]="trackByPedido">
+                <ng-container matColumnDef="fechaRecepcionado">
+                    <th mat-header-cell
+                        *matHeaderCellDef>
+                        Fecha recepcionado
+                    </th>
+                    <td mat-cell
+                        *matCellDef="let row">
+                        {{ formatDate(row.fechaRecepcionado) }}
+                    </td>
+                </ng-container>
+
+                <ng-container matColumnDef="fechaPedido">
+                    <th mat-header-cell
+                        *matHeaderCellDef>
+                        Fecha pedido
+                    </th>
+                    <td mat-cell
+                        *matCellDef="let row">
+                        {{ formatDate(row.fechaPedido) }}
+                    </td>
+                </ng-container>
+
+                <ng-container matColumnDef="fechaPago">
+                    <th mat-header-cell
+                        *matHeaderCellDef>
+                        Fecha pago
+                    </th>
+                    <td mat-cell
+                        *matCellDef="let row">
+                        {{ formatDate(row.fechaPago) }}
+                    </td>
+                </ng-container>
+
+                <ng-container matColumnDef="proveedor">
+                    <th mat-header-cell
+                        *matHeaderCellDef>
+                        Proveedor
+                    </th>
+                    <td mat-cell
+                        *matCellDef="let row">
+                        {{ row.proveedorNombre }}
+                        @if (row.observaciones) {
+                        <mat-icon class="orders__info-icon"
+                                  [matTooltip]="row.observaciones">
+                            info_outline
+                        </mat-icon>
+                        }
+                    </td>
+                </ng-container>
+
+                <ng-container matColumnDef="tipo">
+                    <th mat-header-cell
+                        *matHeaderCellDef>
+                        Tipo
+                    </th>
+                    <td mat-cell
+                        *matCellDef="let row">
+                        {{ formatTipo(row) }}
+                    </td>
+                </ng-container>
+
+                <ng-container matColumnDef="importe">
+                    <th mat-header-cell
+                        *matHeaderCellDef
+                        class="orders__right">
+                        Importe
+                    </th>
+                    <td mat-cell
+                        *matCellDef="let row"
+                        class="orders__right">
+                        {{ formatMicros(row.importeMicros) }}
+                    </td>
+                </ng-container>
+
+                <ng-container matColumnDef="ue">
+                    <th mat-header-cell
+                        *matHeaderCellDef
+                        class="orders__ue">
+                    </th>
+                    <td mat-cell
+                        *matCellDef="let row"
+                        class="orders__ue">
+                        @if (row.europeo) {
+                        <img src="/icons/europe-flag.svg"
+                             alt="Unión Europea"
+                             class="orders__eu-icon"
+                             matTooltip="Pedido de la Unión Europea">
+                        }
+                    </td>
+                </ng-container>
+
+                <tr mat-header-row
+                    *matHeaderRowDef="recepcionadosColumns">
+                </tr>
+                <tr mat-row
+                    *matRowDef="let row; columns: recepcionadosColumns"
+                    class="orders__row"
+                    tabindex="0"
+                    [attr.aria-label]="'Abrir pedido ' + row.id"
+                    (click)="openPedido(row.id)"
+                    (keydown.enter)="openPedido(row.id)">
+                </tr>
+            </table>
+
+            @if (recepcionadosLoading()) {
+            <div class="orders__loading">
+                Cargando pedidos…
+            </div>
+            } @else if (recepcionadosRows().length === 0) {
+            <div class="orders__empty">
+                No se ha encontrado ningún pedido recepcionado.
+            </div>
+            }
+        </div>
+
+        <mat-paginator [length]="recepcionadosTotalRows()"
+                       [pageIndex]="recepcionadosState().pagina - 1"
+                       [pageSize]="recepcionadosState().num"
+                       [pageSizeOptions]="pageSizeOptions"
+                       [showFirstLastButtons]="true"
+                       (page)="onRecepcionadosPageChange($event)" />
+        }
+    </article>
+</section>

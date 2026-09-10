@@ -13,6 +13,7 @@ import PurchasesTabsComponent from '@modules/compras/components/purchases-tabs/p
 import { DialogService } from '@osumi/angular-tools';
 import AppDataService from '@services/app-data.service';
 import { getErrorMessage } from '@utils/error.utils';
+import PedidosComponent from '@modules/compras/pedidos/components/pedidos/pedidos.component';
 
 /**
  * Página principal del módulo de Compras.
@@ -21,7 +22,7 @@ import { getErrorMessage } from '@utils/error.utils';
   selector: 'otpv-purchases',
   templateUrl: './purchases.component.html',
   styleUrl: './purchases.component.scss',
-  imports: [HeaderComponent, PurchasesTabsComponent],
+  imports: [HeaderComponent, PedidosComponent, PurchasesTabsComponent],
 })
 export default class PurchasesComponent implements OnInit {
   private readonly dialog: DialogService = inject(DialogService);

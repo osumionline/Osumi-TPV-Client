@@ -15,12 +15,7 @@
         <div class="purchases__content">
             @switch (activeSection()) {
             @case ('orders') {
-            <section class="purchases__state">
-                <h2>PEDIDOS</h2>
-                <p>
-                    Gestión de pedidos realizados a proveedores.
-                </p>
-            </section>
+            <otpv-pedidos />
             }
             @case ('brands') {
             <section class="purchases__state">

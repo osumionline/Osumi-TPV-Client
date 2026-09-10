@@ -32,6 +32,18 @@ const routes: Routes = [
     loadComponent: () => import('@modules/articulos/pages/articles/articles.component'),
   },
   {
+    path: 'compras/pedido',
+    canActivate: [readyApplicationGuard],
+    loadComponent: () =>
+      import('@modules/compras/pedidos/pages/purchase-order/purchase-order.component'),
+  },
+  {
+    path: 'compras/pedido/:idPedido',
+    canActivate: [readyApplicationGuard],
+    loadComponent: () =>
+      import('@modules/compras/pedidos/pages/purchase-order/purchase-order.component'),
+  },
+  {
     path: 'compras',
     canActivate: [readyApplicationGuard],
     loadComponent: () => import('@modules/compras/pages/purchases/purchases.component'),

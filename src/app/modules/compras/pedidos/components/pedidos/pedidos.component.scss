@@ -1,0 +1,195 @@
+:host {
+    display: block;
+    min-height: 100%;
+}
+
+.orders {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 18px;
+    padding: 18px 24px 24px;
+
+    .orders__block {
+        border: 1px solid var(--separator-color);
+        border-radius: 8px;
+        background-color: var(--color-white);
+    }
+
+    .orders__block-header {
+        position: relative;
+        display: flex;
+        min-height: 54px;
+        align-items: center;
+        gap: 12px;
+        padding: 6px 12px 6px 16px;
+        border-bottom: 1px solid var(--separator-color);
+        background-color: var(--bg-color);
+
+        h2 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 500;
+        }
+    }
+
+    .orders__header-spacer {
+        flex: 1 1 auto;
+    }
+
+    .orders__filter-button--active {
+        color: var(--main-color);
+    }
+
+    .orders__filters-panel {
+        position: absolute;
+        z-index: 5;
+        top: 48px;
+        right: 12px;
+        width: min(620px, calc(100vw - 80px));
+        padding: 16px;
+        border: 1px solid var(--separator-color);
+        border-radius: 8px;
+        background-color: var(--color-white);
+        box-shadow: 0 4px 14px rgb(0 0 0 / 18%);
+    }
+
+    .orders__filters-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+
+        mat-form-field {
+            width: 100%;
+            font-size: 13px;
+            --mat-form-field-container-height: 42px;
+            --mat-form-field-container-vertical-padding: 8px;
+        }
+    }
+
+    .orders__filter-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 14px;
+    }
+
+    .orders__table-container {
+        position: relative;
+        width: 100%;
+        min-height: 120px;
+        overflow-x: auto;
+
+        table {
+            width: 100%;
+            min-width: 760px;
+        }
+
+        th.mat-mdc-header-cell {
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        td.mat-mdc-cell,
+        th.mat-mdc-header-cell {
+            padding-right: 16px;
+            padding-left: 16px;
+        }
+    }
+
+    .orders__table-container--received {
+        table {
+            min-width: 1080px;
+        }
+    }
+
+    .orders__row {
+        cursor: pointer;
+
+        &:hover {
+            background-color: rgb(0 0 0 / 3%);
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--main-color);
+            outline-offset: -2px;
+        }
+    }
+
+    .orders__right {
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    .orders__ue {
+        width: 56px;
+        text-align: center;
+    }
+
+    .orders__info-icon {
+        width: 18px;
+        height: 18px;
+        margin-left: 4px;
+        font-size: 18px;
+        vertical-align: middle;
+    }
+
+    .orders__eu-icon {
+        display: inline-block;
+        width: 24px;
+        height: auto;
+        vertical-align: middle;
+    }
+
+    .orders__loading {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        min-height: 120px;
+        place-items: center;
+        background-color: rgb(255 255 255 / 78%);
+        font-size: 13px;
+    }
+
+    .orders__empty {
+        padding: 38px 20px;
+        border-top: 1px solid var(--separator-color);
+        text-align: center;
+        opacity: 0.6;
+    }
+
+    .orders__error {
+        display: flex;
+        min-height: 120px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 20px;
+        color: var(--color-red);
+        text-align: center;
+    }
+
+    mat-paginator {
+        border-top: 1px solid var(--separator-color);
+    }
+}
+
+@media (max-width: 760px) {
+    .orders {
+        padding: 16px;
+
+        .orders__block-header {
+            flex-wrap: wrap;
+        }
+
+        .orders__filters-panel {
+            right: 0;
+            width: calc(100vw - 64px);
+        }
+
+        .orders__filters-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+}

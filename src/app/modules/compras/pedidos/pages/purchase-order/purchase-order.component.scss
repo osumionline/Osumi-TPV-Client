@@ -1,0 +1,45 @@
+:host {
+    display: block;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.purchase-order {
+    height: calc(100vh - 56px);
+    min-height: 0;
+    padding: 16px;
+    background-color: var(--bg-color);
+
+    .purchase-order__panel {
+        display: flex;
+        height: 100%;
+        min-height: 0;
+        flex-direction: column;
+        background-color: var(--color-white);
+        box-shadow: 0 1px 2px rgb(0 0 0 / 20%);
+    }
+
+    .purchase-order__toolbar {
+        display: flex;
+        min-height: 64px;
+        align-items: center;
+        gap: 8px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--separator-color);
+
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 400;
+        }
+    }
+
+    .purchase-order__placeholder {
+        display: grid;
+        min-height: 0;
+        flex: 1;
+        place-items: center;
+        padding: 32px;
+        opacity: 0.55;
+    }
+}
