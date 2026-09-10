@@ -1,9 +1,9 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.51  
+**Versión:** 2.52  
 **Fecha:** 10 de septiembre de 2026  
-**Base de continuidad:** `v2.51 + main` una vez este documento se suba al repositorio.  
-**Documento anterior:** `Osumi_TPV_Client_Documento_Continuidad_v2.50.md`
+**Base de continuidad:** `v2.52 + main` una vez este documento se suba al repositorio.  
+**Documento anterior:** `Osumi_TPV_Client_Documento_Continuidad_v2.51.md`
 
 ---
 
@@ -39,10 +39,15 @@ REF Pausa técnica pre-Hito 16                     ✅ CERRADA
     REF.6D Imprenta: autofocus buscador            ✅
   REF.7 Cierre pausa técnica                      ✅
 
-16 Compras                                        🟦 PLANIFICADO
-  16.1 Base de Compras + históricos               ⬅️ SIGUIENTE
-  16.2 Backend listados de Pedidos                ⬜
-  16.3 Pantalla principal de Pedidos              ⬜
+16 Compras                                        🟦 EN DESARROLLO
+  16.1 Base de Compras + históricos               ✅
+  16.2 Backend listados de Pedidos                ✅
+  16.3 Pantalla principal de Pedidos              ✅
+
+CTRL Normalización controles pre-16.4             🟦
+  CTRL.1 Primera pasada global                    ⬅️ SIGUIENTE
+  CTRL.2 Segunda pasada Artículos                 ⬜
+
   16.4 Ficha Pedido: cabecera + persistencia      ⬜
   16.5 Líneas + buscador de artículos             ⬜
   16.6 Motor económico                            ⬜
@@ -66,33 +71,65 @@ El **Hito 15 — Almacén** está cerrado funcionalmente y la pausa técnica pos
 
 # 2. Punto exacto de continuación
 
-El siguiente mini-hito es:
+Los mini-hitos `16.1`, `16.2` y `16.3` están cerrados y validados.
+
+Antes de comenzar la ficha de Pedido se ha acordado una normalización corta de controles para evitar seguir duplicando CSS y fijar una gramática visual común.
+
+El siguiente punto exacto es:
 
 ```text
-16.1 — Base de Compras + auditoría/corrección de históricos
+CTRL.1 — Primera pasada de controles globales
 ```
 
-Objetivos generales:
+Objetivos:
 
 ```text
-Compras
-→ activar módulo/ruta
-→ estructura con pestañas:
-   Pedidos
-   Marcas
-   Proveedores
+crear src/styles/controls.scss
+→ nueva fuente canónica para primitivas visuales de controles
 
-Marcas / Proveedores
-→ placeholders de momento
+fechas
+→ input type="date" nativo
+→ label + input nativos
+→ valor YYYY-MM-DD
+→ no MatDatepicker
+→ no mat-form-field para fechas
 
-Históricos de artículo
-→ centralizar tipos conocidos
-→ auditar escrituras existentes
-→ corregir origen/tipo donde proceda
-→ dejar PEDIDO = 3 preparado para Compras
+Material compacto
+→ centralizar estilo repetido de filtros
+→ Inventario / Caducidades / Compras
+
+dinero / decimal / porcentaje
+→ input type="text"
+→ inputmode="decimal"
+→ parsing explícito compatible con coma
+
+edición compacta en tablas
+→ extraer una base visual reutilizable desde Inventario
+
+validación visual
+→ Compras
+→ Clientes → Ventas
+→ Inventario
+→ Caducidades
 ```
 
-No avanzar a `16.2` sin confirmación del usuario tras tests y prueba funcional de `16.1`.
+Después de validar `CTRL.1`:
+
+```text
+CTRL.2
+→ segunda pasada pequeña sobre Artículos
+→ ArticleGeneral
+→ ArticleNotes
+→ altas rápidas cuando proceda
+```
+
+Solo tras cerrar esta normalización:
+
+```text
+16.4 — Ficha Pedido: cabecera + persistencia básica
+```
+
+No convertir CTRL en una nueva pausa de refactorización general. No limpiar toda la aplicación ni reescribir componentes funcionales solo por uniformidad visual.
 
 ---
 
@@ -2075,9 +2112,13 @@ ajustar schema v1 durante desarrollo
 # 41. Plan Hito 16 — visión general
 
 ```text
-16.1  Base Compras + históricos
-16.2  Backend listados
-16.3  UI listados
+16.1  Base Compras + históricos ✅
+16.2  Backend listados ✅
+16.3  UI listados ✅
+
+CTRL.1 Primera pasada controles globales ⬅️
+CTRL.2 Segunda pasada Artículos
+
 16.4  Cabecera/persistencia Pedido
 16.5  Líneas/búsqueda
 16.6  Motor económico
@@ -2104,9 +2145,30 @@ implementar
 
 ---
 
-# 42. 16.1 — Base de Compras + auditoría de históricos ⬅️ SIGUIENTE
+# 42. 16.1 — Base de Compras + auditoría de históricos ✅ CERRADO
 
-Objetivos:
+Estado validado:
+
+```text
+ruta /compras activa
+tabs Pedidos / Marcas / Proveedores
+Marcas y Proveedores como placeholders
+
+históricos centralizados:
+VENTA          1
+VENTA_SYNC     2
+PEDIDO         3
+ARTICULO       4
+INVENTARIO     5
+INVENTARIO_ALL 6
+CADUCIDAD      7
+
+Inventario:
+Guardar fila   → tipo 5
+Guardar todos  → tipo 6
+```
+
+Objetivos cumplidos:
 
 ## Renderer
 
@@ -2152,9 +2214,27 @@ Corregir donde proceda.
 
 ---
 
-# 43. 16.2 — Backend de listados de Pedidos
+# 43. 16.2 — Backend de listados de Pedidos ✅ CERRADO
 
-Crear subdominio según patrón consolidado:
+Estado validado:
+
+```text
+ComprasService
+→ preload
+→ IPC
+→ PedidosService
+→ PedidosRepository
+→ TypeOrmPedidosRepository
+→ SQLite
+
+searchPedidosGuardados()
+searchPedidosRecepcionados()
+getPedidoFilterOptions()
+```
+
+Los proveedores disponibles para filtros incluyen activos y proveedores históricos todavía referenciados por pedidos.
+
+Implementación consolidada:
 
 ```text
 PedidosService
@@ -2198,9 +2278,50 @@ Orden estable.
 
 ---
 
-# 44. 16.3 — Pantalla principal de Pedidos
+# 44. 16.3 — Pantalla principal de Pedidos ✅ CERRADO
 
-Implementar:
+Estado validado funcionalmente:
+
+```text
+Pedidos guardados
+Pedidos recepcionados
+Nuevo pedido
+
+filtros independientes
+paginación 20 / 50 / 100 / 200
+workspace independiente de ambos listados
+tooltip de observaciones
+icono UE
+tipo + número
+navegación a carcasa de Pedido
+```
+
+Decisión final importante sobre fechas:
+
+```text
+<label>
+  <span>...</span>
+  <input type="date">
+</label>
+```
+
+- Fechas nativas Chromium/Electron.
+- Valor `YYYY-MM-DD`.
+- No `MatDatepicker`.
+- No `matInput`.
+- No envolver fechas en `mat-form-field`.
+- El aspecto visual se resolverá mediante los estilos globales acordados en CTRL.
+
+La carcasa de:
+
+```text
+/compras/pedido
+/compras/pedido/:idPedido
+```
+
+ya existe y será completada en `16.4`.
+
+Implementación consolidada:
 
 ```text
 tabs Compras
@@ -2225,7 +2346,365 @@ Marcas y Proveedores siguen placeholders.
 
 ---
 
-# 45. 16.4 — Ficha Pedido: cabecera + persistencia básica
+# 45. CTRL — Normalización de controles pre-16.4 🟦
+
+Esta normalización se introduce porque la auditoría visual previa a `16.4` ha detectado estilos de controles repetidos en varios componentes.
+
+No es una nueva pausa arquitectónica.
+
+Objetivo:
+
+```text
+reducir CSS duplicado
++
+fijar una gramática visual común
++
+evitar que la ficha de Pedido genere otra familia de estilos paralela
+```
+
+## 45.1 Principio general
+
+No imponer:
+
+```text
+todo Material
+```
+
+ni:
+
+```text
+todo HTML nativo
+```
+
+Regla:
+
+```text
+usar el control más adecuado por funcionalidad
++
+compartir la apariencia cuando conceptualmente sean el mismo tipo de control
+```
+
+Distinguir siempre:
+
+```text
+apariencia común
+→ estilos globales
+
+layout, ancho y colocación
+→ componente
+```
+
+Los estilos globales no deben imponer anchos o distribuciones específicas de una pantalla.
+
+## 45.2 Nueva hoja canónica
+
+Crear:
+
+```text
+src/styles/controls.scss
+```
+
+e importarla desde:
+
+```text
+src/styles.scss
+```
+
+`forms.scss` permanece por ahora como compatibilidad/estilos anteriores.
+
+No hacer una limpieza total de `forms.scss`.
+
+Política:
+
+```text
+controls.scss
+→ nueva fuente canónica
+
+forms.scss
+→ estilos legacy/compatibilidad
+
+cuando desaparezca el último consumidor de una regla antigua
+→ eliminarla de forms.scss
+```
+
+## 45.3 Convenciones acordadas
+
+### Fechas
+
+```text
+HTML nativo
+→ input type="date"
+
+valor
+→ YYYY-MM-DD
+
+estructura
+→ label + texto + input nativos
+
+NO MatDatepicker
+NO matInput
+NO mat-form-field
+```
+
+Electron usa Chromium, por lo que el selector nativo es suficiente y consistente.
+
+### Enteros
+
+```text
+input type="number"
+step="1"
+```
+
+Ejemplos:
+
+```text
+stock
+unidades
+cantidades enteras
+```
+
+### Dinero / decimales / porcentajes
+
+Patrón canónico:
+
+```text
+input type="text"
+inputmode="decimal"
+```
+
+Con:
+
+```text
+parsing explícito
+soporte de coma decimal
+validación propia
+precisión interna independiente del string mostrado
+```
+
+Evitar `type="number"` para importes monetarios cuando necesitemos controlar formato europeo y parsing.
+
+### Texto / búsqueda simple
+
+Puede ser nativo o `matInput` según contexto.
+
+Regla:
+
+```text
+control simple sin comportamiento Material necesario
+→ preferir HTML nativo estilizado
+
+formulario con validación, errores, prefijos/sufijos u otras capacidades Material
+→ mat-form-field + matInput
+```
+
+### Select simple
+
+Si no necesita funcionalidades especiales:
+
+```text
+select nativo
+```
+
+Si necesita:
+
+```text
+selección múltiple
+overlay complejo
+funcionalidad específica de Material
+```
+
+usar:
+
+```text
+mat-select
+```
+
+No migrar selects funcionales solo por uniformidad.
+
+### Textarea
+
+Misma regla que texto:
+
+```text
+simple
+→ textarea nativo con apariencia compartida
+
+validación/error Material
+→ textarea matInput
+```
+
+### Booleanos
+
+```text
+mat-checkbox
+→ elección booleana independiente
+
+mat-slide-toggle
+→ activar/desactivar un modo o filtro con efecto inmediato
+```
+
+### Botones
+
+```text
+acción principal
+→ mat-flat-button
+
+acción secundaria
+→ mat-stroked-button
+
+acción compacta por icono
+→ mat-icon-button
+→ aria-label obligatorio
+→ normalmente matTooltip
+```
+
+### Edición dentro de tablas
+
+Crear una base visual compartida para editores compactos.
+
+Referencia inicial:
+
+```text
+Inventario
+```
+
+Objetivo visual aproximado:
+
+```text
+altura compacta ~30 px
+focus común
+estado dirty
+estado invalid
+```
+
+No forzar `mat-form-field` dentro de tablas cuando perjudique densidad y edición tipo hoja de cálculo.
+
+### Altura normal
+
+Altura canónica propuesta:
+
+```text
+40 px
+```
+
+para controles normales.
+
+Las variaciones actuales de 38/42 px se consideran candidatas a normalización, no contratos funcionales.
+
+## 45.4 CTRL.1 — Primera pasada global ⬅️ SIGUIENTE
+
+Alcance:
+
+```text
+1. crear controls.scss
+
+2. fechas nativas compartidas
+   → Clientes → Ventas
+   → Compras → Pedidos
+
+3. Material compacto compartido
+   → Inventario
+   → Caducidades
+   → Compras
+
+4. importes de filtros de Compras
+   → type="text"
+   → inputmode="decimal"
+
+5. base visual de editor compacto de tabla
+   → extraída desde Inventario
+   → preparada para futura tabla de Pedido
+
+6. validación visual
+   → Compras
+   → Clientes → Ventas
+   → Inventario
+   → Caducidades
+```
+
+No modificar lógica funcional.
+
+Después:
+
+```text
+tests
+build
+lint
+prueba visual
+confirmación explícita
+```
+
+## 45.5 CTRL.2 — Segunda pasada Artículos
+
+Solo después de validar CTRL.1.
+
+Candidatos:
+
+```text
+ArticleGeneral
+→ inputs/selects nativos repetidos
+
+ArticleNotes
+→ textarea nativo
+
+BrandQuickCreate
+SupplierQuickCreate
+→ consumir primitivas globales cuando encaje
+```
+
+Objetivo:
+
+```text
+eliminar CSS duplicado claro
+sin alterar comportamiento
+```
+
+La segunda pasada puede ajustarse si durante CTRL.1 se comprueba que alguna migración no aporta suficiente beneficio.
+
+## 45.6 Fuera de alcance
+
+No tocar ahora:
+
+```text
+ClientForm
+→ Material + Signal Forms + errores
+→ uso justificado
+
+Imprenta
+→ buscador Material ya estable y validado
+
+layouts completos de tablas
+loading / empty / error generales
+tables.scss entero
+forms.scss entero
+application-composition
+arquitectura backend
+```
+
+No crear componentes Angular triviales solo para envolver controles HTML.
+
+Ejemplo:
+
+```text
+input type="date"
+→ estilo global
+→ NO DateInputComponent sin comportamiento propio
+```
+
+## 45.7 Fin de CTRL
+
+Una vez validadas las pasadas acordadas:
+
+```text
+CTRL ✅ CERRADO
+→ continuar 16.4
+```
+
+Las convenciones anteriores pasan a ser la referencia para toda la nueva ficha de Pedido y desarrollos posteriores.
+
+---
+
+# 46. 16.4 — Ficha Pedido: cabecera + persistencia básica
 
 Implementar:
 
@@ -2260,7 +2739,7 @@ Todavía no aplicar efectos canónicos.
 
 ---
 
-# 46. 16.5 — Líneas + buscador de artículos
+# 47. 16.5 — Líneas + buscador de artículos
 
 Implementar:
 
@@ -2283,7 +2762,7 @@ No recepcionar todavía si no está implementada la fase correspondiente.
 
 ---
 
-# 47. 16.6 — Motor económico
+# 48. 16.6 — Motor económico
 
 Crear responsabilidad específica para cálculos.
 
@@ -2316,7 +2795,7 @@ Contrastar casos reales contra el TPV antiguo.
 
 ---
 
-# 48. 16.7 — Dirty state + navegación segura
+# 49. 16.7 — Dirty state + navegación segura
 
 Implementar detección de dirty contra snapshot persistido.
 
@@ -2335,7 +2814,7 @@ No convertir el workspace en un autosave de pedido.
 
 ---
 
-# 49. 16.8 — Integración Pedido → Artículos
+# 50. 16.8 — Integración Pedido → Artículos
 
 Flujo:
 
@@ -2356,7 +2835,7 @@ No mezclarlo con borradores sin guardar.
 
 ---
 
-# 50. 16.9 — PDFs
+# 51. 16.9 — PDFs
 
 Implementar:
 
@@ -2379,7 +2858,7 @@ pedido recepcionado
 
 ---
 
-# 51. 16.10 — Recepción atómica
+# 52. 16.10 — Recepción atómica
 
 Implementar la transacción completa.
 
@@ -2413,7 +2892,7 @@ Tests cross-layer obligatorios.
 
 ---
 
-# 52. 16.11 — Pedido recepcionado
+# 53. 16.11 — Pedido recepcionado
 
 Implementar modo histórico:
 
@@ -2435,7 +2914,7 @@ sin efectos secundarios sobre artículos/históricos
 
 ---
 
-# 53. 16.12 — Regresión integral de Pedidos
+# 54. 16.12 — Regresión integral de Pedidos
 
 Antes de cerrar Pedidos:
 
@@ -2536,7 +3015,7 @@ Pedidos ✅ CERRADO
 
 ---
 
-# 54. 16.13 — Marcas
+# 55. 16.13 — Marcas
 
 No desarrollar antes de cerrar Pedidos.
 
@@ -2558,7 +3037,7 @@ placeholder
 
 ---
 
-# 55. 16.14 — Proveedores
+# 56. 16.14 — Proveedores
 
 Misma regla que Marcas.
 
@@ -2572,7 +3051,7 @@ placeholder
 
 ---
 
-# 56. Convenciones arquitectónicas resultantes
+# 57. Convenciones arquitectónicas resultantes
 
 ## 56.1 Compartido vs privado
 
@@ -2645,8 +3124,13 @@ Si no, el tamaño no basta.
 
 ---
 
-# 57. Decisiones que no deben revertirse
+# 58. Decisiones que no deben revertirse
 
+- Fechas de la aplicación: usar `input type="date"` nativo con valor `YYYY-MM-DD`; no introducir `MatDatepicker` como patrón general.
+- No envolver fechas nativas en `mat-form-field` únicamente por apariencia.
+- Dinero/decimales/porcentajes: preferir `type="text" + inputmode="decimal"` cuando necesitemos parsing/formato europeo.
+- Mantener apariencia compartida en `controls.scss` y layout/ancho en cada componente.
+- No crear componentes Angular triviales únicamente para envolver controles nativos.
 - No reabrir Hito 15 por ajustes de Compras.
 - No reabrir la pausa REF por refactors oportunistas.
 - No volver a crear `AlmacenService` backend agregado.
@@ -2673,7 +3157,7 @@ Si no, el tamaño no basta.
 
 ---
 
-# 58. Pendientes externos/no bloqueantes
+# 59. Pendientes externos/no bloqueantes
 
 ```text
 TicketBAI 12C.9
@@ -2688,7 +3172,7 @@ Imprenta
 
 ---
 
-# 59. Cómo retomar
+# 60. Cómo retomar
 
 En una conversación nueva:
 
@@ -2697,56 +3181,96 @@ En una conversación nueva:
 3. confirmar que:
    - Hito 15 está cerrado;
    - REF está cerrada;
-   - REF.6A–D están implementados;
-4. no reimplementar la pausa técnica;
+   - `16.1`, `16.2` y `16.3` están cerrados;
+   - la pantalla principal de Pedidos funciona con filtros, paginación, workspace y fechas nativas;
+4. no reimplementar 16.1–16.3;
 5. continuar exactamente con:
 
 ```text
-16.1 — Base de Compras + auditoría/corrección de históricos
+CTRL.1 — Primera pasada de controles globales
 ```
 
-6. usar el TPV antiguo solo como referencia funcional/paridad cuando sea útil;
-7. respetar las decisiones explícitas de Compras de este documento;
-8. esperar tests + confirmación tras cada mini-hito;
-9. no avanzar a Marcas ni Proveedores antes de cerrar Pedidos.
+6. respetar la convención ya acordada de fechas nativas `type="date"`;
+7. no convertir CTRL en una limpieza global indiscriminada;
+8. después de CTRL.1, validar visualmente antes de hacer CTRL.2;
+9. tras cerrar CTRL, continuar con:
+
+```text
+16.4 — Ficha Pedido: cabecera + persistencia básica
+```
+
+10. usar el TPV antiguo solo como referencia funcional/paridad cuando sea útil;
+11. respetar las decisiones económicas y de compatibilidad de Pedidos de este documento;
+12. esperar tests + confirmación tras cada mini-hito;
+13. no avanzar a Marcas ni Proveedores antes de cerrar Pedidos.
 
 ---
 
-# 60. Resumen ultracorto
+# 61. Resumen ultracorto
 
 ```text
 Proyecto: Osumi TPV Client
 Continuidad: 10/09/2026
-Base: v2.51 + main
+Base: v2.52 + main
 
 Hito 13 Artículos ✅
 Hito 14 Clientes ✅
 Hito 15 Almacén ✅
 
 Pausa técnica REF ✅ CERRADA
-REF.1 shared constants/utils ✅
-REF.2 *.private.ts ✅
-REF.3 estructura por subdominio ✅
-REF.4 backend/repositories separados ✅
-REF.5 hotspots ✅
-REF.6A última venta + cambio ✅
-REF.6B Inventario → Artículos + estado ✅
-REF.6C Caducidades → Artículos + estado ✅
-REF.6D autofocus Imprenta ✅
-REF.7 cierre ✅
 
 TicketBAI ordinario ✅
 TicketBAI devoluciones/mixtas ⏸️ Berein
 
-Hito 16 Compras 🟦 PLANIFICADO
+Hito 16 Compras 🟦 EN DESARROLLO
 
-Compras:
-→ Pedidos primero
-→ Marcas placeholder
-→ Proveedores placeholder
+16.1 Base + históricos ✅
+16.2 Backend listados ✅
+16.3 UI listados ✅
+
+16.3 consolidado:
+→ Pedidos guardados / recepcionados
+→ filtros
+→ paginación 20/50/100/200
+→ workspace independiente
+→ observaciones
+→ UE
+→ navegación a Pedido
+→ fechas nativas type="date"
+→ YYYY-MM-DD
+→ sin MatDatepicker
 
 SIGUIENTE:
-16.1 Base de Compras + auditoría de históricos
+CTRL.1 Primera pasada de controles globales
+
+Convenciones:
+→ nueva fuente canónica: src/styles/controls.scss
+→ apariencia global / layout local
+→ fecha: input type="date"
+→ entero: type="number" step="1"
+→ dinero/decimal/%: text + inputmode="decimal"
+→ Material cuando aporta validación/errores/overlay
+→ select nativo para casos simples
+→ checkbox = opción
+→ slide-toggle = modo inmediato
+→ botones Material según acción
+→ editor de tabla compacto compartido
+
+CTRL.1:
+→ controls.scss
+→ fechas Clientes/Compras
+→ Material compacto Inventario/Caducidades/Compras
+→ importes filtros Compras
+→ base editor tabla
+→ validación visual
+
+CTRL.2:
+→ ArticleGeneral
+→ ArticleNotes
+→ quick creates cuando encaje
+
+DESPUÉS:
+16.4 Ficha Pedido: cabecera + persistencia
 
 Históricos:
 1 VENTA
@@ -2781,10 +3305,9 @@ Economía:
    muestra impuestos sombreados
    añade Total sin IVA
 
-Plan:
-16.1 Base + históricos
-16.2 Backend listados
-16.3 UI listados
+Plan restante:
+CTRL.1 controles globales
+CTRL.2 Artículos
 16.4 Cabecera/persistencia
 16.5 Líneas/búsqueda
 16.6 Motor económico
