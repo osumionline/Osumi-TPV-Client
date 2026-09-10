@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest';
 import {
   formatPedidoDate,
   formatPedidoTipo,
   parsePedidoFilterAmountMicros,
-} from './pedidos.component.private';
+} from '@modules/compras/pedidos/components/pedidos/pedidos.component.private';
+import { describe, expect, it } from 'vitest';
 
 describe('pedidos.component.private', (): void => {
   it('convierte euros con coma o punto a microeuros', (): void => {

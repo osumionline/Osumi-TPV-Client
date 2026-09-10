@@ -32,23 +32,25 @@
             <form class="orders__filters-panel"
                   (submit)="applyGuardadosFilters($event)">
                 <div class="orders__filters-grid">
-                    <mat-form-field appearance="outline"
-                                    subscriptSizing="dynamic">
-                        <mat-label>Fecha desde</mat-label>
-                        <input matInput
-                               type="date"
-                               [value]="guardadosState().fechaDesde"
-                               (input)="onGuardadosFilterInput('fechaDesde', $event)">
-                    </mat-form-field>
+                    <label class="orders__date-field">
+                        <span>
+                            Fecha desde
+                        </span>
 
-                    <mat-form-field appearance="outline"
-                                    subscriptSizing="dynamic">
-                        <mat-label>Fecha hasta</mat-label>
-                        <input matInput
-                               type="date"
+                        <input type="date"
+                               [value]="guardadosState().fechaDesde"
+                               (change)="onGuardadosFilterInput('fechaDesde', $event)">
+                    </label>
+
+                    <label class="orders__date-field">
+                        <span>
+                            Fecha hasta
+                        </span>
+
+                        <input type="date"
                                [value]="guardadosState().fechaHasta"
-                               (input)="onGuardadosFilterInput('fechaHasta', $event)">
-                    </mat-form-field>
+                               (change)="onGuardadosFilterInput('fechaHasta', $event)">
+                    </label>
 
                     <mat-form-field appearance="outline"
                                     subscriptSizing="dynamic">
@@ -245,23 +247,25 @@
             <form class="orders__filters-panel"
                   (submit)="applyRecepcionadosFilters($event)">
                 <div class="orders__filters-grid">
-                    <mat-form-field appearance="outline"
-                                    subscriptSizing="dynamic">
-                        <mat-label>Fecha desde</mat-label>
-                        <input matInput
-                               type="date"
-                               [value]="recepcionadosState().fechaDesde"
-                               (input)="onRecepcionadosFilterInput('fechaDesde', $event)">
-                    </mat-form-field>
+                    <label class="orders__date-field">
+                        <span>
+                            Fecha desde
+                        </span>
 
-                    <mat-form-field appearance="outline"
-                                    subscriptSizing="dynamic">
-                        <mat-label>Fecha hasta</mat-label>
-                        <input matInput
-                               type="date"
+                        <input type="date"
+                               [value]="recepcionadosState().fechaDesde"
+                               (change)="onRecepcionadosFilterInput('fechaDesde', $event)">
+                    </label>
+
+                    <label class="orders__date-field">
+                        <span>
+                            Fecha hasta
+                        </span>
+
+                        <input type="date"
                                [value]="recepcionadosState().fechaHasta"
-                               (input)="onRecepcionadosFilterInput('fechaHasta', $event)">
-                    </mat-form-field>
+                               (change)="onRecepcionadosFilterInput('fechaHasta', $event)">
+                    </label>
 
                     <mat-form-field appearance="outline"
                                     subscriptSizing="dynamic">
