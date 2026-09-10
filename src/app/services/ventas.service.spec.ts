@@ -898,4 +898,36 @@ describe('VentasService', (): void => {
 
     expect(service.ventas()).toHaveLength(1);
   });
+
+  it('conserva el resumen de la última venta aunque se cierren las ventas abiertas', (): void => {
+    const service: VentasService = new VentasService();
+    const venta: VentaEnCurso = service.crearVenta();
+
+    service.registrarUltimaVenta({
+      totalCents: 2_350,
+      cambioCents: 650,
+    });
+
+    expect(service.ultimaVenta()).toEqual({
+      totalCents: 2_350,
+      cambioCents: 650,
+    });
+
+    service.cerrarVenta(venta.idTemporal);
+
+    expect(service.ultimaVenta()).toEqual({
+      totalCents: 2_350,
+      cambioCents: 650,
+    });
+
+    service.registrarUltimaVenta({
+      totalCents: 1_500,
+      cambioCents: 0,
+    });
+
+    expect(service.ultimaVenta()).toEqual({
+      totalCents: 1_500,
+      cambioCents: 0,
+    });
+  });
 });

@@ -17,6 +17,7 @@ import type {
 
 import type VentaLineaReservaOrigen from '@model/ventas/venta-linea-reserva-origen.interface';
 import type VentaReservaOrigen from '@model/ventas/venta-reserva-origen.interface';
+import type UltimaVentaResumen from '@model/ventas/ultima-venta-resumen.interface';
 
 /**
  * Mantiene las ventas abiertas y su workspace durante toda la sesión de la aplicación.
@@ -26,19 +27,28 @@ export default class VentasService {
   private readonly ventasSignal: WritableSignal<readonly VentaEnCurso[]> = signal<
     readonly VentaEnCurso[]
   >([]);
-
   private readonly ventaActivaIdSignal: WritableSignal<string | null> = signal<string | null>(null);
-
   private readonly workspacesSignal: WritableSignal<ReadonlyMap<string, VentaWorkspaceState>> =
     signal<ReadonlyMap<string, VentaWorkspaceState>>(new Map<string, VentaWorkspaceState>());
+  private readonly ultimaVentaSignal: WritableSignal<UltimaVentaResumen | null> =
+    signal<UltimaVentaResumen | null>(null);
 
   private nextVentaNumber: number = 1;
 
   readonly ventas: Signal<readonly VentaEnCurso[]> = this.ventasSignal.asReadonly();
-
   readonly ventaActivaId: Signal<string | null> = this.ventaActivaIdSignal.asReadonly();
-
   readonly hasVentas: Signal<boolean> = computed((): boolean => this.ventas().length > 0);
+  readonly ultimaVenta: Signal<UltimaVentaResumen | null> = this.ultimaVentaSignal.asReadonly();
+
+  /**
+   * Conserva el resumen de la última venta finalizada
+   * durante la sesión actual de la aplicación.
+   */
+  registrarUltimaVenta(resumen: UltimaVentaResumen): void {
+    this.ultimaVentaSignal.set({
+      ...resumen,
+    });
+  }
 
   /**
    * Identificadores de las reservas que ya están cargadas

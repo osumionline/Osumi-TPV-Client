@@ -450,6 +450,27 @@
             }}
         </button>
 
+        @if (ventasService.ultimaVenta(); as ultimaVenta) {
+        <div class="sale__last-sale">
+            <span>
+                Última venta:
+                {{
+                    ultimaVenta.totalCents
+                        | centsToEuros
+                        | currency:'EUR':'symbol':'1.2-2'
+                }}
+            </span>
+            <span>
+                Cambio:
+                {{
+                    ultimaVenta.cambioCents
+                        | centsToEuros
+                        | currency:'EUR':'symbol':'1.2-2'
+                }}
+            </span>
+        </div>
+        }
+
         <div class="sale__controls">
             <mat-icon class="sale__drag-handle"
                       cdkDragHandle

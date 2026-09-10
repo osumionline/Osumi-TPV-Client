@@ -338,6 +338,17 @@
         }
     }
 
+    .sale__last-sale {
+        display: flex;
+        padding: 0 10px 10px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        color: var(--disabled-color);
+        font-size: 0.8rem;
+        white-space: nowrap;
+    }
+
     .sale__controls {
         display: flex;
         align-items: center;
