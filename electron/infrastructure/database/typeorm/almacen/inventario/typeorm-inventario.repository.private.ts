@@ -1,3 +1,8 @@
+import type HISTORICO_ARTICULO_TIPO from '@backend/domain/articulos/historico-articulo.constants';
+
+export type InventarioHistoricoTipo =
+  typeof HISTORICO_ARTICULO_TIPO.INVENTARIO | typeof HISTORICO_ARTICULO_TIPO.INVENTARIO_ALL;
+
 export interface InventarioAggregateDatabaseRow {
   readonly total_rows: number;
   readonly media_margen_microporcentaje: number;

@@ -240,7 +240,7 @@ describe('TypeORM Almacén repositories', (): void => {
       codigoAdicional: 'ALFA-EXTRA',
     };
 
-    await requireInventarioRepository().saveInventarioRows([command]);
+    await requireInventarioRepository().saveInventarioRow(command);
 
     const articleRows = (await dataSource.query(
       `
@@ -331,13 +331,44 @@ describe('TypeORM Almacén repositories', (): void => {
     }[];
 
     expect(historyRows[0]).toEqual({
-      tipo: 4,
+      tipo: 5,
       stock_previo: 2,
       diferencia: -7,
       stock_final: -5,
       puc_micros: 1_331_000,
       pvp_micros: 2_500_000,
     });
+  });
+
+  it('registra tipo 6 cuando el cambio de stock procede de Guardar todos', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDataSource();
+
+    await requireInventarioRepository().saveInventarioRows([
+      {
+        idArticulo: 1,
+        idsCategorias: [1, 2],
+        stock: 3,
+        precioAlbaranMicros: 1_000_000,
+        pucMicros: 1_210_000,
+        pvpCents: 200,
+        margenMicroporcentaje: 395_000,
+        codigoAdicional: null,
+      },
+    ]);
+
+    const historyRows = (await dataSource.query(
+      `
+        SELECT tipo
+        FROM historico_articulo
+        WHERE id_articulo = 1
+        ORDER BY id DESC
+        LIMIT 1
+      `,
+    )) as readonly {
+      readonly tipo: number;
+    }[];
+
+    expect(historyRows[0]?.tipo).toBe(6);
   });
 
   it('hace rollback completo si una fila falla dentro de Guardar todos', async (): Promise<void> => {
@@ -433,7 +464,7 @@ describe('TypeORM Almacén repositories', (): void => {
       codigoAdicional: 'EXTRA-BETA',
     };
 
-    await expect(requireInventarioRepository().saveInventarioRows([command])).rejects.toThrow(
+    await expect(requireInventarioRepository().saveInventarioRow(command)).rejects.toThrow(
       'El código "EXTRA-BETA" ya está siendo utilizado.',
     );
 
@@ -456,18 +487,16 @@ describe('TypeORM Almacén repositories', (): void => {
   it('da de baja artículo y códigos conservando el histórico', async (): Promise<void> => {
     const dataSource: DataSource = await requireDataSource();
 
-    await requireInventarioRepository().saveInventarioRows([
-      {
-        idArticulo: 3,
-        idsCategorias: [1],
-        stock: -4,
-        precioAlbaranMicros: 400_000,
-        pucMicros: 500_000,
-        pvpCents: 100,
-        margenMicroporcentaje: 500_000,
-        codigoAdicional: null,
-      },
-    ]);
+    await requireInventarioRepository().saveInventarioRow({
+      idArticulo: 3,
+      idsCategorias: [1],
+      stock: -4,
+      precioAlbaranMicros: 400_000,
+      pucMicros: 500_000,
+      pvpCents: 100,
+      margenMicroporcentaje: 500_000,
+      codigoAdicional: null,
+    });
 
     await requireInventarioRepository().deactivateArticulo(3);
 

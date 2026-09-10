@@ -1,0 +1,44 @@
+<otpv-header selectedOption="compras"
+             [appName]="appName()" />
+
+<main class="purchases">
+    <section class="purchases__panel">
+        <header class="purchases__toolbar">
+            <h1>
+                COMPRAS
+            </h1>
+        </header>
+
+        <otpv-purchases-tabs [activeSection]="activeSection()"
+                             (selectSectionEvent)="selectSection($event)" />
+
+        <div class="purchases__content">
+            @switch (activeSection()) {
+            @case ('orders') {
+            <section class="purchases__state">
+                <h2>PEDIDOS</h2>
+                <p>
+                    Gestión de pedidos realizados a proveedores.
+                </p>
+            </section>
+            }
+            @case ('brands') {
+            <section class="purchases__state">
+                <h2>MARCAS</h2>
+                <p>
+                    La gestión de marcas se incorporará después de completar Pedidos.
+                </p>
+            </section>
+            }
+            @case ('suppliers') {
+            <section class="purchases__state">
+                <h2>PROVEEDORES</h2>
+                <p>
+                    La gestión de proveedores se incorporará después de completar Pedidos.
+                </p>
+            </section>
+            }
+            }
+        </div>
+    </section>
+</main>

@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 
 class FakeInventarioRepository implements InventarioRepository {
   lastQuery: InventarioRepositoryQuery | null = null;
+  lastSavedCommand: InventarioSaveRecord | null = null;
   lastSavedCommands: readonly InventarioSaveRecord[] | null = null;
   lastDeactivatedArticuloId: number | null = null;
   lastReportQuery: InventarioFilterQuery | null = null;
@@ -72,6 +73,15 @@ class FakeInventarioRepository implements InventarioRepository {
     this.lastReportQuery = query;
 
     return Promise.resolve(this.reportResult);
+  }
+
+  /**
+   * Conserva la fila individual recibida.
+   */
+  saveInventarioRow(command: InventarioSaveRecord): Promise<void> {
+    this.lastSavedCommand = command;
+
+    return Promise.resolve();
   }
 
   /**
@@ -181,16 +191,40 @@ describe('InventarioService', (): void => {
       }),
     );
 
+    expect(repository.lastSavedCommand).toEqual({
+      idArticulo: 25,
+      idsCategorias: [2, 7],
+      stock: -3,
+      precioAlbaranMicros: 590_000,
+      pucMicros: 744_580,
+      pvpCents: 100,
+      margenMicroporcentaje: 255_420,
+      codigoAdicional: 'EXTRA-25',
+    });
+    expect(repository.lastSavedCommands).toBeNull();
+  });
+
+  it('delega Guardar todos en la operación múltiple aunque solo haya una fila', async (): Promise<void> => {
+    const repository = new FakeInventarioRepository();
+    const service = createService(repository);
+
+    await service.saveInventarioRows([
+      createSaveCommand({
+        stock: 10,
+      }),
+    ]);
+
+    expect(repository.lastSavedCommand).toBeNull();
     expect(repository.lastSavedCommands).toEqual([
       {
         idArticulo: 25,
         idsCategorias: [2, 7],
-        stock: -3,
+        stock: 10,
         precioAlbaranMicros: 590_000,
         pucMicros: 744_580,
         pvpCents: 100,
         margenMicroporcentaje: 255_420,
-        codigoAdicional: 'EXTRA-25',
+        codigoAdicional: null,
       },
     ]);
   });

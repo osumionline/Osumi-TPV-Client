@@ -183,22 +183,26 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
 
     expect(stock.stock).toBe(18);
 
-    const historico: HistoricoRow = await queryOne<HistoricoRow>(
+    const historico: HistoricoRow & { readonly tipo: number } = await queryOne<
+      HistoricoRow & { readonly tipo: number }
+    >(
       dataSource,
       `
-              SELECT
-                stock_previo,
-                diferencia,
-                stock_final,
-                puc_micros,
-                pvp_micros
-              FROM historico_articulo
-              WHERE id_venta = ?
-            `,
+        SELECT
+          tipo,
+          stock_previo,
+          diferencia,
+          stock_final,
+          puc_micros,
+          pvp_micros
+        FROM historico_articulo
+        WHERE id_venta = ?
+      `,
       [result.id],
     );
 
     expect(historico).toEqual({
+      tipo: 1,
       stock_previo: 20,
       diferencia: 2,
       stock_final: 18,

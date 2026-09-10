@@ -45,7 +45,7 @@ export default class HeaderComponent {
       id: 'compras',
       label: 'Compras',
       icon: 'shopping_cart',
-      route: null,
+      route: '/compras',
     },
     {
       id: 'clientes',

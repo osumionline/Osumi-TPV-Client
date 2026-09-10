@@ -32,6 +32,11 @@ const routes: Routes = [
     loadComponent: () => import('@modules/articulos/pages/articles/articles.component'),
   },
   {
+    path: 'compras',
+    canActivate: [readyApplicationGuard],
+    loadComponent: () => import('@modules/compras/pages/purchases/purchases.component'),
+  },
+  {
     path: 'clientes',
     canActivate: [readyApplicationGuard],
     loadComponent: () => import('@modules/clientes/pages/clients/clients.component'),

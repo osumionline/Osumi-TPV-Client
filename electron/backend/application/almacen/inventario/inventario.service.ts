@@ -144,7 +144,7 @@ export default class InventarioService implements InventarioReportProvider {
   async saveInventarioRow(command: InventarioSaveCommand): Promise<void> {
     const record: InventarioSaveRecord = this.mapSaveRecord(command);
 
-    await this.inventarioRepository.saveInventarioRows([record]);
+    await this.inventarioRepository.saveInventarioRow(record);
   }
 
   /**

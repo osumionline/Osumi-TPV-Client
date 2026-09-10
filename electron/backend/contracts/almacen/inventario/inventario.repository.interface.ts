@@ -21,8 +21,13 @@ export default interface InventarioRepository {
   getInventarioReport(query: InventarioFilterQuery): Promise<InventarioReportRecord>;
 
   /**
-   * Persiste varias filas de Inventario dentro
-   * de una única transacción.
+   * Persiste una única fila modificada desde Inventario.
+   */
+  saveInventarioRow(command: InventarioSaveRecord): Promise<void>;
+
+  /**
+   * Persiste varias filas mediante Guardar todos
+   * dentro de una única transacción.
    */
   saveInventarioRows(commands: readonly InventarioSaveRecord[]): Promise<void>;
 

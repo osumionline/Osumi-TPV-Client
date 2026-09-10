@@ -22,12 +22,14 @@ import type {
   InventarioAggregateDatabaseRow,
   InventarioCategoriaDatabaseRow,
   InventarioDatabaseRow,
+  InventarioHistoricoTipo,
   InventarioReportBarcodeDatabaseRow,
   InventarioReportCategoriaDatabaseRow,
   InventarioReportDatabaseRow,
   InventarioSqlFilter,
   InventarioUpdateDatabaseRow,
 } from './typeorm-inventario.repository.private';
+
 /**
  * Gestiona la persistencia SQLite propia de Inventario.
  */
@@ -246,18 +248,35 @@ export default class TypeOrmInventarioRepository implements InventarioRepository
   }
 
   /**
-   * Persiste atómicamente todas las filas de Inventario indicadas.
+   * Persiste una fila individual usando el tipo histórico de Inventario.
+   */
+  async saveInventarioRow(command: InventarioSaveRecord): Promise<void> {
+    await this.saveInventarioRowsWithHistoryType([command], HISTORICO_ARTICULO_TIPO.INVENTARIO);
+  }
+
+  /**
+   * Persiste atómicamente las filas procedentes de Guardar todos.
    */
   async saveInventarioRows(commands: readonly InventarioSaveRecord[]): Promise<void> {
+    await this.saveInventarioRowsWithHistoryType(commands, HISTORICO_ARTICULO_TIPO.INVENTARIO_ALL);
+  }
+
+  /**
+   * Persiste las filas dentro de una transacción usando
+   * el tipo histórico correspondiente al origen de la operación.
+   */
+  private async saveInventarioRowsWithHistoryType(
+    commands: readonly InventarioSaveRecord[],
+    historicoTipo: InventarioHistoricoTipo,
+  ): Promise<void> {
     if (commands.length === 0) {
       return;
     }
 
     const dataSource: DataSource = await this.applicationDatabase.connect();
-
     await runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
       for (const command of commands) {
-        await this.saveInventarioRow(queryRunner, command);
+        await this.saveInventarioRowInTransaction(queryRunner, command, historicoTipo);
       }
     });
   }
@@ -542,9 +561,10 @@ export default class TypeOrmInventarioRepository implements InventarioRepository
    * Persiste una fila de Inventario usando el QueryRunner
    * perteneciente a la transacción global.
    */
-  private async saveInventarioRow(
+  private async saveInventarioRowInTransaction(
     queryRunner: QueryRunner,
     command: InventarioSaveRecord,
+    historicoTipo: InventarioHistoricoTipo,
   ): Promise<void> {
     const current: InventarioUpdateDatabaseRow = await this.requireActiveArticle(
       queryRunner,
@@ -587,7 +607,13 @@ export default class TypeOrmInventarioRepository implements InventarioRepository
     }
 
     if (current.stock !== command.stock) {
-      await this.insertManualStockHistory(queryRunner, command, current.stock, timestamp);
+      await this.insertManualStockHistory(
+        queryRunner,
+        command,
+        current.stock,
+        historicoTipo,
+        timestamp,
+      );
     }
 
     if (!scalarChanged && (categoriesChanged || barcodeChanged)) {
@@ -900,6 +926,7 @@ export default class TypeOrmInventarioRepository implements InventarioRepository
     queryRunner: QueryRunner,
     command: InventarioSaveRecord,
     previousStock: number,
+    historicoTipo: InventarioHistoricoTipo,
     timestamp: string,
   ): Promise<void> {
     const pvpMicros: number = (command.pvpCents * UNIT_PRICE_SCALE) / MONEY_SCALE;
@@ -923,7 +950,7 @@ export default class TypeOrmInventarioRepository implements InventarioRepository
       [
         randomUUID(),
         command.idArticulo,
-        HISTORICO_ARTICULO_TIPO.ARTICULO,
+        historicoTipo,
         previousStock,
         command.stock - previousStock,
         command.stock,

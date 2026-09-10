@@ -1,0 +1,11 @@
+<nav class="purchases-tabs"
+     aria-label="Apartados de Compras">
+    @for (section of sections; track section.id) {
+    <button type="button"
+            class="purchases-tabs__item"
+            [class.purchases-tabs__item--active]="activeSection() === section.id"
+            (click)="selectSection(section.id)">
+        {{ section.label }}
+    </button>
+    }
+</nav>

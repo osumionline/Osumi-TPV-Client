@@ -4,6 +4,7 @@ import type {
   GuardarVentaRecordCommand,
 } from '@backend/contracts/ventas/guardar-venta-record-command.interface';
 import type VentasPersistenciaRepository from '@backend/contracts/ventas/ventas-persistencia.repository.interface';
+import HISTORICO_ARTICULO_TIPO from '@backend/domain/articulos/historico-articulo.constants';
 import type VentaPersistidaRecord from '@backend/domain/ventas/venta-persistida-record.interface';
 import { getLastInsertId } from '@infrastructure/database/typeorm/sqlite.utils';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
@@ -14,8 +15,6 @@ import type { DataSource, QueryRunner } from 'typeorm';
 const VENTA_DOCUMENT_TYPE: string = 'venta';
 const VENTA_SERIE: string = '';
 const EFECTIVO_SLUG: string = 'efectivo';
-
-const HISTORICO_ARTICULO_TIPO_VENTA: number = 1;
 const MICROS_PER_CENT: number = 10_000;
 
 interface DatabaseIdRow {
@@ -1174,7 +1173,7 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
       [
         randomUUID(),
         idArticulo,
-        HISTORICO_ARTICULO_TIPO_VENTA,
+        HISTORICO_ARTICULO_TIPO.VENTA,
         stockPrevio,
         diferencia,
         stockFinal,
