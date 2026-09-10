@@ -11,7 +11,9 @@ import type ImprentaArticuloSearchRecord from '@backend/domain/almacen/imprenta/
 import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario/inventario-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario/inventario-save-record.interface';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
-import TypeOrmAlmacenRepository from '@infrastructure/database/typeorm/typeorm-almacen.repository';
+import TypeOrmCaducidadesRepository from '@infrastructure/database/typeorm/almacen/caducidades/typeorm-caducidades.repository';
+import TypeOrmImprentaRepository from '@infrastructure/database/typeorm/almacen/imprenta/typeorm-imprenta.repository';
+import TypeOrmInventarioRepository from '@infrastructure/database/typeorm/almacen/inventario/typeorm-inventario.repository';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -22,9 +24,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 let tempDirectory: string | null = null;
 let applicationDatabase: TypeOrmApplicationDatabase | null = null;
-let repository: TypeOrmAlmacenRepository | null = null;
+let inventarioRepository: TypeOrmInventarioRepository | null = null;
+let caducidadesRepository: TypeOrmCaducidadesRepository | null = null;
+let imprentaRepository: TypeOrmImprentaRepository | null = null;
 
-describe('TypeOrmAlmacenRepository', (): void => {
+describe('TypeORM Almacén repositories', (): void => {
   beforeEach(async (): Promise<void> => {
     tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-almacen-'));
 
@@ -39,7 +43,9 @@ describe('TypeOrmAlmacenRepository', (): void => {
     await seedInventario(dataSource);
     await seedCaducidades(dataSource);
 
-    repository = new TypeOrmAlmacenRepository(applicationDatabase);
+    inventarioRepository = new TypeOrmInventarioRepository(applicationDatabase);
+    caducidadesRepository = new TypeOrmCaducidadesRepository(applicationDatabase);
+    imprentaRepository = new TypeOrmImprentaRepository(applicationDatabase);
   });
 
   afterEach(async (): Promise<void> => {
@@ -54,14 +60,16 @@ describe('TypeOrmAlmacenRepository', (): void => {
       });
     }
 
-    repository = null;
+    inventarioRepository = null;
+    caducidadesRepository = null;
+    imprentaRepository = null;
     applicationDatabase = null;
     tempDirectory = null;
   });
 
   it('recupera la página con categorías, flags y agregados globales', async (): Promise<void> => {
     const result: InventarioResultadoRecord =
-      await requireRepository().searchInventario(createQuery());
+      await requireInventarioRepository().searchInventario(createQuery());
 
     expect(result.totalRows).toBe(3);
     expect(result.rows).toHaveLength(3);
@@ -101,7 +109,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   });
 
   it('pagina filas sin limitar los totales del conjunto filtrado', async (): Promise<void> => {
-    const result: InventarioResultadoRecord = await requireRepository().searchInventario(
+    const result: InventarioResultadoRecord = await requireInventarioRepository().searchInventario(
       createQuery({
         offset: 1,
         limit: 1,
@@ -117,7 +125,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   });
 
   it('filtra categorías por asociación explícita sin incluir descendientes', async (): Promise<void> => {
-    const result: InventarioResultadoRecord = await requireRepository().searchInventario(
+    const result: InventarioResultadoRecord = await requireInventarioRepository().searchInventario(
       createQuery({
         idCategoria: 1,
       }),
@@ -129,7 +137,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   });
 
   it('combina los filtros exactos de proveedor y marca', async (): Promise<void> => {
-    const result: InventarioResultadoRecord = await requireRepository().searchInventario(
+    const result: InventarioResultadoRecord = await requireInventarioRepository().searchInventario(
       createQuery({
         idProveedor: 1,
         idMarca: 2,
@@ -140,7 +148,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   });
 
   it('busca por localizador, referencia, código de barras y etiqueta', async (): Promise<void> => {
-    const currentRepository: TypeOrmAlmacenRepository = requireRepository();
+    const currentRepository: TypeOrmInventarioRepository = requireInventarioRepository();
 
     const byLocalizador: InventarioResultadoRecord = await currentRepository.searchInventario(
       createQuery({
@@ -170,7 +178,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   });
 
   it('filtra por existencia de precio de descuento persistido', async (): Promise<void> => {
-    const result: InventarioResultadoRecord = await requireRepository().searchInventario(
+    const result: InventarioResultadoRecord = await requireInventarioRepository().searchInventario(
       createQuery({
         conDescuento: true,
       }),
@@ -180,7 +188,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   });
 
   it('recupera para reportes todas las filas persistidas del filtro', async (): Promise<void> => {
-    const result = await requireRepository().getInventarioReport({
+    const result = await requireInventarioRepository().getInventarioReport({
       idProveedor: null,
       idMarca: null,
       idCategoria: null,
@@ -208,7 +216,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   });
 
   it('aplica al reporte los mismos filtros de Inventario', async (): Promise<void> => {
-    const result = await requireRepository().getInventarioReport({
+    const result = await requireInventarioRepository().getInventarioReport({
       idProveedor: null,
       idMarca: null,
       idCategoria: 2,
@@ -234,7 +242,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
       codigoAdicional: 'ALFA-EXTRA',
     };
 
-    await requireRepository().saveInventarioRows([command]);
+    await requireInventarioRepository().saveInventarioRows([command]);
 
     const articleRows = (await dataSource.query(
       `
@@ -360,7 +368,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
     };
 
     await expect(
-      requireRepository().saveInventarioRows([firstCommand, invalidSecondCommand]),
+      requireInventarioRepository().saveInventarioRows([firstCommand, invalidSecondCommand]),
     ).rejects.toThrow('El artículo ya tiene un código de barras adicional.');
 
     const articleRows = (await dataSource.query(
@@ -427,7 +435,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
       codigoAdicional: 'EXTRA-BETA',
     };
 
-    await expect(requireRepository().saveInventarioRows([command])).rejects.toThrow(
+    await expect(requireInventarioRepository().saveInventarioRows([command])).rejects.toThrow(
       'El código "EXTRA-BETA" ya está siendo utilizado.',
     );
 
@@ -450,7 +458,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   it('da de baja artículo y códigos conservando el histórico', async (): Promise<void> => {
     const dataSource: DataSource = await requireDataSource();
 
-    await requireRepository().saveInventarioRows([
+    await requireInventarioRepository().saveInventarioRows([
       {
         idArticulo: 3,
         idsCategorias: [1],
@@ -463,7 +471,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
       },
     ]);
 
-    await requireRepository().deactivateArticulo(3);
+    await requireInventarioRepository().deactivateArticulo(3);
 
     const articleRows = (await dataSource.query(
       `
@@ -504,14 +512,14 @@ describe('TypeOrmAlmacenRepository', (): void => {
     expect(historyRows[0]?.total).toBe(1);
 
     const result: InventarioResultadoRecord =
-      await requireRepository().searchInventario(createQuery());
+      await requireInventarioRepository().searchInventario(createQuery());
 
     expect(result.rows.some((row): boolean => row.id === 3)).toBe(false);
   });
 
   it('recupera caducidades históricas con agregados globales', async (): Promise<void> => {
     const result: CaducidadResultadoRecord =
-      await requireRepository().searchCaducidades(createCaducidadQuery());
+      await requireCaducidadesRepository().searchCaducidades(createCaducidadQuery());
 
     expect(result.totalRows).toBe(3);
     expect(result.rows).toHaveLength(3);
@@ -537,7 +545,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   });
 
   it('pagina Caducidades sin limitar sus totales globales', async (): Promise<void> => {
-    const result: CaducidadResultadoRecord = await requireRepository().searchCaducidades(
+    const result: CaducidadResultadoRecord = await requireCaducidadesRepository().searchCaducidades(
       createCaducidadQuery({
         offset: 1,
         limit: 1,
@@ -554,7 +562,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   });
 
   it('filtra Caducidades por año y mes de baja', async (): Promise<void> => {
-    const december2025 = await requireRepository().searchCaducidades(
+    const december2025 = await requireCaducidadesRepository().searchCaducidades(
       createCaducidadQuery({
         anio: 2025,
         mes: 12,
@@ -563,7 +571,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
 
     expect(december2025.rows.map((row): number => row.id)).toEqual([3]);
 
-    const julyEveryYear = await requireRepository().searchCaducidades(
+    const julyEveryYear = await requireCaducidadesRepository().searchCaducidades(
       createCaducidadQuery({
         mes: 7,
       }),
@@ -573,7 +581,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   });
 
   it('filtra sobre marca y nombre históricos sin depender del artículo actual', async (): Promise<void> => {
-    const byBrand = await requireRepository().searchCaducidades(
+    const byBrand = await requireCaducidadesRepository().searchCaducidades(
       createCaducidadQuery({
         idMarca: 9,
       }),
@@ -582,7 +590,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
     expect(byBrand.rows).toHaveLength(1);
     expect(byBrand.rows[0]?.marcaNombre).toBe('Marca Histórica');
 
-    const byName = await requireRepository().searchCaducidades(
+    const byName = await requireCaducidadesRepository().searchCaducidades(
       createCaducidadQuery({
         nombre: 'legacy',
       }),
@@ -593,7 +601,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
 
   it('recupera años y marcas presentes en el histórico activo', async (): Promise<void> => {
     const result: CaducidadFilterOptionsRecord =
-      await requireRepository().getCaducidadFilterOptions();
+      await requireCaducidadesRepository().getCaducidadFilterOptions();
 
     expect(result.anios).toEqual([2026, 2025]);
 
@@ -614,7 +622,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   });
 
   it('busca artículos activos para una nueva caducidad', async (): Promise<void> => {
-    const byName = await requireRepository().searchCaducidadArticulos('beta');
+    const byName = await requireCaducidadesRepository().searchCaducidadArticulos('beta');
 
     expect(byName).toEqual([
       {
@@ -628,13 +636,17 @@ describe('TypeOrmAlmacenRepository', (): void => {
       },
     ]);
 
-    expect((await requireRepository().searchCaducidadArticulos('REF-A'))[0]?.id).toBe(1);
+    expect((await requireCaducidadesRepository().searchCaducidadArticulos('REF-A'))[0]?.id).toBe(1);
 
-    expect((await requireRepository().searchCaducidadArticulos('EXTRA-BETA'))[0]?.id).toBe(2);
+    expect(
+      (await requireCaducidadesRepository().searchCaducidadArticulos('EXTRA-BETA'))[0]?.id,
+    ).toBe(2);
 
-    expect(await requireRepository().searchCaducidadArticulos('REF-DELETED')).toEqual([]);
+    expect(await requireCaducidadesRepository().searchCaducidadArticulos('REF-DELETED')).toEqual(
+      [],
+    );
 
-    expect(await requireRepository().searchCaducidadArticulos('gamma')).toEqual([]);
+    expect(await requireCaducidadesRepository().searchCaducidadArticulos('gamma')).toEqual([]);
 
     const dataSource: DataSource = await requireDataSource();
 
@@ -646,7 +658,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
       `,
     );
 
-    expect(await requireRepository().searchCaducidadArticulos('beta')).toEqual([]);
+    expect(await requireCaducidadesRepository().searchCaducidadArticulos('beta')).toEqual([]);
   });
 
   it('crea una caducidad con snapshot y movimiento de stock asociado', async (): Promise<void> => {
@@ -658,7 +670,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
       fechaBaja: '2026-09-08T10:00:00.000Z',
     };
 
-    await requireRepository().createCaducidad(command);
+    await requireCaducidadesRepository().createCaducidad(command);
 
     const expirationRows = (await dataSource.query(
       `
@@ -770,7 +782,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   `);
 
     await expect(
-      requireRepository().createCaducidad({
+      requireCaducidadesRepository().createCaducidad({
         idArticulo: 1,
         unidades: 3,
         fechaBaja: '2026-09-08T11:00:00.000Z',
@@ -817,7 +829,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
     const dataSource: DataSource = await requireDataSource();
 
     await expect(
-      requireRepository().createCaducidad({
+      requireCaducidadesRepository().createCaducidad({
         idArticulo: 3,
         unidades: 1,
         fechaBaja: '2026-09-08T12:00:00.000Z',
@@ -862,7 +874,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
     );
 
     await expect(
-      requireRepository().createCaducidad({
+      requireCaducidadesRepository().createCaducidad({
         idArticulo: 3,
         unidades: 1,
         fechaBaja: '2026-09-08T12:01:00.000Z',
@@ -876,7 +888,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
     const dataSource: DataSource = await requireDataSource();
 
     await expect(
-      requireRepository().createCaducidad({
+      requireCaducidadesRepository().createCaducidad({
         idArticulo: 1,
         unidades: 3,
         fechaBaja: '2026-09-08T13:00:00.000Z',
@@ -924,7 +936,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   it('revierte una caducidad restaurando stock y usando sus precios snapshot', async (): Promise<void> => {
     const dataSource: DataSource = await requireDataSource();
 
-    await requireRepository().deactivateCaducidad(1);
+    await requireCaducidadesRepository().deactivateCaducidad(1);
 
     const expirationRows = (await dataSource.query(
       `
@@ -1003,7 +1015,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
       `,
     );
 
-    await requireRepository().deactivateCaducidad(2);
+    await requireCaducidadesRepository().deactivateCaducidad(2);
 
     const articleRows = (await dataSource.query(
       `
@@ -1039,7 +1051,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   it('rechaza revertir una caducidad que ya está eliminada', async (): Promise<void> => {
     const dataSource: DataSource = await requireDataSource();
 
-    await expect(requireRepository().deactivateCaducidad(4)).rejects.toThrow(
+    await expect(requireCaducidadesRepository().deactivateCaducidad(4)).rejects.toThrow(
       'La caducidad indicada ya ha sido eliminada.',
     );
 
@@ -1087,7 +1099,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
       END
     `);
 
-    await expect(requireRepository().deactivateCaducidad(1)).rejects.toThrow();
+    await expect(requireCaducidadesRepository().deactivateCaducidad(1)).rejects.toThrow();
 
     const expirationRows = (await dataSource.query(
       `
@@ -1162,7 +1174,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
       )
     `);
 
-    const result: CaducidadReportRecord = await requireRepository().getCaducidadReport(
+    const result: CaducidadReportRecord = await requireCaducidadesRepository().getCaducidadReport(
       createCaducidadReportQuery(),
     );
 
@@ -1244,7 +1256,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   });
 
   it('aplica al informe exactamente los filtros históricos de Caducidades', async (): Promise<void> => {
-    const result: CaducidadReportRecord = await requireRepository().getCaducidadReport(
+    const result: CaducidadReportRecord = await requireCaducidadesRepository().getCaducidadReport(
       createCaducidadReportQuery({
         anio: 2026,
         mes: 7,
@@ -1286,7 +1298,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   });
 
   it('busca artículos activos para Imprenta por nombre, localizador y códigos', async (): Promise<void> => {
-    const currentRepository: TypeOrmAlmacenRepository = requireRepository();
+    const currentRepository: TypeOrmImprentaRepository = requireImprentaRepository();
 
     const byName: readonly ImprentaArticuloSearchRecord[] =
       await currentRepository.searchImprentaArticulos('beta', []);
@@ -1310,7 +1322,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   });
 
   it('no restringe Imprenta por stock y excluye artículos antes de devolver resultados', async (): Promise<void> => {
-    const currentRepository: TypeOrmAlmacenRepository = requireRepository();
+    const currentRepository: TypeOrmImprentaRepository = requireImprentaRepository();
 
     const negativeStock: readonly ImprentaArticuloSearchRecord[] =
       await currentRepository.searchImprentaArticulos('gamma', []);
@@ -1324,7 +1336,7 @@ describe('TypeOrmAlmacenRepository', (): void => {
   });
 
   it('no busca por referencia ni devuelve artículos dados de baja en Imprenta', async (): Promise<void> => {
-    const currentRepository: TypeOrmAlmacenRepository = requireRepository();
+    const currentRepository: TypeOrmImprentaRepository = requireImprentaRepository();
 
     expect(await currentRepository.searchImprentaArticulos('REF-A', [])).toEqual([]);
     expect(await currentRepository.searchImprentaArticulos('eliminado', [])).toEqual([]);
@@ -1852,12 +1864,34 @@ async function requireDataSource(): Promise<DataSource> {
 }
 
 /**
- * Devuelve el repository inicializado para el test.
+ * Devuelve el repository de Inventario inicializado.
  */
-function requireRepository(): TypeOrmAlmacenRepository {
-  if (repository === null) {
-    throw new Error('El repository de Almacén no está inicializado.');
+function requireInventarioRepository(): TypeOrmInventarioRepository {
+  if (inventarioRepository === null) {
+    throw new Error('El repository de Inventario no está inicializado.');
   }
 
-  return repository;
+  return inventarioRepository;
+}
+
+/**
+ * Devuelve el repository de Caducidades inicializado.
+ */
+function requireCaducidadesRepository(): TypeOrmCaducidadesRepository {
+  if (caducidadesRepository === null) {
+    throw new Error('El repository de Caducidades no está inicializado.');
+  }
+
+  return caducidadesRepository;
+}
+
+/**
+ * Devuelve el repository de Imprenta inicializado.
+ */
+function requireImprentaRepository(): TypeOrmImprentaRepository {
+  if (imprentaRepository === null) {
+    throw new Error('El repository de Imprenta no está inicializado.');
+  }
+
+  return imprentaRepository;
 }

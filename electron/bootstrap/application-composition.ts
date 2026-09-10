@@ -38,7 +38,9 @@ import VentasPostventaService from '@backend/application/ventas/ventas-postventa
 import VentasTicketBaiService from '@backend/application/ventas/ventas-ticket-bai.service';
 import VentasTicketEmailService from '@backend/application/ventas/ventas-ticket-email.service';
 import VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
-import type AlmacenRepository from '@backend/contracts/almacen/almacen.repository.interface';
+import type CaducidadesRepository from '@backend/contracts/almacen/caducidades/caducidades.repository.interface';
+import type ImprentaRepository from '@backend/contracts/almacen/imprenta/imprenta.repository.interface';
+import type InventarioRepository from '@backend/contracts/almacen/inventario/inventario.repository.interface';
 import type CaducidadReportWindow from '@backend/contracts/almacen/caducidades/caducidad-report-window.interface';
 import type ImprentaPrintWindow from '@backend/contracts/almacen/imprenta/imprenta-print-window.interface';
 import type InventarioCsvFileSaver from '@backend/contracts/almacen/inventario/inventario-csv-file-saver.interface';
@@ -86,7 +88,9 @@ import NewInstallationDataService from '@infrastructure/database/initial-data/ne
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
 import completeDatabaseSchemaTables from '@infrastructure/database/schema/complete-database-schema.tables';
 import DatabaseSchemaService from '@infrastructure/database/schema/database-schema.service';
-import TypeOrmAlmacenRepository from '@infrastructure/database/typeorm/typeorm-almacen.repository';
+import TypeOrmCaducidadesRepository from '@infrastructure/database/typeorm/almacen/caducidades/typeorm-caducidades.repository';
+import TypeOrmImprentaRepository from '@infrastructure/database/typeorm/almacen/imprenta/typeorm-imprenta.repository';
+import TypeOrmInventarioRepository from '@infrastructure/database/typeorm/almacen/inventario/typeorm-inventario.repository';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import TypeOrmArticulosRepository from '@infrastructure/database/typeorm/typeorm-articulos.repository';
 import TypeOrmCajaRepository from '@infrastructure/database/typeorm/typeorm-caja.repository';
@@ -271,10 +275,16 @@ export default function createApplicationComposition(
   /*
    * Almacén.
    */
-  const almacenRepository: AlmacenRepository = new TypeOrmAlmacenRepository(operationalDatabase);
-  const inventarioService: InventarioService = new InventarioService(almacenRepository);
-  const caducidadesService: CaducidadesService = new CaducidadesService(almacenRepository);
-  const imprentaService: ImprentaService = new ImprentaService(almacenRepository);
+  const inventarioRepository: InventarioRepository = new TypeOrmInventarioRepository(
+    operationalDatabase,
+  );
+  const caducidadesRepository: CaducidadesRepository = new TypeOrmCaducidadesRepository(
+    operationalDatabase,
+  );
+  const imprentaRepository: ImprentaRepository = new TypeOrmImprentaRepository(operationalDatabase);
+  const inventarioService: InventarioService = new InventarioService(inventarioRepository);
+  const caducidadesService: CaducidadesService = new CaducidadesService(caducidadesRepository);
+  const imprentaService: ImprentaService = new ImprentaService(imprentaRepository);
 
   const inventarioCsvBuilder: InventarioCsvBuilder = new InventarioCsvBuilder();
   const inventarioCsvFileSaver: InventarioCsvFileSaver = new ElectronInventarioCsvFileSaver(
