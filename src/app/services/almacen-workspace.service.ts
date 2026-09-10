@@ -1,6 +1,7 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { Service, signal } from '@angular/core';
 import type AlmacenSection from '@model/almacen/almacen-section.type';
+import type CaducidadesWorkspaceState from '@model/almacen/caducidades-workspace.interface';
 import type {
   InventarioDraftEntry,
   InventarioDraftValues,
@@ -17,6 +18,7 @@ export default class AlmacenWorkspaceService {
     signal<AlmacenSection>('inventory');
 
   private inventarioState: InventarioWorkspaceState | null = null;
+  private caducidadesState: CaducidadesWorkspaceState | null = null;
 
   readonly activeSection: Signal<AlmacenSection> = this.activeSectionSignal.asReadonly();
 
@@ -43,6 +45,24 @@ export default class AlmacenWorkspaceService {
    */
   setInventarioState(state: InventarioWorkspaceState): void {
     this.inventarioState = this.cloneInventarioState(state);
+  }
+
+  /**
+   * Recupera una copia del último estado conocido de Caducidades.
+   */
+  getCaducidadesState(): CaducidadesWorkspaceState | null {
+    if (this.caducidadesState === null) {
+      return null;
+    }
+
+    return { ...this.caducidadesState };
+  }
+
+  /**
+   * Conserva el estado actual de Caducidades durante la sesión.
+   */
+  setCaducidadesState(state: CaducidadesWorkspaceState): void {
+    this.caducidadesState = { ...state };
   }
 
   /**

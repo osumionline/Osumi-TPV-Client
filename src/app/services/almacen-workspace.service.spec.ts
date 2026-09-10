@@ -1,3 +1,4 @@
+import type CaducidadesWorkspaceState from '@model/almacen/caducidades-workspace.interface';
 import type { InventarioDraftEntry } from '@model/almacen/inventario/inventario-draft.interface';
 import type InventarioWorkspaceState from '@model/almacen/inventario/inventario-workspace.interface';
 import AlmacenWorkspaceService from '@services/almacen-workspace.service';
@@ -69,5 +70,30 @@ describe('AlmacenWorkspaceService', (): void => {
     const service: AlmacenWorkspaceService = new AlmacenWorkspaceService();
 
     expect(service.getInventarioState()).toBeNull();
+  });
+
+  it('conserva el estado completo de Caducidades', (): void => {
+    const service: AlmacenWorkspaceService = new AlmacenWorkspaceService();
+    const state: CaducidadesWorkspaceState = {
+      anio: 2026,
+      mes: 9,
+      idMarca: 4,
+      nombre: 'caducidad',
+      pagina: 3,
+      num: 100,
+    };
+
+    service.setCaducidadesState(state);
+
+    const restored: CaducidadesWorkspaceState | null = service.getCaducidadesState();
+
+    expect(restored).toEqual(state);
+    expect(restored).not.toBe(state);
+  });
+
+  it('no tiene estado de Caducidades antes de la primera visita', (): void => {
+    const service: AlmacenWorkspaceService = new AlmacenWorkspaceService();
+
+    expect(service.getCaducidadesState()).toBeNull();
   });
 });

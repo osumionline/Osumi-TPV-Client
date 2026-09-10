@@ -15,6 +15,7 @@ import { MatPaginator, type PageEvent } from '@angular/material/paginator';
 import { MatSelect, type MatSelectChange } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltip } from '@angular/material/tooltip';
+import { Router } from '@angular/router';
 import { MONTH_OPTIONS, type MonthOption } from '@constants/date.constants';
 import type { CaducidadCreateCommand } from '@desktop-contracts/almacen/caducidades/caducidad-create.interface';
 import type { CaducidadReportConsulta } from '@desktop-contracts/almacen/caducidades/caducidad-report.interface';
@@ -25,12 +26,14 @@ import type {
   CaducidadRowInterface,
 } from '@desktop-contracts/almacen/caducidades/caducidad.interface';
 import { PAGE_SIZE_OPTIONS } from '@desktop-contracts/shared/pagination.constants';
+import type CaducidadesWorkspaceState from '@model/almacen/caducidades-workspace.interface';
 import CaducidadCreateComponent from '@modules/almacen/caducidades/components/caducidad-create/caducidad-create.component';
 import {
   CADUCIDAD_COLUMNS,
   TEXT_SEARCH_DELAY_MS,
 } from '@modules/almacen/caducidades/components/caducidades/caducidades.component.private';
 import { DialogService } from '@osumi/angular-tools';
+import AlmacenWorkspaceService from '@services/almacen-workspace.service';
 import AlmacenService from '@services/almacen.service';
 import ArticulosService from '@services/articulos.service';
 import { getErrorMessage } from '@utils/error.utils';
@@ -62,18 +65,34 @@ export default class CaducidadesComponent implements OnInit, OnDestroy {
   readonly almacenService: AlmacenService = inject(AlmacenService);
   readonly articulosService: ArticulosService = inject(ArticulosService);
   private readonly dialog: DialogService = inject(DialogService);
+  private readonly router: Router = inject(Router);
+  private readonly almacenWorkspaceService: AlmacenWorkspaceService =
+    inject(AlmacenWorkspaceService);
 
-  readonly anio: WritableSignal<number | null> = signal<number | null>(null);
-  readonly mes: WritableSignal<number | null> = signal<number | null>(null);
-  readonly idMarca: WritableSignal<number | null> = signal<number | null>(null);
-  readonly nombre: WritableSignal<string> = signal<string>('');
-  readonly pagina: WritableSignal<number> = signal<number>(1);
-  readonly num: WritableSignal<number> = signal<number>(50);
+  private readonly initialWorkspaceState: CaducidadesWorkspaceState | null =
+    this.almacenWorkspaceService.getCaducidadesState();
+
+  readonly anio: WritableSignal<number | null> = signal<number | null>(
+    this.initialWorkspaceState?.anio ?? null,
+  );
+  readonly mes: WritableSignal<number | null> = signal<number | null>(
+    this.initialWorkspaceState?.mes ?? null,
+  );
+  readonly idMarca: WritableSignal<number | null> = signal<number | null>(
+    this.initialWorkspaceState?.idMarca ?? null,
+  );
+  readonly nombre: WritableSignal<string> = signal<string>(
+    this.initialWorkspaceState?.nombre ?? '',
+  );
+  readonly pagina: WritableSignal<number> = signal<number>(this.initialWorkspaceState?.pagina ?? 1);
+  readonly num: WritableSignal<number> = signal<number>(this.initialWorkspaceState?.num ?? 50);
+
   readonly createOpen: WritableSignal<boolean> = signal<boolean>(false);
   readonly createSaving: WritableSignal<boolean> = signal<boolean>(false);
   readonly createError: WritableSignal<string | null> = signal<string | null>(null);
   readonly deactivatingCaducidadId: WritableSignal<number | null> = signal<number | null>(null);
   readonly reportOpening: WritableSignal<boolean> = signal<boolean>(false);
+  readonly openingArticle: WritableSignal<boolean> = signal<boolean>(false);
 
   readonly pageSizeOptions: readonly number[] = PAGE_SIZE_OPTIONS;
   readonly monthOptions: readonly MonthOption[] = MONTH_OPTIONS;
@@ -112,6 +131,8 @@ export default class CaducidadesComponent implements OnInit, OnDestroy {
    * Cancela búsquedas pendientes al destruir el componente.
    */
   ngOnDestroy(): void {
+    this.persistWorkspaceState();
+
     this.destroyed = true;
     this.requestSequence++;
     this.clearTextSearchTimeout();
@@ -199,6 +220,59 @@ export default class CaducidadesComponent implements OnInit, OnDestroy {
    */
   trackByCaducidad(_index: number, row: CaducidadRowInterface): number {
     return row.id;
+  }
+
+  /**
+   * Abre la ficha de Artículos asociada a una caducidad.
+   */
+  async openArticulo(row: CaducidadRowInterface): Promise<void> {
+    if (
+      this.openingArticle() ||
+      this.loading() ||
+      this.createSaving() ||
+      this.deactivatingCaducidadId() !== null ||
+      this.reportOpening()
+    ) {
+      return;
+    }
+
+    this.openingArticle.set(true);
+
+    try {
+      const tab = await this.articulosService.cargarPorId(row.idArticulo);
+
+      if (tab === null) {
+        this.dialog
+          .alert({
+            title: 'Atención',
+            content: 'El artículo ya no está disponible.',
+          })
+          .subscribe();
+
+        return;
+      }
+
+      /*
+       * Conservamos explícitamente el workspace antes
+       * de abandonar el módulo.
+       */
+      this.persistWorkspaceState();
+
+      const navigated: boolean = await this.router.navigate(['/articulos']);
+
+      if (!navigated) {
+        throw new Error('No se ha podido abrir el módulo de Artículos.');
+      }
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido abrir la ficha del artículo.'),
+        })
+        .subscribe();
+    } finally {
+      this.openingArticle.set(false);
+    }
   }
 
   /**
@@ -390,6 +464,21 @@ export default class CaducidadesComponent implements OnInit, OnDestroy {
     } finally {
       this.deactivatingCaducidadId.set(null);
     }
+  }
+
+  /**
+   * Conserva filtros y paginación para la siguiente
+   * instancia de Caducidades durante la sesión.
+   */
+  private persistWorkspaceState(): void {
+    this.almacenWorkspaceService.setCaducidadesState({
+      anio: this.anio(),
+      mes: this.mes(),
+      idMarca: this.idMarca(),
+      nombre: this.nombre(),
+      pagina: this.pagina(),
+      num: this.num(),
+    });
   }
 
   /**
