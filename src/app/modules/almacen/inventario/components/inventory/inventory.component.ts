@@ -30,6 +30,7 @@ import type {
   InventarioRowInterface,
 } from '@desktop-contracts/almacen/inventario/inventario.interface';
 import { PAGE_SIZE_OPTIONS } from '@desktop-contracts/shared/pagination.constants';
+import InventarioDraftManager from '@model/almacen/inventario/inventario-draft-manager';
 import type {
   InventarioDirtyField,
   InventarioDraftEntry,
@@ -137,7 +138,8 @@ export default class InventoryComponent implements OnInit, OnDestroy {
 
   readonly hasDirtyRows: Signal<boolean> = computed((): boolean =>
     [...this.drafts().values()].some(
-      (entry: InventarioDraftEntry): boolean => this.getDirtyFields(entry).length > 0,
+      (entry: InventarioDraftEntry): boolean =>
+        InventarioDraftManager.getDirtyFields(entry).length > 0,
     ),
   );
 
@@ -165,9 +167,10 @@ export default class InventoryComponent implements OnInit, OnDestroy {
 
       return this.rows().map((row: InventarioRowInterface): InventarioDisplayRow => {
         const entry: InventarioDraftEntry | undefined = drafts.get(row.id);
-        const draft: InventarioDraftValues = entry?.draft ?? this.createDraftValues(row);
+        const draft: InventarioDraftValues =
+          entry?.draft ?? InventarioDraftManager.createValues(row);
         const dirtyFields: readonly InventarioDirtyField[] =
-          entry === undefined ? [] : this.getDirtyFields(entry);
+          entry === undefined ? [] : InventarioDraftManager.getDirtyFields(entry);
 
         return {
           ...row,
@@ -188,7 +191,10 @@ export default class InventoryComponent implements OnInit, OnDestroy {
 
     let marginSum: number = this.mediaMargenMicroporcentaje() * totalRows;
 
-    for (const entry of this.getDraftEntriesForCurrentResult()) {
+    for (const entry of InventarioDraftManager.getEntriesForFilter(
+      this.drafts(),
+      this.activeResultFilterKey(),
+    )) {
       marginSum += entry.draft.margenMicroporcentaje - entry.snapshot.margenMicroporcentaje;
     }
 
@@ -198,7 +204,10 @@ export default class InventoryComponent implements OnInit, OnDestroy {
   readonly liveTotalPucMicros: Signal<number> = computed((): number => {
     let total: number = this.totalPucMicros();
 
-    for (const entry of this.getDraftEntriesForCurrentResult()) {
+    for (const entry of InventarioDraftManager.getEntriesForFilter(
+      this.drafts(),
+      this.activeResultFilterKey(),
+    )) {
       total +=
         entry.draft.stock * entry.draft.pucMicros - entry.snapshot.stock * entry.snapshot.pucMicros;
     }
@@ -209,7 +218,10 @@ export default class InventoryComponent implements OnInit, OnDestroy {
   readonly liveTotalPvpCents: Signal<number> = computed((): number => {
     let total: number = this.totalPvpCents();
 
-    for (const entry of this.getDraftEntriesForCurrentResult()) {
+    for (const entry of InventarioDraftManager.getEntriesForFilter(
+      this.drafts(),
+      this.activeResultFilterKey(),
+    )) {
       total +=
         entry.draft.stock * entry.draft.pvpCents - entry.snapshot.stock * entry.snapshot.pvpCents;
     }
@@ -409,7 +421,7 @@ export default class InventoryComponent implements OnInit, OnDestroy {
 
     const entry: InventarioDraftEntry | undefined = this.drafts().get(idArticulo);
 
-    if (entry === undefined || this.getDirtyFields(entry).length === 0) {
+    if (entry === undefined || InventarioDraftManager.getDirtyFields(entry).length === 0) {
       return;
     }
 
@@ -418,11 +430,12 @@ export default class InventoryComponent implements OnInit, OnDestroy {
     let persisted: boolean = false;
 
     try {
-      await this.almacenService.saveInventarioRow(this.createSaveCommand(idArticulo, entry));
+      await this.almacenService.saveInventarioRow(
+        InventarioDraftManager.createSaveCommand(idArticulo, entry),
+      );
+      this.drafts.set(InventarioDraftManager.remove(this.drafts(), [idArticulo]));
 
       persisted = true;
-
-      this.removeDrafts([idArticulo]);
 
       await this.articulosService.sincronizarInventarioPersistido([idArticulo]);
 
@@ -455,7 +468,8 @@ export default class InventoryComponent implements OnInit, OnDestroy {
     const dirtyEntries: readonly [number, InventarioDraftEntry][] = [
       ...this.drafts().entries(),
     ].filter(
-      (item: [number, InventarioDraftEntry]): boolean => this.getDirtyFields(item[1]).length > 0,
+      (item: [number, InventarioDraftEntry]): boolean =>
+        InventarioDraftManager.getDirtyFields(item[1]).length > 0,
     );
 
     if (dirtyEntries.length === 0) {
@@ -464,7 +478,7 @@ export default class InventoryComponent implements OnInit, OnDestroy {
 
     const commands: readonly InventarioSaveCommand[] = dirtyEntries.map(
       ([idArticulo, entry]: [number, InventarioDraftEntry]): InventarioSaveCommand =>
-        this.createSaveCommand(idArticulo, entry),
+        InventarioDraftManager.createSaveCommand(idArticulo, entry),
     );
 
     const idsArticulos: readonly number[] = commands.map(
@@ -477,10 +491,9 @@ export default class InventoryComponent implements OnInit, OnDestroy {
 
     try {
       await this.almacenService.saveInventarioRows(commands);
+      this.drafts.set(InventarioDraftManager.remove(this.drafts(), idsArticulos));
 
       persisted = true;
-
-      this.removeDrafts(idsArticulos);
 
       await this.articulosService.sincronizarInventarioPersistido(idsArticulos);
 
@@ -645,7 +658,7 @@ export default class InventoryComponent implements OnInit, OnDestroy {
         this.articulosService.cerrarTab(openTab.idTemporal);
       }
 
-      this.removeDrafts([idArticulo]);
+      this.drafts.set(InventarioDraftManager.remove(this.drafts(), [idArticulo]));
 
       if (this.rows().length === 1 && this.pagina() > 1) {
         this.pagina.update((pagina: number): number => pagina - 1);
@@ -662,21 +675,6 @@ export default class InventoryComponent implements OnInit, OnDestroy {
     } finally {
       this.processing.set(false);
     }
-  }
-
-  /**
-   * Elimina del espacio local los drafts ya persistidos.
-   */
-  private removeDrafts(idsArticulos: readonly number[]): void {
-    const drafts: Map<number, InventarioDraftEntry> = new Map<number, InventarioDraftEntry>(
-      this.drafts(),
-    );
-
-    for (const idArticulo of idsArticulos) {
-      drafts.delete(idArticulo);
-    }
-
-    this.drafts.set(drafts);
   }
 
   /**
@@ -731,7 +729,7 @@ export default class InventoryComponent implements OnInit, OnDestroy {
       pagina: this.pagina(),
       num: this.num(),
     };
-    const filterKey: string = this.buildFilterKey(consulta);
+    const filterKey: string = InventarioDraftManager.buildFilterKey(consulta);
 
     try {
       const result: InventarioResultado = await this.almacenService.searchInventario(consulta);
@@ -740,7 +738,7 @@ export default class InventoryComponent implements OnInit, OnDestroy {
         return;
       }
 
-      this.reconcileDrafts(result.rows, filterKey);
+      this.drafts.set(InventarioDraftManager.reconcile(this.drafts(), result.rows, filterKey));
       this.rows.set(result.rows);
       this.activeResultFilterKey.set(filterKey);
       this.totalRows.set(result.totalRows);
@@ -843,9 +841,11 @@ export default class InventoryComponent implements OnInit, OnDestroy {
       )
       .sort((a: number, b: number): number => a - b);
 
-    this.updateDraft(idArticulo, {
-      idsCategorias,
-    });
+    this.drafts.set(
+      InventarioDraftManager.update(this.drafts(), idArticulo, {
+        idsCategorias,
+      }),
+    );
   }
 
   /**
@@ -913,9 +913,11 @@ export default class InventoryComponent implements OnInit, OnDestroy {
       return true;
     }
 
-    this.updateDraft(idArticulo, {
-      stock,
-    });
+    this.drafts.set(
+      InventarioDraftManager.update(this.drafts(), idArticulo, {
+        stock,
+      }),
+    );
 
     return true;
   }
@@ -1153,7 +1155,7 @@ export default class InventoryComponent implements OnInit, OnDestroy {
         break;
     }
 
-    this.updateDraft(row.id, patch);
+    this.drafts.set(InventarioDraftManager.update(this.drafts(), row.id, patch));
   }
 
   /**
@@ -1249,9 +1251,11 @@ export default class InventoryComponent implements OnInit, OnDestroy {
       return true;
     }
 
-    this.updateDraft(idArticulo, {
-      codigoAdicional,
-    });
+    this.drafts.set(
+      InventarioDraftManager.update(this.drafts(), idArticulo, {
+        codigoAdicional,
+      }),
+    );
 
     return true;
   }
@@ -1266,196 +1270,13 @@ export default class InventoryComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const drafts: Map<number, InventarioDraftEntry> = new Map<number, InventarioDraftEntry>(
-      this.drafts(),
-    );
-
-    drafts.set(idArticulo, {
-      ...entry,
-      draft: this.cloneDraftValues(entry.snapshot),
-    });
-
-    this.drafts.set(drafts);
+    this.drafts.set(InventarioDraftManager.reset(this.drafts(), idArticulo));
 
     const editingCell: InventarioDecimalEditorState | null = this.editingDecimalCell();
 
     if (editingCell?.idArticulo === idArticulo) {
       this.editingDecimalCell.set(null);
     }
-  }
-
-  /**
-   * Crea los valores editables iniciales a partir de una fila persistida.
-   */
-  private createDraftValues(row: InventarioRowInterface): InventarioDraftValues {
-    return {
-      idsCategorias: [...row.idsCategorias].sort((a: number, b: number): number => a - b),
-      stock: row.stock,
-      precioAlbaranMicros: row.precioAlbaranMicros,
-      pucMicros: row.pucMicros,
-      pvpCents: row.pvpCents,
-      margenMicroporcentaje: row.margenMicroporcentaje,
-      codigoAdicional: '',
-    };
-  }
-
-  /**
-   * Copia los valores editables sin compartir arrays.
-   */
-  private cloneDraftValues(values: InventarioDraftValues): InventarioDraftValues {
-    return {
-      ...values,
-      idsCategorias: [...values.idsCategorias],
-    };
-  }
-
-  /**
-   * Incorpora las filas recién cargadas al espacio local de drafts.
-   */
-  private reconcileDrafts(rows: readonly InventarioRowInterface[], filterKey: string): void {
-    const drafts: Map<number, InventarioDraftEntry> = new Map<number, InventarioDraftEntry>(
-      this.drafts(),
-    );
-
-    for (const row of rows) {
-      const current: InventarioDraftEntry | undefined = drafts.get(row.id);
-      const persistedValues: InventarioDraftValues = this.createDraftValues(row);
-
-      if (current === undefined) {
-        drafts.set(row.id, {
-          snapshot: persistedValues,
-          draft: this.cloneDraftValues(persistedValues),
-          filterKeys: [filterKey],
-        });
-
-        continue;
-      }
-
-      const filterKeys: readonly string[] = current.filterKeys.includes(filterKey)
-        ? current.filterKeys
-        : [...current.filterKeys, filterKey];
-
-      if (this.getDirtyFields(current).length === 0) {
-        drafts.set(row.id, {
-          snapshot: persistedValues,
-          draft: this.cloneDraftValues(persistedValues),
-          filterKeys,
-        });
-
-        continue;
-      }
-
-      drafts.set(row.id, {
-        ...current,
-        filterKeys,
-      });
-    }
-
-    this.drafts.set(drafts);
-  }
-
-  /**
-   * Aplica un cambio parcial a una fila local.
-   */
-  private updateDraft(idArticulo: number, patch: InventarioDraftPatch): void {
-    const current: InventarioDraftEntry | undefined = this.drafts().get(idArticulo);
-
-    if (current === undefined) {
-      return;
-    }
-
-    const drafts: Map<number, InventarioDraftEntry> = new Map<number, InventarioDraftEntry>(
-      this.drafts(),
-    );
-
-    drafts.set(idArticulo, {
-      ...current,
-      draft: {
-        ...current.draft,
-        ...patch,
-        idsCategorias:
-          patch.idsCategorias === undefined
-            ? current.draft.idsCategorias
-            : [...patch.idsCategorias],
-      },
-    });
-
-    this.drafts.set(drafts);
-  }
-
-  /**
-   * Obtiene las celdas modificadas de una fila.
-   */
-  private getDirtyFields(entry: InventarioDraftEntry): readonly InventarioDirtyField[] {
-    const dirty: InventarioDirtyField[] = [];
-
-    if (!this.sameIds(entry.snapshot.idsCategorias, entry.draft.idsCategorias)) {
-      dirty.push('categoria');
-    }
-
-    if (entry.snapshot.stock !== entry.draft.stock) {
-      dirty.push('stock');
-    }
-
-    if (entry.snapshot.precioAlbaranMicros !== entry.draft.precioAlbaranMicros) {
-      dirty.push('precioAlbaran');
-    }
-
-    if (entry.snapshot.pucMicros !== entry.draft.pucMicros) {
-      dirty.push('puc');
-    }
-
-    if (entry.snapshot.pvpCents !== entry.draft.pvpCents) {
-      dirty.push('pvp');
-    }
-
-    if (entry.snapshot.margenMicroporcentaje !== entry.draft.margenMicroporcentaje) {
-      dirty.push('margen');
-    }
-
-    if (entry.draft.codigoAdicional.trim().length > 0) {
-      dirty.push('codigoBarras');
-    }
-
-    return dirty;
-  }
-
-  /**
-   * Compara dos selecciones de categorías normalizadas.
-   */
-  private sameIds(first: readonly number[], second: readonly number[]): boolean {
-    return (
-      first.length === second.length &&
-      first.every((id: number, index: number): boolean => id === second[index])
-    );
-  }
-
-  /**
-   * Obtiene los drafts conocidos como pertenecientes al filtro mostrado.
-   */
-  private getDraftEntriesForCurrentResult(): readonly InventarioDraftEntry[] {
-    const filterKey: string | null = this.activeResultFilterKey();
-
-    if (filterKey === null) {
-      return [];
-    }
-
-    return [...this.drafts().values()].filter((entry: InventarioDraftEntry): boolean =>
-      entry.filterKeys.includes(filterKey),
-    );
-  }
-
-  /**
-   * Crea una clave estable para identificar el conjunto filtrado.
-   */
-  private buildFilterKey(consulta: InventarioConsulta): string {
-    return JSON.stringify([
-      consulta.idProveedor,
-      consulta.idMarca,
-      consulta.idCategoria,
-      consulta.texto.trim(),
-      consulta.conDescuento,
-    ]);
   }
 
   /**
@@ -1505,26 +1326,5 @@ export default class InventoryComponent implements OnInit, OnDestroy {
         return;
       }
     });
-  }
-
-  /**
-   * Convierte un draft local en el contrato reducido de persistencia.
-   */
-  private createSaveCommand(
-    idArticulo: number,
-    entry: InventarioDraftEntry,
-  ): InventarioSaveCommand {
-    const codigoAdicional: string = entry.draft.codigoAdicional.trim();
-
-    return {
-      idArticulo,
-      idsCategorias: [...entry.draft.idsCategorias],
-      stock: entry.draft.stock,
-      precioAlbaranMicros: entry.draft.precioAlbaranMicros,
-      pucMicros: entry.draft.pucMicros,
-      pvpCents: entry.draft.pvpCents,
-      margenMicroporcentaje: entry.draft.margenMicroporcentaje,
-      codigoAdicional: codigoAdicional.length === 0 ? null : codigoAdicional,
-    };
   }
 }
