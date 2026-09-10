@@ -10,6 +10,9 @@ import {
   computed,
   inject,
   signal,
+  viewChild,
+  type AfterViewInit,
+  type ElementRef,
   type OnDestroy,
   type Signal,
   type WritableSignal,
@@ -68,9 +71,10 @@ import { QRCodeComponent } from 'angularx-qrcode';
     QRCodeComponent,
   ],
 })
-export default class ImprentaComponent implements OnDestroy {
+export default class ImprentaComponent implements AfterViewInit, OnDestroy {
   readonly almacenService: AlmacenService = inject(AlmacenService);
   private readonly dialog: DialogService = inject(DialogService);
+  private readonly searchInput = viewChild.required<ElementRef<HTMLInputElement>>('searchInput');
   readonly query: WritableSignal<string> = signal<string>('');
   readonly results: WritableSignal<readonly ImprentaArticuloSearchInterface[]> = signal<
     readonly ImprentaArticuloSearchInterface[]
@@ -151,6 +155,13 @@ export default class ImprentaComponent implements OnDestroy {
   private searchSequence: number = 0;
   private nextGapId: number = 1;
   private destroyed: boolean = false;
+
+  /**
+   * Sitúa el foco en el buscador al entrar en Imprenta.
+   */
+  ngAfterViewInit(): void {
+    this.searchInput().nativeElement.focus();
+  }
 
   /**
    * Cancela búsquedas pendientes al destruir el diseñador.
