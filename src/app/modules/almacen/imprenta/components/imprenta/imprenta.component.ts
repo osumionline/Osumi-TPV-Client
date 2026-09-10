@@ -6,13 +6,12 @@ import {
   type CdkDragDrop,
 } from '@angular/cdk/drag-drop';
 import {
+  afterNextRender,
   Component,
   computed,
   inject,
   signal,
   viewChild,
-  type AfterViewInit,
-  type ElementRef,
   type OnDestroy,
   type Signal,
   type WritableSignal,
@@ -71,10 +70,11 @@ import { QRCodeComponent } from 'angularx-qrcode';
     QRCodeComponent,
   ],
 })
-export default class ImprentaComponent implements AfterViewInit, OnDestroy {
+export default class ImprentaComponent implements OnDestroy {
   readonly almacenService: AlmacenService = inject(AlmacenService);
   private readonly dialog: DialogService = inject(DialogService);
-  private readonly searchInput = viewChild.required<ElementRef<HTMLInputElement>>('searchInput');
+  private readonly searchInput: Signal<MatInput> = viewChild.required<MatInput>('searchInput');
+
   readonly query: WritableSignal<string> = signal<string>('');
   readonly results: WritableSignal<readonly ImprentaArticuloSearchInterface[]> = signal<
     readonly ImprentaArticuloSearchInterface[]
@@ -157,10 +157,14 @@ export default class ImprentaComponent implements AfterViewInit, OnDestroy {
   private destroyed: boolean = false;
 
   /**
-   * Sitúa el foco en el buscador al entrar en Imprenta.
+   * Programa el foco del buscador una vez completado el primer render.
    */
-  ngAfterViewInit(): void {
-    this.searchInput().nativeElement.focus();
+  constructor() {
+    afterNextRender({
+      write: (): void => {
+        this.searchInput().focus();
+      },
+    });
   }
 
   /**
