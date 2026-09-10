@@ -64,6 +64,12 @@ import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes
 import type CrearClienteFacturaDesdeVentaCommand from '@desktop-contracts/clientes/crear-cliente-factura-desde-venta-command.interface';
 import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
 import type EmitirClienteFacturaCommand from '@desktop-contracts/clientes/emitir-cliente-factura-command.interface';
+import type {
+  PedidoFilterOptionsInterface,
+  PedidoListadoConsulta,
+  PedidosGuardadosResultado,
+  PedidosRecepcionadosResultado,
+} from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type { InstallationResult } from '@desktop-contracts/configuration/installation-result.interface';
@@ -177,6 +183,27 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
       >,
     openImprentaPrint: (command: ImprentaPrintCommand): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.almacenOpenImprentaPrint, command) as Promise<void>,
+  }),
+
+  compras: Object.freeze({
+    searchPedidosGuardados: (consulta: PedidoListadoConsulta): Promise<PedidosGuardadosResultado> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.comprasSearchPedidosGuardados,
+        consulta,
+      ) as Promise<PedidosGuardadosResultado>,
+
+    searchPedidosRecepcionados: (
+      consulta: PedidoListadoConsulta,
+    ): Promise<PedidosRecepcionadosResultado> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.comprasSearchPedidosRecepcionados,
+        consulta,
+      ) as Promise<PedidosRecepcionadosResultado>,
+
+    getPedidoFilterOptions: (): Promise<PedidoFilterOptionsInterface> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.comprasGetPedidoFilterOptions,
+      ) as Promise<PedidoFilterOptionsInterface>,
   }),
 
   legacyImport: {

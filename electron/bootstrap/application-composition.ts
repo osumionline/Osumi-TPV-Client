@@ -17,6 +17,7 @@ import ClienteFacturaPdfService from '@backend/application/clientes/cliente-fact
 import ClienteFacturaPrintService from '@backend/application/clientes/cliente-factura-print.service';
 import ClienteFacturasService from '@backend/application/clientes/cliente-facturas.service';
 import ClientesService from '@backend/application/clientes/clientes.service';
+import PedidosService from '@backend/application/compras/pedidos/pedidos.service';
 import ConfigurationService from '@backend/application/configuration/configuration.service';
 import InstallationService from '@backend/application/configuration/installation.service';
 import EmpleadosService from '@backend/application/empleados/empleados.service';
@@ -38,13 +39,13 @@ import VentasPostventaService from '@backend/application/ventas/ventas-postventa
 import VentasTicketBaiService from '@backend/application/ventas/ventas-ticket-bai.service';
 import VentasTicketEmailService from '@backend/application/ventas/ventas-ticket-email.service';
 import VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
-import type CaducidadesRepository from '@backend/contracts/almacen/caducidades/caducidades.repository.interface';
-import type ImprentaRepository from '@backend/contracts/almacen/imprenta/imprenta.repository.interface';
-import type InventarioRepository from '@backend/contracts/almacen/inventario/inventario.repository.interface';
 import type CaducidadReportWindow from '@backend/contracts/almacen/caducidades/caducidad-report-window.interface';
+import type CaducidadesRepository from '@backend/contracts/almacen/caducidades/caducidades.repository.interface';
 import type ImprentaPrintWindow from '@backend/contracts/almacen/imprenta/imprenta-print-window.interface';
+import type ImprentaRepository from '@backend/contracts/almacen/imprenta/imprenta.repository.interface';
 import type InventarioCsvFileSaver from '@backend/contracts/almacen/inventario/inventario-csv-file-saver.interface';
 import type InventarioPrintWindow from '@backend/contracts/almacen/inventario/inventario-print-window.interface';
+import type InventarioRepository from '@backend/contracts/almacen/inventario/inventario.repository.interface';
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';
@@ -53,6 +54,7 @@ import type ClienteFacturaPdfStorage from '@backend/contracts/clientes/cliente-f
 import type ClienteFacturaPreviewWindow from '@backend/contracts/clientes/cliente-factura-preview-window.interface';
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type ClienteRepository from '@backend/contracts/clientes/cliente.repository.interface';
+import type PedidosRepository from '@backend/contracts/compras/pedidos/pedidos.repository.interface';
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
 import type InstallationDatabase from '@backend/contracts/configuration/installation-database.interface';
 import type InstallationFinalizer from '@backend/contracts/configuration/installation-finalizer.interface';
@@ -91,6 +93,7 @@ import DatabaseSchemaService from '@infrastructure/database/schema/database-sche
 import TypeOrmCaducidadesRepository from '@infrastructure/database/typeorm/almacen/caducidades/typeorm-caducidades.repository';
 import TypeOrmImprentaRepository from '@infrastructure/database/typeorm/almacen/imprenta/typeorm-imprenta.repository';
 import TypeOrmInventarioRepository from '@infrastructure/database/typeorm/almacen/inventario/typeorm-inventario.repository';
+import TypeOrmPedidosRepository from '@infrastructure/database/typeorm/compras/pedidos/typeorm-pedidos.repository';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import TypeOrmArticulosRepository from '@infrastructure/database/typeorm/typeorm-articulos.repository';
 import TypeOrmCajaRepository from '@infrastructure/database/typeorm/typeorm-caja.repository';
@@ -147,6 +150,7 @@ import registerAlmacenIpc from '@ipc/almacen/register-almacen-ipc';
 import registerCaducidadReportIpc from '@ipc/almacen/register-caducidad-report-ipc';
 import registerImprentaPrintIpc from '@ipc/almacen/register-imprenta-print-ipc';
 import registerInventarioPrintIpc from '@ipc/almacen/register-inventario-print-ipc';
+import registerComprasIpc from '@ipc/compras/register-compras-ipc';
 import registerApplicationIpc from '@ipc/register-application-ipc';
 import registerArticulosIpc from '@ipc/register-articulos-ipc';
 import registerCajaIpc from '@ipc/register-caja-ipc';
@@ -319,6 +323,12 @@ export default function createApplicationComposition(
     imprentaService,
     imprentaPrintWindow,
   );
+
+  /*
+   * Compras.
+   */
+  const pedidosRepository: PedidosRepository = new TypeOrmPedidosRepository(operationalDatabase);
+  const pedidosService: PedidosService = new PedidosService(pedidosRepository);
 
   /*
    * Artículos.
@@ -599,6 +609,7 @@ export default function createApplicationComposition(
   registerInventarioPrintIpc(inventarioPrintWindow);
   registerCaducidadReportIpc(caducidadReportWindow);
   registerImprentaPrintIpc(imprentaPrintWindow);
+  registerComprasIpc(getMainWindow, pedidosService);
   registerArticulosIpc(getMainWindow, articulosService);
   registerFilesIpc(getMainWindow, imageStagingService);
   registerMarcasIpc(getMainWindow, marcasService);

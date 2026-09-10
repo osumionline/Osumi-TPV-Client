@@ -40,6 +40,10 @@ const IPC_CHANNELS = {
   inventarioPrintGetDocumento: 'inventario-print:get-documento',
   inventarioPrintPrint: 'inventario-print:print',
 
+  comprasSearchPedidosGuardados: 'compras:search-pedidos-guardados',
+  comprasSearchPedidosRecepcionados: 'compras:search-pedidos-recepcionados',
+  comprasGetPedidoFilterOptions: 'compras:get-pedido-filter-options',
+
   marcasGetAll: 'marcas:get-all',
   marcasCreate: 'marcas:create',
 

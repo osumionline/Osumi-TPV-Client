@@ -1,8 +1,10 @@
+import type AlmacenApi from '@desktop-contracts/almacen/almacen-api.interface';
 import type ApplicationApi from '@desktop-contracts/application/application-api.interface';
 import type ArticulosApi from '@desktop-contracts/articulos/articulos-api.interface';
 import type CajaApi from '@desktop-contracts/caja/caja-api.interface';
 import type CategoriasApi from '@desktop-contracts/categorias/categorias-api.interface';
 import type ClientesApi from '@desktop-contracts/clientes/clientes-api.interface';
+import type ComprasApi from '@desktop-contracts/compras/compras-api.interface';
 import type ConfigurationApi from '@desktop-contracts/configuration/configuration-api.interface';
 import type EmpleadosApi from '@desktop-contracts/empleados/empleados-api.interface';
 import type FilesApi from '@desktop-contracts/files/files-api.interface';
@@ -13,12 +15,12 @@ import type ProveedoresApi from '@desktop-contracts/proveedores/proveedores-api.
 import type ReservasApi from '@desktop-contracts/reservas/reservas-api.interface';
 import type SystemApi from '@desktop-contracts/system/system-api.interface';
 import type VentasApi from '@desktop-contracts/ventas/ventas-api.interface';
-import type AlmacenApi from '@desktop-contracts/almacen/almacen-api.interface';
 
 export default interface OsumiDesktopApi {
   readonly isElectron: true;
   readonly application: ApplicationApi;
   readonly almacen: AlmacenApi;
+  readonly compras: ComprasApi;
   readonly system: SystemApi;
   readonly legacyImport: LegacyImportApi;
   readonly configuration: ConfigurationApi;
