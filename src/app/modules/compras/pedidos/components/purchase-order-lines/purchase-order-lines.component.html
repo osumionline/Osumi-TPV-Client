@@ -80,15 +80,50 @@
                     <th class="purchase-order-lines__number">
                         PVP
                     </th>
+
+                    @if (!disabled()) {
+                    <th class="purchase-order-lines__delete">
+                        Borrar
+                    </th>
+                    }
                 </tr>
             </thead>
 
             <tbody>
-                @for (line of lines(); track line.key) {
+                @for (line of lines(); track line.key; let index = $index) {
                 <tr>
                     @if (visibleColumnIds().has(1)) {
                     <td class="purchase-order-lines__order">
+                        @if (!disabled()) {
+                        <div class="purchase-order-lines__order-actions">
+                            <button mat-icon-button
+                                    class="purchase-order-lines__icon-button"
+                                    type="button"
+                                    matTooltip="Subir línea"
+                                    aria-label="Subir línea"
+                                    [disabled]="index === 0"
+                                    (click)="moveLine(line.key, 'up')">
+                                <mat-icon>
+                                    keyboard_arrow_up
+                                </mat-icon>
+                            </button>
+
+                            <button mat-icon-button
+                                    class="purchase-order-lines__icon-button"
+                                    type="button"
+                                    matTooltip="Bajar línea"
+                                    aria-label="Bajar línea"
+                                    [disabled]="index === lines().length - 1"
+                                    (click)="moveLine(line.key, 'down')">
+                                <mat-icon>
+                                    keyboard_arrow_down
+                                </mat-icon>
+                            </button>
+                        </div>
+                        }
+                        @else {
                         {{ line.orden + 1 }}
+                        }
                     </td>
                     }
 
@@ -192,6 +227,21 @@
                     <td class="purchase-order-lines__number">
                         {{ line.pvpMicros | microsToEuros | number: '1.2-6' }} €
                     </td>
+
+                    @if (!disabled()) {
+                    <td class="purchase-order-lines__delete">
+                        <button mat-icon-button
+                                class="purchase-order-lines__icon-button"
+                                type="button"
+                                matTooltip="Eliminar línea"
+                                aria-label="Eliminar línea"
+                                (click)="requestLineDelete(line.key)">
+                            <mat-icon>
+                                delete
+                            </mat-icon>
+                        </button>
+                    </td>
+                    }
                 </tr>
                 }
             </tbody>

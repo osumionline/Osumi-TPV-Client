@@ -267,7 +267,9 @@
                                        [recargoEquivalencia]="order.recargoEquivalencia"
                                        [disabled]="order.recepcionado || processing()"
                                        (articlesSelected)="onArticlesSelected($event)"
-                                       (unitsChange)="onLineUnitsChange($event)" />
+                                       (unitsChange)="onLineUnitsChange($event)"
+                                       (lineMove)="onLineMove($event)"
+                                       (lineDeleteRequested)="onLineDeleteRequested($event)" />
         </div>
         }
     </section>

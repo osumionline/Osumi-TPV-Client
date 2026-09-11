@@ -80,3 +80,20 @@
     width: 7ch;
     text-align: right;
 }
+
+.purchase-order-lines__order-actions {
+    display: flex;
+    justify-content: center;
+    gap: 2px;
+}
+
+.purchase-order-lines__icon-button {
+    width: 30px;
+    height: 30px;
+    padding: 3px;
+}
+
+.purchase-order-lines__delete {
+    width: 60px;
+    text-align: center !important;
+}

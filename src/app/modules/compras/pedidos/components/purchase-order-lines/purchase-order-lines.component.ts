@@ -15,7 +15,11 @@ import {
   type Signal,
   type WritableSignal,
 } from '@angular/core';
+import { MatIconButton } from '@angular/material/button';
+import { MatIcon } from '@angular/material/icon';
+import { MatTooltip } from '@angular/material/tooltip';
 import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
+import type PurchaseOrderLineMove from '@model/compras/pedidos/purchase-order-line-move.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
 import ArticleSearchComponent from '@modules/ventas/components/article-search/article-search.component';
@@ -32,7 +36,15 @@ import { getErrorMessage } from '@utils/error.utils';
   selector: 'otpv-purchase-order-lines',
   templateUrl: './purchase-order-lines.component.html',
   styleUrl: './purchase-order-lines.component.scss',
-  imports: [ArticleSearchComponent, BpsToPercentPipe, DecimalPipe, MicrosToEurosPipe],
+  imports: [
+    ArticleSearchComponent,
+    BpsToPercentPipe,
+    DecimalPipe,
+    MicrosToEurosPipe,
+    MatIcon,
+    MatIconButton,
+    MatTooltip,
+  ],
 })
 export default class PurchaseOrderLinesComponent {
   private readonly comprasService: ComprasService = inject(ComprasService);
@@ -53,6 +65,9 @@ export default class PurchaseOrderLinesComponent {
     output<readonly PedidoArticuloInterface[]>();
   readonly unitsChange: OutputEmitterRef<PurchaseOrderLineUnitsChange> =
     output<PurchaseOrderLineUnitsChange>();
+  readonly lineMove: OutputEmitterRef<PurchaseOrderLineMove> = output<PurchaseOrderLineMove>();
+
+  readonly lineDeleteRequested: OutputEmitterRef<string> = output<string>();
 
   readonly localizador: WritableSignal<string> = signal<string>('');
   readonly searching: WritableSignal<boolean> = signal<boolean>(false);
@@ -69,6 +84,32 @@ export default class PurchaseOrderLinesComponent {
         this.focusLocalizador();
       }
     });
+  }
+
+  /**
+   * Solicita mover una línea una posición
+   * hacia arriba o hacia abajo.
+   */
+  moveLine(lineKey: string, direction: 'up' | 'down'): void {
+    if (this.disabled()) {
+      return;
+    }
+
+    this.lineMove.emit({
+      lineKey,
+      direction,
+    });
+  }
+
+  /**
+   * Solicita la eliminación de una línea editable.
+   */
+  requestLineDelete(lineKey: string): void {
+    if (this.disabled()) {
+      return;
+    }
+
+    this.lineDeleteRequested.emit(lineKey);
   }
 
   /**

@@ -5,6 +5,7 @@ import type {
 } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
 import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/pedido-columnas.constants';
 import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
+import type PurchaseOrderLineMove from '@model/compras/pedidos/purchase-order-line-move.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
 import {
@@ -20,10 +21,12 @@ import {
   createNewPurchaseOrderFormState,
   createNewPurchaseOrderLineState,
   getPurchaseOrderPaymentKey,
+  movePurchaseOrderLine,
   normalizePurchaseOrderColumns,
   parsePurchaseOrderRouteId,
   parsePurchaseOrderTipo,
   PURCHASE_ORDER_COLUMN_OPTIONS,
+  removePurchaseOrderLine,
   updatePurchaseOrderLineUnits,
   type AddPurchaseOrderArticlesResult,
 } from '@modules/compras/pedidos/pages/purchase-order/purchase-order.component.private';
@@ -626,5 +629,151 @@ describe('purchase-order.component.private', (): void => {
         unidades: 10,
       }),
     ).toBe(lines);
+  });
+
+  it('mueve una línea hacia arriba y normaliza el orden', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          id: 20,
+          orden: 2,
+        }),
+      ),
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          id: 21,
+          publicId: 'order-line-21',
+          idArticulo: 9,
+          localizador: 267960,
+          orden: 5,
+        }),
+      ),
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          id: 22,
+          publicId: 'order-line-22',
+          idArticulo: 10,
+          localizador: 269395,
+          orden: 8,
+        }),
+      ),
+    ];
+
+    const move: PurchaseOrderLineMove = {
+      lineKey: 'line:22',
+      direction: 'up',
+    };
+
+    const result: readonly PurchaseOrderLineState[] = movePurchaseOrderLine(lines, move);
+
+    expect(result.map((line: PurchaseOrderLineState): string => line.key)).toEqual([
+      'line:20',
+      'line:22',
+      'line:21',
+    ]);
+
+    expect(result.map((line: PurchaseOrderLineState): number => line.orden)).toEqual([0, 1, 2]);
+  });
+
+  it('mueve una línea hacia abajo', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          id: 20,
+          orden: 0,
+        }),
+      ),
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          id: 21,
+          publicId: 'order-line-21',
+          idArticulo: 9,
+          localizador: 267960,
+          orden: 1,
+        }),
+      ),
+    ];
+
+    const result: readonly PurchaseOrderLineState[] = movePurchaseOrderLine(lines, {
+      lineKey: 'line:20',
+      direction: 'down',
+    });
+
+    expect(result.map((line: PurchaseOrderLineState): string => line.key)).toEqual([
+      'line:21',
+      'line:20',
+    ]);
+
+    expect(result.map((line: PurchaseOrderLineState): number => line.orden)).toEqual([0, 1]);
+  });
+
+  it('ignora movimientos fuera de los límites del Pedido', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          orden: 0,
+        }),
+      ),
+    ];
+
+    expect(
+      movePurchaseOrderLine(lines, {
+        lineKey: 'line:20',
+        direction: 'up',
+      }),
+    ).toBe(lines);
+
+    expect(
+      movePurchaseOrderLine(lines, {
+        lineKey: 'line:20',
+        direction: 'down',
+      }),
+    ).toBe(lines);
+  });
+
+  it('elimina una línea y normaliza el orden restante', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          id: 20,
+          orden: 0,
+        }),
+      ),
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          id: 21,
+          publicId: 'order-line-21',
+          idArticulo: 9,
+          localizador: 267960,
+          orden: 1,
+        }),
+      ),
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          id: 22,
+          publicId: 'order-line-22',
+          idArticulo: 10,
+          localizador: 269395,
+          orden: 2,
+        }),
+      ),
+    ];
+
+    const result: readonly PurchaseOrderLineState[] = removePurchaseOrderLine(lines, 'line:21');
+
+    expect(result.map((line: PurchaseOrderLineState): string => line.key)).toEqual([
+      'line:20',
+      'line:22',
+    ]);
+
+    expect(result.map((line: PurchaseOrderLineState): number => line.orden)).toEqual([0, 1]);
+  });
+
+  it('ignora la eliminación de una línea inexistente', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(createPedidoLinea()),
+    ];
+
+    expect(removePurchaseOrderLine(lines, 'unknown')).toBe(lines);
   });
 });

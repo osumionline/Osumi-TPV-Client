@@ -8,8 +8,77 @@ import type {
 import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/pedido-columnas.constants';
 import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type { PedidoTipo } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
+import type PurchaseOrderLineMove from '@model/compras/pedidos/purchase-order-line-move.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
+
+/**
+ * Mueve una línea una posición dentro del Pedido y
+ * normaliza el orden resultante.
+ */
+export function movePurchaseOrderLine(
+  lines: readonly PurchaseOrderLineState[],
+  move: PurchaseOrderLineMove,
+): readonly PurchaseOrderLineState[] {
+  const sourceIndex: number = lines.findIndex(
+    (line: PurchaseOrderLineState): boolean => line.key === move.lineKey,
+  );
+
+  if (sourceIndex === -1) {
+    return lines;
+  }
+
+  const targetIndex: number = move.direction === 'up' ? sourceIndex - 1 : sourceIndex + 1;
+
+  if (targetIndex < 0 || targetIndex >= lines.length) {
+    return lines;
+  }
+
+  const reorderedLines: PurchaseOrderLineState[] = [...lines];
+
+  const [movedLine] = reorderedLines.splice(sourceIndex, 1);
+
+  if (movedLine === undefined) {
+    return lines;
+  }
+
+  reorderedLines.splice(targetIndex, 0, movedLine);
+
+  return normalizePurchaseOrderLineOrder(reorderedLines);
+}
+
+/**
+ * Elimina una línea del estado editable y normaliza
+ * el orden de las líneas restantes.
+ */
+export function removePurchaseOrderLine(
+  lines: readonly PurchaseOrderLineState[],
+  lineKey: string,
+): readonly PurchaseOrderLineState[] {
+  if (!lines.some((line: PurchaseOrderLineState): boolean => line.key === lineKey)) {
+    return lines;
+  }
+
+  return normalizePurchaseOrderLineOrder(
+    lines.filter((line: PurchaseOrderLineState): boolean => line.key !== lineKey),
+  );
+}
+
+/**
+ * Renumera las líneas según su posición actual.
+ */
+function normalizePurchaseOrderLineOrder(
+  lines: readonly PurchaseOrderLineState[],
+): readonly PurchaseOrderLineState[] {
+  return lines.map((line: PurchaseOrderLineState, index: number): PurchaseOrderLineState =>
+    line.orden === index
+      ? line
+      : {
+          ...line,
+          orden: index,
+        },
+  );
+}
 
 export interface AddPurchaseOrderArticleResult {
   readonly lines: readonly PurchaseOrderLineState[];

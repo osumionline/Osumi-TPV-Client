@@ -27,6 +27,7 @@ import type {
 import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type { PedidoTipo } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
+import type PurchaseOrderLineMove from '@model/compras/pedidos/purchase-order-line-move.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
 import Proveedor from '@model/proveedores/proveedor.model';
@@ -42,10 +43,12 @@ import {
   createExistingPurchaseOrderLineState,
   createNewPurchaseOrderFormState,
   getPurchaseOrderPaymentKey,
+  movePurchaseOrderLine,
   normalizePurchaseOrderColumns,
   parsePurchaseOrderRouteId,
   parsePurchaseOrderTipo,
   PURCHASE_ORDER_COLUMN_OPTIONS,
+  removePurchaseOrderLine,
   updatePurchaseOrderLineUnits,
   type AddPurchaseOrderArticlesResult,
   type PurchaseOrderColumnOption,
@@ -332,6 +335,87 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
     const nextLines: readonly PurchaseOrderLineState[] = updatePurchaseOrderLineUnits(
       currentLines,
       change,
+    );
+
+    if (nextLines === currentLines) {
+      return;
+    }
+
+    this.clearSaveFeedback();
+    this.lines.set(nextLines);
+  }
+
+  /**
+   * Aplica un cambio de posición solicitado desde
+   * la tabla editable del Pedido.
+   */
+  onLineMove(move: PurchaseOrderLineMove): void {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (state === null || state.recepcionado || this.processing()) {
+      return;
+    }
+
+    const currentLines: readonly PurchaseOrderLineState[] = this.lines();
+
+    const nextLines: readonly PurchaseOrderLineState[] = movePurchaseOrderLine(currentLines, move);
+
+    if (nextLines === currentLines) {
+      return;
+    }
+
+    this.clearSaveFeedback();
+    this.lines.set(nextLines);
+  }
+
+  /**
+   * Solicita confirmación antes de eliminar una línea
+   * del Pedido pendiente.
+   */
+  onLineDeleteRequested(lineKey: string): void {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (state === null || state.recepcionado || this.processing()) {
+      return;
+    }
+
+    const line: PurchaseOrderLineState | undefined = this.lines().find(
+      (currentLine: PurchaseOrderLineState): boolean => currentLine.key === lineKey,
+    );
+
+    if (line === undefined) {
+      return;
+    }
+
+    this.dialog
+      .confirm({
+        title: 'Eliminar línea',
+        content: `¿Quieres eliminar "${line.nombreArticulo}" ` + 'del pedido?',
+      })
+      .subscribe((result: boolean): void => {
+        if (!result) {
+          return;
+        }
+
+        this.removeLine(lineKey);
+      });
+  }
+
+  /**
+   * Elimina una línea previamente confirmada.
+   */
+  private removeLine(lineKey: string): void {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (state === null || state.recepcionado || this.processing()) {
+      return;
+    }
+
+    const currentLines: readonly PurchaseOrderLineState[] = this.lines();
+
+    const nextLines: readonly PurchaseOrderLineState[] = removePurchaseOrderLine(
+      currentLines,
+      lineKey,
     );
 
     if (nextLines === currentLines) {
