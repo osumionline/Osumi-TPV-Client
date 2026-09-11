@@ -20,12 +20,16 @@
     width: 100%;
     height: 40px;
     padding: 0 10px;
-    border: 1px solid var(--separator-color);
+    border: 1px solid var(--control-border-color);
     border-radius: 4px;
     outline: 0;
     background-color: var(--color-white);
     color: inherit;
     font: inherit;
+
+    &:hover:not(:disabled) {
+        border-color: var(--color-black);
+    }
 
     &:focus {
         border-color: var(--main-color);
