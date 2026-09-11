@@ -262,9 +262,9 @@
                 </label>
             </section>
 
-            <section class="purchase-order__future-lines">
-                Las líneas del pedido se implementarán en 16.5.
-            </section>
+            <otpv-purchase-order-lines [lines]="lines()"
+                                       [visibleColumns]="order.columnasVisibles"
+                                       [recargoEquivalencia]="order.recargoEquivalencia" />
         </div>
         }
     </section>

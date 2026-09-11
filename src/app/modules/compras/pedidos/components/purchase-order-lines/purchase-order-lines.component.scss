@@ -1,0 +1,64 @@
+:host {
+    display: block;
+    min-width: 0;
+    margin-top: 20px;
+}
+
+.purchase-order-lines {
+    overflow: hidden;
+    border: 1px solid var(--separator-color);
+    border-radius: 4px;
+}
+
+.purchase-order-lines__empty {
+    display: grid;
+    min-height: 180px;
+    place-items: center;
+    padding: 24px;
+    color: var(--disabled-color);
+}
+
+.purchase-order-lines__table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.purchase-order-lines__table {
+    width: 100%;
+    min-width: 980px;
+    border-collapse: collapse;
+    margin: 0;
+
+    th,
+    td {
+        padding: 9px 10px;
+        border-bottom: 1px solid var(--separator-color);
+        text-align: left;
+        vertical-align: middle;
+    }
+
+    th {
+        background-color: var(--color-very-light-grey);
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    tbody tr:last-child td {
+        border-bottom: 0;
+    }
+}
+
+.purchase-order-lines__description {
+    min-width: 220px;
+}
+
+.purchase-order-lines__order {
+    width: 60px;
+    text-align: center !important;
+}
+
+.purchase-order-lines__number {
+    text-align: right !important;
+    white-space: nowrap;
+}

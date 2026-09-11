@@ -22,10 +22,12 @@ import type {
   PedidoFormOptionsInterface,
   PedidoSaveCommand,
 } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
+import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type { PedidoTipo } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
 import Proveedor from '@model/proveedores/proveedor.model';
 import ProviderQuickCreateComponent from '@modules/articulos/components/provider-quick-create/provider-quick-create.component';
+import PurchaseOrderLinesComponent from '@modules/compras/pedidos/components/purchase-order-lines/purchase-order-lines.component';
 import {
   addPurchaseOrderProviderOption,
   buildPurchaseOrderPaymentOptions,
@@ -61,6 +63,7 @@ import { getErrorMessage } from '@utils/error.utils';
   imports: [
     HeaderComponent,
     ProviderQuickCreateComponent,
+    PurchaseOrderLinesComponent,
     MatButton,
     MatCheckbox,
     MatFormField,
@@ -108,6 +111,9 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
   private showSaveFeedbackAfterLoad: boolean =
     this.router.currentNavigation()?.extras.state?.['purchaseOrderSaveSuccessful'] === true;
   readonly loadError: WritableSignal<string | null> = signal<string | null>(null);
+  readonly lines: WritableSignal<readonly PedidoLineaInterface[]> = signal<
+    readonly PedidoLineaInterface[]
+  >([]);
 
   readonly columnOptions: readonly PurchaseOrderColumnOption[] = PURCHASE_ORDER_COLUMN_OPTIONS;
 
@@ -476,22 +482,26 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
         this.route.snapshot.paramMap.get('idPedido'),
       );
 
-      const [appData, options, pedido]: [
+      const [appData, options, pedido, lines]: [
         Awaited<ReturnType<AppDataService['load']>>,
         PedidoFormOptionsInterface,
         PedidoCabeceraInterface | null,
+        readonly PedidoLineaInterface[],
       ] = await Promise.all([
         this.appDataService.load(),
         this.comprasService.getPedidoFormOptions(),
         idPedido === null ? Promise.resolve(null) : this.comprasService.getPedido(idPedido),
+        idPedido === null
+          ? Promise.resolve<readonly PedidoLineaInterface[]>([])
+          : this.comprasService.getPedidoLineas(idPedido),
       ]);
 
       if (idPedido !== null && pedido === null) {
         throw new Error('El pedido indicado no existe.');
       }
 
+      this.lines.set(lines);
       this.providerOptions.set(buildPurchaseOrderProviderOptions(options.proveedores, pedido));
-
       this.paymentOptions.set(buildPurchaseOrderPaymentOptions(options.tiposPago, pedido));
 
       this.formState.set(
@@ -507,6 +517,7 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
       const message: string = getErrorMessage(error, 'No se ha podido cargar la ficha de Pedido.');
 
       this.formState.set(null);
+      this.lines.set([]);
       this.providerOptions.set([]);
       this.paymentOptions.set([]);
       this.loadError.set(message);

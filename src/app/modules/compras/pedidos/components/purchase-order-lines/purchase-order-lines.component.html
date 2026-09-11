@@ -1,0 +1,186 @@
+<section class="purchase-order-lines">
+    @if (lines().length === 0) {
+    <div class="purchase-order-lines__empty">
+        Todavía no hay líneas en este pedido.
+    </div>
+    }
+    @else {
+    <div class="purchase-order-lines__table-wrapper">
+        <table class="purchase-order-lines__table">
+            <thead>
+                <tr>
+                    @if (visibleColumnIds().has(1)) {
+                    <th class="purchase-order-lines__order">
+                        Orden
+                    </th>
+                    }
+
+                    <th>
+                        Loc.
+                    </th>
+
+                    <th class="purchase-order-lines__description">
+                        Descripción
+                    </th>
+
+                    @if (visibleColumnIds().has(4)) {
+                    <th>
+                        Referencia
+                    </th>
+                    }
+
+                    @if (visibleColumnIds().has(5)) {
+                    <th>
+                        Marca
+                    </th>
+                    }
+
+                    @if (visibleColumnIds().has(6)) {
+                    <th>
+                        Cód. barras
+                    </th>
+                    }
+
+                    <th class="purchase-order-lines__number">
+                        Unidades
+                    </th>
+
+                    @if (visibleColumnIds().has(8)) {
+                    <th class="purchase-order-lines__number">
+                        Stock actual
+                    </th>
+                    }
+
+                    @if (visibleColumnIds().has(9)) {
+                    <th class="purchase-order-lines__number">
+                        Stock final
+                    </th>
+                    }
+
+                    <th class="purchase-order-lines__number">
+                        P. Alb.
+                    </th>
+
+                    @if (visibleColumnIds().has(11)) {
+                    <th class="purchase-order-lines__number">
+                        Descuento
+                    </th>
+                    }
+
+                    @if (visibleColumnIds().has(13)) {
+                    <th class="purchase-order-lines__number">
+                        IVA{{ recargoEquivalencia() ? ' + RE' : '' }}
+                    </th>
+                    }
+
+                    <th class="purchase-order-lines__number">
+                        PUC
+                    </th>
+
+                    <th class="purchase-order-lines__number">
+                        PVP
+                    </th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @for (line of lines(); track line.id) {
+                <tr>
+                    @if (visibleColumnIds().has(1)) {
+                    <td class="purchase-order-lines__order">
+                        {{ line.orden + 1 }}
+                    </td>
+                    }
+
+                    <td>
+                        @if (line.localizador !== null) {
+                        {{ line.localizador }}
+                        }
+                        @else {
+                        —
+                        }
+                    </td>
+
+                    <td class="purchase-order-lines__description">
+                        {{ line.nombreArticulo }}
+                    </td>
+
+                    @if (visibleColumnIds().has(4)) {
+                    <td>
+                        {{ line.referencia ?? '—' }}
+                    </td>
+                    }
+
+                    @if (visibleColumnIds().has(5)) {
+                    <td>
+                        {{ line.marcaNombre ?? '—' }}
+                    </td>
+                    }
+
+                    @if (visibleColumnIds().has(6)) {
+                    <td>
+                        {{ line.codigoBarras ?? '—' }}
+                    </td>
+                    }
+
+                    <td class="purchase-order-lines__number">
+                        {{ line.unidades }}
+                    </td>
+
+                    @if (visibleColumnIds().has(8)) {
+                    <td class="purchase-order-lines__number">
+                        @if (line.stockActual !== null) {
+                        {{ line.stockActual }}
+                        }
+                        @else {
+                        —
+                        }
+                    </td>
+                    }
+
+                    @if (visibleColumnIds().has(9)) {
+                    <td class="purchase-order-lines__number">
+                        @if (line.stockFinal !== null) {
+                        {{ line.stockFinal }}
+                        }
+                        @else {
+                        —
+                        }
+                    </td>
+                    }
+
+                    <td class="purchase-order-lines__number">
+                        {{ line.palbMicros | microsToEuros | number: '1.2-6' }} €
+                    </td>
+
+                    @if (visibleColumnIds().has(11)) {
+                    <td class="purchase-order-lines__number">
+                        {{ line.descuentoBps | bpsToPercent | number: '1.0-2' }} %
+                    </td>
+                    }
+
+                    @if (visibleColumnIds().has(13)) {
+                    <td class="purchase-order-lines__number">
+                        {{ line.ivaBps | bpsToPercent | number: '1.0-2' }} %
+
+                        @if (recargoEquivalencia()) {
+                        +
+                        {{ line.recargoEquivalenciaBps | bpsToPercent | number: '1.0-2' }} %
+                        }
+                    </td>
+                    }
+
+                    <td class="purchase-order-lines__number">
+                        {{ line.pucMicros | microsToEuros | number: '1.2-6' }} €
+                    </td>
+
+                    <td class="purchase-order-lines__number">
+                        {{ line.pvpMicros | microsToEuros | number: '1.2-6' }} €
+                    </td>
+                </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    }
+</section>

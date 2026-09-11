@@ -137,16 +137,6 @@
         grid-column: span 5;
     }
 
-    .purchase-order__future-lines {
-        display: grid;
-        min-height: 220px;
-        margin-top: 20px;
-        border: 1px dashed var(--separator-color);
-        border-radius: 4px;
-        place-items: center;
-        color: var(--disabled-color);
-    }
-
     .purchase-order__provider-control {
         display: flex;
         min-width: 0;
