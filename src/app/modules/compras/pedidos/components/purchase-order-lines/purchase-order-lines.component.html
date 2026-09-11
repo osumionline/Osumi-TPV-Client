@@ -124,7 +124,22 @@
                     }
 
                     <td class="purchase-order-lines__number">
+                        @if (!disabled()) {
+                        <input #unitsInput
+                               class="otpv-table-control purchase-order-lines__units-input"
+                               type="number"
+                               min="0"
+                               step="1"
+                               autocomplete="off"
+                               [attr.data-line-key]="line.key"
+                               [value]="line.unidades"
+                               (input)="onUnitsInput(line, $event)"
+                               (blur)="onUnitsBlur(line, $event)"
+                               (focus)="selectTableControl($event)">
+                        }
+                        @else {
                         {{ line.unidades }}
+                        }
                     </td>
 
                     @if (visibleColumnIds().has(8)) {

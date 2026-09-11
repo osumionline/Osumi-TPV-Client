@@ -9,6 +9,7 @@ import {
   output,
   signal,
   viewChild,
+  viewChildren,
   type InputSignal,
   type OutputEmitterRef,
   type Signal,
@@ -16,6 +17,7 @@ import {
 } from '@angular/core';
 import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
+import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
 import ArticleSearchComponent from '@modules/ventas/components/article-search/article-search.component';
 import { DialogService } from '@osumi/angular-tools';
 import BpsToPercentPipe from '@pipes/bps-to-percent.pipe';
@@ -34,30 +36,27 @@ import { getErrorMessage } from '@utils/error.utils';
 })
 export default class PurchaseOrderLinesComponent {
   private readonly comprasService: ComprasService = inject(ComprasService);
-
   private readonly dialog: DialogService = inject(DialogService);
 
   private readonly localizadorInput: Signal<ElementRef<HTMLInputElement> | undefined> =
     viewChild<ElementRef<HTMLInputElement>>('localizadorInput');
+  private readonly unitsInputs: Signal<readonly ElementRef<HTMLInputElement>[]> =
+    viewChildren<ElementRef<HTMLInputElement>>('unitsInput');
 
   readonly lines: InputSignal<readonly PurchaseOrderLineState[]> =
     input.required<readonly PurchaseOrderLineState[]>();
-
   readonly visibleColumns: InputSignal<readonly number[]> = input.required<readonly number[]>();
-
   readonly recargoEquivalencia: InputSignal<boolean> = input.required<boolean>();
-
   readonly disabled: InputSignal<boolean> = input.required<boolean>();
 
   readonly articlesSelected: OutputEmitterRef<readonly PedidoArticuloInterface[]> =
     output<readonly PedidoArticuloInterface[]>();
+  readonly unitsChange: OutputEmitterRef<PurchaseOrderLineUnitsChange> =
+    output<PurchaseOrderLineUnitsChange>();
 
   readonly localizador: WritableSignal<string> = signal<string>('');
-
   readonly searching: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly searchOpen: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly searchInitialQuery: WritableSignal<string> = signal<string>('');
 
   readonly visibleColumnIds: Signal<ReadonlySet<number>> = computed(
@@ -125,6 +124,77 @@ export default class PurchaseOrderLinesComponent {
   closeSearch(): void {
     this.searchOpen.set(false);
     this.focusLocalizador();
+  }
+
+  /**
+   * Actualiza las unidades cuando el valor introducido
+   * representa un entero no negativo.
+   */
+  onUnitsInput(line: PurchaseOrderLineState, event: Event): void {
+    if (this.disabled()) {
+      return;
+    }
+
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
+    const rawValue: string = inputElement.value.trim();
+
+    if (rawValue.length === 0) {
+      return;
+    }
+
+    const unidades: number = Number(rawValue);
+
+    if (!Number.isSafeInteger(unidades) || unidades < 0) {
+      return;
+    }
+
+    this.unitsChange.emit({
+      lineKey: line.key,
+      unidades,
+    });
+  }
+
+  /**
+   * Restaura el valor canónico de Unidades cuando el
+   * contenido temporal del control no es válido.
+   */
+  onUnitsBlur(line: PurchaseOrderLineState, event: FocusEvent): void {
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
+    const unidades: number = Number(inputElement.value);
+
+    if (inputElement.value.trim().length === 0 || !Number.isSafeInteger(unidades) || unidades < 0) {
+      inputElement.value = String(line.unidades);
+    }
+  }
+
+  /**
+   * Selecciona el contenido completo de un editor numérico
+   * al recibir el foco.
+   */
+  selectTableControl(event: FocusEvent): void {
+    (event.target as HTMLInputElement).select();
+  }
+
+  /**
+   * Enfoca el editor de Unidades correspondiente
+   * a una línea ya existente.
+   */
+  focusUnits(lineKey: string): void {
+    window.queueMicrotask((): void => {
+      const input: HTMLInputElement | undefined = this.unitsInputs().find(
+        (element: ElementRef<HTMLInputElement>): boolean =>
+          element.nativeElement.dataset['lineKey'] === lineKey,
+      )?.nativeElement;
+
+      if (input === undefined) {
+        return;
+      }
+
+      input.focus();
+      input.select();
+    });
   }
 
   /**

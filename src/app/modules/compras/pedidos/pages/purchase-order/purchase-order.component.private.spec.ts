@@ -6,6 +6,7 @@ import type {
 import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/pedido-columnas.constants';
 import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
+import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
 import {
   addPurchaseOrderArticle,
   AddPurchaseOrderArticleResult,
@@ -23,6 +24,8 @@ import {
   parsePurchaseOrderRouteId,
   parsePurchaseOrderTipo,
   PURCHASE_ORDER_COLUMN_OPTIONS,
+  updatePurchaseOrderLineUnits,
+  type AddPurchaseOrderArticlesResult,
 } from '@modules/compras/pedidos/pages/purchase-order/purchase-order.component.private';
 import { describe, expect, it } from 'vitest';
 
@@ -478,7 +481,7 @@ describe('purchase-order.component.private', (): void => {
       ),
     ];
 
-    const result: readonly PurchaseOrderLineState[] = addPurchaseOrderArticles(lines, [
+    const result: AddPurchaseOrderArticlesResult = addPurchaseOrderArticles(lines, [
       createPedidoArticulo({
         id: 8,
         publicId: 'article-8',
@@ -496,16 +499,19 @@ describe('purchase-order.component.private', (): void => {
       }),
     ]);
 
-    expect(result).toHaveLength(3);
+    expect(result.lines).toHaveLength(3);
 
-    expect(result.map((line: PurchaseOrderLineState): number | null => line.idArticulo)).toEqual([
-      8, 9, 10,
+    expect(
+      result.lines.map((line: PurchaseOrderLineState): number | null => line.idArticulo),
+    ).toEqual([8, 9, 10]);
+
+    expect(result.lines.map((line: PurchaseOrderLineState): number => line.orden)).toEqual([
+      2, 3, 4,
     ]);
 
-    expect(result.map((line: PurchaseOrderLineState): number => line.orden)).toEqual([2, 3, 4]);
-
-    expect(result[1]?.unidades).toBe(0);
-    expect(result[2]?.unidades).toBe(0);
+    expect(result.lines[1]?.unidades).toBe(0);
+    expect(result.lines[2]?.unidades).toBe(0);
+    expect(result.duplicateLineKey).toBe('line:20');
   });
 
   it('mantiene el mismo estado cuando toda la selección múltiple ya existe', (): void => {
@@ -518,10 +524,107 @@ describe('purchase-order.component.private', (): void => {
       ),
     ];
 
-    const result: readonly PurchaseOrderLineState[] = addPurchaseOrderArticles(lines, [
+    const result: AddPurchaseOrderArticlesResult = addPurchaseOrderArticles(lines, [
       createPedidoArticulo(),
     ]);
 
-    expect(result).toBe(lines);
+    expect(result.lines).toBe(lines);
+    expect(result.duplicateLineKey).toBe('line:20');
+  });
+
+  it('actualiza las unidades y recalcula el stock final', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          unidades: 4,
+          stockActual: 10,
+          stockFinal: 14,
+        }),
+      ),
+    ];
+
+    const change: PurchaseOrderLineUnitsChange = {
+      lineKey: 'line:20',
+      unidades: 7,
+    };
+
+    const result: readonly PurchaseOrderLineState[] = updatePurchaseOrderLineUnits(lines, change);
+
+    expect(result).not.toBe(lines);
+    expect(result[0]?.unidades).toBe(7);
+    expect(result[0]?.stockActual).toBe(10);
+    expect(result[0]?.stockFinal).toBe(17);
+  });
+
+  it('mantiene stock final desconocido cuando no existe snapshot utilizable', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          stockActual: null,
+          stockFinal: null,
+        }),
+      ),
+    ];
+
+    const result: readonly PurchaseOrderLineState[] = updatePurchaseOrderLineUnits(lines, {
+      lineKey: 'line:20',
+      unidades: 8,
+    });
+
+    expect(result[0]?.unidades).toBe(8);
+    expect(result[0]?.stockFinal).toBeNull();
+  });
+
+  it('permite dejar una línea pendiente con cero unidades', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          unidades: 4,
+          stockActual: 10,
+          stockFinal: 14,
+        }),
+      ),
+    ];
+
+    const result: readonly PurchaseOrderLineState[] = updatePurchaseOrderLineUnits(lines, {
+      lineKey: 'line:20',
+      unidades: 0,
+    });
+
+    expect(result[0]?.unidades).toBe(0);
+    expect(result[0]?.stockFinal).toBe(10);
+  });
+
+  it('rechaza unidades negativas o no enteras', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(createPedidoLinea()),
+    ];
+
+    expect(
+      updatePurchaseOrderLineUnits(lines, {
+        lineKey: 'line:20',
+        unidades: -1,
+      }),
+    ).toBe(lines);
+
+    expect(
+      updatePurchaseOrderLineUnits(lines, {
+        lineKey: 'line:20',
+        unidades: 1.5,
+      }),
+    ).toBe(lines);
+  });
+
+  it('ignora cambios dirigidos a una línea inexistente', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(createPedidoLinea()),
+    ];
+
+    expect(
+      updatePurchaseOrderLineUnits(lines, {
+        lineKey: 'unknown',
+        unidades: 10,
+      }),
+    ).toBe(lines);
   });
 });

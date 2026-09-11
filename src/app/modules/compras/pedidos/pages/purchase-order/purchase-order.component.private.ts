@@ -9,11 +9,17 @@ import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/p
 import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type { PedidoTipo } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
+import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
 
 export interface AddPurchaseOrderArticleResult {
   readonly lines: readonly PurchaseOrderLineState[];
   readonly added: boolean;
   readonly lineKey: string;
+}
+
+export interface AddPurchaseOrderArticlesResult {
+  readonly lines: readonly PurchaseOrderLineState[];
+  readonly duplicateLineKey: string | null;
 }
 
 /**
@@ -100,19 +106,68 @@ export function addPurchaseOrderArticle(
 
 /**
  * Incorpora varios artículos al Pedido en el orden recibido,
- * omitiendo los que ya dispongan de una línea.
+ * omitiendo duplicados y devolviendo la primera línea
+ * existente que deba recibir el foco.
  */
 export function addPurchaseOrderArticles(
   lines: readonly PurchaseOrderLineState[],
   articulos: readonly PedidoArticuloInterface[],
-): readonly PurchaseOrderLineState[] {
+): AddPurchaseOrderArticlesResult {
   let resultLines: readonly PurchaseOrderLineState[] = lines;
 
+  let duplicateLineKey: string | null = null;
+
   for (const articulo of articulos) {
-    resultLines = addPurchaseOrderArticle(resultLines, articulo).lines;
+    const result: AddPurchaseOrderArticleResult = addPurchaseOrderArticle(resultLines, articulo);
+
+    resultLines = result.lines;
+
+    if (!result.added && duplicateLineKey === null) {
+      duplicateLineKey = result.lineKey;
+    }
   }
 
-  return resultLines;
+  return {
+    lines: resultLines,
+    duplicateLineKey,
+  };
+}
+
+/**
+ * Actualiza las unidades de una línea editable y recalcula
+ * su stock final cuando se conoce el stock actual.
+ */
+export function updatePurchaseOrderLineUnits(
+  lines: readonly PurchaseOrderLineState[],
+  change: PurchaseOrderLineUnitsChange,
+): readonly PurchaseOrderLineState[] {
+  if (!Number.isSafeInteger(change.unidades) || change.unidades < 0) {
+    return lines;
+  }
+
+  const lineIndex: number = lines.findIndex(
+    (line: PurchaseOrderLineState): boolean => line.key === change.lineKey,
+  );
+
+  if (lineIndex === -1) {
+    return lines;
+  }
+
+  const line: PurchaseOrderLineState | undefined = lines[lineIndex];
+
+  if (line === undefined || line.unidades === change.unidades) {
+    return lines;
+  }
+
+  const updatedLine: PurchaseOrderLineState = {
+    ...line,
+    unidades: change.unidades,
+    stockFinal: line.stockActual === null ? null : line.stockActual + change.unidades,
+  };
+
+  return lines.map((currentLine: PurchaseOrderLineState, index: number): PurchaseOrderLineState =>
+    index === lineIndex ? updatedLine : currentLine,
+  );
 }
 
 export interface PurchaseOrderFormState {

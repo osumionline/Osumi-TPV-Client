@@ -3,6 +3,7 @@ import {
   computed,
   inject,
   signal,
+  viewChild,
   type OnDestroy,
   type OnInit,
   type Signal,
@@ -27,6 +28,7 @@ import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido
 import type { PedidoTipo } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
+import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
 import Proveedor from '@model/proveedores/proveedor.model';
 import ProviderQuickCreateComponent from '@modules/articulos/components/provider-quick-create/provider-quick-create.component';
 import PurchaseOrderLinesComponent from '@modules/compras/pedidos/components/purchase-order-lines/purchase-order-lines.component';
@@ -44,6 +46,8 @@ import {
   parsePurchaseOrderRouteId,
   parsePurchaseOrderTipo,
   PURCHASE_ORDER_COLUMN_OPTIONS,
+  updatePurchaseOrderLineUnits,
+  type AddPurchaseOrderArticlesResult,
   type PurchaseOrderColumnOption,
   type PurchaseOrderFormState,
   type PurchaseOrderPaymentOption,
@@ -88,17 +92,18 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
   readonly appDataService: AppDataService = inject(AppDataService);
   readonly marcasService: MarcasService = inject(MarcasService);
 
+  private readonly purchaseOrderLines: Signal<PurchaseOrderLinesComponent | undefined> = viewChild(
+    PurchaseOrderLinesComponent,
+  );
+
   readonly formState: WritableSignal<PurchaseOrderFormState | null> =
     signal<PurchaseOrderFormState | null>(null);
-
   readonly providerOptions: WritableSignal<readonly PurchaseOrderProviderOption[]> = signal<
     readonly PurchaseOrderProviderOption[]
   >([]);
-
   readonly paymentOptions: WritableSignal<readonly PurchaseOrderPaymentOption[]> = signal<
     readonly PurchaseOrderPaymentOption[]
   >([]);
-
   readonly loading: WritableSignal<boolean> = signal<boolean>(true);
   readonly saving: WritableSignal<boolean> = signal<boolean>(false);
   readonly deleting: WritableSignal<boolean> = signal<boolean>(false);
@@ -296,9 +301,37 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
 
     const currentLines: readonly PurchaseOrderLineState[] = this.lines();
 
-    const nextLines: readonly PurchaseOrderLineState[] = addPurchaseOrderArticles(
+    const result: AddPurchaseOrderArticlesResult = addPurchaseOrderArticles(
       currentLines,
       articulos,
+    );
+
+    if (result.lines !== currentLines) {
+      this.clearSaveFeedback();
+      this.lines.set(result.lines);
+    }
+
+    if (result.duplicateLineKey !== null) {
+      this.purchaseOrderLines()?.focusUnits(result.duplicateLineKey);
+    }
+  }
+
+  /**
+   * Aplica al estado editable un cambio de unidades
+   * realizado desde la tabla del Pedido.
+   */
+  onLineUnitsChange(change: PurchaseOrderLineUnitsChange): void {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (state === null || state.recepcionado || this.processing()) {
+      return;
+    }
+
+    const currentLines: readonly PurchaseOrderLineState[] = this.lines();
+
+    const nextLines: readonly PurchaseOrderLineState[] = updatePurchaseOrderLineUnits(
+      currentLines,
+      change,
     );
 
     if (nextLines === currentLines) {

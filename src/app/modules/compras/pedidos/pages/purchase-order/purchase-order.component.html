@@ -266,7 +266,8 @@
                                        [visibleColumns]="order.columnasVisibles"
                                        [recargoEquivalencia]="order.recargoEquivalencia"
                                        [disabled]="order.recepcionado || processing()"
-                                       (articlesSelected)="onArticlesSelected($event)" />
+                                       (articlesSelected)="onArticlesSelected($event)"
+                                       (unitsChange)="onLineUnitsChange($event)" />
         </div>
         }
     </section>
