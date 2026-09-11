@@ -1,9 +1,9 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.52  
-**Fecha:** 10 de septiembre de 2026  
-**Base de continuidad:** `v2.52 + main` una vez este documento se suba al repositorio.  
-**Documento anterior:** `Osumi_TPV_Client_Documento_Continuidad_v2.51.md`
+**Versión:** 2.53  
+**Fecha:** 11 de septiembre de 2026  
+**Base de continuidad:** `v2.53 + main` una vez este documento se suba al repositorio.  
+**Documento anterior:** `Osumi_TPV_Client_Documento_Continuidad_v2.52.md`
 
 ---
 
@@ -27,29 +27,25 @@ Ventas 12 — Postventa                             🟦
 15 Almacén                                        ✅ HITO CERRADO
 
 REF Pausa técnica pre-Hito 16                     ✅ CERRADA
-  REF.1 Constantes y utilidades compartidas       ✅
-  REF.2 Convención *.private.ts                   ✅
-  REF.3 Reorganización estructural de Almacén     ✅
-  REF.4 Backend por subdominio                    ✅
-  REF.5 Revisión de hotspots                      ✅
-  REF.6 Paridad funcional pre-Compras             ✅
-    REF.6A Última venta + cambio                   ✅
-    REF.6B Inventario → Artículos + estado sesión ✅
-    REF.6C Caducidades → Artículos + estado       ✅
-    REF.6D Imprenta: autofocus buscador            ✅
-  REF.7 Cierre pausa técnica                      ✅
 
 16 Compras                                        🟦 EN DESARROLLO
   16.1 Base de Compras + históricos               ✅
   16.2 Backend listados de Pedidos                ✅
   16.3 Pantalla principal de Pedidos              ✅
 
-CTRL Normalización controles pre-16.4             🟦
-  CTRL.1 Primera pasada global                    ⬅️ SIGUIENTE
-  CTRL.2 Segunda pasada Artículos                 ⬜
+  CTRL Normalización controles pre-16.4           ✅ CERRADA
+    CTRL.1 Primera pasada global                  ✅
+    CTRL.2 Segunda pasada Artículos               ✅
 
-  16.4 Ficha Pedido: cabecera + persistencia      ⬜
-  16.5 Líneas + buscador de artículos             ⬜
+  16.4 Ficha Pedido: cabecera + persistencia      ✅ CERRADO
+
+  16.5 Líneas + buscador de artículos             🟦 EN DESARROLLO
+    16.5A.1 Schema líneas + snapshots stock       ✅
+    16.5A.2 Lectura backend de líneas             ✅
+    16.5A.3 Resolución/búsqueda artículos          🟦
+      16.5A.3.1 Repository TypeORM                ✅
+      16.5A.3.2 Service + API/IPC/preload         ⬅️ SIGUIENTE
+
   16.6 Motor económico                            ⬜
   16.7 Dirty state + navegación segura            ⬜
   16.8 Integración Pedido → Artículos             ⬜
@@ -65,73 +61,98 @@ Star TSP100/TSP143 80 mm                          ⏸️ prueba física no bloqu
 
 TicketBAI ordinario permanece cerrado. `12C.9 — TicketBAI devoluciones/mixtas` sigue bloqueado hasta recibir respuesta o documentación actualizada de Berein.
 
-El **Hito 15 — Almacén** está cerrado funcionalmente y la pausa técnica posterior queda también cerrada. No reabrir ninguno de estos bloques por el inicio de Compras salvo que aparezca una regresión real.
-
----
+El **Hito 15 — Almacén**, la pausa técnica REF y la normalización CTRL están cerrados. No reabrirlos por ajustes de Compras salvo regresión real.
 
 # 2. Punto exacto de continuación
 
-Los mini-hitos `16.1`, `16.2` y `16.3` están cerrados y validados.
+Están cerrados y validados:
 
-Antes de comenzar la ficha de Pedido se ha acordado una normalización corta de controles para evitar seguir duplicando CSS y fijar una gramática visual común.
+```text
+16.1
+16.2
+16.3
+CTRL.1
+CTRL.2
+16.4
+16.5A.1
+16.5A.2
+16.5A.3.1
+```
 
 El siguiente punto exacto es:
 
 ```text
-CTRL.1 — Primera pasada de controles globales
+16.5A.3.2 — Application Service + contrato público
+             + ComprasApi + IPC + preload + fachada Angular
 ```
 
-Objetivos:
+Objetivo:
 
 ```text
-crear src/styles/controls.scss
-→ nueva fuente canónica para primitivas visuales de controles
-
-fechas
-→ input type="date" nativo
-→ label + input nativos
-→ valor YYYY-MM-DD
-→ no MatDatepicker
-→ no mat-form-field para fechas
-
-Material compacto
-→ centralizar estilo repetido de filtros
-→ Inventario / Caducidades / Compras
-
-dinero / decimal / porcentaje
-→ input type="text"
-→ inputmode="decimal"
-→ parsing explícito compatible con coma
-
-edición compacta en tablas
-→ extraer una base visual reutilizable desde Inventario
-
-validación visual
-→ Compras
-→ Clientes → Ventas
-→ Inventario
-→ Caducidades
+exponer al renderer la resolución exacta de artículos
++
+exponer búsqueda libre de artículos
++
+normalizar entrada en PedidosService
++
+añadir tests completos de service/fakes
++
+mantener toda la cadena tipada
 ```
 
-Después de validar `CTRL.1`:
+Todavía NO implementar en este paso:
 
 ```text
-CTRL.2
-→ segunda pasada pequeña sobre Artículos
-→ ArticleGeneral
-→ ArticleNotes
-→ altas rápidas cuando proceda
+tabla editable de líneas
+persistencia de líneas
+autofocus del buscador
+duplicados/foco Unidades
+recepción
+motor económico
 ```
 
-Solo tras cerrar esta normalización:
+Estado ya disponible en Repository:
 
 ```text
-16.4 — Ficha Pedido: cabecera + persistencia básica
+resolvePedidoArticulo()
+→ prioridad:
+   acceso directo
+   localizador
+   código de barras activo
+
+searchPedidoArticulos()
+→ búsqueda por slug normalizado
 ```
 
-No convertir CTRL en una nueva pausa de refactorización general. No limpiar toda la aplicación ni reescribir componentes funcionales solo por uniformidad visual.
+El record recuperado contiene:
 
----
+```text
+id/publicId
+localizador
+nombre
+referencia
+marca
+stock
+PALB
+PUC
+PVP en microeuros
+margen
+IVA
+RE
+existencia de código adicional
+observaciones
+flag mostrar observaciones en Pedidos
+```
+
+Importante:
+
+```text
+PEDIDO_ARTICULO_SELECT
+→ está en typeorm-pedidos.repository.private.ts
+→ NO dentro de la clase repository
+```
+
+Después de validar `16.5A.3.2`, volver a revisar `main` y decidir el siguiente bloque pequeño de `16.5`.
 
 # 3. Repositorios y referencias
 
@@ -203,6 +224,7 @@ No tocar `12C.9` sin nueva información de Berein.
 - No dejar líneas en blanco innecesarias entre propiedades relacionadas.
 - Sí separar visualmente métodos y responsabilidades distintas.
 - Evitar `@HostListener`; preferir `host` cuando aplique.
+- Si Angular marca una API como deprecated y existe sustitución moderna estable, usar la API moderna. Ejemplo ya aplicado: `Router.currentNavigation()` signal en vez de `getCurrentNavigation()`.
 
 ## 4.2 Forma de trabajar
 
@@ -214,11 +236,47 @@ El asistente:
 - no hace commits;
 - no abre PR;
 - no avanza de mini-hito hasta confirmación explícita;
+- prefiere **bloques pequeños pero completos** frente a mega-bloques;
+- si un cambio modifica una interfaz, en el mismo bloque incluye todos los fakes/mocks/fixtures afectados;
+- si se proponen tests, se entrega el código concreto de los tests, no solo una lista textual de casos;
+- si un nuevo método necesita JSDoc, el patch lo incluye;
+- no deja adaptaciones necesarias implícitas para que el usuario las deduzca;
 - archivo nuevo: contenido completo;
 - archivo existente: fragmento actual reconocible → fragmento nuevo;
-- imports: indicar solo los imports nuevos salvo sustitución necesaria.
+- cuando hay imports nuevos, se indican explícitamente todos los imports necesarios;
+- no hace falta indicar en qué posición física colocar cada import;
+- VSCode/Prettier se encargan de ordenar imports/formato al guardar.
 
-## 4.3 Exports
+## 4.3 Imports
+
+Regla obligatoria para imports internos del proyecto:
+
+```text
+SIEMPRE ruta absoluta mediante alias
+```
+
+Incluso cuando dos archivos estén en la misma carpeta:
+
+```ts
+// NO
+import type X from './x.interface';
+
+// SÍ
+import type X from '@backend/.../x.interface';
+```
+
+No introducir imports relativos entre archivos del proyecto en patches nuevos.
+
+Los imports de paquetes externos (`@angular/...`, `typeorm`, `vitest`, `node:*`, etc.) conservan naturalmente sus rutas de paquete.
+
+Cuando el asistente diga que hay que añadir imports:
+
+```text
+→ debe proporcionar el código exacto de esos imports
+→ no necesita indicar "ponlo antes/después de..."
+```
+
+## 4.4 Exports
 
 ```text
 1 export  → default export
@@ -227,7 +285,7 @@ El asistente:
 
 También se aplica a `*.private.ts`.
 
-## 4.4 Batería habitual
+## 4.5 Batería habitual
 
 Frontend:
 
@@ -256,8 +314,6 @@ npm run lint
 ```
 
 `npm test` ya incorpora `--watch=false`.
-
----
 
 # 5. SQLite durante desarrollo
 
@@ -468,11 +524,34 @@ uso exclusivo de un consumidor
 → <consumer>.private.ts
 ```
 
-Puede contener interfaces/types internos, constantes, mapas/configuración estática y helpers puros exclusivos del consumidor.
+Puede contener:
+
+```text
+interfaces/types internos
+constantes
+mapas/configuración estática
+helpers puros exclusivos del consumidor
+fragmentos SQL/SELECT constantes exclusivos de una clase/repository
+```
+
+Ejemplo ya consolidado en Compras:
+
+```text
+PEDIDO_ARTICULO_SELECT
+→ typeorm-pedidos.repository.private.ts
+→ no ensucia TypeOrmPedidosRepository
+```
+
+La regla no es “todo a `.private.ts`”.
 
 No mover métodos de clase solo para reducir líneas. No crear sidecar vacío ni por obligación. Estado y comportamiento de instancia permanecen en la clase.
 
----
+Los imports de un `.private.ts` siguen la misma regla general:
+
+```text
+imports internos
+→ alias absoluto
+```
 
 # 11. REF.3/REF.4 — Almacén por subdominio ✅
 
@@ -993,6 +1072,51 @@ Paypal
 ```
 
 No crear un catálogo rígido adicional para todas las opciones antiguas.
+
+Implementación cerrada en `16.4`:
+
+```text
+pedido.id_tipo_pago
+→ referencia opcional a tipo_pago configurable
+
+pedido.forma_pago
+→ snapshot textual histórico
+```
+
+Pedidos nuevos:
+
+```text
+Domiciliación bancaria
+Transferencia bancaria
+→ id_tipo_pago = NULL
+→ forma_pago = literal correspondiente
+
+tipo de pago configurable
+→ id_tipo_pago = ID real
+→ forma_pago = snapshot del nombre canónico
+```
+
+Importación legacy correcta:
+
+```text
+metodo_pago 0 → Domiciliación bancaria
+metodo_pago 1 → Tarjeta
+metodo_pago 2 → Paypal
+metodo_pago 3 → Al contado
+metodo_pago 4 → Transferencia bancaria
+
+id_tipo_pago → NULL
+forma_pago   → snapshot
+```
+
+No reinterpretar nunca el índice legacy como ID de `tipo_pago`.
+
+Si el tipo configurable se renombra después:
+
+```text
+pedido histórico
+→ conserva su forma_pago snapshot
+```
 
 ## 21.3 Tipo documental
 
@@ -2070,9 +2194,9 @@ Guardar un pedido recepcionado:
 
 # 40. Base de datos existente para Compras
 
-Existe trabajo previo del esquema/importación `.otpv`.
+Existe trabajo previo del esquema/importación `.otpv` y ya ha sido ampliado durante `16.4` y `16.5`.
 
-Conceptos ya presentes:
+Conceptos presentes:
 
 ```text
 pedido
@@ -2091,59 +2215,149 @@ historico_articulo
 → dispone de relación id_pedido
 ```
 
-Las líneas ya contemplan datos económicos/snapshots y la vista del pedido permite persistir configuración de columnas.
+## 40.1 Cabecera de Pedido
 
-Principio para Hito 16:
-
-```text
-revisar y aprovechar lo existente
-→ no rediseñar desde cero sin necesidad
-```
-
-Si falta una columna/constraint necesaria:
+`pedido` distingue:
 
 ```text
-ajustar schema v1 durante desarrollo
-→ sin migración
+id_tipo_pago
+→ relación opcional al catálogo configurable
+
+forma_pago
+→ snapshot textual de la forma de pago usada
 ```
 
----
+Esta separación protege datos históricos y evita reinterpretar índices del TPV antiguo.
+
+## 40.2 Líneas
+
+`linea_pedido` contiene ya:
+
+```text
+orden
+stock_actual_snapshot
+stock_final_snapshot
+
+unidades
+PALB
+PUC
+PVP
+margen
+IVA
+RE
+descuento
+código de barras
+snapshot de nombre
+```
+
+Semántica de stock:
+
+```text
+pendiente
+→ snapshots pueden ser NULL
+→ Stock actual se relee del artículo canónico
+→ Stock final = stock canónico + unidades
+
+recepcionado nuevo
+→ usar stock_actual_snapshot
+→ usar stock_final_snapshot
+
+recepcionado legacy sin snapshots
+→ NULL
+→ NO inventar valores usando stock actual
+```
+
+El índice de líneas está preparado para:
+
+```text
+id_pedido
+orden
+id
+```
+
+No se impone `UNIQUE(id_pedido, orden)` para evitar colisiones temporales durante reordenaciones.
+
+## 40.3 Importación legacy de líneas
+
+El TPV antiguo no almacenaba snapshots históricos de stock.
+
+Por tanto:
+
+```text
+stock_actual_snapshot = NULL
+stock_final_snapshot  = NULL
+```
+
+El `orden` se reconstruye de manera estable durante importación a partir del orden de IDs legacy.
+
+## 40.4 Vista de columnas
+
+`vista_pedido` persiste configuración de columnas opcionales.
+
+IDs opcionales conocidos:
+
+```text
+1  Ordenar
+4  Referencia
+5  Marca
+6  Código de barras
+8  Stock actual
+9  Stock final
+11 Descuento
+13 IVA
+```
+
+Principio durante desarrollo:
+
+```text
+DATABASE_SCHEMA_VERSION = 1
+→ ajustar schema cuando haga falta
+→ borrar/recrear instalación si el cambio es incompatible
+→ sin migraciones todavía
+```
 
 # 41. Plan Hito 16 — visión general
 
 ```text
-16.1  Base Compras + históricos ✅
-16.2  Backend listados ✅
-16.3  UI listados ✅
+16.1  Base Compras + históricos                   ✅
+16.2  Backend listados                           ✅
+16.3  UI listados                                ✅
 
-CTRL.1 Primera pasada controles globales ⬅️
-CTRL.2 Segunda pasada Artículos
+CTRL.1 Controles globales                         ✅
+CTRL.2 Artículos / quick creates                  ✅
 
-16.4  Cabecera/persistencia Pedido
-16.5  Líneas/búsqueda
-16.6  Motor económico
-16.7  Dirty/navigation guard
-16.8  Integración con Artículos
-16.9  PDFs
-16.10 Recepción atómica
-16.11 Pedido recepcionado
-16.12 Regresión Pedidos
-16.13 Marcas
-16.14 Proveedores
+16.4  Cabecera/persistencia Pedido                ✅
+
+16.5  Líneas/búsqueda                             🟦
+  16.5A.1 Schema orden + snapshots stock          ✅
+  16.5A.2 Lectura backend líneas                  ✅
+  16.5A.3 Resolución/búsqueda artículos           🟦
+    16.5A.3.1 TypeORM                             ✅
+    16.5A.3.2 Service + API/IPC/preload            ⬅️
+
+16.6  Motor económico                             ⬜
+16.7  Dirty/navigation guard                      ⬜
+16.8  Integración con Artículos                   ⬜
+16.9  PDFs                                        ⬜
+16.10 Recepción atómica                           ⬜
+16.11 Pedido recepcionado                         ⬜
+16.12 Regresión Pedidos                           ⬜
+16.13 Marcas                                      ⬜
+16.14 Proveedores                                 ⬜
 ```
 
-Cada mini-hito:
+Cada bloque:
 
 ```text
-implementar
+revisar main
+→ implementar bloque pequeño pero completo
+→ adaptar contracts/fakes/specs afectados en el mismo bloque
 → tests
 → build/lint
-→ prueba funcional
+→ prueba funcional cuando exista UI
 → confirmación explícita
 → siguiente
 ```
-
----
 
 # 42. 16.1 — Base de Compras + auditoría de históricos ✅ CERRADO
 
@@ -2346,377 +2560,254 @@ Marcas y Proveedores siguen placeholders.
 
 ---
 
-# 45. CTRL — Normalización de controles pre-16.4 🟦
+# 45. CTRL — Normalización de controles pre-16.4 ✅ CERRADA
 
-Esta normalización se introduce porque la auditoría visual previa a `16.4` ha detectado estilos de controles repetidos en varios componentes.
+La normalización visual previa a la ficha de Pedido se completó y validó.
 
-No es una nueva pausa arquitectónica.
-
-Objetivo:
+Objetivo conseguido:
 
 ```text
 reducir CSS duplicado
 +
-fijar una gramática visual común
+fijar gramática visual común
 +
-evitar que la ficha de Pedido genere otra familia de estilos paralela
+evitar nuevos estilos paralelos durante Compras
 ```
 
-## 45.1 Principio general
+## 45.1 Fuente canónica
 
-No imponer:
-
-```text
-todo Material
-```
-
-ni:
-
-```text
-todo HTML nativo
-```
-
-Regla:
-
-```text
-usar el control más adecuado por funcionalidad
-+
-compartir la apariencia cuando conceptualmente sean el mismo tipo de control
-```
-
-Distinguir siempre:
-
-```text
-apariencia común
-→ estilos globales
-
-layout, ancho y colocación
-→ componente
-```
-
-Los estilos globales no deben imponer anchos o distribuciones específicas de una pantalla.
-
-## 45.2 Nueva hoja canónica
-
-Crear:
+Existe:
 
 ```text
 src/styles/controls.scss
 ```
 
-e importarla desde:
+Primitivas consolidadas:
 
 ```text
-src/styles.scss
+.otpv-field
+.otpv-field__label
+.otpv-control
+.otpv-control--textarea
+.otpv-mat-field--compact
+.otpv-table-control
+.otpv-table-control--dirty
+.otpv-table-control--invalid
 ```
 
-`forms.scss` permanece por ahora como compatibilidad/estilos anteriores.
-
-No hacer una limpieza total de `forms.scss`.
-
-Política:
+Token visual introducido:
 
 ```text
-controls.scss
-→ nueva fuente canónica
-
-forms.scss
-→ estilos legacy/compatibilidad
-
-cuando desaparezca el último consumidor de una regla antigua
-→ eliminarla de forms.scss
+--control-border-color
 ```
 
-## 45.3 Convenciones acordadas
+Los controles nativos normales usan un borde con peso visual coherente con Material outlined.
 
-### Fechas
+## 45.2 Convenciones cerradas
 
 ```text
-HTML nativo
-→ input type="date"
-
-valor
+Fecha
+→ input type="date" nativo
 → YYYY-MM-DD
+→ sin MatDatepicker
 
-estructura
-→ label + texto + input nativos
+Entero
+→ input type="number"
+→ step="1"
 
-NO MatDatepicker
-NO matInput
-NO mat-form-field
+Dinero / decimal / porcentaje
+→ input type="text"
+→ inputmode="decimal"
+→ parsing explícito compatible con coma
+
+Select simple
+→ nativo cuando basta
+
+Select múltiple/overlay complejo
+→ mat-select
+
+Checkbox
+→ elección booleana
+
+Slide toggle
+→ activar/desactivar modo inmediato
+
+Edición compacta en tabla
+→ .otpv-table-control
 ```
 
-Electron usa Chromium, por lo que el selector nativo es suficiente y consistente.
-
-### Enteros
-
-```text
-input type="number"
-step="1"
-```
-
-Ejemplos:
-
-```text
-stock
-unidades
-cantidades enteras
-```
-
-### Dinero / decimales / porcentajes
-
-Patrón canónico:
-
-```text
-input type="text"
-inputmode="decimal"
-```
-
-Con:
-
-```text
-parsing explícito
-soporte de coma decimal
-validación propia
-precisión interna independiente del string mostrado
-```
-
-Evitar `type="number"` para importes monetarios cuando necesitemos controlar formato europeo y parsing.
-
-### Texto / búsqueda simple
-
-Puede ser nativo o `matInput` según contexto.
-
-Regla:
-
-```text
-control simple sin comportamiento Material necesario
-→ preferir HTML nativo estilizado
-
-formulario con validación, errores, prefijos/sufijos u otras capacidades Material
-→ mat-form-field + matInput
-```
-
-### Select simple
-
-Si no necesita funcionalidades especiales:
-
-```text
-select nativo
-```
-
-Si necesita:
-
-```text
-selección múltiple
-overlay complejo
-funcionalidad específica de Material
-```
-
-usar:
-
-```text
-mat-select
-```
-
-No migrar selects funcionales solo por uniformidad.
-
-### Textarea
-
-Misma regla que texto:
-
-```text
-simple
-→ textarea nativo con apariencia compartida
-
-validación/error Material
-→ textarea matInput
-```
-
-### Booleanos
-
-```text
-mat-checkbox
-→ elección booleana independiente
-
-mat-slide-toggle
-→ activar/desactivar un modo o filtro con efecto inmediato
-```
-
-### Botones
-
-```text
-acción principal
-→ mat-flat-button
-
-acción secundaria
-→ mat-stroked-button
-
-acción compacta por icono
-→ mat-icon-button
-→ aria-label obligatorio
-→ normalmente matTooltip
-```
-
-### Edición dentro de tablas
-
-Crear una base visual compartida para editores compactos.
-
-Referencia inicial:
-
-```text
-Inventario
-```
-
-Objetivo visual aproximado:
-
-```text
-altura compacta ~30 px
-focus común
-estado dirty
-estado invalid
-```
-
-No forzar `mat-form-field` dentro de tablas cuando perjudique densidad y edición tipo hoja de cálculo.
-
-### Altura normal
-
-Altura canónica propuesta:
+Altura normal canónica:
 
 ```text
 40 px
 ```
 
-para controles normales.
-
-Las variaciones actuales de 38/42 px se consideran candidatas a normalización, no contratos funcionales.
-
-## 45.4 CTRL.1 — Primera pasada global ⬅️ SIGUIENTE
-
-Alcance:
+Editor de tabla:
 
 ```text
-1. crear controls.scss
-
-2. fechas nativas compartidas
-   → Clientes → Ventas
-   → Compras → Pedidos
-
-3. Material compacto compartido
-   → Inventario
-   → Caducidades
-   → Compras
-
-4. importes de filtros de Compras
-   → type="text"
-   → inputmode="decimal"
-
-5. base visual de editor compacto de tabla
-   → extraída desde Inventario
-   → preparada para futura tabla de Pedido
-
-6. validación visual
-   → Compras
-   → Clientes → Ventas
-   → Inventario
-   → Caducidades
+~30 px
 ```
 
-No modificar lógica funcional.
+## 45.3 CTRL.1 completado
 
-Después:
+Migrado/centralizado:
 
 ```text
-tests
-build
-lint
-prueba visual
-confirmación explícita
+Clientes → Ventas
+Compras → filtros Pedidos
+Inventario
+Caducidades
 ```
 
-## 45.5 CTRL.2 — Segunda pasada Artículos
+Incluyó:
 
-Solo después de validar CTRL.1.
+```text
+fechas nativas compartidas
+Material compacto compartido
+importes filtros Compras con inputmode decimal
+base global de editor compacto de tabla
+```
 
-Candidatos:
+## 45.4 CTRL.2 completado
+
+Migrado:
 
 ```text
 ArticleGeneral
-→ inputs/selects nativos repetidos
-
 ArticleNotes
-→ textarea nativo
-
 BrandQuickCreate
-SupplierQuickCreate
-→ consumir primitivas globales cuando encaje
+ProviderQuickCreate
 ```
 
-Objetivo:
+Se eliminó CSS repetido de inputs/selects/textarea cuando la apariencia era realmente la misma.
+
+`ClientForm`, Imprenta, `forms.scss` completo y layouts generales quedaron fuera de alcance deliberadamente.
+
+## 45.5 Principio resultante
 
 ```text
-eliminar CSS duplicado claro
-sin alterar comportamiento
-```
+apariencia y estados compartidos
+→ controls.scss
 
-La segunda pasada puede ajustarse si durante CTRL.1 se comprueba que alguna migración no aporta suficiente beneficio.
-
-## 45.6 Fuera de alcance
-
-No tocar ahora:
-
-```text
-ClientForm
-→ Material + Signal Forms + errores
-→ uso justificado
-
-Imprenta
-→ buscador Material ya estable y validado
-
-layouts completos de tablas
-loading / empty / error generales
-tables.scss entero
-forms.scss entero
-application-composition
-arquitectura backend
+layout / ancho / colocación
+→ componente
 ```
 
 No crear componentes Angular triviales solo para envolver controles HTML.
 
-Ejemplo:
+CTRL queda cerrada. No reabrirla por diferencias visuales menores sin una necesidad real.
+
+# 46. 16.4 — Ficha Pedido: cabecera + persistencia básica ✅ CERRADO
+
+`16.4` está implementado, probado funcionalmente y subido a `main`.
+
+## 46.1 Backend/modelo
+
+Cadena disponible:
 
 ```text
-input type="date"
-→ estilo global
-→ NO DateInputComponent sin comportamiento propio
+ComprasService renderer
+→ preload
+→ IPC
+→ PedidosService
+→ PedidosRepository
+→ TypeOrmPedidosRepository
+→ SQLite
 ```
 
-## 45.7 Fin de CTRL
-
-Una vez validadas las pasadas acordadas:
+Casos de uso cerrados:
 
 ```text
-CTRL ✅ CERRADO
-→ continuar 16.4
+getPedido()
+getPedidoFormOptions()
+savePedido()
+deletePedido()
 ```
 
-Las convenciones anteriores pasan a ser la referencia para toda la nueva ficha de Pedido y desarrollos posteriores.
+Proveedor obligatorio para guardar.
 
----
-
-# 46. 16.4 — Ficha Pedido: cabecera + persistencia básica
-
-Implementar:
+Pedido pendiente:
 
 ```text
-Nuevo pedido
-Pedido existente pendiente
+puede guardarse con 0 líneas
+→ NO modifica stock
+→ NO modifica precios canónicos
+→ NO crea histórico
 ```
 
-Cabecera:
+Pedido recepcionado:
 
 ```text
-Proveedor
+R.E. congelado
+→ resto de campos informativos permitidos puede guardarse
+→ guardar NO reaplica stock/precios/históricos
+```
+
+## 46.2 Forma de pago y compatibilidad legacy
+
+Modelo:
+
+```text
+id_tipo_pago
+→ opcional
+
+forma_pago
+→ snapshot textual
+```
+
+Built-ins del nuevo Pedido:
+
+```text
+Domiciliación bancaria
+Transferencia bancaria
+```
+
+Más:
+
+```text
+tipos de pago configurables activos
+```
+
+Mapping legacy fijado y cubierto por test integral:
+
+```text
+0 → Domiciliación bancaria
+1 → Tarjeta
+2 → Paypal
+3 → Al contado
+4 → Transferencia bancaria
+```
+
+Pedidos legacy:
+
+```text
+id_tipo_pago = NULL
+forma_pago   = snapshot
+```
+
+Índice desconocido:
+
+```text
+pedido se conserva
+forma_pago = NULL
+warningCount++
+```
+
+No reinterpretar esos índices como IDs de `tipo_pago`.
+
+## 46.3 Cabecera renderer
+
+Rutas:
+
+```text
+/compras/pedido
+/compras/pedido/:idPedido
+```
+
+Campos funcionales:
+
+```text
+Proveedor *
 Forma de pago
 Tipo
 Número
@@ -2728,24 +2819,166 @@ Columnas
 Observaciones
 ```
 
-Persistencia inicial:
+Nuevo pedido:
 
 ```text
-Proveedor obligatorio
-0 líneas permitido
+tipo = Albarán
+fecha pedido = hoy
+columnas opcionales iniciales = Ordenar + Marca
 ```
 
-Todavía no aplicar efectos canónicos.
+Proveedores históricos:
 
----
+```text
+si el proveedor del pedido ya no está activo
+→ se añade como opción histórica
+```
 
-# 47. 16.5 — Líneas + buscador de artículos
+Formas de pago históricas:
 
-Implementar:
+```text
+se conserva snapshot exacto
+→ no se reinterpreta según catálogo actual
+```
+
+Los `<select>` nativos usan selección explícita por opción para que valores cargados asíncronamente queden visualmente seleccionados.
+
+## 46.4 Guardado
+
+Guardar:
+
+```text
+construye PedidoSaveCommand
+→ backend valida
+→ persiste
+→ renderer relee getPedido()
+→ usa estado canónico persistido
+```
+
+Primer guardado:
+
+```text
+/compras/pedido
+→ save
+→ /compras/pedido/:id
+→ replaceUrl
+```
+
+Feedback:
+
+```text
+Pedido guardado correctamente
+→ visible ~4 segundos
+→ desaparece al volver a editar
+```
+
+Para transportar el feedback tras el primer guardado se usa:
+
+```text
+Router.currentNavigation()
+```
+
+No usar `Router.getCurrentNavigation()` deprecated.
+
+## 46.5 Eliminación
+
+Solo existe botón Eliminar cuando:
+
+```text
+pedido.id !== NULL
+AND
+pedido.recepcionado = false
+```
+
+Flujo:
+
+```text
+confirmación
+→ deletePedido()
+→ baja lógica
+→ /compras con replaceUrl
+```
+
+Pedido nuevo:
+
+```text
+sin botón Eliminar
+```
+
+Pedido recepcionado:
+
+```text
+sin botón Eliminar
+```
+
+## 46.6 Alta rápida de Proveedor
+
+Se reutiliza:
+
+```text
+ProviderQuickCreateComponent
+ProveedoresService
+MarcasService
+```
+
+Comportamiento:
+
+```text
++ proveedor
+→ carga perezosa de marcas
+→ abre modal
+→ crea proveedor
+→ lo incorpora al combo
+→ lo selecciona
+→ NO guarda automáticamente el Pedido
+```
+
+El componente reutilizable dejó de documentarse como exclusivo de Artículos.
+
+## 46.7 Columnas opcionales
+
+IDs persistidos:
+
+```text
+1  Ordenar
+4  Referencia
+5  Marca
+6  Código de barras
+8  Stock actual
+9  Stock final
+11 Descuento
+13 IVA
+```
+
+Nuevo pedido:
+
+```text
+visibles inicialmente
+→ 1 Ordenar
+→ 5 Marca
+```
+
+## 46.8 Aún pendiente fuera de 16.4
+
+No confundir la cabecera ya cerrada con funcionalidades posteriores:
+
+```text
+líneas
+buscador artículos
+motor económico
+dirty/navigation guard
+Pedido → Artículos
+PDFs
+recepción
+```
+
+# 47. 16.5 — Líneas + buscador de artículos 🟦 EN DESARROLLO
+
+Objetivo funcional completo de `16.5`:
 
 - búsqueda por localizador;
 - acceso directo;
-- búsqueda por texto;
+- búsqueda libre;
 - autofocus;
 - añadir línea con unidades `0`;
 - evitar duplicados;
@@ -2758,9 +2991,278 @@ Implementar:
 - código adicional pendiente;
 - persistencia de líneas.
 
-No recepcionar todavía si no está implementada la fase correspondiente.
+No recepcionar todavía en `16.5`.
 
----
+## 47.1 16.5A.1 — Schema líneas + snapshots stock ✅
+
+Añadido a `linea_pedido`:
+
+```text
+orden INTEGER
+stock_actual_snapshot INTEGER NULL
+stock_final_snapshot INTEGER NULL
+```
+
+Índice:
+
+```text
+(id_pedido, orden, id)
+```
+
+No usar `UNIQUE(id_pedido, orden)`.
+
+Importación legacy:
+
+```text
+orden
+→ reconstruido establemente por pedido
+
+stock_actual_snapshot
+stock_final_snapshot
+→ NULL
+```
+
+Razón:
+
+```text
+TPV antiguo no guardaba esos stocks
+→ no inventar historia
+```
+
+## 47.2 16.5A.2 — Lectura backend de líneas ✅
+
+Cadena completa:
+
+```text
+SQLite
+→ TypeOrmPedidosRepository.getPedidoLineas()
+→ PedidosService
+→ ComprasApi
+→ IPC
+→ preload
+→ ComprasService renderer
+```
+
+Contrato público:
+
+```text
+PedidoLineaInterface
+```
+
+Reglas de stock:
+
+```text
+PENDIENTE
+stockActual
+→ articulo.stock actual
+
+stockFinal
+→ articulo.stock + unidades
+
+RECEPCIONADO NUEVO
+stockActual
+→ stock_actual_snapshot
+
+stockFinal
+→ stock_final_snapshot
+
+RECEPCIONADO LEGACY SIN SNAPSHOTS
+→ NULL / NULL
+→ nunca sustituir por stock actual
+```
+
+Datos de línea:
+
+```text
+nombreArticulo
+→ snapshot persistido en linea_pedido
+
+localizador
+referencia
+marca
+→ datos actuales del artículo vinculado si sigue existiendo
+```
+
+Orden:
+
+```text
+ORDER BY orden, id
+```
+
+Tests cubren:
+
+```text
+pendiente ignora snapshots accidentales y usa stock canónico
+recepcionado usa snapshots
+legacy sin vínculo/snapshot devuelve NULL
+```
+
+## 47.3 16.5A.3.1 — Repository resolución/búsqueda artículos ✅
+
+Existe:
+
+```text
+PedidoArticuloRecord
+```
+
+Métodos de `PedidosRepository` / `TypeOrmPedidosRepository`:
+
+```text
+resolvePedidoArticulo(codigo, codigoNumerico)
+searchPedidoArticulos(searchPattern)
+```
+
+Resolución exacta:
+
+```text
+si código numérico:
+1. acceso_directo
+2. localizador
+3. código de barras activo
+
+si no numérico:
+→ código de barras activo
+```
+
+Búsqueda libre:
+
+```text
+articulo.slug LIKE pattern
+→ solo artículos activos
+→ orden nombre NOCASE, id
+```
+
+Datos devueltos:
+
+```text
+id
+publicId
+localizador
+nombre
+referencia
+marcaNombre
+stock
+palbMicros
+pucMicros
+pvpMicros
+margenMicroporcentaje
+ivaBps
+recargoEquivalenciaBps
+tieneCodigoBarrasAdicional
+observaciones
+mostrarObservacionesPedidos
+```
+
+PVP canónico:
+
+```text
+articulo.pvp_cents
+→ convertido a microeuros para línea de Pedido
+```
+
+Códigos adicionales:
+
+```text
+solo cuenta código_barras
+por_defecto = 0
+AND deleted_at IS NULL
+```
+
+Observaciones:
+
+```text
+se recupera texto
++
+mostrar_observaciones_pedidos
+```
+
+Decisión estructural:
+
+```text
+PEDIDO_ARTICULO_SELECT
+→ typeorm-pedidos.repository.private.ts
+```
+
+No dejar constantes SQL grandes exclusivas de una clase dentro de la clase principal.
+
+## 47.4 16.5A.3.2 — SIGUIENTE
+
+Implementar de forma completa:
+
+```text
+contrato público de artículo para Pedido
+PedidosService:
+  resolución exacta
+  búsqueda libre
+  normalización/validación de entrada
+
+FakePedidosRepository actualizado
+tests completos PedidosService
+
+ComprasApi
+IPC channel + handler
+preload
+ComprasService renderer
+```
+
+Regla de trabajo:
+
+```text
+si se amplía PedidosRepository/ComprasApi
+→ adaptar en el mismo bloque TODOS los fakes/mocks afectados
+```
+
+Todos los imports internos nuevos:
+
+```text
+→ alias absoluto
+→ nunca ./archivo
+```
+
+Todavía NO crear tabla renderer en este bloque.
+
+## 47.5 Reglas funcionales que siguen vigentes para la futura UI
+
+Nueva línea:
+
+```text
+unidades = 0
+```
+
+Artículo duplicado:
+
+```text
+NO crear segunda línea
+→ localizar existente
+→ enfocar Unidades
+```
+
+Pedido pendiente:
+
+```text
+Stock = canónico actual
+Stock final = Stock + unidades
+```
+
+Pedido recepcionado:
+
+```text
+usar snapshots
+→ nunca reemplazarlos por stock actual
+```
+
+Código adicional:
+
+```text
+si artículo no tiene adicional
+→ permitir introducir uno pendiente
+
+si ya tiene adicional(es)
+→ mostrar indicador
+→ no permitir añadir otro desde Compras
+```
+
+No hacer canónico ese código hasta Recepción.
 
 # 48. 16.6 — Motor económico
 
@@ -3053,7 +3555,7 @@ placeholder
 
 # 57. Convenciones arquitectónicas resultantes
 
-## 56.1 Compartido vs privado
+## 57.1 Compartido vs privado
 
 ```text
 global y estable
@@ -3069,7 +3571,9 @@ estado/comportamiento de instancia
 → clase
 ```
 
-## 56.2 Subdominios
+Una constante SQL extensa exclusiva de un repository es un candidato claro a `.private.ts`.
+
+## 57.2 Subdominios
 
 Crear carpeta propia cuando existe un subdominio reconocible con varias piezas.
 
@@ -3077,7 +3581,7 @@ No crear una carpeta por archivo.
 
 Las fachadas comunes pueden permanecer en la raíz.
 
-## 56.3 Backend
+## 57.3 Backend
 
 Patrón de referencia:
 
@@ -3093,13 +3597,13 @@ Servicios secundarios:
 → providers estrechos
 ```
 
-## 56.4 Composition root
+## 57.4 Composition root
 
 No dividir `application-composition.ts` solo por longitud.
 
 Su responsabilidad es mostrar el grafo de dependencias.
 
-## 56.5 Renderer state
+## 57.5 Renderer state
 
 ```text
 datos canónicos
@@ -3112,7 +3616,19 @@ estado efímero
 → componente
 ```
 
-## 56.6 Hotspots
+## 57.6 Imports internos
+
+```text
+si el módulo pertenece al proyecto
+→ usar alias absoluto
+
+aunque origen y destino estén en la misma carpeta
+→ seguir usando alias
+```
+
+El orden textual de imports no forma parte del patch: VSCode/Prettier lo normalizan.
+
+## 57.7 Hotspots
 
 Antes de extraer:
 
@@ -3122,17 +3638,49 @@ Antes de extraer:
 
 Si no, el tamaño no basta.
 
----
+## 57.8 Bloques de implementación
+
+Preferencia consolidada:
+
+```text
+bloque más pequeño
++
+completo
+>
+mega-bloque con piezas implícitas
+```
+
+Completo significa incluir, cuando proceda:
+
+```text
+interfaces
+implementación
+imports
+JSDoc
+fakes/mocks
+tests
+fixtures
+IPC/preload
+compilación afectada
+```
 
 # 58. Decisiones que no deben revertirse
 
+- Imports internos del proyecto: usar siempre alias absolutos; no introducir imports relativos aunque los archivos estén en la misma carpeta.
+- Cuando se soliciten imports, proporcionar todos los imports necesarios, pero no indicar su posición/orden físico porque VSCode/Prettier lo normalizan.
+- Todo método TS/JS nuevo lleva JSDoc.
+- Si una interfaz cambia, adaptar en el mismo bloque todos los fakes/mocks/specs necesarios para que compile.
+- Si se anuncian casos de test, entregar su código; no dejar la implementación del test implícita.
+- Preferir bloques pequeños pero completos.
+- Constantes/mapas/fragmentos SQL exclusivos de una clase y con entidad propia pueden ir a su `.private.ts`; `PEDIDO_ARTICULO_SELECT` es precedente explícito.
 - Fechas de la aplicación: usar `input type="date"` nativo con valor `YYYY-MM-DD`; no introducir `MatDatepicker` como patrón general.
 - No envolver fechas nativas en `mat-form-field` únicamente por apariencia.
 - Dinero/decimales/porcentajes: preferir `type="text" + inputmode="decimal"` cuando necesitemos parsing/formato europeo.
 - Mantener apariencia compartida en `controls.scss` y layout/ancho en cada componente.
 - No crear componentes Angular triviales únicamente para envolver controles nativos.
+- No usar `Router.getCurrentNavigation()`; usar `Router.currentNavigation()` signal.
 - No reabrir Hito 15 por ajustes de Compras.
-- No reabrir la pausa REF por refactors oportunistas.
+- No reabrir la pausa REF ni CTRL por refactors oportunistas.
 - No volver a crear `AlmacenService` backend agregado.
 - No volver a crear `AlmacenRepository`.
 - No volver a crear `TypeOrmAlmacenRepository`.
@@ -3144,18 +3692,19 @@ Si no, el tamaño no basta.
 - No permitir recepción si alguna línea tiene `unidades = 0`.
 - No permitir líneas duplicadas del mismo artículo dentro del pedido; dirigir a la existente.
 - No reinterpretar `Abono` como devolución: es tipo documental.
+- No reinterpretar `metodo_pago` legacy como ID de `tipo_pago`.
+- `forma_pago` de Pedido es snapshot histórico; no destruirlo por renombrar el catálogo.
 - No hacer que `UE` elimine IVA/RE del PUC legacy.
 - No sustituir `Media margen` legacy por una media simple.
 - No aplicar descuento global a portes.
 - No incluir portes/descuento global en `Total beneficios`.
 - No permitir modificar R.E. después de recepcionar.
 - No releer stock actual para sustituir snapshots de un pedido recepcionado.
+- Para recepcionados legacy sin snapshot de stock, devolver `NULL`; no inventar historia.
 - No volver a aplicar stock/precios al editar información de un pedido recepcionado.
 - No diseñar Marcas/Proveedores antes de cerrar su contrato funcional.
 - No tocar TicketBAI 12C.9 sin información de Berein.
 - No bloquear el proyecto por la prueba física Star.
-
----
 
 # 59. Pendientes externos/no bloqueantes
 
@@ -3177,100 +3726,127 @@ Imprenta
 En una conversación nueva:
 
 1. usar este documento como continuidad principal;
-2. revisar `main` actual;
+2. revisar siempre `main` actual antes de proponer cambios;
 3. confirmar que:
-   - Hito 15 está cerrado;
+   - Hitos 13, 14 y 15 están cerrados;
    - REF está cerrada;
-   - `16.1`, `16.2` y `16.3` están cerrados;
-   - la pantalla principal de Pedidos funciona con filtros, paginación, workspace y fechas nativas;
-4. no reimplementar 16.1–16.3;
+   - CTRL está cerrada;
+   - `16.1`, `16.2`, `16.3` y `16.4` están cerrados;
+   - `16.5A.1`, `16.5A.2` y `16.5A.3.1` están cerrados;
+4. no reimplementar esos bloques;
 5. continuar exactamente con:
 
 ```text
-CTRL.1 — Primera pasada de controles globales
+16.5A.3.2
+→ Application Service
+→ contrato público
+→ ComprasApi
+→ IPC
+→ preload
+→ ComprasService renderer
+→ tests completos
 ```
 
-6. respetar la convención ya acordada de fechas nativas `type="date"`;
-7. no convertir CTRL en una limpieza global indiscriminada;
-8. después de CTRL.1, validar visualmente antes de hacer CTRL.2;
-9. tras cerrar CTRL, continuar con:
-
-```text
-16.4 — Ficha Pedido: cabecera + persistencia básica
-```
-
-10. usar el TPV antiguo solo como referencia funcional/paridad cuando sea útil;
-11. respetar las decisiones económicas y de compatibilidad de Pedidos de este documento;
-12. esperar tests + confirmación tras cada mini-hito;
-13. no avanzar a Marcas ni Proveedores antes de cerrar Pedidos.
-
----
+6. no crear todavía tabla de líneas en ese bloque;
+7. todos los imports internos nuevos deben usar alias absolutos;
+8. no indicar posición/orden de imports: entregar solo el código exacto necesario;
+9. si se amplía una interfaz, adaptar en el mismo bloque fakes/mocks/specs;
+10. todo método nuevo debe llevar JSDoc;
+11. no dejar tests descritos sin código;
+12. mantener `PEDIDO_ARTICULO_SELECT` en `typeorm-pedidos.repository.private.ts`;
+13. usar el TPV antiguo solo como referencia funcional/paridad;
+14. respetar las decisiones económicas y de compatibilidad de Pedidos;
+15. esperar tests + confirmación tras cada bloque;
+16. no avanzar a Marcas ni Proveedores antes de cerrar Pedidos.
 
 # 61. Resumen ultracorto
 
 ```text
 Proyecto: Osumi TPV Client
-Continuidad: 10/09/2026
-Base: v2.52 + main
+Continuidad: 11/09/2026
+Base: v2.53 + main
 
 Hito 13 Artículos ✅
 Hito 14 Clientes ✅
 Hito 15 Almacén ✅
-
-Pausa técnica REF ✅ CERRADA
+REF ✅
+CTRL controles ✅
 
 TicketBAI ordinario ✅
 TicketBAI devoluciones/mixtas ⏸️ Berein
 
-Hito 16 Compras 🟦 EN DESARROLLO
+Hito 16 Compras 🟦
 
 16.1 Base + históricos ✅
 16.2 Backend listados ✅
 16.3 UI listados ✅
+16.4 Cabecera Pedido ✅
 
-16.3 consolidado:
-→ Pedidos guardados / recepcionados
-→ filtros
-→ paginación 20/50/100/200
-→ workspace independiente
-→ observaciones
-→ UE
-→ navegación a Pedido
-→ fechas nativas type="date"
-→ YYYY-MM-DD
-→ sin MatDatepicker
+16.4 incluye:
+→ get/save/delete cabecera
+→ proveedores y pagos históricos
+→ forma_pago snapshot
+→ mapping legacy pago 0..4 correcto
+→ UI cabecera
+→ fechas nativas
+→ columnas opcionales
+→ Guardar + feedback 4 s
+→ Router.currentNavigation()
+→ Eliminar pendiente
+→ alta rápida Proveedor
+
+16.5 🟦
+
+16.5A.1 ✅
+→ linea_pedido.orden
+→ stock_actual_snapshot
+→ stock_final_snapshot
+→ import legacy snapshots NULL
+
+16.5A.2 ✅
+→ getPedidoLineas()
+→ pendiente usa stock canónico
+→ recepcionado usa snapshots
+→ legacy sin snapshots devuelve NULL
+
+16.5A.3.1 ✅
+→ PedidoArticuloRecord
+→ resolvePedidoArticulo()
+→ searchPedidoArticulos()
+→ acceso directo > localizador > barcode
+→ búsqueda por slug
+→ PVP cents → micros
+→ barcode adicional
+→ observaciones Pedidos
+→ PEDIDO_ARTICULO_SELECT en .private.ts
 
 SIGUIENTE:
-CTRL.1 Primera pasada de controles globales
+16.5A.3.2
+→ service
+→ contrato público
+→ ComprasApi
+→ IPC
+→ preload
+→ ComprasService
+→ tests completos
 
-Convenciones:
-→ nueva fuente canónica: src/styles/controls.scss
-→ apariencia global / layout local
-→ fecha: input type="date"
-→ entero: type="number" step="1"
-→ dinero/decimal/%: text + inputmode="decimal"
-→ Material cuando aporta validación/errores/overlay
-→ select nativo para casos simples
-→ checkbox = opción
-→ slide-toggle = modo inmediato
-→ botones Material según acción
-→ editor de tabla compacto compartido
+Convenciones nuevas IMPORTANTES:
+→ imports internos SIEMPRE alias absoluto
+→ incluso misma carpeta
+→ entregar imports exactos
+→ no indicar posición/orden de imports
+→ VSCode/Prettier los ordenan
+→ todo método nuevo con JSDoc
+→ bloques pequeños pero completos
+→ interfaz nueva/cambiada implica adaptar fakes/mocks/specs
+→ tests propuestos deben venir con código
+→ constantes/SQL privados con responsabilidad propia → .private.ts
 
-CTRL.1:
-→ controls.scss
-→ fechas Clientes/Compras
-→ Material compacto Inventario/Caducidades/Compras
-→ importes filtros Compras
-→ base editor tabla
-→ validación visual
-
-CTRL.2:
-→ ArticleGeneral
-→ ArticleNotes
-→ quick creates cuando encaje
-
-DESPUÉS:
-16.4 Ficha Pedido: cabecera + persistencia
+Controles:
+→ controls.scss fuente canónica
+→ fecha nativa type=date
+→ decimal text + inputmode=decimal
+→ editor tabla global compacto
 
 Históricos:
 1 VENTA
@@ -3283,33 +3859,30 @@ Históricos:
 
 Pedidos:
 → pendiente = borrador sin efectos canónicos
-→ recepcionar = transacción atómica
-→ todas las líneas > 0
-→ recepción actualiza stock/precios/código
+→ nueva línea futura unidades 0
+→ no duplicados
+→ recepción exige todas unidades >0
 → histórico PEDIDO=3
 → recepcionado congela economía/stock
-→ datos informativos + observaciones + PDFs siguen editables
-→ dirty al salir pide confirmación
-→ crear Artículo exige pedido guardado y permite retorno
+→ R.E. congelado
+→ datos informativos siguen editables
+→ dirty al salir se implementará en 16.7
+→ crear Artículo/retorno se implementará en 16.8
 
 Economía:
 → descuento línea afecta PUC
 → descuento global afecta bases/impuestos de líneas
 → descuento global no altera PUC
-→ portes = base ficticia IVA 21 %, RE 5,2 % si aplica
-→ portes fuera del descuento global
+→ portes IVA 21 %, RE 5,2 % si aplica
+→ portes fuera descuento global
 → Total beneficios solo líneas
-→ Media margen = fórmula legacy ponderada + portes
-→ UE = compatibilidad legacy:
-   mantiene IVA/RE y PUC
-   muestra impuestos sombreados
-   añade Total sin IVA
+→ Media margen fórmula legacy ponderada + portes
+→ UE mantiene IVA/RE y PUC
+→ UE añade Total sin IVA
 
 Plan restante:
-CTRL.1 controles globales
-CTRL.2 Artículos
-16.4 Cabecera/persistencia
-16.5 Líneas/búsqueda
+16.5A.3.2 Service/API búsqueda artículos
+16.5 resto líneas + buscador/persistencia
 16.6 Motor económico
 16.7 Dirty/navigation
 16.8 Pedido → Artículos
@@ -3321,5 +3894,9 @@ CTRL.2 Artículos
 16.14 Proveedores
 
 Regla clave:
-revisar main antes de cada patch y no avanzar sin confirmación.
+revisar main antes de cada patch
+→ bloque pequeño pero completo
+→ tests
+→ confirmación
+→ siguiente.
 ```
