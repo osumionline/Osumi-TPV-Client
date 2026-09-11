@@ -31,7 +31,7 @@ import Proveedor from '@model/proveedores/proveedor.model';
 import ProviderQuickCreateComponent from '@modules/articulos/components/provider-quick-create/provider-quick-create.component';
 import PurchaseOrderLinesComponent from '@modules/compras/pedidos/components/purchase-order-lines/purchase-order-lines.component';
 import {
-  addPurchaseOrderArticle,
+  addPurchaseOrderArticles,
   addPurchaseOrderProviderOption,
   buildPurchaseOrderPaymentOptions,
   buildPurchaseOrderProviderOptions,
@@ -284,24 +284,29 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Incorpora al estado editable el artículo elegido
-   * desde el buscador de líneas.
+   * Incorpora al estado editable los artículos elegidos
+   * desde el localizador o el buscador.
    */
-  onArticleSelected(articulo: PedidoArticuloInterface): void {
+  onArticlesSelected(articulos: readonly PedidoArticuloInterface[]): void {
     const state: PurchaseOrderFormState | null = this.formState();
 
-    if (state === null || state.recepcionado || this.processing()) {
+    if (state === null || state.recepcionado || this.processing() || articulos.length === 0) {
       return;
     }
 
-    const result = addPurchaseOrderArticle(this.lines(), articulo);
+    const currentLines: readonly PurchaseOrderLineState[] = this.lines();
 
-    if (!result.added) {
+    const nextLines: readonly PurchaseOrderLineState[] = addPurchaseOrderArticles(
+      currentLines,
+      articulos,
+    );
+
+    if (nextLines === currentLines) {
       return;
     }
 
     this.clearSaveFeedback();
-    this.lines.set(result.lines);
+    this.lines.set(nextLines);
   }
 
   /**

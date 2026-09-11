@@ -1,21 +1,23 @@
 import { DecimalPipe } from '@angular/common';
 import {
+  afterNextRender,
   Component,
   computed,
+  ElementRef,
   inject,
   input,
   output,
   signal,
+  viewChild,
   type InputSignal,
   type OutputEmitterRef,
   type Signal,
   type WritableSignal,
 } from '@angular/core';
-import { MatIconButton } from '@angular/material/button';
-import { MatIcon } from '@angular/material/icon';
-import { MatTooltip } from '@angular/material/tooltip';
 import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
+import ArticleSearchComponent from '@modules/ventas/components/article-search/article-search.component';
+import { DialogService } from '@osumi/angular-tools';
 import BpsToPercentPipe from '@pipes/bps-to-percent.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
 import ComprasService from '@services/compras.service';
@@ -28,133 +30,169 @@ import { getErrorMessage } from '@utils/error.utils';
   selector: 'otpv-purchase-order-lines',
   templateUrl: './purchase-order-lines.component.html',
   styleUrl: './purchase-order-lines.component.scss',
-  imports: [BpsToPercentPipe, DecimalPipe, MatIcon, MatIconButton, MatTooltip, MicrosToEurosPipe],
+  imports: [ArticleSearchComponent, BpsToPercentPipe, DecimalPipe, MicrosToEurosPipe],
 })
 export default class PurchaseOrderLinesComponent {
   private readonly comprasService: ComprasService = inject(ComprasService);
 
+  private readonly dialog: DialogService = inject(DialogService);
+
+  private readonly localizadorInput: Signal<ElementRef<HTMLInputElement> | undefined> =
+    viewChild<ElementRef<HTMLInputElement>>('localizadorInput');
+
   readonly lines: InputSignal<readonly PurchaseOrderLineState[]> =
     input.required<readonly PurchaseOrderLineState[]>();
+
   readonly visibleColumns: InputSignal<readonly number[]> = input.required<readonly number[]>();
+
   readonly recargoEquivalencia: InputSignal<boolean> = input.required<boolean>();
+
   readonly disabled: InputSignal<boolean> = input.required<boolean>();
 
-  readonly articleSelected: OutputEmitterRef<PedidoArticuloInterface> =
-    output<PedidoArticuloInterface>();
+  readonly articlesSelected: OutputEmitterRef<readonly PedidoArticuloInterface[]> =
+    output<readonly PedidoArticuloInterface[]>();
 
-  readonly searchText: WritableSignal<string> = signal<string>('');
+  readonly localizador: WritableSignal<string> = signal<string>('');
+
   readonly searching: WritableSignal<boolean> = signal<boolean>(false);
-  readonly searchResults: WritableSignal<readonly PedidoArticuloInterface[]> = signal<
-    readonly PedidoArticuloInterface[]
-  >([]);
-  readonly searchMessage: WritableSignal<string | null> = signal<string | null>(null);
+
+  readonly searchOpen: WritableSignal<boolean> = signal<boolean>(false);
+
+  readonly searchInitialQuery: WritableSignal<string> = signal<string>('');
 
   readonly visibleColumnIds: Signal<ReadonlySet<number>> = computed(
     (): ReadonlySet<number> => new Set<number>(this.visibleColumns()),
   );
 
-  /**
-   * Actualiza el texto del buscador y elimina
-   * resultados pertenecientes a una consulta anterior.
-   */
-  onSearchInput(event: Event): void {
-    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
-
-    this.searchText.set(inputElement.value);
-    this.searchResults.set([]);
-    this.searchMessage.set(null);
+  constructor() {
+    afterNextRender((): void => {
+      if (!this.disabled()) {
+        this.focusLocalizador();
+      }
+    });
   }
 
   /**
-   * Ejecuta la búsqueda cuando se pulsa Enter.
+   * Actualiza el contenido actual del localizador.
    */
-  onSearchKeydown(event: KeyboardEvent): void {
+  onLocalizadorInput(event: Event): void {
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
+    this.localizador.set(inputElement.value);
+  }
+
+  /**
+   * Abre el buscador al comenzar a escribir un nombre
+   * y resuelve códigos exactos al pulsar Enter.
+   */
+  onLocalizadorKeydown(event: KeyboardEvent): void {
+    if (this.disabled() || this.searching()) {
+      return;
+    }
+
+    if (/^\p{L}$/u.test(event.key) && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+
+      this.openSearch(`${this.localizador()}${event.key}`);
+
+      return;
+    }
+
     if (event.key !== 'Enter') {
       return;
     }
 
     event.preventDefault();
-    event.stopPropagation();
 
-    void this.searchArticle();
+    void this.resolveLocalizador();
   }
 
   /**
-   * Ejecuta manualmente la búsqueda actual.
+   * Recibe los artículos elegidos en el buscador,
+   * cierra el modal y los propaga al Pedido.
    */
-  onSearchClick(): void {
-    void this.searchArticle();
+  onSearchSelected(articulos: readonly PedidoArticuloInterface[]): void {
+    this.searchOpen.set(false);
+    this.localizador.set('');
+    this.articlesSelected.emit(articulos);
+    this.focusLocalizador();
   }
 
   /**
-   * Selecciona uno de los resultados de búsqueda
-   * y limpia el buscador.
+   * Cierra el buscador sin seleccionar artículos
+   * y devuelve el foco al localizador.
    */
-  selectArticle(articulo: PedidoArticuloInterface): void {
-    if (this.disabled()) {
-      return;
-    }
-
-    this.articleSelected.emit(articulo);
-    this.clearSearch();
+  closeSearch(): void {
+    this.searchOpen.set(false);
+    this.focusLocalizador();
   }
 
   /**
-   * Resuelve primero códigos exactos y, cuando no existe
-   * coincidencia, realiza una búsqueda libre por artículo.
+   * Abre el buscador común de artículos con
+   * el texto que ha iniciado la búsqueda.
    */
-  private async searchArticle(): Promise<void> {
-    if (this.disabled() || this.searching()) {
-      return;
-    }
+  private openSearch(query: string): void {
+    this.searchInitialQuery.set(query);
+    this.searchOpen.set(true);
+  }
 
-    const searchText: string = this.searchText().trim();
+  /**
+   * Resuelve el localizador, acceso directo o código
+   * de barras introducido y añade el artículo encontrado.
+   */
+  private async resolveLocalizador(): Promise<void> {
+    const codigo: string = this.localizador().trim();
 
-    if (searchText.length === 0) {
-      this.searchResults.set([]);
-      this.searchMessage.set(null);
-
+    if (codigo.length === 0 || this.disabled() || this.searching()) {
       return;
     }
 
     this.searching.set(true);
-    this.searchResults.set([]);
-    this.searchMessage.set(null);
 
     try {
-      const exactArticle: PedidoArticuloInterface | null =
-        searchText.length <= 100
-          ? await this.comprasService.resolvePedidoArticulo(searchText)
-          : null;
+      const articulo: PedidoArticuloInterface | null =
+        await this.comprasService.resolvePedidoArticulo(codigo);
 
-      if (exactArticle !== null) {
-        this.selectArticle(exactArticle);
+      if (articulo === null) {
+        this.dialog
+          .alert({
+            title: 'Artículo no encontrado',
+            content: 'El código introducido no corresponde a ningún artículo.',
+          })
+          .subscribe((): void => {
+            this.localizador.set('');
+            this.focusLocalizador();
+          });
 
         return;
       }
 
-      const results: readonly PedidoArticuloInterface[] =
-        await this.comprasService.searchPedidoArticulos(searchText);
-
-      this.searchResults.set(results);
-
-      if (results.length === 0) {
-        this.searchMessage.set('No se han encontrado artículos.');
-      }
+      this.localizador.set('');
+      this.articlesSelected.emit([articulo]);
+      this.focusLocalizador();
     } catch (error: unknown) {
-      this.searchMessage.set(getErrorMessage(error, 'No se ha podido buscar el artículo.'));
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido resolver el artículo.'),
+        })
+        .subscribe((): void => {
+          this.focusLocalizador();
+        });
     } finally {
       this.searching.set(false);
     }
   }
 
   /**
-   * Vacía el texto, los resultados y cualquier
-   * mensaje asociado a la búsqueda anterior.
+   * Devuelve el foco al campo Localizador cuando
+   * el Pedido continúa siendo editable.
    */
-  private clearSearch(): void {
-    this.searchText.set('');
-    this.searchResults.set([]);
-    this.searchMessage.set(null);
+  private focusLocalizador(): void {
+    if (this.disabled()) {
+      return;
+    }
+
+    this.localizadorInput()?.nativeElement.focus();
   }
 }

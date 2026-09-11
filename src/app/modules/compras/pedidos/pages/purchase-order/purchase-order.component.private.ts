@@ -98,6 +98,23 @@ export function addPurchaseOrderArticle(
   };
 }
 
+/**
+ * Incorpora varios artículos al Pedido en el orden recibido,
+ * omitiendo los que ya dispongan de una línea.
+ */
+export function addPurchaseOrderArticles(
+  lines: readonly PurchaseOrderLineState[],
+  articulos: readonly PedidoArticuloInterface[],
+): readonly PurchaseOrderLineState[] {
+  let resultLines: readonly PurchaseOrderLineState[] = lines;
+
+  for (const articulo of articulos) {
+    resultLines = addPurchaseOrderArticle(resultLines, articulo).lines;
+  }
+
+  return resultLines;
+}
+
 export interface PurchaseOrderFormState {
   readonly id: number | null;
   readonly publicId: string | null;

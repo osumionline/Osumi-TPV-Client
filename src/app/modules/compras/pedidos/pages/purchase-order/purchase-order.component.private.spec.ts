@@ -9,6 +9,7 @@ import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-l
 import {
   addPurchaseOrderArticle,
   AddPurchaseOrderArticleResult,
+  addPurchaseOrderArticles,
   addPurchaseOrderProviderOption,
   buildPurchaseOrderPaymentOptions,
   buildPurchaseOrderProviderOptions,
@@ -464,5 +465,63 @@ describe('purchase-order.component.private', (): void => {
 
     expect(result.added).toBe(false);
     expect(result.lines).toBe(lines);
+  });
+
+  it('añade una selección múltiple en orden y omite artículos ya existentes', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          idArticulo: 8,
+          localizador: 260458,
+          orden: 2,
+        }),
+      ),
+    ];
+
+    const result: readonly PurchaseOrderLineState[] = addPurchaseOrderArticles(lines, [
+      createPedidoArticulo({
+        id: 8,
+        publicId: 'article-8',
+        localizador: 260458,
+      }),
+      createPedidoArticulo({
+        id: 9,
+        publicId: 'article-9',
+        localizador: 267960,
+      }),
+      createPedidoArticulo({
+        id: 10,
+        publicId: 'article-10',
+        localizador: 269395,
+      }),
+    ]);
+
+    expect(result).toHaveLength(3);
+
+    expect(result.map((line: PurchaseOrderLineState): number | null => line.idArticulo)).toEqual([
+      8, 9, 10,
+    ]);
+
+    expect(result.map((line: PurchaseOrderLineState): number => line.orden)).toEqual([2, 3, 4]);
+
+    expect(result[1]?.unidades).toBe(0);
+    expect(result[2]?.unidades).toBe(0);
+  });
+
+  it('mantiene el mismo estado cuando toda la selección múltiple ya existe', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          idArticulo: 9,
+          localizador: 267960,
+        }),
+      ),
+    ];
+
+    const result: readonly PurchaseOrderLineState[] = addPurchaseOrderArticles(lines, [
+      createPedidoArticulo(),
+    ]);
+
+    expect(result).toBe(lines);
   });
 });

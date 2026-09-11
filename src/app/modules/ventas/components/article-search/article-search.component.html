@@ -69,9 +69,11 @@
                         class="search__name"
                         [attr.aria-label]="
                         context() === 'articulos'
-                          ? 'Abrir ' + articulo.nombre
-                          : 'Añadir ' + articulo.nombre + ' directamente a la venta'
-                      "
+                            ? 'Abrir ' + articulo.nombre
+                            : context() === 'pedidos'
+                            ? 'Añadir ' + articulo.nombre + ' al pedido'
+                            : 'Añadir ' + articulo.nombre + ' directamente a la venta'
+                        "
                         (click)="selectArticulo(articulo)">
                     {{ articulo.nombre }}
                 </button>
@@ -82,13 +84,10 @@
 
                 <span class="search__price">
                     {{
-                  (
-                    articulo.pvpDescuentoCents
-                    ?? articulo.pvpCents
-                  )
-                    | centsToEuros
-                    | currency:'EUR':'symbol':'1.2-2'
-                }}
+                      articulo.precioMicros
+                        | microsToEuros
+                        | currency:'EUR':'symbol':'1.2-2'
+                    }}
                 </span>
 
                 <span class="search__stock">
