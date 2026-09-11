@@ -31,11 +31,23 @@ export default interface ComprasApi {
    */
   getPedidoFilterOptions(): Promise<PedidoFilterOptionsInterface>;
 
+  /**
+   * Recupera la cabecera persistida de un pedido.
+   */
   getPedido(idPedido: number): Promise<PedidoCabeceraInterface | null>;
 
+  /**
+   * Recupera las opciones disponibles para editar una ficha de Pedido.
+   */
   getPedidoFormOptions(): Promise<PedidoFormOptionsInterface>;
 
+  /**
+   * Crea o actualiza la cabecera de un pedido.
+   */
   savePedido(command: PedidoSaveCommand): Promise<number>;
 
+  /**
+   * Elimina lógicamente un pedido todavía pendiente.
+   */
   deletePedido(idPedido: number): Promise<void>;
 }

@@ -1,10 +1,16 @@
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
 import type PedidosRepository from '@backend/contracts/compras/pedidos/pedidos.repository.interface';
 import type {
+  PedidoCabeceraRecord,
+  PedidoFormOptionsRecord,
+  PedidoSaveRecord,
+} from '@backend/domain/compras/pedidos/pedido-cabecera-record.interface';
+import type {
   PedidoFilterOptionsRecord,
   PedidosGuardadosResultadoRecord,
   PedidosRecepcionadosResultadoRecord,
 } from '@backend/domain/compras/pedidos/pedido-listado-record.interface';
+import type { PedidoSaveCommand } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
 import type {
   PedidoListadoConsulta,
   PedidosGuardadosResultado,
@@ -16,6 +22,28 @@ import PedidosService from './pedidos.service';
 class FakePedidosRepository implements PedidosRepository {
   lastGuardadosQuery: PedidoRepositoryQuery | null = null;
   lastRecepcionadosQuery: PedidoRepositoryQuery | null = null;
+  lastGetPedidoId: number | null = null;
+  lastSavedCommand: PedidoSaveRecord | null = null;
+  lastDeletedPedidoId: number | null = null;
+
+  pedidoResult: PedidoCabeceraRecord | null = {
+    id: 9,
+    publicId: 'order-9',
+    idProveedor: 4,
+    proveedorNombre: 'Proveedor',
+    idTipoPago: null,
+    formaPago: 'Domiciliación bancaria',
+    tipo: 'factura',
+    numero: 'ORD-9',
+    fechaPedido: '2026-09-10',
+    fechaPago: '2026-09-11',
+    fechaRecepcionado: null,
+    recargoEquivalencia: true,
+    europeo: false,
+    recepcionado: false,
+    observaciones: 'Pedido de prueba',
+    columnasVisibles: [1, 4],
+  };
 
   /**
    * Conserva la consulta de pendientes recibida.
@@ -83,8 +111,58 @@ class FakePedidosRepository implements PedidosRepository {
       ],
     });
   }
+
+  /**
+   * Devuelve el pedido configurado para el test.
+   */
+  getPedido(idPedido: number): Promise<PedidoCabeceraRecord | null> {
+    this.lastGetPedidoId = idPedido;
+
+    return Promise.resolve(this.pedidoResult);
+  }
+
+  /**
+   * Devuelve opciones representativas para editar la ficha.
+   */
+  getPedidoFormOptions(): Promise<PedidoFormOptionsRecord> {
+    return Promise.resolve({
+      proveedores: [
+        {
+          idProveedor: 4,
+          nombre: 'Proveedor',
+        },
+      ],
+      tiposPago: [
+        {
+          idTipoPago: 7,
+          nombre: 'Tarjeta',
+        },
+      ],
+    });
+  }
+
+  /**
+   * Conserva la cabecera recibida y devuelve un identificador simulado.
+   */
+  savePedido(command: PedidoSaveRecord): Promise<number> {
+    this.lastSavedCommand = command;
+
+    return Promise.resolve(77);
+  }
+
+  /**
+   * Conserva el identificador del pedido solicitado para eliminación.
+   */
+  deletePedido(idPedido: number): Promise<void> {
+    this.lastDeletedPedidoId = idPedido;
+
+    return Promise.resolve();
+  }
 }
 
+/**
+ * Construye una consulta representativa de los listados.
+ */
 function createConsulta(overrides: Partial<PedidoListadoConsulta> = {}): PedidoListadoConsulta {
   return {
     fechaDesde: null,
@@ -95,6 +173,27 @@ function createConsulta(overrides: Partial<PedidoListadoConsulta> = {}): PedidoL
     importeHastaMicros: null,
     pagina: 1,
     num: 20,
+    ...overrides,
+  };
+}
+
+/**
+ * Construye un comando válido de guardado de Pedido.
+ */
+function createSaveCommand(overrides: Partial<PedidoSaveCommand> = {}): PedidoSaveCommand {
+  return {
+    id: null,
+    idProveedor: 4,
+    idTipoPago: null,
+    formaPago: 'Domiciliación bancaria',
+    tipo: 'factura',
+    numero: 'ORD-77',
+    fechaPedido: '2026-09-10',
+    fechaPago: null,
+    recargoEquivalencia: true,
+    europeo: false,
+    observaciones: 'Pedido de prueba',
+    columnasVisibles: [1, 4],
     ...overrides,
   };
 }
@@ -188,7 +287,7 @@ describe('PedidosService', (): void => {
     ).rejects.toThrow('El tamaño de página');
   });
 
-  it('expone las opciones de proveedor sin compartir estructuras del repository', async (): Promise<void> => {
+  it('expone las opciones de proveedor de los filtros', async (): Promise<void> => {
     const service = new PedidosService(new FakePedidosRepository());
 
     const result = await service.getPedidoFilterOptions();
@@ -201,5 +300,159 @@ describe('PedidosService', (): void => {
         },
       ],
     });
+  });
+
+  it('recupera y mapea la cabecera de un pedido', async (): Promise<void> => {
+    const repository = new FakePedidosRepository();
+    const service = new PedidosService(repository);
+
+    const result = await service.getPedido(9);
+
+    expect(repository.lastGetPedidoId).toBe(9);
+    expect(result).toEqual({
+      id: 9,
+      publicId: 'order-9',
+      idProveedor: 4,
+      proveedorNombre: 'Proveedor',
+      idTipoPago: null,
+      formaPago: 'Domiciliación bancaria',
+      tipo: 'factura',
+      numero: 'ORD-9',
+      fechaPedido: '2026-09-10',
+      fechaPago: '2026-09-11',
+      fechaRecepcionado: null,
+      recargoEquivalencia: true,
+      europeo: false,
+      recepcionado: false,
+      observaciones: 'Pedido de prueba',
+      columnasVisibles: [1, 4],
+    });
+  });
+
+  it('devuelve null cuando el pedido no existe', async (): Promise<void> => {
+    const repository = new FakePedidosRepository();
+    repository.pedidoResult = null;
+
+    const service = new PedidosService(repository);
+
+    await expect(service.getPedido(9)).resolves.toBeNull();
+    expect(repository.lastGetPedidoId).toBe(9);
+  });
+
+  it('rechaza identificadores de pedido inválidos', async (): Promise<void> => {
+    const service = new PedidosService(new FakePedidosRepository());
+
+    await expect(service.getPedido(0)).rejects.toThrow('El identificador del pedido no es válido.');
+    await expect(service.deletePedido(-1)).rejects.toThrow(
+      'El identificador del pedido no es válido.',
+    );
+  });
+
+  it('expone las opciones disponibles para editar la ficha', async (): Promise<void> => {
+    const service = new PedidosService(new FakePedidosRepository());
+
+    const result = await service.getPedidoFormOptions();
+
+    expect(result).toEqual({
+      proveedores: [
+        {
+          idProveedor: 4,
+          nombre: 'Proveedor',
+        },
+      ],
+      tiposPago: [
+        {
+          idTipoPago: 7,
+          nombre: 'Tarjeta',
+        },
+      ],
+    });
+  });
+
+  it('normaliza la cabecera antes de guardarla', async (): Promise<void> => {
+    const repository = new FakePedidosRepository();
+    const service = new PedidosService(repository);
+
+    const idPedido: number = await service.savePedido(
+      createSaveCommand({
+        formaPago: '  Domiciliación bancaria  ',
+        numero: '  ORD-100  ',
+        observaciones: '  Observación  ',
+        columnasVisibles: [1, 4, 1],
+      }),
+    );
+
+    expect(idPedido).toBe(77);
+    expect(repository.lastSavedCommand).toEqual({
+      id: null,
+      idProveedor: 4,
+      idTipoPago: null,
+      formaPago: 'Domiciliación bancaria',
+      tipo: 'factura',
+      numero: 'ORD-100',
+      fechaPedido: '2026-09-10',
+      fechaPago: null,
+      recargoEquivalencia: true,
+      europeo: false,
+      observaciones: 'Observación',
+      columnasVisibles: [1, 4],
+    });
+  });
+
+  it('rechaza un guardado sin proveedor válido', async (): Promise<void> => {
+    const service = new PedidosService(new FakePedidosRepository());
+
+    await expect(
+      service.savePedido(
+        createSaveCommand({
+          idProveedor: 0,
+        }),
+      ),
+    ).rejects.toThrow('Debes seleccionar un proveedor.');
+  });
+
+  it('rechaza fechas imposibles en la cabecera', async (): Promise<void> => {
+    const service = new PedidosService(new FakePedidosRepository());
+
+    await expect(
+      service.savePedido(
+        createSaveCommand({
+          fechaPedido: '2026-02-30',
+        }),
+      ),
+    ).rejects.toThrow('Una de las fechas del pedido no es válida.');
+  });
+
+  it('rechaza tipos documentales desconocidos', async (): Promise<void> => {
+    const service = new PedidosService(new FakePedidosRepository());
+    const command: PedidoSaveCommand = {
+      ...createSaveCommand(),
+      tipo: 'desconocido',
+    } as unknown as PedidoSaveCommand;
+
+    await expect(service.savePedido(command)).rejects.toThrow(
+      'El tipo documental del pedido no es válido.',
+    );
+  });
+
+  it('rechaza identificadores de columnas que no pertenecen al catálogo opcional', async (): Promise<void> => {
+    const service = new PedidosService(new FakePedidosRepository());
+
+    await expect(
+      service.savePedido(
+        createSaveCommand({
+          columnasVisibles: [1, 999],
+        }),
+      ),
+    ).rejects.toThrow('La configuración de columnas del pedido no es válida.');
+  });
+
+  it('delega la eliminación de un pedido válido', async (): Promise<void> => {
+    const repository = new FakePedidosRepository();
+    const service = new PedidosService(repository);
+
+    await service.deletePedido(9);
+
+    expect(repository.lastDeletedPedidoId).toBe(9);
   });
 });

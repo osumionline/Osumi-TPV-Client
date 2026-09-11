@@ -1,5 +1,5 @@
 import type PedidosService from '@backend/application/compras/pedidos/pedidos.service';
-import {
+import type {
   PedidoCabeceraInterface,
   PedidoFormOptionsInterface,
   PedidoSaveCommand,

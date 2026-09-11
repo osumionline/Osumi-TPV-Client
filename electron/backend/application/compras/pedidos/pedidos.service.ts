@@ -1,6 +1,6 @@
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
 import type PedidosRepository from '@backend/contracts/compras/pedidos/pedidos.repository.interface';
-import {
+import type {
   PedidoCabeceraRecord,
   PedidoFormOptionsRecord,
   PedidoSaveRecord,
@@ -13,7 +13,7 @@ import type {
   PedidosGuardadosResultadoRecord,
   PedidosRecepcionadosResultadoRecord,
 } from '@backend/domain/compras/pedidos/pedido-listado-record.interface';
-import {
+import type {
   PedidoCabeceraInterface,
   PedidoFormOptionsInterface,
   PedidoSaveCommand,

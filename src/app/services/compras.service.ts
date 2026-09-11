@@ -1,5 +1,5 @@
 import { Service } from '@angular/core';
-import {
+import type {
   PedidoCabeceraInterface,
   PedidoFormOptionsInterface,
   PedidoSaveCommand,
