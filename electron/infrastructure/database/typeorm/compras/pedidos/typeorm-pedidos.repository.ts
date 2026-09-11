@@ -1,5 +1,6 @@
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
 import type PedidosRepository from '@backend/contracts/compras/pedidos/pedidos.repository.interface';
+import type PedidoArticuloRecord from '@backend/domain/compras/pedidos/pedido-articulo-record.interface';
 import type {
   PedidoCabeceraRecord,
   PedidoFormOptionsRecord,
@@ -13,24 +14,27 @@ import type {
   PedidosGuardadosResultadoRecord,
   PedidosRecepcionadosResultadoRecord,
 } from '@backend/domain/compras/pedidos/pedido-listado-record.interface';
+import { MONEY_SCALE, UNIT_PRICE_SCALE } from '@backend/domain/database/database-schema.constants';
 import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/pedido-columnas.constants';
+import {
+  type DatabaseIdRow,
+  type PedidoArticuloDatabaseRow,
+  type PedidoCabeceraDatabaseRow,
+  type PedidoCountDatabaseRow,
+  type PedidoCurrentStateDatabaseRow,
+  type PedidoLineaDatabaseRow,
+  type PedidoListadoDatabaseRow,
+  type PedidoProveedorFilterDatabaseRow,
+  type PedidoSqlFilter,
+  type PedidoTipoPagoOptionDatabaseRow,
+  type PedidoVisibleColumnDatabaseRow,
+  PEDIDO_ARTICULO_SELECT,
+} from '@infrastructure/database/typeorm/compras/pedidos/typeorm-pedidos.repository.private';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import escapeLike from '@infrastructure/database/typeorm/typeorm-like.utils';
 import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
 import { randomUUID } from 'node:crypto';
 import type { DataSource, QueryRunner } from 'typeorm';
-import type {
-  DatabaseIdRow,
-  PedidoCabeceraDatabaseRow,
-  PedidoCountDatabaseRow,
-  PedidoCurrentStateDatabaseRow,
-  PedidoLineaDatabaseRow,
-  PedidoListadoDatabaseRow,
-  PedidoProveedorFilterDatabaseRow,
-  PedidoSqlFilter,
-  PedidoTipoPagoOptionDatabaseRow,
-  PedidoVisibleColumnDatabaseRow,
-} from './typeorm-pedidos.repository.private';
 
 /**
  * Gestiona las consultas SQLite de los listados de Pedidos.
@@ -281,6 +285,50 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
       recargoEquivalenciaBps: row.recargo_equivalencia_bps,
       descuentoBps: row.descuento_bps,
     }));
+  }
+
+  /**
+   * Resuelve un artículo activo mediante acceso directo,
+   * localizador o cualquiera de sus códigos de barras activos.
+   */
+  async resolvePedidoArticulo(
+    codigo: string,
+    codigoNumerico: number | null,
+  ): Promise<PedidoArticuloRecord | null> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const rows: readonly PedidoArticuloDatabaseRow[] =
+      codigoNumerico === null
+        ? await this.resolvePedidoArticuloByBarcode(dataSource, codigo)
+        : await this.resolvePedidoArticuloByNumericCode(dataSource, codigo, codigoNumerico);
+
+    const row: PedidoArticuloDatabaseRow | undefined = rows[0];
+
+    return row === undefined ? null : this.mapPedidoArticulo(row);
+  }
+
+  /**
+   * Busca artículos activos por su slug normalizado.
+   */
+  async searchPedidoArticulos(searchPattern: string): Promise<readonly PedidoArticuloRecord[]> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const rows: readonly PedidoArticuloDatabaseRow[] = (await dataSource.query(
+      `
+          ${PEDIDO_ARTICULO_SELECT}
+          WHERE
+            a.deleted_at IS NULL
+            AND a.slug LIKE ? COLLATE NOCASE
+          ORDER BY
+            a.nombre COLLATE NOCASE,
+            a.id
+        `,
+      [searchPattern],
+    )) as readonly PedidoArticuloDatabaseRow[];
+
+    return rows.map((row: PedidoArticuloDatabaseRow): PedidoArticuloRecord =>
+      this.mapPedidoArticulo(row),
+    );
   }
 
   /**
@@ -632,6 +680,98 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
     }
 
     return id;
+  }
+
+  /**
+   * Resuelve un código numérico dando prioridad al acceso
+   * directo y después al localizador.
+   */
+  private async resolvePedidoArticuloByNumericCode(
+    dataSource: DataSource,
+    codigo: string,
+    codigoNumerico: number,
+  ): Promise<readonly PedidoArticuloDatabaseRow[]> {
+    return (await dataSource.query(
+      `
+        ${PEDIDO_ARTICULO_SELECT}
+        WHERE
+          a.deleted_at IS NULL
+          AND (
+            a.acceso_directo = ?
+            OR a.localizador = ?
+            OR EXISTS (
+              SELECT 1
+              FROM codigo_barras cb
+              WHERE
+                cb.id_articulo = a.id
+                AND cb.codigo = ?
+                AND cb.deleted_at IS NULL
+            )
+          )
+        ORDER BY
+          CASE
+            WHEN a.acceso_directo = ? THEN 0
+            WHEN a.localizador = ? THEN 1
+            ELSE 2
+          END,
+          a.id
+        LIMIT 1
+      `,
+      [codigoNumerico, codigoNumerico, codigo, codigoNumerico, codigoNumerico],
+    )) as readonly PedidoArticuloDatabaseRow[];
+  }
+
+  /**
+   * Resuelve un código no numérico exclusivamente
+   * mediante códigos de barras activos.
+   */
+  private async resolvePedidoArticuloByBarcode(
+    dataSource: DataSource,
+    codigo: string,
+  ): Promise<readonly PedidoArticuloDatabaseRow[]> {
+    return (await dataSource.query(
+      `
+        ${PEDIDO_ARTICULO_SELECT}
+        WHERE
+          a.deleted_at IS NULL
+          AND EXISTS (
+            SELECT 1
+            FROM codigo_barras cb
+            WHERE
+              cb.id_articulo = a.id
+              AND cb.codigo = ?
+              AND cb.deleted_at IS NULL
+          )
+        ORDER BY a.id
+        LIMIT 1
+      `,
+      [codigo],
+    )) as readonly PedidoArticuloDatabaseRow[];
+  }
+
+  /**
+   * Convierte un artículo SQLite en los datos canónicos
+   * necesarios para crear una línea de Pedido.
+   */
+  private mapPedidoArticulo(row: PedidoArticuloDatabaseRow): PedidoArticuloRecord {
+    return {
+      id: row.id,
+      publicId: row.public_id,
+      localizador: row.localizador,
+      nombre: row.nombre,
+      referencia: row.referencia,
+      marcaNombre: row.marca_nombre,
+      stock: row.stock,
+      palbMicros: row.palb_micros,
+      pucMicros: row.puc_micros,
+      pvpMicros: (row.pvp_cents * UNIT_PRICE_SCALE) / MONEY_SCALE,
+      margenMicroporcentaje: row.margen_microporcentaje,
+      ivaBps: row.iva_bps,
+      recargoEquivalenciaBps: row.re_bps,
+      tieneCodigoBarrasAdicional: row.tiene_codigo_barras_adicional === 1,
+      observaciones: row.observaciones,
+      mostrarObservacionesPedidos: row.mostrar_observaciones_pedidos === 1,
+    };
   }
 
   /**

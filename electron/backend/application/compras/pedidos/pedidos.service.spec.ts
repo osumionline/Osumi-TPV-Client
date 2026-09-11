@@ -1,6 +1,7 @@
 import PedidosService from '@backend/application/compras/pedidos/pedidos.service';
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
 import type PedidosRepository from '@backend/contracts/compras/pedidos/pedidos.repository.interface';
+import type PedidoArticuloRecord from '@backend/domain/compras/pedidos/pedido-articulo-record.interface';
 import type {
   PedidoCabeceraRecord,
   PedidoFormOptionsRecord,
@@ -71,6 +72,33 @@ class FakePedidosRepository implements PedidosRepository {
       descuentoBps: 0,
     },
   ];
+
+  pedidoArticuloResult: PedidoArticuloRecord | null = null;
+  pedidoArticulosSearchResult: readonly PedidoArticuloRecord[] = [];
+
+  /**
+   * Devuelve el artículo configurado para una resolución
+   * de código simulada.
+   */
+  resolvePedidoArticulo(
+    codigo: string,
+    codigoNumerico: number | null,
+  ): Promise<PedidoArticuloRecord | null> {
+    void codigo;
+    void codigoNumerico;
+
+    return Promise.resolve(this.pedidoArticuloResult);
+  }
+
+  /**
+   * Devuelve los artículos configurados para una
+   * búsqueda simulada.
+   */
+  searchPedidoArticulos(searchPattern: string): Promise<readonly PedidoArticuloRecord[]> {
+    void searchPattern;
+
+    return Promise.resolve(this.pedidoArticulosSearchResult);
+  }
 
   /**
    * Conserva la consulta de pendientes recibida.

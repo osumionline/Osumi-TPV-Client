@@ -1,4 +1,5 @@
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
+import type PedidoArticuloRecord from '@backend/domain/compras/pedidos/pedido-articulo-record.interface';
 import type {
   PedidoCabeceraRecord,
   PedidoFormOptionsRecord,
@@ -41,6 +42,20 @@ export default interface PedidosRepository {
    * Recupera las líneas persistidas de un pedido.
    */
   getPedidoLineas(idPedido: number): Promise<readonly PedidoLineaRecord[]>;
+
+  /**
+   * Resuelve un artículo mediante acceso directo,
+   * localizador o código de barras.
+   */
+  resolvePedidoArticulo(
+    codigo: string,
+    codigoNumerico: number | null,
+  ): Promise<PedidoArticuloRecord | null>;
+
+  /**
+   * Busca artículos activos mediante su slug normalizado.
+   */
+  searchPedidoArticulos(searchPattern: string): Promise<readonly PedidoArticuloRecord[]>;
 
   /**
    * Recupera proveedores y tipos de pago disponibles

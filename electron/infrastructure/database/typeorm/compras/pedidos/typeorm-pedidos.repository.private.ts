@@ -89,3 +89,54 @@ export interface PedidoLineaDatabaseRow {
   readonly recargo_equivalencia_bps: number;
   readonly descuento_bps: number;
 }
+
+export interface PedidoArticuloDatabaseRow {
+  readonly id: number;
+  readonly public_id: string;
+  readonly localizador: number;
+  readonly nombre: string;
+  readonly referencia: string | null;
+  readonly marca_nombre: string;
+  readonly stock: number;
+  readonly palb_micros: number;
+  readonly puc_micros: number;
+  readonly pvp_cents: number;
+  readonly margen_microporcentaje: number;
+  readonly iva_bps: number;
+  readonly re_bps: number;
+  readonly tiene_codigo_barras_adicional: number;
+  readonly observaciones: string | null;
+  readonly mostrar_observaciones_pedidos: number;
+}
+
+export const PEDIDO_ARTICULO_SELECT: string = `
+  SELECT
+    a.id,
+    a.public_id,
+    a.localizador,
+    a.nombre,
+    a.referencia,
+    m.nombre AS marca_nombre,
+    a.stock,
+    a.palb_micros,
+    a.puc_micros,
+    a.pvp_cents,
+    a.margen_microporcentaje,
+    a.iva_bps,
+    a.re_bps,
+
+    EXISTS (
+      SELECT 1
+      FROM codigo_barras cb_adicional
+      WHERE
+        cb_adicional.id_articulo = a.id
+        AND cb_adicional.por_defecto = 0
+        AND cb_adicional.deleted_at IS NULL
+    ) AS tiene_codigo_barras_adicional,
+
+    a.observaciones,
+    a.mostrar_observaciones_pedidos
+  FROM articulo a
+  INNER JOIN marca m
+    ON m.id = a.id_marca
+`;

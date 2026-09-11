@@ -1,4 +1,5 @@
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
+import type PedidoArticuloRecord from '@backend/domain/compras/pedidos/pedido-articulo-record.interface';
 import type {
   PedidoCabeceraRecord,
   PedidoFormOptionsRecord,
@@ -577,6 +578,67 @@ describe('TypeOrmPedidosRepository', (): void => {
     ]);
   });
 
+  it('resuelve artículos por acceso directo, localizador y código de barras', async (): Promise<void> => {
+    const byAccessCode: PedidoArticuloRecord | null =
+      await requireRepository().resolvePedidoArticulo('55', 55);
+
+    const byLocator: PedidoArticuloRecord | null = await requireRepository().resolvePedidoArticulo(
+      '102',
+      102,
+    );
+
+    const byBarcode: PedidoArticuloRecord | null = await requireRepository().resolvePedidoArticulo(
+      'EXTRA-A',
+      null,
+    );
+
+    expect(byAccessCode?.id).toBe(10);
+    expect(byLocator?.id).toBe(11);
+    expect(byBarcode?.id).toBe(10);
+  });
+
+  it('devuelve todos los datos canónicos necesarios para una línea nueva', async (): Promise<void> => {
+    const result: PedidoArticuloRecord | null = await requireRepository().resolvePedidoArticulo(
+      '101',
+      101,
+    );
+
+    expect(result).toEqual({
+      id: 10,
+      publicId: 'article-10',
+      localizador: 101,
+      nombre: 'Artículo actual A',
+      referencia: 'REF-A',
+      marcaNombre: 'Marca Uno',
+      stock: 7,
+      palbMicros: 10_000_000,
+      pucMicros: 12_705_000,
+      pvpMicros: 19_950_000,
+      margenMicroporcentaje: 36_315_789,
+      ivaBps: 2100,
+      recargoEquivalenciaBps: 520,
+      tieneCodigoBarrasAdicional: true,
+      observaciones: 'Observación para pedidos',
+      mostrarObservacionesPedidos: true,
+    });
+
+    const withoutAdditionalBarcode: PedidoArticuloRecord | null =
+      await requireRepository().resolvePedidoArticulo('102', 102);
+
+    expect(withoutAdditionalBarcode?.tieneCodigoBarrasAdicional).toBe(false);
+  });
+
+  it('busca artículos activos por slug y excluye los eliminados', async (): Promise<void> => {
+    const result: readonly PedidoArticuloRecord[] =
+      await requireRepository().searchPedidoArticulos('%articulo%actual%');
+
+    expect(result.map((articulo: PedidoArticuloRecord): number => articulo.id)).toEqual([10, 11]);
+
+    await expect(
+      requireRepository().searchPedidoArticulos('%articulo%eliminado%'),
+    ).resolves.toEqual([]);
+  });
+
   it('impide eliminar un pedido recepcionado', async (): Promise<void> => {
     await expect(requireRepository().deletePedido(3)).rejects.toThrow(
       'Un pedido recepcionado no se puede eliminar.',
@@ -821,7 +883,17 @@ async function seedPedidos(currentDataSource: DataSource): Promise<void> {
       slug,
       id_marca,
       referencia,
-      stock
+      palb_micros,
+      puc_micros,
+      pvp_cents,
+      iva_bps,
+      re_bps,
+      margen_microporcentaje,
+      stock,
+      observaciones,
+      mostrar_observaciones_pedidos,
+      acceso_directo,
+      deleted_at
     )
     VALUES
       (
@@ -832,7 +904,17 @@ async function seedPedidos(currentDataSource: DataSource): Promise<void> {
         'articulo-actual-a',
         1,
         'REF-A',
-        7
+        10000000,
+        12705000,
+        1995,
+        2100,
+        520,
+        36315789,
+        7,
+        'Observación para pedidos',
+        1,
+        55,
+        NULL
       ),
       (
         11,
@@ -842,7 +924,89 @@ async function seedPedidos(currentDataSource: DataSource): Promise<void> {
         'articulo-actual-b',
         1,
         'REF-B',
-        -2
+        20000000,
+        24200000,
+        3000,
+        1000,
+        140,
+        19333333,
+        -2,
+        NULL,
+        0,
+        NULL,
+        NULL
+      ),
+      (
+        12,
+        'article-12',
+        103,
+        'Artículo eliminado',
+        'articulo-eliminado',
+        1,
+        'REF-DELETED',
+        5000000,
+        6050000,
+        900,
+        2100,
+        0,
+        32777778,
+        0,
+        NULL,
+        0,
+        NULL,
+        '2026-01-01T00:00:00.000Z'
+      )
+  `);
+
+  await currentDataSource.query(`
+    INSERT INTO codigo_barras (
+      id,
+      public_id,
+      id_articulo,
+      codigo,
+      por_defecto,
+      deleted_at
+    )
+    VALUES
+      (
+        1000,
+        'barcode-article-10-default',
+        10,
+        '101',
+        1,
+        NULL
+      ),
+      (
+        1001,
+        'barcode-article-10-extra',
+        10,
+        'EXTRA-A',
+        0,
+        NULL
+      ),
+      (
+        1002,
+        'barcode-article-11-default',
+        11,
+        '102',
+        1,
+        NULL
+      ),
+      (
+        1003,
+        'barcode-article-11-deleted-extra',
+        11,
+        'OLD-B',
+        0,
+        '2026-01-01T00:00:00.000Z'
+      ),
+      (
+        1004,
+        'barcode-article-12-default',
+        12,
+        '103',
+        1,
+        '2026-01-01T00:00:00.000Z'
       )
   `);
 
