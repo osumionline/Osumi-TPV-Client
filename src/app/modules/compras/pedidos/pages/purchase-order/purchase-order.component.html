@@ -52,14 +52,15 @@
                     </span>
 
                     <select class="otpv-control"
-                            [value]="order.idProveedor ?? ''"
                             (change)="onProviderChange($event)">
-                        <option value="">
+                        <option value=""
+                                [selected]="order.idProveedor === null">
                             Elige proveedor
                         </option>
 
                         @for (provider of providerOptions(); track provider.idProveedor) {
-                        <option [value]="provider.idProveedor">
+                        <option [value]="provider.idProveedor"
+                                [selected]="provider.idProveedor === order.idProveedor">
                             {{ provider.nombre }}{{ provider.historical ? ' (histórico)' : '' }}
                         </option>
                         }
@@ -72,14 +73,15 @@
                     </span>
 
                     <select class="otpv-control"
-                            [value]="selectedPaymentKey()"
                             (change)="onPaymentChange($event)">
-                        <option value="">
+                        <option value=""
+                                [selected]="selectedPaymentKey() === ''">
                             Sin especificar
                         </option>
 
                         @for (payment of paymentOptions(); track payment.key) {
-                        <option [value]="payment.key">
+                        <option [value]="payment.key"
+                                [selected]="payment.key === selectedPaymentKey()">
                             {{ payment.label }}{{ payment.historical ? ' (histórico)' : '' }}
                         </option>
                         }
@@ -92,15 +94,17 @@
                     </span>
 
                     <select class="otpv-control"
-                            [value]="order.tipo"
                             (change)="onTipoChange($event)">
-                        <option value="albaran">
+                        <option value="albaran"
+                                [selected]="order.tipo === 'albaran'">
                             Albarán
                         </option>
-                        <option value="factura">
+                        <option value="factura"
+                                [selected]="order.tipo === 'factura'">
                             Factura
                         </option>
-                        <option value="abono">
+                        <option value="abono"
+                                [selected]="order.tipo === 'abono'">
                             Abono
                         </option>
                     </select>
@@ -154,7 +158,7 @@
                            (change)="onTextInput('fechaPago', $event)">
                 </label>
 
-                <label class="otpv-field purchase-order__columns">
+                <div class="otpv-field purchase-order__columns">
                     <span class="otpv-field__label">
                         Columnas
                     </span>
@@ -163,6 +167,7 @@
                                     subscriptSizing="dynamic"
                                     class="otpv-mat-field--compact">
                         <mat-select multiple
+                                    aria-label="Columnas"
                                     [value]="order.columnasVisibles"
                                     (selectionChange)="onColumnsChange($event)">
                             @for (column of columnOptions; track column.id) {
@@ -172,7 +177,7 @@
                             }
                         </mat-select>
                     </mat-form-field>
-                </label>
+                </div>
 
                 <label class="otpv-field purchase-order__notes">
                     <span class="otpv-field__label">
