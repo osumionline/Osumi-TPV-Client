@@ -1,11 +1,12 @@
 <section class="article-notes">
     <div class="article-notes__layout">
-        <label class="article-notes__field">
+        <label class="otpv-field article-notes__field">
             <span>
                 Observaciones
             </span>
 
-            <textarea rows="14"
+            <textarea class="otpv-control otpv-control--textarea"
+                      rows="14"
                       autocomplete="off"
                       placeholder="Observaciones del artículo"
                       [value]="tab().draft.observaciones"

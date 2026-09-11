@@ -102,33 +102,6 @@
     font-size: 13px;
     font-weight: 500;
   }
-
-  >input,
-  >textarea {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid var(--color-dark-grey);
-    border-radius: 4px;
-    background-color: var(--color-white);
-    font: inherit;
-    outline: 0;
-
-    &:focus {
-      border-color: var(--main-color);
-    }
-
-    &:disabled {
-      background-color: var(--color-very-light-grey);
-    }
-  }
-
-  >input {
-    height: 40px;
-  }
-
-  >textarea {
-    resize: vertical;
-  }
 }
 
 .quick-create__field--full {

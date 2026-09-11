@@ -27,6 +27,7 @@
                         </span>
 
                         <input #nameInput
+                               class="otpv-control"
                                type="text"
                                autocomplete="off"
                                maxlength="150"
@@ -42,6 +43,7 @@
                         </span>
 
                         <input type="text"
+                               class="otpv-control"
                                autocomplete="off"
                                [value]="direccion()"
                                [disabled]="saving()"
@@ -54,6 +56,7 @@
                         </span>
 
                         <input type="email"
+                               class="otpv-control"
                                autocomplete="off"
                                [value]="email()"
                                [disabled]="saving()"
@@ -66,6 +69,7 @@
                         </span>
 
                         <input type="text"
+                               class="otpv-control"
                                autocomplete="off"
                                [value]="web()"
                                [disabled]="saving()"
@@ -78,6 +82,7 @@
                         </span>
 
                         <input type="text"
+                               class="otpv-control"
                                autocomplete="off"
                                [value]="telefono()"
                                [disabled]="saving()"
@@ -89,7 +94,8 @@
                             Observaciones
                         </span>
 
-                        <textarea rows="4"
+                        <textarea class="otpv-control otpv-control--textarea"
+                                  rows="4"
                                   [value]="observaciones()"
                                   [disabled]="saving()"
                                   (input)="updateText($event, 'observaciones')">

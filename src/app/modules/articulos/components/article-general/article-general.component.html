@@ -17,13 +17,14 @@
     </div>
     } @else {
     <div class="general__top-grid">
-        <div class="general__field general__field--brand">
+        <div class="otpv-field general__field general__field--brand">
             <label for="article-brand">
                 Marca *
             </label>
 
             <div class="general__select-action">
                 <select id="article-brand"
+                        class="otpv-control"
                         (change)="onMarcaChange($event)">
                     <option value=""
                             [selected]="tab().draft.idMarca === null">
@@ -49,12 +50,13 @@
             </div>
         </div>
 
-        <div class="general__field general__field--iva">
+        <div class="otpv-field general__field general__field--iva">
             <label for="article-iva">
                 IVA *
             </label>
 
             <select id="article-iva"
+                    class="otpv-control"
                     (change)="onFiscalOptionChange($event)">
                 <option value=""
                         disabled
@@ -71,13 +73,14 @@
             </select>
         </div>
 
-        <div class="general__field general__field--re">
+        <div class="otpv-field general__field general__field--re">
             <label for="article-re">
                 RE *
             </label>
 
             @if (usesRecargoEquivalencia()) {
             <select id="article-re"
+                    class="otpv-control"
                     (change)="onFiscalOptionChange($event)">
                 <option value=""
                         disabled
@@ -94,6 +97,7 @@
             </select>
             } @else {
             <select id="article-re"
+                    class="otpv-control"
                     disabled>
                 <option selected>
                     @if (tab().draft.ivaBps === null) {
@@ -117,13 +121,14 @@
             </mat-slide-toggle>
         </div>
 
-        <div class="general__field general__field--provider">
+        <div class="otpv-field general__field general__field--provider">
             <label for="article-provider">
                 Proveedor
             </label>
 
             <div class="general__select-action">
                 <select id="article-provider"
+                        class="otpv-control"
                         (change)="onProveedorChange($event)">
                     <option value=""
                             [selected]="tab().draft.idProveedor === null">
@@ -149,12 +154,12 @@
             </div>
         </div>
 
-        <div class="general__field general__field--categories">
+        <div class="otpv-field general__field general__field--categories">
             <span>
                 Categorías
             </span>
 
-            <mat-select class="general__categories-select"
+            <mat-select class="otpv-control general__categories-select"
                         aria-label="Categorías"
                         multiple
                         placeholder="Sin categorías"
@@ -173,12 +178,13 @@
             </mat-select>
         </div>
 
-        <label class="general__field general__field--reference">
+        <label class="otpv-field general__field general__field--reference">
             <span>
                 Referencia
             </span>
 
             <input type="text"
+                   class="otpv-control"
                    autocomplete="off"
                    [value]="tab().draft.referencia"
                    (input)="onReferenciaInput($event)">
@@ -192,7 +198,8 @@
                     Precio albarán (€)
                 </span>
 
-                <input type="text"
+                <input class="otpv-control general__numeric-control"
+                       type="text"
                        inputmode="decimal"
                        autocomplete="off"
                        [disabled]="!hasFiscalidad()"
@@ -207,7 +214,8 @@
                     PUC (€)
                 </span>
 
-                <input type="text"
+                <input class="otpv-control general__numeric-control"
+                       type="text"
                        inputmode="decimal"
                        autocomplete="off"
                        [disabled]="!hasFiscalidad()"
@@ -223,7 +231,8 @@
                 </label>
 
                 <div class="general__inline-control">
-                    <input id="article-margin"
+                    <input class="otpv-control general__numeric-control"
+                           id="article-margin"
                            type="text"
                            inputmode="decimal"
                            autocomplete="off"
@@ -249,7 +258,8 @@
                     PVP (€)
                 </span>
 
-                <input type="text"
+                <input class="otpv-control general__numeric-control"
+                       type="text"
                        inputmode="decimal"
                        autocomplete="off"
                        [disabled]="!hasFiscalidad()"
@@ -278,7 +288,8 @@
                     Descuento (%)
                 </span>
 
-                <input type="text"
+                <input class="otpv-control general__numeric-control"
+                       type="text"
                        inputmode="decimal"
                        autocomplete="off"
                        [value]="getDecimalInputValue('descuento')"
@@ -292,7 +303,8 @@
                     Margen dto. (%)
                 </span>
 
-                <input type="text"
+                <input class="otpv-control general__numeric-control"
+                       type="text"
                        inputmode="decimal"
                        autocomplete="off"
                        [value]="getDecimalInputValue('margenDescuento')"
@@ -306,7 +318,8 @@
                     PVP dto. (€)
                 </span>
 
-                <input type="text"
+                <input class="otpv-control general__numeric-control"
+                       type="text"
                        inputmode="decimal"
                        autocomplete="off"
                        [value]="getDecimalInputValue('pvpDescuento')"
@@ -323,7 +336,8 @@
                     Stock
                 </span>
 
-                <input type="number"
+                <input class="otpv-control general__numeric-control"
+                       type="number"
                        step="1"
                        [value]="tab().draft.stock"
                        (focus)="selectInputContent($event)"
@@ -335,7 +349,8 @@
                     Stock mínimo
                 </span>
 
-                <input type="number"
+                <input class="otpv-control general__numeric-control"
+                       type="number"
                        min="0"
                        step="1"
                        [value]="tab().draft.stockMin"
@@ -348,7 +363,8 @@
                     Stock máximo
                 </span>
 
-                <input type="number"
+                <input class="otpv-control general__numeric-control"
+                       type="number"
                        min="0"
                        step="1"
                        [value]="tab().draft.stockMax"
@@ -361,7 +377,8 @@
                     Lote óptimo
                 </span>
 
-                <input type="number"
+                <input class="otpv-control general__numeric-control"
+                       type="number"
                        min="0"
                        step="1"
                        [value]="tab().draft.loteOptimo"

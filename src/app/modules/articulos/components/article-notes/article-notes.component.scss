@@ -18,9 +18,7 @@
 }
 
 .article-notes__field {
-    display: flex;
     min-width: 0;
-    flex-direction: column;
     gap: 6px;
 
     >span {
@@ -29,21 +27,7 @@
     }
 
     >textarea {
-        width: 100%;
         min-height: 300px;
-        padding: 12px;
-        border: 1px solid var(--color-dark-grey);
-        border-radius: 4px;
-        box-sizing: border-box;
-        background-color: var(--color-white);
-        font: inherit;
-        line-height: 1.45;
-        resize: vertical;
-        outline: 0;
-
-        &:focus {
-            border-color: var(--main-color);
-        }
     }
 }
 

@@ -42,6 +42,13 @@
     }
 }
 
+.otpv-control--textarea {
+    height: auto;
+    padding: 10px 12px;
+    line-height: 1.45;
+    resize: vertical;
+}
+
 /*
  * Campos Angular Material compactos utilizados en toolbars y filtros.
  */
