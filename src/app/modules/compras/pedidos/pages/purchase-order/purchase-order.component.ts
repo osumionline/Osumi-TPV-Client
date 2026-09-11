@@ -86,6 +86,9 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
 
   readonly loading: WritableSignal<boolean> = signal<boolean>(true);
   readonly saving: WritableSignal<boolean> = signal<boolean>(false);
+  readonly deleting: WritableSignal<boolean> = signal<boolean>(false);
+
+  readonly processing: Signal<boolean> = computed((): boolean => this.saving() || this.deleting());
   readonly saveSuccessful: WritableSignal<boolean> = signal<boolean>(false);
 
   private saveFeedbackTimeoutId: number | null = null;
@@ -163,6 +166,66 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
    */
   onSave(): void {
     void this.saveOrder();
+  }
+
+  /**
+   * Solicita confirmación antes de eliminar un pedido pendiente.
+   */
+  onDelete(): void {
+    if (this.processing()) {
+      return;
+    }
+
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (state === null || state.id === null || state.recepcionado) {
+      return;
+    }
+
+    const idPedido: number = state.id;
+
+    this.dialog
+      .confirm({
+        title: 'Eliminar pedido',
+        content:
+          '¿Estás seguro de querer eliminar este pedido? ' + 'Esta acción no se puede deshacer.',
+      })
+      .subscribe((result: boolean): void => {
+        if (!result) {
+          return;
+        }
+
+        void this.deleteOrder(idPedido);
+      });
+  }
+
+  /**
+   * Elimina el pedido confirmado y vuelve al listado de Compras.
+   */
+  private async deleteOrder(idPedido: number): Promise<void> {
+    if (this.processing()) {
+      return;
+    }
+
+    this.clearSaveFeedback();
+    this.deleting.set(true);
+
+    try {
+      await this.comprasService.deletePedido(idPedido);
+
+      await this.router.navigate(['/compras'], {
+        replaceUrl: true,
+      });
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido eliminar el pedido.'),
+        })
+        .subscribe();
+    } finally {
+      this.deleting.set(false);
+    }
   }
 
   /**
@@ -250,7 +313,7 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
    * si es nueva, actualiza la URL con su identificador.
    */
   private async saveOrder(): Promise<void> {
-    if (this.saving()) {
+    if (this.processing()) {
       return;
     }
 

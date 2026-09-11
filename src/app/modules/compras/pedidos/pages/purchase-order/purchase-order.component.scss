@@ -51,6 +51,10 @@
         gap: 8px;
     }
 
+    .purchase-order__delete-button {
+        color: var(--color-red);
+    }
+
     .purchase-order__save-feedback {
         margin-right: 4px;
         padding-right: 16px;

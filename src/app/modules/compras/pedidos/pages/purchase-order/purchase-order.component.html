@@ -9,7 +9,7 @@
                     type="button"
                     routerLink="/compras"
                     aria-label="Volver a Pedidos"
-                    [disabled]="saving()">
+                    [disabled]="processing()">
                 <mat-icon>
                     arrow_back
                 </mat-icon>
@@ -25,8 +25,26 @@
             </span>
             }
 
-            @if (formState() !== null) {
+            @if (formState(); as order) {
             <div class="purchase-order__toolbar-actions">
+                @if (order.id !== null && !order.recepcionado) {
+                <button mat-stroked-button
+                        class="purchase-order__delete-button"
+                        type="button"
+                        [disabled]="processing()"
+                        (click)="onDelete()">
+                    <mat-icon>
+                        delete
+                    </mat-icon>
+
+                    @if (deleting()) {
+                    Eliminando…
+                    }
+                    @else {
+                    Eliminar
+                    }
+                </button>
+                }
                 @if (saveSuccessful()) {
                 <span class="purchase-order__save-feedback"
                       role="status"
@@ -37,7 +55,7 @@
 
                 <button mat-flat-button
                         type="button"
-                        [disabled]="saving()"
+                        [disabled]="processing()"
                         (click)="onSave()">
                     <mat-icon>
                         save
@@ -81,7 +99,7 @@
                     </span>
 
                     <select class="otpv-control"
-                            [disabled]="saving()"
+                            [disabled]="processing()"
                             (change)="onProviderChange($event)">
                         <option value=""
                                 [selected]="order.idProveedor === null">
@@ -103,7 +121,7 @@
                     </span>
 
                     <select class="otpv-control"
-                            [disabled]="saving()"
+                            [disabled]="processing()"
                             (change)="onPaymentChange($event)">
                         <option value=""
                                 [selected]="selectedPaymentKey() === ''">
@@ -125,7 +143,7 @@
                     </span>
 
                     <select class="otpv-control"
-                            [disabled]="saving()"
+                            [disabled]="processing()"
                             (change)="onTipoChange($event)">
                         <option value="albaran"
                                 [selected]="order.tipo === 'albaran'">
@@ -150,7 +168,7 @@
                     <input class="otpv-control"
                            type="text"
                            autocomplete="off"
-                           [disabled]="saving()"
+                           [disabled]="processing()"
                            [placeholder]="numeroPlaceholder()"
                            [value]="order.numero"
                            (input)="onTextInput('numero', $event)">
@@ -158,13 +176,13 @@
 
                 <div class="purchase-order__flags">
                     <mat-checkbox [checked]="order.recargoEquivalencia"
-                                  [disabled]="order.recepcionado || saving()"
+                                  [disabled]="order.recepcionado || processing()"
                                   (change)="onRecargoEquivalenciaChange($event)">
                         R.E.
                     </mat-checkbox>
 
                     <mat-checkbox [checked]="order.europeo"
-                                  [disabled]="saving()"
+                                  [disabled]="processing()"
                                   (change)="onEuropeoChange($event)">
                         UE
                     </mat-checkbox>
@@ -178,7 +196,7 @@
                     <input class="otpv-control"
                            type="date"
                            [value]="order.fechaPedido"
-                           [disabled]="saving()"
+                           [disabled]="processing()"
                            (change)="onTextInput('fechaPedido', $event)">
                 </label>
 
@@ -190,7 +208,7 @@
                     <input class="otpv-control"
                            type="date"
                            [value]="order.fechaPago"
-                           [disabled]="saving()"
+                           [disabled]="processing()"
                            (change)="onTextInput('fechaPago', $event)">
                 </label>
 
@@ -204,7 +222,7 @@
                                     class="otpv-mat-field--compact">
                         <mat-select multiple
                                     aria-label="Columnas"
-                                    [disabled]="saving()"
+                                    [disabled]="processing()"
                                     [value]="order.columnasVisibles"
                                     (selectionChange)="onColumnsChange($event)">
                             @for (column of columnOptions; track column.id) {
@@ -223,7 +241,7 @@
 
                     <textarea class="otpv-control otpv-control--textarea"
                               rows="3"
-                              [disabled]="saving()"
+                              [disabled]="processing()"
                               [value]="order.observaciones"
                               (input)="onTextInput('observaciones', $event)"></textarea>
                 </label>
