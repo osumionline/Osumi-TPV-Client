@@ -184,6 +184,32 @@ export function buildPurchaseOrderProviderOptions(
 }
 
 /**
+ * Incorpora un proveedor recién creado a las opciones de la ficha,
+ * sustituyendo cualquier versión histórica previa y manteniendo
+ * el orden alfabético.
+ */
+export function addPurchaseOrderProviderOption(
+  options: readonly PurchaseOrderProviderOption[],
+  idProveedor: number,
+  nombre: string,
+): readonly PurchaseOrderProviderOption[] {
+  return [
+    ...options.filter(
+      (option: PurchaseOrderProviderOption): boolean => option.idProveedor !== idProveedor,
+    ),
+    {
+      idProveedor,
+      nombre,
+      historical: false,
+    },
+  ].sort((left: PurchaseOrderProviderOption, right: PurchaseOrderProviderOption): number =>
+    left.nombre.localeCompare(right.nombre, 'es', {
+      sensitivity: 'base',
+    }),
+  );
+}
+
+/**
  * Construye las dos formas propias de Compras, los tipos
  * configurables y, cuando sea necesario, el snapshot histórico.
  */

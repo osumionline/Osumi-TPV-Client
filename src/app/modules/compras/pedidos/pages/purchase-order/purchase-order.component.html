@@ -93,27 +93,42 @@
         @else if (formState(); as order) {
         <div class="purchase-order__content">
             <section class="purchase-order__header-grid">
-                <label class="otpv-field purchase-order__provider">
-                    <span class="otpv-field__label">
+                <div class="otpv-field purchase-order__provider">
+                    <label class="otpv-field__label"
+                           for="purchase-order-provider">
                         Proveedor *
-                    </span>
+                    </label>
 
-                    <select class="otpv-control"
-                            [disabled]="processing()"
-                            (change)="onProviderChange($event)">
-                        <option value=""
-                                [selected]="order.idProveedor === null">
-                            Elige proveedor
-                        </option>
+                    <div class="purchase-order__provider-control">
+                        <select id="purchase-order-provider"
+                                class="otpv-control"
+                                [disabled]="processing()"
+                                (change)="onProviderChange($event)">
+                            <option value=""
+                                    [selected]="order.idProveedor === null">
+                                Elige proveedor
+                            </option>
 
-                        @for (provider of providerOptions(); track provider.idProveedor) {
-                        <option [value]="provider.idProveedor"
-                                [selected]="provider.idProveedor === order.idProveedor">
-                            {{ provider.nombre }}{{ provider.historical ? ' (histórico)' : '' }}
-                        </option>
-                        }
-                    </select>
-                </label>
+                            @for (provider of providerOptions(); track provider.idProveedor) {
+                            <option [value]="provider.idProveedor"
+                                    [selected]="provider.idProveedor === order.idProveedor">
+                                {{ provider.nombre }}{{ provider.historical ? ' (histórico)' : '' }}
+                            </option>
+                            }
+                        </select>
+
+                        <button mat-icon-button
+                                type="button"
+                                matTooltip="Crear nuevo proveedor"
+                                aria-label="Crear nuevo proveedor"
+                                [disabled]="processing() || preparingProveedorModal()"
+                                (click)="openProveedorModal()">
+                            <mat-icon>
+                                add
+                            </mat-icon>
+                        </button>
+                    </div>
+                </div>
 
                 <label class="otpv-field purchase-order__payment">
                     <span class="otpv-field__label">
@@ -254,3 +269,11 @@
         }
     </section>
 </main>
+
+@if (proveedorModalOpen()) {
+<otpv-provider-quick-create [marcas]="marcasService.marcas()"
+                            [saving]="creatingProveedor()"
+                            [error]="proveedorCreateError()"
+                            (createEvent)="createProveedor($event)"
+                            (closeEvent)="closeProveedorModal()" />
+}

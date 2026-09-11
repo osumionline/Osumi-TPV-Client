@@ -23,7 +23,11 @@ import type {
   PedidoSaveCommand,
 } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
 import type { PedidoTipo } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
+import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
+import Proveedor from '@model/proveedores/proveedor.model';
+import ProviderQuickCreateComponent from '@modules/articulos/components/provider-quick-create/provider-quick-create.component';
 import {
+  addPurchaseOrderProviderOption,
   buildPurchaseOrderPaymentOptions,
   buildPurchaseOrderProviderOptions,
   buildPurchaseOrderSaveCommand,
@@ -43,6 +47,8 @@ import {
 import { DialogService } from '@osumi/angular-tools';
 import AppDataService from '@services/app-data.service';
 import ComprasService from '@services/compras.service';
+import MarcasService from '@services/marcas.service';
+import ProveedoresService from '@services/proveedores.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 /**
@@ -54,6 +60,7 @@ import { getErrorMessage } from '@utils/error.utils';
   styleUrl: './purchase-order.component.scss',
   imports: [
     HeaderComponent,
+    ProviderQuickCreateComponent,
     MatButton,
     MatCheckbox,
     MatFormField,
@@ -69,9 +76,10 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
   private readonly route: ActivatedRoute = inject(ActivatedRoute);
   private readonly router: Router = inject(Router);
   private readonly comprasService: ComprasService = inject(ComprasService);
+  private readonly proveedoresService: ProveedoresService = inject(ProveedoresService);
   private readonly dialog: DialogService = inject(DialogService);
-
   readonly appDataService: AppDataService = inject(AppDataService);
+  readonly marcasService: MarcasService = inject(MarcasService);
 
   readonly formState: WritableSignal<PurchaseOrderFormState | null> =
     signal<PurchaseOrderFormState | null>(null);
@@ -87,6 +95,10 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
   readonly loading: WritableSignal<boolean> = signal<boolean>(true);
   readonly saving: WritableSignal<boolean> = signal<boolean>(false);
   readonly deleting: WritableSignal<boolean> = signal<boolean>(false);
+  readonly proveedorModalOpen: WritableSignal<boolean> = signal<boolean>(false);
+  readonly preparingProveedorModal: WritableSignal<boolean> = signal<boolean>(false);
+  readonly creatingProveedor: WritableSignal<boolean> = signal<boolean>(false);
+  readonly proveedorCreateError: WritableSignal<string | null> = signal<string | null>(null);
 
   readonly processing: Signal<boolean> = computed((): boolean => this.saving() || this.deleting());
   readonly saveSuccessful: WritableSignal<boolean> = signal<boolean>(false);
@@ -200,6 +212,68 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Prepara y abre el formulario de creación rápida de Proveedor.
+   */
+  openProveedorModal(): void {
+    if (this.processing() || this.preparingProveedorModal() || this.creatingProveedor()) {
+      return;
+    }
+
+    void this.prepareProveedorModal();
+  }
+
+  /**
+   * Cierra el formulario de Proveedor cuando no existe
+   * una creación en curso.
+   */
+  closeProveedorModal(): void {
+    if (this.creatingProveedor()) {
+      return;
+    }
+
+    this.proveedorModalOpen.set(false);
+    this.proveedorCreateError.set(null);
+  }
+
+  /**
+   * Crea el proveedor y lo selecciona inmediatamente
+   * en la cabecera del Pedido.
+   */
+  async createProveedor(command: CrearProveedorCommand): Promise<void> {
+    if (this.creatingProveedor()) {
+      return;
+    }
+
+    this.creatingProveedor.set(true);
+    this.proveedorCreateError.set(null);
+
+    try {
+      const proveedor: Proveedor = await this.proveedoresService.create(command);
+
+      if (proveedor.id === null) {
+        throw new Error('El proveedor creado no dispone de identificador.');
+      }
+
+      const idProveedor: number = proveedor.id;
+
+      this.providerOptions.update(
+        (options: readonly PurchaseOrderProviderOption[]): readonly PurchaseOrderProviderOption[] =>
+          addPurchaseOrderProviderOption(options, idProveedor, proveedor.nombre),
+      );
+
+      this.updateState({
+        idProveedor,
+      });
+
+      this.proveedorModalOpen.set(false);
+    } catch (error: unknown) {
+      this.proveedorCreateError.set(getErrorMessage(error, 'No se ha podido crear el proveedor.'));
+    } finally {
+      this.creatingProveedor.set(false);
+    }
+  }
+
+  /**
    * Elimina el pedido confirmado y vuelve al listado de Compras.
    */
   private async deleteOrder(idPedido: number): Promise<void> {
@@ -306,6 +380,32 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
     this.updateState({
       columnasVisibles: normalizePurchaseOrderColumns(event.value),
     });
+  }
+
+  /**
+   * Carga las marcas necesarias para el formulario rápido
+   * y abre el modal cuando la carga finaliza correctamente.
+   */
+  private async prepareProveedorModal(): Promise<void> {
+    this.preparingProveedorModal.set(true);
+    this.proveedorCreateError.set(null);
+
+    try {
+      await this.marcasService.load();
+
+      if (!this.processing()) {
+        this.proveedorModalOpen.set(true);
+      }
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se han podido cargar las marcas disponibles.'),
+        })
+        .subscribe();
+    } finally {
+      this.preparingProveedorModal.set(false);
+    }
   }
 
   /**

@@ -4,6 +4,7 @@ import type {
 } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
 import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/pedido-columnas.constants';
 import {
+  addPurchaseOrderProviderOption,
   buildPurchaseOrderPaymentOptions,
   buildPurchaseOrderProviderOptions,
   buildPurchaseOrderSaveCommand,
@@ -259,5 +260,37 @@ describe('purchase-order.component.private', (): void => {
     expect(PURCHASE_ORDER_COLUMN_OPTIONS.map((option) => option.id)).toEqual(
       PEDIDO_OPTIONAL_COLUMN_IDS,
     );
+  });
+
+  it('incorpora y ordena un proveedor recién creado', (): void => {
+    const result = addPurchaseOrderProviderOption(
+      [
+        {
+          idProveedor: 2,
+          nombre: 'Beta',
+          historical: false,
+        },
+        {
+          idProveedor: 7,
+          nombre: 'Proveedor antiguo',
+          historical: true,
+        },
+      ],
+      7,
+      'Alfa',
+    );
+
+    expect(result).toEqual([
+      {
+        idProveedor: 7,
+        nombre: 'Alfa',
+        historical: false,
+      },
+      {
+        idProveedor: 2,
+        nombre: 'Beta',
+        historical: false,
+      },
+    ]);
   });
 });

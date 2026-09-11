@@ -19,7 +19,7 @@ import type Marca from '@model/marcas/marca.model';
 type ProviderTextField = 'nombre' | 'direccion' | 'email' | 'web' | 'telefono' | 'observaciones';
 
 /**
- * Permite crear rápidamente un proveedor desde la ficha de Artículos.
+ * Permite crear rápidamente un proveedor desde otras fichas de la aplicación.
  */
 @Component({
   selector: 'otpv-provider-quick-create',
