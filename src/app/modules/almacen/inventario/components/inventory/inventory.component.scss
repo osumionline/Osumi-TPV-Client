@@ -20,9 +20,6 @@
 
         .inventory__compact-field {
             flex: 0 0 auto;
-            font-size: 13px;
-            --mat-form-field-container-height: 40px;
-            --mat-form-field-container-vertical-padding: 8px;
         }
 
         .inventory__filter-provider {
@@ -217,20 +214,6 @@
         box-shadow: inset 3px 0 0 var(--color-yellow);
     }
 
-    .inventory__cell-input {
-        height: 30px;
-        padding: 3px 6px;
-        border: 1px solid var(--separator-color);
-        border-radius: 4px;
-        outline: 0;
-        background-color: var(--color-white);
-        font: inherit;
-
-        &:focus {
-            border-color: var(--main-color);
-        }
-    }
-
     .inventory__cell-input--stock {
         width: 66px;
         text-align: right;
@@ -243,14 +226,6 @@
 
     .inventory__cell-input--barcode {
         width: 135px;
-    }
-
-    .inventory__editor--dirty {
-        border-color: var(--color-yellow);
-    }
-
-    .inventory__editor--invalid {
-        border-color: var(--color-red);
     }
 
     .inventory__cell-select {

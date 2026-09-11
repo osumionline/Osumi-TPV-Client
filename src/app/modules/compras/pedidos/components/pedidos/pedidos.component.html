@@ -32,28 +32,29 @@
             <form class="orders__filters-panel"
                   (submit)="applyGuardadosFilters($event)">
                 <div class="orders__filters-grid">
-                    <label class="orders__date-field">
-                        <span>
+                    <label class="otpv-field">
+                        <span class="otpv-field__label">
                             Fecha desde
                         </span>
-
-                        <input type="date"
+                        <input class="otpv-control"
+                               type="date"
                                [value]="guardadosState().fechaDesde"
                                (change)="onGuardadosFilterInput('fechaDesde', $event)">
                     </label>
 
-                    <label class="orders__date-field">
-                        <span>
+                    <label class="otpv-field">
+                        <span class="otpv-field__label">
                             Fecha hasta
                         </span>
-
-                        <input type="date"
+                        <input class="otpv-control"
+                               type="date"
                                [value]="guardadosState().fechaHasta"
                                (change)="onGuardadosFilterInput('fechaHasta', $event)">
                     </label>
 
                     <mat-form-field appearance="outline"
-                                    subscriptSizing="dynamic">
+                                    subscriptSizing="dynamic"
+                                    class="otpv-mat-field--compact">
                         <mat-label>Proveedor</mat-label>
                         <mat-select [value]="guardadosState().idProveedor"
                                     [disabled]="filterOptionsLoading()"
@@ -72,7 +73,8 @@
                     </mat-form-field>
 
                     <mat-form-field appearance="outline"
-                                    subscriptSizing="dynamic">
+                                    subscriptSizing="dynamic"
+                                    class="otpv-mat-field--compact">
                         <mat-label>Albarán</mat-label>
                         <input matInput
                                type="search"
@@ -82,26 +84,29 @@
                     </mat-form-field>
 
                     <mat-form-field appearance="outline"
-                                    subscriptSizing="dynamic">
+                                    subscriptSizing="dynamic"
+                                    class="otpv-mat-field--compact">
                         <mat-label>Importe desde (€)</mat-label>
                         <input matInput
-                               type="number"
-                               min="0"
-                               step="0.01"
+                               type="text"
+                               inputmode="decimal"
+                               autocomplete="off"
                                [value]="guardadosState().importeDesde"
                                (input)="onGuardadosFilterInput('importeDesde', $event)">
                     </mat-form-field>
 
                     <mat-form-field appearance="outline"
-                                    subscriptSizing="dynamic">
+                                    subscriptSizing="dynamic"
+                                    class="otpv-mat-field--compact">
                         <mat-label>Importe hasta (€)</mat-label>
                         <input matInput
-                               type="number"
-                               min="0"
-                               step="0.01"
+                               type="text"
+                               inputmode="decimal"
+                               autocomplete="off"
                                [value]="guardadosState().importeHasta"
                                (input)="onGuardadosFilterInput('importeHasta', $event)">
                     </mat-form-field>
+
                 </div>
 
                 <div class="orders__filter-actions">
@@ -247,28 +252,29 @@
             <form class="orders__filters-panel"
                   (submit)="applyRecepcionadosFilters($event)">
                 <div class="orders__filters-grid">
-                    <label class="orders__date-field">
-                        <span>
+                    <label class="otpv-field">
+                        <span class="otpv-field__label">
                             Fecha desde
                         </span>
-
-                        <input type="date"
+                        <input class="otpv-control"
+                               type="date"
                                [value]="recepcionadosState().fechaDesde"
                                (change)="onRecepcionadosFilterInput('fechaDesde', $event)">
                     </label>
 
-                    <label class="orders__date-field">
-                        <span>
+                    <label class="otpv-field">
+                        <span class="otpv-field__label">
                             Fecha hasta
                         </span>
-
-                        <input type="date"
+                        <input class="otpv-control"
+                               type="date"
                                [value]="recepcionadosState().fechaHasta"
                                (change)="onRecepcionadosFilterInput('fechaHasta', $event)">
                     </label>
 
                     <mat-form-field appearance="outline"
-                                    subscriptSizing="dynamic">
+                                    subscriptSizing="dynamic"
+                                    class="otpv-mat-field--compact">
                         <mat-label>Proveedor</mat-label>
                         <mat-select [value]="recepcionadosState().idProveedor"
                                     [disabled]="filterOptionsLoading()"
@@ -287,7 +293,8 @@
                     </mat-form-field>
 
                     <mat-form-field appearance="outline"
-                                    subscriptSizing="dynamic">
+                                    subscriptSizing="dynamic"
+                                    class="otpv-mat-field--compact">
                         <mat-label>Albarán</mat-label>
                         <input matInput
                                type="search"
@@ -297,23 +304,25 @@
                     </mat-form-field>
 
                     <mat-form-field appearance="outline"
-                                    subscriptSizing="dynamic">
+                                    subscriptSizing="dynamic"
+                                    class="otpv-mat-field--compact">
                         <mat-label>Importe desde (€)</mat-label>
                         <input matInput
-                               type="number"
-                               min="0"
-                               step="0.01"
+                               type="text"
+                               inputmode="decimal"
+                               autocomplete="off"
                                [value]="recepcionadosState().importeDesde"
                                (input)="onRecepcionadosFilterInput('importeDesde', $event)">
                     </mat-form-field>
 
                     <mat-form-field appearance="outline"
-                                    subscriptSizing="dynamic">
+                                    subscriptSizing="dynamic"
+                                    class="otpv-mat-field--compact">
                         <mat-label>Importe hasta (€)</mat-label>
                         <input matInput
-                               type="number"
-                               min="0"
-                               step="0.01"
+                               type="text"
+                               inputmode="decimal"
+                               autocomplete="off"
                                [value]="recepcionadosState().importeHasta"
                                (input)="onRecepcionadosFilterInput('importeHasta', $event)">
                     </mat-form-field>

@@ -2,7 +2,7 @@
     <div class="inventory__toolbar">
         <mat-form-field appearance="outline"
                         subscriptSizing="dynamic"
-                        class="inventory__compact-field inventory__filter-provider">
+                        class="otpv-mat-field--compact inventory__compact-field inventory__filter-provider">
             <mat-label>
                 Proveedor
             </mat-label>
@@ -22,7 +22,7 @@
 
         <mat-form-field appearance="outline"
                         subscriptSizing="dynamic"
-                        class="inventory__compact-field inventory__filter-brand">
+                        class="otpv-mat-field--compact inventory__compact-field inventory__filter-brand">
             <mat-label>
                 Marca
             </mat-label>
@@ -42,7 +42,7 @@
 
         <mat-form-field appearance="outline"
                         subscriptSizing="dynamic"
-                        class="inventory__compact-field inventory__filter-category">
+                        class="otpv-mat-field--compact inventory__compact-field inventory__filter-category">
             <mat-label>
                 Categoría
             </mat-label>
@@ -62,7 +62,7 @@
 
         <mat-form-field appearance="outline"
                         subscriptSizing="dynamic"
-                        class="inventory__compact-field inventory__text-filter">
+                        class="otpv-mat-field--compact inventory__compact-field inventory__text-filter">
             <mat-label>
                 Buscar
             </mat-label>
@@ -81,7 +81,7 @@
 
         <mat-form-field appearance="outline"
                         subscriptSizing="dynamic"
-                        class="inventory__compact-field inventory__columns">
+                        class="otpv-mat-field--compact inventory__compact-field inventory__columns">
 
             <mat-label>
                 Columnas
@@ -251,8 +251,8 @@
                     class="inventory__right">
                     <input type="number"
                            step="1"
-                           class="inventory__cell-input inventory__cell-input--stock"
-                           [class.inventory__editor--dirty]="row.dirtyFields.includes('stock')"
+                           class="otpv-table-control inventory__cell-input--stock"
+                           [class.otpv-table-control--dirty]="row.dirtyFields.includes('stock')"
                            [value]="row.draft.stock"
                            [attr.data-inventory-row-id]="row.id"
                            data-inventory-field="stock"
@@ -277,9 +277,9 @@
                     <input type="text"
                            inputmode="decimal"
                            autocomplete="off"
-                           class="inventory__cell-input inventory__cell-input--money"
-                           [class.inventory__editor--dirty]="row.dirtyFields.includes('precioAlbaran')"
-                           [class.inventory__editor--invalid]="hasDecimalError(row.id, 'precioAlbaran')"
+                           class="otpv-table-control inventory__cell-input--money"
+                           [class.otpv-table-control--dirty]="row.dirtyFields.includes('precioAlbaran')"
+                           [class.otpv-table-control--invalid]="hasDecimalError(row.id, 'precioAlbaran')"
                            [attr.title]="getDecimalError(row.id, 'precioAlbaran')"
                            [attr.data-inventory-row-id]="row.id"
                            data-inventory-field="precioAlbaran"
@@ -305,9 +305,9 @@
                     <input type="text"
                            inputmode="decimal"
                            autocomplete="off"
-                           class="inventory__cell-input inventory__cell-input--money"
-                           [class.inventory__editor--dirty]="row.dirtyFields.includes('puc')"
-                           [class.inventory__editor--invalid]="hasDecimalError(row.id, 'puc')"
+                           class="otpv-table-control inventory__cell-input--money"
+                           [class.otpv-table-control--dirty]="row.dirtyFields.includes('puc')"
+                           [class.otpv-table-control--invalid]="hasDecimalError(row.id, 'puc')"
                            [attr.title]="getDecimalError(row.id, 'puc')"
                            [attr.data-inventory-row-id]="row.id"
                            data-inventory-field="puc"
@@ -333,9 +333,9 @@
                     <input type="text"
                            inputmode="decimal"
                            autocomplete="off"
-                           class="inventory__cell-input inventory__cell-input--money"
-                           [class.inventory__editor--dirty]="row.dirtyFields.includes('pvp')"
-                           [class.inventory__editor--invalid]="hasDecimalError(row.id, 'pvp')"
+                           class="otpv-table-control inventory__cell-input--money"
+                           [class.otpv-table-control--dirty]="row.dirtyFields.includes('pvp')"
+                           [class.otpv-table-control--invalid]="hasDecimalError(row.id, 'pvp')"
                            [attr.title]="getDecimalError(row.id, 'pvp')"
                            [attr.data-inventory-row-id]="row.id"
                            data-inventory-field="pvp"
@@ -380,8 +380,8 @@
                     } @else {
                     <input type="text"
                            autocomplete="off"
-                           class="inventory__cell-input inventory__cell-input--barcode"
-                           [class.inventory__editor--dirty]="row.dirtyFields.includes('codigoBarras')"
+                           class="otpv-table-control inventory__cell-input--barcode"
+                           [class.otpv-table-control--dirty]="row.dirtyFields.includes('codigoBarras')"
                            [value]="row.draft.codigoAdicional"
                            [attr.data-inventory-row-id]="row.id"
                            data-inventory-field="codigoBarras"

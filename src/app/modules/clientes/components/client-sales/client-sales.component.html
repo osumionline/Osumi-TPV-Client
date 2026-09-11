@@ -13,26 +13,26 @@
 
         <div class="client-sales__filters"
              aria-label="Periodo de ventas">
-            <label>
-                <span>
+            <label class="otpv-field">
+                <span class="otpv-field__label">
                     Desde
                 </span>
 
-                <input type="date"
+                <input class="otpv-control"
+                       type="date"
                        [value]="desde()"
-                       [disabled]="disabled() || loading()"
                        [disabled]="disabled() || loading() || actionInProgress()"
                        (change)="onDesdeChange($event)">
             </label>
 
-            <label>
-                <span>
+            <label class="otpv-field">
+                <span class="otpv-field__label">
                     Hasta
                 </span>
 
-                <input type="date"
+                <input class="otpv-control"
+                       type="date"
                        [value]="hasta()"
-                       [disabled]="disabled() || loading()"
                        [disabled]="disabled() || loading() || actionInProgress()"
                        (change)="onHastaChange($event)">
             </label>

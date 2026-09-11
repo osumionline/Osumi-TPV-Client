@@ -37,28 +37,6 @@
         flex: 0 0 auto;
         align-items: flex-end;
         gap: 8px;
-
-        label {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-
-            span {
-                color: var(--disabled-color);
-                font-size: 13px;
-            }
-        }
-
-        input {
-            min-height: 38px;
-            padding: 0 10px;
-            box-sizing: border-box;
-            border: 1px solid var(--separator-color);
-            border-radius: 4px;
-            background-color: var(--color-white);
-            color: inherit;
-            font: inherit;
-        }
     }
 
     .client-sales__error {

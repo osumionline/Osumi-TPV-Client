@@ -1,0 +1,80 @@
+/*
+ * Controles HTML nativos.
+ *
+ * Esta hoja define únicamente apariencia y estados compartidos.
+ * El layout, anchos y colocación pertenecen a cada componente.
+ */
+
+.otpv-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.otpv-field__label {
+    color: var(--disabled-color);
+    font-size: 13px;
+}
+
+.otpv-control {
+    width: 100%;
+    height: 40px;
+    padding: 0 10px;
+    border: 1px solid var(--separator-color);
+    border-radius: 4px;
+    outline: 0;
+    background-color: var(--color-white);
+    color: inherit;
+    font: inherit;
+
+    &:focus {
+        border-color: var(--main-color);
+    }
+
+    &:disabled {
+        background-color: var(--color-very-light-grey);
+        color: var(--disabled-color);
+        cursor: not-allowed;
+    }
+}
+
+/*
+ * Campos Angular Material compactos utilizados en toolbars y filtros.
+ */
+.otpv-mat-field--compact {
+    font-size: 13px;
+    --mat-form-field-container-height: 40px;
+    --mat-form-field-container-vertical-padding: 8px;
+}
+
+/*
+ * Editores nativos compactos utilizados dentro de tablas.
+ */
+.otpv-table-control {
+    height: 30px;
+    padding: 3px 6px;
+    border: 1px solid var(--separator-color);
+    border-radius: 4px;
+    outline: 0;
+    background-color: var(--color-white);
+    color: inherit;
+    font: inherit;
+
+    &:focus {
+        border-color: var(--main-color);
+    }
+
+    &:disabled {
+        background-color: var(--color-very-light-grey);
+        color: var(--disabled-color);
+        cursor: not-allowed;
+    }
+}
+
+.otpv-table-control--dirty {
+    border-color: var(--color-yellow);
+}
+
+.otpv-table-control--invalid {
+    border-color: var(--color-red);
+}
