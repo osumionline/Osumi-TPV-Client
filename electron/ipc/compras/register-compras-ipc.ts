@@ -1,4 +1,5 @@
 import type PedidosService from '@backend/application/compras/pedidos/pedidos.service';
+import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type {
   PedidoCabeceraInterface,
   PedidoFormOptionsInterface,
@@ -92,6 +93,24 @@ export default function registerComprasIpc(
       assertTrustedSender(event, getMainWindow);
 
       return pedidosService.deletePedido(idPedido);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.comprasResolvePedidoArticulo,
+    async (event, codigo: string): Promise<PedidoArticuloInterface | null> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return pedidosService.resolvePedidoArticulo(codigo);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.comprasSearchPedidoArticulos,
+    async (event, texto: string): Promise<readonly PedidoArticuloInterface[]> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return pedidosService.searchPedidoArticulos(texto);
     },
   );
 }

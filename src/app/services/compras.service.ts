@@ -1,4 +1,5 @@
 import { Service } from '@angular/core';
+import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type {
   PedidoCabeceraInterface,
   PedidoFormOptionsInterface,
@@ -73,5 +74,20 @@ export default class ComprasService {
    */
   deletePedido(idPedido: number): Promise<void> {
     return window.osumiDesktop.compras.deletePedido(idPedido);
+  }
+
+  /**
+   * Resuelve un artículo mediante un código introducido
+   * o escaneado en la ficha de Pedido.
+   */
+  resolvePedidoArticulo(codigo: string): Promise<PedidoArticuloInterface | null> {
+    return window.osumiDesktop.compras.resolvePedidoArticulo(codigo);
+  }
+
+  /**
+   * Busca artículos activos mediante texto libre.
+   */
+  searchPedidoArticulos(texto: string): Promise<readonly PedidoArticuloInterface[]> {
+    return window.osumiDesktop.compras.searchPedidoArticulos(texto);
   }
 }

@@ -13,6 +13,7 @@ import type {
   PedidosGuardadosResultadoRecord,
   PedidosRecepcionadosResultadoRecord,
 } from '@backend/domain/compras/pedidos/pedido-listado-record.interface';
+import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type { PedidoSaveCommand } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
 import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type {
@@ -73,29 +74,38 @@ class FakePedidosRepository implements PedidosRepository {
     },
   ];
 
+  lastResolvePedidoArticuloInput: {
+    readonly codigo: string;
+    readonly codigoNumerico: number | null;
+  } | null = null;
+
+  lastSearchPedidoArticulosPattern: string | null = null;
+
   pedidoArticuloResult: PedidoArticuloRecord | null = null;
   pedidoArticulosSearchResult: readonly PedidoArticuloRecord[] = [];
 
   /**
-   * Devuelve el artículo configurado para una resolución
-   * de código simulada.
+   * Devuelve el artículo configurado y conserva los datos
+   * recibidos para comprobar la resolución en los tests.
    */
   resolvePedidoArticulo(
     codigo: string,
     codigoNumerico: number | null,
   ): Promise<PedidoArticuloRecord | null> {
-    void codigo;
-    void codigoNumerico;
+    this.lastResolvePedidoArticuloInput = {
+      codigo,
+      codigoNumerico,
+    };
 
     return Promise.resolve(this.pedidoArticuloResult);
   }
 
   /**
-   * Devuelve los artículos configurados para una
-   * búsqueda simulada.
+   * Devuelve los artículos configurados y conserva
+   * el patrón de búsqueda recibido.
    */
   searchPedidoArticulos(searchPattern: string): Promise<readonly PedidoArticuloRecord[]> {
-    void searchPattern;
+    this.lastSearchPedidoArticulosPattern = searchPattern;
 
     return Promise.resolve(this.pedidoArticulosSearchResult);
   }
@@ -258,6 +268,34 @@ function createSaveCommand(overrides: Partial<PedidoSaveCommand> = {}): PedidoSa
     europeo: false,
     observaciones: 'Pedido de prueba',
     columnasVisibles: [1, 4],
+    ...overrides,
+  };
+}
+
+/**
+ * Construye un artículo canónico representativo
+ * para los casos de uso de Pedido.
+ */
+function createPedidoArticuloRecord(
+  overrides: Partial<PedidoArticuloRecord> = {},
+): PedidoArticuloRecord {
+  return {
+    id: 8,
+    publicId: 'article-8',
+    localizador: 123,
+    nombre: 'Artículo de prueba',
+    referencia: 'REF-123',
+    marcaNombre: 'Marca de prueba',
+    stock: 7,
+    palbMicros: 10_000_000,
+    pucMicros: 12_705_000,
+    pvpMicros: 19_950_000,
+    margenMicroporcentaje: 36_315_789,
+    ivaBps: 2100,
+    recargoEquivalenciaBps: 520,
+    tieneCodigoBarrasAdicional: true,
+    observaciones: 'Observación para pedidos',
+    mostrarObservacionesPedidos: true,
     ...overrides,
   };
 }
@@ -558,5 +596,131 @@ describe('PedidosService', (): void => {
     await service.deletePedido(9);
 
     expect(repository.lastDeletedPedidoId).toBe(9);
+  });
+
+  it('normaliza y resuelve un código numérico de artículo', async (): Promise<void> => {
+    const repository = new FakePedidosRepository();
+    repository.pedidoArticuloResult = createPedidoArticuloRecord();
+
+    const service = new PedidosService(repository);
+
+    const result: PedidoArticuloInterface | null = await service.resolvePedidoArticulo('  55  ');
+
+    expect(repository.lastResolvePedidoArticuloInput).toEqual({
+      codigo: '55',
+      codigoNumerico: 55,
+    });
+
+    expect(result).toEqual({
+      id: 8,
+      publicId: 'article-8',
+      localizador: 123,
+      nombre: 'Artículo de prueba',
+      referencia: 'REF-123',
+      marcaNombre: 'Marca de prueba',
+      stock: 7,
+      palbMicros: 10_000_000,
+      pucMicros: 12_705_000,
+      pvpMicros: 19_950_000,
+      margenMicroporcentaje: 36_315_789,
+      ivaBps: 2100,
+      recargoEquivalenciaBps: 520,
+      tieneCodigoBarrasAdicional: true,
+      observaciones: 'Observación para pedidos',
+      mostrarObservacionesPedidos: true,
+    });
+  });
+
+  it('resuelve un código alfanumérico sin convertirlo a número', async (): Promise<void> => {
+    const repository = new FakePedidosRepository();
+    repository.pedidoArticuloResult = createPedidoArticuloRecord();
+
+    const service = new PedidosService(repository);
+
+    await service.resolvePedidoArticulo(' EXTRA-A ');
+
+    expect(repository.lastResolvePedidoArticuloInput).toEqual({
+      codigo: 'EXTRA-A',
+      codigoNumerico: null,
+    });
+  });
+
+  it('no consulta el repository cuando el código está vacío', async (): Promise<void> => {
+    const repository = new FakePedidosRepository();
+    const service = new PedidosService(repository);
+
+    await expect(service.resolvePedidoArticulo('   ')).resolves.toBeNull();
+
+    expect(repository.lastResolvePedidoArticuloInput).toBeNull();
+  });
+
+  it('trata como barcode un número que no cabe en un entero seguro', async (): Promise<void> => {
+    const repository = new FakePedidosRepository();
+    const service = new PedidosService(repository);
+
+    await service.resolvePedidoArticulo('999999999999999999999999');
+
+    expect(repository.lastResolvePedidoArticuloInput).toEqual({
+      codigo: '999999999999999999999999',
+      codigoNumerico: null,
+    });
+  });
+
+  it('rechaza códigos de artículo inválidos o demasiado largos', async (): Promise<void> => {
+    const service = new PedidosService(new FakePedidosRepository());
+
+    await expect(service.resolvePedidoArticulo(123 as unknown as string)).rejects.toThrow(
+      'El código del artículo no es válido.',
+    );
+
+    await expect(service.resolvePedidoArticulo('A'.repeat(101))).rejects.toThrow(
+      'El código del artículo es demasiado largo.',
+    );
+  });
+
+  it('normaliza acentos y palabras para buscar artículos por slug', async (): Promise<void> => {
+    const repository = new FakePedidosRepository();
+
+    repository.pedidoArticulosSearchResult = [
+      createPedidoArticuloRecord(),
+      createPedidoArticuloRecord({
+        id: 9,
+        publicId: 'article-9',
+        localizador: 124,
+        nombre: 'Segundo artículo',
+      }),
+    ];
+
+    const service = new PedidosService(repository);
+
+    const result: readonly PedidoArticuloInterface[] =
+      await service.searchPedidoArticulos('  Artículo   Ázul  ');
+
+    expect(repository.lastSearchPedidoArticulosPattern).toBe('%articulo%azul%');
+
+    expect(result.map((articulo: PedidoArticuloInterface): number => articulo.id)).toEqual([8, 9]);
+  });
+
+  it('no busca cuando el texto libre está vacío o no contiene términos', async (): Promise<void> => {
+    const repository = new FakePedidosRepository();
+    const service = new PedidosService(repository);
+
+    await expect(service.searchPedidoArticulos('   ')).resolves.toEqual([]);
+
+    await expect(service.searchPedidoArticulos(' --- ### ')).resolves.toEqual([]);
+
+    expect(repository.lastSearchPedidoArticulosPattern).toBeNull();
+  });
+
+  it('rechaza textos de búsqueda inválidos o demasiado largos', async (): Promise<void> => {
+    const service = new PedidosService(new FakePedidosRepository());
+
+    await expect(service.searchPedidoArticulos(null as unknown as string)).rejects.toThrow(
+      'El texto de búsqueda de artículos no es válido.',
+    );
+
+    await expect(service.searchPedidoArticulos('A'.repeat(201))).rejects.toThrow(
+      'El texto de búsqueda de artículos es demasiado largo.',
+    );
   });
 });

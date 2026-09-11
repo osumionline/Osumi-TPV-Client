@@ -1,5 +1,6 @@
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
 import type PedidosRepository from '@backend/contracts/compras/pedidos/pedidos.repository.interface';
+import type PedidoArticuloRecord from '@backend/domain/compras/pedidos/pedido-articulo-record.interface';
 import type {
   PedidoCabeceraRecord,
   PedidoFormOptionsRecord,
@@ -14,6 +15,7 @@ import type {
   PedidosGuardadosResultadoRecord,
   PedidosRecepcionadosResultadoRecord,
 } from '@backend/domain/compras/pedidos/pedido-listado-record.interface';
+import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type {
   PedidoCabeceraInterface,
   PedidoFormOptionsInterface,
@@ -33,7 +35,7 @@ import type {
 import { PAGE_SIZE_OPTIONS } from '@desktop-contracts/shared/pagination.constants';
 
 /**
- * Expone los casos de uso de los listados de Pedidos.
+ * Expone los casos de uso propios de Pedidos.
  */
 export default class PedidosService {
   /**
@@ -188,6 +190,130 @@ export default class PedidosService {
     this.validatePedidoId(idPedido);
 
     await this.pedidosRepository.deletePedido(idPedido);
+  }
+
+  /**
+   * Resuelve un código introducido o escaneado mediante
+   * acceso directo, localizador o código de barras.
+   */
+  async resolvePedidoArticulo(codigo: string): Promise<PedidoArticuloInterface | null> {
+    if (typeof codigo !== 'string') {
+      throw new Error('El código del artículo no es válido.');
+    }
+
+    const normalizedCode: string = codigo.trim();
+
+    if (normalizedCode.length === 0) {
+      return null;
+    }
+
+    if (normalizedCode.length > 100) {
+      throw new Error('El código del artículo es demasiado largo.');
+    }
+
+    const codigoNumerico: number | null = this.getPedidoArticuloNumericCode(normalizedCode);
+
+    const record: PedidoArticuloRecord | null = await this.pedidosRepository.resolvePedidoArticulo(
+      normalizedCode,
+      codigoNumerico,
+    );
+
+    return record === null ? null : this.mapPedidoArticulo(record);
+  }
+
+  /**
+   * Busca artículos activos mediante el texto libre
+   * introducido en la ficha de Pedido.
+   */
+  async searchPedidoArticulos(texto: string): Promise<readonly PedidoArticuloInterface[]> {
+    if (typeof texto !== 'string') {
+      throw new Error('El texto de búsqueda de artículos no es válido.');
+    }
+
+    const normalizedText: string = texto.trim();
+
+    if (normalizedText.length === 0) {
+      return [];
+    }
+
+    if (normalizedText.length > 200) {
+      throw new Error('El texto de búsqueda de artículos es demasiado largo.');
+    }
+
+    const searchPattern: string | null = this.getPedidoArticuloSearchPattern(normalizedText);
+
+    if (searchPattern === null) {
+      return [];
+    }
+
+    const records: readonly PedidoArticuloRecord[] =
+      await this.pedidosRepository.searchPedidoArticulos(searchPattern);
+
+    return records.map((record: PedidoArticuloRecord): PedidoArticuloInterface =>
+      this.mapPedidoArticulo(record),
+    );
+  }
+
+  /**
+   * Convierte un código numérico positivo y seguro
+   * en el valor utilizado por localizador/acceso directo.
+   */
+  private getPedidoArticuloNumericCode(codigo: string): number | null {
+    if (!/^\d+$/.test(codigo)) {
+      return null;
+    }
+
+    const numericCode: number = Number(codigo);
+
+    if (!Number.isSafeInteger(numericCode) || numericCode <= 0) {
+      return null;
+    }
+
+    return numericCode;
+  }
+
+  /**
+   * Convierte un texto libre en el patrón utilizado
+   * contra el slug normalizado de los artículos.
+   */
+  private getPedidoArticuloSearchPattern(texto: string): string | null {
+    const normalizedText: string = texto
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+
+    if (normalizedText.length === 0) {
+      return null;
+    }
+
+    return `%${normalizedText.split(/\s+/).join('%')}%`;
+  }
+
+  /**
+   * Convierte el record interno del artículo en el
+   * contrato público utilizado por Compras.
+   */
+  private mapPedidoArticulo(record: PedidoArticuloRecord): PedidoArticuloInterface {
+    return {
+      id: record.id,
+      publicId: record.publicId,
+      localizador: record.localizador,
+      nombre: record.nombre,
+      referencia: record.referencia,
+      marcaNombre: record.marcaNombre,
+      stock: record.stock,
+      palbMicros: record.palbMicros,
+      pucMicros: record.pucMicros,
+      pvpMicros: record.pvpMicros,
+      margenMicroporcentaje: record.margenMicroporcentaje,
+      ivaBps: record.ivaBps,
+      recargoEquivalenciaBps: record.recargoEquivalenciaBps,
+      tieneCodigoBarrasAdicional: record.tieneCodigoBarrasAdicional,
+      observaciones: record.observaciones,
+      mostrarObservacionesPedidos: record.mostrarObservacionesPedidos,
+    };
   }
 
   /**

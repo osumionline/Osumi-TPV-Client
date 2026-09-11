@@ -1,3 +1,4 @@
+import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type {
   PedidoCabeceraInterface,
   PedidoFormOptionsInterface,
@@ -56,4 +57,15 @@ export default interface ComprasApi {
    * Elimina lógicamente un pedido todavía pendiente.
    */
   deletePedido(idPedido: number): Promise<void>;
+
+  /**
+   * Resuelve un artículo mediante un código introducido
+   * o escaneado en la ficha de Pedido.
+   */
+  resolvePedidoArticulo(codigo: string): Promise<PedidoArticuloInterface | null>;
+
+  /**
+   * Busca artículos activos mediante texto libre.
+   */
+  searchPedidoArticulos(texto: string): Promise<readonly PedidoArticuloInterface[]>;
 }
