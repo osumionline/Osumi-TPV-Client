@@ -264,7 +264,9 @@
 
             <otpv-purchase-order-lines [lines]="lines()"
                                        [visibleColumns]="order.columnasVisibles"
-                                       [recargoEquivalencia]="order.recargoEquivalencia" />
+                                       [recargoEquivalencia]="order.recargoEquivalencia"
+                                       [disabled]="order.recepcionado || processing()"
+                                       (articleSelected)="onArticleSelected($event)" />
         </div>
         }
     </section>

@@ -84,7 +84,7 @@
             </thead>
 
             <tbody>
-                @for (line of lines(); track line.id) {
+                @for (line of lines(); track line.key) {
                 <tr>
                     @if (visibleColumnIds().has(1)) {
                     <td class="purchase-order-lines__order">
@@ -182,5 +182,65 @@
             </tbody>
         </table>
     </div>
+    <div class="purchase-order-lines__search">
+        <label class="otpv-field purchase-order-lines__search-field">
+            <span class="otpv-field__label">
+                Localizador / búsqueda
+            </span>
+
+            <input class="otpv-control"
+                   type="text"
+                   autocomplete="off"
+                   placeholder="Localizador, código de barras o nombre"
+                   [disabled]="disabled() || searching()"
+                   [value]="searchText()"
+                   (input)="onSearchInput($event)"
+                   (keydown)="onSearchKeydown($event)">
+        </label>
+
+        <button mat-icon-button
+                type="button"
+                matTooltip="Buscar artículo"
+                aria-label="Buscar artículo"
+                [disabled]="disabled() || searching()"
+                (click)="onSearchClick()">
+            <mat-icon>
+                search
+            </mat-icon>
+        </button>
+    </div>
+
+    @if (searchMessage() !== null) {
+    <div class="purchase-order-lines__search-message">
+        {{ searchMessage() }}
+    </div>
+    }
+
+    @if (searchResults().length > 0) {
+    <div class="purchase-order-lines__results">
+        @for (article of searchResults(); track article.id) {
+        <button class="purchase-order-lines__result"
+                type="button"
+                [disabled]="disabled()"
+                (click)="selectArticle(article)">
+            <span class="purchase-order-lines__result-localizador">
+                {{ article.localizador }}
+            </span>
+
+            <span class="purchase-order-lines__result-name">
+                {{ article.nombre }}
+            </span>
+
+            <span class="purchase-order-lines__result-brand">
+                {{ article.marcaNombre }}
+            </span>
+
+            <span class="purchase-order-lines__result-stock">
+                Stock: {{ article.stock }}
+            </span>
+        </button>
+        }
+    </div>
+    }
     }
 </section>

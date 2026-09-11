@@ -1,15 +1,22 @@
+import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type {
   PedidoCabeceraInterface,
   PedidoFormOptionsInterface,
 } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
 import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/pedido-columnas.constants';
+import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
+import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
 import {
+  addPurchaseOrderArticle,
+  AddPurchaseOrderArticleResult,
   addPurchaseOrderProviderOption,
   buildPurchaseOrderPaymentOptions,
   buildPurchaseOrderProviderOptions,
   buildPurchaseOrderSaveCommand,
   createExistingPurchaseOrderFormState,
+  createExistingPurchaseOrderLineState,
   createNewPurchaseOrderFormState,
+  createNewPurchaseOrderLineState,
   getPurchaseOrderPaymentKey,
   normalizePurchaseOrderColumns,
   parsePurchaseOrderRouteId,
@@ -58,6 +65,62 @@ function createPedido(overrides: Partial<PedidoCabeceraInterface> = {}): PedidoC
     recepcionado: false,
     observaciones: null,
     columnasVisibles: [1, 4],
+    ...overrides,
+  };
+}
+
+/**
+ * Construye una línea persistida representativa.
+ */
+function createPedidoLinea(overrides: Partial<PedidoLineaInterface> = {}): PedidoLineaInterface {
+  return {
+    id: 20,
+    publicId: 'order-line-20',
+    orden: 0,
+    idArticulo: 8,
+    localizador: 260458,
+    nombreArticulo: 'Artículo persistido',
+    referencia: 'REF-20',
+    marcaNombre: 'Marca',
+    codigoBarras: null,
+    unidades: 4,
+    stockActual: 10,
+    stockFinal: 14,
+    palbMicros: 570_000,
+    pucMicros: 630_000,
+    pvpMicros: 990_000,
+    margenMicroporcentaje: 36_363_636,
+    ivaBps: 1000,
+    recargoEquivalenciaBps: 140,
+    descuentoBps: 0,
+    ...overrides,
+  };
+}
+
+/**
+ * Construye un artículo representativo para añadirlo
+ * a una línea editable de Pedido.
+ */
+function createPedidoArticulo(
+  overrides: Partial<PedidoArticuloInterface> = {},
+): PedidoArticuloInterface {
+  return {
+    id: 9,
+    publicId: 'article-9',
+    localizador: 267960,
+    nombre: 'Artículo nuevo',
+    referencia: 'REF-9',
+    marcaNombre: 'Otra marca',
+    stock: 7,
+    palbMicros: 800_000,
+    pucMicros: 950_000,
+    pvpMicros: 1_500_000,
+    margenMicroporcentaje: 36_666_667,
+    ivaBps: 2100,
+    recargoEquivalenciaBps: 520,
+    tieneCodigoBarrasAdicional: false,
+    observaciones: null,
+    mostrarObservacionesPedidos: false,
     ...overrides,
   };
 }
@@ -292,5 +355,114 @@ describe('purchase-order.component.private', (): void => {
         historical: false,
       },
     ]);
+  });
+
+  it('convierte una línea persistida al estado editable del renderer', (): void => {
+    const result: PurchaseOrderLineState =
+      createExistingPurchaseOrderLineState(createPedidoLinea());
+
+    expect(result).toEqual({
+      ...createPedidoLinea(),
+      key: 'line:20',
+    });
+  });
+
+  it('crea una línea nueva con unidades cero y stock final inicial sin cambios', (): void => {
+    const result: PurchaseOrderLineState = createNewPurchaseOrderLineState(
+      createPedidoArticulo(),
+      3,
+    );
+
+    expect(result).toEqual({
+      key: 'article:9',
+      id: null,
+      publicId: null,
+      orden: 3,
+      idArticulo: 9,
+      localizador: 267960,
+      nombreArticulo: 'Artículo nuevo',
+      referencia: 'REF-9',
+      marcaNombre: 'Otra marca',
+      codigoBarras: null,
+      unidades: 0,
+      stockActual: 7,
+      stockFinal: 7,
+      palbMicros: 800_000,
+      pucMicros: 950_000,
+      pvpMicros: 1_500_000,
+      margenMicroporcentaje: 36_666_667,
+      ivaBps: 2100,
+      recargoEquivalenciaBps: 520,
+      descuentoBps: 0,
+    });
+  });
+
+  it('añade un artículo al final respetando el mayor orden existente', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          id: 20,
+          orden: 2,
+        }),
+      ),
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          id: 21,
+          publicId: 'order-line-21',
+          orden: 5,
+          idArticulo: 10,
+          localizador: 300000,
+        }),
+      ),
+    ];
+
+    const result: AddPurchaseOrderArticleResult = addPurchaseOrderArticle(
+      lines,
+      createPedidoArticulo(),
+    );
+
+    expect(result.added).toBe(true);
+    expect(result.lineKey).toBe('article:9');
+    expect(result.lines).toHaveLength(3);
+    expect(result.lines[2]?.orden).toBe(6);
+    expect(result.lines[2]?.unidades).toBe(0);
+  });
+
+  it('no crea una segunda línea cuando el artículo ya está en el pedido', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          idArticulo: 9,
+        }),
+      ),
+    ];
+
+    const result: AddPurchaseOrderArticleResult = addPurchaseOrderArticle(
+      lines,
+      createPedidoArticulo(),
+    );
+
+    expect(result.added).toBe(false);
+    expect(result.lines).toBe(lines);
+    expect(result.lineKey).toBe('line:20');
+  });
+
+  it('detecta también un duplicado legacy mediante localizador', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          idArticulo: null,
+          localizador: 267960,
+        }),
+      ),
+    ];
+
+    const result: AddPurchaseOrderArticleResult = addPurchaseOrderArticle(
+      lines,
+      createPedidoArticulo(),
+    );
+
+    expect(result.added).toBe(false);
+    expect(result.lines).toBe(lines);
   });
 });

@@ -17,6 +17,7 @@ import { MatSelect, type MatSelectChange } from '@angular/material/select';
 import { MatTooltip } from '@angular/material/tooltip';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import HeaderComponent from '@app/components/header/header.component';
+import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type {
   PedidoCabeceraInterface,
   PedidoFormOptionsInterface,
@@ -25,15 +26,18 @@ import type {
 import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type { PedidoTipo } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
+import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
 import Proveedor from '@model/proveedores/proveedor.model';
 import ProviderQuickCreateComponent from '@modules/articulos/components/provider-quick-create/provider-quick-create.component';
 import PurchaseOrderLinesComponent from '@modules/compras/pedidos/components/purchase-order-lines/purchase-order-lines.component';
 import {
+  addPurchaseOrderArticle,
   addPurchaseOrderProviderOption,
   buildPurchaseOrderPaymentOptions,
   buildPurchaseOrderProviderOptions,
   buildPurchaseOrderSaveCommand,
   createExistingPurchaseOrderFormState,
+  createExistingPurchaseOrderLineState,
   createNewPurchaseOrderFormState,
   getPurchaseOrderPaymentKey,
   normalizePurchaseOrderColumns,
@@ -111,8 +115,8 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
   private showSaveFeedbackAfterLoad: boolean =
     this.router.currentNavigation()?.extras.state?.['purchaseOrderSaveSuccessful'] === true;
   readonly loadError: WritableSignal<string | null> = signal<string | null>(null);
-  readonly lines: WritableSignal<readonly PedidoLineaInterface[]> = signal<
-    readonly PedidoLineaInterface[]
+  readonly lines: WritableSignal<readonly PurchaseOrderLineState[]> = signal<
+    readonly PurchaseOrderLineState[]
   >([]);
 
   readonly columnOptions: readonly PurchaseOrderColumnOption[] = PURCHASE_ORDER_COLUMN_OPTIONS;
@@ -277,6 +281,27 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
     } finally {
       this.creatingProveedor.set(false);
     }
+  }
+
+  /**
+   * Incorpora al estado editable el artículo elegido
+   * desde el buscador de líneas.
+   */
+  onArticleSelected(articulo: PedidoArticuloInterface): void {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (state === null || state.recepcionado || this.processing()) {
+      return;
+    }
+
+    const result = addPurchaseOrderArticle(this.lines(), articulo);
+
+    if (!result.added) {
+      return;
+    }
+
+    this.clearSaveFeedback();
+    this.lines.set(result.lines);
   }
 
   /**
@@ -500,7 +525,11 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
         throw new Error('El pedido indicado no existe.');
       }
 
-      this.lines.set(lines);
+      this.lines.set(
+        lines.map((line: PedidoLineaInterface): PurchaseOrderLineState =>
+          createExistingPurchaseOrderLineState(line),
+        ),
+      );
       this.providerOptions.set(buildPurchaseOrderProviderOptions(options.proveedores, pedido));
       this.paymentOptions.set(buildPurchaseOrderPaymentOptions(options.tiposPago, pedido));
 

@@ -1,3 +1,4 @@
+import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type {
   PedidoCabeceraInterface,
   PedidoProveedorOptionInterface,
@@ -5,7 +6,97 @@ import type {
   PedidoTipoPagoOptionInterface,
 } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
 import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/pedido-columnas.constants';
+import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type { PedidoTipo } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
+import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
+
+export interface AddPurchaseOrderArticleResult {
+  readonly lines: readonly PurchaseOrderLineState[];
+  readonly added: boolean;
+  readonly lineKey: string;
+}
+
+/**
+ * Convierte una línea persistida en el estado editable
+ * utilizado por la ficha de Pedido.
+ */
+export function createExistingPurchaseOrderLineState(
+  line: PedidoLineaInterface,
+): PurchaseOrderLineState {
+  return {
+    ...line,
+    key: `line:${line.id}`,
+  };
+}
+
+/**
+ * Construye una línea nueva a partir del estado canónico
+ * actual del artículo seleccionado.
+ */
+export function createNewPurchaseOrderLineState(
+  articulo: PedidoArticuloInterface,
+  orden: number,
+): PurchaseOrderLineState {
+  return {
+    key: `article:${articulo.id}`,
+    id: null,
+    publicId: null,
+    orden,
+    idArticulo: articulo.id,
+    localizador: articulo.localizador,
+    nombreArticulo: articulo.nombre,
+    referencia: articulo.referencia,
+    marcaNombre: articulo.marcaNombre,
+    codigoBarras: null,
+    unidades: 0,
+    stockActual: articulo.stock,
+    stockFinal: articulo.stock,
+    palbMicros: articulo.palbMicros,
+    pucMicros: articulo.pucMicros,
+    pvpMicros: articulo.pvpMicros,
+    margenMicroporcentaje: articulo.margenMicroporcentaje,
+    ivaBps: articulo.ivaBps,
+    recargoEquivalenciaBps: articulo.recargoEquivalenciaBps,
+    descuentoBps: 0,
+  };
+}
+
+/**
+ * Incorpora un artículo al final del Pedido sin permitir
+ * una segunda línea para el mismo artículo.
+ */
+export function addPurchaseOrderArticle(
+  lines: readonly PurchaseOrderLineState[],
+  articulo: PedidoArticuloInterface,
+): AddPurchaseOrderArticleResult {
+  const existingLine: PurchaseOrderLineState | undefined = lines.find(
+    (line: PurchaseOrderLineState): boolean =>
+      line.idArticulo === articulo.id ||
+      (line.idArticulo === null && line.localizador === articulo.localizador),
+  );
+
+  if (existingLine !== undefined) {
+    return {
+      lines,
+      added: false,
+      lineKey: existingLine.key,
+    };
+  }
+
+  const nextOrder: number =
+    lines.reduce(
+      (maxOrder: number, line: PurchaseOrderLineState): number => Math.max(maxOrder, line.orden),
+      -1,
+    ) + 1;
+
+  const newLine: PurchaseOrderLineState = createNewPurchaseOrderLineState(articulo, nextOrder);
+
+  return {
+    lines: [...lines, newLine],
+    added: true,
+    lineKey: newLine.key,
+  };
+}
 
 export interface PurchaseOrderFormState {
   readonly id: number | null;
