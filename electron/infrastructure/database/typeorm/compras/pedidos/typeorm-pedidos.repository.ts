@@ -26,6 +26,7 @@ import type {
   PedidoListadoDatabaseRow,
   PedidoProveedorFilterDatabaseRow,
   PedidoSqlFilter,
+  PedidoTipoPagoOptionDatabaseRow,
   PedidoVisibleColumnDatabaseRow,
 } from './typeorm-pedidos.repository.private';
 
@@ -205,16 +206,16 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
   async getPedidoFormOptions(): Promise<PedidoFormOptionsRecord> {
     const dataSource: DataSource = await this.applicationDatabase.connect();
 
-    const [proveedores, tiposPago] = await Promise.all([
-      dataSource.query(`
+    const proveedores: readonly PedidoProveedorFilterDatabaseRow[] = (await dataSource.query(`
       SELECT
         id AS id_proveedor,
         nombre
       FROM proveedor
       WHERE deleted_at IS NULL
       ORDER BY nombre COLLATE NOCASE, id
-    `),
-      dataSource.query(`
+    `)) as readonly PedidoProveedorFilterDatabaseRow[];
+
+    const tiposPago: readonly PedidoTipoPagoOptionDatabaseRow[] = (await dataSource.query(`
       SELECT
         id AS id_tipo_pago,
         nombre
@@ -226,12 +227,17 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
         orden,
         nombre COLLATE NOCASE,
         id
-    `),
-    ]);
+    `)) as readonly PedidoTipoPagoOptionDatabaseRow[];
 
     return {
-      proveedores: proveedores as PedidoFormOptionsRecord['proveedores'],
-      tiposPago: tiposPago as PedidoFormOptionsRecord['tiposPago'],
+      proveedores: proveedores.map((proveedor: PedidoProveedorFilterDatabaseRow) => ({
+        idProveedor: proveedor.id_proveedor,
+        nombre: proveedor.nombre,
+      })),
+      tiposPago: tiposPago.map((tipoPago: PedidoTipoPagoOptionDatabaseRow) => ({
+        idTipoPago: tipoPago.id_tipo_pago,
+        nombre: tipoPago.nombre,
+      })),
     };
   }
 

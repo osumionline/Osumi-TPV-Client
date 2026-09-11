@@ -1,5 +1,10 @@
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
 import type {
+  PedidoCabeceraRecord,
+  PedidoFormOptionsRecord,
+  PedidoSaveRecord,
+} from '@backend/domain/compras/pedidos/pedido-cabecera-record.interface';
+import type {
   PedidosGuardadosResultadoRecord,
   PedidosRecepcionadosResultadoRecord,
 } from '@backend/domain/compras/pedidos/pedido-listado-record.interface';
@@ -13,8 +18,38 @@ import type { DataSource } from 'typeorm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import TypeOrmPedidosRepository from './typeorm-pedidos.repository';
 
+interface PedidoPersistenceDatabaseRow {
+  readonly id: number;
+  readonly public_id: string;
+  readonly id_proveedor: number;
+  readonly id_tipo_pago: number | null;
+  readonly forma_pago: string | null;
+  readonly tipo: string;
+  readonly numero: string | null;
+  readonly importe_micros: number;
+  readonly portes_micros: number;
+  readonly descuento_bps: number;
+  readonly fecha_pago: string | null;
+  readonly fecha_pedido: string | null;
+  readonly recargo_equivalencia: number;
+  readonly europeo: number;
+  readonly recepcionado: number;
+  readonly observaciones: string | null;
+  readonly deleted_at: string | null;
+}
+
+interface PedidoColumnDatabaseRow {
+  readonly id_columna: number;
+  readonly visible: number;
+}
+
+interface PedidoDeletedAtDatabaseRow {
+  readonly deleted_at: string | null;
+}
+
 let tempDirectory: string | null = null;
 let applicationDatabase: TypeOrmApplicationDatabase | null = null;
+let dataSource: DataSource | null = null;
 let repository: TypeOrmPedidosRepository | null = null;
 
 describe('TypeOrmPedidosRepository', (): void => {
@@ -24,8 +59,7 @@ describe('TypeOrmPedidosRepository', (): void => {
       join(tempDirectory, 'pedidos.sqlite'),
       new TypeOrmDataSourceFactory(),
     );
-
-    const dataSource: DataSource = await applicationDatabase.connect();
+    dataSource = await applicationDatabase.connect();
 
     for (const schema of completeDatabaseSchema) {
       for (const statement of schema.statements) {
@@ -34,6 +68,7 @@ describe('TypeOrmPedidosRepository', (): void => {
     }
 
     await seedPedidos(dataSource);
+
     repository = new TypeOrmPedidosRepository(applicationDatabase);
   });
 
@@ -50,6 +85,7 @@ describe('TypeOrmPedidosRepository', (): void => {
     }
 
     repository = null;
+    dataSource = null;
     applicationDatabase = null;
     tempDirectory = null;
   });
@@ -129,6 +165,354 @@ describe('TypeOrmPedidosRepository', (): void => {
 
     expect(guardados.rows.some((row): boolean => row.id === 5)).toBe(false);
   });
+
+  it('recupera la cabecera y únicamente las columnas opcionales visibles', async (): Promise<void> => {
+    const result: PedidoCabeceraRecord | null = await requireRepository().getPedido(1);
+
+    expect(result).toEqual({
+      id: 1,
+      publicId: 'order-pending-1',
+      idProveedor: 1,
+      proveedorNombre: 'Proveedor Uno',
+      idTipoPago: 10,
+      formaPago: 'Tarjeta histórica',
+      tipo: 'factura',
+      numero: 'ORD-1077436',
+      fechaPedido: '2026-09-10',
+      fechaPago: '2026-09-10',
+      fechaRecepcionado: null,
+      recargoEquivalencia: true,
+      europeo: false,
+      recepcionado: false,
+      observaciones: 'Pedido pendiente reciente',
+      columnasVisibles: [1, 4],
+    });
+
+    await expect(requireRepository().getPedido(999)).resolves.toBeNull();
+  });
+
+  it('recupera únicamente proveedores y tipos de pago activos para la ficha', async (): Promise<void> => {
+    const result: PedidoFormOptionsRecord = await requireRepository().getPedidoFormOptions();
+
+    expect(result).toEqual({
+      proveedores: [
+        {
+          idProveedor: 3,
+          nombre: 'Proveedor Sin Pedidos',
+        },
+        {
+          idProveedor: 1,
+          nombre: 'Proveedor Uno',
+        },
+      ],
+      tiposPago: [
+        {
+          idTipoPago: 11,
+          nombre: 'Paypal',
+        },
+        {
+          idTipoPago: 10,
+          nombre: 'Tarjeta',
+        },
+      ],
+    });
+  });
+
+  it('crea un pedido pendiente sin modificar valores económicos y persiste sus columnas', async (): Promise<void> => {
+    const idPedido: number = await requireRepository().savePedido(
+      createSaveRecord({
+        columnasVisibles: [1, 4, 8],
+      }),
+    );
+
+    expect(idPedido).toBeGreaterThan(5);
+
+    const row: PedidoPersistenceDatabaseRow = await readPedidoPersistenceRow(idPedido);
+
+    expect(row).toMatchObject({
+      id: idPedido,
+      id_proveedor: 1,
+      id_tipo_pago: null,
+      forma_pago: 'Domiciliación bancaria',
+      tipo: 'factura',
+      numero: 'NEW-001',
+      importe_micros: 0,
+      portes_micros: 0,
+      descuento_bps: 0,
+      fecha_pago: null,
+      fecha_pedido: '2026-09-11',
+      recargo_equivalencia: 0,
+      europeo: 0,
+      recepcionado: 0,
+      observaciones: 'Pedido nuevo',
+      deleted_at: null,
+    });
+    expect(row.public_id).not.toBe('');
+
+    expect(await readOptionalColumns(idPedido)).toEqual([
+      {
+        id_columna: 1,
+        visible: 1,
+      },
+      {
+        id_columna: 4,
+        visible: 1,
+      },
+      {
+        id_columna: 5,
+        visible: 0,
+      },
+      {
+        id_columna: 6,
+        visible: 0,
+      },
+      {
+        id_columna: 8,
+        visible: 1,
+      },
+      {
+        id_columna: 9,
+        visible: 0,
+      },
+      {
+        id_columna: 11,
+        visible: 0,
+      },
+      {
+        id_columna: 13,
+        visible: 0,
+      },
+    ]);
+  });
+
+  it('actualiza un pedido conservando su identidad persistida', async (): Promise<void> => {
+    const before: PedidoPersistenceDatabaseRow = await readPedidoPersistenceRow(1);
+
+    const idPedido: number = await requireRepository().savePedido(
+      createSaveRecord({
+        id: 1,
+        idProveedor: 3,
+        formaPago: 'Transferencia bancaria',
+        tipo: 'abono',
+        numero: 'AB-UPDATED',
+        fechaPedido: '2026-09-09',
+        fechaPago: '2026-09-10',
+        recargoEquivalencia: false,
+        europeo: true,
+        observaciones: 'Pedido actualizado',
+        columnasVisibles: [4, 11],
+      }),
+    );
+
+    expect(idPedido).toBe(1);
+
+    const after: PedidoPersistenceDatabaseRow = await readPedidoPersistenceRow(1);
+
+    expect(after).toMatchObject({
+      id: 1,
+      public_id: before.public_id,
+      id_proveedor: 3,
+      id_tipo_pago: null,
+      forma_pago: 'Transferencia bancaria',
+      tipo: 'abono',
+      numero: 'AB-UPDATED',
+      fecha_pago: '2026-09-10',
+      fecha_pedido: '2026-09-09',
+      recargo_equivalencia: 0,
+      europeo: 1,
+      recepcionado: 0,
+      observaciones: 'Pedido actualizado',
+      deleted_at: null,
+    });
+  });
+
+  it('usa el nombre canónico al seleccionar un tipo de pago configurable', async (): Promise<void> => {
+    const idPedido: number = await requireRepository().savePedido(
+      createSaveRecord({
+        idTipoPago: 10,
+        formaPago: 'Texto que no debe persistirse',
+      }),
+    );
+
+    const row: PedidoPersistenceDatabaseRow = await readPedidoPersistenceRow(idPedido);
+
+    expect(row.id_tipo_pago).toBe(10);
+    expect(row.forma_pago).toBe('Tarjeta');
+  });
+
+  it('conserva el snapshot histórico si se mantiene el mismo tipo de pago', async (): Promise<void> => {
+    const currentDataSource: DataSource = requireDataSource();
+
+    await currentDataSource.query(
+      `
+        UPDATE tipo_pago
+        SET nombre = ?
+        WHERE id = ?
+      `,
+      ['Tarjeta Renombrada', 10],
+    );
+
+    await requireRepository().savePedido(
+      createSaveRecord({
+        id: 1,
+        idTipoPago: 10,
+        formaPago: null,
+        recargoEquivalencia: true,
+        columnasVisibles: [1, 4],
+      }),
+    );
+
+    const row: PedidoPersistenceDatabaseRow = await readPedidoPersistenceRow(1);
+
+    expect(row.id_tipo_pago).toBe(10);
+    expect(row.forma_pago).toBe('Tarjeta histórica');
+  });
+
+  it('actualiza la visibilidad de todas las columnas opcionales', async (): Promise<void> => {
+    await requireRepository().savePedido(
+      createSaveRecord({
+        id: 1,
+        recargoEquivalencia: true,
+        columnasVisibles: [5, 13],
+      }),
+    );
+
+    expect(await readOptionalColumns(1)).toEqual([
+      {
+        id_columna: 1,
+        visible: 0,
+      },
+      {
+        id_columna: 4,
+        visible: 0,
+      },
+      {
+        id_columna: 5,
+        visible: 1,
+      },
+      {
+        id_columna: 6,
+        visible: 0,
+      },
+      {
+        id_columna: 8,
+        visible: 0,
+      },
+      {
+        id_columna: 9,
+        visible: 0,
+      },
+      {
+        id_columna: 11,
+        visible: 0,
+      },
+      {
+        id_columna: 13,
+        visible: 1,
+      },
+    ]);
+
+    await requireRepository().savePedido(
+      createSaveRecord({
+        id: 1,
+        recargoEquivalencia: true,
+        columnasVisibles: [4, 6],
+      }),
+    );
+
+    expect(await readOptionalColumns(1)).toEqual([
+      {
+        id_columna: 1,
+        visible: 0,
+      },
+      {
+        id_columna: 4,
+        visible: 1,
+      },
+      {
+        id_columna: 5,
+        visible: 0,
+      },
+      {
+        id_columna: 6,
+        visible: 1,
+      },
+      {
+        id_columna: 8,
+        visible: 0,
+      },
+      {
+        id_columna: 9,
+        visible: 0,
+      },
+      {
+        id_columna: 11,
+        visible: 0,
+      },
+      {
+        id_columna: 13,
+        visible: 0,
+      },
+    ]);
+  });
+
+  it('impide modificar R.E. de un pedido recepcionado', async (): Promise<void> => {
+    await expect(
+      requireRepository().savePedido(
+        createSaveRecord({
+          id: 3,
+          idTipoPago: 11,
+          formaPago: 'Paypal',
+          numero: '#000051640',
+          fechaPedido: '2026-05-26',
+          fechaPago: '2026-05-29',
+          recargoEquivalencia: false,
+          europeo: true,
+          observaciones: null,
+          columnasVisibles: [],
+        }),
+      ),
+    ).rejects.toThrow(
+      'El Recargo de Equivalencia de un pedido recepcionado no se puede modificar.',
+    );
+
+    const row: PedidoPersistenceDatabaseRow = await readPedidoPersistenceRow(3);
+
+    expect(row.recargo_equivalencia).toBe(1);
+  });
+
+  it('elimina lógicamente un pedido pendiente', async (): Promise<void> => {
+    await requireRepository().deletePedido(1);
+
+    const rows: readonly PedidoDeletedAtDatabaseRow[] = (await requireDataSource().query(
+      `
+          SELECT deleted_at
+          FROM pedido
+          WHERE id = ?
+        `,
+      [1],
+    )) as readonly PedidoDeletedAtDatabaseRow[];
+
+    expect(rows[0]?.deleted_at).not.toBeNull();
+    await expect(requireRepository().getPedido(1)).resolves.toBeNull();
+  });
+
+  it('impide eliminar un pedido recepcionado', async (): Promise<void> => {
+    await expect(requireRepository().deletePedido(3)).rejects.toThrow(
+      'Un pedido recepcionado no se puede eliminar.',
+    );
+
+    const rows: readonly PedidoDeletedAtDatabaseRow[] = (await requireDataSource().query(
+      `
+          SELECT deleted_at
+          FROM pedido
+          WHERE id = ?
+        `,
+      [3],
+    )) as readonly PedidoDeletedAtDatabaseRow[];
+
+    expect(rows[0]?.deleted_at).toBeNull();
+  });
 });
 
 /**
@@ -149,6 +533,27 @@ function createQuery(overrides: Partial<PedidoRepositoryQuery> = {}): PedidoRepo
 }
 
 /**
+ * Construye un comando válido de persistencia de cabecera.
+ */
+function createSaveRecord(overrides: Partial<PedidoSaveRecord> = {}): PedidoSaveRecord {
+  return {
+    id: null,
+    idProveedor: 1,
+    idTipoPago: null,
+    formaPago: 'Domiciliación bancaria',
+    tipo: 'factura',
+    numero: 'NEW-001',
+    fechaPedido: '2026-09-11',
+    fechaPago: null,
+    recargoEquivalencia: false,
+    europeo: false,
+    observaciones: 'Pedido nuevo',
+    columnasVisibles: [1, 4, 8],
+    ...overrides,
+  };
+}
+
+/**
  * Obtiene el repository inicializado por el test.
  */
 function requireRepository(): TypeOrmPedidosRepository {
@@ -160,10 +565,89 @@ function requireRepository(): TypeOrmPedidosRepository {
 }
 
 /**
- * Inserta proveedores y pedidos representativos.
+ * Obtiene la conexión SQLite inicializada por el test.
  */
-async function seedPedidos(dataSource: DataSource): Promise<void> {
-  await dataSource.query(`
+function requireDataSource(): DataSource {
+  if (dataSource === null) {
+    throw new Error('La base de datos de Pedidos no está inicializada.');
+  }
+
+  return dataSource;
+}
+
+/**
+ * Recupera el estado persistido de una cabecera de Pedido.
+ */
+async function readPedidoPersistenceRow(idPedido: number): Promise<PedidoPersistenceDatabaseRow> {
+  const rows: readonly PedidoPersistenceDatabaseRow[] = (await requireDataSource().query(
+    `
+        SELECT
+          id,
+          public_id,
+          id_proveedor,
+          id_tipo_pago,
+          forma_pago,
+          tipo,
+          numero,
+          importe_micros,
+          portes_micros,
+          descuento_bps,
+          fecha_pago,
+          fecha_pedido,
+          recargo_equivalencia,
+          europeo,
+          recepcionado,
+          observaciones,
+          deleted_at
+        FROM pedido
+        WHERE id = ?
+      `,
+    [idPedido],
+  )) as readonly PedidoPersistenceDatabaseRow[];
+
+  const row: PedidoPersistenceDatabaseRow | undefined = rows[0];
+
+  if (row === undefined) {
+    throw new Error(`No existe el pedido ${idPedido}.`);
+  }
+
+  return row;
+}
+
+/**
+ * Recupera el estado de todas las columnas opcionales persistidas.
+ */
+async function readOptionalColumns(idPedido: number): Promise<readonly PedidoColumnDatabaseRow[]> {
+  return (await requireDataSource().query(
+    `
+      SELECT
+        id_columna,
+        visible
+      FROM vista_pedido
+      WHERE
+        id_pedido = ?
+        AND id_columna IN (
+          1,
+          4,
+          5,
+          6,
+          8,
+          9,
+          11,
+          13
+        )
+      ORDER BY id_columna
+    `,
+    [idPedido],
+  )) as readonly PedidoColumnDatabaseRow[];
+}
+
+/**
+ * Inserta proveedores, formas de pago, pedidos y
+ * configuración representativa para los tests.
+ */
+async function seedPedidos(currentDataSource: DataSource): Promise<void> {
+  await currentDataSource.query(`
     INSERT INTO proveedor (
       id,
       public_id,
@@ -172,15 +656,76 @@ async function seedPedidos(dataSource: DataSource): Promise<void> {
     )
     VALUES
       (1, 'provider-1', 'Proveedor Uno', NULL),
-      (2, 'provider-2', 'Proveedor Histórico', '2026-06-01T00:00:00.000Z'),
-      (3, 'provider-3', 'Proveedor Sin Pedidos', NULL)
+      (
+        2,
+        'provider-2',
+        'Proveedor Histórico',
+        '2026-06-01T00:00:00.000Z'
+      ),
+      (
+        3,
+        'provider-3',
+        'Proveedor Sin Pedidos',
+        NULL
+      )
   `);
 
-  await dataSource.query(`
+  await currentDataSource.query(`
+    INSERT INTO tipo_pago (
+      id,
+      public_id,
+      nombre,
+      slug,
+      orden,
+      activo,
+      deleted_at
+    )
+    VALUES
+      (
+        10,
+        'payment-card',
+        'Tarjeta',
+        'tarjeta',
+        2,
+        1,
+        NULL
+      ),
+      (
+        11,
+        'payment-paypal',
+        'Paypal',
+        'paypal',
+        1,
+        1,
+        NULL
+      ),
+      (
+        12,
+        'payment-disabled',
+        'Desactivado',
+        'desactivado',
+        0,
+        0,
+        NULL
+      ),
+      (
+        13,
+        'payment-deleted',
+        'Eliminado',
+        'eliminado',
+        0,
+        1,
+        '2026-01-01T00:00:00.000Z'
+      )
+  `);
+
+  await currentDataSource.query(`
     INSERT INTO pedido (
       id,
       public_id,
       id_proveedor,
+      id_tipo_pago,
+      forma_pago,
       tipo,
       numero,
       importe_micros,
@@ -198,6 +743,8 @@ async function seedPedidos(dataSource: DataSource): Promise<void> {
         1,
         'order-pending-1',
         1,
+        10,
+        'Tarjeta histórica',
         'factura',
         'ORD-1077436',
         28670000,
@@ -214,6 +761,8 @@ async function seedPedidos(dataSource: DataSource): Promise<void> {
         2,
         'order-pending-2',
         2,
+        NULL,
+        'Domiciliación bancaria',
         'albaran',
         'ALB-HIST',
         100000000,
@@ -230,6 +779,8 @@ async function seedPedidos(dataSource: DataSource): Promise<void> {
         3,
         'order-received-1',
         1,
+        11,
+        'Paypal',
         'factura',
         '#000051640',
         603990000,
@@ -246,6 +797,8 @@ async function seedPedidos(dataSource: DataSource): Promise<void> {
         4,
         'order-received-2',
         2,
+        NULL,
+        'Transferencia bancaria',
         'abono',
         'AB-001',
         171440000,
@@ -262,6 +815,8 @@ async function seedPedidos(dataSource: DataSource): Promise<void> {
         5,
         'order-deleted',
         1,
+        NULL,
+        NULL,
         'factura',
         'DELETED',
         999000000,
@@ -274,5 +829,18 @@ async function seedPedidos(dataSource: DataSource): Promise<void> {
         NULL,
         '2026-09-11T12:00:00.000Z'
       )
+  `);
+
+  await currentDataSource.query(`
+    INSERT INTO vista_pedido (
+      id_pedido,
+      id_columna,
+      visible
+    )
+    VALUES
+      (1, 1, 1),
+      (1, 2, 1),
+      (1, 4, 1),
+      (1, 5, 0)
   `);
 }
