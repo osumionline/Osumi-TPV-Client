@@ -1,6 +1,7 @@
 import type {
   PedidoCabeceraInterface,
   PedidoProveedorOptionInterface,
+  PedidoSaveCommand,
   PedidoTipoPagoOptionInterface,
 } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
 import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/pedido-columnas.constants';
@@ -290,6 +291,45 @@ export function normalizePurchaseOrderColumns(value: unknown): readonly number[]
       ),
     ),
   ];
+}
+
+/**
+ * Construye el comando de persistencia a partir del estado
+ * editable actual de la ficha.
+ */
+export function buildPurchaseOrderSaveCommand(state: PurchaseOrderFormState): PedidoSaveCommand {
+  if (state.idProveedor === null) {
+    throw new Error('Debes seleccionar un proveedor.');
+  }
+
+  return {
+    id: state.id,
+    idProveedor: state.idProveedor,
+    idTipoPago: state.idTipoPago,
+    formaPago: normalizeOptionalText(state.formaPago),
+    tipo: state.tipo,
+    numero: normalizeOptionalText(state.numero),
+    fechaPedido: normalizeOptionalText(state.fechaPedido),
+    fechaPago: normalizeOptionalText(state.fechaPago),
+    recargoEquivalencia: state.recargoEquivalencia,
+    europeo: state.europeo,
+    observaciones: normalizeOptionalText(state.observaciones),
+    columnasVisibles: [...state.columnasVisibles],
+  };
+}
+
+/**
+ * Convierte un valor textual vacío en NULL y elimina
+ * espacios exteriores del resto de valores.
+ */
+function normalizeOptionalText(value: string | null): string | null {
+  if (value === null) {
+    return null;
+  }
+
+  const normalized: string = value.trim();
+
+  return normalized === '' ? null : normalized;
 }
 
 /**

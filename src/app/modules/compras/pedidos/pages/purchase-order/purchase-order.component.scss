@@ -44,6 +44,23 @@
         font-weight: 600;
     }
 
+    .purchase-order__toolbar-actions {
+        display: flex;
+        margin-left: auto;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .purchase-order__save-feedback {
+        margin-right: 4px;
+        padding-right: 16px;
+        border-right: 1px solid var(--separator-color);
+        color: var(--color-dark-green);
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
     .purchase-order__message {
         display: grid;
         min-height: 0;

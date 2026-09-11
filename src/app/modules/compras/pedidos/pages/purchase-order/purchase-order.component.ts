@@ -3,6 +3,7 @@ import {
   computed,
   inject,
   signal,
+  type OnDestroy,
   type OnInit,
   type Signal,
   type WritableSignal,
@@ -14,16 +15,18 @@ import { MatFormField } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatSelect, type MatSelectChange } from '@angular/material/select';
 import { MatTooltip } from '@angular/material/tooltip';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import HeaderComponent from '@app/components/header/header.component';
 import type {
   PedidoCabeceraInterface,
   PedidoFormOptionsInterface,
+  PedidoSaveCommand,
 } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
 import type { PedidoTipo } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
 import {
   buildPurchaseOrderPaymentOptions,
   buildPurchaseOrderProviderOptions,
+  buildPurchaseOrderSaveCommand,
   createExistingPurchaseOrderFormState,
   createNewPurchaseOrderFormState,
   getPurchaseOrderPaymentKey,
@@ -62,8 +65,9 @@ import { getErrorMessage } from '@utils/error.utils';
     RouterLink,
   ],
 })
-export default class PurchaseOrderComponent implements OnInit {
+export default class PurchaseOrderComponent implements OnInit, OnDestroy {
   private readonly route: ActivatedRoute = inject(ActivatedRoute);
+  private readonly router: Router = inject(Router);
   private readonly comprasService: ComprasService = inject(ComprasService);
   private readonly dialog: DialogService = inject(DialogService);
 
@@ -81,6 +85,13 @@ export default class PurchaseOrderComponent implements OnInit {
   >([]);
 
   readonly loading: WritableSignal<boolean> = signal<boolean>(true);
+  readonly saving: WritableSignal<boolean> = signal<boolean>(false);
+  readonly saveSuccessful: WritableSignal<boolean> = signal<boolean>(false);
+
+  private saveFeedbackTimeoutId: number | null = null;
+
+  private showSaveFeedbackAfterLoad: boolean =
+    this.router.currentNavigation()?.extras.state?.['purchaseOrderSaveSuccessful'] === true;
   readonly loadError: WritableSignal<string | null> = signal<string | null>(null);
 
   readonly columnOptions: readonly PurchaseOrderColumnOption[] = PURCHASE_ORDER_COLUMN_OPTIONS;
@@ -134,10 +145,24 @@ export default class PurchaseOrderComponent implements OnInit {
   }
 
   /**
+   * Libera el temporizador pendiente de confirmación de guardado.
+   */
+  ngOnDestroy(): void {
+    this.clearSaveFeedback();
+  }
+
+  /**
    * Reintenta una carga fallida de la ficha.
    */
   retryLoad(): void {
     void this.loadPage();
+  }
+
+  /**
+   * Inicia el guardado de la cabecera actualmente editada.
+   */
+  onSave(): void {
+    void this.saveOrder();
   }
 
   /**
@@ -221,10 +246,65 @@ export default class PurchaseOrderComponent implements OnInit {
   }
 
   /**
+   * Persiste la cabecera, relee su estado canónico y,
+   * si es nueva, actualiza la URL con su identificador.
+   */
+  private async saveOrder(): Promise<void> {
+    if (this.saving()) {
+      return;
+    }
+
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (state === null) {
+      return;
+    }
+
+    this.clearSaveFeedback();
+    this.saving.set(true);
+
+    try {
+      const command: PedidoSaveCommand = buildPurchaseOrderSaveCommand(state);
+
+      const wasNew: boolean = command.id === null;
+
+      const idPedido: number = await this.comprasService.savePedido(command);
+
+      const pedido: PedidoCabeceraInterface | null = await this.comprasService.getPedido(idPedido);
+
+      if (pedido === null) {
+        throw new Error('El pedido se ha guardado pero no se ha podido volver a cargar.');
+      }
+
+      this.formState.set(createExistingPurchaseOrderFormState(pedido));
+      this.showSaveFeedback();
+
+      if (wasNew) {
+        await this.router.navigate(['/compras/pedido', idPedido], {
+          replaceUrl: true,
+          state: {
+            purchaseOrderSaveSuccessful: true,
+          },
+        });
+      }
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido guardar el pedido.'),
+        })
+        .subscribe();
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  /**
    * Carga en paralelo la configuración general, las opciones
    * de formulario y, cuando procede, el pedido persistido.
    */
   private async loadPage(): Promise<void> {
+    this.clearSaveFeedback();
     this.loading.set(true);
     this.loadError.set(null);
 
@@ -256,6 +336,10 @@ export default class PurchaseOrderComponent implements OnInit {
           ? createNewPurchaseOrderFormState(appData?.tipoIva === 're')
           : createExistingPurchaseOrderFormState(pedido),
       );
+      if (this.showSaveFeedbackAfterLoad) {
+        this.showSaveFeedbackAfterLoad = false;
+        this.showSaveFeedback();
+      }
     } catch (error: unknown) {
       const message: string = getErrorMessage(error, 'No se ha podido cargar la ficha de Pedido.');
 
@@ -276,9 +360,38 @@ export default class PurchaseOrderComponent implements OnInit {
   }
 
   /**
+   * Muestra temporalmente la confirmación de que
+   * el pedido se ha guardado correctamente.
+   */
+  private showSaveFeedback(): void {
+    this.clearSaveFeedback();
+    this.saveSuccessful.set(true);
+
+    this.saveFeedbackTimeoutId = window.setTimeout((): void => {
+      this.saveSuccessful.set(false);
+      this.saveFeedbackTimeoutId = null;
+    }, 4_000);
+  }
+
+  /**
+   * Oculta la confirmación de guardado activa y cancela
+   * su temporizador cuando todavía está pendiente.
+   */
+  private clearSaveFeedback(): void {
+    if (this.saveFeedbackTimeoutId !== null) {
+      window.clearTimeout(this.saveFeedbackTimeoutId);
+      this.saveFeedbackTimeoutId = null;
+    }
+
+    this.saveSuccessful.set(false);
+  }
+
+  /**
    * Aplica un cambio parcial al estado editable actual.
    */
   private updateState(patch: Partial<PurchaseOrderFormState>): void {
+    this.clearSaveFeedback();
+
     this.formState.update((state: PurchaseOrderFormState | null): PurchaseOrderFormState | null =>
       state === null
         ? null

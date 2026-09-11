@@ -3,10 +3,10 @@ import type {
   PedidoFormOptionsInterface,
 } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
 import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/pedido-columnas.constants';
-import { describe, expect, it } from 'vitest';
 import {
   buildPurchaseOrderPaymentOptions,
   buildPurchaseOrderProviderOptions,
+  buildPurchaseOrderSaveCommand,
   createExistingPurchaseOrderFormState,
   createNewPurchaseOrderFormState,
   getPurchaseOrderPaymentKey,
@@ -14,7 +14,8 @@ import {
   parsePurchaseOrderRouteId,
   parsePurchaseOrderTipo,
   PURCHASE_ORDER_COLUMN_OPTIONS,
-} from './purchase-order.component.private';
+} from '@modules/compras/pedidos/pages/purchase-order/purchase-order.component.private';
+import { describe, expect, it } from 'vitest';
 
 const FORM_OPTIONS: PedidoFormOptionsInterface = {
   proveedores: [
@@ -213,6 +214,45 @@ describe('purchase-order.component.private', (): void => {
     expect(normalizePurchaseOrderColumns([1, 4, 4, 999, '5'])).toEqual([1, 4]);
 
     expect(normalizePurchaseOrderColumns(null)).toEqual([]);
+  });
+
+  it('construye y normaliza el comando de guardado de la cabecera', (): void => {
+    const state = {
+      ...createNewPurchaseOrderFormState(false, new Date(2026, 8, 11)),
+      id: 12,
+      idProveedor: 4,
+      idTipoPago: 10,
+      formaPago: '  Tarjeta  ',
+      tipo: 'factura' as const,
+      numero: '  FAC-100  ',
+      fechaPedido: '2026-09-11',
+      fechaPago: '   ',
+      recargoEquivalencia: true,
+      europeo: true,
+      observaciones: '  Observación de prueba  ',
+      columnasVisibles: [1, 4, 13],
+    };
+
+    expect(buildPurchaseOrderSaveCommand(state)).toEqual({
+      id: 12,
+      idProveedor: 4,
+      idTipoPago: 10,
+      formaPago: 'Tarjeta',
+      tipo: 'factura',
+      numero: 'FAC-100',
+      fechaPedido: '2026-09-11',
+      fechaPago: null,
+      recargoEquivalencia: true,
+      europeo: true,
+      observaciones: 'Observación de prueba',
+      columnasVisibles: [1, 4, 13],
+    });
+  });
+
+  it('rechaza el guardado de un pedido sin proveedor', (): void => {
+    const state = createNewPurchaseOrderFormState(false, new Date(2026, 8, 11));
+
+    expect(() => buildPurchaseOrderSaveCommand(state)).toThrow('Debes seleccionar un proveedor.');
   });
 
   it('mantiene sincronizado el catálogo visual con el contrato backend', (): void => {
