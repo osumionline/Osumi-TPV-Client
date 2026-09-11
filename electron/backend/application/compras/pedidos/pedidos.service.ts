@@ -1,5 +1,10 @@
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
 import type PedidosRepository from '@backend/contracts/compras/pedidos/pedidos.repository.interface';
+import {
+  PedidoCabeceraRecord,
+  PedidoFormOptionsRecord,
+  PedidoSaveRecord,
+} from '@backend/domain/compras/pedidos/pedido-cabecera-record.interface';
 import type {
   PedidoFilterOptionsRecord,
   PedidoGuardadoRowRecord,
@@ -8,6 +13,12 @@ import type {
   PedidosGuardadosResultadoRecord,
   PedidosRecepcionadosResultadoRecord,
 } from '@backend/domain/compras/pedidos/pedido-listado-record.interface';
+import {
+  PedidoCabeceraInterface,
+  PedidoFormOptionsInterface,
+  PedidoSaveCommand,
+} from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
+import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/pedido-columnas.constants';
 import type {
   PedidoFilterOptionsInterface,
   PedidoGuardadoRowInterface,
@@ -97,6 +108,151 @@ export default class PedidosService {
         }),
       ),
     };
+  }
+
+  /**
+   * Recupera un pedido para editar su cabecera.
+   */
+  async getPedido(idPedido: number): Promise<PedidoCabeceraInterface | null> {
+    this.validatePedidoId(idPedido);
+
+    const record: PedidoCabeceraRecord | null = await this.pedidosRepository.getPedido(idPedido);
+
+    return record === null
+      ? null
+      : {
+          ...record,
+          columnasVisibles: [...record.columnasVisibles],
+        };
+  }
+
+  /**
+   * Recupera las opciones disponibles de la ficha.
+   */
+  async getPedidoFormOptions(): Promise<PedidoFormOptionsInterface> {
+    const result: PedidoFormOptionsRecord = await this.pedidosRepository.getPedidoFormOptions();
+
+    return {
+      proveedores: result.proveedores.map((proveedor) => ({ ...proveedor })),
+      tiposPago: result.tiposPago.map((tipoPago) => ({ ...tipoPago })),
+    };
+  }
+
+  /**
+   * Crea o actualiza una cabecera de Pedido.
+   */
+  async savePedido(command: PedidoSaveCommand): Promise<number> {
+    const record: PedidoSaveRecord = this.normalizeSaveCommand(command);
+
+    return this.pedidosRepository.savePedido(record);
+  }
+
+  /**
+   * Elimina un pedido todavía pendiente.
+   */
+  async deletePedido(idPedido: number): Promise<void> {
+    this.validatePedidoId(idPedido);
+
+    await this.pedidosRepository.deletePedido(idPedido);
+  }
+
+  /**
+   * Valida un identificador de Pedido.
+   */
+  private validatePedidoId(idPedido: number): void {
+    if (!Number.isSafeInteger(idPedido) || idPedido <= 0) {
+      throw new Error('El identificador del pedido no es válido.');
+    }
+  }
+
+  /**
+   * Normaliza la cabecera antes de persistirla.
+   */
+  private normalizeSaveCommand(command: PedidoSaveCommand): PedidoSaveRecord {
+    if (typeof command !== 'object' || command === null) {
+      throw new Error('Los datos del pedido no son válidos.');
+    }
+
+    if (command.id !== null) {
+      this.validatePedidoId(command.id);
+    }
+
+    if (!Number.isSafeInteger(command.idProveedor) || command.idProveedor <= 0) {
+      throw new Error('Debes seleccionar un proveedor.');
+    }
+
+    if (
+      command.idTipoPago !== null &&
+      (!Number.isSafeInteger(command.idTipoPago) || command.idTipoPago <= 0)
+    ) {
+      throw new Error('La forma de pago seleccionada no es válida.');
+    }
+
+    if (!['albaran', 'factura', 'abono'].includes(command.tipo)) {
+      throw new Error('El tipo documental del pedido no es válido.');
+    }
+
+    const columnasVisibles: readonly number[] = [...new Set<number>(command.columnasVisibles)];
+
+    if (
+      columnasVisibles.some(
+        (idColumna: number): boolean =>
+          !Number.isSafeInteger(idColumna) || !PEDIDO_OPTIONAL_COLUMN_IDS.includes(idColumna),
+      )
+    ) {
+      throw new Error('La configuración de columnas del pedido no es válida.');
+    }
+
+    return {
+      id: command.id,
+      idProveedor: command.idProveedor,
+      idTipoPago: command.idTipoPago,
+      formaPago: this.normalizeOptionalText(command.formaPago, 100),
+      tipo: command.tipo,
+      numero: this.normalizeOptionalText(command.numero, 200),
+      fechaPedido: this.normalizePedidoDate(command.fechaPedido),
+      fechaPago: this.normalizePedidoDate(command.fechaPago),
+      recargoEquivalencia: command.recargoEquivalencia,
+      europeo: command.europeo,
+      observaciones: this.normalizeOptionalText(command.observaciones, null),
+      columnasVisibles,
+    };
+  }
+
+  /**
+   * Normaliza un texto opcional.
+   */
+  private normalizeOptionalText(value: string | null, maxLength: number | null): string | null {
+    if (value === null) {
+      return null;
+    }
+
+    if (typeof value !== 'string') {
+      throw new Error('Uno de los textos del pedido no es válido.');
+    }
+
+    const normalized: string = value.trim();
+
+    if (normalized === '') {
+      return null;
+    }
+
+    if (maxLength !== null && normalized.length > maxLength) {
+      throw new Error('Uno de los textos del pedido es demasiado largo.');
+    }
+
+    return normalized;
+  }
+
+  /**
+   * Normaliza una fecha civil opcional.
+   */
+  private normalizePedidoDate(value: string | null): string | null {
+    if (value === null) {
+      return null;
+    }
+
+    return this.normalizeOptionalDate(value, 'Una de las fechas del pedido no es válida.');
   }
 
   /**

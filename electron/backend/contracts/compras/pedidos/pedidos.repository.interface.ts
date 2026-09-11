@@ -1,9 +1,14 @@
+import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
+import type {
+  PedidoCabeceraRecord,
+  PedidoFormOptionsRecord,
+  PedidoSaveRecord,
+} from '@backend/domain/compras/pedidos/pedido-cabecera-record.interface';
 import type {
   PedidoFilterOptionsRecord,
   PedidosGuardadosResultadoRecord,
   PedidosRecepcionadosResultadoRecord,
 } from '@backend/domain/compras/pedidos/pedido-listado-record.interface';
-import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
 
 /**
  * Define el acceso a los datos de listados de Pedidos.
@@ -25,4 +30,25 @@ export default interface PedidosRepository {
    * Recupera proveedores utilizables en los filtros de Pedidos.
    */
   getPedidoFilterOptions(): Promise<PedidoFilterOptionsRecord>;
+
+  /**
+   * Recupera la cabecera persistida de un pedido.
+   */
+  getPedido(idPedido: number): Promise<PedidoCabeceraRecord | null>;
+
+  /**
+   * Recupera proveedores y tipos de pago disponibles
+   * para editar la cabecera.
+   */
+  getPedidoFormOptions(): Promise<PedidoFormOptionsRecord>;
+
+  /**
+   * Crea o actualiza la cabecera de un pedido.
+   */
+  savePedido(command: PedidoSaveRecord): Promise<number>;
+
+  /**
+   * Elimina lógicamente un pedido todavía pendiente.
+   */
+  deletePedido(idPedido: number): Promise<void>;
 }

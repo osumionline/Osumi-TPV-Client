@@ -6,6 +6,7 @@ import type LegacyImportPhaseResult from '@backend/domain/legacy-import/legacy-i
 import type LegacySqlInsert from '@backend/domain/legacy-import/legacy-sql-insert.interface';
 import LegacyImportNumberConverter from '@infrastructure/legacy-import/legacy-import-number.converter';
 import LegacyImportPublicIdFactory from '@infrastructure/legacy-import/legacy-import-public-id.factory';
+import resolveLegacyPurchasePaymentMethod from '@infrastructure/legacy-import/legacy-import-purchase-data.importer.private';
 import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value.reader';
 import type { QueryRunner } from 'typeorm';
 
@@ -13,99 +14,60 @@ type OrderType = 'albaran' | 'factura' | 'abono';
 
 interface LegacyOrderRow {
   readonly id: number;
-
   readonly providerId: number | null;
-
   readonly paymentMethod: number | null;
-
   readonly type: string | null;
-
   readonly number: string | null;
-
   readonly amount: number;
-
   readonly shippingAmount: number;
-
   readonly discount: number;
-
   readonly paymentDate: string | null;
-
   readonly orderDate: string | null;
-
   readonly receptionDate: string | null;
-
   readonly equivalenceSurcharge: boolean;
-
   readonly european: boolean;
-
   readonly missingItems: boolean;
-
   readonly received: boolean;
-
   readonly notes: string | null;
-
   readonly createdAt: string;
-
   readonly updatedAt: string;
 }
 
 interface LegacyOrderLineRow {
   readonly id: number;
-
   readonly orderId: number;
-
   readonly articleId: number | null;
-
   readonly articleName: string | null;
-
   readonly barcode: string | null;
-
   readonly units: number;
-
   readonly deliveryPrice: number;
-
   readonly purchasePrice: number;
-
   readonly salePrice: number;
-
   readonly margin: number | null;
-
   readonly taxRate: number;
-
   readonly equivalenceSurcharge: number | null;
-
   readonly discount: number;
-
   readonly createdAt: string;
-
   readonly updatedAt: string;
 }
 
 interface LegacyOrderViewRow {
   readonly orderId: number;
-
   readonly columnId: number;
-
   readonly visible: boolean;
-
   readonly createdAt: string;
-
   readonly updatedAt: string;
 }
 
 interface MutablePurchaseDataState {
   readonly orders: LegacyOrderRow[];
-
   readonly orderLines: LegacyOrderLineRow[];
-
   readonly orderViews: LegacyOrderViewRow[];
 }
 
 interface MutableImportCounters {
   importedRows: number;
-
   skippedRows: number;
-
   warningCount: number;
 }
 
@@ -117,39 +79,23 @@ interface MaximumIdRow {
   readonly maximumId: number;
 }
 
-interface PaymentTypeRow {
-  readonly id: number;
-
-  readonly slug: string;
-}
-
 interface ArticleRow {
   readonly id: number;
-
   readonly nombre: string;
 }
 
 interface PurchaseReferences {
   readonly providerIds: Set<number>;
-
   readonly fallbackProviderId: number | null;
-
-  readonly paymentTypeIds: ReadonlySet<number>;
-
-  readonly cashPaymentTypeId: number | null;
-
   readonly articleNames: ReadonlyMap<number, string>;
 }
 
 interface NormalizedReception {
   readonly receptionDate: string | null;
-
   readonly received: boolean;
 }
 
 const PURCHASE_DATA_TABLES: readonly string[] = ['pedido', 'linea_pedido', 'vista_pedido'];
-
-const CASH_PAYMENT_TYPE_SLUG: string = 'efectivo';
 
 const FALLBACK_PROVIDER_NAME: string = 'Proveedor legacy desconocido';
 
@@ -374,11 +320,11 @@ export default class LegacyImportPurchaseDataImporter implements LegacyImportPha
 
       const providerId: number = this.resolveProviderId(order.providerId, references, counters);
 
-      const paymentTypeId: number | null = this.resolvePaymentTypeId(
-        order.paymentMethod,
-        references,
-        counters,
-      );
+      const paymentMethod: string | null = resolveLegacyPurchasePaymentMethod(order.paymentMethod);
+
+      if (order.paymentMethod !== null && paymentMethod === null) {
+        counters.warningCount++;
+      }
 
       const type: OrderType = this.normalizeOrderType(order.type, counters);
 
@@ -391,6 +337,7 @@ export default class LegacyImportPurchaseDataImporter implements LegacyImportPha
             public_id,
             id_proveedor,
             id_tipo_pago,
+            forma_pago,
             tipo,
             numero,
             importe_micros,
@@ -428,6 +375,7 @@ export default class LegacyImportPurchaseDataImporter implements LegacyImportPha
             ?,
             ?,
             ?,
+            ?,
             NULL
           )
         `,
@@ -435,7 +383,8 @@ export default class LegacyImportPurchaseDataImporter implements LegacyImportPha
           order.id,
           this.publicIdFactory.create(command.sourceHash, 'pedido', order.id),
           providerId,
-          paymentTypeId,
+          null,
+          paymentMethod,
           type,
           this.normalizeOptionalText(order.number, 200, counters),
           this.numberConverter.toMicros(
@@ -682,20 +631,6 @@ export default class LegacyImportPurchaseDataImporter implements LegacyImportPha
       providerIds.add(fallbackProviderId);
     }
 
-    const paymentTypes: readonly PaymentTypeRow[] = (await queryRunner.query(
-      `
-            SELECT
-              id,
-              slug
-            FROM tipo_pago
-          `,
-    )) as readonly PaymentTypeRow[];
-
-    const cashPaymentType: PaymentTypeRow | undefined = paymentTypes.find(
-      (paymentType: PaymentTypeRow): boolean =>
-        paymentType.slug.trim().toLocaleLowerCase('es-ES') === CASH_PAYMENT_TYPE_SLUG,
-    );
-
     const articleRows: readonly ArticleRow[] = (await queryRunner.query(
       `
             SELECT
@@ -710,10 +645,6 @@ export default class LegacyImportPurchaseDataImporter implements LegacyImportPha
     return {
       providerIds,
       fallbackProviderId,
-      paymentTypeIds: new Set<number>(
-        paymentTypes.map((paymentType: PaymentTypeRow): number => paymentType.id),
-      ),
-      cashPaymentTypeId: cashPaymentType?.id ?? null,
       articleNames: new Map<number, string>(
         articleRows.map((article: ArticleRow): [number, string] => [article.id, article.nombre]),
       ),
@@ -833,38 +764,6 @@ export default class LegacyImportPurchaseDataImporter implements LegacyImportPha
     counters.warningCount++;
 
     return fallbackProviderId;
-  }
-
-  private resolvePaymentTypeId(
-    paymentMethod: number | null,
-    references: PurchaseReferences,
-    counters: MutableImportCounters,
-  ): number | null {
-    if (paymentMethod === null) {
-      return null;
-    }
-
-    if (paymentMethod === 0) {
-      const cashPaymentTypeId: number | null = references.cashPaymentTypeId;
-
-      if (cashPaymentTypeId === null) {
-        throw new Error(
-          ['Un pedido legacy utiliza efectivo,', 'pero no existe el tipo de pago Efectivo.'].join(
-            ' ',
-          ),
-        );
-      }
-
-      return cashPaymentTypeId;
-    }
-
-    if (paymentMethod > 0 && references.paymentTypeIds.has(paymentMethod)) {
-      return paymentMethod;
-    }
-
-    counters.warningCount++;
-
-    return null;
   }
 
   private normalizeOrderType(value: string | null, counters: MutableImportCounters): OrderType {

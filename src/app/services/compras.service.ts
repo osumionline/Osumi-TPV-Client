@@ -1,4 +1,9 @@
 import { Service } from '@angular/core';
+import {
+  PedidoCabeceraInterface,
+  PedidoFormOptionsInterface,
+  PedidoSaveCommand,
+} from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
 import type {
   PedidoFilterOptionsInterface,
   PedidoListadoConsulta,
@@ -32,5 +37,33 @@ export default class ComprasService {
    */
   getPedidoFilterOptions(): Promise<PedidoFilterOptionsInterface> {
     return window.osumiDesktop.compras.getPedidoFilterOptions();
+  }
+
+  /**
+   * Recupera la cabecera de un pedido.
+   */
+  getPedido(idPedido: number): Promise<PedidoCabeceraInterface | null> {
+    return window.osumiDesktop.compras.getPedido(idPedido);
+  }
+
+  /**
+   * Recupera opciones para la ficha de Pedido.
+   */
+  getPedidoFormOptions(): Promise<PedidoFormOptionsInterface> {
+    return window.osumiDesktop.compras.getPedidoFormOptions();
+  }
+
+  /**
+   * Crea o actualiza un pedido.
+   */
+  savePedido(command: PedidoSaveCommand): Promise<number> {
+    return window.osumiDesktop.compras.savePedido(command);
+  }
+
+  /**
+   * Elimina un pedido pendiente.
+   */
+  deletePedido(idPedido: number): Promise<void> {
+    return window.osumiDesktop.compras.deletePedido(idPedido);
   }
 }

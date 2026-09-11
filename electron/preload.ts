@@ -64,6 +64,11 @@ import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes
 import type CrearClienteFacturaDesdeVentaCommand from '@desktop-contracts/clientes/crear-cliente-factura-desde-venta-command.interface';
 import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
 import type EmitirClienteFacturaCommand from '@desktop-contracts/clientes/emitir-cliente-factura-command.interface';
+import {
+  PedidoCabeceraInterface,
+  PedidoFormOptionsInterface,
+  PedidoSaveCommand,
+} from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
 import type {
   PedidoFilterOptionsInterface,
   PedidoListadoConsulta,
@@ -204,6 +209,23 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
       ipcRenderer.invoke(
         IPC_CHANNELS.comprasGetPedidoFilterOptions,
       ) as Promise<PedidoFilterOptionsInterface>,
+
+    getPedido: (idPedido: number): Promise<PedidoCabeceraInterface | null> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.comprasGetPedido,
+        idPedido,
+      ) as Promise<PedidoCabeceraInterface | null>,
+
+    getPedidoFormOptions: (): Promise<PedidoFormOptionsInterface> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.comprasGetPedidoFormOptions,
+      ) as Promise<PedidoFormOptionsInterface>,
+
+    savePedido: (command: PedidoSaveCommand): Promise<number> =>
+      ipcRenderer.invoke(IPC_CHANNELS.comprasSavePedido, command) as Promise<number>,
+
+    deletePedido: (idPedido: number): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.comprasDeletePedido, idPedido) as Promise<void>,
   }),
 
   legacyImport: {

@@ -12,21 +12,30 @@ const statements: readonly string[] = [
       id_proveedor INTEGER NOT NULL,
 
       /*
-       * Método utilizado para pagar al proveedor.
+       * Tipo de pago configurable relacionado con
+       * la forma de pago utilizada.
        *
-       * Se relaciona con tipo_pago. Durante la
-       * importación legacy:
-       *
-       *   metodo_pago = 0
-       *   → tipo de pago "Efectivo"
-       *
-       *   metodo_pago > 0
-       *   → tipo_pago con el ID correspondiente
-       *
-       *   metodo_pago = NULL
-       *   → id_tipo_pago = NULL
+       * Puede ser NULL para formas propias de Compras
+       * o snapshots legacy que no pertenecen al catálogo
+       * configurable de tipo_pago.
        */
       id_tipo_pago INTEGER,
+
+      /*
+       * Snapshot textual de la forma de pago elegida.
+       *
+       * Se conserva aunque posteriormente el tipo de pago
+       * relacionado cambie de nombre o sea dado de baja.
+       */
+      forma_pago TEXT
+        CHECK (
+          forma_pago IS NULL
+          OR (
+            forma_pago = trim(forma_pago)
+            AND length(forma_pago)
+              BETWEEN 1 AND 100
+          )
+        ),
 
       tipo TEXT NOT NULL
         CHECK (

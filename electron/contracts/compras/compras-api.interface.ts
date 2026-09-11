@@ -1,4 +1,9 @@
 import type {
+  PedidoCabeceraInterface,
+  PedidoFormOptionsInterface,
+  PedidoSaveCommand,
+} from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
+import type {
   PedidoFilterOptionsInterface,
   PedidoListadoConsulta,
   PedidosGuardadosResultado,
@@ -25,4 +30,12 @@ export default interface ComprasApi {
    * Recupera los proveedores disponibles para filtrar pedidos.
    */
   getPedidoFilterOptions(): Promise<PedidoFilterOptionsInterface>;
+
+  getPedido(idPedido: number): Promise<PedidoCabeceraInterface | null>;
+
+  getPedidoFormOptions(): Promise<PedidoFormOptionsInterface>;
+
+  savePedido(command: PedidoSaveCommand): Promise<number>;
+
+  deletePedido(idPedido: number): Promise<void>;
 }
