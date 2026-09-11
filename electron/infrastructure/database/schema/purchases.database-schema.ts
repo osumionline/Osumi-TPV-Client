@@ -214,10 +214,22 @@ const statements: readonly string[] = [
       public_id TEXT NOT NULL
         UNIQUE,
 
-      id_pedido INTEGER NOT NULL,
+          id_pedido INTEGER NOT NULL,
 
-      /*
-       * Puede quedar a NULL si el artículo histórico
+    /*
+     * Posición visual de la línea dentro del pedido.
+     *
+     * Empieza en cero y se persiste para conservar
+     * el orden definido manualmente por el usuario.
+     */
+    orden INTEGER NOT NULL
+      DEFAULT 0
+      CHECK (
+        orden >= 0
+      ),
+
+    /*
+     * Puede quedar a NULL si el artículo histórico
        * se elimina físicamente o no se puede recuperar
        * durante una importación.
        *
@@ -250,13 +262,29 @@ const statements: readonly string[] = [
        * Se permiten cero unidades para conservar
        * líneas legacy pendientes o incompletas.
        */
-      unidades INTEGER NOT NULL
+          unidades INTEGER NOT NULL
         DEFAULT 0
         CHECK (
           unidades >= 0
         ),
 
       /*
+       * Snapshots del stock capturados únicamente
+       * cuando el pedido se recepciona.
+       *
+       * En pedidos pendientes permanecen a NULL porque
+       * Stock actual se obtiene siempre del artículo
+       * canónico en ese momento.
+       *
+       * Los pedidos legacy tampoco disponen de estos
+       * datos históricos, por lo que se importan a NULL.
+       *
+       * El stock puede ser negativo.
+       */
+      stock_actual_snapshot INTEGER,
+      stock_final_snapshot INTEGER,
+
+       /*
        * Valores del dominio de compras expresados
        * en microeuros.
        */
@@ -338,7 +366,9 @@ const statements: readonly string[] = [
   `
     CREATE INDEX idx_linea_pedido_pedido
     ON linea_pedido (
-      id_pedido
+      id_pedido,
+      orden,
+      id
     )
   `,
 

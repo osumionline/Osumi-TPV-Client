@@ -426,6 +426,7 @@ export default class LegacyImportPurchaseDataImporter implements LegacyImportPha
     counters: MutableImportCounters,
   ): Promise<void> {
     const insertedLineIds: Set<number> = new Set<number>();
+    const nextOrderPositionByOrderId: Map<number, number> = new Map<number, number>();
 
     const sortedLines: readonly LegacyOrderLineRow[] = [...orderLines].sort(
       (first: LegacyOrderLineRow, second: LegacyOrderLineRow): number => first.id - second.id,
@@ -466,6 +467,9 @@ export default class LegacyImportPurchaseDataImporter implements LegacyImportPha
       );
 
       const units: number = this.normalizeUnits(line.units, counters);
+      const orderPosition: number = nextOrderPositionByOrderId.get(line.orderId) ?? 0;
+
+      nextOrderPositionByOrderId.set(line.orderId, orderPosition + 1);
 
       await queryRunner.query(
         `
@@ -473,10 +477,13 @@ export default class LegacyImportPurchaseDataImporter implements LegacyImportPha
             id,
             public_id,
             id_pedido,
+            orden,
             id_articulo,
             nombre_articulo,
             codigo_barras,
             unidades,
+            stock_actual_snapshot,
+            stock_final_snapshot,
             palb_micros,
             puc_micros,
             pvp_micros,
@@ -503,6 +510,9 @@ export default class LegacyImportPurchaseDataImporter implements LegacyImportPha
             ?,
             ?,
             ?,
+            ?,
+            ?,
+            ?,
             ?
           )
         `,
@@ -510,10 +520,13 @@ export default class LegacyImportPurchaseDataImporter implements LegacyImportPha
           line.id,
           this.publicIdFactory.create(command.sourceHash, 'linea_pedido', line.id),
           line.orderId,
+          orderPosition,
           articleId,
           articleName,
           this.normalizeOptionalText(line.barcode, 100, counters),
           units,
+          null,
+          null,
           this.numberConverter.toMicros(
             this.normalizePurchaseAmount(line.deliveryPrice, counters),
             `linea_pedido ${line.id}.palb`,

@@ -22,6 +22,14 @@ interface ImportedPaymentMethodRow {
   readonly forma_pago: string | null;
 }
 
+interface ImportedOrderLineRow {
+  readonly id: number;
+  readonly id_pedido: number;
+  readonly orden: number;
+  readonly stock_actual_snapshot: number | null;
+  readonly stock_final_snapshot: number | null;
+}
+
 class FakeLegacyImportDumpReader implements LegacyImportDumpReader {
   constructor(private readonly inserts: readonly LegacySqlInsert[]) {}
 
@@ -208,6 +216,47 @@ describe('LegacyImportPurchaseDataImporter', (): void => {
       },
     ]);
   });
+
+  it('asigna orden estable y deja sin stock histórico las líneas legacy', async (): Promise<void> => {
+    const inserts: readonly LegacySqlInsert[] = [
+      createLegacyOrderInsert(1, 0),
+      createLegacyOrderLineInsert(30, 1, 'Artículo B'),
+      createLegacyOrderLineInsert(10, 1, 'Artículo A'),
+    ];
+
+    const importer: LegacyImportPurchaseDataImporter = createImporter(inserts);
+
+    const result: LegacyImportPhaseResult = await importer.import(
+      requireQueryRunner(),
+      createExecutionCommand(1, 2),
+      (progress): void => {
+        void progress;
+      },
+    );
+
+    expect(result).toEqual({
+      importedRows: 3,
+      skippedRows: 0,
+      warningCount: 0,
+    });
+
+    expect(await readOrderLines()).toEqual([
+      {
+        id: 10,
+        id_pedido: 1,
+        orden: 0,
+        stock_actual_snapshot: null,
+        stock_final_snapshot: null,
+      },
+      {
+        id: 30,
+        id_pedido: 1,
+        orden: 1,
+        stock_actual_snapshot: null,
+        stock_final_snapshot: null,
+      },
+    ]);
+  });
 });
 
 /**
@@ -227,7 +276,10 @@ function createImporter(inserts: readonly LegacySqlInsert[]): LegacyImportPurcha
  * Construye el comando mínimo necesario para ejecutar
  * una fase de importación de pedidos.
  */
-function createExecutionCommand(orderCount: number): LegacyImportExecutionCommand {
+function createExecutionCommand(
+  orderCount: number,
+  orderLineCount: number = 0,
+): LegacyImportExecutionCommand {
   return {
     selectionId: 'legacy-purchase-test',
     packagePath: '/tmp/legacy-purchase-test.otpv',
@@ -235,12 +287,12 @@ function createExecutionCommand(orderCount: number): LegacyImportExecutionComman
     sourceVersion: 'legacy',
     sourceSchemaVersion: 'legacy',
     sourceHash: 'a'.repeat(64),
-    sourceRows: orderCount,
+    sourceRows: orderCount + orderLineCount,
     initialSaleNumber: 0,
     initialInvoiceNumber: 0,
     expectedTableRows: {
       pedido: orderCount,
-      linea_pedido: 0,
+      linea_pedido: orderLineCount,
       vista_pedido: 0,
     },
     fileInventory: [],
@@ -274,6 +326,36 @@ function createLegacyOrderInsert(id: number, paymentMethod: number | null): Lega
       ['faltas', '0'],
       ['recepcionado', '0'],
       ['observaciones', null],
+      ['created_at', '2026-09-01T10:00:00.000Z'],
+      ['updated_at', '2026-09-01T10:00:00.000Z'],
+    ]),
+  };
+}
+
+/**
+ * Construye una línea legacy representativa de un pedido.
+ */
+function createLegacyOrderLineInsert(
+  id: number,
+  idPedido: number,
+  nombreArticulo: string,
+): LegacySqlInsert {
+  return {
+    tableName: 'linea_pedido',
+    values: new Map<string, string | null>([
+      ['id', String(id)],
+      ['id_pedido', String(idPedido)],
+      ['id_articulo', null],
+      ['nombre_articulo', nombreArticulo],
+      ['codigo_barras', null],
+      ['unidades', '2'],
+      ['palb', '10.50'],
+      ['puc', '12.705'],
+      ['pvp', '19.95'],
+      ['margen', '36.315'],
+      ['iva', '21'],
+      ['re', '5.2'],
+      ['descuento', '0'],
       ['created_at', '2026-09-01T10:00:00.000Z'],
       ['updated_at', '2026-09-01T10:00:00.000Z'],
     ]),
@@ -335,4 +417,25 @@ async function readPaymentMethods(): Promise<readonly ImportedPaymentMethodRow[]
       ORDER BY id
     `,
   )) as readonly ImportedPaymentMethodRow[];
+}
+
+/**
+ * Recupera orden y snapshots de las líneas importadas.
+ */
+async function readOrderLines(): Promise<readonly ImportedOrderLineRow[]> {
+  return (await requireDataSource().query(
+    `
+      SELECT
+        id,
+        id_pedido,
+        orden,
+        stock_actual_snapshot,
+        stock_final_snapshot
+      FROM linea_pedido
+      ORDER BY
+        id_pedido,
+        orden,
+        id
+    `,
+  )) as readonly ImportedOrderLineRow[];
 }
