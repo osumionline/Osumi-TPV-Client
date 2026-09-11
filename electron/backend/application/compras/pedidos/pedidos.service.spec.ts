@@ -1,3 +1,4 @@
+import PedidosService from '@backend/application/compras/pedidos/pedidos.service';
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
 import type PedidosRepository from '@backend/contracts/compras/pedidos/pedidos.repository.interface';
 import type {
@@ -5,24 +6,26 @@ import type {
   PedidoFormOptionsRecord,
   PedidoSaveRecord,
 } from '@backend/domain/compras/pedidos/pedido-cabecera-record.interface';
+import type PedidoLineaRecord from '@backend/domain/compras/pedidos/pedido-linea-record.interface';
 import type {
   PedidoFilterOptionsRecord,
   PedidosGuardadosResultadoRecord,
   PedidosRecepcionadosResultadoRecord,
 } from '@backend/domain/compras/pedidos/pedido-listado-record.interface';
 import type { PedidoSaveCommand } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
+import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type {
   PedidoListadoConsulta,
   PedidosGuardadosResultado,
   PedidosRecepcionadosResultado,
 } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
 import { describe, expect, it } from 'vitest';
-import PedidosService from './pedidos.service';
 
 class FakePedidosRepository implements PedidosRepository {
   lastGuardadosQuery: PedidoRepositoryQuery | null = null;
   lastRecepcionadosQuery: PedidoRepositoryQuery | null = null;
   lastGetPedidoId: number | null = null;
+  lastGetPedidoLineasId: number | null = null;
   lastSavedCommand: PedidoSaveRecord | null = null;
   lastDeletedPedidoId: number | null = null;
 
@@ -44,6 +47,30 @@ class FakePedidosRepository implements PedidosRepository {
     observaciones: 'Pedido de prueba',
     columnasVisibles: [1, 4],
   };
+
+  pedidoLineasResult: readonly PedidoLineaRecord[] = [
+    {
+      id: 21,
+      publicId: 'order-line-21',
+      orden: 0,
+      idArticulo: 8,
+      localizador: 123,
+      nombreArticulo: 'Artículo del pedido',
+      referencia: 'REF-123',
+      marcaNombre: 'Marca',
+      codigoBarras: '8412345678901',
+      unidades: 3,
+      stockActual: 7,
+      stockFinal: 10,
+      palbMicros: 10_000_000,
+      pucMicros: 12_705_000,
+      pvpMicros: 19_950_000,
+      margenMicroporcentaje: 36_315_789,
+      ivaBps: 2100,
+      recargoEquivalenciaBps: 520,
+      descuentoBps: 0,
+    },
+  ];
 
   /**
    * Conserva la consulta de pendientes recibida.
@@ -119,6 +146,15 @@ class FakePedidosRepository implements PedidosRepository {
     this.lastGetPedidoId = idPedido;
 
     return Promise.resolve(this.pedidoResult);
+  }
+
+  /**
+   * Devuelve las líneas configuradas para el test.
+   */
+  getPedidoLineas(idPedido: number): Promise<readonly PedidoLineaRecord[]> {
+    this.lastGetPedidoLineasId = idPedido;
+
+    return Promise.resolve(this.pedidoLineasResult);
   }
 
   /**
@@ -344,6 +380,46 @@ describe('PedidosService', (): void => {
 
     await expect(service.getPedido(0)).rejects.toThrow('El identificador del pedido no es válido.');
     await expect(service.deletePedido(-1)).rejects.toThrow(
+      'El identificador del pedido no es válido.',
+    );
+  });
+
+  it('recupera y mapea las líneas de un pedido', async (): Promise<void> => {
+    const repository = new FakePedidosRepository();
+    const service = new PedidosService(repository);
+
+    const result: readonly PedidoLineaInterface[] = await service.getPedidoLineas(9);
+
+    expect(repository.lastGetPedidoLineasId).toBe(9);
+    expect(result).toEqual([
+      {
+        id: 21,
+        publicId: 'order-line-21',
+        orden: 0,
+        idArticulo: 8,
+        localizador: 123,
+        nombreArticulo: 'Artículo del pedido',
+        referencia: 'REF-123',
+        marcaNombre: 'Marca',
+        codigoBarras: '8412345678901',
+        unidades: 3,
+        stockActual: 7,
+        stockFinal: 10,
+        palbMicros: 10_000_000,
+        pucMicros: 12_705_000,
+        pvpMicros: 19_950_000,
+        margenMicroporcentaje: 36_315_789,
+        ivaBps: 2100,
+        recargoEquivalenciaBps: 520,
+        descuentoBps: 0,
+      },
+    ]);
+  });
+
+  it('rechaza un identificador inválido al recuperar líneas', async (): Promise<void> => {
+    const service = new PedidosService(new FakePedidosRepository());
+
+    await expect(service.getPedidoLineas(0)).rejects.toThrow(
       'El identificador del pedido no es válido.',
     );
   });

@@ -3,6 +3,7 @@ import type {
   PedidoFormOptionsInterface,
   PedidoSaveCommand,
 } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
+import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type {
   PedidoFilterOptionsInterface,
   PedidoListadoConsulta,
@@ -35,6 +36,11 @@ export default interface ComprasApi {
    * Recupera la cabecera persistida de un pedido.
    */
   getPedido(idPedido: number): Promise<PedidoCabeceraInterface | null>;
+
+  /**
+   * Recupera las líneas persistidas de un pedido.
+   */
+  getPedidoLineas(idPedido: number): Promise<readonly PedidoLineaInterface[]>;
 
   /**
    * Recupera las opciones disponibles para editar una ficha de Pedido.

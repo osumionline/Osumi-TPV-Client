@@ -5,6 +5,7 @@ import type {
   PedidoFormOptionsRecord,
   PedidoSaveRecord,
 } from '@backend/domain/compras/pedidos/pedido-cabecera-record.interface';
+import type PedidoLineaRecord from '@backend/domain/compras/pedidos/pedido-linea-record.interface';
 import type {
   PedidoFilterOptionsRecord,
   PedidoGuardadoRowRecord,
@@ -19,6 +20,7 @@ import type {
   PedidoSaveCommand,
 } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
 import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/pedido-columnas.constants';
+import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type {
   PedidoFilterOptionsInterface,
   PedidoGuardadoRowInterface,
@@ -124,6 +126,38 @@ export default class PedidosService {
           ...record,
           columnasVisibles: [...record.columnasVisibles],
         };
+  }
+
+  /**
+   * Recupera las líneas persistidas de un pedido.
+   */
+  async getPedidoLineas(idPedido: number): Promise<readonly PedidoLineaInterface[]> {
+    this.validatePedidoId(idPedido);
+
+    const records: readonly PedidoLineaRecord[] =
+      await this.pedidosRepository.getPedidoLineas(idPedido);
+
+    return records.map((record: PedidoLineaRecord): PedidoLineaInterface => ({
+      id: record.id,
+      publicId: record.publicId,
+      orden: record.orden,
+      idArticulo: record.idArticulo,
+      localizador: record.localizador,
+      nombreArticulo: record.nombreArticulo,
+      referencia: record.referencia,
+      marcaNombre: record.marcaNombre,
+      codigoBarras: record.codigoBarras,
+      unidades: record.unidades,
+      stockActual: record.stockActual,
+      stockFinal: record.stockFinal,
+      palbMicros: record.palbMicros,
+      pucMicros: record.pucMicros,
+      pvpMicros: record.pvpMicros,
+      margenMicroporcentaje: record.margenMicroporcentaje,
+      ivaBps: record.ivaBps,
+      recargoEquivalenciaBps: record.recargoEquivalenciaBps,
+      descuentoBps: record.descuentoBps,
+    }));
   }
 
   /**

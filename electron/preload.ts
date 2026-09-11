@@ -69,6 +69,7 @@ import type {
   PedidoFormOptionsInterface,
   PedidoSaveCommand,
 } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
+import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type {
   PedidoFilterOptionsInterface,
   PedidoListadoConsulta,
@@ -215,6 +216,11 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         IPC_CHANNELS.comprasGetPedido,
         idPedido,
       ) as Promise<PedidoCabeceraInterface | null>,
+
+    getPedidoLineas: (idPedido: number): Promise<readonly PedidoLineaInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.comprasGetPedidoLineas, idPedido) as Promise<
+        readonly PedidoLineaInterface[]
+      >,
 
     getPedidoFormOptions: (): Promise<PedidoFormOptionsInterface> =>
       ipcRenderer.invoke(

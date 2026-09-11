@@ -4,11 +4,13 @@ import type {
   PedidoFormOptionsRecord,
   PedidoSaveRecord,
 } from '@backend/domain/compras/pedidos/pedido-cabecera-record.interface';
+import type PedidoLineaRecord from '@backend/domain/compras/pedidos/pedido-linea-record.interface';
 import type {
   PedidosGuardadosResultadoRecord,
   PedidosRecepcionadosResultadoRecord,
 } from '@backend/domain/compras/pedidos/pedido-listado-record.interface';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
+import TypeOrmPedidosRepository from '@infrastructure/database/typeorm/compras/pedidos/typeorm-pedidos.repository';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -16,7 +18,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DataSource } from 'typeorm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import TypeOrmPedidosRepository from './typeorm-pedidos.repository';
 
 interface PedidoPersistenceDatabaseRow {
   readonly id: number;
@@ -497,6 +498,85 @@ describe('TypeOrmPedidosRepository', (): void => {
     await expect(requireRepository().getPedido(1)).resolves.toBeNull();
   });
 
+  it('usa stock canónico actual en líneas pendientes y respeta su orden', async (): Promise<void> => {
+    const result: readonly PedidoLineaRecord[] = await requireRepository().getPedidoLineas(1);
+
+    expect(result.map((line): number => line.id)).toEqual([101, 100]);
+
+    expect(result[0]).toMatchObject({
+      id: 101,
+      orden: 0,
+      idArticulo: 11,
+      localizador: 102,
+      nombreArticulo: 'Artículo B snapshot',
+      referencia: 'REF-B',
+      marcaNombre: 'Marca Uno',
+      unidades: 2,
+      stockActual: -2,
+      stockFinal: 0,
+    });
+
+    expect(result[1]).toMatchObject({
+      id: 100,
+      orden: 1,
+      idArticulo: 10,
+      localizador: 101,
+      nombreArticulo: 'Artículo A snapshot',
+      referencia: 'REF-A',
+      marcaNombre: 'Marca Uno',
+      codigoBarras: 'BC-A',
+      unidades: 3,
+      stockActual: 7,
+      stockFinal: 10,
+      palbMicros: 10_000_000,
+      pucMicros: 12_705_000,
+      pvpMicros: 19_950_000,
+      ivaBps: 2100,
+      recargoEquivalenciaBps: 520,
+      descuentoBps: 0,
+    });
+  });
+
+  it('usa exclusivamente snapshots de stock en pedidos recepcionados', async (): Promise<void> => {
+    const result: readonly PedidoLineaRecord[] = await requireRepository().getPedidoLineas(3);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: 200,
+      idArticulo: 10,
+      stockActual: 4,
+      stockFinal: 9,
+    });
+  });
+
+  it('no inventa stock para líneas legacy recepcionadas sin snapshots', async (): Promise<void> => {
+    const result: readonly PedidoLineaRecord[] = await requireRepository().getPedidoLineas(4);
+
+    expect(result).toEqual([
+      {
+        id: 201,
+        publicId: 'order-line-201',
+        orden: 0,
+        idArticulo: null,
+        localizador: null,
+        nombreArticulo: 'Artículo legacy sin vínculo',
+        referencia: null,
+        marcaNombre: null,
+        codigoBarras: 'LEGACY',
+        unidades: 2,
+        stockActual: null,
+        stockFinal: null,
+        palbMicros: 5_000_000,
+        pucMicros: 6_050_000,
+        pvpMicros: 9_000_000,
+        margenMicroporcentaje: 32_777_778,
+        ivaBps: 2100,
+        recargoEquivalenciaBps: 0,
+        descuentoBps: 0,
+      },
+    ]);
+  });
+
   it('impide eliminar un pedido recepcionado', async (): Promise<void> => {
     await expect(requireRepository().deletePedido(3)).rejects.toThrow(
       'Un pedido recepcionado no se puede eliminar.',
@@ -720,6 +800,53 @@ async function seedPedidos(currentDataSource: DataSource): Promise<void> {
   `);
 
   await currentDataSource.query(`
+    INSERT INTO marca (
+      id,
+      public_id,
+      nombre
+    )
+    VALUES (
+      1,
+      'brand-1',
+      'Marca Uno'
+    )
+  `);
+
+  await currentDataSource.query(`
+    INSERT INTO articulo (
+      id,
+      public_id,
+      localizador,
+      nombre,
+      slug,
+      id_marca,
+      referencia,
+      stock
+    )
+    VALUES
+      (
+        10,
+        'article-10',
+        101,
+        'Artículo actual A',
+        'articulo-actual-a',
+        1,
+        'REF-A',
+        7
+      ),
+      (
+        11,
+        'article-11',
+        102,
+        'Artículo actual B',
+        'articulo-actual-b',
+        1,
+        'REF-B',
+        -2
+      )
+  `);
+
+  await currentDataSource.query(`
     INSERT INTO pedido (
       id,
       public_id,
@@ -828,6 +955,105 @@ async function seedPedidos(currentDataSource: DataSource): Promise<void> {
         0,
         NULL,
         '2026-09-11T12:00:00.000Z'
+      )
+  `);
+
+  await currentDataSource.query(`
+    INSERT INTO linea_pedido (
+      id,
+      public_id,
+      id_pedido,
+      orden,
+      id_articulo,
+      nombre_articulo,
+      codigo_barras,
+      unidades,
+      stock_actual_snapshot,
+      stock_final_snapshot,
+      palb_micros,
+      puc_micros,
+      pvp_micros,
+      margen_microporcentaje,
+      iva_bps,
+      recargo_equivalencia_bps,
+      descuento_bps
+    )
+    VALUES
+      (
+        100,
+        'order-line-100',
+        1,
+        1,
+        10,
+        'Artículo A snapshot',
+        'BC-A',
+        3,
+        100,
+        103,
+        10000000,
+        12705000,
+        19950000,
+        36315789,
+        2100,
+        520,
+        0
+      ),
+      (
+        101,
+        'order-line-101',
+        1,
+        0,
+        11,
+        'Artículo B snapshot',
+        NULL,
+        2,
+        NULL,
+        NULL,
+        20000000,
+        24200000,
+        30000000,
+        19333333,
+        1000,
+        140,
+        500
+      ),
+      (
+        200,
+        'order-line-200',
+        3,
+        0,
+        10,
+        'Artículo recibido snapshot',
+        'BC-R',
+        5,
+        4,
+        9,
+        10000000,
+        12705000,
+        19950000,
+        36315789,
+        2100,
+        520,
+        0
+      ),
+      (
+        201,
+        'order-line-201',
+        4,
+        0,
+        NULL,
+        'Artículo legacy sin vínculo',
+        'LEGACY',
+        2,
+        NULL,
+        NULL,
+        5000000,
+        6050000,
+        9000000,
+        32777778,
+        2100,
+        0,
+        0
       )
   `);
 

@@ -4,6 +4,7 @@ import type {
   PedidoFormOptionsInterface,
   PedidoSaveCommand,
 } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
+import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type {
   PedidoFilterOptionsInterface,
   PedidoListadoConsulta,
@@ -44,6 +45,13 @@ export default class ComprasService {
    */
   getPedido(idPedido: number): Promise<PedidoCabeceraInterface | null> {
     return window.osumiDesktop.compras.getPedido(idPedido);
+  }
+
+  /**
+   * Recupera las líneas persistidas de un pedido.
+   */
+  getPedidoLineas(idPedido: number): Promise<readonly PedidoLineaInterface[]> {
+    return window.osumiDesktop.compras.getPedidoLineas(idPedido);
   }
 
   /**

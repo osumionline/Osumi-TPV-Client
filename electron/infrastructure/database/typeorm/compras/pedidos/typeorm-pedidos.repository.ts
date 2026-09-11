@@ -5,6 +5,7 @@ import type {
   PedidoFormOptionsRecord,
   PedidoSaveRecord,
 } from '@backend/domain/compras/pedidos/pedido-cabecera-record.interface';
+import type PedidoLineaRecord from '@backend/domain/compras/pedidos/pedido-linea-record.interface';
 import type {
   PedidoFilterOptionsRecord,
   PedidoGuardadoRowRecord,
@@ -23,6 +24,7 @@ import type {
   PedidoCabeceraDatabaseRow,
   PedidoCountDatabaseRow,
   PedidoCurrentStateDatabaseRow,
+  PedidoLineaDatabaseRow,
   PedidoListadoDatabaseRow,
   PedidoProveedorFilterDatabaseRow,
   PedidoSqlFilter,
@@ -198,6 +200,87 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
         .map((visibleRow: PedidoVisibleColumnDatabaseRow): number => visibleRow.id_columna)
         .filter((idColumna: number): boolean => PEDIDO_OPTIONAL_COLUMN_IDS.includes(idColumna)),
     };
+  }
+
+  /**
+   * Recupera las líneas de un pedido utilizando stock
+   * actual para pendientes y snapshots para recepcionados.
+   */
+  async getPedidoLineas(idPedido: number): Promise<readonly PedidoLineaRecord[]> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const rows: readonly PedidoLineaDatabaseRow[] = (await dataSource.query(
+      `
+          SELECT
+            lp.id,
+            lp.public_id,
+            lp.orden,
+            lp.id_articulo,
+            a.localizador,
+            lp.nombre_articulo,
+            a.referencia,
+            m.nombre AS marca_nombre,
+            lp.codigo_barras,
+            lp.unidades,
+
+            CASE
+              WHEN pe.recepcionado = 1
+                THEN lp.stock_actual_snapshot
+              ELSE a.stock
+            END AS stock_actual,
+
+            CASE
+              WHEN pe.recepcionado = 1
+                THEN lp.stock_final_snapshot
+              WHEN a.id IS NULL
+                THEN NULL
+              ELSE a.stock + lp.unidades
+            END AS stock_final,
+
+            lp.palb_micros,
+            lp.puc_micros,
+            lp.pvp_micros,
+            lp.margen_microporcentaje,
+            lp.iva_bps,
+            lp.recargo_equivalencia_bps,
+            lp.descuento_bps
+          FROM linea_pedido lp
+          INNER JOIN pedido pe
+            ON pe.id = lp.id_pedido
+            AND pe.deleted_at IS NULL
+          LEFT JOIN articulo a
+            ON a.id = lp.id_articulo
+          LEFT JOIN marca m
+            ON m.id = a.id_marca
+          WHERE lp.id_pedido = ?
+          ORDER BY
+            lp.orden,
+            lp.id
+        `,
+      [idPedido],
+    )) as readonly PedidoLineaDatabaseRow[];
+
+    return rows.map((row: PedidoLineaDatabaseRow): PedidoLineaRecord => ({
+      id: row.id,
+      publicId: row.public_id,
+      orden: row.orden,
+      idArticulo: row.id_articulo,
+      localizador: row.localizador,
+      nombreArticulo: row.nombre_articulo,
+      referencia: row.referencia,
+      marcaNombre: row.marca_nombre,
+      codigoBarras: row.codigo_barras,
+      unidades: row.unidades,
+      stockActual: row.stock_actual,
+      stockFinal: row.stock_final,
+      palbMicros: row.palb_micros,
+      pucMicros: row.puc_micros,
+      pvpMicros: row.pvp_micros,
+      margenMicroporcentaje: row.margen_microporcentaje,
+      ivaBps: row.iva_bps,
+      recargoEquivalenciaBps: row.recargo_equivalencia_bps,
+      descuentoBps: row.descuento_bps,
+    }));
   }
 
   /**

@@ -67,3 +67,25 @@ export interface PedidoCurrentStateDatabaseRow {
 export interface DatabaseIdRow {
   readonly id: number;
 }
+
+export interface PedidoLineaDatabaseRow {
+  readonly id: number;
+  readonly public_id: string;
+  readonly orden: number;
+  readonly id_articulo: number | null;
+  readonly localizador: number | null;
+  readonly nombre_articulo: string;
+  readonly referencia: string | null;
+  readonly marca_nombre: string | null;
+  readonly codigo_barras: string | null;
+  readonly unidades: number;
+  readonly stock_actual: number | null;
+  readonly stock_final: number | null;
+  readonly palb_micros: number;
+  readonly puc_micros: number;
+  readonly pvp_micros: number;
+  readonly margen_microporcentaje: number;
+  readonly iva_bps: number;
+  readonly recargo_equivalencia_bps: number;
+  readonly descuento_bps: number;
+}

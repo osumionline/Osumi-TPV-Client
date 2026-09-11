@@ -4,6 +4,7 @@ import type {
   PedidoFormOptionsRecord,
   PedidoSaveRecord,
 } from '@backend/domain/compras/pedidos/pedido-cabecera-record.interface';
+import type PedidoLineaRecord from '@backend/domain/compras/pedidos/pedido-linea-record.interface';
 import type {
   PedidoFilterOptionsRecord,
   PedidosGuardadosResultadoRecord,
@@ -35,6 +36,11 @@ export default interface PedidosRepository {
    * Recupera la cabecera persistida de un pedido.
    */
   getPedido(idPedido: number): Promise<PedidoCabeceraRecord | null>;
+
+  /**
+   * Recupera las líneas persistidas de un pedido.
+   */
+  getPedidoLineas(idPedido: number): Promise<readonly PedidoLineaRecord[]>;
 
   /**
    * Recupera proveedores y tipos de pago disponibles
