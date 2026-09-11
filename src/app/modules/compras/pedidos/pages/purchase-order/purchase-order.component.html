@@ -5,6 +5,7 @@
     <section class="purchase-order__panel">
         <header class="purchase-order__toolbar">
             <button mat-icon-button
+                    matTooltip="Volver a Pedidos"
                     type="button"
                     routerLink="/compras"
                     aria-label="Volver a Pedidos">
@@ -14,12 +15,181 @@
             </button>
 
             <h1>
-                {{ title }}
+                {{ title() }}
             </h1>
+
+            @if (formState()?.recepcionado) {
+            <span class="purchase-order__status">
+                Recepcionado
+            </span>
+            }
         </header>
 
-        <div class="purchase-order__placeholder">
-            La ficha de Pedido se implementará en el siguiente mini-hito.
+        @if (loading()) {
+        <div class="purchase-order__message">
+            Cargando pedido…
         </div>
+        }
+        @else if (loadError() !== null) {
+        <div class="purchase-order__message purchase-order__message--error">
+            <p>
+                {{ loadError() }}
+            </p>
+
+            <button mat-stroked-button
+                    type="button"
+                    (click)="retryLoad()">
+                Reintentar
+            </button>
+        </div>
+        }
+        @else if (formState(); as order) {
+        <div class="purchase-order__content">
+            <section class="purchase-order__header-grid">
+                <label class="otpv-field purchase-order__provider">
+                    <span class="otpv-field__label">
+                        Proveedor *
+                    </span>
+
+                    <select class="otpv-control"
+                            [value]="order.idProveedor ?? ''"
+                            (change)="onProviderChange($event)">
+                        <option value="">
+                            Elige proveedor
+                        </option>
+
+                        @for (provider of providerOptions(); track provider.idProveedor) {
+                        <option [value]="provider.idProveedor">
+                            {{ provider.nombre }}{{ provider.historical ? ' (histórico)' : '' }}
+                        </option>
+                        }
+                    </select>
+                </label>
+
+                <label class="otpv-field purchase-order__payment">
+                    <span class="otpv-field__label">
+                        Forma de pago
+                    </span>
+
+                    <select class="otpv-control"
+                            [value]="selectedPaymentKey()"
+                            (change)="onPaymentChange($event)">
+                        <option value="">
+                            Sin especificar
+                        </option>
+
+                        @for (payment of paymentOptions(); track payment.key) {
+                        <option [value]="payment.key">
+                            {{ payment.label }}{{ payment.historical ? ' (histórico)' : '' }}
+                        </option>
+                        }
+                    </select>
+                </label>
+
+                <label class="otpv-field purchase-order__type">
+                    <span class="otpv-field__label">
+                        Tipo
+                    </span>
+
+                    <select class="otpv-control"
+                            [value]="order.tipo"
+                            (change)="onTipoChange($event)">
+                        <option value="albaran">
+                            Albarán
+                        </option>
+                        <option value="factura">
+                            Factura
+                        </option>
+                        <option value="abono">
+                            Abono
+                        </option>
+                    </select>
+                </label>
+
+                <label class="otpv-field purchase-order__number">
+                    <span class="otpv-field__label">
+                        Número
+                    </span>
+
+                    <input class="otpv-control"
+                           type="text"
+                           autocomplete="off"
+                           [placeholder]="numeroPlaceholder()"
+                           [value]="order.numero"
+                           (input)="onTextInput('numero', $event)">
+                </label>
+
+                <div class="purchase-order__flags">
+                    <mat-checkbox [checked]="order.recargoEquivalencia"
+                                  [disabled]="order.recepcionado"
+                                  (change)="onRecargoEquivalenciaChange($event)">
+                        R.E.
+                    </mat-checkbox>
+
+                    <mat-checkbox [checked]="order.europeo"
+                                  (change)="onEuropeoChange($event)">
+                        UE
+                    </mat-checkbox>
+                </div>
+
+                <label class="otpv-field purchase-order__date">
+                    <span class="otpv-field__label">
+                        Fecha pedido
+                    </span>
+
+                    <input class="otpv-control"
+                           type="date"
+                           [value]="order.fechaPedido"
+                           (change)="onTextInput('fechaPedido', $event)">
+                </label>
+
+                <label class="otpv-field purchase-order__date">
+                    <span class="otpv-field__label">
+                        Fecha pago
+                    </span>
+
+                    <input class="otpv-control"
+                           type="date"
+                           [value]="order.fechaPago"
+                           (change)="onTextInput('fechaPago', $event)">
+                </label>
+
+                <label class="otpv-field purchase-order__columns">
+                    <span class="otpv-field__label">
+                        Columnas
+                    </span>
+
+                    <mat-form-field appearance="outline"
+                                    subscriptSizing="dynamic"
+                                    class="otpv-mat-field--compact">
+                        <mat-select multiple
+                                    [value]="order.columnasVisibles"
+                                    (selectionChange)="onColumnsChange($event)">
+                            @for (column of columnOptions; track column.id) {
+                            <mat-option [value]="column.id">
+                                {{ column.label }}
+                            </mat-option>
+                            }
+                        </mat-select>
+                    </mat-form-field>
+                </label>
+
+                <label class="otpv-field purchase-order__notes">
+                    <span class="otpv-field__label">
+                        Observaciones
+                    </span>
+
+                    <textarea class="otpv-control otpv-control--textarea"
+                              rows="3"
+                              [value]="order.observaciones"
+                              (input)="onTextInput('observaciones', $event)"></textarea>
+                </label>
+            </section>
+
+            <section class="purchase-order__future-lines">
+                Las líneas del pedido se implementarán en 16.5.
+            </section>
+        </div>
+        }
     </section>
 </main>

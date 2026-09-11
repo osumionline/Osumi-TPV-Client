@@ -22,6 +22,7 @@
     .purchase-order__toolbar {
         display: flex;
         min-height: 64px;
+        flex: 0 0 auto;
         align-items: center;
         gap: 8px;
         padding: 0 16px;
@@ -34,12 +35,119 @@
         }
     }
 
-    .purchase-order__placeholder {
+    .purchase-order__status {
+        margin-left: 8px;
+        padding: 4px 9px;
+        border-radius: 12px;
+        background-color: var(--color-very-light-grey);
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .purchase-order__message {
         display: grid;
         min-height: 0;
         flex: 1;
         place-items: center;
+        align-content: center;
+        gap: 12px;
         padding: 32px;
-        opacity: 0.55;
+
+        p {
+            margin: 0;
+        }
+    }
+
+    .purchase-order__message--error {
+        color: var(--color-red);
+    }
+
+    .purchase-order__content {
+        min-height: 0;
+        flex: 1;
+        overflow: auto;
+        padding: 16px;
+    }
+
+    .purchase-order__header-grid {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        align-items: end;
+        gap: 12px;
+    }
+
+    .purchase-order__provider {
+        grid-column: span 3;
+    }
+
+    .purchase-order__payment {
+        grid-column: span 3;
+    }
+
+    .purchase-order__type {
+        grid-column: span 2;
+    }
+
+    .purchase-order__number {
+        grid-column: span 2;
+    }
+
+    .purchase-order__flags {
+        display: flex;
+        min-height: 40px;
+        grid-column: span 2;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .purchase-order__date {
+        grid-column: span 2;
+    }
+
+    .purchase-order__columns {
+        grid-column: span 3;
+
+        mat-form-field {
+            width: 100%;
+        }
+    }
+
+    .purchase-order__notes {
+        grid-column: span 5;
+    }
+
+    .purchase-order__future-lines {
+        display: grid;
+        min-height: 220px;
+        margin-top: 20px;
+        border: 1px dashed var(--separator-color);
+        border-radius: 4px;
+        place-items: center;
+        color: var(--disabled-color);
+    }
+}
+
+@media (width <=1200px) {
+    .purchase-order {
+        .purchase-order__header-grid {
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+        }
+
+        .purchase-order__provider,
+        .purchase-order__payment,
+        .purchase-order__columns {
+            grid-column: span 3;
+        }
+
+        .purchase-order__type,
+        .purchase-order__number,
+        .purchase-order__flags,
+        .purchase-order__date {
+            grid-column: span 2;
+        }
+
+        .purchase-order__notes {
+            grid-column: span 6;
+        }
     }
 }
