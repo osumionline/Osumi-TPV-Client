@@ -20,9 +20,18 @@ import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type PurchaseOrderLineBarcodeChange from '@model/compras/pedidos/purchase-order-line-barcode-change.interface';
+import PurchaseOrderLineCalculator from '@model/compras/pedidos/purchase-order-line-calculator';
+import type PurchaseOrderLineEconomicChange from '@model/compras/pedidos/purchase-order-line-economic-change.interface';
 import type PurchaseOrderLineMove from '@model/compras/pedidos/purchase-order-line-move.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
+import {
+  formatPurchaseOrderLineDecimal,
+  isPurchaseOrderLineTransientDecimal,
+  limitPurchaseOrderLineDecimalFraction,
+  parsePurchaseOrderLineDecimal,
+  type PurchaseOrderLineDecimalField,
+} from '@modules/compras/pedidos/components/purchase-order-lines/purchase-order-lines.component.private';
 import ArticleSearchComponent from '@modules/ventas/components/article-search/article-search.component';
 import { DialogService } from '@osumi/angular-tools';
 import BpsToPercentPipe from '@pipes/bps-to-percent.pipe';
@@ -69,6 +78,8 @@ export default class PurchaseOrderLinesComponent {
   readonly lineMove: OutputEmitterRef<PurchaseOrderLineMove> = output<PurchaseOrderLineMove>();
   readonly barcodeChange: OutputEmitterRef<PurchaseOrderLineBarcodeChange> =
     output<PurchaseOrderLineBarcodeChange>();
+  readonly economicChange: OutputEmitterRef<PurchaseOrderLineEconomicChange> =
+    output<PurchaseOrderLineEconomicChange>();
 
   readonly lineDeleteRequested: OutputEmitterRef<string> = output<string>();
 
@@ -76,6 +87,8 @@ export default class PurchaseOrderLinesComponent {
   readonly searching: WritableSignal<boolean> = signal<boolean>(false);
   readonly searchOpen: WritableSignal<boolean> = signal<boolean>(false);
   readonly searchInitialQuery: WritableSignal<string> = signal<string>('');
+  readonly editingEconomicControl: WritableSignal<string | null> = signal<string | null>(null);
+  readonly editingEconomicValue: WritableSignal<string> = signal<string>('');
 
   readonly visibleColumnIds: Signal<ReadonlySet<number>> = computed(
     (): ReadonlySet<number> => new Set<number>(this.visibleColumns()),
@@ -256,6 +269,178 @@ export default class PurchaseOrderLinesComponent {
       input.focus();
       input.select();
     });
+  }
+
+  /**
+   * Inicia la edición de un campo económico
+   * conservando literalmente el texto visible.
+   */
+  onEconomicFocus(
+    line: PurchaseOrderLineState,
+    field: PurchaseOrderLineDecimalField,
+    event: FocusEvent,
+  ): void {
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
+    this.editingEconomicControl.set(this.getEconomicControlKey(line.key, field));
+
+    this.editingEconomicValue.set(inputElement.value);
+
+    inputElement.select();
+  }
+
+  /**
+   * Procesa un decimal económico mientras el usuario
+   * escribe sin interferir con valores transitorios.
+   */
+  onEconomicInput(
+    line: PurchaseOrderLineState,
+    field: PurchaseOrderLineDecimalField,
+    event: Event,
+  ): void {
+    if (this.disabled()) {
+      return;
+    }
+
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
+    const fractionDigits: number = field === 'descuento' ? 2 : 6;
+
+    const rawValue: string = limitPurchaseOrderLineDecimalFraction(
+      inputElement.value,
+      fractionDigits,
+    );
+
+    if (rawValue !== inputElement.value) {
+      inputElement.value = rawValue;
+    }
+
+    this.editingEconomicValue.set(rawValue);
+
+    if (isPurchaseOrderLineTransientDecimal(rawValue)) {
+      return;
+    }
+
+    const value: number | null = parsePurchaseOrderLineDecimal(rawValue, fractionDigits);
+
+    if (value === null || (field === 'descuento' && value > 10_000)) {
+      return;
+    }
+
+    this.emitEconomicChange(line.key, field, value);
+  }
+
+  /**
+   * Finaliza la edición económica y restaura el valor
+   * canónico cuando la entrada no es válida.
+   */
+  onEconomicBlur(
+    line: PurchaseOrderLineState,
+    field: PurchaseOrderLineDecimalField,
+    event: FocusEvent,
+  ): void {
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
+    const fractionDigits: number = field === 'descuento' ? 2 : 6;
+
+    const rawValue: string = inputElement.value.trim();
+
+    const value: number | null = parsePurchaseOrderLineDecimal(rawValue, fractionDigits);
+
+    if (value === null || (field === 'descuento' && value > 10_000)) {
+      inputElement.value = this.formatEconomicValue(line, field);
+    } else {
+      this.emitEconomicChange(line.key, field, value);
+    }
+
+    this.editingEconomicControl.set(null);
+    this.editingEconomicValue.set('');
+  }
+
+  /**
+   * Obtiene el texto que debe mostrarse en un
+   * editor económico de la tabla.
+   */
+  getEconomicInputValue(
+    line: PurchaseOrderLineState,
+    field: PurchaseOrderLineDecimalField,
+  ): string {
+    if (this.editingEconomicControl() === this.getEconomicControlKey(line.key, field)) {
+      return this.editingEconomicValue();
+    }
+
+    return this.formatEconomicValue(line, field);
+  }
+
+  /**
+   * Calcula el Total económico visible de una línea.
+   */
+  getLineTotalMicros(line: PurchaseOrderLineState): number {
+    return PurchaseOrderLineCalculator.calcularTotalMicros(line);
+  }
+
+  /**
+   * Genera la identidad de un editor económico
+   * dentro de una línea concreta.
+   */
+  private getEconomicControlKey(lineKey: string, field: PurchaseOrderLineDecimalField): string {
+    return `${lineKey}:${field}`;
+  }
+
+  /**
+   * Formatea el valor canónico de un campo económico
+   * para mostrarlo en su editor.
+   */
+  private formatEconomicValue(
+    line: PurchaseOrderLineState,
+    field: PurchaseOrderLineDecimalField,
+  ): string {
+    switch (field) {
+      case 'palb':
+        return formatPurchaseOrderLineDecimal(line.palbMicros, 6, 2);
+
+      case 'descuento':
+        return formatPurchaseOrderLineDecimal(line.descuentoBps, 2, 0);
+
+      case 'pvp':
+        return formatPurchaseOrderLineDecimal(line.pvpMicros, 6, 2);
+    }
+  }
+
+  /**
+   * Traduce el campo visual editado al contrato
+   * económico utilizado por la ficha de Pedido.
+   */
+  private emitEconomicChange(
+    lineKey: string,
+    field: PurchaseOrderLineDecimalField,
+    value: number,
+  ): void {
+    switch (field) {
+      case 'palb':
+        this.economicChange.emit({
+          lineKey,
+          field: 'palbMicros',
+          value,
+        });
+        return;
+
+      case 'descuento':
+        this.economicChange.emit({
+          lineKey,
+          field: 'descuentoBps',
+          value,
+        });
+        return;
+
+      case 'pvp':
+        this.economicChange.emit({
+          lineKey,
+          field: 'pvpMicros',
+          value,
+        });
+        return;
+    }
   }
 
   /**

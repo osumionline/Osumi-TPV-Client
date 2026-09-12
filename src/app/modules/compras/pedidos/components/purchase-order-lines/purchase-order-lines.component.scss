@@ -109,3 +109,13 @@
 .purchase-order-lines__barcode-existing {
     vertical-align: middle;
 }
+
+.purchase-order-lines__money-input {
+    width: 10ch;
+    text-align: right;
+}
+
+.purchase-order-lines__percent-input {
+    width: 7ch;
+    text-align: right;
+}

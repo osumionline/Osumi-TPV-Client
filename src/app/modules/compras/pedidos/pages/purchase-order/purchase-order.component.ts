@@ -28,6 +28,7 @@ import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido
 import type { PedidoTipo } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
 import type PurchaseOrderLineBarcodeChange from '@model/compras/pedidos/purchase-order-line-barcode-change.interface';
+import type PurchaseOrderLineEconomicChange from '@model/compras/pedidos/purchase-order-line-economic-change.interface';
 import type PurchaseOrderLineMove from '@model/compras/pedidos/purchase-order-line-move.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
@@ -51,6 +52,7 @@ import {
   PURCHASE_ORDER_COLUMN_OPTIONS,
   removePurchaseOrderLine,
   updatePurchaseOrderLineBarcode,
+  updatePurchaseOrderLineEconomic,
   updatePurchaseOrderLineUnits,
   type AddPurchaseOrderArticlesResult,
   type PurchaseOrderColumnOption,
@@ -427,6 +429,42 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
 
     this.clearSaveFeedback();
     this.lines.set(nextLines);
+  }
+
+  /**
+   * Aplica un cambio económico realizado desde una
+   * línea editable y recalcula sus valores derivados.
+   */
+  onLineEconomicChange(change: PurchaseOrderLineEconomicChange): void {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (state === null || state.recepcionado || this.processing()) {
+      return;
+    }
+
+    const currentLines: readonly PurchaseOrderLineState[] = this.lines();
+
+    try {
+      const nextLines: readonly PurchaseOrderLineState[] = updatePurchaseOrderLineEconomic(
+        currentLines,
+        change,
+        state.recargoEquivalencia,
+      );
+
+      if (nextLines === currentLines) {
+        return;
+      }
+
+      this.clearSaveFeedback();
+      this.lines.set(nextLines);
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido actualizar la línea del pedido.'),
+        })
+        .subscribe();
+    }
   }
 
   /**

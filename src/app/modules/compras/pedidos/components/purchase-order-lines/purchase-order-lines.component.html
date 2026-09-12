@@ -78,7 +78,15 @@
                     </th>
 
                     <th class="purchase-order-lines__number">
+                        Total
+                    </th>
+
+                    <th class="purchase-order-lines__number">
                         PVP
+                    </th>
+
+                    <th class="purchase-order-lines__number">
+                        Margen
                     </th>
 
                     @if (!disabled()) {
@@ -219,12 +227,36 @@
                     }
 
                     <td class="purchase-order-lines__number">
+                        @if (!disabled()) {
+                        <input class="otpv-table-control purchase-order-lines__money-input"
+                               type="text"
+                               inputmode="decimal"
+                               autocomplete="off"
+                               [value]="getEconomicInputValue(line, 'palb')"
+                               (focus)="onEconomicFocus(line, 'palb', $event)"
+                               (input)="onEconomicInput(line, 'palb', $event)"
+                               (blur)="onEconomicBlur(line, 'palb', $event)">
+                        }
+                        @else {
                         {{ line.palbMicros | microsToEuros | number: '1.2-6' }} €
+                        }
                     </td>
 
                     @if (visibleColumnIds().has(11)) {
                     <td class="purchase-order-lines__number">
+                        @if (!disabled()) {
+                        <input class="otpv-table-control purchase-order-lines__percent-input"
+                               type="text"
+                               inputmode="decimal"
+                               autocomplete="off"
+                               [value]="getEconomicInputValue(line, 'descuento')"
+                               (focus)="onEconomicFocus(line, 'descuento', $event)"
+                               (input)="onEconomicInput(line, 'descuento', $event)"
+                               (blur)="onEconomicBlur(line, 'descuento', $event)">
+                        }
+                        @else {
                         {{ line.descuentoBps | bpsToPercent | number: '1.0-2' }} %
+                        }
                     </td>
                     }
 
@@ -244,7 +276,34 @@
                     </td>
 
                     <td class="purchase-order-lines__number">
+                        {{
+                          getLineTotalMicros(line)
+                            | microsToEuros
+                            | number: '1.2-6'
+                        }} €
+                    </td>
+
+                    <td class="purchase-order-lines__number">
+                        @if (!disabled()) {
+                        <input class="otpv-table-control purchase-order-lines__money-input"
+                               type="text"
+                               inputmode="decimal"
+                               autocomplete="off"
+                               [value]="getEconomicInputValue(line, 'pvp')"
+                               (focus)="onEconomicFocus(line, 'pvp', $event)"
+                               (input)="onEconomicInput(line, 'pvp', $event)"
+                               (blur)="onEconomicBlur(line, 'pvp', $event)">
+                        }
+                        @else {
                         {{ line.pvpMicros | microsToEuros | number: '1.2-6' }} €
+                        }
+                    </td>
+
+                    <td class="purchase-order-lines__number">
+                        {{
+                          line.margenMicroporcentaje / 1_000_000
+                            | number: '1.0-2'
+                        }} %
                     </td>
 
                     @if (!disabled()) {

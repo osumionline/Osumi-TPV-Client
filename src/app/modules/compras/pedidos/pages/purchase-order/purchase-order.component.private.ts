@@ -9,9 +9,63 @@ import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/p
 import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type { PedidoTipo } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
 import type PurchaseOrderLineBarcodeChange from '@model/compras/pedidos/purchase-order-line-barcode-change.interface';
+import PurchaseOrderLineCalculator from '@model/compras/pedidos/purchase-order-line-calculator';
+import type PurchaseOrderLineEconomicChange from '@model/compras/pedidos/purchase-order-line-economic-change.interface';
 import type PurchaseOrderLineMove from '@model/compras/pedidos/purchase-order-line-move.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
+
+/**
+ * Aplica un cambio económico a una línea pendiente
+ * utilizando exclusivamente el calculador de Pedido.
+ */
+export function updatePurchaseOrderLineEconomic(
+  lines: readonly PurchaseOrderLineState[],
+  change: PurchaseOrderLineEconomicChange,
+  aplicarRecargoEquivalencia: boolean,
+): readonly PurchaseOrderLineState[] {
+  const lineIndex: number = lines.findIndex(
+    (line: PurchaseOrderLineState): boolean => line.key === change.lineKey,
+  );
+
+  if (lineIndex === -1) {
+    return lines;
+  }
+
+  const line: PurchaseOrderLineState | undefined = lines[lineIndex];
+
+  if (line === undefined || line[change.field] === change.value) {
+    return lines;
+  }
+
+  let updatedLine: PurchaseOrderLineState;
+
+  switch (change.field) {
+    case 'palbMicros':
+      updatedLine = PurchaseOrderLineCalculator.actualizarPrecioAlbaran(
+        line,
+        change.value,
+        aplicarRecargoEquivalencia,
+      );
+      break;
+
+    case 'descuentoBps':
+      updatedLine = PurchaseOrderLineCalculator.actualizarDescuento(
+        line,
+        change.value,
+        aplicarRecargoEquivalencia,
+      );
+      break;
+
+    case 'pvpMicros':
+      updatedLine = PurchaseOrderLineCalculator.actualizarPvp(line, change.value);
+      break;
+  }
+
+  return lines.map((currentLine: PurchaseOrderLineState, index: number): PurchaseOrderLineState =>
+    index === lineIndex ? updatedLine : currentLine,
+  );
+}
 
 /**
  * Actualiza el código de barras adicional pendiente

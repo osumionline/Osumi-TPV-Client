@@ -6,6 +6,7 @@ import type {
 import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/pedido-columnas.constants';
 import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type PurchaseOrderLineBarcodeChange from '@model/compras/pedidos/purchase-order-line-barcode-change.interface';
+import type PurchaseOrderLineEconomicChange from '@model/compras/pedidos/purchase-order-line-economic-change.interface';
 import type PurchaseOrderLineMove from '@model/compras/pedidos/purchase-order-line-move.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
@@ -29,6 +30,7 @@ import {
   PURCHASE_ORDER_COLUMN_OPTIONS,
   removePurchaseOrderLine,
   updatePurchaseOrderLineBarcode,
+  updatePurchaseOrderLineEconomic,
   updatePurchaseOrderLineUnits,
   type AddPurchaseOrderArticlesResult,
 } from '@modules/compras/pedidos/pages/purchase-order/purchase-order.component.private';
@@ -878,6 +880,133 @@ describe('purchase-order.component.private', (): void => {
         lineKey: 'unknown',
         codigoBarras: 'EXTRA',
       }),
+    ).toBe(lines);
+  });
+
+  it('recalcula PUC y margen al cambiar el Precio albarán', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          palbMicros: 800_000,
+          descuentoBps: 1000,
+          ivaBps: 2100,
+          recargoEquivalenciaBps: 520,
+          pucMicros: 908_640,
+          pvpMicros: 1_500_000,
+        }),
+      ),
+    ];
+
+    const change: PurchaseOrderLineEconomicChange = {
+      lineKey: 'line:20',
+      field: 'palbMicros',
+      value: 1_000_000,
+    };
+
+    const result: readonly PurchaseOrderLineState[] = updatePurchaseOrderLineEconomic(
+      lines,
+      change,
+      true,
+    );
+
+    expect(result).not.toBe(lines);
+    expect(result[0]?.palbMicros).toBe(1_000_000);
+    expect(result[0]?.pucMicros).toBe(1_135_800);
+    expect(result[0]?.margenMicroporcentaje).toBe(24_280_000);
+  });
+
+  it('recalcula PUC al cambiar el descuento', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          palbMicros: 800_000,
+          descuentoBps: 0,
+          ivaBps: 2100,
+          recargoEquivalenciaBps: 520,
+          pvpMicros: 1_500_000,
+        }),
+      ),
+    ];
+
+    const result: readonly PurchaseOrderLineState[] = updatePurchaseOrderLineEconomic(
+      lines,
+      {
+        lineKey: 'line:20',
+        field: 'descuentoBps',
+        value: 1000,
+      },
+      true,
+    );
+
+    expect(result[0]?.descuentoBps).toBe(1000);
+
+    expect(result[0]?.pucMicros).toBe(908_640);
+  });
+
+  it('recalcula el margen al cambiar PVP sin modificar PUC', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          pucMicros: 950_000,
+          pvpMicros: 1_500_000,
+        }),
+      ),
+    ];
+
+    const result: readonly PurchaseOrderLineState[] = updatePurchaseOrderLineEconomic(
+      lines,
+      {
+        lineKey: 'line:20',
+        field: 'pvpMicros',
+        value: 2_000_000,
+      },
+      true,
+    );
+
+    expect(result[0]?.pucMicros).toBe(950_000);
+
+    expect(result[0]?.pvpMicros).toBe(2_000_000);
+
+    expect(result[0]?.margenMicroporcentaje).toBe(52_500_000);
+  });
+
+  it('mantiene el mismo estado si el valor económico no cambia', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          palbMicros: 800_000,
+        }),
+      ),
+    ];
+
+    expect(
+      updatePurchaseOrderLineEconomic(
+        lines,
+        {
+          lineKey: 'line:20',
+          field: 'palbMicros',
+          value: 800_000,
+        },
+        false,
+      ),
+    ).toBe(lines);
+  });
+
+  it('ignora cambios económicos dirigidos a una línea inexistente', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(createPedidoLinea()),
+    ];
+
+    expect(
+      updatePurchaseOrderLineEconomic(
+        lines,
+        {
+          lineKey: 'unknown',
+          field: 'pvpMicros',
+          value: 2_000_000,
+        },
+        false,
+      ),
     ).toBe(lines);
   });
 });
