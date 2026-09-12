@@ -6,6 +6,7 @@ import type {
   PedidoTipoPagoOptionInterface,
 } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
 import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/pedido-columnas.constants';
+import type PedidoLineaSaveCommand from '@desktop-contracts/compras/pedidos/pedido-linea-save.interface';
 import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type { PedidoTipo } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
 import type PurchaseOrderLineBarcodeChange from '@model/compras/pedidos/purchase-order-line-barcode-change.interface';
@@ -804,7 +805,10 @@ export function normalizePurchaseOrderColumns(value: unknown): readonly number[]
  * Construye el comando de persistencia a partir del estado
  * editable actual de la ficha.
  */
-export function buildPurchaseOrderSaveCommand(state: PurchaseOrderFormState): PedidoSaveCommand {
+export function buildPurchaseOrderSaveCommand(
+  state: PurchaseOrderFormState,
+  lines: readonly PurchaseOrderLineState[],
+): PedidoSaveCommand {
   if (state.idProveedor === null) {
     throw new Error('Debes seleccionar un proveedor.');
   }
@@ -822,6 +826,37 @@ export function buildPurchaseOrderSaveCommand(state: PurchaseOrderFormState): Pe
     europeo: state.europeo,
     observaciones: normalizeOptionalText(state.observaciones),
     columnasVisibles: [...state.columnasVisibles],
+    lineas: lines.map((line: PurchaseOrderLineState, index: number): PedidoLineaSaveCommand =>
+      buildPurchaseOrderLineSaveCommand(line, index),
+    ),
+  };
+}
+
+/**
+ * Convierte el estado visual de una línea en
+ * su contrato mínimo de persistencia.
+ */
+function buildPurchaseOrderLineSaveCommand(
+  line: PurchaseOrderLineState,
+  orden: number,
+): PedidoLineaSaveCommand {
+  if (line.id === null && line.idArticulo === null) {
+    throw new Error('Una línea nueva debe estar vinculada a un artículo.');
+  }
+
+  return {
+    id: line.id,
+    idArticulo: line.idArticulo,
+    orden,
+    codigoBarras: normalizeOptionalText(line.codigoBarras),
+    unidades: line.unidades,
+    palbMicros: line.palbMicros,
+    pucMicros: line.pucMicros,
+    pvpMicros: line.pvpMicros,
+    margenMicroporcentaje: line.margenMicroporcentaje,
+    ivaBps: line.ivaBps,
+    recargoEquivalenciaBps: line.recargoEquivalenciaBps,
+    descuentoBps: line.descuentoBps,
   };
 }
 

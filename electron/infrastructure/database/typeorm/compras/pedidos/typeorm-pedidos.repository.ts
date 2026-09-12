@@ -7,6 +7,7 @@ import type {
   PedidoSaveRecord,
 } from '@backend/domain/compras/pedidos/pedido-cabecera-record.interface';
 import type PedidoLineaRecord from '@backend/domain/compras/pedidos/pedido-linea-record.interface';
+import type PedidoLineaSaveRecord from '@backend/domain/compras/pedidos/pedido-linea-save-record.interface';
 import type {
   PedidoFilterOptionsRecord,
   PedidoGuardadoRowRecord,
@@ -17,19 +18,21 @@ import type {
 import { MONEY_SCALE, UNIT_PRICE_SCALE } from '@backend/domain/database/database-schema.constants';
 import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/pedido-columnas.constants';
 import {
+  PEDIDO_ARTICULO_SELECT,
+  PEDIDO_TIENE_CODIGO_BARRAS_ADICIONAL_SQL,
   type DatabaseIdRow,
   type PedidoArticuloDatabaseRow,
+  type PedidoArticuloLineaSnapshotDatabaseRow,
   type PedidoCabeceraDatabaseRow,
   type PedidoCountDatabaseRow,
   type PedidoCurrentStateDatabaseRow,
   type PedidoLineaDatabaseRow,
+  type PedidoLineaIdentityDatabaseRow,
   type PedidoListadoDatabaseRow,
   type PedidoProveedorFilterDatabaseRow,
   type PedidoSqlFilter,
   type PedidoTipoPagoOptionDatabaseRow,
   type PedidoVisibleColumnDatabaseRow,
-  PEDIDO_ARTICULO_SELECT,
-  PEDIDO_TIENE_CODIGO_BARRAS_ADICIONAL_SQL,
 } from '@infrastructure/database/typeorm/compras/pedidos/typeorm-pedidos.repository.private';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import escapeLike from '@infrastructure/database/typeorm/typeorm-like.utils';
@@ -376,7 +379,8 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
   }
 
   /**
-   * Crea o actualiza únicamente la cabecera de un pedido.
+   * Crea o actualiza atómicamente un Pedido pendiente
+   * junto con sus líneas y configuración visual.
    */
   async savePedido(command: PedidoSaveRecord): Promise<number> {
     const dataSource: DataSource = await this.applicationDatabase.connect();
@@ -490,6 +494,10 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
         }
 
         await this.syncOptionalColumns(queryRunner, idPedido, command.columnasVisibles, timestamp);
+
+        if (current?.recepcionado !== 1) {
+          await this.syncPedidoLineas(queryRunner, idPedido, command.lineas);
+        }
 
         return idPedido;
       },
@@ -631,6 +639,230 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
     }
 
     return nombre;
+  }
+
+  /**
+   * Sincroniza por completo las líneas editables de
+   * un Pedido todavía pendiente.
+   */
+  private async syncPedidoLineas(
+    queryRunner: QueryRunner,
+    idPedido: number,
+    lineas: readonly PedidoLineaSaveRecord[],
+  ): Promise<void> {
+    const currentRows: readonly PedidoLineaIdentityDatabaseRow[] = (await queryRunner.query(
+      `
+          SELECT
+            id,
+            id_articulo
+          FROM linea_pedido
+          WHERE id_pedido = ?
+        `,
+      [idPedido],
+    )) as readonly PedidoLineaIdentityDatabaseRow[];
+
+    const currentById: ReadonlyMap<number, PedidoLineaIdentityDatabaseRow> = new Map<
+      number,
+      PedidoLineaIdentityDatabaseRow
+    >(
+      currentRows.map(
+        (row: PedidoLineaIdentityDatabaseRow): [number, PedidoLineaIdentityDatabaseRow] => [
+          row.id,
+          row,
+        ],
+      ),
+    );
+
+    const retainedIds: number[] = [];
+
+    for (const linea of lineas) {
+      if (linea.id === null) {
+        continue;
+      }
+
+      const currentLine: PedidoLineaIdentityDatabaseRow | undefined = currentById.get(linea.id);
+
+      if (currentLine === undefined) {
+        throw new Error('Una línea del pedido no pertenece al pedido indicado.');
+      }
+
+      if (currentLine.id_articulo !== linea.idArticulo) {
+        throw new Error('No se puede cambiar el artículo asociado a una línea del pedido.');
+      }
+
+      retainedIds.push(linea.id);
+    }
+
+    if (retainedIds.length === 0) {
+      await queryRunner.query(
+        `
+        DELETE FROM linea_pedido
+        WHERE id_pedido = ?
+      `,
+        [idPedido],
+      );
+    } else {
+      const placeholders: string = retainedIds.map((): string => '?').join(', ');
+
+      await queryRunner.query(
+        `
+        DELETE FROM linea_pedido
+        WHERE
+          id_pedido = ?
+          AND id NOT IN (${placeholders})
+      `,
+        [idPedido, ...retainedIds],
+      );
+    }
+
+    for (const linea of lineas) {
+      if (linea.id === null) {
+        await this.insertPedidoLinea(queryRunner, idPedido, linea);
+      } else {
+        await this.updatePedidoLinea(queryRunner, idPedido, linea);
+      }
+    }
+  }
+
+  /**
+   * Inserta una línea nueva tomando del artículo
+   * exclusivamente su snapshot identificativo.
+   */
+  private async insertPedidoLinea(
+    queryRunner: QueryRunner,
+    idPedido: number,
+    linea: PedidoLineaSaveRecord,
+  ): Promise<void> {
+    if (linea.idArticulo === null) {
+      throw new Error('Una línea nueva debe estar vinculada a un artículo.');
+    }
+
+    const articulo: PedidoArticuloLineaSnapshotDatabaseRow =
+      await this.requirePedidoArticuloLineaSnapshot(queryRunner, linea.idArticulo);
+
+    await queryRunner.query(
+      `
+      INSERT INTO linea_pedido (
+        public_id,
+        id_pedido,
+        orden,
+        id_articulo,
+        nombre_articulo,
+        codigo_barras,
+        unidades,
+        stock_actual_snapshot,
+        stock_final_snapshot,
+        palb_micros,
+        puc_micros,
+        pvp_micros,
+        margen_microporcentaje,
+        iva_bps,
+        recargo_equivalencia_bps,
+        descuento_bps
+      )
+      VALUES (
+        ?, ?, ?, ?, ?, ?, ?, NULL, NULL,
+        ?, ?, ?, ?, ?, ?, ?
+      )
+    `,
+      [
+        randomUUID(),
+        idPedido,
+        linea.orden,
+        articulo.id,
+        articulo.nombre,
+        linea.codigoBarras,
+        linea.unidades,
+        linea.palbMicros,
+        linea.pucMicros,
+        linea.pvpMicros,
+        linea.margenMicroporcentaje,
+        linea.ivaBps,
+        linea.recargoEquivalenciaBps,
+        linea.descuentoBps,
+      ],
+    );
+  }
+
+  /**
+   * Actualiza exclusivamente los datos editables de
+   * una línea pendiente ya persistida.
+   */
+  private async updatePedidoLinea(
+    queryRunner: QueryRunner,
+    idPedido: number,
+    linea: PedidoLineaSaveRecord,
+  ): Promise<void> {
+    if (linea.id === null) {
+      throw new Error('La línea indicada no está persistida.');
+    }
+
+    await queryRunner.query(
+      `
+      UPDATE linea_pedido
+      SET
+        orden = ?,
+        codigo_barras = ?,
+        unidades = ?,
+        stock_actual_snapshot = NULL,
+        stock_final_snapshot = NULL,
+        palb_micros = ?,
+        puc_micros = ?,
+        pvp_micros = ?,
+        margen_microporcentaje = ?,
+        iva_bps = ?,
+        recargo_equivalencia_bps = ?,
+        descuento_bps = ?
+      WHERE
+        id = ?
+        AND id_pedido = ?
+    `,
+      [
+        linea.orden,
+        linea.codigoBarras,
+        linea.unidades,
+        linea.palbMicros,
+        linea.pucMicros,
+        linea.pvpMicros,
+        linea.margenMicroporcentaje,
+        linea.ivaBps,
+        linea.recargoEquivalenciaBps,
+        linea.descuentoBps,
+        linea.id,
+        idPedido,
+      ],
+    );
+  }
+
+  /**
+   * Recupera el mínimo snapshot canónico necesario
+   * para crear una línea nueva.
+   */
+  private async requirePedidoArticuloLineaSnapshot(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+  ): Promise<PedidoArticuloLineaSnapshotDatabaseRow> {
+    const rows: readonly PedidoArticuloLineaSnapshotDatabaseRow[] = (await queryRunner.query(
+      `
+          SELECT
+            id,
+            nombre
+          FROM articulo
+          WHERE
+            id = ?
+            AND deleted_at IS NULL
+          LIMIT 1
+        `,
+      [idArticulo],
+    )) as readonly PedidoArticuloLineaSnapshotDatabaseRow[];
+
+    const articulo: PedidoArticuloLineaSnapshotDatabaseRow | undefined = rows[0];
+
+    if (articulo === undefined) {
+      throw new Error('El artículo seleccionado para una línea ya no está disponible.');
+    }
+
+    return articulo;
   }
 
   /**

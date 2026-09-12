@@ -7,6 +7,7 @@ import type {
   PedidoSaveRecord,
 } from '@backend/domain/compras/pedidos/pedido-cabecera-record.interface';
 import type PedidoLineaRecord from '@backend/domain/compras/pedidos/pedido-linea-record.interface';
+import type PedidoLineaSaveRecord from '@backend/domain/compras/pedidos/pedido-linea-save-record.interface';
 import type {
   PedidoFilterOptionsRecord,
   PedidoGuardadoRowRecord,
@@ -22,6 +23,7 @@ import type {
   PedidoSaveCommand,
 } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
 import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/pedido-columnas.constants';
+import type PedidoLineaSaveCommand from '@desktop-contracts/compras/pedidos/pedido-linea-save.interface';
 import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type {
   PedidoFilterOptionsInterface,
@@ -176,7 +178,8 @@ export default class PedidosService {
   }
 
   /**
-   * Crea o actualiza una cabecera de Pedido.
+   * Crea o actualiza una cabecera de Pedido.Crea o actualiza un Pedido pendiente junto
+   * con sus líneas editables.
    */
   async savePedido(command: PedidoSaveCommand): Promise<number> {
     const record: PedidoSaveRecord = this.normalizeSaveCommand(command);
@@ -377,7 +380,138 @@ export default class PedidosService {
       europeo: command.europeo,
       observaciones: this.normalizeOptionalText(command.observaciones, null),
       columnasVisibles,
+      lineas: this.normalizeSaveLineas(command.lineas),
     };
+  }
+
+  /**
+   * Valida y normaliza todas las líneas enviadas
+   * para persistir un Pedido.
+   */
+  private normalizeSaveLineas(
+    lineas: readonly PedidoLineaSaveCommand[],
+  ): readonly PedidoLineaSaveRecord[] {
+    if (!Array.isArray(lineas)) {
+      throw new Error('Las líneas del pedido no son válidas.');
+    }
+
+    const ids: Set<number> = new Set<number>();
+    const ordenes: Set<number> = new Set<number>();
+    const articulos: Set<number> = new Set<number>();
+
+    return lineas.map((linea: PedidoLineaSaveCommand): PedidoLineaSaveRecord => {
+      if (typeof linea !== 'object' || linea === null) {
+        throw new Error('Una de las líneas del pedido no es válida.');
+      }
+
+      if (linea.id !== null) {
+        if (!Number.isSafeInteger(linea.id) || linea.id <= 0) {
+          throw new Error('El identificador de una línea del pedido no es válido.');
+        }
+
+        if (ids.has(linea.id)) {
+          throw new Error('El pedido contiene identificadores de línea duplicados.');
+        }
+
+        ids.add(linea.id);
+      }
+
+      if (
+        linea.idArticulo !== null &&
+        (!Number.isSafeInteger(linea.idArticulo) || linea.idArticulo <= 0)
+      ) {
+        throw new Error('El artículo de una línea del pedido no es válido.');
+      }
+
+      if (linea.id === null && linea.idArticulo === null) {
+        throw new Error('Una línea nueva debe estar vinculada a un artículo.');
+      }
+
+      if (linea.idArticulo !== null && articulos.has(linea.idArticulo)) {
+        throw new Error('El pedido contiene el mismo artículo más de una vez.');
+      }
+
+      if (linea.idArticulo !== null) {
+        articulos.add(linea.idArticulo);
+      }
+
+      this.validatePedidoLineaNonNegativeInteger(linea.orden, 'orden');
+
+      if (ordenes.has(linea.orden)) {
+        throw new Error('El pedido contiene órdenes de línea duplicados.');
+      }
+
+      ordenes.add(linea.orden);
+
+      this.validatePedidoLineaNonNegativeInteger(linea.unidades, 'unidades');
+
+      this.validatePedidoLineaNonNegativeInteger(linea.palbMicros, 'Precio albarán');
+
+      this.validatePedidoLineaNonNegativeInteger(linea.pucMicros, 'PUC');
+
+      this.validatePedidoLineaNonNegativeInteger(linea.pvpMicros, 'PVP');
+
+      if (!Number.isSafeInteger(linea.margenMicroporcentaje)) {
+        throw new Error('El margen de una línea del pedido no es válido.');
+      }
+
+      this.validatePedidoLineaNonNegativeInteger(linea.ivaBps, 'IVA');
+
+      this.validatePedidoLineaNonNegativeInteger(linea.recargoEquivalenciaBps, 'RE');
+
+      this.validatePedidoLineaNonNegativeInteger(linea.descuentoBps, 'descuento');
+
+      if (linea.descuentoBps > 10_000) {
+        throw new Error('El descuento de una línea debe estar entre 0 % y 100 %.');
+      }
+
+      return {
+        id: linea.id,
+        idArticulo: linea.idArticulo,
+        orden: linea.orden,
+        codigoBarras: this.normalizePedidoLineaBarcode(linea.codigoBarras),
+        unidades: linea.unidades,
+        palbMicros: linea.palbMicros,
+        pucMicros: linea.pucMicros,
+        pvpMicros: linea.pvpMicros,
+        margenMicroporcentaje: linea.margenMicroporcentaje,
+        ivaBps: linea.ivaBps,
+        recargoEquivalenciaBps: linea.recargoEquivalenciaBps,
+        descuentoBps: linea.descuentoBps,
+      };
+    });
+  }
+
+  /**
+   * Comprueba que un valor entero de línea sea
+   * seguro y no negativo.
+   */
+  private validatePedidoLineaNonNegativeInteger(value: number, fieldName: string): void {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error(`El valor de ${fieldName} de una línea del pedido no es válido.`);
+    }
+  }
+
+  /**
+   * Normaliza un código de barras adicional
+   * todavía pendiente de recepción.
+   */
+  private normalizePedidoLineaBarcode(value: string | null): string | null {
+    if (value === null) {
+      return null;
+    }
+
+    if (typeof value !== 'string') {
+      throw new Error('El código de barras de una línea del pedido no es válido.');
+    }
+
+    const normalized: string = value.trim();
+
+    if (normalized.length > 100) {
+      throw new Error('El código de barras de una línea del pedido es demasiado largo.');
+    }
+
+    return normalized.length === 0 ? null : normalized;
   }
 
   /**

@@ -297,7 +297,7 @@ describe('purchase-order.component.private', (): void => {
     expect(normalizePurchaseOrderColumns(null)).toEqual([]);
   });
 
-  it('construye y normaliza el comando de guardado de la cabecera', (): void => {
+  it('construye y normaliza el comando completo de guardado', (): void => {
     const state = {
       ...createNewPurchaseOrderFormState(false, new Date(2026, 8, 11)),
       id: 12,
@@ -314,7 +314,17 @@ describe('purchase-order.component.private', (): void => {
       columnasVisibles: [1, 4, 13],
     };
 
-    expect(buildPurchaseOrderSaveCommand(state)).toEqual({
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          orden: 7,
+          codigoBarras: '  EXISTENTE-20  ',
+        }),
+      ),
+      createNewPurchaseOrderLineState(createPedidoArticulo(), 12),
+    ];
+
+    expect(buildPurchaseOrderSaveCommand(state, lines)).toEqual({
       id: 12,
       idProveedor: 4,
       idTipoPago: 10,
@@ -327,13 +337,45 @@ describe('purchase-order.component.private', (): void => {
       europeo: true,
       observaciones: 'Observación de prueba',
       columnasVisibles: [1, 4, 13],
+      lineas: [
+        {
+          id: 20,
+          idArticulo: 8,
+          orden: 0,
+          codigoBarras: 'EXISTENTE-20',
+          unidades: 4,
+          palbMicros: 570_000,
+          pucMicros: 630_000,
+          pvpMicros: 990_000,
+          margenMicroporcentaje: 36_363_636,
+          ivaBps: 1000,
+          recargoEquivalenciaBps: 140,
+          descuentoBps: 0,
+        },
+        {
+          id: null,
+          idArticulo: 9,
+          orden: 1,
+          codigoBarras: null,
+          unidades: 0,
+          palbMicros: 800_000,
+          pucMicros: 950_000,
+          pvpMicros: 1_500_000,
+          margenMicroporcentaje: 36_666_667,
+          ivaBps: 2100,
+          recargoEquivalenciaBps: 520,
+          descuentoBps: 0,
+        },
+      ],
     });
   });
 
   it('rechaza el guardado de un pedido sin proveedor', (): void => {
     const state = createNewPurchaseOrderFormState(false, new Date(2026, 8, 11));
 
-    expect(() => buildPurchaseOrderSaveCommand(state)).toThrow('Debes seleccionar un proveedor.');
+    expect(() => buildPurchaseOrderSaveCommand(state, [])).toThrow(
+      'Debes seleccionar un proveedor.',
+    );
   });
 
   it('mantiene sincronizado el catálogo visual con el contrato backend', (): void => {

@@ -701,8 +701,8 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Persiste la cabecera, relee su estado canónico y,
-   * si es nueva, actualiza la URL con su identificador.
+   * Persiste el Pedido completo, relee su estado
+   * canónico y actualiza la URL cuando es nuevo.
    */
   private async saveOrder(): Promise<void> {
     if (this.processing()) {
@@ -719,19 +719,31 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
     this.saving.set(true);
 
     try {
-      const command: PedidoSaveCommand = buildPurchaseOrderSaveCommand(state);
+      const command: PedidoSaveCommand = buildPurchaseOrderSaveCommand(state, this.lines());
 
       const wasNew: boolean = command.id === null;
 
       const idPedido: number = await this.comprasService.savePedido(command);
 
-      const pedido: PedidoCabeceraInterface | null = await this.comprasService.getPedido(idPedido);
+      const [pedido, savedLines]: [
+        PedidoCabeceraInterface | null,
+        readonly PedidoLineaInterface[],
+      ] = await Promise.all([
+        this.comprasService.getPedido(idPedido),
+        this.comprasService.getPedidoLineas(idPedido),
+      ]);
 
       if (pedido === null) {
         throw new Error('El pedido se ha guardado pero no se ha podido volver a cargar.');
       }
 
       this.formState.set(createExistingPurchaseOrderFormState(pedido));
+
+      this.lines.set(
+        savedLines.map((line: PedidoLineaInterface): PurchaseOrderLineState =>
+          createExistingPurchaseOrderLineState(line),
+        ),
+      );
       this.showSaveFeedback();
 
       if (wasNew) {

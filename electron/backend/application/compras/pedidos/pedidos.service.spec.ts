@@ -15,6 +15,7 @@ import type {
 } from '@backend/domain/compras/pedidos/pedido-listado-record.interface';
 import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type { PedidoSaveCommand } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
+import type PedidoLineaSaveCommand from '@desktop-contracts/compras/pedidos/pedido-linea-save.interface';
 import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type {
   PedidoListadoConsulta,
@@ -269,6 +270,7 @@ function createSaveCommand(overrides: Partial<PedidoSaveCommand> = {}): PedidoSa
     europeo: false,
     observaciones: 'Pedido de prueba',
     columnasVisibles: [1, 4],
+    lineas: [],
     ...overrides,
   };
 }
@@ -297,6 +299,29 @@ function createPedidoArticuloRecord(
     tieneCodigoBarrasAdicional: true,
     observaciones: 'Observación para pedidos',
     mostrarObservacionesPedidos: true,
+    ...overrides,
+  };
+}
+
+/**
+ * Construye una línea válida para guardar un Pedido.
+ */
+function createLineaSaveCommand(
+  overrides: Partial<PedidoLineaSaveCommand> = {},
+): PedidoLineaSaveCommand {
+  return {
+    id: null,
+    idArticulo: 8,
+    orden: 0,
+    codigoBarras: null,
+    unidades: 0,
+    palbMicros: 800_000,
+    pucMicros: 950_000,
+    pvpMicros: 1_500_000,
+    margenMicroporcentaje: 36_666_667,
+    ivaBps: 2100,
+    recargoEquivalenciaBps: 520,
+    descuentoBps: 0,
     ...overrides,
   };
 }
@@ -540,7 +565,123 @@ describe('PedidosService', (): void => {
       europeo: false,
       observaciones: 'Observación',
       columnasVisibles: [1, 4],
+      lineas: [],
     });
+  });
+
+  it('normaliza las líneas antes de persistirlas', async (): Promise<void> => {
+    const repository = new FakePedidosRepository();
+
+    const service = new PedidosService(repository);
+
+    await service.savePedido(
+      createSaveCommand({
+        lineas: [
+          createLineaSaveCommand({
+            codigoBarras: '  EXTRA-PENDIENTE  ',
+          }),
+        ],
+      }),
+    );
+
+    expect(repository.lastSavedCommand?.lineas).toEqual([
+      {
+        id: null,
+        idArticulo: 8,
+        orden: 0,
+        codigoBarras: 'EXTRA-PENDIENTE',
+        unidades: 0,
+        palbMicros: 800_000,
+        pucMicros: 950_000,
+        pvpMicros: 1_500_000,
+        margenMicroporcentaje: 36_666_667,
+        ivaBps: 2100,
+        recargoEquivalenciaBps: 520,
+        descuentoBps: 0,
+      },
+    ]);
+  });
+
+  it('rechaza una línea nueva sin artículo', async (): Promise<void> => {
+    const service = new PedidosService(new FakePedidosRepository());
+
+    await expect(
+      service.savePedido(
+        createSaveCommand({
+          lineas: [
+            createLineaSaveCommand({
+              idArticulo: null,
+            }),
+          ],
+        }),
+      ),
+    ).rejects.toThrow('Una línea nueva debe estar vinculada a un artículo.');
+  });
+
+  it('rechaza artículos y órdenes duplicados entre líneas', async (): Promise<void> => {
+    const service = new PedidosService(new FakePedidosRepository());
+
+    await expect(
+      service.savePedido(
+        createSaveCommand({
+          lineas: [
+            createLineaSaveCommand({
+              idArticulo: 8,
+              orden: 0,
+            }),
+            createLineaSaveCommand({
+              idArticulo: 8,
+              orden: 1,
+            }),
+          ],
+        }),
+      ),
+    ).rejects.toThrow('El pedido contiene el mismo artículo más de una vez.');
+
+    await expect(
+      service.savePedido(
+        createSaveCommand({
+          lineas: [
+            createLineaSaveCommand({
+              idArticulo: 8,
+              orden: 0,
+            }),
+            createLineaSaveCommand({
+              idArticulo: 9,
+              orden: 0,
+            }),
+          ],
+        }),
+      ),
+    ).rejects.toThrow('El pedido contiene órdenes de línea duplicados.');
+  });
+
+  it('rechaza unidades negativas y descuentos superiores al cien por cien', async (): Promise<void> => {
+    const service = new PedidosService(new FakePedidosRepository());
+
+    await expect(
+      service.savePedido(
+        createSaveCommand({
+          lineas: [
+            createLineaSaveCommand({
+              unidades: -1,
+            }),
+          ],
+        }),
+      ),
+    ).rejects.toThrow('El valor de unidades de una línea del pedido no es válido.');
+
+    await expect(
+      service.savePedido(
+        createSaveCommand({
+          lineas: [
+            createLineaSaveCommand({
+              descuentoBps: 10_001,
+            }),
+          ],
+        }),
+      ),
+    ).rejects.toThrow('El descuento de una línea debe estar entre 0 % y 100 %.');
   });
 
   it('rechaza un guardado sin proveedor válido', async (): Promise<void> => {

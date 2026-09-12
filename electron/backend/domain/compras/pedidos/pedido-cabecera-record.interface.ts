@@ -1,3 +1,4 @@
+import type PedidoLineaSaveRecord from '@backend/domain/compras/pedidos/pedido-linea-save-record.interface';
 import type { PedidoTipoRecord } from '@backend/domain/compras/pedidos/pedido-listado-record.interface';
 
 export interface PedidoCabeceraRecord {
@@ -47,4 +48,5 @@ export interface PedidoSaveRecord {
   readonly europeo: boolean;
   readonly observaciones: string | null;
   readonly columnasVisibles: readonly number[];
+  readonly lineas: readonly PedidoLineaSaveRecord[];
 }

@@ -13,7 +13,7 @@ import type {
 } from '@backend/domain/compras/pedidos/pedido-listado-record.interface';
 
 /**
- * Define el acceso a los datos de listados de Pedidos.
+ * Define el acceso a los datos propios de Pedidos.
  */
 export default interface PedidosRepository {
   /**
@@ -64,7 +64,7 @@ export default interface PedidosRepository {
   getPedidoFormOptions(): Promise<PedidoFormOptionsRecord>;
 
   /**
-   * Crea o actualiza la cabecera de un pedido.
+   * Crea o actualiza un pedido y sus líneas editables.
    */
   savePedido(command: PedidoSaveRecord): Promise<number>;
 

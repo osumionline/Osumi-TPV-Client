@@ -145,3 +145,13 @@ export const PEDIDO_ARTICULO_SELECT: string = `
   INNER JOIN marca m
     ON m.id = a.id_marca
 `;
+
+export interface PedidoLineaIdentityDatabaseRow {
+  readonly id: number;
+  readonly id_articulo: number | null;
+}
+
+export interface PedidoArticuloLineaSnapshotDatabaseRow {
+  readonly id: number;
+  readonly nombre: string;
+}

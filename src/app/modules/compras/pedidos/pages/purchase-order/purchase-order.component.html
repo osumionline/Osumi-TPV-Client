@@ -27,6 +27,14 @@
 
             @if (formState(); as order) {
             <div class="purchase-order__toolbar-actions">
+                @if (saveSuccessful()) {
+                <span class="purchase-order__save-feedback"
+                      role="status"
+                      aria-live="polite">
+                    Pedido guardado correctamente
+                </span>
+                }
+
                 @if (order.id !== null && !order.recepcionado) {
                 <button mat-stroked-button
                         class="purchase-order__delete-button"
@@ -44,13 +52,6 @@
                     Eliminar
                     }
                 </button>
-                }
-                @if (saveSuccessful()) {
-                <span class="purchase-order__save-feedback"
-                      role="status"
-                      aria-live="polite">
-                    Pedido guardado correctamente
-                </span>
                 }
 
                 <button mat-flat-button

@@ -1,3 +1,4 @@
+import type PedidoLineaSaveCommand from '@desktop-contracts/compras/pedidos/pedido-linea-save.interface';
 import type { PedidoTipo } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
 
 export interface PedidoCabeceraInterface {
@@ -47,4 +48,5 @@ export interface PedidoSaveCommand {
   readonly europeo: boolean;
   readonly observaciones: string | null;
   readonly columnasVisibles: readonly number[];
+  readonly lineas: readonly PedidoLineaSaveCommand[];
 }

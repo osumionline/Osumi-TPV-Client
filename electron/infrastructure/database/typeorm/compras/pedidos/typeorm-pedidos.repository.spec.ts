@@ -6,6 +6,7 @@ import type {
   PedidoSaveRecord,
 } from '@backend/domain/compras/pedidos/pedido-cabecera-record.interface';
 import type PedidoLineaRecord from '@backend/domain/compras/pedidos/pedido-linea-record.interface';
+import type PedidoLineaSaveRecord from '@backend/domain/compras/pedidos/pedido-linea-save-record.interface';
 import type {
   PedidosGuardadosResultadoRecord,
   PedidosRecepcionadosResultadoRecord,
@@ -47,6 +48,30 @@ interface PedidoColumnDatabaseRow {
 
 interface PedidoDeletedAtDatabaseRow {
   readonly deleted_at: string | null;
+}
+
+interface PedidoLineaPersistenceDatabaseRow {
+  readonly id: number;
+  readonly public_id: string;
+  readonly id_pedido: number;
+  readonly orden: number;
+  readonly id_articulo: number | null;
+  readonly nombre_articulo: string;
+  readonly codigo_barras: string | null;
+  readonly unidades: number;
+  readonly stock_actual_snapshot: number | null;
+  readonly stock_final_snapshot: number | null;
+  readonly palb_micros: number;
+  readonly puc_micros: number;
+  readonly pvp_micros: number;
+  readonly margen_microporcentaje: number;
+  readonly iva_bps: number;
+  readonly recargo_equivalencia_bps: number;
+  readonly descuento_bps: number;
+}
+
+interface DatabaseCountRow {
+  readonly total: number;
 }
 
 let tempDirectory: string | null = null;
@@ -659,6 +684,207 @@ describe('TypeOrmPedidosRepository', (): void => {
 
     expect(rows[0]?.deleted_at).toBeNull();
   });
+
+  it('crea líneas de borrador sin modificar el artículo canónico', async (): Promise<void> => {
+    const articuloBefore: PedidoArticuloRecord | null =
+      await requireRepository().resolvePedidoArticulo('101', 101);
+
+    const idPedido: number = await requireRepository().savePedido(
+      createSaveRecord({
+        lineas: [
+          createLineaSaveRecord({
+            codigoBarras: 'PENDING-X',
+            unidades: 0,
+            palbMicros: 11_000_000,
+            pucMicros: 13_000_000,
+            pvpMicros: 21_000_000,
+          }),
+        ],
+      }),
+    );
+
+    const rows: readonly PedidoLineaPersistenceDatabaseRow[] =
+      await readPedidoLineasPersistence(idPedido);
+
+    expect(rows).toHaveLength(1);
+
+    expect(rows[0]).toMatchObject({
+      id_pedido: idPedido,
+      orden: 0,
+      id_articulo: 10,
+      nombre_articulo: 'Artículo actual A',
+      codigo_barras: 'PENDING-X',
+      unidades: 0,
+      stock_actual_snapshot: null,
+      stock_final_snapshot: null,
+      palb_micros: 11_000_000,
+      puc_micros: 13_000_000,
+      pvp_micros: 21_000_000,
+    });
+
+    expect(rows[0]?.public_id).not.toBe('');
+
+    const articuloAfter: PedidoArticuloRecord | null =
+      await requireRepository().resolvePedidoArticulo('101', 101);
+
+    expect(articuloAfter).toEqual(articuloBefore);
+
+    const barcodeRows: readonly DatabaseCountRow[] = (await requireDataSource().query(
+      `
+          SELECT COUNT(*) AS total
+          FROM codigo_barras
+          WHERE
+            codigo = ?
+            AND deleted_at IS NULL
+        `,
+      ['PENDING-X'],
+    )) as readonly DatabaseCountRow[];
+
+    expect(barcodeRows[0]?.total).toBe(0);
+  });
+
+  it('sincroniza altas cambios bajas y orden de un borrador', async (): Promise<void> => {
+    await requireRepository().savePedido(
+      createSaveRecord({
+        id: 1,
+        recargoEquivalencia: true,
+        lineas: [
+          createLineaSaveRecord({
+            id: null,
+            idArticulo: 11,
+            orden: 0,
+            codigoBarras: 'NEW-B',
+            unidades: 6,
+            palbMicros: 21_000_000,
+            pucMicros: 25_000_000,
+            pvpMicros: 31_000_000,
+            margenMicroporcentaje: 19_354_839,
+            ivaBps: 1000,
+            recargoEquivalenciaBps: 140,
+            descuentoBps: 250,
+          }),
+          createLineaSaveRecord({
+            id: 100,
+            idArticulo: 10,
+            orden: 1,
+            codigoBarras: 'UPDATED-A',
+            unidades: 8,
+            palbMicros: 12_000_000,
+            pucMicros: 15_000_000,
+            pvpMicros: 22_000_000,
+            margenMicroporcentaje: 31_818_182,
+            ivaBps: 2100,
+            recargoEquivalenciaBps: 520,
+            descuentoBps: 500,
+          }),
+        ],
+      }),
+    );
+
+    const rows: readonly PedidoLineaPersistenceDatabaseRow[] = await readPedidoLineasPersistence(1);
+
+    expect(rows).toHaveLength(2);
+
+    expect(rows[0]).toMatchObject({
+      orden: 0,
+      id_articulo: 11,
+      nombre_articulo: 'Artículo actual B',
+      codigo_barras: 'NEW-B',
+      unidades: 6,
+      stock_actual_snapshot: null,
+      stock_final_snapshot: null,
+    });
+
+    expect(rows[0]?.id).not.toBe(101);
+
+    expect(rows[1]).toMatchObject({
+      id: 100,
+      public_id: 'order-line-100',
+      orden: 1,
+      id_articulo: 10,
+      nombre_articulo: 'Artículo A snapshot',
+      codigo_barras: 'UPDATED-A',
+      unidades: 8,
+      stock_actual_snapshot: null,
+      stock_final_snapshot: null,
+      descuento_bps: 500,
+    });
+
+    expect(rows.some((row: PedidoLineaPersistenceDatabaseRow): boolean => row.id === 101)).toBe(
+      false,
+    );
+  });
+
+  it('revierte cabecera y líneas si una línea nueva deja de ser válida', async (): Promise<void> => {
+    const headerBefore: PedidoPersistenceDatabaseRow = await readPedidoPersistenceRow(1);
+
+    const linesBefore: readonly PedidoLineaPersistenceDatabaseRow[] =
+      await readPedidoLineasPersistence(1);
+
+    await expect(
+      requireRepository().savePedido(
+        createSaveRecord({
+          id: 1,
+          numero: 'NO-DEBE-PERSISTIR',
+          recargoEquivalencia: true,
+          lineas: [
+            createLineaSaveRecord({
+              id: 100,
+              idArticulo: 10,
+              orden: 0,
+            }),
+            createLineaSaveRecord({
+              id: null,
+              idArticulo: 999,
+              orden: 1,
+            }),
+          ],
+        }),
+      ),
+    ).rejects.toThrow('El artículo seleccionado para una línea ya no está disponible.');
+
+    expect(await readPedidoPersistenceRow(1)).toEqual(headerBefore);
+
+    expect(await readPedidoLineasPersistence(1)).toEqual(linesBefore);
+  });
+
+  it('ignora cambios de líneas al editar información de un pedido recepcionado', async (): Promise<void> => {
+    const linesBefore: readonly PedidoLineaPersistenceDatabaseRow[] =
+      await readPedidoLineasPersistence(3);
+
+    await requireRepository().savePedido(
+      createSaveRecord({
+        id: 3,
+        idProveedor: 1,
+        idTipoPago: 11,
+        formaPago: 'Paypal',
+        numero: '#000051640-EDITADO',
+        fechaPedido: '2026-05-26',
+        fechaPago: '2026-05-29',
+        recargoEquivalencia: true,
+        europeo: false,
+        columnasVisibles: [],
+        lineas: [
+          createLineaSaveRecord({
+            id: 200,
+            idArticulo: 10,
+            orden: 0,
+            unidades: 999,
+            palbMicros: 1,
+            pucMicros: 1,
+            pvpMicros: 1,
+            margenMicroporcentaje: 0,
+          }),
+        ],
+      }),
+    );
+
+    expect(await readPedidoLineasPersistence(3)).toEqual(linesBefore);
+
+    const header: PedidoPersistenceDatabaseRow = await readPedidoPersistenceRow(3);
+
+    expect(header.numero).toBe('#000051640-EDITADO');
+  });
 });
 
 /**
@@ -695,6 +921,31 @@ function createSaveRecord(overrides: Partial<PedidoSaveRecord> = {}): PedidoSave
     europeo: false,
     observaciones: 'Pedido nuevo',
     columnasVisibles: [1, 4, 8],
+    lineas: [],
+    ...overrides,
+  };
+}
+
+/**
+ * Construye una línea normalizada representativa
+ * para los tests del repository.
+ */
+function createLineaSaveRecord(
+  overrides: Partial<PedidoLineaSaveRecord> = {},
+): PedidoLineaSaveRecord {
+  return {
+    id: null,
+    idArticulo: 10,
+    orden: 0,
+    codigoBarras: null,
+    unidades: 0,
+    palbMicros: 10_000_000,
+    pucMicros: 12_705_000,
+    pvpMicros: 19_950_000,
+    margenMicroporcentaje: 36_315_789,
+    ivaBps: 2100,
+    recargoEquivalenciaBps: 520,
+    descuentoBps: 0,
     ...overrides,
   };
 }
@@ -758,6 +1009,43 @@ async function readPedidoPersistenceRow(idPedido: number): Promise<PedidoPersist
   }
 
   return row;
+}
+
+/**
+ * Recupera las líneas tal y como están almacenadas
+ * físicamente en SQLite.
+ */
+async function readPedidoLineasPersistence(
+  idPedido: number,
+): Promise<readonly PedidoLineaPersistenceDatabaseRow[]> {
+  return (await requireDataSource().query(
+    `
+      SELECT
+        id,
+        public_id,
+        id_pedido,
+        orden,
+        id_articulo,
+        nombre_articulo,
+        codigo_barras,
+        unidades,
+        stock_actual_snapshot,
+        stock_final_snapshot,
+        palb_micros,
+        puc_micros,
+        pvp_micros,
+        margen_microporcentaje,
+        iva_bps,
+        recargo_equivalencia_bps,
+        descuento_bps
+      FROM linea_pedido
+      WHERE id_pedido = ?
+      ORDER BY
+        orden,
+        id
+    `,
+    [idPedido],
+  )) as readonly PedidoLineaPersistenceDatabaseRow[];
 }
 
 /**

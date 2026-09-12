@@ -49,7 +49,8 @@ export default interface ComprasApi {
   getPedidoFormOptions(): Promise<PedidoFormOptionsInterface>;
 
   /**
-   * Crea o actualiza la cabecera de un pedido.
+   * Crea o actualiza un pedido pendiente
+   * junto con sus líneas.
    */
   savePedido(command: PedidoSaveCommand): Promise<number>;
 
