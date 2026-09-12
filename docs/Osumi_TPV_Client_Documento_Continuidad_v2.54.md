@@ -1,9 +1,9 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.53  
-**Fecha:** 11 de septiembre de 2026  
-**Base de continuidad:** `v2.53 + main` una vez este documento se suba al repositorio.  
-**Documento anterior:** `Osumi_TPV_Client_Documento_Continuidad_v2.52.md`
+**Versión:** 2.54  
+**Fecha:** 13 de septiembre de 2026  
+**Base de continuidad:** `v2.54 + main` una vez este documento se suba al repositorio.  
+**Documento anterior:** `Osumi_TPV_Client_Documento_Continuidad_v2.53.md`
 
 ---
 
@@ -27,26 +27,31 @@ Ventas 12 — Postventa                             🟦
 15 Almacén                                        ✅ HITO CERRADO
 
 REF Pausa técnica pre-Hito 16                     ✅ CERRADA
+CTRL Normalización de controles                   ✅ CERRADA
 
 16 Compras                                        🟦 EN DESARROLLO
   16.1 Base de Compras + históricos               ✅
   16.2 Backend listados de Pedidos                ✅
   16.3 Pantalla principal de Pedidos              ✅
-
-  CTRL Normalización controles pre-16.4           ✅ CERRADA
-    CTRL.1 Primera pasada global                  ✅
-    CTRL.2 Segunda pasada Artículos               ✅
-
   16.4 Ficha Pedido: cabecera + persistencia      ✅ CERRADO
 
   16.5 Líneas + buscador de artículos             🟦 EN DESARROLLO
     16.5A.1 Schema líneas + snapshots stock       ✅
     16.5A.2 Lectura backend de líneas             ✅
-    16.5A.3 Resolución/búsqueda artículos          🟦
-      16.5A.3.1 Repository TypeORM                ✅
-      16.5A.3.2 Service + API/IPC/preload         ⬅️ SIGUIENTE
+    16.5A.3 Resolución/búsqueda artículos          ✅ CERRADO
 
-  16.6 Motor económico                            ⬜
+    16.5B Renderer / edición en memoria            🟦
+      B.1 Mostrar líneas existentes               ✅
+      B.2 Localizador + buscador común            ✅
+      B.3 Unidades + Stock final + duplicados     ✅
+      B.4 Ordenación + eliminación                ✅
+      B.5 Código de barras adicional              ✅
+      B.6A Calculador económico unitario          ✅
+      B.6B.1 PALB/Dto./PVP/PUC/Total/Margen       ✅
+      B.6B.2 IVA↔RE + R.E. global                 ✅
+      B.7 Persistencia de líneas                  ⬅️ SIGUIENTE
+
+  16.6 Motor económico global                     ⬜
   16.7 Dirty state + navegación segura            ⬜
   16.8 Integración Pedido → Artículos             ⬜
   16.9 PDFs                                       ⬜
@@ -61,7 +66,7 @@ Star TSP100/TSP143 80 mm                          ⏸️ prueba física no bloqu
 
 TicketBAI ordinario permanece cerrado. `12C.9 — TicketBAI devoluciones/mixtas` sigue bloqueado hasta recibir respuesta o documentación actualizada de Berein.
 
-El **Hito 15 — Almacén**, la pausa técnica REF y la normalización CTRL están cerrados. No reabrirlos por ajustes de Compras salvo regresión real.
+El **Hito 15 — Almacén**, la pausa técnica REF y CTRL siguen cerrados. No reabrirlos por ajustes de Compras salvo regresión real.
 
 # 2. Punto exacto de continuación
 
@@ -77,82 +82,129 @@ CTRL.2
 16.5A.1
 16.5A.2
 16.5A.3.1
+16.5A.3.2
+16.5B.1
+16.5B.2
+16.5B.3
+16.5B.4
+16.5B.5
+16.5B.6A
+16.5B.6B.1
+16.5B.6B.2
 ```
 
 El siguiente punto exacto es:
 
 ```text
-16.5A.3.2 — Application Service + contrato público
-             + ComprasApi + IPC + preload + fachada Angular
+16.5B.7 — Persistencia de líneas de Pedido
 ```
 
-Objetivo:
+Objetivo general del siguiente bloque:
 
 ```text
-exponer al renderer la resolución exacta de artículos
+persistir el estado editable actual de lines[]
 +
-exponer búsqueda libre de artículos
+insertar líneas nuevas
 +
-normalizar entrada en PedidosService
+actualizar líneas existentes
 +
-añadir tests completos de service/fakes
+eliminar las quitadas del borrador
 +
-mantener toda la cadena tipada
+persistir orden
++
+persistir unidades / código adicional pendiente
++
+persistir PALB / PUC / PVP / margen / IVA / RE / descuento
++
+mantener Guardar pedido pendiente SIN efectos canónicos sobre Artículos
 ```
 
-Todavía NO implementar en este paso:
+Antes de proponer el patch hay que volver a revisar `main` y cerrar la forma exacta del contrato de persistencia. No adelantar recepción, históricos de stock ni actualización canónica de artículos.
+
+Estado renderer ya disponible para una línea pendiente:
 
 ```text
-tabla editable de líneas
-persistencia de líneas
-autofocus del buscador
-duplicados/foco Unidades
-recepción
-motor económico
-```
-
-Estado ya disponible en Repository:
-
-```text
-resolvePedidoArticulo()
-→ prioridad:
-   acceso directo
-   localizador
-   código de barras activo
-
-searchPedidoArticulos()
-→ búsqueda por slug normalizado
-```
-
-El record recuperado contiene:
-
-```text
-id/publicId
-localizador
-nombre
-referencia
-marca
-stock
+key de renderer
+id/publicId opcionales
+orden
+idArticulo
+localizador / nombre / referencia / marca
+código adicional pendiente + flag de existencia previa
+unidades
+stock actual / stock final
 PALB
 PUC
-PVP en microeuros
+PVP
 margen
 IVA
 RE
-existencia de código adicional
-observaciones
-flag mostrar observaciones en Pedidos
+descuento
 ```
 
-Importante:
+Interacciones ya operativas:
 
 ```text
-PEDIDO_ARTICULO_SELECT
-→ está en typeorm-pedidos.repository.private.ts
-→ NO dentro de la clase repository
+Localizador + Enter
+→ localizador / acceso directo / barcode
+→ añade línea
+
+primera letra
+→ abre ArticleSearchComponent compartido
+→ contexto pedidos
+→ búsqueda por nombre
+→ selección simple o múltiple
+
+artículo duplicado
+→ no añade segunda línea
+→ enfoca Unidades de la existente
+
+Unidades
+→ entero >= 0
+→ recalcula Stock final
+
+Ordenar
+→ subir / bajar
+
+Borrar
+→ confirmación
+
+Código adicional
+→ editor solo si el artículo no tiene ya uno adicional
+
+PALB / Descuento / PVP
+→ edición decimal europea
+→ cálculo unitario centralizado
+
+IVA ↔ RE
+→ parejas ligadas desde app-data
+→ cambiar uno selecciona su pareja
+
+R.E. global
+→ activa/desactiva efecto económico del RE
+→ conserva pareja fiscal en la línea
 ```
 
-Después de validar `16.5A.3.2`, volver a revisar `main` y decidir el siguiente bloque pequeño de `16.5`.
+Importante para el siguiente paso:
+
+```text
+savePedido() actual
+→ todavía persiste la cabecera
+
+lines[]
+→ todavía son estado renderer/editable
+→ los cambios de líneas se pierden al recargar
+```
+
+`Subtotal` se mantiene reservado para el motor económico global de `16.6`, salvo que al revisar `main` antes de cerrar `16.5` aparezca una razón clara para adelantar únicamente su presentación.
+
+También queda pendiente una revisión pequeña antes de cerrar definitivamente `16.5` sobre el uso de:
+
+```text
+PedidoArticuloInterface.observaciones
+PedidoArticuloInterface.mostrarObservacionesPedidos
+```
+
+La resolución/búsqueda ya recupera esos datos, pero todavía no se ha fijado en esta fase una interacción renderer específica para ellos. No inventarla sin revisar la paridad/contrato.
 
 # 3. Repositorios y referencias
 
@@ -1345,32 +1397,75 @@ Pedido recepcionado:
 
 # 24. Buscador de artículos en Pedido
 
-Debajo de la tabla:
+El comportamiento actual ya replica el patrón compartido de **Ventas** y **Artículos**.
+
+Debajo de la tabla existe un campo pequeño:
 
 ```text
-campo Localizador / búsqueda
-+
-icono añadir artículo
+Localizador
+→ ancho visual aproximado 6–10 caracteres
+→ autofocus al entrar en una ficha editable
 ```
 
-Comportamiento análogo a Ventas/Artículos:
+Resolución exacta:
 
 ```text
-localizador
-acceso directo
-escritura libre
-→ búsqueda de artículos
+introducir localizador + Enter
+→ resolver
+→ añadir línea
+
+introducir acceso directo + Enter
+→ resolver
+→ añadir línea
+
+introducir código de barras + Enter
+→ resolver
+→ añadir línea
 ```
 
-Al entrar en la ficha editable:
+Búsqueda libre:
 
 ```text
-→ foco por defecto en este campo
+empezar a escribir una letra
+→ abrir ArticleSearchComponent
+→ contexto="pedidos"
+→ texto inicial = contenido previo + tecla escrita
 ```
 
-La solución de autofocus debe respetar el ciclo de render real de Angular/Material y evitar repetir el problema visual corregido en Imprenta.
+`ArticleSearchComponent` es ahora reutilizado por:
 
----
+```text
+Ventas
+Artículos
+Pedidos
+```
+
+En contexto Pedidos:
+
+```text
+→ usa ComprasService.searchPedidoArticulos()
+→ devuelve PedidoArticuloInterface
+→ permite seleccionar uno o varios artículos
+→ selección múltiple añade varias líneas
+```
+
+No resolver un artículo seleccionado por el modal volviendo a pasar su localizador por la resolución exacta: el modal ya devuelve el artículo de Pedido correcto y volver a resolver podría colisionar con la prioridad acceso directo/localizador.
+
+Al añadir:
+
+```text
+unidades = 0
+```
+
+Si el artículo ya existe en el pedido:
+
+```text
+NO crear segunda línea
+→ localizar la existente
+→ enfocar y seleccionar Unidades
+```
+
+El autofocus usa el momento posterior al render y no `ngAfterViewInit()` directo, siguiendo el patrón ya consolidado tras el problema visual de Imprenta.
 
 # 25. Datos de cada línea
 
@@ -2331,11 +2426,23 @@ CTRL.2 Artículos / quick creates                  ✅
 16.5  Líneas/búsqueda                             🟦
   16.5A.1 Schema orden + snapshots stock          ✅
   16.5A.2 Lectura backend líneas                  ✅
-  16.5A.3 Resolución/búsqueda artículos           🟦
+  16.5A.3 Resolución/búsqueda artículos           ✅
     16.5A.3.1 TypeORM                             ✅
-    16.5A.3.2 Service + API/IPC/preload            ⬅️
+    16.5A.3.2 Service/API/IPC/preload             ✅
 
-16.6  Motor económico                             ⬜
+  16.5B Renderer / edición en memoria             🟦
+    16.5B.1 Mostrar líneas                        ✅
+    16.5B.2 Localizador + buscador compartido     ✅
+    16.5B.3 Unidades + Stock final + duplicados   ✅
+    16.5B.4 Ordenar + borrar                      ✅
+    16.5B.5 Código de barras adicional            ✅
+    16.5B.6 Economía unitaria                     ✅
+      16.5B.6A Calculador                         ✅
+      16.5B.6B.1 PALB/Dto./PVP/Total/Margen      ✅
+      16.5B.6B.2 IVA/RE + R.E. global            ✅
+    16.5B.7 Persistencia de líneas                ⬅️ SIGUIENTE
+
+16.6  Motor económico global                      ⬜
 16.7  Dirty/navigation guard                      ⬜
 16.8  Integración con Artículos                   ⬜
 16.9  PDFs                                        ⬜
@@ -2976,18 +3083,22 @@ recepción
 
 Objetivo funcional completo de `16.5`:
 
+- cargar líneas persistidas;
 - búsqueda por localizador;
 - acceso directo;
-- búsqueda libre;
+- código de barras;
+- búsqueda libre mediante modal compartido;
+- selección múltiple;
 - autofocus;
 - añadir línea con unidades `0`;
-- evitar duplicados;
-- enfocar `Unidades` si ya existe;
+- evitar duplicados y enfocar Unidades;
 - columnas configurables;
 - orden;
 - eliminación;
 - stock actual/final;
 - snapshots editables de PALB/PUC/PVP;
+- descuento;
+- fiscalidad IVA/RE;
 - código adicional pendiente;
 - persistencia de líneas.
 
@@ -3097,7 +3208,9 @@ recepcionado usa snapshots
 legacy sin vínculo/snapshot devuelve NULL
 ```
 
-## 47.3 16.5A.3.1 — Repository resolución/búsqueda artículos ✅
+## 47.3 16.5A.3 — Resolución/búsqueda de artículos ✅ CERRADO
+
+### 47.3.1 Repository TypeORM ✅
 
 Existe:
 
@@ -3105,7 +3218,7 @@ Existe:
 PedidoArticuloRecord
 ```
 
-Métodos de `PedidosRepository` / `TypeOrmPedidosRepository`:
+Métodos:
 
 ```text
 resolvePedidoArticulo(codigo, codigoNumerico)
@@ -3132,7 +3245,7 @@ articulo.slug LIKE pattern
 → orden nombre NOCASE, id
 ```
 
-Datos devueltos:
+Datos recuperados:
 
 ```text
 id
@@ -3168,14 +3281,6 @@ por_defecto = 0
 AND deleted_at IS NULL
 ```
 
-Observaciones:
-
-```text
-se recupera texto
-+
-mostrar_observaciones_pedidos
-```
-
 Decisión estructural:
 
 ```text
@@ -3183,119 +3288,578 @@ PEDIDO_ARTICULO_SELECT
 → typeorm-pedidos.repository.private.ts
 ```
 
-No dejar constantes SQL grandes exclusivas de una clase dentro de la clase principal.
+### 47.3.2 Service + contrato/API/IPC/preload ✅
 
-## 47.4 16.5A.3.2 — SIGUIENTE
-
-Implementar de forma completa:
+Cadena pública cerrada:
 
 ```text
-contrato público de artículo para Pedido
-PedidosService:
-  resolución exacta
-  búsqueda libre
-  normalización/validación de entrada
-
-FakePedidosRepository actualizado
-tests completos PedidosService
-
-ComprasApi
-IPC channel + handler
-preload
-ComprasService renderer
+PedidosService
+→ ComprasApi
+→ IPC
+→ preload
+→ ComprasService renderer
 ```
 
-Regla de trabajo:
+Contrato:
 
 ```text
-si se amplía PedidosRepository/ComprasApi
-→ adaptar en el mismo bloque TODOS los fakes/mocks afectados
+PedidoArticuloInterface
 ```
 
-Todos los imports internos nuevos:
+`PedidosService` normaliza:
 
 ```text
-→ alias absoluto
-→ nunca ./archivo
+trim
+código numérico seguro
+entrada vacía
+límites de longitud
+slug de búsqueda
+acentos
+palabras → patrón %palabra%palabra%
 ```
 
-Todavía NO crear tabla renderer en este bloque.
-
-## 47.5 Reglas funcionales que siguen vigentes para la futura UI
-
-Nueva línea:
+Casos importantes cubiertos:
 
 ```text
-unidades = 0
+código numérico
+barcode alfanumérico
+entero no seguro tratado como barcode
+búsqueda sin términos → no consulta catálogo completo
+mapping record → contrato público
 ```
 
-Artículo duplicado:
+## 47.4 16.5B.1 — Cargar y mostrar líneas ✅
+
+Se creó:
+
+```text
+PurchaseOrderLinesComponent
+```
+
+La ficha carga en paralelo:
+
+```text
+AppData
+opciones Pedido
+cabecera
+líneas
+```
+
+Las líneas persistidas se convierten a estado renderer:
+
+```text
+PedidoLineaInterface
+→ PurchaseOrderLineState
+```
+
+La tabla respeta:
+
+```text
+columnas visibles del Pedido
+orden
+stock actual/final
+valores históricos
+```
+
+Pedido sin líneas:
+
+```text
+→ estado vacío
+→ localizador sigue disponible
+```
+
+## 47.5 16.5B.2 — Localizador + buscador común ✅
+
+Se descartó el primer buscador inline propuesto para Compras y se replicó la UX ya existente en Ventas/Artículos.
+
+`ArticleSearchComponent` soporta ahora:
+
+```text
+context = ventas
+context = articulos
+context = pedidos
+```
+
+En Pedidos:
+
+```text
+Localizador + Enter
+→ resolvePedidoArticulo()
+
+primera letra
+→ ArticleSearchComponent
+→ initialQuery
+→ ComprasService.searchPedidoArticulos()
+
+selección simple
+→ 1 línea
+
+selección múltiple
+→ N líneas
+```
+
+No volver a resolver por localizador un resultado que el modal ya ha devuelto como `PedidoArticuloInterface`.
+
+Autofocus:
+
+```text
+afterNextRender()
+→ foco Localizador
+```
+
+## 47.6 16.5B.3 — Unidades + Stock final + duplicados ✅
+
+Reglas implementadas:
+
+```text
+nueva línea
+→ unidades = 0
+
+editar Unidades
+→ entero >= 0
+→ Stock final = Stock actual + Unidades
+
+Stock actual desconocido
+→ Stock final permanece NULL
+```
+
+Duplicados:
 
 ```text
 NO crear segunda línea
-→ localizar existente
-→ enfocar Unidades
+→ devolver lineKey existente
+→ focusUnits()
+→ seleccionar contenido de Unidades
 ```
 
-Pedido pendiente:
+`PurchaseOrderLineState.key` es identidad exclusiva del renderer y permite trabajar con líneas persistidas y nuevas (`id = null`).
+
+## 47.7 16.5B.4 — Ordenación + eliminación ✅
+
+Si `Ordenar` está visible:
 
 ```text
-Stock = canónico actual
-Stock final = Stock + unidades
+↑ subir
+↓ bajar
+```
+
+Los movimientos:
+
+```text
+→ cambian posición
+→ normalizan orden 0..n-1
+```
+
+Eliminar:
+
+```text
+pedido pendiente
+→ confirmación
+→ elimina línea del estado
+→ normaliza orden
+
+pedido recepcionado
+→ no permitido
+```
+
+Todavía son cambios en memoria hasta `16.5B.7`.
+
+## 47.8 16.5B.5 — Código de barras adicional ✅
+
+El contrato de línea conoce:
+
+```text
+tieneCodigoBarrasAdicional
+```
+
+La detección canónica reutiliza:
+
+```text
+por_defecto = 0
+AND deleted_at IS NULL
+```
+
+UI pendiente:
+
+```text
+artículo SIN código adicional
+→ input editable
+→ máximo 100 caracteres
+→ admite alfanumérico
+
+artículo CON código adicional
+→ check informativo
+→ no permitir introducir otro
+```
+
+El valor escrito permanece en `linea.codigoBarras` del estado de Pedido.
+
+Regla clave:
+
+```text
+Guardar borrador
+→ NO crea todavía codigo_barras canónico
+
+Recepcionar
+→ validará unicidad global
+→ lo aplicará al artículo
 ```
 
 Pedido recepcionado:
 
 ```text
-usar snapshots
-→ nunca reemplazarlos por stock actual
+→ mostrar snapshot linea_pedido.codigo_barras
+→ nunca editor
 ```
 
-Código adicional:
+## 47.9 16.5B.6A — Calculador económico unitario ✅
+
+Existe:
 
 ```text
-si artículo no tiene adicional
-→ permitir introducir uno pendiente
-
-si ya tiene adicional(es)
-→ mostrar indicador
-→ no permitir añadir otro desde Compras
+PurchaseOrderLineCalculator
 ```
 
-No hacer canónico ese código hasta Recepción.
-
-# 48. 16.6 — Motor económico
-
-Crear responsabilidad específica para cálculos.
-
-Cubrir con tests exhaustivos:
+Responsabilidades:
 
 ```text
-descuento línea
-descuento global
+PALB
+Descuento de línea
 IVA
-RE
-IVA ↔ RE
-R.E. activo/inactivo
+RE efectivo
 PUC
 PVP
-margen línea
-subtotal
-totales
-varios tipos de IVA
+Margen
+Total de línea
+```
+
+Precisión:
+
+```text
+microeuros
+basis points
+microporcentaje
+BigInt para productos/divisiones enteras
+```
+
+No usar strings formateados ni floats como estado económico canónico.
+
+Fórmula unitaria conceptual:
+
+```text
+PUC =
+PALB
+× (1 - descuento línea)
+× (1 + IVA + RE efectivo)
+```
+
+R.E. desactivado:
+
+```text
+RE permanece guardado en la línea
+→ no participa en PUC
+```
+
+UE:
+
+```text
+NO interviene en el calculador unitario
+→ mantiene compatibilidad legacy
+```
+
+Margen:
+
+```text
+100 × (PVP - PUC) / PVP
+```
+
+PVP = 0:
+
+```text
+margen = 0
+```
+
+Total unitario de línea:
+
+```text
+unidades × PUC
+```
+
+## 47.10 16.5B.6B.1 — PALB + Descuento + PVP + Total/Margen ✅
+
+Editores compactos de tabla:
+
+```text
+PALB
+→ text + inputmode decimal
+→ coma o punto
+→ hasta 6 decimales
+
+Descuento
+→ text + inputmode decimal
+→ 0..100 %
+→ hasta 2 decimales
+
+PVP
+→ text + inputmode decimal
+→ coma o punto
+→ hasta 6 decimales
+```
+
+Se creó lógica privada de parsing/formato exclusiva del componente:
+
+```text
+purchase-order-lines.component.private.ts
+```
+
+Permite estados intermedios de edición como:
+
+```text
+""
+"12,"
+```
+
+sin convertirlos prematuramente en estado canónico inválido.
+
+Cambios reactivos:
+
+```text
+PALB
+→ recalcula PUC + Margen
+
+Descuento
+→ recalcula PUC + Margen
+
+PVP
+→ recalcula Margen
+
+Unidades
+→ Total reacciona mediante unidades × PUC
+```
+
+Presentación acordada:
+
+```text
+PUC
+→ mostrar 2 decimales
+
+Total
+→ mostrar 2 decimales
+
+precisión interna
+→ NO se reduce
+```
+
+## 47.11 16.5B.6B.2 — IVA/RE ligados + R.E. global ✅
+
+Se construyen parejas fiscales desde:
+
+```text
+appData.ivaList
+appData.reList
+```
+
+Las listas se interpretan como paralelas.
+
+Ejemplo real actual:
+
+```text
+IVA 4 %  ↔ RE 0,5 %
+IVA 10 % ↔ RE 1,4 %
+IVA 21 % ↔ RE 5,2 %
+```
+
+Internamente:
+
+```text
+4   → 400 bps
+10  → 1000 bps
+21  → 2100 bps
+
+0,5 → 50 bps
+1,4 → 140 bps
+5,2 → 520 bps
+```
+
+Reglas:
+
+```text
+cambiar IVA
+→ selecciona automáticamente su RE
+→ recalcula PUC/Margen
+
+cambiar RE
+→ selecciona automáticamente su IVA
+→ recalcula PUC/Margen
+```
+
+Fiscalidades históricas:
+
+```text
+si un valor ya no existe en AppData
+→ añadirlo a las opciones visuales de esa línea
+→ no destruir el histórico
+```
+
+R.E. global:
+
+```text
+OFF
+→ RE no participa en PUC
+→ pareja RE se conserva
+
+ON
+→ RE participa en PUC
+→ si línea legacy tiene IVA conocido + RE 0
+   recuperar RE configurado para ese IVA
+```
+
+Se detectó una regresión visual en `<select>` nativo:
+
+```text
+4 % → 10 %
+estado sí cambiaba RE 0,5 → 1,4
+pero el DOM podía seguir mostrando 0,5
+```
+
+Corrección consolidada:
+
+```text
+<option [selected]="valor === estado">
+```
+
+para IVA y RE, siguiendo el mismo precedente ya utilizado por selects nativos asíncronos/reactivos de la cabecera de Pedido.
+
+Tests de regresión incluyen el salto directo:
+
+```text
+IVA 4 % → 10 %
+→ RE 1,4 %
+```
+
+## 47.12 16.5B.7 — SIGUIENTE: persistencia de líneas
+
+Todavía:
+
+```text
+Guardar
+→ persiste cabecera
+
+líneas editadas
+→ solo memoria renderer
+```
+
+`16.5B.7` debe cerrar la persistencia de borrador sin producir efectos canónicos.
+
+Debe contemplar al menos:
+
+```text
+líneas existentes modificadas
+líneas nuevas
+líneas eliminadas
+orden
+unidades
+código adicional pendiente
+PALB
+PUC
+PVP
+margen
+IVA
+RE
+descuento
+nombre snapshot
+```
+
+Regla esencial:
+
+```text
+Guardar pedido pendiente
+≠ Recepcionar
+```
+
+Por tanto guardar líneas NO debe:
+
+```text
+cambiar stock de articulo
+cambiar PALB/PUC/PVP canónicos
+crear codigo_barras canónico
+crear histórico PEDIDO
+fijar snapshots de recepción
+fijar fecha_recepcionado
+```
+
+Antes del patch revisar `main` y decidir el contrato/operación transaccional más limpio para guardar cabecera + líneas sin dejar estado parcial.
+
+Después de cerrar persistencia, hacer una revisión final pequeña de `16.5` para confirmar si hay que materializar alguna interacción con:
+
+```text
+observaciones de artículo
+mostrar_observaciones_pedidos
+```
+
+y mantener `Subtotal` dentro de `16.6` salvo decisión explícita contraria.
+
+# 48. 16.6 — Motor económico global ⬜
+
+`16.6` todavía no ha comenzado como bloque global, pero ya existe una base unitaria cerrada y testeada:
+
+```text
+PurchaseOrderLineCalculator
+→ PALB
+→ descuento línea
+→ IVA/RE efectivo
+→ PUC
+→ PVP
+→ margen línea
+→ Total = unidades × PUC
+```
+
+No duplicar estas fórmulas cuando empiece `16.6`.
+
+El bloque global debe cubrir:
+
+```text
+descuento global
+bases tras descuento global
 portes
-portes + RE
+portes + IVA 21 %
+portes + RE 5,2 % si procede
+desglose por tipos IVA
+desglose por tipos RE
+Subtotal
+Total líneas
+Total artículos
 Total beneficios
 Total PVP
 Media margen legacy
+Total factura
 UE
 Total sin IVA
-redondeos/precisión
+redondeos/precisión globales
+```
+
+Tests exhaustivos mínimos:
+
+```text
+descuento línea + descuento global
+descuento global no altera PUC
+varios tipos de IVA
+RE activo/inactivo
+IVA ↔ RE
+portes sin RE
+portes con RE
+portes fuera del descuento global
+Total beneficios sin portes/descuento global
+Total PVP
+Media margen legacy ponderada + portes
+UE mantiene PUC/IVA/RE
+Total sin IVA
+precisión y redondeos
 ```
 
 Contrastar casos reales contra el TPV antiguo.
 
----
+No convertir `PurchaseOrderLineCalculator` en un componente de totales globales si aparecen responsabilidades claramente distintas. Crear una responsabilidad propia para agregados del Pedido cuando llegue el momento.
 
 # 49. 16.7 — Dirty state + navegación segura
 
@@ -3690,10 +4254,30 @@ compilación afectada
 - No mantener pedidos dirty mediante autosave silencioso.
 - No modificar artículos reales al guardar un pedido pendiente.
 - No permitir recepción si alguna línea tiene `unidades = 0`.
-- No permitir líneas duplicadas del mismo artículo dentro del pedido; dirigir a la existente.
+- No permitir líneas duplicadas del mismo artículo dentro del pedido; dirigir a la existente y enfocar Unidades.
+- Una línea nueva de Pedido empieza siempre con `unidades = 0`.
+- El buscador de Pedido debe mantener la UX común con Ventas/Artículos: Enter resuelve código; comenzar a escribir abre `ArticleSearchComponent`.
+- `ArticleSearchComponent` se comparte ahora entre Ventas, Artículos y Pedidos; no crear otro modal de búsqueda paralelo para Compras sin una necesidad real.
+- En contexto Pedidos, el modal devuelve `PedidoArticuloInterface` y admite selección múltiple.
+- No volver a resolver por localizador un `PedidoArticuloInterface` ya seleccionado en el modal.
+- El `key` de `PurchaseOrderLineState` es identidad de renderer, no dato persistente de dominio.
+- Reordenar/eliminar líneas en borrador normaliza `orden`; no imponer `UNIQUE(id_pedido, orden)` por posibles colisiones temporales.
+- Un código adicional escrito en un pedido pendiente no se convierte en código canónico hasta Recepcionar.
+- Si el artículo ya tiene código adicional activo, Compras no permite introducir otro desde la línea.
 - No reinterpretar `Abono` como devolución: es tipo documental.
 - No reinterpretar `metodo_pago` legacy como ID de `tipo_pago`.
 - `forma_pago` de Pedido es snapshot histórico; no destruirlo por renombrar el catálogo.
+- La precisión económica canónica de líneas se mantiene en enteros escalados: microeuros, basis points y microporcentaje.
+- No reducir la precisión interna porque la UI muestre dos decimales.
+- PUC y Total se presentan actualmente con dos decimales; su valor interno conserva microeuros.
+- PALB y PVP editables pueden conservar hasta seis decimales internos; Descuento hasta dos decimales porcentuales.
+- Las fórmulas unitarias de línea viven en `PurchaseOrderLineCalculator`; no duplicarlas en componentes/templates.
+- IVA y RE son parejas fiscales construidas desde `appData.ivaList` y `appData.reList` por posición.
+- Cambiar IVA selecciona su RE; cambiar RE selecciona su IVA cuando existe pareja configurada.
+- Con R.E. desactivado, el RE se conserva en la línea pero no participa en el PUC.
+- Al activar R.E., una línea legacy con IVA conocido puede recuperar el RE configurado correspondiente.
+- Los valores fiscales históricos que ya no están en AppData deben seguir pudiendo mostrarse; no destruirlos.
+- Para selects nativos cuyo valor cambia reactivamente por otra selección, usar selección explícita por `<option [selected]>` cuando sea necesario; es precedente consolidado en cabecera de Pedido e IVA/RE.
 - No hacer que `UE` elimine IVA/RE del PUC legacy.
 - No sustituir `Media margen` legacy por una media simple.
 - No aplicar descuento global a portes.
@@ -3702,6 +4286,7 @@ compilación afectada
 - No releer stock actual para sustituir snapshots de un pedido recepcionado.
 - Para recepcionados legacy sin snapshot de stock, devolver `NULL`; no inventar historia.
 - No volver a aplicar stock/precios al editar información de un pedido recepcionado.
+- `Subtotal` global/visual permanece reservado para `16.6` salvo decisión explícita tras revisar `main`.
 - No diseñar Marcas/Proveedores antes de cerrar su contrato funcional.
 - No tocar TicketBAI 12C.9 sin información de Berein.
 - No bloquear el proyecto por la prueba física Star.
@@ -3732,39 +4317,39 @@ En una conversación nueva:
    - REF está cerrada;
    - CTRL está cerrada;
    - `16.1`, `16.2`, `16.3` y `16.4` están cerrados;
-   - `16.5A.1`, `16.5A.2` y `16.5A.3.1` están cerrados;
+   - `16.5A.1`, `16.5A.2` y `16.5A.3` están cerrados;
+   - `16.5B.1` a `16.5B.6B.2` están cerrados;
 4. no reimplementar esos bloques;
 5. continuar exactamente con:
 
 ```text
-16.5A.3.2
-→ Application Service
-→ contrato público
-→ ComprasApi
-→ IPC
-→ preload
-→ ComprasService renderer
-→ tests completos
+16.5B.7 — Persistencia de líneas
 ```
 
-6. no crear todavía tabla de líneas en ese bloque;
-7. todos los imports internos nuevos deben usar alias absolutos;
-8. no indicar posición/orden de imports: entregar solo el código exacto necesario;
-9. si se amplía una interfaz, adaptar en el mismo bloque fakes/mocks/specs;
-10. todo método nuevo debe llevar JSDoc;
-11. no dejar tests descritos sin código;
-12. mantener `PEDIDO_ARTICULO_SELECT` en `typeorm-pedidos.repository.private.ts`;
-13. usar el TPV antiguo solo como referencia funcional/paridad;
-14. respetar las decisiones económicas y de compatibilidad de Pedidos;
-15. esperar tests + confirmación tras cada bloque;
-16. no avanzar a Marcas ni Proveedores antes de cerrar Pedidos.
+6. recordar que actualmente `savePedido()` todavía guarda cabecera, mientras `lines[]` contiene edición renderer no persistida;
+7. diseñar el bloque de persistencia tras revisar `main`, incluyendo contratos/backend/fakes/tests afectados en el mismo patch;
+8. guardar un borrador NO debe modificar Artículos, stock, precios canónicos, históricos ni códigos de barras canónicos;
+9. mantener el buscador común Ventas/Artículos/Pedidos;
+10. mantener nueva línea con unidades `0` y duplicado → foco Unidades;
+11. mantener `PurchaseOrderLineCalculator` como fuente única de cálculos unitarios;
+12. mantener IVA/RE emparejados desde `appData.ivaList/reList`;
+13. no perder fiscalidades históricas que ya no estén en configuración;
+14. mantener PUC/Total a 2 decimales solo en presentación, con microeuros internos;
+15. dejar `Subtotal` y agregados globales para `16.6` salvo decisión explícita;
+16. antes de cerrar definitivamente `16.5`, revisar si las observaciones de artículo recuperadas necesitan interacción de Pedido;
+17. todos los imports internos nuevos deben usar alias absolutos;
+18. si se amplía una interfaz, adaptar en el mismo bloque fakes/mocks/specs;
+19. todo método nuevo debe llevar JSDoc;
+20. no dejar tests descritos sin código;
+21. esperar tests + confirmación tras cada bloque;
+22. no avanzar a Marcas ni Proveedores antes de cerrar Pedidos.
 
 # 61. Resumen ultracorto
 
 ```text
 Proyecto: Osumi TPV Client
-Continuidad: 11/09/2026
-Base: v2.53 + main
+Continuidad: 13/09/2026
+Base: v2.54 + main
 
 Hito 13 Artículos ✅
 Hito 14 Clientes ✅
@@ -3782,121 +4367,70 @@ Hito 16 Compras 🟦
 16.3 UI listados ✅
 16.4 Cabecera Pedido ✅
 
-16.4 incluye:
-→ get/save/delete cabecera
-→ proveedores y pagos históricos
-→ forma_pago snapshot
-→ mapping legacy pago 0..4 correcto
-→ UI cabecera
-→ fechas nativas
-→ columnas opcionales
-→ Guardar + feedback 4 s
-→ Router.currentNavigation()
-→ Eliminar pendiente
-→ alta rápida Proveedor
+16.5 Líneas/búsqueda 🟦
 
-16.5 🟦
+16.5A.1 ✅ Schema orden + snapshots stock
+16.5A.2 ✅ getPedidoLineas()
+16.5A.3 ✅ resolución/búsqueda completa hasta renderer
 
-16.5A.1 ✅
-→ linea_pedido.orden
-→ stock_actual_snapshot
-→ stock_final_snapshot
-→ import legacy snapshots NULL
-
-16.5A.2 ✅
-→ getPedidoLineas()
-→ pendiente usa stock canónico
-→ recepcionado usa snapshots
-→ legacy sin snapshots devuelve NULL
-
-16.5A.3.1 ✅
-→ PedidoArticuloRecord
-→ resolvePedidoArticulo()
-→ searchPedidoArticulos()
-→ acceso directo > localizador > barcode
-→ búsqueda por slug
-→ PVP cents → micros
-→ barcode adicional
-→ observaciones Pedidos
-→ PEDIDO_ARTICULO_SELECT en .private.ts
+16.5B.1 ✅ mostrar líneas
+16.5B.2 ✅ Localizador + ArticleSearch compartido
+             → Enter: localizador/acceso directo/barcode
+             → letra: modal
+             → selección múltiple
+16.5B.3 ✅ unidades 0 + Stock final + foco duplicado
+16.5B.4 ✅ ordenar + borrar
+16.5B.5 ✅ código adicional pendiente
+16.5B.6A ✅ PurchaseOrderLineCalculator
+16.5B.6B.1 ✅ PALB/Dto./PVP + PUC/Total/Margen
+16.5B.6B.2 ✅ IVA↔RE + R.E. global
+             → AppData ivaList/reList paralelas
+             → 4↔0,5 | 10↔1,4 | 21↔5,2
+             → opción histórica preservada
+             → selects nativos con [selected] explícito
+             → PUC/Total UI 2 decimales
+             → precisión interna en microeuros
 
 SIGUIENTE:
-16.5A.3.2
-→ service
-→ contrato público
-→ ComprasApi
-→ IPC
-→ preload
-→ ComprasService
-→ tests completos
+16.5B.7 Persistencia de líneas
+→ nuevas / modificadas / eliminadas
+→ orden
+→ unidades
+→ barcode pendiente
+→ PALB/PUC/PVP/margen
+→ IVA/RE/descuento
+→ SIN efectos canónicos
 
-Convenciones nuevas IMPORTANTES:
-→ imports internos SIEMPRE alias absoluto
-→ incluso misma carpeta
-→ entregar imports exactos
-→ no indicar posición/orden de imports
-→ VSCode/Prettier los ordenan
-→ todo método nuevo con JSDoc
-→ bloques pequeños pero completos
-→ interfaz nueva/cambiada implica adaptar fakes/mocks/specs
-→ tests propuestos deben venir con código
-→ constantes/SQL privados con responsabilidad propia → .private.ts
+Después:
+→ revisión final 16.5 (observaciones artículo si procede)
+→ 16.6 Motor económico global
+   descuento global / portes / impuestos / totales / UE
+→ 16.7 Dirty/navigation
+→ 16.8 Pedido → Artículos
+→ 16.9 PDFs
+→ 16.10 Recepción
+→ 16.11 Recepcionado
+→ 16.12 Regresión Pedidos
+→ 16.13 Marcas
+→ 16.14 Proveedores
 
-Controles:
-→ controls.scss fuente canónica
-→ fecha nativa type=date
-→ decimal text + inputmode=decimal
-→ editor tabla global compacto
-
-Históricos:
-1 VENTA
-2 VENTA_SYNC
-3 PEDIDO
-4 ARTICULO
-5 INVENTARIO
-6 INVENTARIO_ALL
-7 CADUCIDAD
-
-Pedidos:
-→ pendiente = borrador sin efectos canónicos
-→ nueva línea futura unidades 0
-→ no duplicados
-→ recepción exige todas unidades >0
-→ histórico PEDIDO=3
-→ recepcionado congela economía/stock
-→ R.E. congelado
-→ datos informativos siguen editables
-→ dirty al salir se implementará en 16.7
-→ crear Artículo/retorno se implementará en 16.8
-
-Economía:
-→ descuento línea afecta PUC
-→ descuento global afecta bases/impuestos de líneas
-→ descuento global no altera PUC
-→ portes IVA 21 %, RE 5,2 % si aplica
-→ portes fuera descuento global
-→ Total beneficios solo líneas
-→ Media margen fórmula legacy ponderada + portes
-→ UE mantiene IVA/RE y PUC
-→ UE añade Total sin IVA
-
-Plan restante:
-16.5A.3.2 Service/API búsqueda artículos
-16.5 resto líneas + buscador/persistencia
-16.6 Motor económico
-16.7 Dirty/navigation
-16.8 Pedido → Artículos
-16.9 PDFs
-16.10 Recepción
-16.11 Recepcionado
-16.12 Regresión Pedidos
-16.13 Marcas
-16.14 Proveedores
-
-Regla clave:
-revisar main antes de cada patch
+Reglas clave:
+→ revisar main antes de cada patch
 → bloque pequeño pero completo
-→ tests
+→ imports internos por alias absoluto
+→ JSDoc en métodos nuevos
+→ interfaces implican fakes/mocks/specs
+→ tests siempre con código
+→ Guardar borrador ≠ Recepcionar
+→ líneas nuevas unidades 0
+→ duplicado no crea segunda línea
+→ ArticleSearch compartido Ventas/Artículos/Pedidos
+→ cálculos unitarios solo en PurchaseOrderLineCalculator
+→ IVA/RE ligados por AppData
+→ UE no elimina IVA/RE ni cambia PUC legacy
+→ precisión interna no se reduce por formato UI
+→ test + build + lint + prueba funcional
 → confirmación
 → siguiente.
 ```
+
