@@ -29,6 +29,7 @@ import {
   type PedidoTipoPagoOptionDatabaseRow,
   type PedidoVisibleColumnDatabaseRow,
   PEDIDO_ARTICULO_SELECT,
+  PEDIDO_TIENE_CODIGO_BARRAS_ADICIONAL_SQL,
 } from '@infrastructure/database/typeorm/compras/pedidos/typeorm-pedidos.repository.private';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import escapeLike from '@infrastructure/database/typeorm/typeorm-like.utils';
@@ -225,6 +226,7 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
             a.referencia,
             m.nombre AS marca_nombre,
             lp.codigo_barras,
+            ${PEDIDO_TIENE_CODIGO_BARRAS_ADICIONAL_SQL} AS tiene_codigo_barras_adicional,
             lp.unidades,
 
             CASE
@@ -274,6 +276,7 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
       referencia: row.referencia,
       marcaNombre: row.marca_nombre,
       codigoBarras: row.codigo_barras,
+      tieneCodigoBarrasAdicional: row.tiene_codigo_barras_adicional === 1,
       unidades: row.unidades,
       stockActual: row.stock_actual,
       stockFinal: row.stock_final,

@@ -512,6 +512,7 @@ describe('TypeOrmPedidosRepository', (): void => {
       nombreArticulo: 'Artículo B snapshot',
       referencia: 'REF-B',
       marcaNombre: 'Marca Uno',
+      tieneCodigoBarrasAdicional: false,
       unidades: 2,
       stockActual: -2,
       stockFinal: 0,
@@ -526,6 +527,7 @@ describe('TypeOrmPedidosRepository', (): void => {
       referencia: 'REF-A',
       marcaNombre: 'Marca Uno',
       codigoBarras: 'BC-A',
+      tieneCodigoBarrasAdicional: true,
       unidades: 3,
       stockActual: 7,
       stockFinal: 10,
@@ -545,6 +547,7 @@ describe('TypeOrmPedidosRepository', (): void => {
     expect(result[0]).toMatchObject({
       id: 200,
       idArticulo: 10,
+      tieneCodigoBarrasAdicional: true,
       stockActual: 4,
       stockFinal: 9,
     });
@@ -564,6 +567,7 @@ describe('TypeOrmPedidosRepository', (): void => {
         referencia: null,
         marcaNombre: null,
         codigoBarras: 'LEGACY',
+        tieneCodigoBarrasAdicional: false,
         unidades: 2,
         stockActual: null,
         stockFinal: null,

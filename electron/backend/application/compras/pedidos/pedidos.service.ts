@@ -149,6 +149,7 @@ export default class PedidosService {
       referencia: record.referencia,
       marcaNombre: record.marcaNombre,
       codigoBarras: record.codigoBarras,
+      tieneCodigoBarrasAdicional: record.tieneCodigoBarrasAdicional,
       unidades: record.unidades,
       stockActual: record.stockActual,
       stockFinal: record.stockFinal,

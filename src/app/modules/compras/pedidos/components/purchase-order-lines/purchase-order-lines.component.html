@@ -153,8 +153,27 @@
                     }
 
                     @if (visibleColumnIds().has(6)) {
-                    <td>
+                    <td class="purchase-order-lines__barcode">
+                        @if (disabled()) {
                         {{ line.codigoBarras ?? '—' }}
+                        }
+                        @else if (line.tieneCodigoBarrasAdicional) {
+                        <mat-icon class="purchase-order-lines__barcode-existing"
+                                  matTooltip="El artículo ya tiene un código de barras adicional">
+                            check
+                        </mat-icon>
+                        }
+                        @else {
+                        <input class="otpv-table-control purchase-order-lines__barcode-input"
+                               type="text"
+                               maxlength="100"
+                               autocomplete="off"
+                               spellcheck="false"
+                               placeholder="Código"
+                               [value]="line.codigoBarras ?? ''"
+                               (input)="onBarcodeInput(line, $event)"
+                               (focus)="selectTableControl($event)">
+                        }
                     </td>
                     }
 

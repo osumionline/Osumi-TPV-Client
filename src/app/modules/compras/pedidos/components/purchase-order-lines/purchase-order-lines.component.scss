@@ -97,3 +97,15 @@
     width: 60px;
     text-align: center !important;
 }
+
+.purchase-order-lines__barcode {
+    text-align: center;
+}
+
+.purchase-order-lines__barcode-input {
+    width: 16ch;
+}
+
+.purchase-order-lines__barcode-existing {
+    vertical-align: middle;
+}

@@ -11,6 +11,7 @@ export default interface PedidoLineaRecord {
   readonly referencia: string | null;
   readonly marcaNombre: string | null;
   readonly codigoBarras: string | null;
+  readonly tieneCodigoBarrasAdicional: boolean;
   readonly unidades: number;
   readonly stockActual: number | null;
   readonly stockFinal: number | null;

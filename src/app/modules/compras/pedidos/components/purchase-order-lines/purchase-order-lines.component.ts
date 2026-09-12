@@ -19,6 +19,7 @@ import { MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
+import type PurchaseOrderLineBarcodeChange from '@model/compras/pedidos/purchase-order-line-barcode-change.interface';
 import type PurchaseOrderLineMove from '@model/compras/pedidos/purchase-order-line-move.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
@@ -66,6 +67,8 @@ export default class PurchaseOrderLinesComponent {
   readonly unitsChange: OutputEmitterRef<PurchaseOrderLineUnitsChange> =
     output<PurchaseOrderLineUnitsChange>();
   readonly lineMove: OutputEmitterRef<PurchaseOrderLineMove> = output<PurchaseOrderLineMove>();
+  readonly barcodeChange: OutputEmitterRef<PurchaseOrderLineBarcodeChange> =
+    output<PurchaseOrderLineBarcodeChange>();
 
   readonly lineDeleteRequested: OutputEmitterRef<string> = output<string>();
 
@@ -83,6 +86,23 @@ export default class PurchaseOrderLinesComponent {
       if (!this.disabled()) {
         this.focusLocalizador();
       }
+    });
+  }
+
+  /**
+   * Propaga el código de barras adicional introducido
+   * para una línea editable.
+   */
+  onBarcodeInput(line: PurchaseOrderLineState, event: Event): void {
+    if (this.disabled() || line.tieneCodigoBarrasAdicional) {
+      return;
+    }
+
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
+    this.barcodeChange.emit({
+      lineKey: line.key,
+      codigoBarras: inputElement.value.length === 0 ? null : inputElement.value,
     });
   }
 

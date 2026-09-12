@@ -78,6 +78,7 @@ export interface PedidoLineaDatabaseRow {
   readonly referencia: string | null;
   readonly marca_nombre: string | null;
   readonly codigo_barras: string | null;
+  readonly tiene_codigo_barras_adicional: number;
   readonly unidades: number;
   readonly stock_actual: number | null;
   readonly stock_final: number | null;
@@ -109,6 +110,17 @@ export interface PedidoArticuloDatabaseRow {
   readonly mostrar_observaciones_pedidos: number;
 }
 
+export const PEDIDO_TIENE_CODIGO_BARRAS_ADICIONAL_SQL: string = `
+  EXISTS (
+    SELECT 1
+    FROM codigo_barras cb_adicional
+    WHERE
+      cb_adicional.id_articulo = a.id
+      AND cb_adicional.por_defecto = 0
+      AND cb_adicional.deleted_at IS NULL
+  )
+`;
+
 export const PEDIDO_ARTICULO_SELECT: string = `
   SELECT
     a.id,
@@ -125,14 +137,7 @@ export const PEDIDO_ARTICULO_SELECT: string = `
     a.iva_bps,
     a.re_bps,
 
-    EXISTS (
-      SELECT 1
-      FROM codigo_barras cb_adicional
-      WHERE
-        cb_adicional.id_articulo = a.id
-        AND cb_adicional.por_defecto = 0
-        AND cb_adicional.deleted_at IS NULL
-    ) AS tiene_codigo_barras_adicional,
+    ${PEDIDO_TIENE_CODIGO_BARRAS_ADICIONAL_SQL} AS tiene_codigo_barras_adicional,
 
     a.observaciones,
     a.mostrar_observaciones_pedidos

@@ -27,6 +27,7 @@ import type {
 import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type { PedidoTipo } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
+import type PurchaseOrderLineBarcodeChange from '@model/compras/pedidos/purchase-order-line-barcode-change.interface';
 import type PurchaseOrderLineMove from '@model/compras/pedidos/purchase-order-line-move.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
@@ -49,6 +50,7 @@ import {
   parsePurchaseOrderTipo,
   PURCHASE_ORDER_COLUMN_OPTIONS,
   removePurchaseOrderLine,
+  updatePurchaseOrderLineBarcode,
   updatePurchaseOrderLineUnits,
   type AddPurchaseOrderArticlesResult,
   type PurchaseOrderColumnOption,
@@ -399,6 +401,32 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
 
         this.removeLine(lineKey);
       });
+  }
+
+  /**
+   * Aplica al estado editable un cambio del código
+   * de barras adicional de una línea.
+   */
+  onLineBarcodeChange(change: PurchaseOrderLineBarcodeChange): void {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (state === null || state.recepcionado || this.processing()) {
+      return;
+    }
+
+    const currentLines: readonly PurchaseOrderLineState[] = this.lines();
+
+    const nextLines: readonly PurchaseOrderLineState[] = updatePurchaseOrderLineBarcode(
+      currentLines,
+      change,
+    );
+
+    if (nextLines === currentLines) {
+      return;
+    }
+
+    this.clearSaveFeedback();
+    this.lines.set(nextLines);
   }
 
   /**

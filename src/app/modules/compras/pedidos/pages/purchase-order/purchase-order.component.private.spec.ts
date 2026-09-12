@@ -5,6 +5,7 @@ import type {
 } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
 import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/pedido-columnas.constants';
 import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
+import type PurchaseOrderLineBarcodeChange from '@model/compras/pedidos/purchase-order-line-barcode-change.interface';
 import type PurchaseOrderLineMove from '@model/compras/pedidos/purchase-order-line-move.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
@@ -27,6 +28,7 @@ import {
   parsePurchaseOrderTipo,
   PURCHASE_ORDER_COLUMN_OPTIONS,
   removePurchaseOrderLine,
+  updatePurchaseOrderLineBarcode,
   updatePurchaseOrderLineUnits,
   type AddPurchaseOrderArticlesResult,
 } from '@modules/compras/pedidos/pages/purchase-order/purchase-order.component.private';
@@ -90,6 +92,7 @@ function createPedidoLinea(overrides: Partial<PedidoLineaInterface> = {}): Pedid
     referencia: 'REF-20',
     marcaNombre: 'Marca',
     codigoBarras: null,
+    tieneCodigoBarrasAdicional: false,
     unidades: 4,
     stockActual: 10,
     stockFinal: 14,
@@ -391,6 +394,7 @@ describe('purchase-order.component.private', (): void => {
       referencia: 'REF-9',
       marcaNombre: 'Otra marca',
       codigoBarras: null,
+      tieneCodigoBarrasAdicional: false,
       unidades: 0,
       stockActual: 7,
       stockFinal: 7,
@@ -402,6 +406,19 @@ describe('purchase-order.component.private', (): void => {
       recargoEquivalenciaBps: 520,
       descuentoBps: 0,
     });
+  });
+
+  it('conserva que un artículo nuevo ya dispone de código de barras adicional', (): void => {
+    const result: PurchaseOrderLineState = createNewPurchaseOrderLineState(
+      createPedidoArticulo({
+        tieneCodigoBarrasAdicional: true,
+      }),
+      0,
+    );
+
+    expect(result.tieneCodigoBarrasAdicional).toBe(true);
+
+    expect(result.codigoBarras).toBeNull();
   });
 
   it('añade un artículo al final respetando el mayor orden existente', (): void => {
@@ -775,5 +792,92 @@ describe('purchase-order.component.private', (): void => {
     ];
 
     expect(removePurchaseOrderLine(lines, 'unknown')).toBe(lines);
+  });
+
+  it('actualiza el código de barras adicional pendiente', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          codigoBarras: null,
+          tieneCodigoBarrasAdicional: false,
+        }),
+      ),
+    ];
+
+    const change: PurchaseOrderLineBarcodeChange = {
+      lineKey: 'line:20',
+      codigoBarras: 'EXTRA-123',
+    };
+
+    const result: readonly PurchaseOrderLineState[] = updatePurchaseOrderLineBarcode(lines, change);
+
+    expect(result).not.toBe(lines);
+    expect(result[0]?.codigoBarras).toBe('EXTRA-123');
+  });
+
+  it('permite borrar el código de barras pendiente', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          codigoBarras: 'EXTRA-123',
+          tieneCodigoBarrasAdicional: false,
+        }),
+      ),
+    ];
+
+    const result: readonly PurchaseOrderLineState[] = updatePurchaseOrderLineBarcode(lines, {
+      lineKey: 'line:20',
+      codigoBarras: null,
+    });
+
+    expect(result[0]?.codigoBarras).toBeNull();
+  });
+
+  it('no permite introducir otro código cuando el artículo ya tiene uno adicional', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          codigoBarras: null,
+          tieneCodigoBarrasAdicional: true,
+        }),
+      ),
+    ];
+
+    expect(
+      updatePurchaseOrderLineBarcode(lines, {
+        lineKey: 'line:20',
+        codigoBarras: 'OTRO-CODIGO',
+      }),
+    ).toBe(lines);
+  });
+
+  it('rechaza códigos de barras pendientes de más de 100 caracteres', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          tieneCodigoBarrasAdicional: false,
+        }),
+      ),
+    ];
+
+    expect(
+      updatePurchaseOrderLineBarcode(lines, {
+        lineKey: 'line:20',
+        codigoBarras: 'A'.repeat(101),
+      }),
+    ).toBe(lines);
+  });
+
+  it('ignora un cambio de código dirigido a una línea inexistente', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(createPedidoLinea()),
+    ];
+
+    expect(
+      updatePurchaseOrderLineBarcode(lines, {
+        lineKey: 'unknown',
+        codigoBarras: 'EXTRA',
+      }),
+    ).toBe(lines);
   });
 });

@@ -8,9 +8,53 @@ import type {
 import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/pedido-columnas.constants';
 import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type { PedidoTipo } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
+import type PurchaseOrderLineBarcodeChange from '@model/compras/pedidos/purchase-order-line-barcode-change.interface';
 import type PurchaseOrderLineMove from '@model/compras/pedidos/purchase-order-line-move.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
+
+/**
+ * Actualiza el código de barras adicional pendiente
+ * de una línea que todavía permite introducirlo.
+ */
+export function updatePurchaseOrderLineBarcode(
+  lines: readonly PurchaseOrderLineState[],
+  change: PurchaseOrderLineBarcodeChange,
+): readonly PurchaseOrderLineState[] {
+  const lineIndex: number = lines.findIndex(
+    (line: PurchaseOrderLineState): boolean => line.key === change.lineKey,
+  );
+
+  if (lineIndex === -1) {
+    return lines;
+  }
+
+  const line: PurchaseOrderLineState | undefined = lines[lineIndex];
+
+  if (line === undefined || line.tieneCodigoBarrasAdicional) {
+    return lines;
+  }
+
+  const codigoBarras: string | null =
+    change.codigoBarras === null || change.codigoBarras.length === 0 ? null : change.codigoBarras;
+
+  if (codigoBarras !== null && codigoBarras.length > 100) {
+    return lines;
+  }
+
+  if (line.codigoBarras === codigoBarras) {
+    return lines;
+  }
+
+  return lines.map((currentLine: PurchaseOrderLineState, index: number): PurchaseOrderLineState =>
+    index === lineIndex
+      ? {
+          ...line,
+          codigoBarras,
+        }
+      : currentLine,
+  );
+}
 
 /**
  * Mueve una línea una posición dentro del Pedido y
@@ -123,6 +167,7 @@ export function createNewPurchaseOrderLineState(
     referencia: articulo.referencia,
     marcaNombre: articulo.marcaNombre,
     codigoBarras: null,
+    tieneCodigoBarrasAdicional: articulo.tieneCodigoBarrasAdicional,
     unidades: 0,
     stockActual: articulo.stock,
     stockFinal: articulo.stock,
