@@ -266,12 +266,14 @@
                                        [visibleColumns]="order.columnasVisibles"
                                        [recargoEquivalencia]="order.recargoEquivalencia"
                                        [disabled]="order.recepcionado || processing()"
+                                       [taxPairs]="taxPairs()"
                                        (articlesSelected)="onArticlesSelected($event)"
                                        (unitsChange)="onLineUnitsChange($event)"
                                        (barcodeChange)="onLineBarcodeChange($event)"
                                        (lineMove)="onLineMove($event)"
                                        (lineDeleteRequested)="onLineDeleteRequested($event)"
-                                       (economicChange)="onLineEconomicChange($event)" />
+                                       (economicChange)="onLineEconomicChange($event)"
+                                       (taxChange)="onLineTaxChange($event)" />
         </div>
         }
     </section>

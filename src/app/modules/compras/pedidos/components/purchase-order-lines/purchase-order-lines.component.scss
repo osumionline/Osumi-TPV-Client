@@ -119,3 +119,18 @@
     width: 7ch;
     text-align: right;
 }
+
+.purchase-order-lines__tax {
+    white-space: nowrap;
+    text-align: right;
+}
+
+.purchase-order-lines__tax-select {
+    width: 8ch;
+    text-align: right;
+}
+
+.purchase-order-lines__tax-separator {
+    display: inline-block;
+    margin: 0 3px;
+}

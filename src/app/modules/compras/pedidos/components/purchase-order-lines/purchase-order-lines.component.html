@@ -261,25 +261,60 @@
                     }
 
                     @if (visibleColumnIds().has(13)) {
-                    <td class="purchase-order-lines__number">
-                        {{ line.ivaBps | bpsToPercent | number: '1.0-2' }} %
+                    <td class="purchase-order-lines__tax">
+                        @if (disabled()) {
+                        <span>
+                            {{ line.ivaBps | bpsToPercent | number: '1.0-2' }} %
+                        </span>
 
                         @if (recargoEquivalencia()) {
-                        +
-                        {{ line.recargoEquivalenciaBps | bpsToPercent | number: '1.0-2' }} %
+                        <span>
+                            +
+                            {{ line.recargoEquivalenciaBps | bpsToPercent | number: '1.0-2' }} %
+                        </span>
+                        }
+                        }
+                        @else {
+                        <select class="otpv-table-control purchase-order-lines__tax-select"
+                                aria-label="IVA"
+                                (change)="onTaxChange(line, 'ivaBps', $event)">
+                            @for (ivaBps of getIvaOptions(line); track ivaBps) {
+                            <option [value]="ivaBps"
+                                    [selected]="ivaBps === line.ivaBps">
+                                {{ ivaBps | bpsToPercent | number: '1.0-2' }} %
+                            </option>
+                            }
+                        </select>
+
+                        @if (recargoEquivalencia()) {
+                        <span class="purchase-order-lines__tax-separator">
+                            +
+                        </span>
+
+                        <select class="otpv-table-control purchase-order-lines__tax-select"
+                                aria-label="Recargo de Equivalencia"
+                                (change)="onTaxChange(line, 'recargoEquivalenciaBps', $event)">
+                            @for (reBps of getRecargoEquivalenciaOptions(line); track reBps) {
+                            <option [value]="reBps"
+                                    [selected]="reBps === line.recargoEquivalenciaBps">
+                                {{ reBps | bpsToPercent | number: '1.0-2' }} %
+                            </option>
+                            }
+                        </select>
+                        }
                         }
                     </td>
                     }
 
                     <td class="purchase-order-lines__number">
-                        {{ line.pucMicros | microsToEuros | number: '1.2-6' }} €
+                        {{ line.pucMicros | microsToEuros | number: '1.2-2' }} €
                     </td>
 
                     <td class="purchase-order-lines__number">
                         {{
                           getLineTotalMicros(line)
                             | microsToEuros
-                            | number: '1.2-6'
+                            | number: '1.2-2'
                         }} €
                     </td>
 

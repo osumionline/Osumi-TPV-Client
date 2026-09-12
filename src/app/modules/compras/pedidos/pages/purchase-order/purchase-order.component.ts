@@ -31,7 +31,9 @@ import type PurchaseOrderLineBarcodeChange from '@model/compras/pedidos/purchase
 import type PurchaseOrderLineEconomicChange from '@model/compras/pedidos/purchase-order-line-economic-change.interface';
 import type PurchaseOrderLineMove from '@model/compras/pedidos/purchase-order-line-move.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
+import PurchaseOrderLineTaxChange from '@model/compras/pedidos/purchase-order-line-tax-change.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
+import type PurchaseOrderTaxPair from '@model/compras/pedidos/purchase-order-tax-pair.interface';
 import Proveedor from '@model/proveedores/proveedor.model';
 import ProviderQuickCreateComponent from '@modules/articulos/components/provider-quick-create/provider-quick-create.component';
 import PurchaseOrderLinesComponent from '@modules/compras/pedidos/components/purchase-order-lines/purchase-order-lines.component';
@@ -41,6 +43,7 @@ import {
   buildPurchaseOrderPaymentOptions,
   buildPurchaseOrderProviderOptions,
   buildPurchaseOrderSaveCommand,
+  buildPurchaseOrderTaxPairs,
   createExistingPurchaseOrderFormState,
   createExistingPurchaseOrderLineState,
   createNewPurchaseOrderFormState,
@@ -50,9 +53,11 @@ import {
   parsePurchaseOrderRouteId,
   parsePurchaseOrderTipo,
   PURCHASE_ORDER_COLUMN_OPTIONS,
+  recalculatePurchaseOrderLinesForRecargo,
   removePurchaseOrderLine,
   updatePurchaseOrderLineBarcode,
   updatePurchaseOrderLineEconomic,
+  updatePurchaseOrderLineTax,
   updatePurchaseOrderLineUnits,
   type AddPurchaseOrderArticlesResult,
   type PurchaseOrderColumnOption,
@@ -129,6 +134,9 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
   readonly loadError: WritableSignal<string | null> = signal<string | null>(null);
   readonly lines: WritableSignal<readonly PurchaseOrderLineState[]> = signal<
     readonly PurchaseOrderLineState[]
+  >([]);
+  readonly taxPairs: WritableSignal<readonly PurchaseOrderTaxPair[]> = signal<
+    readonly PurchaseOrderTaxPair[]
   >([]);
 
   readonly columnOptions: readonly PurchaseOrderColumnOption[] = PURCHASE_ORDER_COLUMN_OPTIONS;
@@ -575,12 +583,40 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Actualiza el uso de Recargo de Equivalencia.
+   * Actualiza el uso global de R.E. y recalcula
+   * inmediatamente todas las líneas editables.
    */
   onRecargoEquivalenciaChange(event: MatCheckboxChange): void {
-    this.updateState({
-      recargoEquivalencia: event.checked,
-    });
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (state === null || state.recepcionado || this.processing()) {
+      return;
+    }
+
+    const currentLines: readonly PurchaseOrderLineState[] = this.lines();
+
+    try {
+      const nextLines: readonly PurchaseOrderLineState[] = recalculatePurchaseOrderLinesForRecargo(
+        currentLines,
+        this.taxPairs(),
+        event.checked,
+      );
+
+      if (nextLines !== currentLines) {
+        this.lines.set(nextLines);
+      }
+
+      this.updateState({
+        recargoEquivalencia: event.checked,
+      });
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido actualizar el Recargo de Equivalencia.'),
+        })
+        .subscribe();
+    }
   }
 
   /**
@@ -599,6 +635,43 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
     this.updateState({
       columnasVisibles: normalizePurchaseOrderColumns(event.value),
     });
+  }
+
+  /**
+   * Aplica un cambio de IVA o RE y mantiene
+   * sincronizada su pareja fiscal.
+   */
+  onLineTaxChange(change: PurchaseOrderLineTaxChange): void {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (state === null || state.recepcionado || this.processing()) {
+      return;
+    }
+
+    const currentLines: readonly PurchaseOrderLineState[] = this.lines();
+
+    try {
+      const nextLines: readonly PurchaseOrderLineState[] = updatePurchaseOrderLineTax(
+        currentLines,
+        change,
+        this.taxPairs(),
+        state.recargoEquivalencia,
+      );
+
+      if (nextLines === currentLines) {
+        return;
+      }
+
+      this.clearSaveFeedback();
+      this.lines.set(nextLines);
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido actualizar la fiscalidad de la línea.'),
+        })
+        .subscribe();
+    }
   }
 
   /**
@@ -713,6 +786,8 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
         throw new Error('El pedido indicado no existe.');
       }
 
+      this.taxPairs.set(buildPurchaseOrderTaxPairs(appData?.ivaList ?? [], appData?.reList ?? []));
+
       this.lines.set(
         lines.map((line: PedidoLineaInterface): PurchaseOrderLineState =>
           createExistingPurchaseOrderLineState(line),
@@ -737,6 +812,7 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
       this.lines.set([]);
       this.providerOptions.set([]);
       this.paymentOptions.set([]);
+      this.taxPairs.set([]);
       this.loadError.set(message);
 
       this.dialog

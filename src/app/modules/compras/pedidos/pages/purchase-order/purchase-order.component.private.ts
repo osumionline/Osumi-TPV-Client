@@ -13,7 +13,157 @@ import PurchaseOrderLineCalculator from '@model/compras/pedidos/purchase-order-l
 import type PurchaseOrderLineEconomicChange from '@model/compras/pedidos/purchase-order-line-economic-change.interface';
 import type PurchaseOrderLineMove from '@model/compras/pedidos/purchase-order-line-move.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
+import type PurchaseOrderLineTaxChange from '@model/compras/pedidos/purchase-order-line-tax-change.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
+import type PurchaseOrderTaxPair from '@model/compras/pedidos/purchase-order-tax-pair.interface';
+
+/**
+ * Convierte las listas paralelas IVA/RE de configuración
+ * en las parejas fiscales utilizadas por Pedidos.
+ */
+export function buildPurchaseOrderTaxPairs(
+  ivaList: readonly number[],
+  reList: readonly number[],
+): readonly PurchaseOrderTaxPair[] {
+  if (ivaList.length !== reList.length) {
+    throw new Error('La configuración de IVA y RE no contiene el mismo número de valores.');
+  }
+
+  const pairs: PurchaseOrderTaxPair[] = [];
+
+  for (let index: number = 0; index < ivaList.length; index++) {
+    const iva: number | undefined = ivaList[index];
+
+    const recargoEquivalencia: number | undefined = reList[index];
+
+    if (iva === undefined || recargoEquivalencia === undefined) {
+      throw new Error('La configuración fiscal de Pedidos no es válida.');
+    }
+
+    const pair: PurchaseOrderTaxPair = {
+      ivaBps: convertPurchaseOrderPercentToBps(iva),
+      recargoEquivalenciaBps: convertPurchaseOrderPercentToBps(recargoEquivalencia),
+    };
+
+    if (
+      !pairs.some(
+        (currentPair: PurchaseOrderTaxPair): boolean =>
+          currentPair.ivaBps === pair.ivaBps &&
+          currentPair.recargoEquivalenciaBps === pair.recargoEquivalenciaBps,
+      )
+    ) {
+      pairs.push(pair);
+    }
+  }
+
+  return pairs;
+}
+
+/**
+ * Cambia IVA o RE manteniendo sincronizada su pareja
+ * fiscal y recalculando PUC y Margen.
+ */
+export function updatePurchaseOrderLineTax(
+  lines: readonly PurchaseOrderLineState[],
+  change: PurchaseOrderLineTaxChange,
+  taxPairs: readonly PurchaseOrderTaxPair[],
+  aplicarRecargoEquivalencia: boolean,
+): readonly PurchaseOrderLineState[] {
+  if (!Number.isSafeInteger(change.value) || change.value < 0) {
+    return lines;
+  }
+
+  const lineIndex: number = lines.findIndex(
+    (line: PurchaseOrderLineState): boolean => line.key === change.lineKey,
+  );
+
+  if (lineIndex === -1) {
+    return lines;
+  }
+
+  const line: PurchaseOrderLineState | undefined = lines[lineIndex];
+
+  if (line === undefined) {
+    return lines;
+  }
+
+  let ivaBps: number = line.ivaBps;
+
+  let recargoEquivalenciaBps: number = line.recargoEquivalenciaBps;
+
+  if (change.field === 'ivaBps') {
+    ivaBps = change.value;
+
+    const pair: PurchaseOrderTaxPair | undefined = taxPairs.find(
+      (currentPair: PurchaseOrderTaxPair): boolean => currentPair.ivaBps === change.value,
+    );
+
+    if (pair !== undefined) {
+      recargoEquivalenciaBps = pair.recargoEquivalenciaBps;
+    }
+  } else {
+    recargoEquivalenciaBps = change.value;
+
+    const pair: PurchaseOrderTaxPair | undefined = taxPairs.find(
+      (currentPair: PurchaseOrderTaxPair): boolean =>
+        currentPair.recargoEquivalenciaBps === change.value,
+    );
+
+    if (pair !== undefined) {
+      ivaBps = pair.ivaBps;
+    }
+  }
+
+  if (ivaBps === line.ivaBps && recargoEquivalenciaBps === line.recargoEquivalenciaBps) {
+    return lines;
+  }
+
+  const updatedLine: PurchaseOrderLineState = PurchaseOrderLineCalculator.actualizarFiscalidad(
+    line,
+    ivaBps,
+    recargoEquivalenciaBps,
+    aplicarRecargoEquivalencia,
+  );
+
+  return lines.map((currentLine: PurchaseOrderLineState, index: number): PurchaseOrderLineState =>
+    index === lineIndex ? updatedLine : currentLine,
+  );
+}
+
+/**
+ * Recalcula todas las líneas al activar o desactivar
+ * el Recargo de Equivalencia del Pedido.
+ */
+export function recalculatePurchaseOrderLinesForRecargo(
+  lines: readonly PurchaseOrderLineState[],
+  taxPairs: readonly PurchaseOrderTaxPair[],
+  aplicarRecargoEquivalencia: boolean,
+): readonly PurchaseOrderLineState[] {
+  if (lines.length === 0) {
+    return lines;
+  }
+
+  return lines.map((line: PurchaseOrderLineState): PurchaseOrderLineState => {
+    if (!aplicarRecargoEquivalencia) {
+      return PurchaseOrderLineCalculator.recalcularPorRecargoEquivalencia(line, false);
+    }
+
+    const pair: PurchaseOrderTaxPair | undefined = taxPairs.find(
+      (currentPair: PurchaseOrderTaxPair): boolean => currentPair.ivaBps === line.ivaBps,
+    );
+
+    if (pair === undefined) {
+      return PurchaseOrderLineCalculator.recalcularPorRecargoEquivalencia(line, true);
+    }
+
+    return PurchaseOrderLineCalculator.actualizarFiscalidad(
+      line,
+      pair.ivaBps,
+      pair.recargoEquivalenciaBps,
+      true,
+    );
+  });
+}
 
 /**
  * Aplica un cambio económico a una línea pendiente
@@ -706,4 +856,24 @@ function formatCivilDate(value: Date): string {
  */
 function normalizeCivilDateValue(value: string | null): string {
   return value === null ? '' : value.slice(0, 10);
+}
+
+/**
+ * Convierte un porcentaje configurado a basis points
+ * asegurando una precisión máxima de dos decimales.
+ */
+function convertPurchaseOrderPercentToBps(value: number): number {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error('La configuración fiscal contiene un porcentaje no válido.');
+  }
+
+  const scaledValue: number = value * 100;
+
+  const result: number = Math.round(scaledValue);
+
+  if (!Number.isSafeInteger(result) || Math.abs(scaledValue - result) > 1e-9) {
+    throw new Error('La configuración fiscal admite como máximo dos decimales.');
+  }
+
+  return result;
 }

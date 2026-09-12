@@ -9,7 +9,9 @@ import type PurchaseOrderLineBarcodeChange from '@model/compras/pedidos/purchase
 import type PurchaseOrderLineEconomicChange from '@model/compras/pedidos/purchase-order-line-economic-change.interface';
 import type PurchaseOrderLineMove from '@model/compras/pedidos/purchase-order-line-move.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
+import type PurchaseOrderLineTaxChange from '@model/compras/pedidos/purchase-order-line-tax-change.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
+import type PurchaseOrderTaxPair from '@model/compras/pedidos/purchase-order-tax-pair.interface';
 import {
   addPurchaseOrderArticle,
   AddPurchaseOrderArticleResult,
@@ -18,6 +20,7 @@ import {
   buildPurchaseOrderPaymentOptions,
   buildPurchaseOrderProviderOptions,
   buildPurchaseOrderSaveCommand,
+  buildPurchaseOrderTaxPairs,
   createExistingPurchaseOrderFormState,
   createExistingPurchaseOrderLineState,
   createNewPurchaseOrderFormState,
@@ -28,9 +31,11 @@ import {
   parsePurchaseOrderRouteId,
   parsePurchaseOrderTipo,
   PURCHASE_ORDER_COLUMN_OPTIONS,
+  recalculatePurchaseOrderLinesForRecargo,
   removePurchaseOrderLine,
   updatePurchaseOrderLineBarcode,
   updatePurchaseOrderLineEconomic,
+  updatePurchaseOrderLineTax,
   updatePurchaseOrderLineUnits,
   type AddPurchaseOrderArticlesResult,
 } from '@modules/compras/pedidos/pages/purchase-order/purchase-order.component.private';
@@ -1008,5 +1013,217 @@ describe('purchase-order.component.private', (): void => {
         false,
       ),
     ).toBe(lines);
+  });
+
+  it('convierte las listas configuradas de IVA y RE a basis points', (): void => {
+    const result: readonly PurchaseOrderTaxPair[] = buildPurchaseOrderTaxPairs(
+      [21, 10, 4, 0],
+      [5.2, 1.4, 0.5, 0],
+    );
+
+    expect(result).toEqual([
+      {
+        ivaBps: 2100,
+        recargoEquivalenciaBps: 520,
+      },
+      {
+        ivaBps: 1000,
+        recargoEquivalenciaBps: 140,
+      },
+      {
+        ivaBps: 400,
+        recargoEquivalenciaBps: 50,
+      },
+      {
+        ivaBps: 0,
+        recargoEquivalenciaBps: 0,
+      },
+    ]);
+  });
+
+  it('rechaza una configuración fiscal con listas desalineadas', (): void => {
+    expect(() => buildPurchaseOrderTaxPairs([21, 10], [5.2])).toThrow(
+      'La configuración de IVA y RE no contiene el mismo número de valores.',
+    );
+  });
+
+  it('rechaza porcentajes fiscales con más de dos decimales', (): void => {
+    expect(() => buildPurchaseOrderTaxPairs([21], [5.125])).toThrow(
+      'La configuración fiscal admite como máximo dos decimales.',
+    );
+  });
+
+  it('cambiar IVA selecciona automáticamente su RE y recalcula la línea', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          palbMicros: 570_000,
+          descuentoBps: 0,
+          ivaBps: 1000,
+          recargoEquivalenciaBps: 140,
+          pvpMicros: 990_000,
+        }),
+      ),
+    ];
+
+    const taxPairs: readonly PurchaseOrderTaxPair[] = buildPurchaseOrderTaxPairs(
+      [21, 10],
+      [5.2, 1.4],
+    );
+
+    const change: PurchaseOrderLineTaxChange = {
+      lineKey: 'line:20',
+      field: 'ivaBps',
+      value: 2100,
+    };
+
+    const result: readonly PurchaseOrderLineState[] = updatePurchaseOrderLineTax(
+      lines,
+      change,
+      taxPairs,
+      true,
+    );
+
+    expect(result[0]?.ivaBps).toBe(2100);
+
+    expect(result[0]?.recargoEquivalenciaBps).toBe(520);
+
+    expect(result[0]?.pucMicros).toBe(719_340);
+
+    expect(result[0]?.margenMicroporcentaje).toBe(27_339_394);
+  });
+
+  it('cambiar IVA conserva su RE asociado aunque R.E. esté desactivado', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          palbMicros: 570_000,
+          descuentoBps: 0,
+          ivaBps: 1000,
+          recargoEquivalenciaBps: 140,
+          pvpMicros: 990_000,
+        }),
+      ),
+    ];
+
+    const result: readonly PurchaseOrderLineState[] = updatePurchaseOrderLineTax(
+      lines,
+      {
+        lineKey: 'line:20',
+        field: 'ivaBps',
+        value: 2100,
+      },
+      buildPurchaseOrderTaxPairs([21, 10], [5.2, 1.4]),
+      false,
+    );
+
+    expect(result[0]?.ivaBps).toBe(2100);
+
+    expect(result[0]?.recargoEquivalenciaBps).toBe(520);
+
+    expect(result[0]?.pucMicros).toBe(689_700);
+  });
+
+  it('cambiar RE selecciona automáticamente su IVA asociado', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          ivaBps: 1000,
+          recargoEquivalenciaBps: 140,
+        }),
+      ),
+    ];
+
+    const result: readonly PurchaseOrderLineState[] = updatePurchaseOrderLineTax(
+      lines,
+      {
+        lineKey: 'line:20',
+        field: 'recargoEquivalenciaBps',
+        value: 520,
+      },
+      buildPurchaseOrderTaxPairs([21, 10], [5.2, 1.4]),
+      true,
+    );
+
+    expect(result[0]?.ivaBps).toBe(2100);
+
+    expect(result[0]?.recargoEquivalenciaBps).toBe(520);
+  });
+
+  it('al activar R.E. recupera el RE configurado de una línea legacy', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          palbMicros: 570_000,
+          descuentoBps: 0,
+          ivaBps: 2100,
+          recargoEquivalenciaBps: 0,
+        }),
+      ),
+    ];
+
+    const result: readonly PurchaseOrderLineState[] = recalculatePurchaseOrderLinesForRecargo(
+      lines,
+      buildPurchaseOrderTaxPairs([21], [5.2]),
+      true,
+    );
+
+    expect(result[0]?.recargoEquivalenciaBps).toBe(520);
+
+    expect(result[0]?.pucMicros).toBe(719_340);
+  });
+
+  it('al desactivar R.E. deja de aplicarlo pero conserva la pareja fiscal', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          palbMicros: 570_000,
+          descuentoBps: 0,
+          ivaBps: 2100,
+          recargoEquivalenciaBps: 520,
+        }),
+      ),
+    ];
+
+    const result: readonly PurchaseOrderLineState[] = recalculatePurchaseOrderLinesForRecargo(
+      lines,
+      buildPurchaseOrderTaxPairs([21], [5.2]),
+      false,
+    );
+
+    expect(result[0]?.ivaBps).toBe(2100);
+
+    expect(result[0]?.recargoEquivalenciaBps).toBe(520);
+
+    expect(result[0]?.pucMicros).toBe(689_700);
+  });
+
+  it('cambiar directamente IVA 4 % a 10 % selecciona RE 1,4 %', (): void => {
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          palbMicros: 570_000,
+          descuentoBps: 0,
+          ivaBps: 400,
+          recargoEquivalenciaBps: 50,
+          pvpMicros: 990_000,
+        }),
+      ),
+    ];
+
+    const result: readonly PurchaseOrderLineState[] = updatePurchaseOrderLineTax(
+      lines,
+      {
+        lineKey: 'line:20',
+        field: 'ivaBps',
+        value: 1000,
+      },
+      buildPurchaseOrderTaxPairs([4, 10, 21], [0.5, 1.4, 5.2]),
+      true,
+    );
+
+    expect(result[0]?.ivaBps).toBe(1000);
+
+    expect(result[0]?.recargoEquivalenciaBps).toBe(140);
   });
 });

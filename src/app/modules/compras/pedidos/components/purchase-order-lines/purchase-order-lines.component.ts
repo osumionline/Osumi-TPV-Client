@@ -24,7 +24,9 @@ import PurchaseOrderLineCalculator from '@model/compras/pedidos/purchase-order-l
 import type PurchaseOrderLineEconomicChange from '@model/compras/pedidos/purchase-order-line-economic-change.interface';
 import type PurchaseOrderLineMove from '@model/compras/pedidos/purchase-order-line-move.interface';
 import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-line-state.interface';
+import type PurchaseOrderLineTaxChange from '@model/compras/pedidos/purchase-order-line-tax-change.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
+import type PurchaseOrderTaxPair from '@model/compras/pedidos/purchase-order-tax-pair.interface';
 import {
   formatPurchaseOrderLineDecimal,
   isPurchaseOrderLineTransientDecimal,
@@ -70,6 +72,8 @@ export default class PurchaseOrderLinesComponent {
   readonly visibleColumns: InputSignal<readonly number[]> = input.required<readonly number[]>();
   readonly recargoEquivalencia: InputSignal<boolean> = input.required<boolean>();
   readonly disabled: InputSignal<boolean> = input.required<boolean>();
+  readonly taxPairs: InputSignal<readonly PurchaseOrderTaxPair[]> =
+    input.required<readonly PurchaseOrderTaxPair[]>();
 
   readonly articlesSelected: OutputEmitterRef<readonly PedidoArticuloInterface[]> =
     output<readonly PedidoArticuloInterface[]>();
@@ -80,6 +84,8 @@ export default class PurchaseOrderLinesComponent {
     output<PurchaseOrderLineBarcodeChange>();
   readonly economicChange: OutputEmitterRef<PurchaseOrderLineEconomicChange> =
     output<PurchaseOrderLineEconomicChange>();
+  readonly taxChange: OutputEmitterRef<PurchaseOrderLineTaxChange> =
+    output<PurchaseOrderLineTaxChange>();
 
   readonly lineDeleteRequested: OutputEmitterRef<string> = output<string>();
 
@@ -99,6 +105,56 @@ export default class PurchaseOrderLinesComponent {
       if (!this.disabled()) {
         this.focusLocalizador();
       }
+    });
+  }
+
+  /**
+   * Devuelve los IVAs configurados e incorpora,
+   * cuando sea necesario, el valor histórico de la línea.
+   */
+  getIvaOptions(line: PurchaseOrderLineState): readonly number[] {
+    return this.addHistoricalTaxValue(
+      this.taxPairs().map((pair: PurchaseOrderTaxPair): number => pair.ivaBps),
+      line.ivaBps,
+    );
+  }
+
+  /**
+   * Devuelve los RE configurados e incorpora,
+   * cuando sea necesario, el valor histórico de la línea.
+   */
+  getRecargoEquivalenciaOptions(line: PurchaseOrderLineState): readonly number[] {
+    return this.addHistoricalTaxValue(
+      this.taxPairs().map((pair: PurchaseOrderTaxPair): number => pair.recargoEquivalenciaBps),
+      line.recargoEquivalenciaBps,
+    );
+  }
+
+  /**
+   * Propaga un cambio fiscal realizado mediante
+   * los selectores IVA o RE de una línea.
+   */
+  onTaxChange(
+    line: PurchaseOrderLineState,
+    field: 'ivaBps' | 'recargoEquivalenciaBps',
+    event: Event,
+  ): void {
+    if (this.disabled()) {
+      return;
+    }
+
+    const select: HTMLSelectElement = event.target as HTMLSelectElement;
+
+    const value: number = Number(select.value);
+
+    if (!Number.isSafeInteger(value) || value < 0) {
+      return;
+    }
+
+    this.taxChange.emit({
+      lineKey: line.key,
+      field,
+      value,
     });
   }
 
@@ -377,6 +433,23 @@ export default class PurchaseOrderLinesComponent {
    */
   getLineTotalMicros(line: PurchaseOrderLineState): number {
     return PurchaseOrderLineCalculator.calcularTotalMicros(line);
+  }
+
+  /**
+   * Añade un valor fiscal histórico a una lista
+   * cuando ya no pertenece a la configuración actual.
+   */
+  private addHistoricalTaxValue(
+    values: readonly number[],
+    historicalValue: number,
+  ): readonly number[] {
+    const uniqueValues: number[] = [...new Set<number>(values)];
+
+    if (!uniqueValues.includes(historicalValue)) {
+      uniqueValues.push(historicalValue);
+    }
+
+    return uniqueValues;
   }
 
   /**
