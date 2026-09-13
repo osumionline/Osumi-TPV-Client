@@ -314,4 +314,97 @@ describe('PurchaseOrderTotalsCalculator', (): void => {
 
     expect(result).toBe(0);
   });
+
+  it('mantiene la regresión económica completa con varios IVAs descuentos portes y R.E.', (): void => {
+    const result: PurchaseOrderTotals = PurchaseOrderTotalsCalculator.calcular(
+      [
+        createLine({
+          key: 'article:1',
+          idArticulo: 1,
+          unidades: 4,
+          palbMicros: 570_000,
+          descuentoBps: 500,
+          ivaBps: 1000,
+          recargoEquivalenciaBps: 140,
+          pucMicros: 603_231,
+          pvpMicros: 990_000,
+        }),
+        createLine({
+          key: 'article:2',
+          idArticulo: 2,
+          unidades: 3,
+          palbMicros: 1_250_000,
+          descuentoBps: 1000,
+          ivaBps: 2100,
+          recargoEquivalenciaBps: 520,
+          pucMicros: 1_419_750,
+          pvpMicros: 2_000_000,
+        }),
+      ],
+      2_000_000,
+      750,
+      true,
+    );
+
+    expect(result).toEqual({
+      totalLineas: 2,
+      totalArticulos: 7,
+      totalBeneficiosMicros: 3_287_826,
+      totalPvpMicros: 9_960_000,
+      portesMicros: 2_000_000,
+      mediaMargenMicroporcentaje: 12_929_980,
+      subtotalMicros: 7_125_425,
+      descuentoGlobalBps: 750,
+      ivaMicros: 1_275_949,
+      recargoEquivalenciaMicros: 294_388,
+      desgloseFiscal: [
+        {
+          ivaBps: 1000,
+          recargoEquivalenciaBps: 140,
+          baseMicros: 2_003_550,
+          ivaMicros: 200_355,
+          recargoEquivalenciaMicros: 28_050,
+        },
+        {
+          ivaBps: 2100,
+          recargoEquivalenciaBps: 520,
+          baseMicros: 5_121_875,
+          ivaMicros: 1_075_594,
+          recargoEquivalenciaMicros: 266_338,
+        },
+      ],
+      totalFacturaMicros: 8_695_762,
+      totalSinIvaMicros: 7_125_425,
+    });
+  });
+
+  it('mantiene una línea con cero unidades sin generar base fiscal', (): void => {
+    const result: PurchaseOrderTotals = PurchaseOrderTotalsCalculator.calcular(
+      [
+        createLine({
+          unidades: 0,
+          palbMicros: 25_000_000,
+          pucMicros: 30_000_000,
+          pvpMicros: 50_000_000,
+          descuentoBps: 2500,
+        }),
+      ],
+      0,
+      0,
+      true,
+    );
+
+    expect(result.totalLineas).toBe(1);
+    expect(result.totalArticulos).toBe(0);
+    expect(result.totalBeneficiosMicros).toBe(0);
+    expect(result.totalPvpMicros).toBe(0);
+    expect(result.subtotalMicros).toBe(0);
+    expect(result.ivaMicros).toBe(0);
+
+    expect(result.recargoEquivalenciaMicros).toBe(0);
+
+    expect(result.desgloseFiscal).toEqual([]);
+    expect(result.totalFacturaMicros).toBe(0);
+    expect(result.mediaMargenMicroporcentaje).toBe(0);
+  });
 });

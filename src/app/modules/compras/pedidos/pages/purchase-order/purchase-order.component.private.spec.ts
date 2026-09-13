@@ -12,6 +12,8 @@ import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-l
 import type PurchaseOrderLineTaxChange from '@model/compras/pedidos/purchase-order-line-tax-change.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
 import type PurchaseOrderTaxPair from '@model/compras/pedidos/purchase-order-tax-pair.interface';
+import PurchaseOrderTotalsCalculator from '@model/compras/pedidos/purchase-order-totals-calculator';
+import type { PurchaseOrderTotals } from '@model/compras/pedidos/purchase-order-totals.interface';
 import {
   addPurchaseOrderArticle,
   AddPurchaseOrderArticleResult,
@@ -1328,5 +1330,97 @@ describe('purchase-order.component.private', (): void => {
     );
 
     expect(result.observacionesPedido).toBeNull();
+  });
+
+  it('desactivar R.E. conserva la pareja fiscal pero la excluye de PUC total y guardado', (): void => {
+    const taxPairs: readonly PurchaseOrderTaxPair[] = buildPurchaseOrderTaxPairs([10], [1.4]);
+
+    const lines: readonly PurchaseOrderLineState[] = [
+      createExistingPurchaseOrderLineState(
+        createPedidoLinea({
+          unidades: 4,
+          palbMicros: 570_000,
+          descuentoBps: 0,
+          ivaBps: 1000,
+          recargoEquivalenciaBps: 140,
+          pucMicros: 634_980,
+          pvpMicros: 990_000,
+        }),
+      ),
+    ];
+
+    const withoutRecargo: readonly PurchaseOrderLineState[] =
+      recalculatePurchaseOrderLinesForRecargo(lines, taxPairs, false);
+
+    expect(withoutRecargo[0]?.ivaBps).toBe(1000);
+
+    expect(withoutRecargo[0]?.recargoEquivalenciaBps).toBe(140);
+
+    expect(withoutRecargo[0]?.pucMicros).toBe(627_000);
+
+    const totals: PurchaseOrderTotals = PurchaseOrderTotalsCalculator.calcular(
+      withoutRecargo,
+      0,
+      0,
+      false,
+    );
+
+    expect(totals.subtotalMicros).toBe(2_280_000);
+
+    expect(totals.ivaMicros).toBe(228_000);
+
+    expect(totals.recargoEquivalenciaMicros).toBe(0);
+
+    expect(totals.totalFacturaMicros).toBe(2_508_000);
+
+    const state = createExistingPurchaseOrderFormState(
+      createPedido({
+        recargoEquivalencia: false,
+        portesMicros: 0,
+        descuentoGlobalBps: 0,
+      }),
+    );
+
+    const command = buildPurchaseOrderSaveCommand(state, withoutRecargo);
+
+    expect(command.importeMicros).toBe(2_508_000);
+
+    expect(command.lineas[0]).toMatchObject({
+      pucMicros: 627_000,
+      ivaBps: 1000,
+      recargoEquivalenciaBps: 140,
+    });
+  });
+
+  it('el descuento global reduce la factura pero no modifica el PUC almacenado en las líneas', (): void => {
+    const line: PurchaseOrderLineState = createExistingPurchaseOrderLineState(
+      createPedidoLinea({
+        unidades: 4,
+        palbMicros: 570_000,
+        descuentoBps: 0,
+        ivaBps: 1000,
+        recargoEquivalenciaBps: 140,
+        pucMicros: 634_980,
+        pvpMicros: 990_000,
+      }),
+    );
+
+    const state = createExistingPurchaseOrderFormState(
+      createPedido({
+        recargoEquivalencia: true,
+        portesMicros: 0,
+        descuentoGlobalBps: 5000,
+      }),
+    );
+
+    const command = buildPurchaseOrderSaveCommand(state, [line]);
+
+    expect(command.importeMicros).toBe(1_269_960);
+
+    expect(command.lineas[0]?.pucMicros).toBe(634_980);
+
+    expect(command.lineas[0]?.descuentoBps).toBe(0);
+
+    expect(line.pucMicros).toBe(634_980);
   });
 });
