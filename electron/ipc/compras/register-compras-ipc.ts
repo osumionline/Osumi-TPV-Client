@@ -1,4 +1,5 @@
 import type PedidosService from '@backend/application/compras/pedidos/pedidos.service';
+import type { PedidoArchivoInterface } from '@desktop-contracts/compras/pedidos/pedido-archivo.interface';
 import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type {
   PedidoCabeceraInterface,
@@ -66,6 +67,15 @@ export default function registerComprasIpc(
       assertTrustedSender(event, getMainWindow);
 
       return pedidosService.getPedidoLineas(idPedido);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.comprasGetPedidoArchivos,
+    async (event, idPedido: number): Promise<readonly PedidoArchivoInterface[]> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return pedidosService.getPedidoArchivos(idPedido);
     },
   );
 

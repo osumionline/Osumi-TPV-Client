@@ -1,5 +1,6 @@
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
 import type PedidosRepository from '@backend/contracts/compras/pedidos/pedidos.repository.interface';
+import type { PedidoArchivoRecord } from '@backend/domain/compras/pedidos/pedido-archivo-record.interface';
 import type PedidoArticuloRecord from '@backend/domain/compras/pedidos/pedido-articulo-record.interface';
 import type {
   PedidoCabeceraRecord,
@@ -21,6 +22,7 @@ import {
   PEDIDO_ARTICULO_SELECT,
   PEDIDO_TIENE_CODIGO_BARRAS_ADICIONAL_SQL,
   type DatabaseIdRow,
+  type PedidoArchivoDatabaseRow,
   type PedidoArticuloDatabaseRow,
   type PedidoArticuloLineaSnapshotDatabaseRow,
   type PedidoCabeceraDatabaseRow,
@@ -305,6 +307,55 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
       ivaBps: row.iva_bps,
       recargoEquivalenciaBps: row.recargo_equivalencia_bps,
       descuentoBps: row.descuento_bps,
+    }));
+  }
+
+  /**
+   * Recupera la metadata de los PDFs activos
+   * relacionados con un Pedido.
+   */
+  async getPedidoArchivos(idPedido: number): Promise<readonly PedidoArchivoRecord[]> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const rows: readonly PedidoArchivoDatabaseRow[] = (await dataSource.query(
+      `
+          SELECT
+            pa.id,
+            pa.public_id,
+            pa.id_archivo,
+            pa.tipo,
+            COALESCE(
+              NULLIF(TRIM(a.original_name), ''),
+              a.internal_name
+            ) AS nombre,
+            a.mime_type,
+            a.size_bytes,
+            pa.created_at
+          FROM pedido_archivo pa
+          INNER JOIN pedido pe
+            ON pe.id = pa.id_pedido
+            AND pe.deleted_at IS NULL
+          INNER JOIN archivo a
+            ON a.id = pa.id_archivo
+            AND a.deleted_at IS NULL
+          WHERE
+            pa.id_pedido = ?
+            AND a.purpose = 'order_document'
+            AND a.mime_type = 'application/pdf'
+          ORDER BY pa.id
+        `,
+      [idPedido],
+    )) as readonly PedidoArchivoDatabaseRow[];
+
+    return rows.map((row: PedidoArchivoDatabaseRow): PedidoArchivoRecord => ({
+      id: row.id,
+      publicId: row.public_id,
+      idArchivo: row.id_archivo,
+      tipo: row.tipo,
+      nombre: row.nombre,
+      mimeType: row.mime_type,
+      sizeBytes: row.size_bytes,
+      createdAt: row.created_at,
     }));
   }
 

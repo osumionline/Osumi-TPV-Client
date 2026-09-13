@@ -1,4 +1,5 @@
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
+import type { PedidoArchivoRecord } from '@backend/domain/compras/pedidos/pedido-archivo-record.interface';
 import type PedidoArticuloRecord from '@backend/domain/compras/pedidos/pedido-articulo-record.interface';
 import type {
   PedidoCabeceraRecord,
@@ -42,6 +43,12 @@ export default interface PedidosRepository {
    * Recupera las líneas persistidas de un pedido.
    */
   getPedidoLineas(idPedido: number): Promise<readonly PedidoLineaRecord[]>;
+
+  /**
+   * Recupera los PDFs activos relacionados con
+   * un Pedido persistido.
+   */
+  getPedidoArchivos(idPedido: number): Promise<readonly PedidoArchivoRecord[]>;
 
   /**
    * Recupera un artículo activo por su identificador

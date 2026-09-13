@@ -1,4 +1,5 @@
 import { Service } from '@angular/core';
+import type { PedidoArchivoInterface } from '@desktop-contracts/compras/pedidos/pedido-archivo.interface';
 import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type {
   PedidoCabeceraInterface,
@@ -53,6 +54,13 @@ export default class ComprasService {
    */
   getPedidoLineas(idPedido: number): Promise<readonly PedidoLineaInterface[]> {
     return window.osumiDesktop.compras.getPedidoLineas(idPedido);
+  }
+
+  /**
+   * Recupera los PDFs relacionados con un Pedido.
+   */
+  getPedidoArchivos(idPedido: number): Promise<readonly PedidoArchivoInterface[]> {
+    return window.osumiDesktop.compras.getPedidoArchivos(idPedido);
   }
 
   /**

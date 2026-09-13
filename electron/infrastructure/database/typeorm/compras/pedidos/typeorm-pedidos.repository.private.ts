@@ -1,4 +1,16 @@
+import type { PedidoArchivoTipoRecord } from '@backend/domain/compras/pedidos/pedido-archivo-record.interface';
 import type { PedidoTipoRecord } from '@backend/domain/compras/pedidos/pedido-listado-record.interface';
+
+export interface PedidoArchivoDatabaseRow {
+  readonly id: number;
+  readonly public_id: string;
+  readonly id_archivo: number;
+  readonly tipo: PedidoArchivoTipoRecord;
+  readonly nombre: string;
+  readonly mime_type: string;
+  readonly size_bytes: number;
+  readonly created_at: string;
+}
 
 export interface PedidoListadoDatabaseRow {
   readonly id: number;

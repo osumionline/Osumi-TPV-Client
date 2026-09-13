@@ -1,6 +1,7 @@
 import PedidosService from '@backend/application/compras/pedidos/pedidos.service';
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
 import type PedidosRepository from '@backend/contracts/compras/pedidos/pedidos.repository.interface';
+import type { PedidoArchivoRecord } from '@backend/domain/compras/pedidos/pedido-archivo-record.interface';
 import type PedidoArticuloRecord from '@backend/domain/compras/pedidos/pedido-articulo-record.interface';
 import type {
   PedidoCabeceraRecord,
@@ -13,6 +14,7 @@ import type {
   PedidosGuardadosResultadoRecord,
   PedidosRecepcionadosResultadoRecord,
 } from '@backend/domain/compras/pedidos/pedido-listado-record.interface';
+import type { PedidoArchivoInterface } from '@desktop-contracts/compras/pedidos/pedido-archivo.interface';
 import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type { PedidoSaveCommand } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
 import type PedidoLineaSaveCommand from '@desktop-contracts/compras/pedidos/pedido-linea-save.interface';
@@ -90,6 +92,20 @@ class FakePedidosRepository implements PedidosRepository {
   pedidoArticuloResult: PedidoArticuloRecord | null = null;
   pedidoArticulosSearchResult: readonly PedidoArticuloRecord[] = [];
   lastGetPedidoArticuloById: number | null = null;
+  lastGetPedidoArchivosId: number | null = null;
+
+  pedidoArchivosResult: readonly PedidoArchivoRecord[] = [
+    {
+      id: 31,
+      publicId: 'order-file-31',
+      idArchivo: 81,
+      tipo: 'factura',
+      nombre: 'Factura proveedor.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 12500,
+      createdAt: '2026-09-10T12:00:00.000Z',
+    },
+  ];
 
   /**
    * Devuelve el artículo configurado conservando el
@@ -210,6 +226,16 @@ class FakePedidosRepository implements PedidosRepository {
     this.lastGetPedidoLineasId = idPedido;
 
     return Promise.resolve(this.pedidoLineasResult);
+  }
+
+  /**
+   * Devuelve los PDFs configurados conservando
+   * el Pedido solicitado por el test.
+   */
+  getPedidoArchivos(idPedido: number): Promise<readonly PedidoArchivoRecord[]> {
+    this.lastGetPedidoArchivosId = idPedido;
+
+    return Promise.resolve(this.pedidoArchivosResult);
   }
 
   /**
@@ -965,5 +991,39 @@ describe('PedidosService', (): void => {
     );
 
     expect(repository.lastGetPedidoArticuloById).toBeNull();
+  });
+
+  it('recupera y mapea los PDFs de un pedido', async (): Promise<void> => {
+    const repository = new FakePedidosRepository();
+
+    const service = new PedidosService(repository);
+
+    const result: readonly PedidoArchivoInterface[] = await service.getPedidoArchivos(9);
+
+    expect(repository.lastGetPedidoArchivosId).toBe(9);
+
+    expect(result).toEqual([
+      {
+        id: 31,
+        publicId: 'order-file-31',
+        tipo: 'factura',
+        nombre: 'Factura proveedor.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 12500,
+        createdAt: '2026-09-10T12:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('rechaza un identificador inválido al recuperar PDFs', async (): Promise<void> => {
+    const repository = new FakePedidosRepository();
+
+    const service = new PedidosService(repository);
+
+    await expect(service.getPedidoArchivos(0)).rejects.toThrow(
+      'El identificador del pedido no es válido.',
+    );
+
+    expect(repository.lastGetPedidoArchivosId).toBeNull();
   });
 });

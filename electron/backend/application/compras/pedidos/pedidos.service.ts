@@ -1,5 +1,6 @@
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
 import type PedidosRepository from '@backend/contracts/compras/pedidos/pedidos.repository.interface';
+import type { PedidoArchivoRecord } from '@backend/domain/compras/pedidos/pedido-archivo-record.interface';
 import type PedidoArticuloRecord from '@backend/domain/compras/pedidos/pedido-articulo-record.interface';
 import type {
   PedidoCabeceraRecord,
@@ -16,6 +17,7 @@ import type {
   PedidosGuardadosResultadoRecord,
   PedidosRecepcionadosResultadoRecord,
 } from '@backend/domain/compras/pedidos/pedido-listado-record.interface';
+import type { PedidoArchivoInterface } from '@desktop-contracts/compras/pedidos/pedido-archivo.interface';
 import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type {
   PedidoCabeceraInterface,
@@ -163,6 +165,26 @@ export default class PedidosService {
       ivaBps: record.ivaBps,
       recargoEquivalenciaBps: record.recargoEquivalenciaBps,
       descuentoBps: record.descuentoBps,
+    }));
+  }
+
+  /**
+   * Recupera los PDFs relacionados con un Pedido.
+   */
+  async getPedidoArchivos(idPedido: number): Promise<readonly PedidoArchivoInterface[]> {
+    this.validatePedidoId(idPedido);
+
+    const records: readonly PedidoArchivoRecord[] =
+      await this.pedidosRepository.getPedidoArchivos(idPedido);
+
+    return records.map((record: PedidoArchivoRecord): PedidoArchivoInterface => ({
+      id: record.id,
+      publicId: record.publicId,
+      tipo: record.tipo,
+      nombre: record.nombre,
+      mimeType: record.mimeType,
+      sizeBytes: record.sizeBytes,
+      createdAt: record.createdAt,
     }));
   }
 

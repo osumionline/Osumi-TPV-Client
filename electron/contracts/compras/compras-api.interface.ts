@@ -1,3 +1,4 @@
+import type { PedidoArchivoInterface } from '@desktop-contracts/compras/pedidos/pedido-archivo.interface';
 import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type {
   PedidoCabeceraInterface,
@@ -42,6 +43,11 @@ export default interface ComprasApi {
    * Recupera las líneas persistidas de un pedido.
    */
   getPedidoLineas(idPedido: number): Promise<readonly PedidoLineaInterface[]>;
+
+  /**
+   * Recupera los PDFs relacionados con un Pedido.
+   */
+  getPedidoArchivos(idPedido: number): Promise<readonly PedidoArchivoInterface[]>;
 
   /**
    * Recupera las opciones disponibles para editar una ficha de Pedido.

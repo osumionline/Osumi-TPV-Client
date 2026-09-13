@@ -1,4 +1,5 @@
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
+import type { PedidoArchivoRecord } from '@backend/domain/compras/pedidos/pedido-archivo-record.interface';
 import type PedidoArticuloRecord from '@backend/domain/compras/pedidos/pedido-articulo-record.interface';
 import type {
   PedidoCabeceraRecord,
@@ -610,6 +611,166 @@ describe('TypeOrmPedidosRepository', (): void => {
     ]);
   });
 
+  it('recupera los PDFs activos relacionados con un pedido', async (): Promise<void> => {
+    const currentDataSource: DataSource = requireDataSource();
+
+    await currentDataSource.query(
+      `
+      INSERT INTO archivo (
+        id,
+        public_id,
+        purpose,
+        original_name,
+        internal_name,
+        relative_path,
+        mime_type,
+        size_bytes,
+        sha256
+      )
+      VALUES
+        (
+          500,
+          'file-order-500',
+          'order_document',
+          'Factura proveedor.pdf',
+          'file-order-500.pdf',
+          'files/orders/file-order-500.pdf',
+          'application/pdf',
+          12345,
+          ?
+        ),
+        (
+          501,
+          'file-order-501',
+          'order_document',
+          NULL,
+          'file-order-501.pdf',
+          'files/orders/file-order-501.pdf',
+          'application/pdf',
+          67890,
+          ?
+        )
+    `,
+      ['a'.repeat(64), 'b'.repeat(64)],
+    );
+
+    await currentDataSource.query(`
+    INSERT INTO pedido_archivo (
+      id,
+      public_id,
+      id_pedido,
+      id_archivo,
+      tipo,
+      created_at,
+      updated_at
+    )
+    VALUES
+      (
+        600,
+        'order-file-600',
+        1,
+        500,
+        'factura',
+        '2026-09-01T10:00:00.000Z',
+        '2026-09-01T10:00:00.000Z'
+      ),
+      (
+        601,
+        'order-file-601',
+        1,
+        501,
+        'documento',
+        '2026-09-02T10:00:00.000Z',
+        '2026-09-02T10:00:00.000Z'
+      )
+  `);
+
+    const result: readonly PedidoArchivoRecord[] = await requireRepository().getPedidoArchivos(1);
+
+    expect(result).toEqual([
+      {
+        id: 600,
+        publicId: 'order-file-600',
+        idArchivo: 500,
+        tipo: 'factura',
+        nombre: 'Factura proveedor.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 12345,
+        createdAt: '2026-09-01T10:00:00.000Z',
+      },
+      {
+        id: 601,
+        publicId: 'order-file-601',
+        idArchivo: 501,
+        tipo: 'documento',
+        nombre: 'file-order-501.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 67890,
+        createdAt: '2026-09-02T10:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('recupera PDFs también para pedidos recepcionados', async (): Promise<void> => {
+    const currentDataSource: DataSource = requireDataSource();
+
+    await currentDataSource.query(
+      `
+      INSERT INTO archivo (
+        id,
+        public_id,
+        purpose,
+        original_name,
+        internal_name,
+        relative_path,
+        mime_type,
+        size_bytes,
+        sha256
+      )
+      VALUES (
+        502,
+        'file-order-502',
+        'order_document',
+        'Albarán recibido.pdf',
+        'file-order-502.pdf',
+        'files/orders/file-order-502.pdf',
+        'application/pdf',
+        4567,
+        ?
+      )
+    `,
+      ['c'.repeat(64)],
+    );
+
+    await currentDataSource.query(`
+    INSERT INTO pedido_archivo (
+      id,
+      public_id,
+      id_pedido,
+      id_archivo,
+      tipo
+    )
+    VALUES (
+      602,
+      'order-file-602',
+      3,
+      502,
+      'albaran'
+    )
+  `);
+
+    const result: readonly PedidoArchivoRecord[] = await requireRepository().getPedidoArchivos(3);
+
+    expect(result).toHaveLength(1);
+
+    expect(result[0]).toMatchObject({
+      id: 602,
+      idArchivo: 502,
+      tipo: 'albaran',
+      nombre: 'Albarán recibido.pdf',
+    });
+  });
+
   it('resuelve artículos por acceso directo, localizador y código de barras', async (): Promise<void> => {
     const byAccessCode: PedidoArticuloRecord | null =
       await requireRepository().resolvePedidoArticulo('55', 55);
@@ -889,11 +1050,8 @@ describe('TypeOrmPedidosRepository', (): void => {
     const headerAfter: PedidoPersistenceDatabaseRow = await readPedidoPersistenceRow(3);
 
     expect(headerAfter.numero).toBe('#000051640-EDITADO');
-
     expect(headerAfter.importe_micros).toBe(headerBefore.importe_micros);
-
     expect(headerAfter.portes_micros).toBe(headerBefore.portes_micros);
-
     expect(headerAfter.descuento_bps).toBe(headerBefore.descuento_bps);
   });
 

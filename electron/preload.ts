@@ -64,6 +64,7 @@ import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes
 import type CrearClienteFacturaDesdeVentaCommand from '@desktop-contracts/clientes/crear-cliente-factura-desde-venta-command.interface';
 import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
 import type EmitirClienteFacturaCommand from '@desktop-contracts/clientes/emitir-cliente-factura-command.interface';
+import type { PedidoArchivoInterface } from '@desktop-contracts/compras/pedidos/pedido-archivo.interface';
 import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type {
   PedidoCabeceraInterface,
@@ -221,6 +222,11 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
     getPedidoLineas: (idPedido: number): Promise<readonly PedidoLineaInterface[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.comprasGetPedidoLineas, idPedido) as Promise<
         readonly PedidoLineaInterface[]
+      >,
+
+    getPedidoArchivos: (idPedido: number): Promise<readonly PedidoArchivoInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.comprasGetPedidoArchivos, idPedido) as Promise<
+        readonly PedidoArchivoInterface[]
       >,
 
     getPedidoFormOptions: (): Promise<PedidoFormOptionsInterface> =>
