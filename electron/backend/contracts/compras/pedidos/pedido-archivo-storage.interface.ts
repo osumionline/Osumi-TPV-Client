@@ -6,5 +6,11 @@ import type PedidoArchivoStoredRecord from '@backend/domain/compras/pedidos/pedi
 export default interface PedidoArchivoStorage {
   save(publicId: string, sourcePath: string): Promise<PedidoArchivoStoredRecord>;
 
+  /**
+   * Abre un PDF gestionado con la aplicación
+   * predeterminada del sistema operativo.
+   */
+  open(publicId: string): Promise<void>;
+
   remove(publicId: string): Promise<void>;
 }

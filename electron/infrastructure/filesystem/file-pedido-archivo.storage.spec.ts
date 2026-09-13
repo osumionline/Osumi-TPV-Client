@@ -93,6 +93,12 @@ describe('FilePedidoArchivoStorage', (): void => {
       access(join(requireFilesDirectory(), 'orders', 'pdf-remove.pdf')),
     ).rejects.toThrow();
   });
+
+  it('rechaza abrir un PDF gestionado que ya no existe', async (): Promise<void> => {
+    await expect(requireStorage().open('missing-file')).rejects.toThrow(
+      'El PDF solicitado no está disponible.',
+    );
+  });
 });
 
 /**

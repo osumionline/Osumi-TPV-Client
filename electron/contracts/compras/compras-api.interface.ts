@@ -56,6 +56,16 @@ export default interface ComprasApi {
   attachPedidoPdf(idPedido: number): Promise<PedidoArchivoInterface | null>;
 
   /**
+   * Abre un PDF relacionado con un Pedido.
+   */
+  openPedidoPdf(idPedido: number, idPedidoArchivo: number): Promise<void>;
+
+  /**
+   * Elimina un PDF relacionado con un Pedido.
+   */
+  deletePedidoPdf(idPedido: number, idPedidoArchivo: number): Promise<void>;
+
+  /**
    * Recupera las opciones disponibles para editar una ficha de Pedido.
    */
   getPedidoFormOptions(): Promise<PedidoFormOptionsInterface>;

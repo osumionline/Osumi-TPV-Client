@@ -3,6 +3,10 @@ import type PedidoArchivoStorage from '@backend/contracts/compras/pedidos/pedido
 import type PedidoArchivosRepository from '@backend/contracts/compras/pedidos/pedido-archivos.repository.interface';
 import type PedidoArchivoCreateRecord from '@backend/domain/compras/pedidos/pedido-archivo-create-record.interface';
 import type { PedidoArchivoRecord } from '@backend/domain/compras/pedidos/pedido-archivo-record.interface';
+import type {
+  PedidoArchivoDeleteResultRecord,
+  PedidoArchivoResourceRecord,
+} from '@backend/domain/compras/pedidos/pedido-archivo-resource-record.interface';
 import type PedidoArchivoStoredRecord from '@backend/domain/compras/pedidos/pedido-archivo-stored-record.interface';
 import type { PedidoArchivoInterface } from '@desktop-contracts/compras/pedidos/pedido-archivo.interface';
 import { randomUUID } from 'node:crypto';
@@ -55,6 +59,71 @@ export default class PedidoArchivosService {
       await this.removeStoredFileSafely(archivoPublicId);
 
       throw error;
+    }
+  }
+
+  /**
+   * Abre con el sistema operativo un PDF relacionado
+   * exactamente con el Pedido indicado.
+   */
+  async openPdf(idPedido: number, idPedidoArchivo: number): Promise<void> {
+    this.validatePedidoId(idPedido);
+
+    this.validatePedidoArchivoId(idPedidoArchivo);
+
+    const resource: PedidoArchivoResourceRecord | null =
+      await this.repository.getPedidoArchivoResource(idPedido, idPedidoArchivo);
+
+    if (resource === null) {
+      throw new Error('El PDF indicado no pertenece al pedido.');
+    }
+
+    await this.storage.open(resource.archivoPublicId);
+  }
+
+  /**
+   * Elimina la relación del PDF y limpia el fichero
+   * físico cuando ya no existe ninguna referencia.
+   */
+  async deletePdf(idPedido: number, idPedidoArchivo: number): Promise<void> {
+    this.validatePedidoId(idPedido);
+
+    this.validatePedidoArchivoId(idPedidoArchivo);
+
+    const result: PedidoArchivoDeleteResultRecord = await this.repository.deletePedidoArchivo(
+      idPedido,
+      idPedidoArchivo,
+    );
+
+    if (!result.removePhysicalFile) {
+      return;
+    }
+
+    await this.removeDeletedStoredFileSafely(result.archivoPublicId);
+  }
+
+  /**
+   * Valida la identidad de una relación de archivo
+   * recibida desde el renderer.
+   */
+  private validatePedidoArchivoId(idPedidoArchivo: number): void {
+    if (!Number.isSafeInteger(idPedidoArchivo) || idPedidoArchivo <= 0) {
+      throw new Error('El identificador del PDF no es válido.');
+    }
+  }
+
+  /**
+   * Elimina un fichero ya desvinculado sin convertir
+   * un posible huérfano físico en un fallo lógico.
+   */
+  private async removeDeletedStoredFileSafely(publicId: string): Promise<void> {
+    try {
+      await this.storage.remove(publicId);
+    } catch (cleanupError: unknown) {
+      console.error(
+        'No se ha podido eliminar físicamente un PDF de Pedido ya desvinculado:',
+        cleanupError,
+      );
     }
   }
 

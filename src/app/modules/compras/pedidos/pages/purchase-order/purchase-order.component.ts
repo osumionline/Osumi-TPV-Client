@@ -150,7 +150,12 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
   readonly proveedorCreateError: WritableSignal<string | null> = signal<string | null>(null);
 
   readonly processing: Signal<boolean> = computed(
-    (): boolean => this.saving() || this.deleting() || this.attachingPdf(),
+    (): boolean =>
+      this.saving() ||
+      this.deleting() ||
+      this.attachingPdf() ||
+      this.openingPdfId() !== null ||
+      this.deletingPdfId() !== null,
   );
   readonly saveSuccessful: WritableSignal<boolean> = signal<boolean>(false);
 
@@ -167,6 +172,8 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
   >([]);
 
   readonly attachingPdf: WritableSignal<boolean> = signal<boolean>(false);
+  readonly openingPdfId: WritableSignal<number | null> = signal<number | null>(null);
+  readonly deletingPdfId: WritableSignal<number | null> = signal<number | null>(null);
   private readonly pendingUnitsFocusLineKey: WritableSignal<string | null> = signal<string | null>(
     null,
   );
@@ -274,6 +281,47 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
       linesComponent.focusUnits(lineKey);
       this.pendingUnitsFocusLineKey.set(null);
     });
+  }
+
+  /**
+   * Abre un PDF asociado al Pedido actual.
+   */
+  onOpenPdf(idPedidoArchivo: number): void {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (state === null || state.id === null || this.processing()) {
+      return;
+    }
+
+    void this.openPdf(state.id, idPedidoArchivo);
+  }
+
+  /**
+   * Solicita confirmación antes de desvincular
+   * definitivamente un PDF del Pedido.
+   */
+  onDeletePdfRequested(file: PedidoArchivoInterface): void {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (state === null || state.id === null || this.processing()) {
+      return;
+    }
+
+    const idPedido: number = state.id;
+
+    this.dialog
+      .confirm({
+        title: 'Eliminar PDF',
+        content:
+          `¿Quieres eliminar "${file.nombre}" del pedido? ` + 'Esta acción no se puede deshacer.',
+      })
+      .subscribe((result: boolean): void => {
+        if (!result) {
+          return;
+        }
+
+        void this.deletePdf(idPedido, file.id);
+      });
   }
 
   /**
@@ -689,6 +737,62 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
     this.updateState({
       descuentoGlobalBps,
     });
+  }
+
+  /**
+   * Abre físicamente un PDF mediante Electron.
+   */
+  private async openPdf(idPedido: number, idPedidoArchivo: number): Promise<void> {
+    if (this.processing()) {
+      return;
+    }
+
+    this.openingPdfId.set(idPedidoArchivo);
+
+    try {
+      await this.comprasService.openPedidoPdf(idPedido, idPedidoArchivo);
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido abrir el PDF.'),
+        })
+        .subscribe();
+    } finally {
+      this.openingPdfId.set(null);
+    }
+  }
+
+  /**
+   * Elimina inmediatamente un PDF persistido
+   * y lo retira del estado visible.
+   */
+  private async deletePdf(idPedido: number, idPedidoArchivo: number): Promise<void> {
+    if (this.processing()) {
+      return;
+    }
+
+    this.deletingPdfId.set(idPedidoArchivo);
+
+    try {
+      await this.comprasService.deletePedidoPdf(idPedido, idPedidoArchivo);
+
+      this.files.update(
+        (currentFiles: readonly PedidoArchivoInterface[]): readonly PedidoArchivoInterface[] =>
+          currentFiles.filter(
+            (file: PedidoArchivoInterface): boolean => file.id !== idPedidoArchivo,
+          ),
+      );
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido eliminar el PDF.'),
+        })
+        .subscribe();
+    } finally {
+      this.deletingPdfId.set(null);
+    }
   }
 
   /**

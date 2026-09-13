@@ -91,6 +91,24 @@ export default function registerComprasIpc(
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.comprasOpenPedidoPdf,
+    async (event, idPedido: number, idPedidoArchivo: number): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await pedidoArchivosService.openPdf(idPedido, idPedidoArchivo);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.comprasDeletePedidoPdf,
+    async (event, idPedido: number, idPedidoArchivo: number): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await pedidoArchivosService.deletePdf(idPedido, idPedidoArchivo);
+    },
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.comprasGetPedidoFormOptions,
     async (event): Promise<PedidoFormOptionsInterface> => {
       assertTrustedSender(event, getMainWindow);

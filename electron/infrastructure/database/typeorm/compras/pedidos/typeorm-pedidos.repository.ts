@@ -3,6 +3,10 @@ import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedid
 import type PedidosRepository from '@backend/contracts/compras/pedidos/pedidos.repository.interface';
 import type PedidoArchivoCreateRecord from '@backend/domain/compras/pedidos/pedido-archivo-create-record.interface';
 import type { PedidoArchivoRecord } from '@backend/domain/compras/pedidos/pedido-archivo-record.interface';
+import type {
+  PedidoArchivoDeleteResultRecord,
+  PedidoArchivoResourceRecord,
+} from '@backend/domain/compras/pedidos/pedido-archivo-resource-record.interface';
 import type PedidoArticuloRecord from '@backend/domain/compras/pedidos/pedido-articulo-record.interface';
 import type {
   PedidoCabeceraRecord,
@@ -25,6 +29,7 @@ import {
   PEDIDO_TIENE_CODIGO_BARRAS_ADICIONAL_SQL,
   type DatabaseIdRow,
   type PedidoArchivoDatabaseRow,
+  type PedidoArchivoResourceDatabaseRow,
   type PedidoArchivoTargetDatabaseRow,
   type PedidoArticuloDatabaseRow,
   type PedidoArticuloLineaSnapshotDatabaseRow,
@@ -481,6 +486,134 @@ export default class TypeOrmPedidosRepository
           mimeType: command.storedFile.mimeType,
           sizeBytes: command.storedFile.sizeBytes,
           createdAt: timestamp,
+        };
+      },
+    );
+  }
+
+  /**
+   * Resuelve el archivo físico perteneciente exactamente
+   * a una relación y a su Pedido.
+   */
+  async getPedidoArchivoResource(
+    idPedido: number,
+    idPedidoArchivo: number,
+  ): Promise<PedidoArchivoResourceRecord | null> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const rows: readonly PedidoArchivoResourceDatabaseRow[] = (await dataSource.query(
+      `
+          SELECT
+            pa.id_archivo,
+            a.public_id AS archivo_public_id
+          FROM pedido_archivo pa
+          INNER JOIN pedido pe
+            ON pe.id = pa.id_pedido
+            AND pe.deleted_at IS NULL
+          INNER JOIN archivo a
+            ON a.id = pa.id_archivo
+            AND a.deleted_at IS NULL
+          WHERE
+            pa.id = ?
+            AND pa.id_pedido = ?
+            AND a.purpose = 'order_document'
+            AND a.mime_type = 'application/pdf'
+          LIMIT 1
+        `,
+      [idPedidoArchivo, idPedido],
+    )) as readonly PedidoArchivoResourceDatabaseRow[];
+
+    const row: PedidoArchivoResourceDatabaseRow | undefined = rows[0];
+
+    return row === undefined
+      ? null
+      : {
+          archivoPublicId: row.archivo_public_id,
+        };
+  }
+
+  /**
+   * Elimina una relación de PDF y marca su archivo
+   * como eliminado cuando ya no tiene más referencias.
+   */
+  async deletePedidoArchivo(
+    idPedido: number,
+    idPedidoArchivo: number,
+  ): Promise<PedidoArchivoDeleteResultRecord> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<PedidoArchivoDeleteResultRecord> => {
+        const rows: readonly PedidoArchivoResourceDatabaseRow[] = (await queryRunner.query(
+          `
+              SELECT
+                pa.id_archivo,
+                a.public_id AS archivo_public_id
+              FROM pedido_archivo pa
+              INNER JOIN pedido pe
+                ON pe.id = pa.id_pedido
+                AND pe.deleted_at IS NULL
+              INNER JOIN archivo a
+                ON a.id = pa.id_archivo
+                AND a.deleted_at IS NULL
+              WHERE
+                pa.id = ?
+                AND pa.id_pedido = ?
+                AND a.purpose = 'order_document'
+                AND a.mime_type = 'application/pdf'
+              LIMIT 1
+            `,
+          [idPedidoArchivo, idPedido],
+        )) as readonly PedidoArchivoResourceDatabaseRow[];
+
+        const target: PedidoArchivoResourceDatabaseRow | undefined = rows[0];
+
+        if (target === undefined) {
+          throw new Error('El PDF indicado no pertenece al pedido.');
+        }
+
+        await queryRunner.query(
+          `
+          DELETE FROM pedido_archivo
+          WHERE
+            id = ?
+            AND id_pedido = ?
+        `,
+          [idPedidoArchivo, idPedido],
+        );
+
+        const countRows: readonly PedidoCountDatabaseRow[] = (await queryRunner.query(
+          `
+              SELECT COUNT(*) AS total_rows
+              FROM pedido_archivo
+              WHERE id_archivo = ?
+            `,
+          [target.id_archivo],
+        )) as readonly PedidoCountDatabaseRow[];
+
+        const removePhysicalFile: boolean = (countRows[0]?.total_rows ?? 0) === 0;
+
+        if (removePhysicalFile) {
+          const timestamp: string = new Date().toISOString();
+
+          await queryRunner.query(
+            `
+            UPDATE archivo
+            SET
+              deleted_at = ?,
+              updated_at = ?
+            WHERE
+              id = ?
+              AND deleted_at IS NULL
+          `,
+            [timestamp, timestamp, target.id_archivo],
+          );
+        }
+
+        return {
+          archivoPublicId: target.archivo_public_id,
+          removePhysicalFile,
         };
       },
     );

@@ -286,7 +286,12 @@
                     <otpv-purchase-order-files [files]="files()"
                                                [attaching]="attachingPdf()"
                                                [canAttach]="canAttachPdf()"
-                                               (attachRequested)="onAttachPdf()" />
+                                               [openingFileId]="openingPdfId()"
+                                               [deletingFileId]="deletingPdfId()"
+                                               [actionsDisabled]="processing()"
+                                               (attachRequested)="onAttachPdf()"
+                                               (openRequested)="onOpenPdf($event)"
+                                               (deleteRequested)="onDeletePdfRequested($event)" />
                 </div>
                 }
 

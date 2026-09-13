@@ -142,15 +142,56 @@ export default class FilePedidoArchivoStorage implements PedidoArchivoStorage {
   }
 
   /**
-   * Elimina un PDF definitivo recién creado
-   * cuando su persistencia lógica ha fallado.
+   * Abre un PDF gestionado mediante la aplicación
+   * predeterminada del sistema operativo.
+   */
+  async open(publicId: string): Promise<void> {
+    const normalizedPublicId: string = this.normalizePublicId(publicId);
+
+    const filePath: string = this.getManagedPdfPath(normalizedPublicId);
+
+    try {
+      const fileStats = await stat(filePath);
+
+      if (!fileStats.isFile()) {
+        throw new Error('El PDF solicitado no está disponible.');
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+        throw new Error('El PDF solicitado no está disponible.', {
+          cause: error,
+        });
+      }
+
+      throw error;
+    }
+
+    const { shell } = await import('electron');
+
+    const errorMessage: string = await shell.openPath(filePath);
+
+    if (errorMessage.length > 0) {
+      throw new Error(`No se ha podido abrir el PDF: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Elimina un PDF definitivo gestionado.
    */
   async remove(publicId: string): Promise<void> {
     const normalizedPublicId: string = this.normalizePublicId(publicId);
 
-    await rm(join(this.filesDirectory, ORDER_FILES_DIRECTORY, `${normalizedPublicId}.pdf`), {
+    await rm(this.getManagedPdfPath(normalizedPublicId), {
       force: true,
     });
+  }
+
+  /**
+   * Construye la ruta absoluta de un PDF de Pedido
+   * a partir de un identificador ya validado.
+   */
+  private getManagedPdfPath(publicId: string): string {
+    return join(this.filesDirectory, ORDER_FILES_DIRECTORY, `${publicId}.pdf`);
   }
 
   /**

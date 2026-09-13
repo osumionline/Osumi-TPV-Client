@@ -1,6 +1,10 @@
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
 import type PedidoArchivoCreateRecord from '@backend/domain/compras/pedidos/pedido-archivo-create-record.interface';
 import type { PedidoArchivoRecord } from '@backend/domain/compras/pedidos/pedido-archivo-record.interface';
+import type {
+  PedidoArchivoDeleteResultRecord,
+  PedidoArchivoResourceRecord,
+} from '@backend/domain/compras/pedidos/pedido-archivo-resource-record.interface';
 import type PedidoArticuloRecord from '@backend/domain/compras/pedidos/pedido-articulo-record.interface';
 import type {
   PedidoCabeceraRecord,
@@ -1220,6 +1224,164 @@ describe('TypeOrmPedidosRepository', (): void => {
     )) as readonly DatabaseCountRow[];
 
     expect(rows[0]?.total).toBe(0);
+  });
+
+  it('resuelve un PDF únicamente desde el Pedido al que pertenece', async (): Promise<void> => {
+    const created: PedidoArchivoRecord = await requireRepository().createPedidoArchivo({
+      idPedido: 1,
+      archivoPublicId: 'resource-file',
+      relacionPublicId: 'resource-relation',
+      storedFile: {
+        originalName: 'Documento.pdf',
+        internalName: 'resource-file.pdf',
+        relativePath: 'files/orders/resource-file.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 500,
+        sha256: 'a'.repeat(64),
+      },
+    });
+
+    const result: PedidoArchivoResourceRecord | null =
+      await requireRepository().getPedidoArchivoResource(1, created.id);
+
+    expect(result).toEqual({
+      archivoPublicId: 'resource-file',
+    });
+
+    await expect(requireRepository().getPedidoArchivoResource(3, created.id)).resolves.toBeNull();
+  });
+
+  it('elimina relación y archivo lógico cuando el PDF queda sin referencias', async (): Promise<void> => {
+    const created: PedidoArchivoRecord = await requireRepository().createPedidoArchivo({
+      idPedido: 1,
+      archivoPublicId: 'delete-file',
+      relacionPublicId: 'delete-relation',
+      storedFile: {
+        originalName: 'Eliminar.pdf',
+        internalName: 'delete-file.pdf',
+        relativePath: 'files/orders/delete-file.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 900,
+        sha256: 'b'.repeat(64),
+      },
+    });
+
+    const result: PedidoArchivoDeleteResultRecord = await requireRepository().deletePedidoArchivo(
+      1,
+      created.id,
+    );
+
+    expect(result).toEqual({
+      archivoPublicId: 'delete-file',
+      removePhysicalFile: true,
+    });
+
+    const relationRows = (await requireDataSource().query(
+      `
+        SELECT COUNT(*) AS total
+        FROM pedido_archivo
+        WHERE id = ?
+      `,
+      [created.id],
+    )) as readonly DatabaseCountRow[];
+
+    expect(relationRows[0]?.total).toBe(0);
+
+    const fileRows = (await requireDataSource().query(
+      `
+        SELECT deleted_at
+        FROM archivo
+        WHERE id = ?
+      `,
+      [created.idArchivo],
+    )) as readonly {
+      readonly deleted_at: string | null;
+    }[];
+
+    expect(fileRows[0]?.deleted_at).not.toBeNull();
+  });
+
+  it('conserva archivo lógico y físico cuando otra relación sigue utilizándolo', async (): Promise<void> => {
+    const created: PedidoArchivoRecord = await requireRepository().createPedidoArchivo({
+      idPedido: 1,
+      archivoPublicId: 'shared-file',
+      relacionPublicId: 'shared-relation-a',
+      storedFile: {
+        originalName: 'Compartido.pdf',
+        internalName: 'shared-file.pdf',
+        relativePath: 'files/orders/shared-file.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 1200,
+        sha256: 'c'.repeat(64),
+      },
+    });
+
+    await requireDataSource().query(
+      `
+      INSERT INTO pedido_archivo (
+        public_id,
+        id_pedido,
+        id_archivo,
+        tipo
+      )
+      VALUES (?, ?, ?, ?)
+    `,
+      ['shared-relation-b', 3, created.idArchivo, 'factura'],
+    );
+
+    const result: PedidoArchivoDeleteResultRecord = await requireRepository().deletePedidoArchivo(
+      1,
+      created.id,
+    );
+
+    expect(result).toEqual({
+      archivoPublicId: 'shared-file',
+      removePhysicalFile: false,
+    });
+
+    const fileRows = (await requireDataSource().query(
+      `
+        SELECT deleted_at
+        FROM archivo
+        WHERE id = ?
+      `,
+      [created.idArchivo],
+    )) as readonly {
+      readonly deleted_at: string | null;
+    }[];
+
+    expect(fileRows[0]?.deleted_at).toBeNull();
+
+    const remainingRows = (await requireDataSource().query(
+      `
+        SELECT COUNT(*) AS total
+        FROM pedido_archivo
+        WHERE id_archivo = ?
+      `,
+      [created.idArchivo],
+    )) as readonly DatabaseCountRow[];
+
+    expect(remainingRows[0]?.total).toBe(1);
+  });
+
+  it('rechaza eliminar una relación perteneciente a otro Pedido', async (): Promise<void> => {
+    const created: PedidoArchivoRecord = await requireRepository().createPedidoArchivo({
+      idPedido: 1,
+      archivoPublicId: 'foreign-file',
+      relacionPublicId: 'foreign-relation',
+      storedFile: {
+        originalName: 'Ajeno.pdf',
+        internalName: 'foreign-file.pdf',
+        relativePath: 'files/orders/foreign-file.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 100,
+        sha256: 'd'.repeat(64),
+      },
+    });
+
+    await expect(requireRepository().deletePedidoArchivo(3, created.id)).rejects.toThrow(
+      'El PDF indicado no pertenece al pedido.',
+    );
   });
 });
 

@@ -72,6 +72,20 @@ export default class ComprasService {
   }
 
   /**
+   * Abre un PDF de Pedido mediante el sistema.
+   */
+  openPedidoPdf(idPedido: number, idPedidoArchivo: number): Promise<void> {
+    return window.osumiDesktop.compras.openPedidoPdf(idPedido, idPedidoArchivo);
+  }
+
+  /**
+   * Elimina un PDF relacionado con un Pedido.
+   */
+  deletePedidoPdf(idPedido: number, idPedidoArchivo: number): Promise<void> {
+    return window.osumiDesktop.compras.deletePedidoPdf(idPedido, idPedidoArchivo);
+  }
+
+  /**
    * Recupera opciones para la ficha de Pedido.
    */
   getPedidoFormOptions(): Promise<PedidoFormOptionsInterface> {

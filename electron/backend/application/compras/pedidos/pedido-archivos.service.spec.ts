@@ -4,6 +4,10 @@ import type PedidoArchivoStorage from '@backend/contracts/compras/pedidos/pedido
 import type PedidoArchivosRepository from '@backend/contracts/compras/pedidos/pedido-archivos.repository.interface';
 import type PedidoArchivoCreateRecord from '@backend/domain/compras/pedidos/pedido-archivo-create-record.interface';
 import type { PedidoArchivoRecord } from '@backend/domain/compras/pedidos/pedido-archivo-record.interface';
+import {
+  PedidoArchivoDeleteResultRecord,
+  PedidoArchivoResourceRecord,
+} from '@backend/domain/compras/pedidos/pedido-archivo-resource-record.interface';
 import type PedidoArchivoStoredRecord from '@backend/domain/compras/pedidos/pedido-archivo-stored-record.interface';
 import type { PedidoArchivoInterface } from '@desktop-contracts/compras/pedidos/pedido-archivo.interface';
 import { describe, expect, it } from 'vitest';
@@ -26,6 +30,12 @@ class FakePedidoArchivoStorage implements PedidoArchivoStorage {
   savedSourcePath: string | null = null;
 
   removedPublicId: string | null = null;
+
+  openedPublicId: string | null = null;
+
+  async open(publicId: string): Promise<void> {
+    this.openedPublicId = publicId;
+  }
 
   async save(publicId: string, sourcePath: string): Promise<PedidoArchivoStoredRecord> {
     this.savedPublicId = publicId;
@@ -50,6 +60,37 @@ class FakePedidoArchivosRepository implements PedidoArchivosRepository {
   lastCommand: PedidoArchivoCreateRecord | null = null;
 
   fail: boolean = false;
+
+  resourceResult: PedidoArchivoResourceRecord | null = {
+    archivoPublicId: 'existing-file',
+  };
+
+  deleteResult: PedidoArchivoDeleteResultRecord = {
+    archivoPublicId: 'existing-file',
+    removePhysicalFile: true,
+  };
+
+  lastResourceIds: readonly [number, number] | null = null;
+
+  lastDeleteIds: readonly [number, number] | null = null;
+
+  async getPedidoArchivoResource(
+    idPedido: number,
+    idPedidoArchivo: number,
+  ): Promise<PedidoArchivoResourceRecord | null> {
+    this.lastResourceIds = [idPedido, idPedidoArchivo];
+
+    return this.resourceResult;
+  }
+
+  async deletePedidoArchivo(
+    idPedido: number,
+    idPedidoArchivo: number,
+  ): Promise<PedidoArchivoDeleteResultRecord> {
+    this.lastDeleteIds = [idPedido, idPedidoArchivo];
+
+    return this.deleteResult;
+  }
 
   async createPedidoArchivo(command: PedidoArchivoCreateRecord): Promise<PedidoArchivoRecord> {
     this.lastCommand = command;
@@ -142,5 +183,64 @@ describe('PedidoArchivosService', (): void => {
     await expect(service.attachPdf(1)).rejects.toThrow('Error de persistencia');
 
     expect(storage.removedPublicId).toBe(storage.savedPublicId);
+  });
+
+  it('abre únicamente el recurso resuelto por Pedido y relación', async (): Promise<void> => {
+    const repository = new FakePedidoArchivosRepository();
+
+    const storage = new FakePedidoArchivoStorage();
+
+    const service = new PedidoArchivosService(repository, new FakePedidoArchivoDialog(), storage);
+
+    await service.openPdf(3, 91);
+
+    expect(repository.lastResourceIds).toEqual([3, 91]);
+
+    expect(storage.openedPublicId).toBe('existing-file');
+  });
+
+  it('no abre un PDF que no pertenece al Pedido', async (): Promise<void> => {
+    const repository = new FakePedidoArchivosRepository();
+
+    repository.resourceResult = null;
+
+    const storage = new FakePedidoArchivoStorage();
+
+    const service = new PedidoArchivosService(repository, new FakePedidoArchivoDialog(), storage);
+
+    await expect(service.openPdf(3, 91)).rejects.toThrow('El PDF indicado no pertenece al pedido.');
+
+    expect(storage.openedPublicId).toBeNull();
+  });
+
+  it('elimina físicamente un PDF cuando queda huérfano', async (): Promise<void> => {
+    const repository = new FakePedidoArchivosRepository();
+
+    const storage = new FakePedidoArchivoStorage();
+
+    const service = new PedidoArchivosService(repository, new FakePedidoArchivoDialog(), storage);
+
+    await service.deletePdf(3, 91);
+
+    expect(repository.lastDeleteIds).toEqual([3, 91]);
+
+    expect(storage.removedPublicId).toBe('existing-file');
+  });
+
+  it('conserva el fichero físico cuando todavía está compartido', async (): Promise<void> => {
+    const repository = new FakePedidoArchivosRepository();
+
+    repository.deleteResult = {
+      archivoPublicId: 'shared-file',
+      removePhysicalFile: false,
+    };
+
+    const storage = new FakePedidoArchivoStorage();
+
+    const service = new PedidoArchivosService(repository, new FakePedidoArchivoDialog(), storage);
+
+    await service.deletePdf(3, 91);
+
+    expect(storage.removedPublicId).toBeNull();
   });
 });

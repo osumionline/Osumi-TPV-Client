@@ -46,6 +46,47 @@
                     {{ getSizeLabel(file.sizeBytes) }}
                 </span>
             </div>
+            <div class="purchase-order-files__actions">
+                <button mat-icon-button
+                        type="button"
+                        matTooltip="Abrir PDF"
+                        aria-label="Abrir PDF"
+                        [disabled]="
+                          actionsDisabled() ||
+                          openingFileId() !== null ||
+                          deletingFileId() !== null
+                        "
+                        (click)="requestOpen(file.id)">
+                    <mat-icon>
+                        @if (openingFileId() === file.id) {
+                        hourglass_empty
+                        }
+                        @else {
+                        open_in_new
+                        }
+                    </mat-icon>
+                </button>
+
+                <button mat-icon-button
+                        type="button"
+                        matTooltip="Eliminar PDF"
+                        aria-label="Eliminar PDF"
+                        [disabled]="
+                          actionsDisabled() ||
+                          openingFileId() !== null ||
+                          deletingFileId() !== null
+                        "
+                        (click)="requestDelete(file)">
+                    <mat-icon>
+                        @if (deletingFileId() === file.id) {
+                        hourglass_empty
+                        }
+                        @else {
+                        delete
+                        }
+                    </mat-icon>
+                </button>
+            </div>
         </div>
         }
     </div>
