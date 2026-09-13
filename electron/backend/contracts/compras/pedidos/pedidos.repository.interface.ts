@@ -44,6 +44,12 @@ export default interface PedidosRepository {
   getPedidoLineas(idPedido: number): Promise<readonly PedidoLineaRecord[]>;
 
   /**
+   * Recupera un artículo activo por su identificador
+   * para incorporarlo a un Pedido.
+   */
+  getPedidoArticuloById(idArticulo: number): Promise<PedidoArticuloRecord | null>;
+
+  /**
    * Resuelve un artículo mediante acceso directo,
    * localizador o código de barras.
    */

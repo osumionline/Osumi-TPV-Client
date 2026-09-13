@@ -89,6 +89,17 @@ class FakePedidosRepository implements PedidosRepository {
 
   pedidoArticuloResult: PedidoArticuloRecord | null = null;
   pedidoArticulosSearchResult: readonly PedidoArticuloRecord[] = [];
+  lastGetPedidoArticuloById: number | null = null;
+
+  /**
+   * Devuelve el artículo configurado conservando el
+   * identificador solicitado por el test.
+   */
+  getPedidoArticuloById(idArticulo: number): Promise<PedidoArticuloRecord | null> {
+    this.lastGetPedidoArticuloById = idArticulo;
+
+    return Promise.resolve(this.pedidoArticuloResult);
+  }
 
   /**
    * Devuelve el artículo configurado y conserva los datos
@@ -907,5 +918,52 @@ describe('PedidosService', (): void => {
         }),
       ),
     ).rejects.toThrow('El descuento global del pedido debe estar entre 0 % y 100 %.');
+  });
+
+  it('recupera y mapea un artículo de Pedido por su ID', async (): Promise<void> => {
+    const repository = new FakePedidosRepository();
+
+    repository.pedidoArticuloResult = createPedidoArticuloRecord();
+
+    const service = new PedidosService(repository);
+
+    const result: PedidoArticuloInterface | null = await service.getPedidoArticuloById(8);
+
+    expect(repository.lastGetPedidoArticuloById).toBe(8);
+
+    expect(result).toEqual({
+      id: 8,
+      publicId: 'article-8',
+      localizador: 123,
+      nombre: 'Artículo de prueba',
+      referencia: 'REF-123',
+      marcaNombre: 'Marca de prueba',
+      stock: 7,
+      palbMicros: 10_000_000,
+      pucMicros: 12_705_000,
+      pvpMicros: 19_950_000,
+      margenMicroporcentaje: 36_315_789,
+      ivaBps: 2100,
+      recargoEquivalenciaBps: 520,
+      tieneCodigoBarrasAdicional: true,
+      observaciones: 'Observación para pedidos',
+      mostrarObservacionesPedidos: true,
+    });
+  });
+
+  it('rechaza identificadores inválidos al recuperar un artículo de Pedido', async (): Promise<void> => {
+    const repository = new FakePedidosRepository();
+
+    const service = new PedidosService(repository);
+
+    await expect(service.getPedidoArticuloById(0)).rejects.toThrow(
+      'El identificador del artículo no es válido.',
+    );
+
+    await expect(service.getPedidoArticuloById(Number.MAX_SAFE_INTEGER + 1)).rejects.toThrow(
+      'El identificador del artículo no es válido.',
+    );
+
+    expect(repository.lastGetPedidoArticuloById).toBeNull();
   });
 });

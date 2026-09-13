@@ -50,6 +50,7 @@ const IPC_CHANNELS = {
   comprasDeletePedido: 'compras:delete-pedido',
   comprasResolvePedidoArticulo: 'compras:resolve-pedido-articulo',
   comprasSearchPedidoArticulos: 'compras:search-pedido-articulos',
+  comprasGetPedidoArticuloById: 'compras:get-pedido-articulo-by-id',
 
   marcasGetAll: 'marcas:get-all',
   marcasCreate: 'marcas:create',

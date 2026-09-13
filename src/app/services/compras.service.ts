@@ -77,6 +77,14 @@ export default class ComprasService {
   }
 
   /**
+   * Recupera un artículo activo por ID preparado
+   * para incorporarlo a un Pedido.
+   */
+  getPedidoArticuloById(idArticulo: number): Promise<PedidoArticuloInterface | null> {
+    return window.osumiDesktop.compras.getPedidoArticuloById(idArticulo);
+  }
+
+  /**
    * Resuelve un artículo mediante un código introducido
    * o escaneado en la ficha de Pedido.
    */

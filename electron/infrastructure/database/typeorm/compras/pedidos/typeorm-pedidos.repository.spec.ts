@@ -896,6 +896,33 @@ describe('TypeOrmPedidosRepository', (): void => {
 
     expect(headerAfter.descuento_bps).toBe(headerBefore.descuento_bps);
   });
+
+  it('recupera un artículo activo de Pedido exactamente por su ID', async (): Promise<void> => {
+    const result: PedidoArticuloRecord | null = await requireRepository().getPedidoArticuloById(10);
+
+    expect(result).toEqual({
+      id: 10,
+      publicId: 'article-10',
+      localizador: 101,
+      nombre: 'Artículo actual A',
+      referencia: 'REF-A',
+      marcaNombre: 'Marca Uno',
+      stock: 7,
+      palbMicros: 10_000_000,
+      pucMicros: 12_705_000,
+      pvpMicros: 19_950_000,
+      margenMicroporcentaje: 36_315_789,
+      ivaBps: 2100,
+      recargoEquivalenciaBps: 520,
+      tieneCodigoBarrasAdicional: true,
+      observaciones: 'Observación para pedidos',
+      mostrarObservacionesPedidos: true,
+    });
+  });
+
+  it('no recupera por ID un artículo dado de baja', async (): Promise<void> => {
+    await expect(requireRepository().getPedidoArticuloById(12)).resolves.toBeNull();
+  });
 });
 
 /**

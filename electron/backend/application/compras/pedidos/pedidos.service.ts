@@ -198,6 +198,21 @@ export default class PedidosService {
   }
 
   /**
+   * Recupera por ID un artículo activo preparado
+   * para incorporarse a una línea de Pedido.
+   */
+  async getPedidoArticuloById(idArticulo: number): Promise<PedidoArticuloInterface | null> {
+    if (!Number.isSafeInteger(idArticulo) || idArticulo <= 0) {
+      throw new Error('El identificador del artículo no es válido.');
+    }
+
+    const record: PedidoArticuloRecord | null =
+      await this.pedidosRepository.getPedidoArticuloById(idArticulo);
+
+    return record === null ? null : this.mapPedidoArticulo(record);
+  }
+
+  /**
    * Resuelve un código introducido o escaneado mediante
    * acceso directo, localizador o código de barras.
    */

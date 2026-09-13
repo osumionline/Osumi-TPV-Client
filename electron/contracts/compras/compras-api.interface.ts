@@ -60,6 +60,12 @@ export default interface ComprasApi {
   deletePedido(idPedido: number): Promise<void>;
 
   /**
+   * Recupera un artículo activo por ID para
+   * incorporarlo a un Pedido.
+   */
+  getPedidoArticuloById(idArticulo: number): Promise<PedidoArticuloInterface | null>;
+
+  /**
    * Resuelve un artículo mediante un código introducido
    * o escaneado en la ficha de Pedido.
    */

@@ -309,6 +309,29 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
   }
 
   /**
+   * Recupera por ID todos los datos canónicos necesarios
+   * para incorporar un artículo activo a un Pedido.
+   */
+  async getPedidoArticuloById(idArticulo: number): Promise<PedidoArticuloRecord | null> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const rows: readonly PedidoArticuloDatabaseRow[] = (await dataSource.query(
+      `
+          ${PEDIDO_ARTICULO_SELECT}
+          WHERE
+            a.id = ?
+            AND a.deleted_at IS NULL
+          LIMIT 1
+        `,
+      [idArticulo],
+    )) as readonly PedidoArticuloDatabaseRow[];
+
+    const row: PedidoArticuloDatabaseRow | undefined = rows[0];
+
+    return row === undefined ? null : this.mapPedidoArticulo(row);
+  }
+
+  /**
    * Resuelve un artículo activo mediante acceso directo,
    * localizador o cualquiera de sus códigos de barras activos.
    */

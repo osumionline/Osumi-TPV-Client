@@ -234,6 +234,12 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
     deletePedido: (idPedido: number): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.comprasDeletePedido, idPedido) as Promise<void>,
 
+    getPedidoArticuloById: (idArticulo: number): Promise<PedidoArticuloInterface | null> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.comprasGetPedidoArticuloById,
+        idArticulo,
+      ) as Promise<PedidoArticuloInterface | null>,
+
     resolvePedidoArticulo: (codigo: string): Promise<PedidoArticuloInterface | null> =>
       ipcRenderer.invoke(
         IPC_CHANNELS.comprasResolvePedidoArticulo,
