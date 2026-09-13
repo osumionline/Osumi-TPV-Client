@@ -148,6 +148,7 @@ export default class PedidosService {
       idArticulo: record.idArticulo,
       localizador: record.localizador,
       nombreArticulo: record.nombreArticulo,
+      observacionesPedido: record.observacionesPedido,
       referencia: record.referencia,
       marcaNombre: record.marcaNombre,
       codigoBarras: record.codigoBarras,

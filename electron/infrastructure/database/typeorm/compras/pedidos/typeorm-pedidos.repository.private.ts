@@ -75,6 +75,7 @@ export interface PedidoLineaDatabaseRow {
   readonly id_articulo: number | null;
   readonly localizador: number | null;
   readonly nombre_articulo: string;
+  readonly observaciones_pedido: string | null;
   readonly referencia: string | null;
   readonly marca_nombre: string | null;
   readonly codigo_barras: string | null;

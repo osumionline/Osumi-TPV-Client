@@ -226,6 +226,14 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
             lp.id_articulo,
             a.localizador,
             lp.nombre_articulo,
+            CASE
+              WHEN
+                a.mostrar_observaciones_pedidos = 1
+                AND a.observaciones IS NOT NULL
+                AND TRIM(a.observaciones) <> ''
+              THEN TRIM(a.observaciones)
+              ELSE NULL
+            END AS observaciones_pedido,
             a.referencia,
             m.nombre AS marca_nombre,
             lp.codigo_barras,
@@ -276,6 +284,7 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
       idArticulo: row.id_articulo,
       localizador: row.localizador,
       nombreArticulo: row.nombre_articulo,
+      observacionesPedido: row.observaciones_pedido,
       referencia: row.referencia,
       marcaNombre: row.marca_nombre,
       codigoBarras: row.codigo_barras,

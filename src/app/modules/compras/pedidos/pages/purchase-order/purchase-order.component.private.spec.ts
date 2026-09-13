@@ -25,7 +25,6 @@ import {
   createExistingPurchaseOrderLineState,
   createNewPurchaseOrderFormState,
   createNewPurchaseOrderLineState,
-  getPurchaseOrderArticleObservations,
   getPurchaseOrderPaymentKey,
   movePurchaseOrderLine,
   normalizePurchaseOrderColumns,
@@ -39,7 +38,6 @@ import {
   updatePurchaseOrderLineTax,
   updatePurchaseOrderLineUnits,
   type AddPurchaseOrderArticlesResult,
-  type PurchaseOrderArticleObservation,
 } from '@modules/compras/pedidos/pages/purchase-order/purchase-order.component.private';
 import { describe, expect, it } from 'vitest';
 
@@ -98,6 +96,7 @@ function createPedidoLinea(overrides: Partial<PedidoLineaInterface> = {}): Pedid
     idArticulo: 8,
     localizador: 260458,
     nombreArticulo: 'Artículo persistido',
+    observacionesPedido: null,
     referencia: 'REF-20',
     marcaNombre: 'Marca',
     codigoBarras: null,
@@ -442,6 +441,7 @@ describe('purchase-order.component.private', (): void => {
       idArticulo: 9,
       localizador: 267960,
       nombreArticulo: 'Artículo nuevo',
+      observacionesPedido: null,
       referencia: 'REF-9',
       marcaNombre: 'Otra marca',
       codigoBarras: null,
@@ -583,9 +583,6 @@ describe('purchase-order.component.private', (): void => {
     expect(result.lines[1]?.unidades).toBe(0);
     expect(result.lines[2]?.unidades).toBe(0);
     expect(result.duplicateLineKey).toBe('line:20');
-    expect(
-      result.addedArticles.map((articulo: PedidoArticuloInterface): number => articulo.id),
-    ).toEqual([9, 10]);
   });
 
   it('mantiene el mismo estado cuando toda la selección múltiple ya existe', (): void => {
@@ -604,7 +601,6 @@ describe('purchase-order.component.private', (): void => {
 
     expect(result.lines).toBe(lines);
     expect(result.duplicateLineKey).toBe('line:20');
-    expect(result.addedArticles).toEqual([]);
   });
 
   it('actualiza las unidades y recalcula el stock final', (): void => {
@@ -1275,39 +1271,28 @@ describe('purchase-order.component.private', (): void => {
     expect(result[0]?.recargoEquivalenciaBps).toBe(140);
   });
 
-  it('recupera únicamente observaciones configuradas para mostrarse en Pedidos', (): void => {
-    const result: readonly PurchaseOrderArticleObservation[] = getPurchaseOrderArticleObservations([
+  it('conserva las observaciones visibles para Pedidos al crear una línea nueva', (): void => {
+    const result: PurchaseOrderLineState = createNewPurchaseOrderLineState(
       createPedidoArticulo({
-        id: 9,
-        nombre: 'Artículo con aviso',
-        observaciones: '  Revisar el lote recibido.  ',
+        nombre: 'Artículo con observaciones',
+        observaciones: '  Revisar embalaje antes de recepcionar.  ',
         mostrarObservacionesPedidos: true,
       }),
+      0,
+    );
+
+    expect(result.observacionesPedido).toBe('Revisar embalaje antes de recepcionar.');
+  });
+
+  it('no genera observación visible cuando el artículo no debe mostrarla en Pedidos', (): void => {
+    const result: PurchaseOrderLineState = createNewPurchaseOrderLineState(
       createPedidoArticulo({
-        id: 10,
-        nombre: 'Artículo sin aviso',
         observaciones: 'No debe mostrarse',
         mostrarObservacionesPedidos: false,
       }),
-      createPedidoArticulo({
-        id: 11,
-        nombre: 'Artículo vacío',
-        observaciones: '   ',
-        mostrarObservacionesPedidos: true,
-      }),
-      createPedidoArticulo({
-        id: 12,
-        nombre: 'Artículo sin observaciones',
-        observaciones: null,
-        mostrarObservacionesPedidos: true,
-      }),
-    ]);
+      0,
+    );
 
-    expect(result).toEqual([
-      {
-        nombre: 'Artículo con aviso',
-        observaciones: 'Revisar el lote recibido.',
-      },
-    ]);
+    expect(result.observacionesPedido).toBeNull();
   });
 });

@@ -145,7 +145,17 @@
                     </td>
 
                     <td class="purchase-order-lines__description">
-                        {{ line.nombreArticulo }}
+                        <div class="purchase-order-lines__description-content">
+                            <span>
+                                {{ line.nombreArticulo }}
+                            </span>
+
+                            @if (line.observacionesPedido !== null) {
+                            <mat-icon [matTooltip]="line.observacionesPedido">
+                                info_outline
+                            </mat-icon>
+                            }
+                        </div>
                     </td>
 
                     @if (visibleColumnIds().has(4)) {

@@ -15,6 +15,7 @@ function createLine(overrides: Partial<PurchaseOrderLineState> = {}): PurchaseOr
     idArticulo: 9,
     localizador: 267960,
     nombreArticulo: 'Artículo de prueba',
+    observacionesPedido: null,
     referencia: 'REF-9',
     marcaNombre: 'Marca',
     codigoBarras: null,

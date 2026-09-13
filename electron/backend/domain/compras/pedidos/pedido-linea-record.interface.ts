@@ -8,6 +8,7 @@ export default interface PedidoLineaRecord {
   readonly idArticulo: number | null;
   readonly localizador: number | null;
   readonly nombreArticulo: string;
+  readonly observacionesPedido: string | null;
   readonly referencia: string | null;
   readonly marcaNombre: string | null;
   readonly codigoBarras: string | null;

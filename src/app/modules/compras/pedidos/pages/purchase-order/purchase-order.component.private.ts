@@ -335,15 +335,9 @@ export interface AddPurchaseOrderArticleResult {
   readonly lineKey: string;
 }
 
-export interface PurchaseOrderArticleObservation {
-  readonly nombre: string;
-  readonly observaciones: string;
-}
-
 export interface AddPurchaseOrderArticlesResult {
   readonly lines: readonly PurchaseOrderLineState[];
   readonly duplicateLineKey: string | null;
-  readonly addedArticles: readonly PedidoArticuloInterface[];
 }
 
 /**
@@ -375,6 +369,7 @@ export function createNewPurchaseOrderLineState(
     idArticulo: articulo.id,
     localizador: articulo.localizador,
     nombreArticulo: articulo.nombre,
+    observacionesPedido: getPedidoArticleObservation(articulo),
     referencia: articulo.referencia,
     marcaNombre: articulo.marcaNombre,
     codigoBarras: null,
@@ -442,16 +437,12 @@ export function addPurchaseOrderArticles(
 
   let duplicateLineKey: string | null = null;
 
-  const addedArticles: PedidoArticuloInterface[] = [];
-
   for (const articulo of articulos) {
     const result: AddPurchaseOrderArticleResult = addPurchaseOrderArticle(resultLines, articulo);
 
     resultLines = result.lines;
 
-    if (result.added) {
-      addedArticles.push(articulo);
-    } else if (duplicateLineKey === null) {
+    if (!result.added && duplicateLineKey === null) {
       duplicateLineKey = result.lineKey;
     }
   }
@@ -459,33 +450,7 @@ export function addPurchaseOrderArticles(
   return {
     lines: resultLines,
     duplicateLineKey,
-    addedArticles,
   };
-}
-
-/**
- * Obtiene las observaciones que deben mostrarse al incorporar
- * artículos nuevos a un Pedido.
- */
-export function getPurchaseOrderArticleObservations(
-  articulos: readonly PedidoArticuloInterface[],
-): readonly PurchaseOrderArticleObservation[] {
-  const result: PurchaseOrderArticleObservation[] = [];
-
-  for (const articulo of articulos) {
-    const observaciones: string = articulo.observaciones?.trim() ?? '';
-
-    if (!articulo.mostrarObservacionesPedidos || observaciones.length === 0) {
-      continue;
-    }
-
-    result.push({
-      nombre: articulo.nombre,
-      observaciones,
-    });
-  }
-
-  return result;
 }
 
 /**
@@ -947,4 +912,18 @@ function convertPurchaseOrderPercentToBps(value: number): number {
   }
 
   return result;
+}
+
+/**
+ * Obtiene las observaciones visibles para Pedidos
+ * a partir del artículo canónico actual.
+ */
+function getPedidoArticleObservation(articulo: PedidoArticuloInterface): string | null {
+  const observaciones: string = articulo.observaciones?.trim() ?? '';
+
+  if (!articulo.mostrarObservacionesPedidos || observaciones.length === 0) {
+    return null;
+  }
+
+  return observaciones;
 }
