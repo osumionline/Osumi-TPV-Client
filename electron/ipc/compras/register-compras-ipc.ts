@@ -1,3 +1,4 @@
+import type PedidoArchivosService from '@backend/application/compras/pedidos/pedido-archivos.service';
 import type PedidosService from '@backend/application/compras/pedidos/pedidos.service';
 import type { PedidoArchivoInterface } from '@desktop-contracts/compras/pedidos/pedido-archivo.interface';
 import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
@@ -24,6 +25,7 @@ import { ipcMain } from 'electron';
 export default function registerComprasIpc(
   getMainWindow: MainWindowProvider,
   pedidosService: PedidosService,
+  pedidoArchivosService: PedidoArchivosService,
 ): void {
   ipcMain.handle(
     IPC_CHANNELS.comprasSearchPedidosGuardados,
@@ -76,6 +78,15 @@ export default function registerComprasIpc(
       assertTrustedSender(event, getMainWindow);
 
       return pedidosService.getPedidoArchivos(idPedido);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.comprasAttachPedidoPdf,
+    async (event, idPedido: number): Promise<PedidoArchivoInterface | null> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return pedidoArchivosService.attachPdf(idPedido);
     },
   );
 

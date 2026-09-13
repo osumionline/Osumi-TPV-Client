@@ -50,6 +50,12 @@ export default interface ComprasApi {
   getPedidoArchivos(idPedido: number): Promise<readonly PedidoArchivoInterface[]>;
 
   /**
+   * Solicita y adjunta un PDF al Pedido indicado.
+   * Devuelve null cuando el selector se cancela.
+   */
+  attachPedidoPdf(idPedido: number): Promise<PedidoArchivoInterface | null>;
+
+  /**
    * Recupera las opciones disponibles para editar una ficha de Pedido.
    */
   getPedidoFormOptions(): Promise<PedidoFormOptionsInterface>;

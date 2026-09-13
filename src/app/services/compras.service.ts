@@ -64,6 +64,14 @@ export default class ComprasService {
   }
 
   /**
+   * Abre el selector nativo y adjunta un PDF
+   * al Pedido indicado.
+   */
+  attachPedidoPdf(idPedido: number): Promise<PedidoArchivoInterface | null> {
+    return window.osumiDesktop.compras.attachPedidoPdf(idPedido);
+  }
+
+  /**
    * Recupera opciones para la ficha de Pedido.
    */
   getPedidoFormOptions(): Promise<PedidoFormOptionsInterface> {

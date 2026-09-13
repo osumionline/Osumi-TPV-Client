@@ -17,6 +17,7 @@ import ClienteFacturaPdfService from '@backend/application/clientes/cliente-fact
 import ClienteFacturaPrintService from '@backend/application/clientes/cliente-factura-print.service';
 import ClienteFacturasService from '@backend/application/clientes/cliente-facturas.service';
 import ClientesService from '@backend/application/clientes/clientes.service';
+import PedidoArchivosService from '@backend/application/compras/pedidos/pedido-archivos.service';
 import PedidosService from '@backend/application/compras/pedidos/pedidos.service';
 import ConfigurationService from '@backend/application/configuration/configuration.service';
 import InstallationService from '@backend/application/configuration/installation.service';
@@ -54,6 +55,9 @@ import type ClienteFacturaPdfStorage from '@backend/contracts/clientes/cliente-f
 import type ClienteFacturaPreviewWindow from '@backend/contracts/clientes/cliente-factura-preview-window.interface';
 import type ClienteFacturasRepository from '@backend/contracts/clientes/cliente-facturas.repository.interface';
 import type ClienteRepository from '@backend/contracts/clientes/cliente.repository.interface';
+import type PedidoArchivoDialog from '@backend/contracts/compras/pedidos/pedido-archivo-dialog.interface';
+import type PedidoArchivoStorage from '@backend/contracts/compras/pedidos/pedido-archivo-storage.interface';
+import type PedidoArchivosRepository from '@backend/contracts/compras/pedidos/pedido-archivos.repository.interface';
 import type PedidosRepository from '@backend/contracts/compras/pedidos/pedidos.repository.interface';
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
 import type InstallationDatabase from '@backend/contracts/configuration/installation-database.interface';
@@ -118,6 +122,7 @@ import ElectronCaducidadReportWindow from '@infrastructure/electron/almacen/elec
 import ElectronImprentaPrintWindow from '@infrastructure/electron/almacen/electron-imprenta-print-window';
 import ElectronInventarioCsvFileSaver from '@infrastructure/electron/almacen/electron-inventario-csv-file-saver';
 import ElectronInventarioPrintWindow from '@infrastructure/electron/almacen/electron-inventario-print-window';
+import ElectronPedidoArchivoDialog from '@infrastructure/electron/compras/electron-pedido-archivo-dialog';
 import ElectronA4DocumentRenderer from '@infrastructure/electron/electron-a4-document.renderer';
 import ElectronAssetUrlBuilder from '@infrastructure/electron/electron-asset-url.builder';
 import ElectronClienteFacturaPreviewWindow from '@infrastructure/electron/electron-cliente-factura-preview-window';
@@ -132,6 +137,7 @@ import { getMainWindow } from '@infrastructure/electron/main-window';
 import NodemailerEmailSender from '@infrastructure/email/nodemailer-email.sender';
 import FileClienteFacturaPdfStorage from '@infrastructure/filesystem/file-cliente-factura-pdf.storage';
 import FileInstallationStaging from '@infrastructure/filesystem/file-installation-staging';
+import FilePedidoArchivoStorage from '@infrastructure/filesystem/file-pedido-archivo.storage';
 import FileVentaTicketPdfStorage from '@infrastructure/filesystem/file-venta-ticket-pdf.storage';
 import FilesystemImageFileStorage from '@infrastructure/filesystem/filesystem-image-file.storage';
 import FilesystemImageStagingStorage from '@infrastructure/filesystem/filesystem-image-staging.storage';
@@ -327,8 +333,23 @@ export default function createApplicationComposition(
   /*
    * Compras.
    */
-  const pedidosRepository: PedidosRepository = new TypeOrmPedidosRepository(operationalDatabase);
+  const typeOrmPedidosRepository: TypeOrmPedidosRepository = new TypeOrmPedidosRepository(
+    operationalDatabase,
+  );
+
+  const pedidosRepository: PedidosRepository = typeOrmPedidosRepository;
+  const pedidoArchivosRepository: PedidoArchivosRepository = typeOrmPedidosRepository;
   const pedidosService: PedidosService = new PedidosService(pedidosRepository);
+  const pedidoArchivoDialog: PedidoArchivoDialog = new ElectronPedidoArchivoDialog(getMainWindow);
+  const pedidoArchivoStorage: PedidoArchivoStorage = new FilePedidoArchivoStorage(
+    applicationPaths.filesDirectory,
+  );
+
+  const pedidoArchivosService: PedidoArchivosService = new PedidoArchivosService(
+    pedidoArchivosRepository,
+    pedidoArchivoDialog,
+    pedidoArchivoStorage,
+  );
 
   /*
    * Artículos.
@@ -609,7 +630,7 @@ export default function createApplicationComposition(
   registerInventarioPrintIpc(inventarioPrintWindow);
   registerCaducidadReportIpc(caducidadReportWindow);
   registerImprentaPrintIpc(imprentaPrintWindow);
-  registerComprasIpc(getMainWindow, pedidosService);
+  registerComprasIpc(getMainWindow, pedidosService, pedidoArchivosService);
   registerArticulosIpc(getMainWindow, articulosService);
   registerFilesIpc(getMainWindow, imageStagingService);
   registerMarcasIpc(getMainWindow, marcasService);

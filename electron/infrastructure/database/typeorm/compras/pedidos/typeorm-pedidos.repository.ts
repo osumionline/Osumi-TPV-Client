@@ -1,5 +1,7 @@
+import type PedidoArchivosRepository from '@backend/contracts/compras/pedidos/pedido-archivos.repository.interface';
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
 import type PedidosRepository from '@backend/contracts/compras/pedidos/pedidos.repository.interface';
+import type PedidoArchivoCreateRecord from '@backend/domain/compras/pedidos/pedido-archivo-create-record.interface';
 import type { PedidoArchivoRecord } from '@backend/domain/compras/pedidos/pedido-archivo-record.interface';
 import type PedidoArticuloRecord from '@backend/domain/compras/pedidos/pedido-articulo-record.interface';
 import type {
@@ -23,6 +25,7 @@ import {
   PEDIDO_TIENE_CODIGO_BARRAS_ADICIONAL_SQL,
   type DatabaseIdRow,
   type PedidoArchivoDatabaseRow,
+  type PedidoArchivoTargetDatabaseRow,
   type PedidoArticuloDatabaseRow,
   type PedidoArticuloLineaSnapshotDatabaseRow,
   type PedidoCabeceraDatabaseRow,
@@ -45,7 +48,9 @@ import type { DataSource, QueryRunner } from 'typeorm';
 /**
  * Gestiona las consultas SQLite propias de Pedidos.
  */
-export default class TypeOrmPedidosRepository implements PedidosRepository {
+export default class TypeOrmPedidosRepository
+  implements PedidosRepository, PedidoArchivosRepository
+{
   /**
    * Crea el repository sobre la base operacional.
    */
@@ -360,6 +365,128 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
   }
 
   /**
+   * Registra atómicamente un PDF físico ya validado
+   * y su relación con un Pedido existente.
+   */
+  async createPedidoArchivo(command: PedidoArchivoCreateRecord): Promise<PedidoArchivoRecord> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<PedidoArchivoRecord> => {
+        const pedidoRows: readonly PedidoArchivoTargetDatabaseRow[] = (await queryRunner.query(
+          `
+              SELECT tipo
+              FROM pedido
+              WHERE
+                id = ?
+                AND deleted_at IS NULL
+              LIMIT 1
+            `,
+          [command.idPedido],
+        )) as readonly PedidoArchivoTargetDatabaseRow[];
+
+        const pedido: PedidoArchivoTargetDatabaseRow | undefined = pedidoRows[0];
+
+        if (pedido === undefined) {
+          throw new Error('El pedido indicado no existe.');
+        }
+
+        const timestamp: string = new Date().toISOString();
+
+        await queryRunner.query(
+          `
+          INSERT INTO archivo (
+            public_id,
+            purpose,
+            original_name,
+            internal_name,
+            relative_path,
+            mime_type,
+            size_bytes,
+            sha256,
+            width,
+            height,
+            created_at,
+            updated_at,
+            deleted_at
+          )
+          VALUES (
+            ?,
+            'order_document',
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            NULL,
+            NULL,
+            ?,
+            ?,
+            NULL
+          )
+        `,
+          [
+            command.archivoPublicId,
+            command.storedFile.originalName,
+            command.storedFile.internalName,
+            command.storedFile.relativePath,
+            command.storedFile.mimeType,
+            command.storedFile.sizeBytes,
+            command.storedFile.sha256,
+            timestamp,
+            timestamp,
+          ],
+        );
+
+        const idArchivo: number = await this.readLastInsertedId(
+          queryRunner,
+          'No se ha podido obtener el identificador del nuevo archivo de Pedido.',
+        );
+
+        await queryRunner.query(
+          `
+          INSERT INTO pedido_archivo (
+            public_id,
+            id_pedido,
+            id_archivo,
+            tipo,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?)
+        `,
+          [
+            command.relacionPublicId,
+            command.idPedido,
+            idArchivo,
+            pedido.tipo,
+            timestamp,
+            timestamp,
+          ],
+        );
+
+        const idRelacion: number = await this.readLastInsertedId(
+          queryRunner,
+          'No se ha podido obtener el identificador de la nueva relación de archivo.',
+        );
+
+        return {
+          id: idRelacion,
+          publicId: command.relacionPublicId,
+          idArchivo,
+          tipo: pedido.tipo,
+          nombre: command.storedFile.originalName,
+          mimeType: command.storedFile.mimeType,
+          sizeBytes: command.storedFile.sizeBytes,
+          createdAt: timestamp,
+        };
+      },
+    );
+  }
+
+  /**
    * Recupera por ID todos los datos canónicos necesarios
    * para incorporar un artículo activo a un Pedido.
    */
@@ -544,7 +671,10 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
             ],
           );
 
-          idPedido = await this.readLastInsertedId(queryRunner);
+          idPedido = await this.readLastInsertedId(
+            queryRunner,
+            'No se ha podido obtener el identificador del nuevo pedido.',
+          );
         } else {
           idPedido = command.id;
 
@@ -1007,7 +1137,10 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
   /**
    * Obtiene el identificador autoincremental recién creado.
    */
-  private async readLastInsertedId(queryRunner: QueryRunner): Promise<number> {
+  private async readLastInsertedId(
+    queryRunner: QueryRunner,
+    errorMessage: string,
+  ): Promise<number> {
     const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
       'SELECT last_insert_rowid() AS id',
     )) as readonly DatabaseIdRow[];
@@ -1015,7 +1148,7 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
     const id: number | undefined = rows[0]?.id;
 
     if (id === undefined) {
-      throw new Error('No se ha podido obtener el identificador del nuevo pedido.');
+      throw new Error(errorMessage);
     }
 
     return id;

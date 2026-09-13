@@ -1,4 +1,5 @@
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
+import type PedidoArchivoCreateRecord from '@backend/domain/compras/pedidos/pedido-archivo-create-record.interface';
 import type { PedidoArchivoRecord } from '@backend/domain/compras/pedidos/pedido-archivo-record.interface';
 import type PedidoArticuloRecord from '@backend/domain/compras/pedidos/pedido-articulo-record.interface';
 import type {
@@ -1080,6 +1081,145 @@ describe('TypeOrmPedidosRepository', (): void => {
 
   it('no recupera por ID un artículo dado de baja', async (): Promise<void> => {
     await expect(requireRepository().getPedidoArticuloById(12)).resolves.toBeNull();
+  });
+
+  it('registra atómicamente un PDF y adopta el tipo documental del Pedido', async (): Promise<void> => {
+    const command: PedidoArchivoCreateRecord = {
+      idPedido: 1,
+      archivoPublicId: 'new-order-file',
+      relacionPublicId: 'new-order-file-relation',
+      storedFile: {
+        originalName: 'Nueva factura.pdf',
+        internalName: 'new-order-file.pdf',
+        relativePath: 'files/orders/new-order-file.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 34567,
+        sha256: 'd'.repeat(64),
+      },
+    };
+
+    const result: PedidoArchivoRecord = await requireRepository().createPedidoArchivo(command);
+
+    expect(result).toMatchObject({
+      publicId: 'new-order-file-relation',
+      tipo: 'factura',
+      nombre: 'Nueva factura.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 34567,
+    });
+
+    const archivoRows = (await requireDataSource().query(
+      `
+        SELECT
+          public_id,
+          purpose,
+          original_name,
+          internal_name,
+          relative_path,
+          mime_type,
+          size_bytes,
+          sha256
+        FROM archivo
+        WHERE public_id = ?
+      `,
+      ['new-order-file'],
+    )) as readonly {
+      readonly public_id: string;
+      readonly purpose: string;
+      readonly original_name: string;
+      readonly internal_name: string;
+      readonly relative_path: string;
+      readonly mime_type: string;
+      readonly size_bytes: number;
+      readonly sha256: string;
+    }[];
+
+    expect(archivoRows).toEqual([
+      {
+        public_id: 'new-order-file',
+        purpose: 'order_document',
+        original_name: 'Nueva factura.pdf',
+        internal_name: 'new-order-file.pdf',
+        relative_path: 'files/orders/new-order-file.pdf',
+        mime_type: 'application/pdf',
+        size_bytes: 34567,
+        sha256: 'd'.repeat(64),
+      },
+    ]);
+
+    const relationRows = (await requireDataSource().query(
+      `
+        SELECT
+          public_id,
+          id_pedido,
+          id_archivo,
+          tipo
+        FROM pedido_archivo
+        WHERE public_id = ?
+      `,
+      ['new-order-file-relation'],
+    )) as readonly {
+      readonly public_id: string;
+      readonly id_pedido: number;
+      readonly id_archivo: number;
+      readonly tipo: string;
+    }[];
+
+    expect(relationRows).toEqual([
+      {
+        public_id: 'new-order-file-relation',
+        id_pedido: 1,
+        id_archivo: result.idArchivo,
+        tipo: 'factura',
+      },
+    ]);
+  });
+
+  it('permite adjuntar un PDF a un pedido ya recepcionado', async (): Promise<void> => {
+    const result: PedidoArchivoRecord = await requireRepository().createPedidoArchivo({
+      idPedido: 4,
+      archivoPublicId: 'received-order-file',
+      relacionPublicId: 'received-order-file-relation',
+      storedFile: {
+        originalName: 'Abono histórico.pdf',
+        internalName: 'received-order-file.pdf',
+        relativePath: 'files/orders/received-order-file.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 1000,
+        sha256: 'e'.repeat(64),
+      },
+    });
+
+    expect(result.tipo).toBe('abono');
+  });
+
+  it('revierte el archivo lógico si el pedido no existe', async (): Promise<void> => {
+    await expect(
+      requireRepository().createPedidoArchivo({
+        idPedido: 999,
+        archivoPublicId: 'orphan-file',
+        relacionPublicId: 'orphan-relation',
+        storedFile: {
+          originalName: 'Huérfano.pdf',
+          internalName: 'orphan-file.pdf',
+          relativePath: 'files/orders/orphan-file.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 100,
+          sha256: 'f'.repeat(64),
+        },
+      }),
+    ).rejects.toThrow('El pedido indicado no existe.');
+
+    const rows = (await requireDataSource().query(
+      `
+        SELECT COUNT(*) AS total
+        FROM archivo
+        WHERE public_id = ?
+      `,
+      ['orphan-file'],
+    )) as readonly DatabaseCountRow[];
+
+    expect(rows[0]?.total).toBe(0);
   });
 });
 

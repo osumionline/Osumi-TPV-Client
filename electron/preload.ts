@@ -229,6 +229,12 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         readonly PedidoArchivoInterface[]
       >,
 
+    attachPedidoPdf: (idPedido: number): Promise<PedidoArchivoInterface | null> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.comprasAttachPedidoPdf,
+        idPedido,
+      ) as Promise<PedidoArchivoInterface | null>,
+
     getPedidoFormOptions: (): Promise<PedidoFormOptionsInterface> =>
       ipcRenderer.invoke(
         IPC_CHANNELS.comprasGetPedidoFormOptions,
