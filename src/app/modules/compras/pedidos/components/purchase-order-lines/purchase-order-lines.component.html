@@ -383,12 +383,12 @@
         </table>
     </div>
     }
+    @if (showArticleEntry()) {
     <div class="purchase-order-lines__locator">
         <label class="otpv-field purchase-order-lines__locator-field">
             <span class="otpv-field__label">
                 Localizador
             </span>
-
             <input #localizadorInput
                    class="otpv-control"
                    type="text"
@@ -410,8 +410,10 @@
             </mat-icon>
         </button>
     </div>
+    }
 </section>
-@if (searchOpen()) {
+
+@if (showArticleEntry() && searchOpen()) {
 <otpv-article-search context="pedidos"
                      [initialQuery]="searchInitialQuery()"
                      (pedidoSelectEvent)="onSearchSelected($event)"

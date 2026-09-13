@@ -270,6 +270,7 @@
                                        [taxPairs]="taxPairs()"
                                        [descuentoGlobalBps]="order.descuentoGlobalBps"
                                        [canCreateArticle]="canCreateArticleFromOrder()"
+                                       [showArticleEntry]="!order.recepcionado"
                                        (articlesSelected)="onArticlesSelected($event)"
                                        (unitsChange)="onLineUnitsChange($event)"
                                        (barcodeChange)="onLineBarcodeChange($event)"

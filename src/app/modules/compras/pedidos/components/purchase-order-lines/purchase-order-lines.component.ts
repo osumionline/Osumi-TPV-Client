@@ -77,6 +77,7 @@ export default class PurchaseOrderLinesComponent {
     input.required<readonly PurchaseOrderTaxPair[]>();
   readonly descuentoGlobalBps: InputSignal<number> = input.required<number>();
   readonly canCreateArticle: InputSignal<boolean> = input.required<boolean>();
+  readonly showArticleEntry: InputSignal<boolean> = input.required<boolean>();
 
   readonly articlesSelected: OutputEmitterRef<readonly PedidoArticuloInterface[]> =
     output<readonly PedidoArticuloInterface[]>();
@@ -454,7 +455,7 @@ export default class PurchaseOrderLinesComponent {
    * referencia destinada al Pedido actual.
    */
   requestCreateArticle(): void {
-    if (this.disabled() || !this.canCreateArticle()) {
+    if (this.disabled() || !this.showArticleEntry() || !this.canCreateArticle()) {
       return;
     }
 
@@ -604,7 +605,7 @@ export default class PurchaseOrderLinesComponent {
    * el Pedido continúa siendo editable.
    */
   private focusLocalizador(): void {
-    if (this.disabled()) {
+    if (this.disabled() || !this.showArticleEntry()) {
       return;
     }
 
