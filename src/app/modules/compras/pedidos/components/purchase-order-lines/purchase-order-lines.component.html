@@ -398,6 +398,17 @@
                    (input)="onLocalizadorInput($event)"
                    (keydown)="onLocalizadorKeydown($event)">
         </label>
+
+        <button mat-icon-button
+                type="button"
+                matTooltip="Crear nuevo artículo"
+                aria-label="Crear nuevo artículo"
+                [disabled]="disabled() || !canCreateArticle()"
+                (click)="requestCreateArticle()">
+            <mat-icon>
+                add
+            </mat-icon>
+        </button>
     </div>
 </section>
 @if (searchOpen()) {

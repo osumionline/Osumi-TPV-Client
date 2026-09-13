@@ -76,6 +76,7 @@ export default class PurchaseOrderLinesComponent {
   readonly taxPairs: InputSignal<readonly PurchaseOrderTaxPair[]> =
     input.required<readonly PurchaseOrderTaxPair[]>();
   readonly descuentoGlobalBps: InputSignal<number> = input.required<number>();
+  readonly canCreateArticle: InputSignal<boolean> = input.required<boolean>();
 
   readonly articlesSelected: OutputEmitterRef<readonly PedidoArticuloInterface[]> =
     output<readonly PedidoArticuloInterface[]>();
@@ -88,8 +89,8 @@ export default class PurchaseOrderLinesComponent {
     output<PurchaseOrderLineEconomicChange>();
   readonly taxChange: OutputEmitterRef<PurchaseOrderLineTaxChange> =
     output<PurchaseOrderLineTaxChange>();
-
   readonly lineDeleteRequested: OutputEmitterRef<string> = output<string>();
+  readonly createArticleRequested: OutputEmitterRef<void> = output<void>();
 
   readonly localizador: WritableSignal<string> = signal<string>('');
   readonly searching: WritableSignal<boolean> = signal<boolean>(false);
@@ -446,6 +447,18 @@ export default class PurchaseOrderLinesComponent {
    */
   getLineTotalMicros(line: PurchaseOrderLineState): number {
     return PurchaseOrderLineCalculator.calcularTotalMicros(line);
+  }
+
+  /**
+   * Solicita abrir Artículos para crear una nueva
+   * referencia destinada al Pedido actual.
+   */
+  requestCreateArticle(): void {
+    if (this.disabled() || !this.canCreateArticle()) {
+      return;
+    }
+
+    this.createArticleRequested.emit();
   }
 
   /**

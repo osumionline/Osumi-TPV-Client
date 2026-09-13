@@ -8,10 +8,16 @@ import {
   type WritableSignal,
 } from '@angular/core';
 import { MatButton } from '@angular/material/button';
+import { Router } from '@angular/router';
 import HeaderComponent from '@app/components/header/header.component';
 import type { ArticuloDraftPatch } from '@model/articulos/articulo-draft.interface';
 import type ArticuloWorkspaceSection from '@model/articulos/articulo-workspace-section.type';
 import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.interface';
+import type PurchaseOrderArticleFlowState from '@model/compras/pedidos/purchase-order-article-flow.interface';
+import {
+  parsePurchaseOrderArticleFlowState,
+  PURCHASE_ORDER_ARTICLE_FLOW_STATE_KEY,
+} from '@model/compras/pedidos/purchase-order-article-flow.utils';
 import type ArticuloVenta from '@model/ventas/articulo-venta.model';
 import ArticleWorkspaceComponent from '@modules/articulos/components/article-workspace/article-workspace.component';
 import ArticlesTabsComponent from '@modules/articulos/components/articles-tabs/articles-tabs.component';
@@ -20,6 +26,7 @@ import { DialogService } from '@osumi/angular-tools';
 import AppDataService from '@services/app-data.service';
 import ArticulosService from '@services/articulos.service';
 import { getErrorMessage } from '@utils/error.utils';
+import { firstValueFrom } from 'rxjs';
 
 /**
  * Página principal del módulo de Artículos.
@@ -40,6 +47,14 @@ export default class ArticlesComponent implements OnInit {
   private readonly dialog: DialogService = inject(DialogService);
   readonly appDataService: AppDataService = inject(AppDataService);
   readonly articulosService: ArticulosService = inject(ArticulosService);
+  private readonly router: Router = inject(Router);
+
+  private readonly purchaseOrderArticleFlow: PurchaseOrderArticleFlowState | null =
+    parsePurchaseOrderArticleFlowState(
+      this.router.currentNavigation()?.extras.state?.[PURCHASE_ORDER_ARTICLE_FLOW_STATE_KEY],
+    );
+
+  private purchaseOrderCreationTabId: string | null = null;
 
   readonly appName: Signal<string> = computed((): string => {
     const appData = this.appDataService.appData();
@@ -56,10 +71,29 @@ export default class ArticlesComponent implements OnInit {
   private saveFeedbackTimeoutId: number | null = null;
 
   /**
-   * Carga la configuración general utilizada por el módulo.
+   * Carga la configuración general y prepara,
+   * cuando procede, una creación iniciada desde Pedido.
    */
   ngOnInit(): void {
+    this.preparePurchaseOrderArticleCreation();
     void this.loadAppData();
+  }
+
+  /**
+   * Crea automáticamente una ficha nueva cuando
+   * Artículos se abre desde un Pedido.
+   */
+  private preparePurchaseOrderArticleCreation(): void {
+    if (
+      this.purchaseOrderArticleFlow === null ||
+      this.purchaseOrderArticleFlow.idArticulo !== null
+    ) {
+      return;
+    }
+
+    const tab: ArticuloWorkspaceTab = this.articulosService.crearBorrador();
+
+    this.purchaseOrderCreationTabId = tab.idTemporal;
   }
 
   /**
@@ -206,6 +240,8 @@ export default class ArticlesComponent implements OnInit {
 
     if (!tab.dirty) {
       this.articulosService.cerrarTab(idTemporal);
+      this.clearPurchaseOrderCreationContext(idTemporal);
+
       return;
     }
 
@@ -232,18 +268,67 @@ export default class ArticlesComponent implements OnInit {
   }
 
   /**
-   * Guarda globalmente la ficha indicada.
+   * Guarda globalmente la ficha indicada y, cuando
+   * procede de un Pedido, ofrece volver e incorporarla.
    */
   async saveArticle(idTemporal: string): Promise<void> {
     if (this.processingTabId() !== null) {
       return;
     }
 
+    const sourceTab: ArticuloWorkspaceTab | undefined = this.articulosService
+      .tabs()
+      .find((tab: ArticuloWorkspaceTab): boolean => tab.idTemporal === idTemporal);
+
+    const shouldOfferPurchaseOrderReturn: boolean =
+      idTemporal === this.purchaseOrderCreationTabId &&
+      this.purchaseOrderArticleFlow !== null &&
+      this.purchaseOrderArticleFlow.idArticulo === null &&
+      sourceTab?.draft.id === null;
+
     this.clearSaveFeedback();
     this.processingTabId.set(idTemporal);
 
     try {
-      await this.articulosService.guardar(idTemporal);
+      const savedTab: ArticuloWorkspaceTab = await this.articulosService.guardar(idTemporal);
+
+      if (
+        shouldOfferPurchaseOrderReturn &&
+        savedTab.draft.id !== null &&
+        this.purchaseOrderArticleFlow !== null
+      ) {
+        this.purchaseOrderCreationTabId = null;
+
+        const returnToPurchaseOrder: boolean = await firstValueFrom(
+          this.dialog.confirm({
+            title: 'Artículo guardado',
+            content:
+              'El artículo se ha guardado correctamente. ' +
+              '¿Quieres volver al pedido y añadirlo?',
+          }),
+        );
+
+        if (returnToPurchaseOrder) {
+          const flowState: PurchaseOrderArticleFlowState = {
+            idPedido: this.purchaseOrderArticleFlow.idPedido,
+            idArticulo: savedTab.draft.id,
+          };
+
+          const navigated: boolean = await this.router.navigate(
+            ['/compras/pedido', flowState.idPedido],
+            {
+              state: {
+                [PURCHASE_ORDER_ARTICLE_FLOW_STATE_KEY]: flowState,
+              },
+            },
+          );
+
+          if (navigated) {
+            return;
+          }
+        }
+      }
+
       this.showSaveFeedback(idTemporal);
     } catch (error: unknown) {
       this.dialog
@@ -359,6 +444,16 @@ export default class ArticlesComponent implements OnInit {
   }
 
   /**
+   * Olvida el retorno automático cuando se cierra
+   * la ficha creada específicamente desde Pedido.
+   */
+  private clearPurchaseOrderCreationContext(idTemporal: string): void {
+    if (this.purchaseOrderCreationTabId === idTemporal) {
+      this.purchaseOrderCreationTabId = null;
+    }
+  }
+
+  /**
    * Ejecuta la baja confirmada y mantiene la ficha
    * abierta cuando la operación falla.
    */
@@ -451,6 +546,7 @@ export default class ArticlesComponent implements OnInit {
   private async closeArticleDiscardingChanges(idTemporal: string): Promise<void> {
     try {
       await this.articulosService.cerrarTabDescartandoCambios(idTemporal);
+      this.clearPurchaseOrderCreationContext(idTemporal);
     } catch (error: unknown) {
       this.dialog
         .alert({

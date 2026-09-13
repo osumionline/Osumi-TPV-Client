@@ -1,6 +1,7 @@
 import {
   Component,
   computed,
+  effect,
   inject,
   signal,
   viewChild,
@@ -27,6 +28,12 @@ import type {
 import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type { PedidoTipo } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
+import type PurchaseOrderArticleFlowState from '@model/compras/pedidos/purchase-order-article-flow.interface';
+import {
+  getPurchaseOrderReturnedArticleId,
+  parsePurchaseOrderArticleFlowState,
+  PURCHASE_ORDER_ARTICLE_FLOW_STATE_KEY,
+} from '@model/compras/pedidos/purchase-order-article-flow.utils';
 import type PurchaseOrderLineBarcodeChange from '@model/compras/pedidos/purchase-order-line-barcode-change.interface';
 import type PurchaseOrderLineEconomicChange from '@model/compras/pedidos/purchase-order-line-economic-change.interface';
 import type PurchaseOrderLineMove from '@model/compras/pedidos/purchase-order-line-move.interface';
@@ -118,6 +125,11 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
     PurchaseOrderLinesComponent,
   );
 
+  private readonly purchaseOrderArticleFlow: PurchaseOrderArticleFlowState | null =
+    parsePurchaseOrderArticleFlowState(
+      this.router.currentNavigation()?.extras.state?.[PURCHASE_ORDER_ARTICLE_FLOW_STATE_KEY],
+    );
+
   readonly formState: WritableSignal<PurchaseOrderFormState | null> =
     signal<PurchaseOrderFormState | null>(null);
   readonly providerOptions: WritableSignal<readonly PurchaseOrderProviderOption[]> = signal<
@@ -145,6 +157,9 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
   readonly lines: WritableSignal<readonly PurchaseOrderLineState[]> = signal<
     readonly PurchaseOrderLineState[]
   >([]);
+  private readonly pendingUnitsFocusLineKey: WritableSignal<string | null> = signal<string | null>(
+    null,
+  );
   private readonly cleanFingerprint: WritableSignal<string | null> = signal<string | null>(null);
 
   readonly dirty: Signal<boolean> = computed((): boolean => {
@@ -218,6 +233,62 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
         return 'Número albarán';
     }
   });
+
+  readonly canCreateArticleFromOrder: Signal<boolean> = computed((): boolean => {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    return (
+      state !== null &&
+      state.id !== null &&
+      !state.recepcionado &&
+      !this.processing() &&
+      !this.dirty()
+    );
+  });
+
+  constructor() {
+    effect((): void => {
+      const lineKey: string | null = this.pendingUnitsFocusLineKey();
+
+      const linesComponent: PurchaseOrderLinesComponent | undefined = this.purchaseOrderLines();
+
+      if (lineKey === null || linesComponent === undefined) {
+        return;
+      }
+
+      linesComponent.focusUnits(lineKey);
+      this.pendingUnitsFocusLineKey.set(null);
+    });
+  }
+
+  /**
+   * Abre Artículos para crear una referencia nueva
+   * destinada al Pedido persistido actual.
+   */
+  onCreateArticleRequested(): void {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (
+      state === null ||
+      state.id === null ||
+      state.recepcionado ||
+      this.processing() ||
+      this.dirty()
+    ) {
+      return;
+    }
+
+    const flowState: PurchaseOrderArticleFlowState = {
+      idPedido: state.id,
+      idArticulo: null,
+    };
+
+    void this.router.navigate(['/articulos'], {
+      state: {
+        [PURCHASE_ORDER_ARTICLE_FLOW_STATE_KEY]: flowState,
+      },
+    });
+  }
 
   /**
    * Carga la configuración, las opciones y la cabecera solicitada.
@@ -592,6 +663,71 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
   }
 
   /**
+   * Incorpora el artículo recién creado cuando la
+   * navegación actual vuelve desde Artículos.
+   */
+  private async addReturnedArticleFromNavigation(idPedido: number): Promise<void> {
+    const idArticulo: number | null = getPurchaseOrderReturnedArticleId(
+      this.purchaseOrderArticleFlow,
+      idPedido,
+    );
+
+    if (idArticulo === null) {
+      return;
+    }
+
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (state === null || state.recepcionado) {
+      return;
+    }
+
+    try {
+      const articulo: PedidoArticuloInterface | null =
+        await this.comprasService.getPedidoArticuloById(idArticulo);
+
+      if (articulo === null) {
+        this.dialog
+          .alert({
+            title: 'Atención',
+            content: 'El artículo creado ya no está disponible.',
+          })
+          .subscribe();
+
+        return;
+      }
+
+      const currentLines: readonly PurchaseOrderLineState[] = this.lines();
+
+      const result: AddPurchaseOrderArticlesResult = addPurchaseOrderArticles(currentLines, [
+        articulo,
+      ]);
+
+      if (result.lines !== currentLines) {
+        this.lines.set(result.lines);
+      }
+
+      const targetLine: PurchaseOrderLineState | undefined = result.lines.find(
+        (line: PurchaseOrderLineState): boolean => line.idArticulo === articulo.id,
+      );
+
+      if (targetLine !== undefined) {
+        this.pendingUnitsFocusLineKey.set(targetLine.key);
+      }
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(
+            error,
+            'No se ha podido incorporar el artículo creado al pedido.',
+          ),
+        })
+        .subscribe();
+    }
+  }
+
+  /**
    * Elimina una línea previamente confirmada.
    */
   private removeLine(lineKey: string): void {
@@ -933,6 +1069,11 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
           : createExistingPurchaseOrderFormState(pedido),
       );
       this.markCurrentStateClean();
+
+      if (idPedido !== null) {
+        await this.addReturnedArticleFromNavigation(idPedido);
+      }
+
       if (this.showSaveFeedbackAfterLoad) {
         this.showSaveFeedbackAfterLoad = false;
         this.showSaveFeedback();
