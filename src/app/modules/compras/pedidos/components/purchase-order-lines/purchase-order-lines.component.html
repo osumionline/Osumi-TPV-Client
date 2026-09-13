@@ -67,6 +67,10 @@
                     </th>
                     }
 
+                    <th class="purchase-order-lines__number">
+                        Subtotal
+                    </th>
+
                     @if (visibleColumnIds().has(13)) {
                     <th class="purchase-order-lines__tax">
                         IVA{{ recargoEquivalencia() ? ' + RE' : '' }}
@@ -269,6 +273,14 @@
                         }
                     </td>
                     }
+
+                    <td class="purchase-order-lines__number">
+                        {{
+                          getLineSubtotalMicros(line)
+                            | microsToEuros
+                            | number: '1.2-2'
+                        }} €
+                    </td>
 
                     @if (visibleColumnIds().has(13)) {
                     <td class="purchase-order-lines__tax">

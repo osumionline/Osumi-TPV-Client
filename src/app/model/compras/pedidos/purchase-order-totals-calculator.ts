@@ -57,12 +57,7 @@ export default class PurchaseOrderTotalsCalculator {
 
       totalBeneficiosMicros += unidades * (BigInt(line.pvpMicros) - BigInt(line.pucMicros));
 
-      const lineDiscountFactor: bigint = BASIS_POINTS_100_PERCENT - BigInt(line.descuentoBps);
-
-      const globalDiscountFactor: bigint = BASIS_POINTS_100_PERCENT - BigInt(descuentoGlobalBps);
-
-      const baseNumerator: bigint =
-        unidades * BigInt(line.palbMicros) * lineDiscountFactor * globalDiscountFactor;
+      const baseNumerator: bigint = this.calculateLineBaseNumerator(line, descuentoGlobalBps);
 
       this.addTaxBase(
         taxGroups,
@@ -129,6 +124,31 @@ export default class PurchaseOrderTotalsCalculator {
   }
 
   /**
+   * Calcula la base económica visible de una línea
+   * aplicando descuentos de línea y global.
+   */
+  static calcularSubtotalLineaMicros(
+    line: PurchaseOrderLineState,
+    descuentoGlobalBps: number,
+  ): number {
+    this.assertNonNegativeSafeInteger(line.unidades, 'Unidades');
+
+    this.assertNonNegativeSafeInteger(line.palbMicros, 'Precio albarán');
+
+    this.assertPercentage(line.descuentoBps, 'Descuento de línea');
+
+    this.assertPercentage(descuentoGlobalBps, 'Descuento global');
+
+    return this.toSafeNumber(
+      this.roundDivide(
+        this.calculateLineBaseNumerator(line, descuentoGlobalBps),
+        BASE_FACTOR_DENOMINATOR,
+      ),
+      'Subtotal de línea',
+    );
+  }
+
+  /**
    * Incorpora una base económica al grupo fiscal
    * correspondiente.
    */
@@ -157,6 +177,23 @@ export default class PurchaseOrderTotalsCalculator {
       recargoEquivalenciaBps,
       baseNumerator,
     });
+  }
+
+  /**
+   * Calcula la base exacta de una línea antes
+   * de convertirla nuevamente a microeuros.
+   */
+  private static calculateLineBaseNumerator(
+    line: PurchaseOrderLineState,
+    descuentoGlobalBps: number,
+  ): bigint {
+    const lineDiscountFactor: bigint = BASIS_POINTS_100_PERCENT - BigInt(line.descuentoBps);
+
+    const globalDiscountFactor: bigint = BASIS_POINTS_100_PERCENT - BigInt(descuentoGlobalBps);
+
+    return (
+      BigInt(line.unidades) * BigInt(line.palbMicros) * lineDiscountFactor * globalDiscountFactor
+    );
   }
 
   /**

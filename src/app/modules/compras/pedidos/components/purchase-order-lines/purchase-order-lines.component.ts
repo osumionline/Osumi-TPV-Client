@@ -27,6 +27,7 @@ import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-l
 import type PurchaseOrderLineTaxChange from '@model/compras/pedidos/purchase-order-line-tax-change.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
 import type PurchaseOrderTaxPair from '@model/compras/pedidos/purchase-order-tax-pair.interface';
+import PurchaseOrderTotalsCalculator from '@model/compras/pedidos/purchase-order-totals-calculator';
 import {
   formatPurchaseOrderLineDecimal,
   isPurchaseOrderLineTransientDecimal,
@@ -74,6 +75,7 @@ export default class PurchaseOrderLinesComponent {
   readonly disabled: InputSignal<boolean> = input.required<boolean>();
   readonly taxPairs: InputSignal<readonly PurchaseOrderTaxPair[]> =
     input.required<readonly PurchaseOrderTaxPair[]>();
+  readonly descuentoGlobalBps: InputSignal<number> = input.required<number>();
 
   readonly articlesSelected: OutputEmitterRef<readonly PedidoArticuloInterface[]> =
     output<readonly PedidoArticuloInterface[]>();
@@ -426,6 +428,17 @@ export default class PurchaseOrderLinesComponent {
     }
 
     return this.formatEconomicValue(line, field);
+  }
+
+  /**
+   * Calcula el Subtotal visible de una línea
+   * aplicando el descuento global actual.
+   */
+  getLineSubtotalMicros(line: PurchaseOrderLineState): number {
+    return PurchaseOrderTotalsCalculator.calcularSubtotalLineaMicros(
+      line,
+      this.descuentoGlobalBps(),
+    );
   }
 
   /**

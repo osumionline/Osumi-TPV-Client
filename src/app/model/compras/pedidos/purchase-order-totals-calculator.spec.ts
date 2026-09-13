@@ -289,4 +289,29 @@ describe('PurchaseOrderTotalsCalculator', (): void => {
       'Descuento global debe estar entre 0 % y 100 %.',
     );
   });
+
+  it('calcula el subtotal individual aplicando descuento de línea y global', (): void => {
+    const result: number = PurchaseOrderTotalsCalculator.calcularSubtotalLineaMicros(
+      createLine({
+        unidades: 2,
+        palbMicros: 10_000_000,
+        descuentoBps: 1000,
+      }),
+      2000,
+    );
+
+    expect(result).toBe(14_400_000);
+  });
+
+  it('un descuento global del cien por cien deja el subtotal de línea a cero', (): void => {
+    const result: number = PurchaseOrderTotalsCalculator.calcularSubtotalLineaMicros(
+      createLine({
+        unidades: 3,
+        palbMicros: 5_000_000,
+      }),
+      10_000,
+    );
+
+    expect(result).toBe(0);
+  });
 });
