@@ -36,6 +36,7 @@ import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-o
 import type PurchaseOrderTaxPair from '@model/compras/pedidos/purchase-order-tax-pair.interface';
 import PurchaseOrderTotalsCalculator from '@model/compras/pedidos/purchase-order-totals-calculator';
 import type { PurchaseOrderTotals } from '@model/compras/pedidos/purchase-order-totals.interface';
+import type PendingChangesAware from '@model/navigation/pending-changes-aware.interface';
 import Proveedor from '@model/proveedores/proveedor.model';
 import ProviderQuickCreateComponent from '@modules/articulos/components/provider-quick-create/provider-quick-create.component';
 import PurchaseOrderLinesComponent from '@modules/compras/pedidos/components/purchase-order-lines/purchase-order-lines.component';
@@ -43,6 +44,7 @@ import PurchaseOrderTotalsComponent from '@modules/compras/pedidos/components/pu
 import {
   addPurchaseOrderArticles,
   addPurchaseOrderProviderOption,
+  buildPurchaseOrderDirtyFingerprint,
   buildPurchaseOrderPaymentOptions,
   buildPurchaseOrderProviderOptions,
   buildPurchaseOrderSaveCommand,
@@ -75,6 +77,7 @@ import ComprasService from '@services/compras.service';
 import MarcasService from '@services/marcas.service';
 import ProveedoresService from '@services/proveedores.service';
 import { getErrorMessage } from '@utils/error.utils';
+import type { Observable } from 'rxjs';
 
 /**
  * Muestra y gestiona la ficha completa de un Pedido.
@@ -98,8 +101,11 @@ import { getErrorMessage } from '@utils/error.utils';
     MatTooltip,
     RouterLink,
   ],
+  host: {
+    '(window:beforeunload)': 'onBeforeUnload($event)',
+  },
 })
-export default class PurchaseOrderComponent implements OnInit, OnDestroy {
+export default class PurchaseOrderComponent implements OnInit, OnDestroy, PendingChangesAware {
   private readonly route: ActivatedRoute = inject(ActivatedRoute);
   private readonly router: Router = inject(Router);
   private readonly comprasService: ComprasService = inject(ComprasService);
@@ -139,6 +145,19 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
   readonly lines: WritableSignal<readonly PurchaseOrderLineState[]> = signal<
     readonly PurchaseOrderLineState[]
   >([]);
+  private readonly cleanFingerprint: WritableSignal<string | null> = signal<string | null>(null);
+
+  readonly dirty: Signal<boolean> = computed((): boolean => {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    const cleanFingerprint: string | null = this.cleanFingerprint();
+
+    if (state === null || cleanFingerprint === null) {
+      return false;
+    }
+
+    return buildPurchaseOrderDirtyFingerprint(state, this.lines()) !== cleanFingerprint;
+  });
   readonly taxPairs: WritableSignal<readonly PurchaseOrderTaxPair[]> = signal<
     readonly PurchaseOrderTaxPair[]
   >([]);
@@ -212,6 +231,40 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
    */
   ngOnDestroy(): void {
     this.clearSaveFeedback();
+  }
+
+  /**
+   * Decide si se puede abandonar la ficha actual
+   * cuando existen cambios todavía no guardados.
+   */
+  canDeactivate(): boolean | Observable<boolean> {
+    if (!this.dirty()) {
+      return true;
+    }
+
+    if (this.processing()) {
+      return false;
+    }
+
+    return this.dialog.confirm({
+      title: 'Cambios sin guardar',
+      content:
+        'Hay cambios en el pedido que todavía no se han guardado. ' +
+        '¿Quieres salir y descartarlos?',
+    });
+  }
+
+  /**
+   * Solicita confirmación nativa al cerrar o recargar
+   * la ventana mientras existen cambios pendientes.
+   */
+  onBeforeUnload(event: BeforeUnloadEvent): void {
+    if (!this.dirty()) {
+      return;
+    }
+
+    event.preventDefault();
+    event.returnValue = '';
   }
 
   /**
@@ -576,6 +629,7 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
 
     try {
       await this.comprasService.deletePedido(idPedido);
+      this.markCurrentStateClean();
 
       await this.router.navigate(['/compras'], {
         replaceUrl: true,
@@ -807,6 +861,7 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
           createExistingPurchaseOrderLineState(line),
         ),
       );
+      this.markCurrentStateClean();
       this.showSaveFeedback();
 
       if (wasNew) {
@@ -835,6 +890,7 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
    */
   private async loadPage(): Promise<void> {
     this.clearSaveFeedback();
+    this.cleanFingerprint.set(null);
     this.loading.set(true);
     this.loadError.set(null);
 
@@ -876,6 +932,7 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
           ? createNewPurchaseOrderFormState(appData?.tipoIva === 're')
           : createExistingPurchaseOrderFormState(pedido),
       );
+      this.markCurrentStateClean();
       if (this.showSaveFeedbackAfterLoad) {
         this.showSaveFeedbackAfterLoad = false;
         this.showSaveFeedback();
@@ -889,6 +946,7 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
       this.paymentOptions.set([]);
       this.taxPairs.set([]);
       this.loadError.set(message);
+      this.cleanFingerprint.set(null);
 
       this.dialog
         .alert({
@@ -942,5 +1000,21 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
             ...patch,
           },
     );
+  }
+
+  /**
+   * Registra el estado actual de cabecera y líneas
+   * como última versión limpia conocida.
+   */
+  private markCurrentStateClean(): void {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (state === null) {
+      this.cleanFingerprint.set(null);
+
+      return;
+    }
+
+    this.cleanFingerprint.set(buildPurchaseOrderDirtyFingerprint(state, this.lines()));
   }
 }

@@ -19,6 +19,7 @@ import {
   AddPurchaseOrderArticleResult,
   addPurchaseOrderArticles,
   addPurchaseOrderProviderOption,
+  buildPurchaseOrderDirtyFingerprint,
   buildPurchaseOrderPaymentOptions,
   buildPurchaseOrderProviderOptions,
   buildPurchaseOrderSaveCommand,
@@ -33,6 +34,7 @@ import {
   parsePurchaseOrderRouteId,
   parsePurchaseOrderTipo,
   PURCHASE_ORDER_COLUMN_OPTIONS,
+  PurchaseOrderFormState,
   recalculatePurchaseOrderLinesForRecargo,
   removePurchaseOrderLine,
   updatePurchaseOrderLineBarcode,
@@ -1422,5 +1424,101 @@ describe('purchase-order.component.private', (): void => {
     expect(command.lineas[0]?.descuentoBps).toBe(0);
 
     expect(line.pucMicros).toBe(634_980);
+  });
+
+  it('construye la misma huella para estados equivalentes tras normalización', (): void => {
+    const state: PurchaseOrderFormState = createExistingPurchaseOrderFormState(createPedido());
+
+    const line: PurchaseOrderLineState = createExistingPurchaseOrderLineState(
+      createPedidoLinea({
+        codigoBarras: '  EXTRA-20  ',
+      }),
+    );
+
+    const firstFingerprint: string = buildPurchaseOrderDirtyFingerprint(
+      {
+        ...state,
+        numero: '  FAC-8  ',
+        observaciones: '   ',
+        columnasVisibles: [4, 1],
+      },
+      [line],
+    );
+
+    const secondFingerprint: string = buildPurchaseOrderDirtyFingerprint(
+      {
+        ...state,
+        numero: 'FAC-8',
+        observaciones: '',
+        columnasVisibles: [1, 4],
+      },
+      [
+        {
+          ...line,
+          codigoBarras: 'EXTRA-20',
+          stockActual: 999,
+          stockFinal: 1003,
+          observacionesPedido: 'Dato visual actualizado',
+        },
+      ],
+    );
+
+    expect(firstFingerprint).toBe(secondFingerprint);
+  });
+
+  it('detecta cambios persistibles de cabecera y líneas', (): void => {
+    const state: PurchaseOrderFormState = createExistingPurchaseOrderFormState(createPedido());
+
+    const line: PurchaseOrderLineState = createExistingPurchaseOrderLineState(createPedidoLinea());
+
+    const fingerprint: string = buildPurchaseOrderDirtyFingerprint(state, [line]);
+
+    expect(
+      buildPurchaseOrderDirtyFingerprint(
+        {
+          ...state,
+          portesMicros: state.portesMicros + 1,
+        },
+        [line],
+      ),
+    ).not.toBe(fingerprint);
+
+    expect(
+      buildPurchaseOrderDirtyFingerprint(state, [
+        {
+          ...line,
+          unidades: line.unidades + 1,
+        },
+      ]),
+    ).not.toBe(fingerprint);
+  });
+
+  it('detecta cambios de orden entre líneas', (): void => {
+    const state: PurchaseOrderFormState = createExistingPurchaseOrderFormState(createPedido());
+
+    const firstLine: PurchaseOrderLineState =
+      createExistingPurchaseOrderLineState(createPedidoLinea());
+
+    const secondLine: PurchaseOrderLineState = createExistingPurchaseOrderLineState(
+      createPedidoLinea({
+        id: 21,
+        publicId: 'order-line-21',
+        idArticulo: 9,
+        localizador: 267960,
+      }),
+    );
+
+    expect(buildPurchaseOrderDirtyFingerprint(state, [firstLine, secondLine])).not.toBe(
+      buildPurchaseOrderDirtyFingerprint(state, [secondLine, firstLine]),
+    );
+  });
+
+  it('puede obtener la huella de un pedido nuevo todavía sin proveedor', (): void => {
+    const state: PurchaseOrderFormState = createNewPurchaseOrderFormState(
+      false,
+      new Date(2026, 8, 13),
+    );
+
+    expect(() => buildPurchaseOrderDirtyFingerprint(state, [])).not.toThrow();
   });
 });

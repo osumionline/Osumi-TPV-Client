@@ -1,6 +1,7 @@
 import type { Routes } from '@angular/router';
 import applicationProblemGuard from '@guards/application-problem.guard';
 import notInstalledGuard from '@guards/not-installed.guard';
+import pendingChangesGuard from '@guards/pending-changes.guard';
 import readyApplicationGuard from '@guards/ready-application.guard';
 import startupGuard from '@guards/startup.guard';
 
@@ -34,12 +35,14 @@ const routes: Routes = [
   {
     path: 'compras/pedido',
     canActivate: [readyApplicationGuard],
+    canDeactivate: [pendingChangesGuard],
     loadComponent: () =>
       import('@modules/compras/pedidos/pages/purchase-order/purchase-order.component'),
   },
   {
     path: 'compras/pedido/:idPedido',
     canActivate: [readyApplicationGuard],
+    canDeactivate: [pendingChangesGuard],
     loadComponent: () =>
       import('@modules/compras/pedidos/pages/purchase-order/purchase-order.component'),
   },

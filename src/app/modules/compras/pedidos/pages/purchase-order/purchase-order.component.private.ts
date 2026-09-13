@@ -813,6 +813,49 @@ export function normalizePurchaseOrderColumns(value: unknown): readonly number[]
 }
 
 /**
+ * Construye una huella estable del estado persistible
+ * actualmente editable de un Pedido.
+ */
+export function buildPurchaseOrderDirtyFingerprint(
+  state: PurchaseOrderFormState,
+  lines: readonly PurchaseOrderLineState[],
+): string {
+  const columnasVisibles: number[] = [
+    ...normalizePurchaseOrderColumns(state.columnasVisibles),
+  ].sort((first: number, second: number): number => first - second);
+
+  return JSON.stringify({
+    idProveedor: state.idProveedor,
+    idTipoPago: state.idTipoPago,
+    formaPago: normalizeOptionalText(state.formaPago),
+    tipo: state.tipo,
+    numero: normalizeOptionalText(state.numero),
+    portesMicros: state.portesMicros,
+    descuentoGlobalBps: state.descuentoGlobalBps,
+    fechaPedido: normalizeOptionalText(state.fechaPedido),
+    fechaPago: normalizeOptionalText(state.fechaPago),
+    recargoEquivalencia: state.recargoEquivalencia,
+    europeo: state.europeo,
+    observaciones: normalizeOptionalText(state.observaciones),
+    columnasVisibles,
+    lineas: lines.map((line: PurchaseOrderLineState, index: number) => ({
+      id: line.id,
+      idArticulo: line.idArticulo,
+      orden: index,
+      codigoBarras: normalizeOptionalText(line.codigoBarras),
+      unidades: line.unidades,
+      palbMicros: line.palbMicros,
+      pucMicros: line.pucMicros,
+      pvpMicros: line.pvpMicros,
+      margenMicroporcentaje: line.margenMicroporcentaje,
+      ivaBps: line.ivaBps,
+      recargoEquivalenciaBps: line.recargoEquivalenciaBps,
+      descuentoBps: line.descuentoBps,
+    })),
+  });
+}
+
+/**
  * Construye el comando de persistencia a partir del estado
  * editable actual de la ficha.
  */
