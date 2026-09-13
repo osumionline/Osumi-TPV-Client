@@ -179,8 +179,8 @@ export default class PedidosService {
   }
 
   /**
-   * Crea o actualiza una cabecera de Pedido.Crea o actualiza un Pedido pendiente junto
-   * con sus líneas editables.
+   * Crea o actualiza un Pedido junto con sus líneas
+   * y valores económicos persistibles.
    */
   async savePedido(command: PedidoSaveCommand): Promise<number> {
     const record: PedidoSaveRecord = this.normalizeSaveCommand(command);
@@ -368,6 +368,19 @@ export default class PedidosService {
       throw new Error('La configuración de columnas del pedido no es válida.');
     }
 
+    this.validatePedidoEconomicValue(command.importeMicros, 'El importe del pedido no es válido.');
+
+    this.validatePedidoEconomicValue(command.portesMicros, 'Los portes del pedido no son válidos.');
+
+    this.validatePedidoEconomicValue(
+      command.descuentoGlobalBps,
+      'El descuento global del pedido no es válido.',
+    );
+
+    if (command.descuentoGlobalBps > 10_000) {
+      throw new Error('El descuento global del pedido debe estar entre 0 % y 100 %.');
+    }
+
     return {
       id: command.id,
       idProveedor: command.idProveedor,
@@ -375,6 +388,9 @@ export default class PedidosService {
       formaPago: this.normalizeOptionalText(command.formaPago, 100),
       tipo: command.tipo,
       numero: this.normalizeOptionalText(command.numero, 200),
+      importeMicros: command.importeMicros,
+      portesMicros: command.portesMicros,
+      descuentoGlobalBps: command.descuentoGlobalBps,
       fechaPedido: this.normalizePedidoDate(command.fechaPedido),
       fechaPago: this.normalizePedidoDate(command.fechaPago),
       recargoEquivalencia: command.recargoEquivalencia,
@@ -383,6 +399,16 @@ export default class PedidosService {
       columnasVisibles,
       lineas: this.normalizeSaveLineas(command.lineas),
     };
+  }
+
+  /**
+   * Valida un valor económico entero y no negativo
+   * perteneciente a la cabecera de Pedido.
+   */
+  private validatePedidoEconomicValue(value: number, message: string): void {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error(message);
+    }
   }
 
   /**

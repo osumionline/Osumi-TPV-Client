@@ -41,6 +41,9 @@ class FakePedidosRepository implements PedidosRepository {
     formaPago: 'Domiciliación bancaria',
     tipo: 'factura',
     numero: 'ORD-9',
+    importeMicros: 28_670_000,
+    portesMicros: 1_000_000,
+    descuentoGlobalBps: 500,
     fechaPedido: '2026-09-10',
     fechaPago: '2026-09-11',
     fechaRecepcionado: null,
@@ -265,6 +268,9 @@ function createSaveCommand(overrides: Partial<PedidoSaveCommand> = {}): PedidoSa
     formaPago: 'Domiciliación bancaria',
     tipo: 'factura',
     numero: 'ORD-77',
+    importeMicros: 0,
+    portesMicros: 0,
+    descuentoGlobalBps: 0,
     fechaPedido: '2026-09-10',
     fechaPago: null,
     recargoEquivalencia: true,
@@ -447,6 +453,9 @@ describe('PedidosService', (): void => {
       formaPago: 'Domiciliación bancaria',
       tipo: 'factura',
       numero: 'ORD-9',
+      importeMicros: 28_670_000,
+      portesMicros: 1_000_000,
+      descuentoGlobalBps: 500,
       fechaPedido: '2026-09-10',
       fechaPago: '2026-09-11',
       fechaRecepcionado: null,
@@ -561,6 +570,9 @@ describe('PedidosService', (): void => {
       formaPago: 'Domiciliación bancaria',
       tipo: 'factura',
       numero: 'ORD-100',
+      importeMicros: 0,
+      portesMicros: 0,
+      descuentoGlobalBps: 0,
       fechaPedido: '2026-09-10',
       fechaPago: null,
       recargoEquivalencia: true,
@@ -867,5 +879,33 @@ describe('PedidosService', (): void => {
     await expect(service.searchPedidoArticulos('A'.repeat(201))).rejects.toThrow(
       'El texto de búsqueda de artículos es demasiado largo.',
     );
+  });
+
+  it('rechaza valores económicos globales inválidos', async (): Promise<void> => {
+    const service = new PedidosService(new FakePedidosRepository());
+
+    await expect(
+      service.savePedido(
+        createSaveCommand({
+          importeMicros: -1,
+        }),
+      ),
+    ).rejects.toThrow('El importe del pedido no es válido.');
+
+    await expect(
+      service.savePedido(
+        createSaveCommand({
+          portesMicros: -1,
+        }),
+      ),
+    ).rejects.toThrow('Los portes del pedido no son válidos.');
+
+    await expect(
+      service.savePedido(
+        createSaveCommand({
+          descuentoGlobalBps: 10_001,
+        }),
+      ),
+    ).rejects.toThrow('El descuento global del pedido debe estar entre 0 % y 100 %.');
   });
 });

@@ -17,6 +17,7 @@ import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-l
 import type PurchaseOrderLineTaxChange from '@model/compras/pedidos/purchase-order-line-tax-change.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
 import type PurchaseOrderTaxPair from '@model/compras/pedidos/purchase-order-tax-pair.interface';
+import PurchaseOrderTotalsCalculator from '@model/compras/pedidos/purchase-order-totals-calculator';
 
 /**
  * Convierte las listas paralelas IVA/RE de configuración
@@ -498,6 +499,9 @@ export interface PurchaseOrderFormState {
   readonly formaPago: string | null;
   readonly tipo: PedidoTipo;
   readonly numero: string;
+  readonly importeMicros: number;
+  readonly portesMicros: number;
+  readonly descuentoGlobalBps: number;
   readonly fechaPedido: string;
   readonly fechaPago: string;
   readonly fechaRecepcionado: string | null;
@@ -598,6 +602,9 @@ export function createNewPurchaseOrderFormState(
     formaPago: null,
     tipo: 'albaran',
     numero: '',
+    importeMicros: 0,
+    portesMicros: 0,
+    descuentoGlobalBps: 0,
     fechaPedido: formatCivilDate(today),
     fechaPago: '',
     fechaRecepcionado: null,
@@ -623,6 +630,9 @@ export function createExistingPurchaseOrderFormState(
     formaPago: pedido.formaPago,
     tipo: pedido.tipo,
     numero: pedido.numero ?? '',
+    importeMicros: pedido.importeMicros,
+    portesMicros: pedido.portesMicros,
+    descuentoGlobalBps: pedido.descuentoGlobalBps,
     fechaPedido: normalizeCivilDateValue(pedido.fechaPedido),
     fechaPago: normalizeCivilDateValue(pedido.fechaPago),
     fechaRecepcionado: pedido.fechaRecepcionado,
@@ -814,6 +824,15 @@ export function buildPurchaseOrderSaveCommand(
     throw new Error('Debes seleccionar un proveedor.');
   }
 
+  const importeMicros: number = state.recepcionado
+    ? state.importeMicros
+    : PurchaseOrderTotalsCalculator.calcular(
+        lines,
+        state.portesMicros,
+        state.descuentoGlobalBps,
+        state.recargoEquivalencia,
+      ).totalFacturaMicros;
+
   return {
     id: state.id,
     idProveedor: state.idProveedor,
@@ -821,6 +840,9 @@ export function buildPurchaseOrderSaveCommand(
     formaPago: normalizeOptionalText(state.formaPago),
     tipo: state.tipo,
     numero: normalizeOptionalText(state.numero),
+    importeMicros,
+    portesMicros: state.portesMicros,
+    descuentoGlobalBps: state.descuentoGlobalBps,
     fechaPedido: normalizeOptionalText(state.fechaPedido),
     fechaPago: normalizeOptionalText(state.fechaPago),
     recargoEquivalencia: state.recargoEquivalencia,

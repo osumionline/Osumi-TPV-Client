@@ -38,6 +38,9 @@ export interface PedidoCabeceraDatabaseRow {
   readonly forma_pago: string | null;
   readonly tipo: PedidoTipoRecord;
   readonly numero: string | null;
+  readonly importe_micros: number;
+  readonly portes_micros: number;
+  readonly descuento_bps: number;
   readonly fecha_pedido: string | null;
   readonly fecha_pago: string | null;
   readonly fecha_recepcionado: string | null;
@@ -60,6 +63,9 @@ export interface PedidoCurrentStateDatabaseRow {
   readonly id_proveedor: number;
   readonly id_tipo_pago: number | null;
   readonly forma_pago: string | null;
+  readonly importe_micros: number;
+  readonly portes_micros: number;
+  readonly descuento_bps: number;
   readonly recargo_equivalencia: number;
   readonly recepcionado: number;
 }

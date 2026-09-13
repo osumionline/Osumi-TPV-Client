@@ -10,6 +10,9 @@ export interface PedidoCabeceraRecord {
   readonly formaPago: string | null;
   readonly tipo: PedidoTipoRecord;
   readonly numero: string | null;
+  readonly importeMicros: number;
+  readonly portesMicros: number;
+  readonly descuentoGlobalBps: number;
   readonly fechaPedido: string | null;
   readonly fechaPago: string | null;
   readonly fechaRecepcionado: string | null;
@@ -42,6 +45,9 @@ export interface PedidoSaveRecord {
   readonly formaPago: string | null;
   readonly tipo: PedidoTipoRecord;
   readonly numero: string | null;
+  readonly importeMicros: number;
+  readonly portesMicros: number;
+  readonly descuentoGlobalBps: number;
   readonly fechaPedido: string | null;
   readonly fechaPago: string | null;
   readonly recargoEquivalencia: boolean;

@@ -73,6 +73,9 @@ function createPedido(overrides: Partial<PedidoCabeceraInterface> = {}): PedidoC
     formaPago: 'Tarjeta',
     tipo: 'factura',
     numero: 'FAC-8',
+    importeMicros: 28_670_000,
+    portesMicros: 1_000_000,
+    descuentoGlobalBps: 500,
     fechaPedido: '2026-09-10 10:30:00',
     fechaPago: null,
     fechaRecepcionado: null,
@@ -155,6 +158,9 @@ describe('purchase-order.component.private', (): void => {
       formaPago: null,
       tipo: 'albaran',
       numero: '',
+      importeMicros: 0,
+      portesMicros: 0,
+      descuentoGlobalBps: 0,
       fechaPedido: '2026-09-11',
       fechaPago: '',
       fechaRecepcionado: null,
@@ -179,6 +185,9 @@ describe('purchase-order.component.private', (): void => {
     expect(result.numero).toBe('FAC-8');
     expect(result.observaciones).toBe('Observaciones');
     expect(result.columnasVisibles).toEqual([1, 4]);
+    expect(result.importeMicros).toBe(28_670_000);
+    expect(result.portesMicros).toBe(1_000_000);
+    expect(result.descuentoGlobalBps).toBe(500);
   });
 
   it('añade el proveedor histórico cuando no está entre los activos', (): void => {
@@ -307,6 +316,8 @@ describe('purchase-order.component.private', (): void => {
       formaPago: '  Tarjeta  ',
       tipo: 'factura' as const,
       numero: '  FAC-100  ',
+      portesMicros: 1_000_000,
+      descuentoGlobalBps: 1000,
       fechaPedido: '2026-09-11',
       fechaPago: '   ',
       recargoEquivalencia: true,
@@ -332,6 +343,9 @@ describe('purchase-order.component.private', (): void => {
       formaPago: 'Tarjeta',
       tipo: 'factura',
       numero: 'FAC-100',
+      importeMicros: 3_547_928,
+      portesMicros: 1_000_000,
+      descuentoGlobalBps: 1000,
       fechaPedido: '2026-09-11',
       fechaPago: null,
       recargoEquivalencia: true,
@@ -369,6 +383,26 @@ describe('purchase-order.component.private', (): void => {
         },
       ],
     });
+  });
+
+  it('conserva el importe persistido al guardar un pedido recepcionado', (): void => {
+    const state = createExistingPurchaseOrderFormState(
+      createPedido({
+        recepcionado: true,
+        fechaRecepcionado: '2026-09-12',
+        importeMicros: 603_990_000,
+        portesMicros: 15_000_000,
+        descuentoGlobalBps: 300,
+      }),
+    );
+
+    const command = buildPurchaseOrderSaveCommand(state, []);
+
+    expect(command.importeMicros).toBe(603_990_000);
+
+    expect(command.portesMicros).toBe(15_000_000);
+
+    expect(command.descuentoGlobalBps).toBe(300);
   });
 
   it('rechaza el guardado de un pedido sin proveedor', (): void => {

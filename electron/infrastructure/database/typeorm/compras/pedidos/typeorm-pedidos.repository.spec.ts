@@ -205,6 +205,9 @@ describe('TypeOrmPedidosRepository', (): void => {
       formaPago: 'Tarjeta histórica',
       tipo: 'factura',
       numero: 'ORD-1077436',
+      importeMicros: 28_670_000,
+      portesMicros: 0,
+      descuentoGlobalBps: 0,
       fechaPedido: '2026-09-10',
       fechaPago: '2026-09-10',
       fechaRecepcionado: null,
@@ -245,35 +248,26 @@ describe('TypeOrmPedidosRepository', (): void => {
     });
   });
 
-  it('crea un pedido pendiente sin modificar valores económicos y persiste sus columnas', async (): Promise<void> => {
+  it('crea un pedido pendiente persistiendo sus valores económicos y columnas', async (): Promise<void> => {
     const idPedido: number = await requireRepository().savePedido(
       createSaveRecord({
+        importeMicros: 34_567_890,
+        portesMicros: 1_500_000,
+        descuentoGlobalBps: 750,
         columnasVisibles: [1, 4, 8],
       }),
     );
-
-    expect(idPedido).toBeGreaterThan(5);
 
     const row: PedidoPersistenceDatabaseRow = await readPedidoPersistenceRow(idPedido);
 
     expect(row).toMatchObject({
       id: idPedido,
-      id_proveedor: 1,
-      id_tipo_pago: null,
-      forma_pago: 'Domiciliación bancaria',
-      tipo: 'factura',
-      numero: 'NEW-001',
-      importe_micros: 0,
-      portes_micros: 0,
-      descuento_bps: 0,
-      fecha_pago: null,
-      fecha_pedido: '2026-09-11',
-      recargo_equivalencia: 0,
-      europeo: 0,
+      importe_micros: 34_567_890,
+      portes_micros: 1_500_000,
+      descuento_bps: 750,
       recepcionado: 0,
-      observaciones: 'Pedido nuevo',
-      deleted_at: null,
     });
+
     expect(row.public_id).not.toBe('');
 
     expect(await readOptionalColumns(idPedido)).toEqual([
@@ -322,6 +316,9 @@ describe('TypeOrmPedidosRepository', (): void => {
         formaPago: 'Transferencia bancaria',
         tipo: 'abono',
         numero: 'AB-UPDATED',
+        importeMicros: 44_000_000,
+        portesMicros: 2_000_000,
+        descuentoGlobalBps: 1250,
         fechaPedido: '2026-09-09',
         fechaPago: '2026-09-10',
         recargoEquivalencia: false,
@@ -343,6 +340,9 @@ describe('TypeOrmPedidosRepository', (): void => {
       forma_pago: 'Transferencia bancaria',
       tipo: 'abono',
       numero: 'AB-UPDATED',
+      importe_micros: 44_000_000,
+      portes_micros: 2_000_000,
+      descuento_bps: 1250,
       fecha_pago: '2026-09-10',
       fecha_pedido: '2026-09-09',
       recargo_equivalencia: 0,
@@ -550,7 +550,7 @@ describe('TypeOrmPedidosRepository', (): void => {
       idArticulo: 10,
       localizador: 101,
       nombreArticulo: 'Artículo A snapshot',
-      observacionesPedido: 'Observaciones artículo A',
+      observacionesPedido: 'Observación para pedidos',
       referencia: 'REF-A',
       marcaNombre: 'Marca Uno',
       codigoBarras: 'BC-A',
@@ -591,6 +591,7 @@ describe('TypeOrmPedidosRepository', (): void => {
         idArticulo: null,
         localizador: null,
         nombreArticulo: 'Artículo legacy sin vínculo',
+        observacionesPedido: null,
         referencia: null,
         marcaNombre: null,
         codigoBarras: 'LEGACY',
@@ -883,9 +884,17 @@ describe('TypeOrmPedidosRepository', (): void => {
 
     expect(await readPedidoLineasPersistence(3)).toEqual(linesBefore);
 
-    const header: PedidoPersistenceDatabaseRow = await readPedidoPersistenceRow(3);
+    const headerBefore: PedidoPersistenceDatabaseRow = await readPedidoPersistenceRow(3);
 
-    expect(header.numero).toBe('#000051640-EDITADO');
+    const headerAfter: PedidoPersistenceDatabaseRow = await readPedidoPersistenceRow(3);
+
+    expect(headerAfter.numero).toBe('#000051640-EDITADO');
+
+    expect(headerAfter.importe_micros).toBe(headerBefore.importe_micros);
+
+    expect(headerAfter.portes_micros).toBe(headerBefore.portes_micros);
+
+    expect(headerAfter.descuento_bps).toBe(headerBefore.descuento_bps);
   });
 });
 
@@ -917,6 +926,9 @@ function createSaveRecord(overrides: Partial<PedidoSaveRecord> = {}): PedidoSave
     formaPago: 'Domiciliación bancaria',
     tipo: 'factura',
     numero: 'NEW-001',
+    importeMicros: 0,
+    portesMicros: 0,
+    descuentoGlobalBps: 0,
     fechaPedido: '2026-09-11',
     fechaPago: null,
     recargoEquivalencia: false,

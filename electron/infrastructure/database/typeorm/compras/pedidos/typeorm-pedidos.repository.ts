@@ -41,7 +41,7 @@ import { randomUUID } from 'node:crypto';
 import type { DataSource, QueryRunner } from 'typeorm';
 
 /**
- * Gestiona las consultas SQLite de los listados de Pedidos.
+ * Gestiona las consultas SQLite propias de Pedidos.
  */
 export default class TypeOrmPedidosRepository implements PedidosRepository {
   /**
@@ -152,6 +152,9 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
         pe.forma_pago,
         pe.tipo,
         pe.numero,
+        pe.importe_micros,
+        pe.portes_micros,
+        pe.descuento_bps,
         pe.fecha_pedido,
         pe.fecha_pago,
         pe.fecha_recepcionado,
@@ -197,6 +200,9 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
       formaPago: row.forma_pago,
       tipo: row.tipo,
       numero: row.numero,
+      importeMicros: row.importe_micros,
+      portesMicros: row.portes_micros,
+      descuentoGlobalBps: row.descuento_bps,
       fechaPedido: row.fecha_pedido,
       fechaPago: row.fecha_pago,
       fechaRecepcionado: row.fecha_recepcionado,
@@ -431,6 +437,9 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
               forma_pago,
               tipo,
               numero,
+              importe_micros,
+              portes_micros,
+              descuento_bps,
               fecha_pago,
               fecha_pedido,
               recargo_equivalencia,
@@ -439,7 +448,7 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
               created_at,
               updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `,
             [
               randomUUID(),
@@ -448,6 +457,9 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
               formaPago,
               command.tipo,
               command.numero,
+              command.importeMicros,
+              command.portesMicros,
+              command.descuentoGlobalBps,
               command.fechaPago,
               command.fechaPedido,
               command.recargoEquivalencia ? 1 : 0,
@@ -471,6 +483,9 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
               forma_pago = ?,
               tipo = ?,
               numero = ?,
+              importe_micros = ?,
+              portes_micros = ?,
+              descuento_bps = ?,
               fecha_pago = ?,
               fecha_pedido = ?,
               recargo_equivalencia = ?,
@@ -487,6 +502,9 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
               formaPago,
               command.tipo,
               command.numero,
+              current?.recepcionado === 1 ? current.importe_micros : command.importeMicros,
+              current?.recepcionado === 1 ? current.portes_micros : command.portesMicros,
+              current?.recepcionado === 1 ? current.descuento_bps : command.descuentoGlobalBps,
               command.fechaPago,
               command.fechaPedido,
               current?.recepcionado === 1
@@ -559,6 +577,9 @@ export default class TypeOrmPedidosRepository implements PedidosRepository {
           id_proveedor,
           id_tipo_pago,
           forma_pago,
+          importe_micros,
+          portes_micros,
+          descuento_bps,
           recargo_equivalencia,
           recepcionado
         FROM pedido
