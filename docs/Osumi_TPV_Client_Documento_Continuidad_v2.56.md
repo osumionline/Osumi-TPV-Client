@@ -1,9 +1,9 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.55  
+**Versión:** 2.56  
 **Fecha:** 13 de septiembre de 2026  
-**Base de continuidad:** `v2.55 + main` una vez este documento se suba al repositorio.  
-**Documento anterior:** `Osumi_TPV_Client_Documento_Continuidad_v2.54.md`
+**Base de continuidad:** `v2.56 + main` una vez este documento se suba al repositorio.  
+**Documento anterior:** `Osumi_TPV_Client_Documento_Continuidad_v2.55.md`
 
 ---
 
@@ -37,11 +37,15 @@ CTRL Normalización de controles                   ✅ CERRADA
   16.5 Líneas + buscador de artículos             ✅ CERRADO
   16.6 Motor económico global                     ✅ CERRADO
   16.7 Dirty state + navegación segura            ✅ CERRADO
-  16.8 Integración Pedido → Artículos             🟦 EN DESARROLLO
+  16.8 Integración Pedido → Artículos             ✅ CERRADO
     16.8A Recuperar artículo de Pedido por ID      ✅
-    16.8B Flujo visible Pedido ↔ Artículos         ⬅️ SIGUIENTE
-  16.9 PDFs                                       ⬜
-  16.10 Recepción atómica                         ⬜
+    16.8B Flujo visible Pedido ↔ Artículos         ✅
+  16.9 PDFs                                       ✅ CERRADO
+    16.9A Lectura de PDFs                         ✅
+    16.9B Adjuntar + almacenamiento gestionado    ✅
+    16.9C Panel renderer                          ✅
+    16.9D Abrir + eliminar seguro                 ✅
+  16.10 Recepción atómica                         ⬅️ SIGUIENTE
   16.11 Pedido recepcionado                       ⬜
   16.12 Regresión integral de Pedidos             ⬜
   16.13 Marcas                                    ⬜
@@ -54,7 +58,7 @@ TicketBAI ordinario permanece cerrado. `12C.9 — TicketBAI devoluciones/mixtas`
 
 El **Hito 15 — Almacén**, la pausa REF y CTRL siguen cerrados. No reabrirlos por ajustes de Compras salvo regresión real.
 
-Desde `v2.54` se han cerrado completamente las líneas de Pedido, el motor económico global y el guard de navegación. El Pedido pendiente ya persiste cabecera + líneas + economía global de forma atómica sin tocar Artículos canónicos, y la ficha dispone de dirty state real. El punto activo es ahora la integración con Artículos.
+Desde `v2.55` se han cerrado por completo la integración Pedido ↔ Artículos y la gestión de PDFs. Un Pedido guardado y limpio ya puede crear un artículo nuevo y recuperarlo por ID al volver; los recepcionados ocultan por completo la zona de Localizador/alta de artículo. Los PDFs ya se leen, adjuntan, validan, almacenan, abren y eliminan de forma segura tanto en pendientes como en recepcionados. El punto activo pasa a ser **16.10 — Recepción atómica**, el primer bloque que aplicará efectos canónicos sobre Artículos.
 
 # 2. Punto exacto de continuación
 
@@ -70,102 +74,78 @@ CTRL.2
 16.5 completo
 16.6 completo
 16.7 completo
-16.8A
+16.8 completo
+16.9 completo
 ```
 
 El siguiente punto exacto es:
 
 ```text
-16.8B — Flujo visible Pedido → Artículos → Pedido
+16.10 — Recepción atómica del Pedido
 ```
 
-Base técnica ya preparada en `16.8A`:
-
-```text
-ComprasService.getPedidoArticuloById(idArticulo)
-→ preload
-→ IPC
-→ PedidosService
-→ PedidosRepository
-→ TypeOrmPedidosRepository
-→ PedidoArticuloInterface canónico
-```
-
-La resolución por ID existe expresamente para el retorno desde Artículos. **No usar localizador** para ese retorno, porque la resolución exacta de Compras conserva prioridad funcional:
-
-```text
-código numérico:
-  acceso_directo
-  → localizador
-  → barcode activo
-
-código no numérico:
-  barcode activo
-```
-
-y un localizador numérico podría colisionar con un acceso directo.
-
-Objetivo de `16.8B`:
-
-```text
-Pedido guardado + limpio
-→ botón + junto a Localizador
-→ abrir Artículos en una ficha nueva con contexto explícito de retorno
-→ usuario guarda el artículo
-→ preguntar si quiere volver al Pedido
-→ si acepta: volver a /compras/pedido/:idPedido
-→ recuperar el artículo recién creado por idArticulo
-→ añadirlo al pedido con unidades = 0
-→ enfocar/select Unidades
-```
-
-Reglas ya acordadas para este flujo:
-
-```text
-pedido nuevo sin guardar
-→ no puede iniciar el flujo
-
-pedido con cambios dirty
-→ no transportar esos cambios ocultos a Artículos
-→ exigir guardar/limpiar antes de salir
-
-retorno
-→ contexto explícito de navegación/sesión
-→ no depender de heurísticas por URL
-
-artículo recién creado
-→ recuperar por ID
-→ no volver a resolver por localizador
-
-si el artículo ya estuviera en el pedido
-→ no duplicar
-→ enfocar Unidades de la línea existente
-```
-
-Estado funcional cerrado antes de entrar en `16.8B`:
+Estado previo ya preparado:
 
 ```text
 Pedido pendiente
-→ cabecera editable
-→ líneas persistidas
-→ nueva línea unidades 0
-→ Localizador/ArticleSearch compartido
-→ selección múltiple
-→ orden/borrado
-→ código adicional pendiente
-→ observaciones de artículo mediante icono info_outline + tooltip
-→ PALB / descuento línea / IVA↔RE / PUC / PVP / Margen
-→ Subtotal por línea
-→ Portes
-→ descuento global
-→ desglose IVA/RE
-→ totales globales
-→ UE + Total sin IVA
-→ dirty fingerprint
-→ canDeactivate + beforeunload
+→ cabecera + líneas + economía persistidas
+→ dirty/navigation guard
+→ artículos nuevos por flujo Pedido ↔ Artículos
+→ PDFs gestionados independientemente
+→ Guardar NO modifica Artículos canónicos
+
+Recepcionar
+→ será el único momento que aplique stock/precios/barcode/histórico
 ```
 
-Guardar un borrador sigue significando únicamente persistir el borrador. No modifica stock, precios canónicos, códigos de barras canónicos ni históricos de artículo.
+Reglas de recepción ya acordadas y que no deben reinterpretarse:
+
+```text
+Proveedor obligatorio
+al menos una línea
+TODAS las líneas con unidades > 0
+artículos reales/activos y coherentes
+nuevos códigos adicionales globalmente únicos
+
+una única transacción
+→ releer artículos canónicos
+→ capturar stock previo
+→ sumar unidades
+→ actualizar PALB / PUC / PVP canónicos
+→ persistir código adicional pendiente si procede
+→ crear histórico ARTICULO tipo PEDIDO = 3
+→ enlazar histórico con id_pedido
+→ fijar stock_actual_snapshot / stock_final_snapshot
+→ fijar fecha_recepcionado real
+→ marcar pedido recepcionado
+→ COMMIT
+
+cualquier error
+→ ROLLBACK completo
+```
+
+Principios especialmente importantes antes de empezar `16.10`:
+
+- **Guardar borrador ≠ Recepcionar**. No mover efectos canónicos al guardado normal.
+- `Abono` sigue siendo solo tipo documental; no convertir la recepción en lógica de devolución.
+- No permitir recepcionar si existe alguna línea con `unidades = 0`.
+- El stock previo debe releerse dentro de la transacción; el valor mostrado mientras el Pedido estaba abierto no es autoridad para la recepción.
+- Los snapshots nuevos deben representar exactamente el stock inmediatamente anterior y posterior a esa recepción.
+- El código adicional pendiente solo se vuelve canónico al recepcionar y debe validarse de nuevo contra la unicidad global dentro de la operación.
+- `historico_articulo.tipo = PEDIDO = 3` y debe quedar relacionado con `id_pedido`.
+- No desarrollar Marcas ni Proveedores hasta cerrar Pedidos.
+
+Por tamaño y riesgo, `16.10` debe dividirse en mini-hitos pequeños pero completos. Antes del primer patch hay que revisar `main` actual de:
+
+```text
+schema de pedido / linea_pedido / articulo / codigo_barras / historico_articulo
+TypeOrmPedidosRepository
+repositorios/servicios que ya escriben Artículos e históricos
+constantes de tipo histórico PEDIDO = 3
+fixtures TypeORM actuales
+```
+
+No empezar por la UI de `Recepcionar`. Primero cerrar contrato, validaciones y transacción backend; después exponer IPC/renderer y, por último, regresión funcional de rollback y snapshots.
 
 # 3. Repositorios y referencias
 
@@ -2170,28 +2150,27 @@ Tras eliminar se marca limpio antes de navegar, de modo que no aparece una segun
 
 El dirty state cubre cambios de cabecera, líneas, orden, unidades, economía, Portes y Descuento global sin necesidad de llamadas `markDirty()` dispersas.
 
-# 34. Pedido → crear nuevo Artículo
+# 34. Pedido → crear nuevo Artículo ✅ CERRADO
 
-El objetivo funcional completo sigue siendo:
+El flujo está completamente implementado y validado:
 
 ```text
-Pedido guardado + limpio
+Pedido guardado + limpio + pendiente
 → icono + junto al Localizador
-→ crear artículo
-→ abrir ficha nueva en Artículos
+→ Artículos
+→ crear borrador nuevo automáticamente
 → usuario guarda
 → preguntar si quiere volver al Pedido
-→ volver
-→ añadir artículo recién creado
-→ unidades = 0
-→ foco Unidades
+→ volver al Pedido original
+→ recuperar artículo por idArticulo exacto
+→ añadir línea con unidades = 0
+→ enfocar/select Unidades
+→ Pedido queda dirty hasta Guardar
 ```
 
-`16.8` se ha dividido en dos partes.
+## 34.1 Recuperación exacta por ID ✅
 
-## 34.1 16.8A — Recuperación exacta por ID ✅
-
-Ya está implementada la vertical completa:
+Vertical completa:
 
 ```text
 ComprasService.getPedidoArticuloById(idArticulo)
@@ -2202,128 +2181,318 @@ ComprasService.getPedidoArticuloById(idArticulo)
 → TypeOrmPedidosRepository
 ```
 
-La consulta reutiliza el mismo `PEDIDO_ARTICULO_SELECT` canónico que resolución/búsqueda y exige:
+La consulta reutiliza `PEDIDO_ARTICULO_SELECT`, exige artículo activo y evita cualquier ambigüedad con `acceso_directo`/`localizador`.
+
+No sustituir este retorno por `resolvePedidoArticulo(localizador)`.
+
+## 34.2 Contexto explícito de navegación ✅
+
+Existe el contrato compartido:
 
 ```text
-a.id = ?
-a.deleted_at IS NULL
+PurchaseOrderArticleFlowState
+  idPedido
+  idArticulo
 ```
 
-El resultado es `PedidoArticuloInterface`, con:
+con utilidades de parsing/validación y una clave explícita de estado de navegación.
+
+No se usan heurísticas por URL ni estado global oculto.
+
+## 34.3 Salida desde Pedido ✅
+
+El botón `+` solo puede iniciar el flujo cuando:
 
 ```text
-id / publicId / localizador
-nombre / referencia / marca
-stock
-PALB / PUC / PVP / margen
-IVA / RE
-flag código adicional
-observaciones
-mostrarObservacionesPedidos
+Pedido tiene id persistido
+Pedido NO está recepcionado
+Pedido está limpio
+no hay processing en curso
 ```
 
-El service valida que el ID sea entero seguro positivo.
+Un Pedido dirty debe guardarse o descartarse primero.
 
-Este método existe para que el retorno desde Artículos sea inequívoco. No sustituirlo por `resolvePedidoArticulo(localizador)`.
+## 34.4 Artículos ✅
 
-## 34.2 16.8B — SIGUIENTE: flujo visible y contexto de retorno
-
-Pendiente implementar:
+Al entrar con contexto de Pedido:
 
 ```text
-botón + junto a Localizador
-reglas de disponibilidad del botón
-contexto de navegación/sesión Pedido → Artículos
-creación automática de borrador nuevo en Artículos
-captura del idArticulo guardado
-pregunta de retorno tras guardar
-navegación al Pedido original
-consumo seguro del contexto de retorno
-getPedidoArticuloById(idArticulo)
-añadir línea / resolver duplicado
-unidades = 0
-focusUnits()
+→ ArticulosService.crearBorrador()
+→ se crea una ficha nueva específica para el flujo
 ```
 
-Reglas:
+Al guardar esa ficha nueva se pregunta si se desea volver al Pedido.
 
-```text
-Pedido debe estar guardado
-Pedido debe estar limpio
-no transportar dirty oculto
-no usar localizador como identidad de retorno
-no crear línea duplicada
-```
-
-Si el usuario rechaza volver:
+Si el usuario elige No:
 
 ```text
 → permanece en Artículos
-→ no modificar el Pedido
+→ no modifica el Pedido
 ```
 
-Si el artículo se da de baja o deja de estar disponible antes del retorno:
+Si el usuario cierra/descarta la ficha contextual, se limpia el contexto de creación para no producir retornos accidentales posteriores.
+
+## 34.5 Retorno al Pedido ✅
+
+Al volver:
 
 ```text
-getPedidoArticuloById() → null
-→ manejarlo de forma explícita
-→ no inventar datos
+idPedido debe coincidir con el Pedido actual
+idArticulo debe ser válido
+→ ComprasService.getPedidoArticuloById(idArticulo)
+→ addPurchaseOrderArticles(...)
 ```
 
-No copiar literalmente mecanismos temporales del TPV antiguo si la arquitectura actual permite un contexto explícito más limpio.
-
-# 35. PDFs de Pedido
-
-Parte inferior:
+Si el artículo ya estuviera en líneas:
 
 ```text
-PDFs
-→ Adjuntar PDF
-→ listado
-→ abrir/previsualizar
-→ eliminar
+→ no duplicar
+→ enfocar Unidades de la existente
 ```
 
-Casos típicos:
+Si es nuevo:
 
 ```text
-albarán recibido por email
+→ unidades = 0
+→ línea renderer nueva
+→ foco Unidades
+→ fingerprint pasa a dirty
+```
+
+El estado persistido se marca limpio **antes** de incorporar el artículo retornado; así la línea nueva queda correctamente detectada como cambio pendiente.
+
+## 34.6 Pedido recepcionado — ajuste visual definitivo ✅
+
+En recepcionados no se muestran controles que nunca podrán usarse:
+
+```text
+Localizador
+botón + Crear artículo
+buscador asociado
+```
+
+Se usa `showArticleEntry = !order.recepcionado` en vez de limitarse a deshabilitarlos.
+
+No usar `disabled()` para decidir esta visibilidad, porque `disabled()` también puede ser temporal durante `processing()` y no debe hacer desaparecer la zona en un Pedido pendiente mientras se guarda.
+
+# 35. PDFs de Pedido ✅ CERRADO
+
+La gestión completa de PDFs está implementada tanto para Pedidos pendientes como recepcionados.
+
+```text
+leer
+adjuntar
+almacenar
+listar
+abrir
+eliminar
+limpiar físicamente cuando corresponde
+```
+
+Los PDFs son documentación independiente del snapshot económico/stock y **no forman parte del dirty fingerprint**: adjuntar/eliminar persiste inmediatamente.
+
+## 35.1 Modelo SQLite y contrato público ✅
+
+Se reutiliza el esquema adelantado:
+
+```text
+archivo
+pedido_archivo
+```
+
+Tipos de relación:
+
+```text
+albaran
 factura
-documentación original del proveedor
+abono
+documento
+otro
 ```
 
-## 35.1 Persistencia
-
-La base de datos guarda referencia/metadatos.
-
-El archivo debe persistirse físicamente en almacenamiento controlado por Electron.
-
-No depender de la ruta original elegida por el usuario.
-
-## 35.2 Eliminación
-
-Eliminar:
+El renderer recibe `PedidoArchivoInterface` con metadata segura:
 
 ```text
-→ pedir confirmación
-→ eliminar relación
-→ borrar físicamente cuando corresponda
+id de pedido_archivo
+publicId de la relación
+ tipo
+nombre
+mimeType
+sizeBytes
+createdAt
 ```
 
-Evitar dejar archivos huérfanos.
-
-## 35.3 Pedido recepcionado
-
-Los PDFs siguen siendo editables:
+No se exponen al renderer:
 
 ```text
-se pueden añadir
-se pueden eliminar
+relative_path
+internal_name
+id_archivo
+ruta absoluta
 ```
 
-porque son documentación/información, no valores económicos ni de stock.
+## 35.2 Lectura ✅
 
----
+Vertical completa:
+
+```text
+ComprasService.getPedidoArchivos(idPedido)
+→ preload / IPC
+→ PedidosService
+→ TypeOrmPedidosRepository
+→ pedido_archivo + archivo
+```
+
+Solo devuelve:
+
+```text
+pedido activo
+archivo activo
+purpose = order_document
+mime_type = application/pdf
+```
+
+Para nombre visible se prioriza `original_name` y se usa `internal_name` como fallback.
+
+## 35.3 Adjuntar y almacenamiento gestionado ✅
+
+Flujo:
+
+```text
+diálogo nativo Electron
+→ seleccionar un único PDF
+→ validar fichero
+→ máximo 100 MB
+→ validar firma %PDF-
+→ SHA-256 en streaming
+→ files/orders/<publicId>.pdf
+→ INSERT archivo
+→ INSERT pedido_archivo
+```
+
+Convenciones:
+
+```text
+purpose = order_document
+mimeType = application/pdf
+files/orders
+internalName = <archivoPublicId>.pdf
+```
+
+El almacenamiento no carga el PDF completo en memoria.
+
+Si la copia física se completa pero falla la persistencia SQLite:
+
+```text
+→ limpiar la copia física
+→ propagar el error
+```
+
+El peor caso ante una interrupción abrupta entre filesystem y SQLite puede ser un fichero físico huérfano, nunca una referencia SQLite activa a un fichero destruido deliberadamente.
+
+El tipo de `pedido_archivo` nuevo se toma del tipo documental **persistido** del Pedido.
+
+Por eso `Adjuntar PDF` requiere:
+
+```text
+Pedido persistido
+Pedido limpio
+sin processing
+```
+
+No exige que el Pedido sea pendiente: un recepcionado también puede adjuntar documentación.
+
+## 35.4 Panel renderer ✅
+
+Existe `PurchaseOrderFilesComponent` en el footer junto a Totales.
+
+Muestra:
+
+```text
+nombre
+etiqueta de tipo
+tamaño legible
+icono PDF
+acciones
+```
+
+Pedido nuevo sin guardar:
+
+```text
+→ panel PDFs no aparece todavía
+```
+
+Pedido persistido:
+
+```text
+→ panel visible
+```
+
+Adjuntar, abrir o eliminar no marca dirty porque son operaciones persistidas inmediatamente.
+
+## 35.5 Abrir ✅
+
+El renderer envía exclusivamente:
+
+```text
+idPedido
+idPedidoArchivo
+```
+
+Backend valida que esa relación pertenezca exactamente al Pedido y resuelve `archivoPublicId`.
+
+`FilePedidoArchivoStorage.open()` construye la ruta gestionada y usa `shell.openPath()` con la aplicación predeterminada del sistema.
+
+Un fichero ausente (`ENOENT`) se normaliza a:
+
+```text
+El PDF solicitado no está disponible.
+```
+
+No filtrar rutas locales/errores `ENOENT` crudos al renderer.
+
+## 35.6 Eliminación segura y PDFs compartidos ✅
+
+Eliminar requiere confirmación en renderer.
+
+Transacción lógica:
+
+```text
+validar idPedido + idPedidoArchivo
+→ DELETE pedido_archivo
+→ contar referencias restantes al mismo id_archivo
+```
+
+Si quedan referencias:
+
+```text
+→ conservar archivo lógico
+→ conservar PDF físico
+```
+
+Si NO quedan referencias:
+
+```text
+→ soft-delete archivo (deleted_at)
+→ COMMIT
+→ intentar borrar físicamente files/orders/<archivoPublicId>.pdf
+```
+
+Esto protege especialmente documentos legacy que puedan compartir el mismo `archivo` entre varias relaciones.
+
+El borrado físico ocurre después de que SQLite ya esté consistente. Si el filesystem falla al eliminar un fichero ya desvinculado, se registra el error y puede quedar un fichero huérfano, pero no se revierte una operación lógica ya correcta ni se deja una referencia activa rota.
+
+## 35.7 Pedido recepcionado ✅
+
+Los PDFs siguen siendo gestionables:
+
+```text
+adjuntar
+abrir
+eliminar
+```
+
+porque son documentación/información y no modifican stock, economía ni históricos.
 
 # 36. Recepcionar Pedido
 
@@ -2654,6 +2823,29 @@ IDs opcionales conocidos:
 
 `Subtotal` es base y no forma parte de esta lista opcional.
 
+## 40.5 Archivos de Pedido
+
+La gestión documental usa:
+
+```text
+archivo
+pedido_archivo
+```
+
+`archivo` contiene metadata física/lógica del recurso gestionado; `pedido_archivo` contiene la relación y tipo documental.
+
+Convención para PDFs de Pedido:
+
+```text
+purpose = order_document
+mime_type = application/pdf
+relative_path = files/orders/<publicId>.pdf
+```
+
+`pedido_archivo` puede compartir un mismo `id_archivo` entre varias relaciones importadas. Por ello eliminar una relación **no implica** borrar automáticamente `archivo` ni el fichero físico: solo se limpian cuando ya no existen referencias.
+
+`archivo` usa baja lógica (`deleted_at`); `pedido_archivo` se elimina físicamente porque es una relación sin `deleted_at`.
+
 Principio durante desarrollo:
 
 ```text
@@ -2677,13 +2869,9 @@ CTRL.2 Artículos / quick creates                  ✅
 16.5  Líneas/búsqueda                             ✅ CERRADO
 16.6  Motor económico global                      ✅ CERRADO
 16.7  Dirty/navigation guard                      ✅ CERRADO
-
-16.8  Integración con Artículos                   🟦
-  16.8A Recuperar artículo por ID                 ✅
-  16.8B Flujo visible + retorno                   ⬅️ SIGUIENTE
-
-16.9  PDFs                                        ⬜
-16.10 Recepción atómica                           ⬜
+16.8  Integración con Artículos                   ✅ CERRADO
+16.9  PDFs                                        ✅ CERRADO
+16.10 Recepción atómica                           ⬅️ SIGUIENTE
 16.11 Pedido recepcionado                         ⬜
 16.12 Regresión Pedidos                           ⬜
 16.13 Marcas                                      ⬜
@@ -2703,7 +2891,9 @@ revisar main
 → siguiente
 ```
 
-No reabrir `16.5`, `16.6` o `16.7` salvo regresión real. El siguiente trabajo pertenece a `16.8B`.
+No reabrir `16.5`, `16.6`, `16.7`, `16.8` o `16.9` salvo regresión real. El siguiente trabajo pertenece a `16.10`.
+
+Por tamaño y riesgo, no implementar `16.10` como un único mega-patch: primero contrato/validaciones y transacción backend; después exposición y UI; finalmente regresión cross-layer/rollback.
 
 # 42. 16.1 — Base de Compras + auditoría de históricos ✅ CERRADO
 
@@ -3304,19 +3494,20 @@ visibles inicialmente
 → 5 Marca
 ```
 
-## 46.8 Aún pendiente fuera de 16.4
+## 46.8 Funcionalidad posterior — estado actual
 
-No confundir la cabecera ya cerrada con funcionalidades posteriores:
+La cabecera de `16.4` no debe confundirse con los bloques posteriores, aunque varios ya estén cerrados:
 
 ```text
-líneas
-buscador artículos
-motor económico
-dirty/navigation guard
-Pedido → Artículos
-PDFs
-recepción
+16.5 líneas/buscador                 ✅
+16.6 motor económico                 ✅
+16.7 dirty/navigation                ✅
+16.8 Pedido ↔ Artículos              ✅
+16.9 PDFs                            ✅
+16.10 recepción atómica              ⬅️ SIGUIENTE
 ```
+
+No reabrir la cabecera para implementar la recepción salvo que exista una dependencia real y explícita.
 
 # 47. 16.5 — Líneas + buscador de artículos ✅ CERRADO
 
@@ -3676,9 +3867,9 @@ La navegación Angular usa diálogo propio y cerrar/recargar utiliza confirmaci�
 
 `16.7` no debe reabrirse salvo regresión real.
 
-# 50. 16.8 — Integración Pedido → Artículos 🟦 EN DESARROLLO
+# 50. 16.8 — Integración Pedido → Artículos ✅ CERRADO
 
-`16.8` está en desarrollo.
+`16.8` está completamente implementado, probado y cerrado.
 
 ## 50.1 16.8A — Recuperar artículo de Pedido por ID ✅
 
@@ -3694,9 +3885,7 @@ preload
 ComprasService
 ```
 
-Valida ID positivo/seguro y solo devuelve artículos activos.
-
-Reutiliza `PEDIDO_ARTICULO_SELECT` y el mapping canónico de `PedidoArticuloInterface`.
+Valida ID positivo/seguro, devuelve solo artículos activos y reutiliza `PEDIDO_ARTICULO_SELECT` + mapping canónico de `PedidoArticuloInterface`.
 
 Motivo:
 
@@ -3708,92 +3897,249 @@ retorno desde Artículos
 
 No usar `resolvePedidoArticulo(localizador)` para el retorno.
 
-## 50.2 16.8B — SIGUIENTE
+## 50.2 16.8B — Flujo visible Pedido ↔ Artículos ✅
 
-Implementar el flujo visible:
+Existe contexto explícito:
 
 ```text
-Pedido guardado + limpio
+PurchaseOrderArticleFlowState
+purchaseOrderArticleFlow
+idPedido
+idArticulo
+```
+
+Salida:
+
+```text
+Pedido guardado + limpio + pendiente
 → botón + junto a Localizador
-→ Artículos
-→ crear borrador nuevo
-→ guardar artículo
+→ /articulos
+→ crearBorrador() específico
+```
+
+Guardado de artículo contextual:
+
+```text
 → preguntar retorno
-→ volver al Pedido original
-→ recuperar por getPedidoArticuloById(idArticulo)
-→ añadir
-→ unidades 0
-→ foco Unidades
+→ si No: permanecer en Artículos
+→ si Sí: volver al idPedido origen con idArticulo
 ```
 
-Hay que revisar `main` de Artículos antes de diseñar el contexto de retorno definitivo, especialmente:
+Retorno:
 
 ```text
-workspace de Artículos
-crearBorrador()
-guardar()
-selección/pestaña activa
-navegación actual desde otros módulos
+getPedidoArticuloById(idArticulo)
+→ addPurchaseOrderArticles()
+→ nuevo: unidades 0 + focusUnits
+→ duplicado: no duplicar + focusUnits existente
 ```
 
-No iniciar `16.9` hasta cerrar y validar `16.8B`.
+La línea retornada hace el Pedido dirty correctamente.
 
-# 51. 16.9 — PDFs
-
-Implementar:
+Pedido recepcionado:
 
 ```text
-selección PDF
-copia a almacenamiento controlado
-referencia DB
-listado
-apertura
-eliminación
-limpieza física
+Localizador + botón + + buscador
+→ no se renderizan
 ```
 
-Debe funcionar en:
+No mantenerlos simplemente deshabilitados.
+
+# 51. 16.9 — PDFs ✅ CERRADO
+
+`16.9` está completamente implementado, probado funcionalmente y cerrado.
+
+## 51.1 16.9A — Lectura ✅
 
 ```text
-pedido pendiente
-pedido recepcionado
+pedido_archivo + archivo
+→ TypeOrmPedidosRepository.getPedidoArchivos()
+→ PedidosService
+→ IPC/preload
+→ ComprasService.getPedidoArchivos()
 ```
 
----
+Solo PDFs activos `order_document`; rutas internas no se exponen al renderer.
 
-# 52. 16.10 — Recepción atómica
+## 51.2 16.9B — Adjuntar + almacenamiento ✅
 
-Implementar la transacción completa.
-
-Validaciones:
+`PedidoArchivosService` coordina:
 
 ```text
-proveedor
+ElectronPedidoArchivoDialog
+PedidoArchivoStorage
+PedidoArchivosRepository
+```
+
+`FilePedidoArchivoStorage`:
+
+```text
+máximo 100 MB
+firma %PDF-
+SHA-256 streaming
+files/orders/<archivoPublicId>.pdf
+```
+
+Persistencia lógica:
+
+```text
+archivo
++ pedido_archivo
+```
+
+Si SQLite falla después de copiar, se limpia el fichero físico recién creado.
+
+## 51.3 16.9C — Panel renderer ✅
+
+Existe `PurchaseOrderFilesComponent` en el footer de Pedido.
+
+```text
+nombre
+ tipo
+tamaño
+Adjuntar PDF
+```
+
+Un Pedido nuevo sin ID no muestra todavía el panel.
+
+Adjuntar requiere Pedido persistido + limpio; funciona también en recepcionados.
+
+## 51.4 16.9D — Abrir + eliminar ✅
+
+Abrir:
+
+```text
+idPedido + idPedidoArchivo
+→ validar pertenencia exacta
+→ resolver archivoPublicId
+→ shell.openPath(ruta gestionada)
+```
+
+`ENOENT` se normaliza a un error funcional y no se filtra la ruta local.
+
+Eliminar:
+
+```text
+confirmación renderer
+→ DELETE pedido_archivo
+→ contar otras referencias al mismo archivo
+```
+
+Con referencias restantes:
+
+```text
+→ conservar archivo y PDF físico
+```
+
+Sin referencias:
+
+```text
+→ soft-delete archivo
+→ COMMIT
+→ borrar PDF físico de forma best-effort
+```
+
+Este diseño protege archivos legacy compartidos.
+
+Los PDFs no forman parte del dirty state porque adjuntar/eliminar persiste inmediatamente.
+
+`16.9` no debe reabrirse salvo regresión real.
+
+# 52. 16.10 — Recepción atómica ⬅️ SIGUIENTE
+
+Este es el próximo hito activo y el primero que aplicará efectos canónicos sobre Artículos.
+
+No comenzar por el botón/UI. Primero diseñar y probar la operación backend atómica.
+
+## 52.1 Precondiciones conocidas
+
+```text
+Pedido existente
+Pedido todavía pendiente
+Proveedor válido
 líneas > 0
-todas unidades > 0
-artículos válidos
-códigos únicos
+TODAS las líneas con unidades > 0
+artículos vinculados válidos/activos
+nuevos códigos adicionales válidos y globalmente únicos
 ```
 
-Efectos:
+Cualquier dato que pueda haber cambiado desde que se cargó el Pedido debe releerse/validarse dentro de la transacción.
+
+## 52.2 Efectos atómicos acordados
+
+Dentro de una única transacción:
 
 ```text
-stock
-PALB
-PUC
-PVP
-código adicional
-histórico PEDIDO=3
-snapshot de stock
-fecha recepción
-estado recepcionado
+1. bloquear/validar estado actual del Pedido según permita SQLite/arquitectura vigente
+2. releer artículos canónicos de todas las líneas
+3. validar que el Pedido sigue pendiente
+4. validar unidades y consistencia de líneas
+5. validar unicidad de códigos adicionales pendientes
+6. capturar stock previo real
+7. stock final = stock previo + unidades
+8. actualizar stock canónico
+9. actualizar PALB canónico
+10. actualizar PUC canónico
+11. actualizar PVP canónico
+12. crear código adicional canónico si procede
+13. crear histórico_articulo tipo PEDIDO = 3 por los cambios requeridos
+14. enlazar histórico con id_pedido
+15. fijar stock_actual_snapshot de cada línea
+16. fijar stock_final_snapshot de cada línea
+17. fijar fecha_recepcionado real
+18. marcar Pedido como recepcionado
+19. COMMIT
 ```
 
-Todo o nada.
+Ante cualquier fallo:
 
-Tests cross-layer obligatorios.
+```text
+ROLLBACK completo
+```
 
----
+No debe existir stock, precios, barcode, histórico o snapshots parcialmente aplicados.
+
+## 52.3 Reglas que no deben cambiar
+
+```text
+Guardar borrador
+→ NO stock
+→ NO precios canónicos
+→ NO barcode canónico
+→ NO histórico PEDIDO
+
+Recepcionar
+→ único punto de aplicación canónica
+```
+
+`Abono` no altera esta semántica; sigue siendo un tipo documental informativo.
+
+La recepción no debe inventar stock histórico a partir de valores visuales del renderer: los snapshots se construyen con el artículo canónico releído en la transacción.
+
+## 52.4 Orden recomendado de trabajo
+
+Antes del primer patch revisar `main` actual de:
+
+```text
+TypeOrmPedidosRepository
+schema pedido / linea_pedido
+schema articulo / codigo_barras
+historico_articulo y sus writers actuales
+constantes de tipo histórico
+servicios/repositorios de Artículos
+fixtures TypeORM de Compras/Artículos
+```
+
+Dividir `16.10` al menos conceptualmente en:
+
+```text
+16.10A contrato + validaciones/backend base
+16.10B transacción TypeORM completa + rollback tests
+16.10C IPC/preload/renderer + confirmación Recepcionar
+16.10D regresión cross-layer y casos límite
+```
+
+Los nombres exactos pueden ajustarse tras revisar `main`; lo importante es no mezclar toda la recepción en un único bloque.
 
 # 53. 16.11 — Pedido recepcionado
 
@@ -4142,6 +4488,20 @@ compilación afectada
 - Para el retorno Artículos → Pedido usar `getPedidoArticuloById(idArticulo)`; no resolver el artículo recién creado por localizador.
 - El flujo `16.8B` solo debe salir desde un Pedido guardado y limpio; no transportar un borrador dirty oculto a Artículos.
 
+- `16.8` y `16.9` están cerrados; no reabrirlos salvo regresión real.
+- El flujo Pedido → Artículos solo sale desde un Pedido persistido, limpio y pendiente; el retorno transporta `idPedido` + `idArticulo` explícitos.
+- En un Pedido recepcionado la zona Localizador + alta de artículo no se renderiza; no mostrarla permanentemente deshabilitada.
+- Los PDFs de Pedido usan almacenamiento gestionado `files/orders/<archivoPublicId>.pdf`; no conservar ni exponer la ruta original elegida por el usuario.
+- Un PDF de Pedido nuevo debe validar tamaño máximo 100 MB, firma `%PDF-` y SHA-256 antes de registrar su relación.
+- El renderer no recibe `relative_path`, `internal_name`, `id_archivo` ni rutas absolutas de PDFs.
+- Los adjuntos no forman parte del dirty fingerprint: adjuntar, abrir y eliminar son operaciones inmediatas e independientes del Guardar del Pedido.
+- Los PDFs siguen siendo gestionables después de recepcionar.
+- No asumir que `pedido_archivo` es propietario exclusivo de `archivo`: archivos legacy pueden estar compartidos.
+- Al eliminar una relación PDF, conservar archivo/fichero si quedan referencias; solo soft-delete `archivo` y borrar físicamente cuando queda huérfano.
+- Abrir un PDF debe validar pertenencia exacta mediante `idPedido + idPedidoArchivo`; no aceptar un ID de relación de otro Pedido.
+- Un `ENOENT` al abrir PDF debe convertirse en error funcional y no filtrar la ruta local.
+- `16.10` es el único siguiente punto: no saltar a `16.11`, Marcas o Proveedores antes de cerrar la recepción atómica.
+
 # 59. Pendientes externos/no bloqueantes
 
 ```text
@@ -4167,53 +4527,55 @@ En una conversación nueva:
    - Hitos 13, 14 y 15 están cerrados;
    - REF está cerrada;
    - CTRL está cerrada;
-   - `16.1–16.7` están cerrados;
-   - `16.8A` está cerrado;
+   - `16.1–16.9` están cerrados;
 4. no reimplementar ni reabrir esos bloques;
 5. continuar exactamente con:
 
 ```text
-16.8B — Flujo visible Pedido → Artículos → Pedido
+16.10 — Recepción atómica
 ```
 
-6. revisar antes el `main` actual de Artículos para identificar la forma vigente de:
+6. **antes de proponer el primer patch**, revisar el `main` actual de:
 
 ```text
-crearBorrador()
-guardar()
-workspace/pestaña activa
-navegación y contextos de retorno existentes
+TypeOrmPedidosRepository
+PedidosService / repository contracts
+schema pedido / linea_pedido
+schema articulo / codigo_barras
+historico_articulo
+writers actuales de Artículos e históricos
+constantes de tipo histórico PEDIDO = 3
+fixtures/specs TypeORM relacionados
 ```
 
-7. diseñar un contexto explícito de retorno con al menos:
-
-```text
-idPedido origen
-intención de crear artículo para Pedido
-idArticulo recién guardado al retorno
-```
-
-8. el botón `+` de Pedido solo debe iniciar el flujo si el Pedido está guardado y limpio;
-9. tras guardar el artículo, preguntar si quiere volver al Pedido original;
-10. al volver, recuperar el artículo por `ComprasService.getPedidoArticuloById(idArticulo)`;
-11. añadirlo mediante las helpers ya existentes, con `unidades = 0`;
-12. si ya existe, no duplicar y enfocar Unidades;
-13. si el artículo ya no está activo/disponible, manejar `null` explícitamente;
-14. mantener la fingerprint dirty y el guard actuales; no introducir bypass global de navegación;
-15. todos los imports internos nuevos deben usar alias absolutos;
-16. si se amplía una interfaz, adaptar en el mismo bloque fakes/mocks/specs;
-17. todo método nuevo debe llevar JSDoc;
-18. no dejar tests descritos sin código;
-19. esperar tests + confirmación tras cada bloque;
-20. después de `16.8B` continuar con `16.9 — PDFs`, no con Marcas/Proveedores;
-21. no tocar TicketBAI `12C.9` sin información de Berein.
+7. no empezar por la UI de Recepcionar;
+8. definir primero un contrato/backend de recepción que pueda probarse sin renderer;
+9. mantener toda mutación canónica dentro de una única transacción;
+10. releer artículos/stock dentro de la transacción y no confiar en el stock mostrado al abrir la ficha;
+11. validar de nuevo códigos adicionales pendientes contra unicidad global;
+12. exigir todas las líneas con unidades > 0;
+13. fijar snapshots de stock previo/final desde los valores canónicos de la recepción real;
+14. crear histórico `PEDIDO = 3` enlazado al `id_pedido`;
+15. actualizar stock + PALB + PUC + PVP canónicos únicamente al recepcionar;
+16. cualquier error debe producir rollback integral;
+17. después de cerrar backend/transacción, añadir IPC/preload/renderer y confirmación de Recepcionar;
+18. mantener dirty/navigation guard actual; no crear autosave ni bypass general;
+19. PDFs son independientes de la recepción y deben seguir gestionables en recepcionados;
+20. todos los imports internos nuevos deben usar alias absolutos;
+21. si se amplía una interfaz, adaptar en el mismo bloque fakes/mocks/specs;
+22. todo método nuevo debe llevar JSDoc;
+23. no dejar tests descritos sin código;
+24. esperar tests + confirmación tras cada mini-hito;
+25. después de `16.10`, continuar con `16.11 — Pedido recepcionado` y luego `16.12 — Regresión integral de Pedidos`;
+26. no tocar Marcas/Proveedores hasta cerrar Pedidos;
+27. no tocar TicketBAI `12C.9` sin información nueva de Berein.
 
 # 61. Resumen ultracorto
 
 ```text
 Proyecto: Osumi TPV Client
 Continuidad: 13/09/2026
-Base: v2.55 + main
+Base: v2.56 + main
 
 Hito 13 Artículos ✅
 Hito 14 Clientes ✅
@@ -4233,58 +4595,63 @@ Hito 16 Compras 🟦
 16.5 Líneas/búsqueda ✅ CERRADO
 16.6 Motor económico global ✅ CERRADO
 16.7 Dirty/navigation ✅ CERRADO
+16.8 Pedido ↔ Artículos ✅ CERRADO
+16.9 PDFs ✅ CERRADO
+16.10 Recepción atómica ⬅️ SIGUIENTE
+16.11 Pedido recepcionado ⬜
+16.12 Regresión Pedidos ⬜
+16.13 Marcas ⬜
+16.14 Proveedores ⬜
 
-16.8 Pedido → Artículos 🟦
-  16.8A getPedidoArticuloById() end-to-end ✅
-  16.8B flujo visible + retorno ⬅️ SIGUIENTE
+16.8 cerrado incluye:
+→ getPedidoArticuloById() end-to-end
+→ contexto explícito idPedido/idArticulo
+→ + solo Pedido persistido + limpio + pendiente
+→ crear borrador nuevo en Artículos
+→ preguntar retorno tras Guardar
+→ volver al Pedido original
+→ añadir por ID, unidades 0, focusUnits
+→ duplicado no duplica
+→ recepcionado oculta Localizador + alta artículo
 
-16.5 cerrado incluye:
-→ localizador + ArticleSearch compartido
-→ selección múltiple
-→ unidades 0 + duplicado focusUnits
-→ ordenar/borrar
-→ barcode adicional pendiente
-→ observaciones info_outline + tooltip
-→ PurchaseOrderLineCalculator
-→ PALB/Dto./IVA↔RE/PUC/PVP/Margen/Total
-→ persistencia atómica de líneas
-→ sin efectos canónicos al Guardar
+16.9 cerrado incluye:
+→ getPedidoArchivos() end-to-end
+→ PedidoArchivoInterface sin rutas internas
+→ selector nativo PDF
+→ máximo 100 MB
+→ firma %PDF-
+→ SHA-256 streaming
+→ files/orders/<publicId>.pdf
+→ archivo + pedido_archivo
+→ limpieza física si falla alta SQLite
+→ panel PDFs junto a Totales
+→ adjuntar también en recepcionados
+→ shell.openPath para abrir
+→ ENOENT normalizado
+→ confirmación de borrado
+→ PDFs compartidos preservados mientras tengan referencias
+→ archivo soft-delete + fichero físico solo al quedar huérfano
+→ PDFs no forman parte del dirty state
 
-16.6 cerrado incluye:
-→ PurchaseOrderTotalsCalculator
-→ Portes
-→ Descuento global
-→ Subtotal línea/global
-→ varios IVA/RE
-→ Total beneficios / Total PVP
-→ Media margen legacy
-→ Total factura
-→ UE + Total sin IVA
-→ importe/portes/descuento persistidos
-→ regresión económica completa
-
-16.7 cerrado incluye:
-→ fingerprint persistible
-→ cleanFingerprint + dirty computed
-→ PendingChangesAware
-→ pendingChangesGuard
-→ beforeunload
-→ Guardar/Eliminar dejan estado limpio antes de navegar
-
-SIGUIENTE 16.8B:
-Pedido guardado + limpio
-→ botón + junto a Localizador
-→ Artículos / nuevo borrador
-→ Guardar
-→ preguntar retorno
-→ volver al idPedido origen
-→ getPedidoArticuloById(idArticulo)
-→ añadir línea unidades 0
-→ foco Unidades
+SIGUIENTE 16.10:
+Recepción atómica
+→ validar Pedido pendiente + proveedor
+→ líneas > 0
+→ TODAS unidades > 0
+→ releer artículos canónicos
+→ validar códigos adicionales
+→ snapshot stock previo
+→ sumar stock
+→ aplicar PALB/PUC/PVP canónicos
+→ crear barcode adicional canónico
+→ histórico PEDIDO = 3 + id_pedido
+→ snapshot stock final
+→ fecha_recepcionado real
+→ marcar recepcionado
+→ COMMIT
+→ cualquier fallo = ROLLBACK total
 
 Después:
-→ 16.9 PDFs
-→ 16.10 Recepción atómica
 → 16.11 Pedido recepcionado
 → 16.12 Regresión Pedidos
 → 16.13 Marcas
@@ -4304,6 +4671,8 @@ Reglas clave:
 → observaciones con tooltip, no alert
 → dirty por fingerprint, no booleanos manuales
 → retorno de artículo por ID, no localizador
+→ PDFs gestionados, sin rutas renderer
+→ recepción = único punto de efectos canónicos
 → test + build + lint + prueba funcional
 → confirmación
 → siguiente
