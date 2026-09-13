@@ -1,0 +1,74 @@
+:host {
+    display: block;
+    width: 100%;
+}
+
+.purchase-order-files {
+    overflow: hidden;
+    border: 1px solid var(--separator-color);
+    border-radius: 4px;
+}
+
+.purchase-order-files__header {
+    display: flex;
+    min-height: 49px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--separator-color);
+    background-color: var(--color-very-light-grey);
+
+    h2 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+    }
+}
+
+.purchase-order-files__empty {
+    padding: 18px 14px;
+    font-size: 13px;
+}
+
+.purchase-order-files__list {
+    display: flex;
+    flex-direction: column;
+}
+
+.purchase-order-files__item {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+
+    +.purchase-order-files__item {
+        border-top: 1px solid var(--separator-color);
+    }
+}
+
+.purchase-order-files__pdf-icon {
+    flex: 0 0 auto;
+    color: var(--color-red);
+}
+
+.purchase-order-files__details {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.purchase-order-files__name {
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.purchase-order-files__metadata {
+    font-size: 12px;
+    opacity: 0.7;
+}

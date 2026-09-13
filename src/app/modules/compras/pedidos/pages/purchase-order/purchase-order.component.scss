@@ -153,10 +153,25 @@
         }
     }
 
+    .purchase-order__footer {
+        display: flex;
+        align-items: flex-start;
+        gap: 20px;
+        margin-top: 20px;
+    }
+
+    .purchase-order__files-wrapper {
+        min-width: 0;
+        max-width: 520px;
+        flex: 1 1 360px;
+    }
+
     .purchase-order__totals-wrapper {
         display: flex;
+        min-width: 0;
+        flex: 0 1 760px;
         justify-content: flex-end;
-        margin-top: 20px;
+        margin-left: auto;
     }
 }
 
@@ -181,6 +196,26 @@
 
         .purchase-order__notes {
             grid-column: span 6;
+        }
+    }
+
+    .purchase-order__footer {
+        flex-direction: column;
+    }
+
+    .purchase-order__files-wrapper,
+    .purchase-order__totals-wrapper {
+        width: 100%;
+        max-width: none;
+        flex-basis: auto;
+    }
+
+    .purchase-order__totals-wrapper {
+        justify-content: stretch;
+        margin-left: 0;
+
+        otpv-purchase-order-totals {
+            width: 100%;
         }
     }
 }

@@ -19,6 +19,7 @@ import { MatSelect, type MatSelectChange } from '@angular/material/select';
 import { MatTooltip } from '@angular/material/tooltip';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import HeaderComponent from '@app/components/header/header.component';
+import type { PedidoArchivoInterface } from '@desktop-contracts/compras/pedidos/pedido-archivo.interface';
 import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type {
   PedidoCabeceraInterface,
@@ -46,6 +47,7 @@ import type { PurchaseOrderTotals } from '@model/compras/pedidos/purchase-order-
 import type PendingChangesAware from '@model/navigation/pending-changes-aware.interface';
 import Proveedor from '@model/proveedores/proveedor.model';
 import ProviderQuickCreateComponent from '@modules/articulos/components/provider-quick-create/provider-quick-create.component';
+import PurchaseOrderFilesComponent from '@modules/compras/pedidos/components/purchase-order-files/purchase-order-files.component';
 import PurchaseOrderLinesComponent from '@modules/compras/pedidos/components/purchase-order-lines/purchase-order-lines.component';
 import PurchaseOrderTotalsComponent from '@modules/compras/pedidos/components/purchase-order-totals/purchase-order-totals.component';
 import {
@@ -98,6 +100,7 @@ import type { Observable } from 'rxjs';
     ProviderQuickCreateComponent,
     PurchaseOrderLinesComponent,
     PurchaseOrderTotalsComponent,
+    PurchaseOrderFilesComponent,
     MatButton,
     MatCheckbox,
     MatFormField,
@@ -146,7 +149,9 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
   readonly creatingProveedor: WritableSignal<boolean> = signal<boolean>(false);
   readonly proveedorCreateError: WritableSignal<string | null> = signal<string | null>(null);
 
-  readonly processing: Signal<boolean> = computed((): boolean => this.saving() || this.deleting());
+  readonly processing: Signal<boolean> = computed(
+    (): boolean => this.saving() || this.deleting() || this.attachingPdf(),
+  );
   readonly saveSuccessful: WritableSignal<boolean> = signal<boolean>(false);
 
   private saveFeedbackTimeoutId: number | null = null;
@@ -157,11 +162,21 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
   readonly lines: WritableSignal<readonly PurchaseOrderLineState[]> = signal<
     readonly PurchaseOrderLineState[]
   >([]);
+  readonly files: WritableSignal<readonly PedidoArchivoInterface[]> = signal<
+    readonly PedidoArchivoInterface[]
+  >([]);
+
+  readonly attachingPdf: WritableSignal<boolean> = signal<boolean>(false);
   private readonly pendingUnitsFocusLineKey: WritableSignal<string | null> = signal<string | null>(
     null,
   );
   private readonly cleanFingerprint: WritableSignal<string | null> = signal<string | null>(null);
 
+  readonly canAttachPdf: Signal<boolean> = computed((): boolean => {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    return state !== null && state.id !== null && !this.processing() && !this.dirty();
+  });
   readonly dirty: Signal<boolean> = computed((): boolean => {
     const state: PurchaseOrderFormState | null = this.formState();
 
@@ -259,6 +274,20 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
       linesComponent.focusUnits(lineKey);
       this.pendingUnitsFocusLineKey.set(null);
     });
+  }
+
+  /**
+   * Abre el selector nativo y adjunta un PDF
+   * inmediatamente al Pedido persistido.
+   */
+  onAttachPdf(): void {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (state === null || state.id === null || !this.canAttachPdf()) {
+      return;
+    }
+
+    void this.attachPdf(state.id);
   }
 
   /**
@@ -663,6 +692,43 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
   }
 
   /**
+   * Ejecuta la incorporación física y lógica
+   * de un PDF y actualiza el listado visible.
+   */
+  private async attachPdf(idPedido: number): Promise<void> {
+    if (this.attachingPdf()) {
+      return;
+    }
+
+    this.attachingPdf.set(true);
+
+    try {
+      const file: PedidoArchivoInterface | null =
+        await this.comprasService.attachPedidoPdf(idPedido);
+
+      if (file === null) {
+        return;
+      }
+
+      this.files.update(
+        (currentFiles: readonly PedidoArchivoInterface[]): readonly PedidoArchivoInterface[] => [
+          ...currentFiles,
+          file,
+        ],
+      );
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido adjuntar el PDF.'),
+        })
+        .subscribe();
+    } finally {
+      this.attachingPdf.set(false);
+    }
+  }
+
+  /**
    * Incorpora el artículo recién creado cuando la
    * navegación actual vuelve desde Artículos.
    */
@@ -1035,11 +1101,12 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
         this.route.snapshot.paramMap.get('idPedido'),
       );
 
-      const [appData, options, pedido, lines]: [
+      const [appData, options, pedido, lines, files]: [
         Awaited<ReturnType<AppDataService['load']>>,
         PedidoFormOptionsInterface,
         PedidoCabeceraInterface | null,
         readonly PedidoLineaInterface[],
+        readonly PedidoArchivoInterface[],
       ] = await Promise.all([
         this.appDataService.load(),
         this.comprasService.getPedidoFormOptions(),
@@ -1047,6 +1114,9 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
         idPedido === null
           ? Promise.resolve<readonly PedidoLineaInterface[]>([])
           : this.comprasService.getPedidoLineas(idPedido),
+        idPedido === null
+          ? Promise.resolve<readonly PedidoArchivoInterface[]>([])
+          : this.comprasService.getPedidoArchivos(idPedido),
       ]);
 
       if (idPedido !== null && pedido === null) {
@@ -1060,6 +1130,7 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
           createExistingPurchaseOrderLineState(line),
         ),
       );
+      this.files.set(files);
       this.providerOptions.set(buildPurchaseOrderProviderOptions(options.proveedores, pedido));
       this.paymentOptions.set(buildPurchaseOrderPaymentOptions(options.tiposPago, pedido));
 
@@ -1083,6 +1154,7 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
 
       this.formState.set(null);
       this.lines.set([]);
+      this.files.set([]);
       this.providerOptions.set([]);
       this.paymentOptions.set([]);
       this.taxPairs.set([]);

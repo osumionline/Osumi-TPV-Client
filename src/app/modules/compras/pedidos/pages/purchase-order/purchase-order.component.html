@@ -280,20 +280,31 @@
                                        (taxChange)="onLineTaxChange($event)"
                                        (createArticleRequested)="onCreateArticleRequested()" />
 
-            @if (totals(); as orderTotals) {
-            <div class="purchase-order__totals-wrapper">
-                <otpv-purchase-order-totals [totals]="orderTotals"
-                                            [importeMicros]="order.importeMicros"
-                                            [portesMicros]="order.portesMicros"
-                                            [descuentoGlobalBps]="order.descuentoGlobalBps"
-                                            [recargoEquivalencia]="order.recargoEquivalencia"
-                                            [europeo]="order.europeo"
-                                            [recepcionado]="order.recepcionado"
-                                            [processing]="processing()"
-                                            (portesChange)="onPortesChange($event)"
-                                            (descuentoGlobalChange)="onDescuentoGlobalChange($event)" />
+            <div class="purchase-order__footer">
+                @if (order.id !== null) {
+                <div class="purchase-order__files-wrapper">
+                    <otpv-purchase-order-files [files]="files()"
+                                               [attaching]="attachingPdf()"
+                                               [canAttach]="canAttachPdf()"
+                                               (attachRequested)="onAttachPdf()" />
+                </div>
+                }
+
+                @if (totals(); as orderTotals) {
+                <div class="purchase-order__totals-wrapper">
+                    <otpv-purchase-order-totals [totals]="orderTotals"
+                                                [importeMicros]="order.importeMicros"
+                                                [portesMicros]="order.portesMicros"
+                                                [descuentoGlobalBps]="order.descuentoGlobalBps"
+                                                [recargoEquivalencia]="order.recargoEquivalencia"
+                                                [europeo]="order.europeo"
+                                                [recepcionado]="order.recepcionado"
+                                                [processing]="processing()"
+                                                (portesChange)="onPortesChange($event)"
+                                                (descuentoGlobalChange)="onDescuentoGlobalChange($event)" />
+                </div>
+                }
             </div>
-            }
         </div>
         }
     </section>

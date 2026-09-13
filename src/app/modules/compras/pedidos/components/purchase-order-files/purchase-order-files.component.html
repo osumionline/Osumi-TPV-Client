@@ -1,0 +1,53 @@
+<section class="purchase-order-files">
+    <header class="purchase-order-files__header">
+        <h2>
+            PDFs
+        </h2>
+
+        <button mat-stroked-button
+                type="button"
+                [disabled]="!canAttach() || attaching()"
+                (click)="requestAttach()">
+            <mat-icon>
+                attach_file
+            </mat-icon>
+
+            @if (attaching()) {
+            Adjuntando…
+            }
+            @else {
+            Adjuntar PDF
+            }
+        </button>
+    </header>
+
+    @if (files().length === 0) {
+    <div class="purchase-order-files__empty">
+        No hay ningún PDF adjunto.
+    </div>
+    }
+    @else {
+    <div class="purchase-order-files__list">
+        @for (file of files(); track file.id) {
+        <div class="purchase-order-files__item">
+            <mat-icon class="purchase-order-files__pdf-icon">
+                picture_as_pdf
+            </mat-icon>
+
+            <div class="purchase-order-files__details">
+                <span class="purchase-order-files__name"
+                      [matTooltip]="file.nombre">
+                    {{ file.nombre }}
+                </span>
+
+                <span class="purchase-order-files__metadata">
+                    {{ getTypeLabel(file.tipo) }}
+                    ·
+                    {{ getSizeLabel(file.sizeBytes) }}
+                </span>
+            </div>
+        </div>
+        }
+    </div>
+    }
+</section>
