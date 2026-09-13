@@ -34,9 +34,12 @@ import type PurchaseOrderLineState from '@model/compras/pedidos/purchase-order-l
 import PurchaseOrderLineTaxChange from '@model/compras/pedidos/purchase-order-line-tax-change.interface';
 import type PurchaseOrderLineUnitsChange from '@model/compras/pedidos/purchase-order-line-units-change.interface';
 import type PurchaseOrderTaxPair from '@model/compras/pedidos/purchase-order-tax-pair.interface';
+import PurchaseOrderTotalsCalculator from '@model/compras/pedidos/purchase-order-totals-calculator';
+import type { PurchaseOrderTotals } from '@model/compras/pedidos/purchase-order-totals.interface';
 import Proveedor from '@model/proveedores/proveedor.model';
 import ProviderQuickCreateComponent from '@modules/articulos/components/provider-quick-create/provider-quick-create.component';
 import PurchaseOrderLinesComponent from '@modules/compras/pedidos/components/purchase-order-lines/purchase-order-lines.component';
+import PurchaseOrderTotalsComponent from '@modules/compras/pedidos/components/purchase-order-totals/purchase-order-totals.component';
 import {
   addPurchaseOrderArticles,
   addPurchaseOrderProviderOption,
@@ -84,6 +87,7 @@ import { getErrorMessage } from '@utils/error.utils';
     HeaderComponent,
     ProviderQuickCreateComponent,
     PurchaseOrderLinesComponent,
+    PurchaseOrderTotalsComponent,
     MatButton,
     MatCheckbox,
     MatFormField,
@@ -138,6 +142,20 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
   readonly taxPairs: WritableSignal<readonly PurchaseOrderTaxPair[]> = signal<
     readonly PurchaseOrderTaxPair[]
   >([]);
+  readonly totals: Signal<PurchaseOrderTotals | null> = computed((): PurchaseOrderTotals | null => {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (state === null) {
+      return null;
+    }
+
+    return PurchaseOrderTotalsCalculator.calcular(
+      this.lines(),
+      state.portesMicros,
+      state.descuentoGlobalBps,
+      state.recargoEquivalencia,
+    );
+  });
 
   readonly columnOptions: readonly PurchaseOrderColumnOption[] = PURCHASE_ORDER_COLUMN_OPTIONS;
 
@@ -473,6 +491,51 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
         })
         .subscribe();
     }
+  }
+
+  /**
+   * Actualiza los portes económicos de un Pedido pendiente.
+   */
+  onPortesChange(portesMicros: number): void {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (
+      state === null ||
+      state.recepcionado ||
+      this.processing() ||
+      !Number.isSafeInteger(portesMicros) ||
+      portesMicros < 0 ||
+      portesMicros === state.portesMicros
+    ) {
+      return;
+    }
+
+    this.updateState({
+      portesMicros,
+    });
+  }
+
+  /**
+   * Actualiza el descuento global de un Pedido pendiente.
+   */
+  onDescuentoGlobalChange(descuentoGlobalBps: number): void {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (
+      state === null ||
+      state.recepcionado ||
+      this.processing() ||
+      !Number.isSafeInteger(descuentoGlobalBps) ||
+      descuentoGlobalBps < 0 ||
+      descuentoGlobalBps > 10_000 ||
+      descuentoGlobalBps === state.descuentoGlobalBps
+    ) {
+      return;
+    }
+
+    this.updateState({
+      descuentoGlobalBps,
+    });
   }
 
   /**

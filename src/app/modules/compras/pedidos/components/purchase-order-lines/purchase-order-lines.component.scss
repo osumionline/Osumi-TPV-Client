@@ -47,6 +47,11 @@
     tbody tr:last-child td {
         border-bottom: 0;
     }
+
+    .purchase-order-lines__barcode,
+    .purchase-order-lines__tax {
+        text-align: center;
+    }
 }
 
 .purchase-order-lines__description {
@@ -59,7 +64,7 @@
 }
 
 .purchase-order-lines__number {
-    text-align: right !important;
+    text-align: center !important;
     white-space: nowrap;
 }
 
@@ -78,7 +83,7 @@
 
 .purchase-order-lines__units-input {
     width: 7ch;
-    text-align: right;
+    text-align: center;
 }
 
 .purchase-order-lines__order-actions {
@@ -98,12 +103,9 @@
     text-align: center !important;
 }
 
-.purchase-order-lines__barcode {
-    text-align: center;
-}
-
 .purchase-order-lines__barcode-input {
     width: 16ch;
+    text-align: center;
 }
 
 .purchase-order-lines__barcode-existing {
@@ -112,22 +114,21 @@
 
 .purchase-order-lines__money-input {
     width: 10ch;
-    text-align: right;
+    text-align: center;
 }
 
 .purchase-order-lines__percent-input {
     width: 7ch;
-    text-align: right;
+    text-align: center;
 }
 
-.purchase-order-lines__tax {
+.purchase-order-lines__table .purchase-order-lines__tax {
     white-space: nowrap;
-    text-align: right;
 }
 
 .purchase-order-lines__tax-select {
     width: 8ch;
-    text-align: right;
+    text-align: center;
 }
 
 .purchase-order-lines__tax-separator {

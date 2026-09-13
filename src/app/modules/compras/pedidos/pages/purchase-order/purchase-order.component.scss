@@ -152,6 +152,12 @@
             flex: 0 0 auto;
         }
     }
+
+    .purchase-order__totals-wrapper {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 20px;
+    }
 }
 
 @media (width <=1200px) {

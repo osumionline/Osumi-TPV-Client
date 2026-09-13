@@ -1,0 +1,213 @@
+<section class="purchase-order-totals">
+    <h2 class="purchase-order-totals__title">
+        Totales
+    </h2>
+
+    <div class="purchase-order-totals__grid">
+        <div class="purchase-order-totals__column">
+            <div class="purchase-order-totals__row">
+                <span>Total líneas</span>
+
+                <strong>
+                    {{ totals().totalLineas }}
+                </strong>
+            </div>
+
+            <div class="purchase-order-totals__row">
+                <span>Total artículos</span>
+
+                <strong>
+                    {{ totals().totalArticulos }}
+                </strong>
+            </div>
+
+            <div class="purchase-order-totals__row">
+                <span>Total beneficios</span>
+
+                <strong>
+                    {{
+                      totals().totalBeneficiosMicros
+                        | microsToEuros
+                        | number: '1.2-2'
+                    }} €
+                </strong>
+            </div>
+
+            <div class="purchase-order-totals__row">
+                <span>Total PVP</span>
+
+                <strong>
+                    {{
+                      totals().totalPvpMicros
+                        | microsToEuros
+                        | number: '1.2-2'
+                    }} €
+                </strong>
+            </div>
+
+            <div class="purchase-order-totals__row">
+                <span>Portes</span>
+
+                @if (!recepcionado()) {
+                <div class="purchase-order-totals__editor">
+                    <input class="otpv-control purchase-order-totals__economic-input"
+                           type="text"
+                           inputmode="decimal"
+                           autocomplete="off"
+                           [disabled]="processing()"
+                           [value]="getEconomicInputValue('portes')"
+                           (focus)="onEconomicFocus('portes', $event)"
+                           (input)="onEconomicInput('portes', $event)"
+                           (blur)="onEconomicBlur('portes', $event)">
+
+                    <span class="purchase-order-totals__suffix">
+                        €
+                    </span>
+                </div>
+                }
+                @else {
+                <strong>
+                    {{
+                      portesMicros()
+                        | microsToEuros
+                        | number: '1.2-2'
+                    }} €
+                </strong>
+                }
+            </div>
+
+            <div class="purchase-order-totals__row">
+                <span>Media margen</span>
+
+                <strong>
+                    {{
+                      totals().mediaMargenMicroporcentaje
+                        / 1_000_000
+                        | number: '1.0-2'
+                    }} %
+                </strong>
+            </div>
+        </div>
+
+        <div class="purchase-order-totals__column">
+            <div class="purchase-order-totals__row">
+                <span>Subtotal</span>
+
+                <strong>
+                    {{
+                      totals().subtotalMicros
+                        | microsToEuros
+                        | number: '1.2-2'
+                    }} €
+                </strong>
+            </div>
+
+            @for (
+            tax of totals().desgloseFiscal;
+            track tax.ivaBps + ':' + tax.recargoEquivalenciaBps
+            ) {
+            <div class="purchase-order-totals__row purchase-order-totals__tax"
+                 [class.purchase-order-totals__tax--deemphasized]="europeo()">
+                <span>
+                    IVA
+                    {{
+                      tax.ivaBps
+                        | bpsToPercent
+                        | number: '1.0-2'
+                    }} %
+                </span>
+
+                <strong>
+                    {{
+                      tax.ivaMicros
+                        | microsToEuros
+                        | number: '1.2-2'
+                    }} €
+                </strong>
+            </div>
+
+            @if (
+            recargoEquivalencia() &&
+            tax.recargoEquivalenciaBps > 0
+            ) {
+            <div class="purchase-order-totals__row purchase-order-totals__tax"
+                 [class.purchase-order-totals__tax--deemphasized]="europeo()">
+                <span>
+                    R.E.
+                    {{
+                      tax.recargoEquivalenciaBps
+                        | bpsToPercent
+                        | number: '1.0-2'
+                    }} %
+                </span>
+
+                <strong>
+                    {{
+                      tax.recargoEquivalenciaMicros
+                        | microsToEuros
+                        | number: '1.2-2'
+                    }} €
+                </strong>
+            </div>
+            }
+            }
+
+            <div class="purchase-order-totals__row">
+                <span>Descuento global</span>
+
+                @if (!recepcionado()) {
+                <div class="purchase-order-totals__editor">
+                    <input class="otpv-control purchase-order-totals__economic-input"
+                           type="text"
+                           inputmode="decimal"
+                           autocomplete="off"
+                           [disabled]="processing()"
+                           [value]="getEconomicInputValue('descuento')"
+                           (focus)="onEconomicFocus('descuento', $event)"
+                           (input)="onEconomicInput('descuento', $event)"
+                           (blur)="onEconomicBlur('descuento', $event)">
+
+                    <span class="purchase-order-totals__suffix">
+                        %
+                    </span>
+                </div>
+                }
+                @else {
+                <strong>
+                    {{
+                      descuentoGlobalBps()
+                        | bpsToPercent
+                        | number: '1.0-2'
+                    }} %
+                </strong>
+                }
+            </div>
+
+            <div class="purchase-order-totals__row purchase-order-totals__row--total">
+                <span>Total factura</span>
+
+                <strong>
+                    {{
+                      displayedTotalMicros()
+                        | microsToEuros
+                        | number: '1.2-2'
+                    }} €
+                </strong>
+            </div>
+
+            @if (europeo()) {
+            <div class="purchase-order-totals__row purchase-order-totals__row--total">
+                <span>Total sin IVA</span>
+
+                <strong>
+                    {{
+                      totals().totalSinIvaMicros
+                        | microsToEuros
+                        | number: '1.2-2'
+                    }} €
+                </strong>
+            </div>
+            }
+        </div>
+    </div>
+</section>

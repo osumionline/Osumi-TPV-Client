@@ -36,7 +36,7 @@
                     }
 
                     @if (visibleColumnIds().has(6)) {
-                    <th>
+                    <th class="purchase-order-lines__barcode">
                         Cód. barras
                     </th>
                     }
@@ -68,7 +68,7 @@
                     }
 
                     @if (visibleColumnIds().has(13)) {
-                    <th class="purchase-order-lines__number">
+                    <th class="purchase-order-lines__tax">
                         IVA{{ recargoEquivalencia() ? ' + RE' : '' }}
                     </th>
                     }

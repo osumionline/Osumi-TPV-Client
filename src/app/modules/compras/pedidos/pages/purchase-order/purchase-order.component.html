@@ -275,6 +275,21 @@
                                        (lineDeleteRequested)="onLineDeleteRequested($event)"
                                        (economicChange)="onLineEconomicChange($event)"
                                        (taxChange)="onLineTaxChange($event)" />
+
+            @if (totals(); as orderTotals) {
+            <div class="purchase-order__totals-wrapper">
+                <otpv-purchase-order-totals [totals]="orderTotals"
+                                            [importeMicros]="order.importeMicros"
+                                            [portesMicros]="order.portesMicros"
+                                            [descuentoGlobalBps]="order.descuentoGlobalBps"
+                                            [recargoEquivalencia]="order.recargoEquivalencia"
+                                            [europeo]="order.europeo"
+                                            [recepcionado]="order.recepcionado"
+                                            [processing]="processing()"
+                                            (portesChange)="onPortesChange($event)"
+                                            (descuentoGlobalChange)="onDescuentoGlobalChange($event)" />
+            </div>
+            }
         </div>
         }
     </section>
