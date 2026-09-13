@@ -335,9 +335,15 @@ export interface AddPurchaseOrderArticleResult {
   readonly lineKey: string;
 }
 
+export interface PurchaseOrderArticleObservation {
+  readonly nombre: string;
+  readonly observaciones: string;
+}
+
 export interface AddPurchaseOrderArticlesResult {
   readonly lines: readonly PurchaseOrderLineState[];
   readonly duplicateLineKey: string | null;
+  readonly addedArticles: readonly PedidoArticuloInterface[];
 }
 
 /**
@@ -425,8 +431,8 @@ export function addPurchaseOrderArticle(
 
 /**
  * Incorpora varios artículos al Pedido en el orden recibido,
- * omitiendo duplicados y devolviendo la primera línea
- * existente que deba recibir el foco.
+ * omitiendo duplicados y devolviendo tanto las nuevas
+ * incorporaciones como la primera línea existente a enfocar.
  */
 export function addPurchaseOrderArticles(
   lines: readonly PurchaseOrderLineState[],
@@ -436,12 +442,16 @@ export function addPurchaseOrderArticles(
 
   let duplicateLineKey: string | null = null;
 
+  const addedArticles: PedidoArticuloInterface[] = [];
+
   for (const articulo of articulos) {
     const result: AddPurchaseOrderArticleResult = addPurchaseOrderArticle(resultLines, articulo);
 
     resultLines = result.lines;
 
-    if (!result.added && duplicateLineKey === null) {
+    if (result.added) {
+      addedArticles.push(articulo);
+    } else if (duplicateLineKey === null) {
       duplicateLineKey = result.lineKey;
     }
   }
@@ -449,7 +459,33 @@ export function addPurchaseOrderArticles(
   return {
     lines: resultLines,
     duplicateLineKey,
+    addedArticles,
   };
+}
+
+/**
+ * Obtiene las observaciones que deben mostrarse al incorporar
+ * artículos nuevos a un Pedido.
+ */
+export function getPurchaseOrderArticleObservations(
+  articulos: readonly PedidoArticuloInterface[],
+): readonly PurchaseOrderArticleObservation[] {
+  const result: PurchaseOrderArticleObservation[] = [];
+
+  for (const articulo of articulos) {
+    const observaciones: string = articulo.observaciones?.trim() ?? '';
+
+    if (!articulo.mostrarObservacionesPedidos || observaciones.length === 0) {
+      continue;
+    }
+
+    result.push({
+      nombre: articulo.nombre,
+      observaciones,
+    });
+  }
+
+  return result;
 }
 
 /**

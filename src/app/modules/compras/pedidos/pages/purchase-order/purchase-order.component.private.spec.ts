@@ -25,6 +25,7 @@ import {
   createExistingPurchaseOrderLineState,
   createNewPurchaseOrderFormState,
   createNewPurchaseOrderLineState,
+  getPurchaseOrderArticleObservations,
   getPurchaseOrderPaymentKey,
   movePurchaseOrderLine,
   normalizePurchaseOrderColumns,
@@ -38,6 +39,7 @@ import {
   updatePurchaseOrderLineTax,
   updatePurchaseOrderLineUnits,
   type AddPurchaseOrderArticlesResult,
+  type PurchaseOrderArticleObservation,
 } from '@modules/compras/pedidos/pages/purchase-order/purchase-order.component.private';
 import { describe, expect, it } from 'vitest';
 
@@ -581,6 +583,9 @@ describe('purchase-order.component.private', (): void => {
     expect(result.lines[1]?.unidades).toBe(0);
     expect(result.lines[2]?.unidades).toBe(0);
     expect(result.duplicateLineKey).toBe('line:20');
+    expect(
+      result.addedArticles.map((articulo: PedidoArticuloInterface): number => articulo.id),
+    ).toEqual([9, 10]);
   });
 
   it('mantiene el mismo estado cuando toda la selección múltiple ya existe', (): void => {
@@ -599,6 +604,7 @@ describe('purchase-order.component.private', (): void => {
 
     expect(result.lines).toBe(lines);
     expect(result.duplicateLineKey).toBe('line:20');
+    expect(result.addedArticles).toEqual([]);
   });
 
   it('actualiza las unidades y recalcula el stock final', (): void => {
@@ -1267,5 +1273,41 @@ describe('purchase-order.component.private', (): void => {
     expect(result[0]?.ivaBps).toBe(1000);
 
     expect(result[0]?.recargoEquivalenciaBps).toBe(140);
+  });
+
+  it('recupera únicamente observaciones configuradas para mostrarse en Pedidos', (): void => {
+    const result: readonly PurchaseOrderArticleObservation[] = getPurchaseOrderArticleObservations([
+      createPedidoArticulo({
+        id: 9,
+        nombre: 'Artículo con aviso',
+        observaciones: '  Revisar el lote recibido.  ',
+        mostrarObservacionesPedidos: true,
+      }),
+      createPedidoArticulo({
+        id: 10,
+        nombre: 'Artículo sin aviso',
+        observaciones: 'No debe mostrarse',
+        mostrarObservacionesPedidos: false,
+      }),
+      createPedidoArticulo({
+        id: 11,
+        nombre: 'Artículo vacío',
+        observaciones: '   ',
+        mostrarObservacionesPedidos: true,
+      }),
+      createPedidoArticulo({
+        id: 12,
+        nombre: 'Artículo sin observaciones',
+        observaciones: null,
+        mostrarObservacionesPedidos: true,
+      }),
+    ]);
+
+    expect(result).toEqual([
+      {
+        nombre: 'Artículo con aviso',
+        observaciones: 'Revisar el lote recibido.',
+      },
+    ]);
   });
 });

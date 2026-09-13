@@ -47,6 +47,7 @@ import {
   createExistingPurchaseOrderFormState,
   createExistingPurchaseOrderLineState,
   createNewPurchaseOrderFormState,
+  getPurchaseOrderArticleObservations,
   getPurchaseOrderPaymentKey,
   movePurchaseOrderLine,
   normalizePurchaseOrderColumns,
@@ -60,6 +61,7 @@ import {
   updatePurchaseOrderLineTax,
   updatePurchaseOrderLineUnits,
   type AddPurchaseOrderArticlesResult,
+  type PurchaseOrderArticleObservation,
   type PurchaseOrderColumnOption,
   type PurchaseOrderFormState,
   type PurchaseOrderPaymentOption,
@@ -74,7 +76,7 @@ import ProveedoresService from '@services/proveedores.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 /**
- * Muestra y edita en memoria la cabecera de un Pedido.
+ * Muestra y gestiona la ficha completa de un Pedido.
  */
 @Component({
   selector: 'otpv-purchase-order',
@@ -204,7 +206,7 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Inicia el guardado de la cabecera actualmente editada.
+   * Inicia el guardado del Pedido actualmente editado.
    */
   onSave(): void {
     void this.saveOrder();
@@ -328,6 +330,15 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
 
     if (result.duplicateLineKey !== null) {
       this.purchaseOrderLines()?.focusUnits(result.duplicateLineKey);
+    }
+
+    const observations: readonly PurchaseOrderArticleObservation[] =
+      getPurchaseOrderArticleObservations(result.addedArticles);
+
+    if (observations.length > 0) {
+      window.queueMicrotask((): void => {
+        this.showArticleObservations(observations);
+      });
     }
   }
 
@@ -473,6 +484,30 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy {
         })
         .subscribe();
     }
+  }
+
+  /**
+   * Muestra secuencialmente las observaciones de los
+   * artículos recién incorporados al Pedido.
+   */
+  private showArticleObservations(
+    observations: readonly PurchaseOrderArticleObservation[],
+    index: number = 0,
+  ): void {
+    const observation: PurchaseOrderArticleObservation | undefined = observations[index];
+
+    if (observation === undefined) {
+      return;
+    }
+
+    this.dialog
+      .alert({
+        title: `Observaciones: ${observation.nombre}`,
+        content: observation.observaciones,
+      })
+      .subscribe((): void => {
+        this.showArticleObservations(observations, index + 1);
+      });
   }
 
   /**
