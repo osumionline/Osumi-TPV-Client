@@ -1,9 +1,9 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.59  
+**Versión:** 2.60  
 **Fecha:** 14 de septiembre de 2026  
-**Base de continuidad:** `v2.59 + main` una vez este documento se suba al repositorio.  
-**Documento anterior:** `Osumi_TPV_Client_Documento_Continuidad_v2.58.md`
+**Base de continuidad:** `v2.60 + main` una vez este documento se suba al repositorio.  
+**Documento anterior:** `Osumi_TPV_Client_Documento_Continuidad_v2.59.md`
 
 ---
 
@@ -34,22 +34,17 @@ CTRL Normalización de controles                   ✅ CERRADA
 
   16.13 Marcas                                    🟦 EN DESARROLLO
     16.13.1 Snapshot histórico Marca en Ventas    ✅ CERRADO
-      16.13.1A Schema                             ✅
-      16.13.1B Ventas nuevas                      ✅
-      16.13.1C Import legacy                      ✅
-      16.13.1D Validación real                    ✅
-
     16.13.2 Backend CRUD/soft-delete              ✅ CERRADO
-      16.13.2A Repository                         ✅
-      16.13.2B Application Service                ✅
-      16.13.2C API / IPC / preload                ✅
-
-    16.13.3 Infraestructura logo                  🟦 EN DESARROLLO
+    16.13.3 Infraestructura logo                  ✅ CERRADO
       16.13.3A Persistencia SQLite                ✅
       16.13.3B Staging / promoción / rollback     ✅
-      16.13.3C Integración + regresión            ⬅️ SIGUIENTE
+      16.13.3C Integración pública brand_image    ✅
 
-    16.13.4 Workspace + pantalla base             ⬜
+    16.13.4 Workspace + pantalla base             🟦 EN DESARROLLO
+      16.13.4A Workspace                          ✅
+      16.13.4B Pantalla base inicial              ✅
+      16.13.4C Barra contextual Compras            ⬅️ SIGUIENTE
+
     16.13.5 Buscador en memoria                   ⬜
     16.13.6 Ficha Datos                           ⬜
     16.13.7 Backend Estadísticas                  ⬜
@@ -64,24 +59,41 @@ Star TSP100/TSP143 80 mm                          ⏸️ prueba física no bloqu
 
 TicketBAI ordinario permanece cerrado. `12C.9 — TicketBAI devoluciones/mixtas` sigue bloqueado hasta recibir respuesta o documentación actualizada de Berein.
 
-El **Hito 15 — Almacén**, la pausa REF, CTRL y **Pedidos 16.1–16.12** siguen cerrados. No reabrirlos salvo regresión real demostrada.
+El **Hito 15 — Almacén**, REF, CTRL y **Pedidos 16.1–16.12** siguen cerrados. No reabrirlos salvo regresión real demostrada.
 
-Desde `v2.57` se ha avanzado de forma importante en Marcas:
-
-```text
-16.13.1 Snapshot histórico Marca en Ventas        ✅ CERRADO
-16.13.2 Backend CRUD/soft-delete de Marcas        ✅ CERRADO
-16.13.3A Persistencia SQLite del logo             ✅
-16.13.3B Staging/promoción/rollback del logo      ✅
-```
-
-El punto exacto de continuación es:
+Desde `v2.59` se ha avanzado en Marcas:
 
 ```text
-16.13.3C — Integración + regresión de staging brand_image
+16.13.3C Integración pública brand_image          ✅ CERRADO
+16.13.4A Workspace                                ✅ CERRADO
+16.13.4B Pantalla base inicial                    ✅ CERRADO
 ```
 
-La versión **2.58 sustituye a 2.57** como documento de continuidad. Si `v2.57` todavía no se había subido al repositorio, no es necesario subir ambas.
+Además, el usuario ha realizado una reorganización amplia del frontend:
+
+```text
+/src/app/services
+→ servicios reorganizados en subcarpetas por dominio/responsabilidad
+→ imports internos actualizados
+→ tests pasan
+→ aplicación arranca correctamente
+```
+
+Este cambio está confirmado funcionalmente por el usuario y ya está subido a `main`.
+
+En esta sesión concreta no se ha podido inspeccionar el commit desde GitHub porque la capa web devuelve:
+
+```text
+DisabledError
+```
+
+Esto NO implica un problema de permisos ni visibilidad del repositorio.
+
+El siguiente mini-hito exacto es:
+
+```text
+16.13.4C — Barra contextual integrada de Compras
+```
 
 ---
 # 2. Punto exacto de continuación
@@ -90,43 +102,92 @@ Están cerrados, probados y subidos a `main`:
 
 ```text
 16.1–16.12 Pedidos
-16.13.1 Snapshot histórico de Marca en Ventas
+16.13.1 Snapshot histórico Marca en Ventas
 16.13.2 Backend CRUD/soft-delete de Marcas
-16.13.3A Persistencia SQLite del logo de Marca
-16.13.3B Staging/promoción/rollback del logo de Marca
+16.13.3 Infraestructura de logo completa
+16.13.4A Workspace de Compras/Marcas
+16.13.4B Pantalla base inicial de Marcas
+```
+
+También está subido y validado por el usuario:
+
+```text
+reorganización de /src/app/services
+→ servicios agrupados en subcarpetas
+→ imports corregidos
+→ tests verdes
+→ aplicación arranca
 ```
 
 El siguiente mini-hito es:
 
 ```text
-16.13.3C — Integración + regresión de staging brand_image
+16.13.4C — Barra contextual integrada de Compras
 ```
 
-Objetivo:
+Objetivo visual/arquitectónico:
 
 ```text
-revisar la entrada pública existente de imágenes staged
-→ confirmar soporte real de purpose = brand_image
-→ asegurar que Marcas puede obtener stagingId desde renderer
-→ reutilizar infraestructura común, sin endpoint específico innecesario
-→ cerrar tests cross-layer necesarios
-→ validar create / keep / remove / replace
-→ cerrar 16.13.3
+eliminar la cabecera redundante propia de Marcas
+
+barra de pestañas Compras:
+PEDIDOS | MARCAS | PROVEEDORES                 zona contextual derecha
 ```
 
-Antes del primer patch revisar el `main` actual de:
+Comportamiento aprobado:
 
 ```text
-contratos públicos del staging de imágenes
-API/IPC/preload del staging
-ImageStagingService / implementación concreta
-validación de ImageAssetPurpose
-uso actual desde Artículos
-tests cross-layer del staging
-MarcasService y sus specs tras 16.13.3B
+PEDIDOS
+→ pestaña Pedidos activa
+→ zona derecha vacía
+
+MARCAS sin ficha
+→ pestaña Marcas activa
+→ derecha: Buscar + Nueva
+
+MARCAS con ficha
+→ pestaña Marcas activa
+→ derecha: nombre Marca + cerrar + Buscar + Nueva
+
+PROVEEDORES sin ficha
+→ pestaña Proveedores activa
+→ derecha: Buscar + Nuevo
+
+PROVEEDORES con ficha
+→ pestaña Proveedores activa
+→ derecha: nombre Proveedor + cerrar + Buscar + Nuevo
 ```
 
-No empezar todavía `16.13.4` ni construir la UI de la ficha. Primero cerrar por completo la infraestructura de logo.
+Principio arquitectónico:
+
+```text
+PurchasesTabsComponent
+→ navegación genérica
+→ NO conoce dominios concretos ni acciones de Marca/Proveedor
+
+PurchasesComponent
+→ compone la barra
+→ proyecta acciones contextuales según activeSection
+
+acciones de Marca
+→ pertenecen funcionalmente a Marcas
+→ aunque se rendericen visualmente dentro de la barra superior
+```
+
+Antes del patch:
+
+```text
+1. intentar leer main actual en GitHub;
+2. tener en cuenta la nueva reorganización de /src/app/services;
+3. no asumir rutas antiguas de servicios;
+4. revisar PurchasesTabsComponent;
+5. revisar PurchasesComponent;
+6. revisar MarcasComponent;
+7. revisar MarcasService en su nueva ruta;
+8. revisar workspace actual.
+```
+
+No avanzar a `16.13.5` hasta cerrar y validar visualmente `16.13.4C`.
 
 ---
 # 3. Repositorios y referencias
@@ -2057,72 +2118,227 @@ fallo cleanup post-COMMIT no invalida éxito
 stagingId vacío rechazado antes de preparar
 ```
 
-### 27.3.3 16.13.3C — Integración + regresión ⬅️ SIGUIENTE
+### 27.3.3 16.13.3C — Integración pública `brand_image` ✅
 
-Objetivo:
+Se añadió una entrada pública específica:
 
 ```text
-revisar API pública actual de staging de imágenes
-confirmar soporte de brand_image de extremo a extremo
-evitar crear un endpoint de Marcas si el staging común ya sirve
-cerrar contratos/IPC/preload que falten
-añadir tests cross-layer necesarios
-validar ciclo real create/replace/remove/keep
-cerrar 16.13.3
+files.stageBrandImage()
 ```
 
-Antes del patch revisar:
+Regla de seguridad:
+
+```text
+renderer NO elige purpose
+
+stageArticleImage()
+→ backend fuerza article_image
+
+stageBrandImage()
+→ backend fuerza brand_image
+```
+
+Se reutiliza:
 
 ```text
 ImageStagingService
-contrato público de selección/staging
-ImageAssetPurpose
-IPC channels de imágenes
-handlers
-preload
-flujo actual usado por Artículos
-tests existentes
+discardStagedImage()
+infraestructura WebP común
 ```
 
-No empezar todavía el componente visual de Marcas.
+No se creó un staging paralelo para Marcas.
+
+Cadena cerrada:
+
+```text
+renderer
+→ files.stageBrandImage()
+→ IPC trusted sender
+→ purpose = brand_image
+→ ImageStagingService
+→ stagingId
+→ MarcasService
+→ ImageAssetPromoter
+→ files/brands/
+→ TypeOrmMarcaRepository
+→ archivo + marca.id_archivo
+```
+
+Resultado:
+
+```text
+16.13.3 ✅ CERRADO
+```
 
 ---
 
-## 27.4 16.13.4 — Workspace + pantalla base ⬜
+## 27.4 16.13.4 — Workspace + pantalla base 🟦 EN DESARROLLO
 
-Estados:
+### 27.4.1 16.13.4A — Workspace ✅
 
-```text
-welcome
-existing
-new
-```
-
-Persistir:
+Se creó el workspace de Marca con:
 
 ```text
-marca
+marcaId
+marcaPublicId
 draft
 baseSnapshot
-tab
-filtros estadísticas
+activeSection
+estadisticasFiltros
 ```
 
 Dirty:
 
 ```text
-draft vs baseSnapshot
+NO booleano manual
+→ computed comparando draft vs baseSnapshot
+```
+
+Marca nueva:
+
+```text
+activeSection = data
+estadísticas no disponibles
+```
+
+Marca persistida:
+
+```text
+data | statistics
+```
+
+Filtros estadísticos:
+
+```text
+mes actual
+año actual
+tipo = amount
+```
+
+Regla:
+
+```text
+Año = Todos
+→ Mes = Todos
 ```
 
 Salir a otro apartado:
 
 ```text
-→ conservar workspace aunque esté dirty
-→ no confirmar
+→ workspace de Marca permanece
+→ dirty permanece
+→ pestaña permanece
+→ filtros permanecen
+→ sin confirmación
 ```
 
----
+También se amplió el workspace de Compras para conservar:
 
+```text
+activeSection = orders | brands | suppliers
+```
+
+Importante:
+
+```text
+ComprasWorkspaceService ya existía por Pedidos
+→ NO crear servicio duplicado
+→ se fusionó activeSection con los estados existentes
+→ listados de Pedidos siguen conservando su workspace independiente
+```
+
+### 27.4.2 16.13.4B — Pantalla base inicial ✅
+
+Se sustituyó el placeholder de Marcas por una pantalla real inicial.
+
+Estado sin ficha:
+
+```text
+Marcas
+Buscar (todavía inactivo)
+Nueva
+"Elige una marca de la lista."
+```
+
+Estado nueva Marca:
+
+```text
+Nueva marca
+DATOS
+```
+
+Marca persistida:
+
+```text
+nombre
+DATOS | ESTADÍSTICAS
+```
+
+Se validó funcionalmente que:
+
+```text
+Compras → Marcas
+→ Nueva marca
+→ salir a otro apartado
+→ volver a Compras
+→ regresar a Marcas
+→ conservar workspace
+```
+
+### 27.4.3 16.13.4C — Barra contextual integrada de Compras ⬅️ SIGUIENTE
+
+Después de ver la pantalla real, se aprobó un rediseño para ganar espacio vertical.
+
+Problema actual:
+
+```text
+COMPRAS
+barra Pedidos/Marcas/Proveedores
+cabecera Marcas + acciones
+contenido
+```
+
+Nuevo diseño:
+
+```text
+COMPRAS
+PEDIDOS | MARCAS | PROVEEDORES                    acciones contextuales
+contenido
+```
+
+Acciones:
+
+```text
+Pedidos
+→ ninguna
+
+Marcas
+→ buscar + nueva
+→ si hay ficha: nombre + cerrar + buscar + nueva
+
+Proveedores
+→ buscar + nuevo
+→ si hay ficha: nombre + cerrar + buscar + nuevo
+```
+
+Arquitectura:
+
+```text
+PurchasesTabsComponent
+→ navegación genérica
+→ zona proyectable de acciones a la derecha
+
+PurchasesComponent
+→ decide qué acciones contextuales proyectar
+
+MarcasComponent
+→ elimina su cabecera redundante
+→ se centra solo en workspace/contenido
+```
+
+No cerrar 16.13.4 hasta validar este rediseño.
+
+---
 ## 27.5 16.13.5 — Buscador en memoria ⬜
 
 ```text
@@ -2291,6 +2507,44 @@ No inventar todavía el contrato.
 
 ---
 
+# 28.1 Reorganización de servicios frontend
+
+Cambio estructural realizado por el usuario después de `16.13.4B`:
+
+```text
+/src/app/services
+→ reorganizado en subcarpetas
+```
+
+Motivación:
+
+```text
+evitar una carpeta plana creciente
+agrupar servicios por dominio/responsabilidad
+mejorar navegación y mantenibilidad
+```
+
+Estado:
+
+```text
+imports corregidos
+tests pasan
+aplicación arranca
+commit subido a main
+```
+
+Regla a partir de ahora:
+
+```text
+NO asumir rutas antiguas @services/<servicio>
+→ revisar main actual
+→ usar las nuevas rutas por subcarpeta
+```
+
+Los ejemplos de documentos anteriores que mencionen rutas antiguas de servicios deben interpretarse como históricos; prevalece `main`.
+
+---
+
 # 29. Convenciones arquitectónicas vigentes
 
 ## 29.1 Compartido vs privado
@@ -2403,53 +2657,57 @@ Hito 14 Clientes ✅
 Hito 15 Almacén ✅
 REF ✅
 CTRL ✅
-Pedidos 16.1–16.12 ✅ COMPLETAMENTE CERRADO
+Pedidos 16.1–16.12 ✅
 
 Marcas:
 16.13.1 ✅
 16.13.2 ✅
-16.13.3A ✅
-16.13.3B ✅
-16.13.3C ⬅️ SIGUIENTE
+16.13.3 ✅
+16.13.4A ✅
+16.13.4B ✅
+16.13.4C ⬅️ SIGUIENTE
 ```
 
-5. no reimplementar Pedidos;
-6. no reabrir 16.13.1/16.13.2 salvo regresión real;
+5. tener en cuenta que `/src/app/services` ha sido reorganizado en subcarpetas;
+6. NO reutilizar rutas antiguas de imports sin comprobar `main`;
 7. continuar exactamente con:
 
 ```text
-16.13.3C — Integración + regresión de staging brand_image
+16.13.4C — Barra contextual integrada de Compras
 ```
 
-8. antes del patch revisar:
+8. objetivo del bloque:
 
 ```text
-contratos de staging de imágenes
-ImageStagingService
-ImageAssetPurpose
-IPC de imágenes
-preload de imágenes
-flujo de Artículos que selecciona/stagea imágenes
-tests cross-layer asociados
-MarcasService y specs actuales
+eliminar cabecera redundante de Marcas
+integrar acciones a la derecha de tabs Compras
+mantener PurchasesTabs genérico
+preparar patrón reutilizable para Proveedores
 ```
 
-9. no crear infraestructura específica de logo si la genérica ya cubre `brand_image`;
-10. mantener `keep/remove/replace` como estados explícitos;
-11. alta rápida desde Artículos debe seguir siendo compatible sin `logoStagingId`;
-12. `ActualizarMarcaCommand.logo` omitido significa `keep`;
-13. fallo SQLite tras promoción → rollback físico;
-14. fallo cleanup tras COMMIT → no invalidar guardado;
-15. `remove/replace` no borran automáticamente el archivo anterior persistido;
-16. imports internos siempre por alias absoluto;
-17. **todo método nuevo, también en interfaces, lleva JSDoc**;
-18. interfaz modificada → adaptar fakes/mocks/specs en el mismo bloque;
-19. usuario aplica y prueba; asistente no hace commits ni ejecuta el proyecto;
-20. esperar confirmación antes de avanzar;
-21. no tocar `12C.9 TicketBAI` sin información de Berein;
-22. no diseñar Proveedores hasta cerrar Marcas;
-23. no empezar `16.13.4` hasta cerrar completamente `16.13.3`;
-24. protocolo GitHub:
+9. revisar antes del patch:
+
+```text
+PurchasesComponent
+PurchasesTabsComponent
+MarcasComponent
+MarcasService en su NUEVA ruta
+ComprasWorkspaceService en su NUEVA ruta
+tests asociados
+```
+
+10. después de 16.13.4C:
+   - prueba visual;
+   - cerrar 16.13.4;
+   - avanzar a 16.13.5 Buscador de Marcas;
+11. imports internos siempre por alias absoluto;
+12. todo método nuevo, también en interfaces, lleva JSDoc;
+13. interfaz modificada → adaptar fakes/mocks/specs en el mismo bloque;
+14. usuario aplica y prueba; asistente no hace commits ni ejecuta el proyecto;
+15. esperar confirmación antes de avanzar;
+16. no tocar `12C.9 TicketBAI` sin información de Berein;
+17. no diseñar Proveedores hasta cerrar Marcas;
+18. protocolo GitHub:
     - intentar `main` primero;
     - si falla, explicar el error exacto;
     - ZIP/adjuntos solo como fallback.
@@ -2460,7 +2718,7 @@ MarcasService y specs actuales
 ```text
 Proyecto: Osumi TPV Client
 Continuidad: 14/09/2026
-Base: v2.59 + main
+Base: v2.60 + main
 
 Hito 13 Artículos ✅
 Hito 14 Clientes ✅
@@ -2477,48 +2735,56 @@ PEDIDOS:
 16.1–16.12 ✅ COMPLETAMENTE CERRADO
 
 MARCAS:
-contrato funcional ✅
-plan 16.13.1–16.13.10 ✅
-
-16.13.1 Snapshot histórico Marca en Ventas ✅
-→ linea_venta.id_marca_snapshot
-→ nullable, sin FK
-→ índice por snapshot + venta
-→ ventas nuevas: articulo.id_marca canónico
-→ devoluciones heredan snapshot origen
-→ import legacy: artículo importado → articulo.id_marca
-→ validación real .otpv correcta
-→ cambiar artículo de marca NO cambia snapshots antiguos
-
+16.13.1 Snapshot histórico ✅
 16.13.2 Backend CRUD/soft-delete ✅
-→ findAll / findById / existsActiveByName
-→ create / update / deactivate
-→ duplicados nuevos activos prohibidos en service
-→ duplicados legacy editables si no cambia realmente nombre
-→ get/update/deactivate expuestos por API/IPC/preload
-→ soft-delete NO toca artículos/proveedor_marca/logo
+16.13.3 Infraestructura logo ✅
 
-16.13.3 Logo 🟦
-16.13.3A ✅ SQLite
-→ keep / remove / replace
-→ ArchivoCreateRecord
-→ insertArchivo
-→ brand_image + image/webp + files/brands/
-→ no borrar archivo anterior automáticamente
+16.13.4 Workspace + pantalla base 🟦
+16.13.4A Workspace ✅
+→ draft/baseSnapshot
+→ dirty computed
+→ data/statistics
+→ filtros persistentes
+→ activeSection Compras persistente
 
-16.13.3B ✅ Staging/service
-→ create logoStagingId opcional
-→ update logo keep/remove/replace
-→ ImageAssetPromoter
-→ StagedImageDiscarder
-→ rollback si falla SQLite
-→ cleanup post-COMMIT no invalida éxito
+16.13.4B Pantalla base ✅
+→ bienvenida
+→ nueva Marca
+→ tabs internas
+→ navegación conserva estado
 
 SIGUIENTE:
-16.13.3C Integración + regresión staging brand_image
+16.13.4C Barra contextual integrada Compras
+
+Nuevo diseño:
+COMPRAS
+PEDIDOS | MARCAS | PROVEEDORES                 contexto derecha
+
+Pedidos:
+→ derecha vacía
+
+Marcas:
+→ Buscar + Nueva
+→ con ficha: nombre + cerrar + Buscar + Nueva
+
+Proveedores:
+→ Buscar + Nuevo
+→ con ficha: nombre + cerrar + Buscar + Nuevo
+
+Arquitectura:
+→ PurchasesTabs genérico
+→ zona proyectable derecha
+→ acciones siguen perteneciendo al dominio activo
+→ eliminar cabecera redundante de Marcas
+
+Refactor adicional:
+→ /src/app/services reorganizado en subcarpetas
+→ imports corregidos
+→ tests verdes
+→ aplicación arranca
+→ NO asumir rutas antiguas
 
 Después:
-16.13.4 Workspace + pantalla base
 16.13.5 Buscador en memoria
 16.13.6 Ficha Datos
 16.13.7 Backend Estadísticas
@@ -2527,13 +2793,10 @@ Después:
 16.13.10 Regresión
 16.14 Proveedores
 
-Reglas reforzadas:
-→ TODO método nuevo lleva JSDoc
-→ también métodos de interfaces
-→ intentar siempre GitHub/main antes de pedir archivos
-→ si falla, comunicar error exacto
-→ DisabledError = capa de acceso, no problema del repo
-→ pedir solo archivos concretos como fallback
+Reglas:
+→ JSDoc en todos los métodos nuevos, también interfaces
+→ intentar GitHub/main antes de pedir archivos
+→ informar error exacto si falla
 ```
 
 ---
@@ -2547,7 +2810,8 @@ Reglas reforzadas:
 | 2.56 | 13/09/2026 | 16.8 + 16.9 cerrados; siguiente Recepción atómica |
 | 2.57 | 14/09/2026 | 16.10–16.12 cerrados; Pedidos cerrado; contrato y plan de Marcas aprobados |
 | 2.58 | 14/09/2026 | 16.13.1 + 16.13.2 cerrados; 16.13.3A/B cerrados; siguiente 16.13.3C |
-| **2.59** | **14/09/2026** | **Añadido protocolo explícito de acceso a GitHub/main y fallback por archivos; siguiente 16.13.3C** |
+| 2.59 | 14/09/2026 | Protocolo explícito de acceso a GitHub/main y fallback por archivos |
+| **2.60** | **14/09/2026** | **16.13.3 cerrado; 16.13.4A/B cerrados; servicios frontend reorganizados; aprobado rediseño barra contextual; siguiente 16.13.4C** |
 
 ---
 # 34. Prompt de arranque recomendado
@@ -2556,12 +2820,9 @@ Reglas reforzadas:
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.59.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.60.
 
 Estado:
-- Installation/importación ✅
-- Startup ✅
-- Refactors A–E ✅
 - Artículos 13 ✅
 - Clientes 14 ✅
 - Almacén 15 ✅
@@ -2570,78 +2831,59 @@ Estado:
 - TicketBAI ordinario ✅
 - TicketBAI devoluciones/mixtas ⏸️ Berein
 - Compras 🟦
-  - Pedidos 16.1–16.12 ✅ COMPLETAMENTE CERRADO
+  - Pedidos 16.1–16.12 ✅
   - Marcas:
     - 16.13.1 Snapshot histórico ✅
     - 16.13.2 Backend CRUD/soft-delete ✅
-    - 16.13.3A Persistencia SQLite logo ✅
-    - 16.13.3B Staging/promoción/rollback ✅
-    - 16.13.3C Integración/regresión ⬅️ SIGUIENTE
+    - 16.13.3 Infraestructura logo ✅
+    - 16.13.4A Workspace ✅
+    - 16.13.4B Pantalla base ✅
+    - 16.13.4C Barra contextual ⬅️ SIGUIENTE
 
 Punto exacto:
-16.13.3C — Integración + regresión de staging brand_image.
+16.13.4C — Barra contextual integrada de Compras.
+
+IMPORTANTE:
+El usuario ha reorganizado completamente `/src/app/services` en subcarpetas.
+Todos los imports fueron corregidos, tests pasan y la aplicación arranca.
+NO asumas rutas antiguas de servicios: revisa `main`.
 
 Antes de proponer cambios:
 - intenta siempre revisar `main` actual en GitHub;
 - si falla, comunica el error exacto;
 - distingue error HTTP real frente a fallo de capa de acceso (`DisabledError`, timeout, DNS, etc.);
-- solo entonces pide los archivos concretos necesarios;
-- revisa contratos públicos de staging;
-- revisa ImageStagingService;
-- revisa ImageAssetPurpose;
-- revisa IPC/preload de imágenes;
-- revisa cómo Artículos obtiene stagingId;
-- revisa tests cross-layer existentes;
-- revisa MarcasService y sus specs actuales.
+- solo entonces pide los archivos concretos necesarios.
 
-Decisiones cerradas:
-- logo Marca usa infraestructura común;
-- purpose = brand_image;
-- destino files/brands/;
-- WebP;
-- create acepta logoStagingId opcional;
-- update usa keep/remove/replace;
-- logo omitido en update = keep;
-- alta rápida desde Artículos sigue funcionando sin logo;
-- fallo SQLite tras prepare = rollback;
-- fallo cleanup después del COMMIT NO invalida guardado;
-- remove/replace NO elimina automáticamente el archivo persistido anterior.
+Diseño aprobado para 16.13.4C:
+- mantener cabecera COMPRAS;
+- usar una sola barra para tabs + acciones contextuales;
+- Pedidos: derecha vacía;
+- Marcas: Buscar + Nueva;
+- Marca abierta: nombre + cerrar + Buscar + Nueva;
+- Proveedores: patrón equivalente en el futuro;
+- eliminar la cabecera redundante propia de Marcas;
+- PurchasesTabsComponent debe seguir siendo genérico;
+- las acciones contextuales deben proyectarse/componerse desde PurchasesComponent o componentes de dominio.
 
-Snapshot histórico:
-- linea_venta.id_marca_snapshot ya existe;
-- ventas nuevas lo resuelven en backend;
-- devoluciones heredan el snapshot original;
-- import legacy lo rellena desde articulo.id_marca de la SQLite nueva;
-- validación real .otpv pasada correctamente.
+Workspace Marcas:
+- draft + baseSnapshot;
+- dirty computed;
+- marca activa;
+- data/statistics;
+- filtros estadísticas persistentes;
+- salir a otro módulo conserva todo.
 
-Soft-delete Marca:
-- solo deleted_at/updated_at;
-- NO tocar articulo.id_marca;
-- NO tocar proveedor_marca;
-- NO borrar logo/archivo.
+No empieces 16.13.5 hasta cerrar y validar visualmente 16.13.4C.
 
-Regla de código:
-- TODO método nuevo lleva JSDoc;
-- también los métodos declarados en interfaces.
-
-Regla de acceso a código:
-- repositorio público: https://github.com/osumionline/Osumi-TPV-Client
-- rama de referencia: main
-- intentar GitHub/main antes de pedir archivos
-- si falla, decir el error exacto
-- `DisabledError` es de la capa de acceso, no del repositorio
-- pedir ZIP/adjuntos solo como fallback y solo de los archivos necesarios
-
-No empieces 16.13.4 hasta cerrar 16.13.3C.
-
-Flujo de trabajo:
-- tú propones cambios archivo por archivo;
-- yo los aplico manualmente;
-- yo ejecuto tests/build/lint y pruebas;
-- cuando lo doy por bueno y lo subo, avanzamos;
-- tú no haces commits ni modificas el repo por tu cuenta.
+Reglas:
+- imports internos por alias absoluto;
+- TODO método nuevo lleva JSDoc, también en interfaces;
+- interfaz modificada → adaptar fakes/mocks/specs;
+- yo aplico manualmente cambios y ejecuto tests;
+- tú no haces commits ni modificas el repo;
+- esperar confirmación antes de avanzar.
 ```
 
 ---
 
-**Fin del documento de continuidad v2.59.**
+**Fin del documento de continuidad v2.60.**
