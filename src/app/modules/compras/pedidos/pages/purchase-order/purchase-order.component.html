@@ -52,6 +52,22 @@
                     Eliminar
                     }
                 </button>
+
+                <button mat-stroked-button
+                        type="button"
+                        [disabled]="!canReceive()"
+                        (click)="onReceive()">
+                    <mat-icon>
+                        inventory_2
+                    </mat-icon>
+
+                    @if (receiving()) {
+                    Recepcionando…
+                    }
+                    @else {
+                    Recepcionar
+                    }
+                </button>
                 }
 
                 <button mat-flat-button

@@ -58,6 +58,7 @@ import {
   buildPurchaseOrderProviderOptions,
   buildPurchaseOrderSaveCommand,
   buildPurchaseOrderTaxPairs,
+  canReceivePurchaseOrder,
   createExistingPurchaseOrderFormState,
   createExistingPurchaseOrderLineState,
   createNewPurchaseOrderFormState,
@@ -143,6 +144,7 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
   >([]);
   readonly loading: WritableSignal<boolean> = signal<boolean>(true);
   readonly saving: WritableSignal<boolean> = signal<boolean>(false);
+  readonly receiving: WritableSignal<boolean> = signal<boolean>(false);
   readonly deleting: WritableSignal<boolean> = signal<boolean>(false);
   readonly proveedorModalOpen: WritableSignal<boolean> = signal<boolean>(false);
   readonly preparingProveedorModal: WritableSignal<boolean> = signal<boolean>(false);
@@ -152,6 +154,7 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
   readonly processing: Signal<boolean> = computed(
     (): boolean =>
       this.saving() ||
+      this.receiving() ||
       this.deleting() ||
       this.attachingPdf() ||
       this.openingPdfId() !== null ||
@@ -194,6 +197,16 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
     }
 
     return buildPurchaseOrderDirtyFingerprint(state, this.lines()) !== cleanFingerprint;
+  });
+  readonly canReceive: Signal<boolean> = computed((): boolean => {
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    return (
+      state !== null &&
+      !this.processing() &&
+      !this.dirty() &&
+      canReceivePurchaseOrder(state, this.lines())
+    );
   });
   readonly taxPairs: WritableSignal<readonly PurchaseOrderTaxPair[]> = signal<
     readonly PurchaseOrderTaxPair[]
@@ -427,6 +440,40 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
    */
   onSave(): void {
     void this.saveOrder();
+  }
+
+  /**
+   * Solicita confirmación antes de recepcionar
+   * definitivamente un Pedido pendiente.
+   */
+  onReceive(): void {
+    if (!this.canReceive()) {
+      return;
+    }
+
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (state === null || state.id === null) {
+      return;
+    }
+
+    const idPedido: number = state.id;
+
+    this.dialog
+      .confirm({
+        title: 'Recepcionar pedido',
+        content:
+          'Al recepcionar el pedido se actualizarán el stock y los precios de sus artículos ' +
+          'y se incorporarán los códigos de barras pendientes. ' +
+          'Esta acción no se puede deshacer. ¿Quieres continuar?',
+      })
+      .subscribe((result: boolean): void => {
+        if (!result) {
+          return;
+        }
+
+        void this.receiveOrder(idPedido);
+      });
   }
 
   /**
@@ -920,6 +967,45 @@ export default class PurchaseOrderComponent implements OnInit, OnDestroy, Pendin
 
     this.clearSaveFeedback();
     this.lines.set(nextLines);
+  }
+
+  /**
+   * Recepciona el Pedido y relee después toda la ficha
+   * desde el estado canónico persistido.
+   */
+  private async receiveOrder(idPedido: number): Promise<void> {
+    if (this.processing() || this.dirty()) {
+      return;
+    }
+
+    const state: PurchaseOrderFormState | null = this.formState();
+
+    if (
+      state === null ||
+      state.id !== idPedido ||
+      state.recepcionado ||
+      !canReceivePurchaseOrder(state, this.lines())
+    ) {
+      return;
+    }
+
+    this.clearSaveFeedback();
+    this.receiving.set(true);
+
+    try {
+      await this.comprasService.recepcionarPedido(idPedido);
+
+      await this.loadPage();
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido recepcionar el pedido.'),
+        })
+        .subscribe();
+    } finally {
+      this.receiving.set(false);
+    }
   }
 
   /**

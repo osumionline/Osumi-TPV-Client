@@ -24,6 +24,7 @@ import {
   buildPurchaseOrderProviderOptions,
   buildPurchaseOrderSaveCommand,
   buildPurchaseOrderTaxPairs,
+  canReceivePurchaseOrder,
   createExistingPurchaseOrderFormState,
   createExistingPurchaseOrderLineState,
   createNewPurchaseOrderFormState,
@@ -1520,5 +1521,76 @@ describe('purchase-order.component.private', (): void => {
     );
 
     expect(() => buildPurchaseOrderDirtyFingerprint(state, [])).not.toThrow();
+  });
+
+  it('permite recepcionar un pedido persistido pendiente con líneas válidas', (): void => {
+    const state: PurchaseOrderFormState = createExistingPurchaseOrderFormState(createPedido());
+
+    const line: PurchaseOrderLineState = createExistingPurchaseOrderLineState(
+      createPedidoLinea({
+        unidades: 4,
+      }),
+    );
+
+    expect(canReceivePurchaseOrder(state, [line])).toBe(true);
+  });
+
+  it('impide recepcionar pedidos nuevos recibidos o sin líneas válidas', (): void => {
+    const state: PurchaseOrderFormState = createExistingPurchaseOrderFormState(createPedido());
+
+    const line: PurchaseOrderLineState = createExistingPurchaseOrderLineState(
+      createPedidoLinea({
+        unidades: 4,
+      }),
+    );
+
+    expect(
+      canReceivePurchaseOrder(
+        {
+          ...state,
+          id: null,
+        },
+        [line],
+      ),
+    ).toBe(false);
+
+    expect(
+      canReceivePurchaseOrder(
+        {
+          ...state,
+          recepcionado: true,
+        },
+        [line],
+      ),
+    ).toBe(false);
+
+    expect(canReceivePurchaseOrder(state, [])).toBe(false);
+
+    expect(
+      canReceivePurchaseOrder(state, [
+        {
+          ...line,
+          unidades: 0,
+        },
+      ]),
+    ).toBe(false);
+
+    expect(
+      canReceivePurchaseOrder(state, [
+        {
+          ...line,
+          idArticulo: null,
+        },
+      ]),
+    ).toBe(false);
+
+    expect(
+      canReceivePurchaseOrder(state, [
+        {
+          ...line,
+          id: null,
+        },
+      ]),
+    ).toBe(false);
   });
 });

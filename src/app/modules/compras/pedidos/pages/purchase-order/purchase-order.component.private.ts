@@ -355,6 +355,27 @@ export function createExistingPurchaseOrderLineState(
 }
 
 /**
+ * Comprueba que el estado persistido de un Pedido
+ * cumpla las precondiciones locales para recepcionarse.
+ */
+export function canReceivePurchaseOrder(
+  state: PurchaseOrderFormState,
+  lines: readonly PurchaseOrderLineState[],
+): boolean {
+  if (state.id === null || state.idProveedor === null || state.recepcionado || lines.length === 0) {
+    return false;
+  }
+
+  return lines.every(
+    (line: PurchaseOrderLineState): boolean =>
+      line.id !== null &&
+      line.idArticulo !== null &&
+      Number.isSafeInteger(line.unidades) &&
+      line.unidades > 0,
+  );
+}
+
+/**
  * Construye una línea nueva a partir del estado canónico
  * actual del artículo seleccionado.
  */
