@@ -57,6 +57,7 @@ interface ArticleSnapshot {
   readonly nombre: string;
   readonly localizador: number;
   readonly marca: string;
+  readonly idMarcaSnapshot: number;
 }
 
 interface ArticleRow extends ArticleSnapshot {
@@ -436,40 +437,43 @@ export default class LegacyImportSalesDataImporter implements LegacyImportPhaseI
 
       const localizador: number = articleSnapshot?.localizador ?? 0;
       const marca: string = articleSnapshot?.marca ?? 'Sin marca';
+      const idMarcaSnapshot: number | null = articleSnapshot?.idMarcaSnapshot ?? null;
 
       const returnedUnits: number = this.normalizeReturnedUnits(line.returnedUnits, counters);
 
       await queryRunner.query(
         `
-          INSERT INTO linea_venta (
-            id,
-            public_id,
-            id_venta,
-            id_articulo,
-            localizador,
-            marca,
-            nombre_articulo,
-            puc_micros,
-            pvp_micros,
-            iva_bps,
-            importe_micros,
-            descuento_bps,
-            importe_descuento_micros,
-            unidades,
-            unidades_devueltas,
-            regalo,
-            created_at,
-            updated_at
-          )
-          VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-          )
-        `,
+    INSERT INTO linea_venta (
+      id,
+      public_id,
+      id_venta,
+      id_articulo,
+      id_marca_snapshot,
+      localizador,
+      marca,
+      nombre_articulo,
+      puc_micros,
+      pvp_micros,
+      iva_bps,
+      importe_micros,
+      descuento_bps,
+      importe_descuento_micros,
+      unidades,
+      unidades_devueltas,
+      regalo,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+    )
+  `,
         [
           line.id,
           this.publicIdFactory.create(command.sourceHash, 'linea_venta', line.id),
           line.saleId,
           articleId,
+          idMarcaSnapshot,
           localizador,
           marca,
           articleName,
@@ -525,15 +529,16 @@ export default class LegacyImportSalesDataImporter implements LegacyImportPhaseI
 
     const articleRows: readonly ArticleRow[] = (await queryRunner.query(
       `
-            SELECT
-              articulo.id,
-              articulo.nombre,
-              articulo.localizador,
-              marca.nombre AS marca
-            FROM articulo
-            INNER JOIN marca
-              ON marca.id = articulo.id_marca
-          `,
+        SELECT
+          articulo.id,
+          articulo.nombre,
+          articulo.localizador,
+          articulo.id_marca AS idMarcaSnapshot,
+          marca.nombre AS marca
+        FROM articulo
+        INNER JOIN marca
+          ON marca.id = articulo.id_marca
+      `,
     )) as readonly ArticleRow[];
 
     const cashRegisters: readonly CashRegisterRow[] = (await queryRunner.query(
@@ -564,6 +569,7 @@ export default class LegacyImportSalesDataImporter implements LegacyImportPhaseI
             nombre: row.nombre,
             localizador: row.localizador,
             marca: row.marca,
+            idMarcaSnapshot: row.idMarcaSnapshot,
           },
         ]),
       ),
