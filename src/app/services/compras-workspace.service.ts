@@ -1,4 +1,5 @@
-import { Service } from '@angular/core';
+import { Service, signal, Signal, WritableSignal } from '@angular/core';
+import type ComprasSection from '@model/compras/compras-section.type';
 import type PedidoListadoWorkspaceState from '@model/compras/pedidos/pedido-listado-workspace.interface';
 
 /**
@@ -9,6 +10,25 @@ import type PedidoListadoWorkspaceState from '@model/compras/pedidos/pedido-list
 export default class ComprasWorkspaceService {
   private pedidosGuardadosState: PedidoListadoWorkspaceState | null = null;
   private pedidosRecepcionadosState: PedidoListadoWorkspaceState | null = null;
+  private readonly activeSectionSignal: WritableSignal<ComprasSection> =
+    signal<ComprasSection>('orders');
+
+  readonly activeSection: Signal<ComprasSection> = this.activeSectionSignal.asReadonly();
+
+  /**
+   * Conserva la sección activa del módulo de Compras
+   * durante toda la sesión de la aplicación.
+   */
+  selectSection(section: ComprasSection): void {
+    this.activeSectionSignal.set(section);
+  }
+
+  /**
+   * Restaura Compras a su sección inicial.
+   */
+  clear(): void {
+    this.activeSectionSignal.set('orders');
+  }
 
   /**
    * Recupera el último estado conocido del listado de pedidos guardados.

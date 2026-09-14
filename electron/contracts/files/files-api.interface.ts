@@ -6,17 +6,13 @@ export default interface FilesApi {
    * Convierte y almacena temporalmente una imagen
    * destinada a una ficha de Artículo.
    */
-  stageArticleImage(
-    request: StageImageRequest,
-  ): Promise<StagedImageInterface>;
+  stageArticleImage(request: StageImageRequest): Promise<StagedImageInterface>;
 
   /**
    * Convierte y almacena temporalmente una imagen
    * destinada al logo de una Marca.
    */
-  stageBrandImage(
-    request: StageImageRequest,
-  ): Promise<StagedImageInterface>;
+  stageBrandImage(request: StageImageRequest): Promise<StagedImageInterface>;
 
   /**
    * Descarta una imagen temporal que ya no forma

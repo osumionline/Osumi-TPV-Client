@@ -2,6 +2,8 @@ import type PedidoListadoWorkspaceState from '@model/compras/pedidos/pedido-list
 import ComprasWorkspaceService from '@services/compras-workspace.service';
 import { describe, expect, it } from 'vitest';
 
+let service: ComprasWorkspaceService;
+
 const STATE: PedidoListadoWorkspaceState = {
   fechaDesde: '2026-01-01',
   fechaHasta: '2026-09-10',
@@ -14,6 +16,32 @@ const STATE: PedidoListadoWorkspaceState = {
 };
 
 describe('ComprasWorkspaceService', (): void => {
+  beforeEach((): void => {
+    service = new ComprasWorkspaceService();
+  });
+
+  it('comienza mostrando Pedidos', (): void => {
+    expect(service.activeSection()).toBe('orders');
+  });
+
+  it('conserva la sección seleccionada mientras vive el servicio', (): void => {
+    service.selectSection('brands');
+
+    expect(service.activeSection()).toBe('brands');
+
+    service.selectSection('suppliers');
+
+    expect(service.activeSection()).toBe('suppliers');
+  });
+
+  it('restaura Pedidos al limpiar el workspace', (): void => {
+    service.selectSection('brands');
+
+    service.clear();
+
+    expect(service.activeSection()).toBe('orders');
+  });
+
   it('mantiene independientes los dos listados de Pedidos', (): void => {
     const service = new ComprasWorkspaceService();
 

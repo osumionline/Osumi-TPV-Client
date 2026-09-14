@@ -102,8 +102,8 @@ const IPC_CHANNELS = {
   articulosDeactivate: 'articulos:deactivate',
 
   filesStageArticleImage: 'files:stage-article-image',
-filesStageBrandImage: 'files:stage-brand-image',
-filesDiscardStagedImage: 'files:discard-staged-image',
+  filesStageBrandImage: 'files:stage-brand-image',
+  filesDiscardStagedImage: 'files:discard-staged-image',
 
   cajaOpen: 'caja:open',
 

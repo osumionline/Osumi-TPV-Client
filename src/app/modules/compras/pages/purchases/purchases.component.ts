@@ -1,12 +1,4 @@
-import {
-  Component,
-  computed,
-  inject,
-  signal,
-  type OnInit,
-  type Signal,
-  type WritableSignal,
-} from '@angular/core';
+import { Component, computed, inject, type OnInit, type Signal } from '@angular/core';
 import HeaderComponent from '@app/components/header/header.component';
 import type ComprasSection from '@model/compras/compras-section.type';
 import PurchasesTabsComponent from '@modules/compras/components/purchases-tabs/purchases-tabs.component';
@@ -14,6 +6,7 @@ import { DialogService } from '@osumi/angular-tools';
 import AppDataService from '@services/app-data.service';
 import { getErrorMessage } from '@utils/error.utils';
 import PedidosComponent from '@modules/compras/pedidos/components/pedidos/pedidos.component';
+import ComprasWorkspaceService from '@services/compras-workspace.service';
 
 /**
  * Página principal del módulo de Compras.
@@ -27,7 +20,11 @@ import PedidosComponent from '@modules/compras/pedidos/components/pedidos/pedido
 export default class PurchasesComponent implements OnInit {
   private readonly dialog: DialogService = inject(DialogService);
   readonly appDataService: AppDataService = inject(AppDataService);
-  readonly activeSection: WritableSignal<ComprasSection> = signal<ComprasSection>('orders');
+
+  private readonly comprasWorkspaceService: ComprasWorkspaceService =
+    inject(ComprasWorkspaceService);
+
+  readonly activeSection: Signal<ComprasSection> = this.comprasWorkspaceService.activeSection;
 
   readonly appName: Signal<string> = computed((): string => {
     const appData = this.appDataService.appData();
@@ -42,10 +39,10 @@ export default class PurchasesComponent implements OnInit {
   }
 
   /**
-   * Cambia la sección activa del módulo.
+   * Cambia y conserva la sección activa del módulo.
    */
   selectSection(section: ComprasSection): void {
-    this.activeSection.set(section);
+    this.comprasWorkspaceService.selectSection(section);
   }
 
   /**
