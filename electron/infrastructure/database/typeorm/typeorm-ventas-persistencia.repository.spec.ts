@@ -78,6 +78,7 @@ interface LineaReservaTrazabilidadRow {
 interface LineaVentaSnapshotRow {
   readonly localizador: number;
   readonly marca: string;
+  readonly marca_snapshot_public_id: string | null;
 }
 
 let tempDirectory: string | null = null;
@@ -149,12 +150,17 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
       dataSource,
       `
       SELECT
-        localizador,
-        marca
-      FROM linea_venta
+        lv.localizador,
+        lv.marca,
+        m.public_id AS marca_snapshot_public_id
+      FROM linea_venta lv
+
+      LEFT JOIN marca m
+        ON m.id = lv.id_marca_snapshot
+
       WHERE
-        id_venta = ?
-        AND id_articulo = (
+        lv.id_venta = ?
+        AND lv.id_articulo = (
           SELECT id
           FROM articulo
           WHERE public_id = ?
@@ -166,9 +172,29 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
     expect(lineaSnapshot).toEqual({
       localizador: 1,
       marca: 'Marca test',
+      marca_snapshot_public_id: 'marca-1',
     });
 
     expect(await countRows(dataSource, 'venta_pago')).toBe(2);
+
+    const variosSnapshot: {
+      readonly id_marca_snapshot: number | null;
+    } = await queryOne<{
+      readonly id_marca_snapshot: number | null;
+    }>(
+      dataSource,
+      `
+        SELECT id_marca_snapshot
+        FROM linea_venta
+        WHERE
+          id_venta = ?
+          AND id_articulo IS NULL
+        LIMIT 1
+      `,
+      [result.id],
+    );
+
+    expect(variosSnapshot.id_marca_snapshot).toBeNull();
 
     const stock: StockRow = await queryOne<StockRow>(
       dataSource,
@@ -1207,6 +1233,68 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
     );
 
     expect(operaciones.total).toBe(0);
+  });
+
+  it('resuelve la identidad de Marca desde el artículo canónico y no desde el payload', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+      INSERT INTO marca (
+        public_id,
+        nombre
+      )
+      VALUES (
+        'marca-2',
+        'Marca canónica nueva'
+      )
+    `,
+    );
+
+    const command: GuardarVentaCommand = createNormalSaleCommand('venta-marca-snapshot-1');
+
+    await dataSource.query(
+      `
+      UPDATE articulo
+      SET id_marca = (
+        SELECT id
+        FROM marca
+        WHERE public_id = ?
+      )
+      WHERE public_id = ?
+    `,
+      ['marca-2', 'articulo-1'],
+    );
+
+    const result: VentaPersistidaRecord = await requireService().save(command);
+
+    const snapshot: {
+      readonly marca_snapshot_public_id: string | null;
+    } = await queryOne<{
+      readonly marca_snapshot_public_id: string | null;
+    }>(
+      dataSource,
+      `
+      SELECT
+        m.public_id AS marca_snapshot_public_id
+      FROM linea_venta lv
+
+      LEFT JOIN marca m
+        ON m.id = lv.id_marca_snapshot
+
+      WHERE
+        lv.id_venta = ?
+        AND lv.id_articulo = (
+          SELECT id
+          FROM articulo
+          WHERE public_id = ?
+        )
+      LIMIT 1
+    `,
+      [result.id, 'articulo-1'],
+    );
+
+    expect(snapshot.marca_snapshot_public_id).toBe('marca-2');
   });
 });
 

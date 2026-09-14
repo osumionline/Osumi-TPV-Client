@@ -45,6 +45,7 @@ interface ReservaDatabaseRow {
 interface LineaVentaOrigenDatabaseRow {
   readonly id: number;
   readonly id_articulo: number | null;
+  readonly id_marca_snapshot: number | null;
 }
 
 interface LineaReservaOrigenDatabaseRow {
@@ -635,6 +636,7 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
   ): Promise<void> {
     const origen: {
       readonly idArticulo: number | null;
+      readonly idMarcaSnapshot: number | null;
       readonly idLineaVentaOrigen: number | null;
       readonly idLineaReservaOrigen: number | null;
     } = await this.resolveLineaOrigen(queryRunner, idVentaOrigenDevolucion, reservas, linea);
@@ -645,6 +647,7 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
           public_id,
           id_venta,
           id_articulo,
+          id_marca_snapshot,
           id_linea_venta_origen_devolucion,
           id_linea_reserva_origen,
           localizador,
@@ -663,13 +666,14 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
           updated_at
         )
         VALUES (
-          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?
         )
       `,
       [
         randomUUID(),
         idVenta,
         origen.idArticulo,
+        origen.idMarcaSnapshot,
         origen.idLineaVentaOrigen,
         origen.idLineaReservaOrigen,
         linea.localizador,
@@ -696,6 +700,7 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
     linea: GuardarVentaLineaRecordCommand,
   ): Promise<{
     readonly idArticulo: number | null;
+    readonly idMarcaSnapshot: number | null;
     readonly idLineaVentaOrigen: number | null;
     readonly idLineaReservaOrigen: number | null;
   }> {
@@ -708,7 +713,8 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
         `
             SELECT
               id,
-              id_articulo
+              id_articulo,
+              id_marca_snapshot
             FROM linea_venta
             WHERE
               public_id = ?
@@ -727,6 +733,7 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
 
       return {
         idArticulo: origen.id_articulo,
+        idMarcaSnapshot: origen.id_marca_snapshot,
         idLineaVentaOrigen: origen.id,
         idLineaReservaOrigen: null,
       };
@@ -766,8 +773,14 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
         throw new Error('Una línea de reserva no pertenece a las reservas indicadas por la venta.');
       }
 
+      const idMarcaSnapshot: number | null = await this.resolveMarcaSnapshotId(
+        queryRunner,
+        origen.id_articulo,
+      );
+
       return {
         idArticulo: origen.id_articulo,
+        idMarcaSnapshot,
         idLineaVentaOrigen: null,
         idLineaReservaOrigen: origen.id,
       };
@@ -778,8 +791,14 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
       linea.articuloPublicId,
     );
 
+    const idMarcaSnapshot: number | null = await this.resolveMarcaSnapshotId(
+      queryRunner,
+      idArticulo,
+    );
+
     return {
       idArticulo,
+      idMarcaSnapshot,
       idLineaVentaOrigen: null,
       idLineaReservaOrigen: null,
     };
@@ -809,6 +828,35 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
     return this.requireDatabaseId(
       rows[0]?.id,
       'Uno de los artículos de la venta ya no está disponible.',
+    );
+  }
+
+  /**
+   * Recupera la identidad canónica de Marca asociada
+   * al artículo que queda congelada en la línea de venta.
+   */
+  private async resolveMarcaSnapshotId(
+    queryRunner: QueryRunner,
+    idArticulo: number | null,
+  ): Promise<number | null> {
+    if (idArticulo === null) {
+      return null;
+    }
+
+    const rows: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+      SELECT
+        id_marca AS id
+      FROM articulo
+      WHERE id = ?
+      LIMIT 1
+    `,
+      [idArticulo],
+    )) as readonly DatabaseIdRow[];
+
+    return this.requireDatabaseId(
+      rows[0]?.id,
+      'No se ha podido recuperar la marca de uno de los artículos de la venta.',
     );
   }
 
