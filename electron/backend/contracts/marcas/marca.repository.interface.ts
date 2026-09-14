@@ -3,15 +3,34 @@ import type CrearMarcaRecordCommand from '@backend/contracts/marcas/crear-marca-
 import type MarcaRecord from '@backend/domain/marcas/marca-record.interface';
 
 export default interface MarcaRepository {
+  /**
+   * Recupera todas las marcas activas ordenadas
+   * para su uso como maestro.
+   */
   findAll(): Promise<readonly MarcaRecord[]>;
 
+  /**
+   * Recupera una marca activa por su identificador interno.
+   */
   findById(id: number): Promise<MarcaRecord | null>;
 
+  /**
+   * Comprueba si existe otra marca activa con el nombre indicado.
+   */
   existsActiveByName(nombre: string, excludeId: number | null): Promise<boolean>;
 
+  /**
+   * Crea una nueva marca y devuelve su estado persistido.
+   */
   create(command: CrearMarcaRecordCommand): Promise<MarcaRecord>;
 
+  /**
+   * Actualiza los datos editables de una marca activa.
+   */
   update(id: number, command: ActualizarMarcaRecordCommand): Promise<MarcaRecord>;
 
+  /**
+   * Da de baja lógicamente una marca activa.
+   */
   deactivate(id: number): Promise<void>;
 }
