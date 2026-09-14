@@ -1,6 +1,7 @@
 import type PedidoArchivosRepository from '@backend/contracts/compras/pedidos/pedido-archivos.repository.interface';
 import type PedidoRepositoryQuery from '@backend/contracts/compras/pedidos/pedido-query.interface';
 import type PedidosRepository from '@backend/contracts/compras/pedidos/pedidos.repository.interface';
+import HISTORICO_ARTICULO_TIPO from '@backend/domain/articulos/historico-articulo.constants';
 import type PedidoArchivoCreateRecord from '@backend/domain/compras/pedidos/pedido-archivo-create-record.interface';
 import type { PedidoArchivoRecord } from '@backend/domain/compras/pedidos/pedido-archivo-record.interface';
 import type {
@@ -23,6 +24,7 @@ import type {
   PedidosRecepcionadosResultadoRecord,
 } from '@backend/domain/compras/pedidos/pedido-listado-record.interface';
 import { MONEY_SCALE, UNIT_PRICE_SCALE } from '@backend/domain/database/database-schema.constants';
+import { microsToCents } from '@backend/utils/money.utils';
 import { PEDIDO_OPTIONAL_COLUMN_IDS } from '@desktop-contracts/compras/pedidos/pedido-columnas.constants';
 import {
   PEDIDO_ARTICULO_SELECT,
@@ -40,6 +42,9 @@ import {
   type PedidoLineaIdentityDatabaseRow,
   type PedidoListadoDatabaseRow,
   type PedidoProveedorFilterDatabaseRow,
+  type PedidoRecepcionArticuloDatabaseRow,
+  type PedidoRecepcionLineaDatabaseRow,
+  type PedidoRecepcionPreparedLine,
   type PedidoSqlFilter,
   type PedidoTipoPagoOptionDatabaseRow,
   type PedidoVisibleColumnDatabaseRow,
@@ -869,6 +874,58 @@ export default class TypeOrmPedidosRepository
   }
 
   /**
+   * Recepciona un Pedido aplicando stock, precios,
+   * códigos, históricos y snapshots en una transacción.
+   */
+  async recepcionarPedido(idPedido: number): Promise<void> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    await runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
+      const current: PedidoCurrentStateDatabaseRow = await this.requireCurrentPedido(
+        queryRunner,
+        idPedido,
+      );
+
+      if (current.recepcionado === 1) {
+        throw new Error('El pedido ya está recepcionado.');
+      }
+
+      await this.requireProveedor(queryRunner, current.id_proveedor, null);
+
+      const lineas: readonly PedidoRecepcionLineaDatabaseRow[] =
+        await this.readPedidoRecepcionLineas(queryRunner, idPedido);
+
+      if (lineas.length === 0) {
+        throw new Error('El pedido debe contener al menos una línea para recepcionarse.');
+      }
+
+      const preparedLines: readonly PedidoRecepcionPreparedLine[] =
+        await this.preparePedidoRecepcionLineas(queryRunner, lineas);
+
+      const timestamp: string = new Date().toISOString();
+
+      for (const line of preparedLines) {
+        await this.applyPedidoRecepcionLine(queryRunner, idPedido, line, timestamp);
+      }
+
+      await queryRunner.query(
+        `
+          UPDATE pedido
+          SET
+            fecha_recepcionado = ?,
+            recepcionado = 1,
+            updated_at = ?
+          WHERE
+            id = ?
+            AND recepcionado = 0
+            AND deleted_at IS NULL
+        `,
+        [timestamp, timestamp, idPedido],
+      );
+    });
+  }
+
+  /**
    * Da de baja un pedido pendiente.
    */
   async deletePedido(idPedido: number): Promise<void> {
@@ -935,6 +992,313 @@ export default class TypeOrmPedidosRepository
     }
 
     return row;
+  }
+
+  /**
+   * Recupera las líneas persistidas que deben participar
+   * en la recepción del Pedido.
+   */
+  private async readPedidoRecepcionLineas(
+    queryRunner: QueryRunner,
+    idPedido: number,
+  ): Promise<readonly PedidoRecepcionLineaDatabaseRow[]> {
+    return (await queryRunner.query(
+      `
+        SELECT
+          id,
+          id_articulo,
+          codigo_barras,
+          unidades,
+          palb_micros,
+          puc_micros,
+          pvp_micros,
+          margen_microporcentaje
+        FROM linea_pedido
+        WHERE id_pedido = ?
+        ORDER BY
+          orden,
+          id
+      `,
+      [idPedido],
+    )) as readonly PedidoRecepcionLineaDatabaseRow[];
+  }
+
+  /**
+   * Revalida todas las líneas contra Artículos y códigos
+   * canónicos antes de realizar la primera escritura.
+   */
+  private async preparePedidoRecepcionLineas(
+    queryRunner: QueryRunner,
+    lineas: readonly PedidoRecepcionLineaDatabaseRow[],
+  ): Promise<readonly PedidoRecepcionPreparedLine[]> {
+    const preparedLines: PedidoRecepcionPreparedLine[] = [];
+    const pendingBarcodes: Set<string> = new Set<string>();
+
+    for (const linea of lineas) {
+      if (linea.id_articulo === null) {
+        throw new Error('Una línea del pedido ya no está vinculada a un artículo.');
+      }
+
+      if (!Number.isSafeInteger(linea.unidades) || linea.unidades <= 0) {
+        throw new Error('Todas las líneas del pedido deben tener unidades mayores que cero.');
+      }
+
+      this.validatePedidoRecepcionEconomicValues(linea);
+
+      const articulo: PedidoRecepcionArticuloDatabaseRow =
+        await this.requirePedidoRecepcionArticulo(queryRunner, linea.id_articulo);
+
+      if (!Number.isSafeInteger(articulo.stock)) {
+        throw new Error('El stock actual de uno de los artículos no es válido.');
+      }
+
+      const stockFinal: number = articulo.stock + linea.unidades;
+
+      if (!Number.isSafeInteger(stockFinal)) {
+        throw new Error(
+          'El stock resultante de una línea del pedido supera el rango numérico seguro.',
+        );
+      }
+
+      const pvpCents: number = microsToCents(linea.pvp_micros);
+
+      if (linea.codigo_barras !== null) {
+        if (pendingBarcodes.has(linea.codigo_barras)) {
+          throw new Error('El pedido contiene códigos de barras adicionales repetidos.');
+        }
+
+        pendingBarcodes.add(linea.codigo_barras);
+
+        await this.requirePedidoAdditionalBarcodeAvailable(
+          queryRunner,
+          linea.id_articulo,
+          linea.codigo_barras,
+        );
+      }
+
+      preparedLines.push({
+        idLinea: linea.id,
+        idArticulo: linea.id_articulo,
+        codigoBarras: linea.codigo_barras,
+        unidades: linea.unidades,
+        stockPrevio: articulo.stock,
+        stockFinal,
+        palbMicros: linea.palb_micros,
+        pucMicros: linea.puc_micros,
+        pvpMicros: linea.pvp_micros,
+        pvpCents,
+        margenMicroporcentaje: linea.margen_microporcentaje,
+      });
+    }
+
+    return preparedLines;
+  }
+
+  /**
+   * Comprueba que la economía persistida de una línea
+   * pueda aplicarse con seguridad al artículo canónico.
+   */
+  private validatePedidoRecepcionEconomicValues(linea: PedidoRecepcionLineaDatabaseRow): void {
+    if (
+      !Number.isSafeInteger(linea.palb_micros) ||
+      linea.palb_micros < 0 ||
+      !Number.isSafeInteger(linea.puc_micros) ||
+      linea.puc_micros < 0 ||
+      !Number.isSafeInteger(linea.pvp_micros) ||
+      linea.pvp_micros < 0 ||
+      !Number.isSafeInteger(linea.margen_microporcentaje)
+    ) {
+      throw new Error('Los datos económicos de una línea del pedido no son válidos.');
+    }
+  }
+
+  /**
+   * Recupera el stock canónico actual de un artículo
+   * y exige que continúe activo durante la recepción.
+   */
+  private async requirePedidoRecepcionArticulo(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+  ): Promise<PedidoRecepcionArticuloDatabaseRow> {
+    const rows: readonly PedidoRecepcionArticuloDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT
+          id,
+          stock
+        FROM articulo
+        WHERE
+          id = ?
+          AND deleted_at IS NULL
+        LIMIT 1
+      `,
+      [idArticulo],
+    )) as readonly PedidoRecepcionArticuloDatabaseRow[];
+
+    const articulo: PedidoRecepcionArticuloDatabaseRow | undefined = rows[0];
+
+    if (articulo === undefined) {
+      throw new Error('Uno de los artículos del pedido ya no está disponible.');
+    }
+
+    return articulo;
+  }
+
+  /**
+   * Comprueba que un código pendiente pueda convertirse
+   * en código adicional canónico sin crear ambigüedades.
+   */
+  private async requirePedidoAdditionalBarcodeAvailable(
+    queryRunner: QueryRunner,
+    idArticulo: number,
+    codigo: string,
+  ): Promise<void> {
+    const ownAdditionalRows: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+        SELECT id
+        FROM codigo_barras
+        WHERE
+          id_articulo = ?
+          AND por_defecto = 0
+          AND deleted_at IS NULL
+        LIMIT 1
+      `,
+      [idArticulo],
+    )) as readonly DatabaseIdRow[];
+
+    if (ownAdditionalRows.length > 0) {
+      throw new Error('El artículo de una línea ya dispone de un código de barras adicional.');
+    }
+
+    const numericCode: number | null =
+      /^\d+$/.test(codigo) && Number.isSafeInteger(Number(codigo)) ? Number(codigo) : null;
+
+    const occupiedRows: readonly DatabaseIdRow[] = (await queryRunner.query(
+      `
+        SELECT cb.id
+        FROM codigo_barras cb
+        WHERE
+          cb.codigo = ?
+          AND cb.deleted_at IS NULL
+
+        UNION ALL
+
+        SELECT a.id
+        FROM articulo a
+        WHERE
+          a.deleted_at IS NULL
+          AND ? IS NOT NULL
+          AND (
+            a.localizador = ?
+            OR a.acceso_directo = ?
+          )
+
+        LIMIT 1
+      `,
+      [codigo, numericCode, numericCode, numericCode],
+    )) as readonly DatabaseIdRow[];
+
+    if (occupiedRows.length > 0) {
+      throw new Error(`El código "${codigo}" ya está siendo utilizado.`);
+    }
+  }
+
+  /**
+   * Aplica una línea ya revalidada sobre Artículos,
+   * histórico y snapshots del Pedido.
+   */
+  private async applyPedidoRecepcionLine(
+    queryRunner: QueryRunner,
+    idPedido: number,
+    line: PedidoRecepcionPreparedLine,
+    timestamp: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+        UPDATE articulo
+        SET
+          stock = ?,
+          palb_micros = ?,
+          puc_micros = ?,
+          pvp_cents = ?,
+          margen_microporcentaje = ?,
+          updated_at = ?
+        WHERE
+          id = ?
+          AND deleted_at IS NULL
+      `,
+      [
+        line.stockFinal,
+        line.palbMicros,
+        line.pucMicros,
+        line.pvpCents,
+        line.margenMicroporcentaje,
+        timestamp,
+        line.idArticulo,
+      ],
+    );
+
+    if (line.codigoBarras !== null) {
+      await queryRunner.query(
+        `
+          INSERT INTO codigo_barras (
+            public_id,
+            id_articulo,
+            codigo,
+            por_defecto,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, 0, ?, ?)
+        `,
+        [randomUUID(), line.idArticulo, line.codigoBarras, timestamp, timestamp],
+      );
+    }
+
+    await queryRunner.query(
+      `
+        INSERT INTO historico_articulo (
+          public_id,
+          id_articulo,
+          tipo,
+          stock_previo,
+          diferencia,
+          stock_final,
+          id_pedido,
+          puc_micros,
+          pvp_micros,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        randomUUID(),
+        line.idArticulo,
+        HISTORICO_ARTICULO_TIPO.PEDIDO,
+        line.stockPrevio,
+        line.unidades,
+        line.stockFinal,
+        idPedido,
+        line.pucMicros,
+        line.pvpMicros,
+        timestamp,
+        timestamp,
+      ],
+    );
+
+    await queryRunner.query(
+      `
+        UPDATE linea_pedido
+        SET
+          stock_actual_snapshot = ?,
+          stock_final_snapshot = ?,
+          updated_at = ?
+        WHERE
+          id = ?
+          AND id_pedido = ?
+      `,
+      [line.stockPrevio, line.stockFinal, timestamp, line.idLinea, idPedido],
+    );
   }
 
   /**

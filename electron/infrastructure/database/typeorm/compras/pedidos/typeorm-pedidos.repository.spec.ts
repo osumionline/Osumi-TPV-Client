@@ -40,6 +40,7 @@ interface PedidoPersistenceDatabaseRow {
   readonly descuento_bps: number;
   readonly fecha_pago: string | null;
   readonly fecha_pedido: string | null;
+  readonly fecha_recepcionado: string | null;
   readonly recargo_equivalencia: number;
   readonly europeo: number;
   readonly recepcionado: number;
@@ -78,6 +79,26 @@ interface PedidoLineaPersistenceDatabaseRow {
 
 interface DatabaseCountRow {
   readonly total: number;
+}
+
+interface ArticuloRecepcionPersistenceDatabaseRow {
+  readonly id: number;
+  readonly stock: number;
+  readonly palb_micros: number;
+  readonly puc_micros: number;
+  readonly pvp_cents: number;
+  readonly margen_microporcentaje: number;
+}
+
+interface HistoricoPedidoDatabaseRow {
+  readonly id_articulo: number;
+  readonly tipo: number;
+  readonly stock_previo: number;
+  readonly diferencia: number;
+  readonly stock_final: number;
+  readonly id_pedido: number | null;
+  readonly puc_micros: number;
+  readonly pvp_micros: number;
 }
 
 let tempDirectory: string | null = null;
@@ -1383,6 +1404,285 @@ describe('TypeOrmPedidosRepository', (): void => {
       'El PDF indicado no pertenece al pedido.',
     );
   });
+
+  it('recepciona atómicamente stock precios barcode históricos y snapshots', async (): Promise<void> => {
+    const currentDataSource: DataSource = requireDataSource();
+
+    await currentDataSource.query(
+      `
+        UPDATE linea_pedido
+        SET
+          codigo_barras = NULL,
+          palb_micros = ?,
+          puc_micros = ?,
+          pvp_micros = ?,
+          margen_microporcentaje = ?
+        WHERE id = ?
+      `,
+      [11_111_111, 13_333_333, 20_005_001, 33_350_001, 100],
+    );
+
+    await currentDataSource.query(
+      `
+        UPDATE linea_pedido
+        SET codigo_barras = ?
+        WHERE id = ?
+      `,
+      ['NEW-B', 101],
+    );
+
+    await requireRepository().recepcionarPedido(1);
+
+    const pedido: PedidoPersistenceDatabaseRow = await readPedidoPersistenceRow(1);
+
+    expect(pedido.recepcionado).toBe(1);
+    expect(pedido.fecha_recepcionado).not.toBeNull();
+    expect(pedido.fecha_recepcionado).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+    const lineas: readonly PedidoLineaPersistenceDatabaseRow[] =
+      await readPedidoLineasPersistence(1);
+
+    expect(lineas).toHaveLength(2);
+
+    expect(lineas[0]).toMatchObject({
+      id: 101,
+      stock_actual_snapshot: -2,
+      stock_final_snapshot: 0,
+    });
+
+    expect(lineas[1]).toMatchObject({
+      id: 100,
+      stock_actual_snapshot: 7,
+      stock_final_snapshot: 10,
+    });
+
+    expect(await readArticuloRecepcionPersistence(10)).toEqual({
+      id: 10,
+      stock: 10,
+      palb_micros: 11_111_111,
+      puc_micros: 13_333_333,
+      pvp_cents: 2001,
+      margen_microporcentaje: 33_350_001,
+    });
+
+    expect(await readArticuloRecepcionPersistence(11)).toMatchObject({
+      id: 11,
+      stock: 0,
+      palb_micros: 20_000_000,
+      puc_micros: 24_200_000,
+      pvp_cents: 3000,
+    });
+
+    expect(await countActiveBarcode('NEW-B')).toBe(1);
+
+    expect(await readPedidoHistoricos(1)).toEqual([
+      {
+        id_articulo: 10,
+        tipo: 3,
+        stock_previo: 7,
+        diferencia: 3,
+        stock_final: 10,
+        id_pedido: 1,
+        puc_micros: 13_333_333,
+        pvp_micros: 20_005_001,
+      },
+      {
+        id_articulo: 11,
+        tipo: 3,
+        stock_previo: -2,
+        diferencia: 2,
+        stock_final: 0,
+        id_pedido: 1,
+        puc_micros: 24_200_000,
+        pvp_micros: 30_000_000,
+      },
+    ]);
+
+    const loadedLines: readonly PedidoLineaRecord[] = await requireRepository().getPedidoLineas(1);
+
+    expect(loadedLines.map((line) => [line.id, line.stockActual, line.stockFinal])).toEqual([
+      [101, -2, 0],
+      [100, 7, 10],
+    ]);
+  });
+
+  it('impide recepcionar dos veces el mismo pedido', async (): Promise<void> => {
+    await expect(requireRepository().recepcionarPedido(3)).rejects.toThrow(
+      'El pedido ya está recepcionado.',
+    );
+
+    expect(await readPedidoHistoricos(3)).toEqual([]);
+  });
+
+  it('exige un proveedor todavía activo al recepcionar', async (): Promise<void> => {
+    await expect(requireRepository().recepcionarPedido(2)).rejects.toThrow(
+      'El proveedor seleccionado no está disponible.',
+    );
+  });
+
+  it('impide recepcionar un pedido sin líneas', async (): Promise<void> => {
+    await requireDataSource().query(
+      `
+        UPDATE pedido
+        SET id_proveedor = ?
+        WHERE id = ?
+      `,
+      [1, 2],
+    );
+
+    await expect(requireRepository().recepcionarPedido(2)).rejects.toThrow(
+      'El pedido debe contener al menos una línea para recepcionarse.',
+    );
+  });
+
+  it('impide recepcionar si alguna línea tiene cero unidades', async (): Promise<void> => {
+    const currentDataSource: DataSource = requireDataSource();
+
+    await currentDataSource.query(
+      `
+        UPDATE linea_pedido
+        SET codigo_barras = NULL
+        WHERE id = ?
+      `,
+      [100],
+    );
+
+    await currentDataSource.query(
+      `
+        UPDATE linea_pedido
+        SET unidades = 0
+        WHERE id = ?
+      `,
+      [101],
+    );
+
+    await expect(requireRepository().recepcionarPedido(1)).rejects.toThrow(
+      'Todas las líneas del pedido deben tener unidades mayores que cero.',
+    );
+
+    expect((await readPedidoPersistenceRow(1)).recepcionado).toBe(0);
+    expect(await readPedidoHistoricos(1)).toEqual([]);
+  });
+
+  it('impide recepcionar si un artículo ya no está disponible', async (): Promise<void> => {
+    const currentDataSource: DataSource = requireDataSource();
+
+    await currentDataSource.query(
+      `
+        UPDATE linea_pedido
+        SET codigo_barras = NULL
+        WHERE id = ?
+      `,
+      [100],
+    );
+
+    await currentDataSource.query(
+      `
+        UPDATE articulo
+        SET deleted_at = ?
+        WHERE id = ?
+      `,
+      ['2026-09-14T00:00:00.000Z', 11],
+    );
+
+    await expect(requireRepository().recepcionarPedido(1)).rejects.toThrow(
+      'Uno de los artículos del pedido ya no está disponible.',
+    );
+
+    expect((await readPedidoPersistenceRow(1)).recepcionado).toBe(0);
+    expect(await readPedidoHistoricos(1)).toEqual([]);
+  });
+
+  it('revalida que el artículo siga admitiendo un código adicional', async (): Promise<void> => {
+    await expect(requireRepository().recepcionarPedido(1)).rejects.toThrow(
+      'El artículo de una línea ya dispone de un código de barras adicional.',
+    );
+
+    expect((await readPedidoPersistenceRow(1)).recepcionado).toBe(0);
+    expect(await countActiveBarcode('BC-A')).toBe(0);
+  });
+
+  it('revalida el código adicional contra todo el espacio comercial', async (): Promise<void> => {
+    const currentDataSource: DataSource = requireDataSource();
+
+    await currentDataSource.query(
+      `
+        UPDATE linea_pedido
+        SET codigo_barras = NULL
+        WHERE id = ?
+      `,
+      [100],
+    );
+
+    await currentDataSource.query(
+      `
+        UPDATE linea_pedido
+        SET codigo_barras = ?
+        WHERE id = ?
+      `,
+      ['55', 101],
+    );
+
+    await expect(requireRepository().recepcionarPedido(1)).rejects.toThrow(
+      'El código "55" ya está siendo utilizado.',
+    );
+
+    expect((await readPedidoPersistenceRow(1)).recepcionado).toBe(0);
+    expect(await countActiveBarcode('55')).toBe(0);
+  });
+
+  it('revierte toda la recepción si falla después de haber empezado a mutar', async (): Promise<void> => {
+    const currentDataSource: DataSource = requireDataSource();
+
+    await currentDataSource.query(
+      `
+        UPDATE codigo_barras
+        SET deleted_at = ?
+        WHERE id = ?
+      `,
+      ['2026-09-14T00:00:00.000Z', 1001],
+    );
+
+    await currentDataSource.query(
+      `
+        UPDATE linea_pedido
+        SET codigo_barras = ?
+        WHERE id = ?
+      `,
+      ['ROLLBACK-A', 100],
+    );
+
+    const pedidoBefore: PedidoPersistenceDatabaseRow = await readPedidoPersistenceRow(1);
+    const lineasBefore: readonly PedidoLineaPersistenceDatabaseRow[] =
+      await readPedidoLineasPersistence(1);
+    const articulo10Before: ArticuloRecepcionPersistenceDatabaseRow =
+      await readArticuloRecepcionPersistence(10);
+    const articulo11Before: ArticuloRecepcionPersistenceDatabaseRow =
+      await readArticuloRecepcionPersistence(11);
+
+    await currentDataSource.query(`
+      CREATE TRIGGER test_recepcion_fail_article_11
+      BEFORE UPDATE OF stock ON articulo
+      WHEN OLD.id = 11
+      BEGIN
+        SELECT RAISE(
+          ABORT,
+          'Fallo forzado durante la recepción.'
+        );
+      END
+    `);
+
+    await expect(requireRepository().recepcionarPedido(1)).rejects.toThrow(
+      'Fallo forzado durante la recepción.',
+    );
+
+    expect(await readPedidoPersistenceRow(1)).toEqual(pedidoBefore);
+    expect(await readPedidoLineasPersistence(1)).toEqual(lineasBefore);
+    expect(await readArticuloRecepcionPersistence(10)).toEqual(articulo10Before);
+    expect(await readArticuloRecepcionPersistence(11)).toEqual(articulo11Before);
+    expect(await readPedidoHistoricos(1)).toEqual([]);
+    expect(await countActiveBarcode('ROLLBACK-A')).toBe(0);
+  });
 });
 
 /**
@@ -1492,6 +1792,7 @@ async function readPedidoPersistenceRow(idPedido: number): Promise<PedidoPersist
           descuento_bps,
           fecha_pago,
           fecha_pedido,
+          fecha_recepcionado,
           recargo_equivalencia,
           europeo,
           recepcionado,
@@ -1575,6 +1876,82 @@ async function readOptionalColumns(idPedido: number): Promise<readonly PedidoCol
     `,
     [idPedido],
   )) as readonly PedidoColumnDatabaseRow[];
+}
+
+/**
+ * Recupera el estado canónico afectado por
+ * la recepción de un artículo.
+ */
+async function readArticuloRecepcionPersistence(
+  idArticulo: number,
+): Promise<ArticuloRecepcionPersistenceDatabaseRow> {
+  const rows: readonly ArticuloRecepcionPersistenceDatabaseRow[] = (await requireDataSource().query(
+    `
+        SELECT
+          id,
+          stock,
+          palb_micros,
+          puc_micros,
+          pvp_cents,
+          margen_microporcentaje
+        FROM articulo
+        WHERE id = ?
+      `,
+    [idArticulo],
+  )) as readonly ArticuloRecepcionPersistenceDatabaseRow[];
+
+  const row: ArticuloRecepcionPersistenceDatabaseRow | undefined = rows[0];
+
+  if (row === undefined) {
+    throw new Error(`No existe el artículo ${idArticulo}.`);
+  }
+
+  return row;
+}
+
+/**
+ * Recupera los históricos creados por un Pedido.
+ */
+async function readPedidoHistoricos(
+  idPedido: number,
+): Promise<readonly HistoricoPedidoDatabaseRow[]> {
+  return (await requireDataSource().query(
+    `
+      SELECT
+        id_articulo,
+        tipo,
+        stock_previo,
+        diferencia,
+        stock_final,
+        id_pedido,
+        puc_micros,
+        pvp_micros
+      FROM historico_articulo
+      WHERE id_pedido = ?
+      ORDER BY
+        id_articulo,
+        id
+    `,
+    [idPedido],
+  )) as readonly HistoricoPedidoDatabaseRow[];
+}
+
+/**
+ * Cuenta códigos de barras activos con un valor concreto.
+ */
+async function countActiveBarcode(codigo: string): Promise<number> {
+  const rows: readonly DatabaseCountRow[] = (await requireDataSource().query(
+    `
+      SELECT COUNT(*) AS total
+      FROM codigo_barras
+      WHERE
+        codigo = ?
+        AND deleted_at IS NULL
+    `,
+    [codigo],
+  )) as readonly DatabaseCountRow[];
+
+  return rows[0]?.total ?? 0;
 }
 
 /**

@@ -268,6 +268,14 @@ class FakePedidosRepository implements PedidosRepository {
   }
 
   /**
+   * Simula una recepción válida para mantener completo
+   * el contrato del repository en estos tests.
+   */
+  recepcionarPedido(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  /**
    * Conserva el identificador del pedido solicitado para eliminación.
    */
   deletePedido(idPedido: number): Promise<void> {

@@ -183,3 +183,33 @@ export interface PedidoArticuloLineaSnapshotDatabaseRow {
   readonly id: number;
   readonly nombre: string;
 }
+
+export interface PedidoRecepcionLineaDatabaseRow {
+  readonly id: number;
+  readonly id_articulo: number | null;
+  readonly codigo_barras: string | null;
+  readonly unidades: number;
+  readonly palb_micros: number;
+  readonly puc_micros: number;
+  readonly pvp_micros: number;
+  readonly margen_microporcentaje: number;
+}
+
+export interface PedidoRecepcionArticuloDatabaseRow {
+  readonly id: number;
+  readonly stock: number;
+}
+
+export interface PedidoRecepcionPreparedLine {
+  readonly idLinea: number;
+  readonly idArticulo: number;
+  readonly codigoBarras: string | null;
+  readonly unidades: number;
+  readonly stockPrevio: number;
+  readonly stockFinal: number;
+  readonly palbMicros: number;
+  readonly pucMicros: number;
+  readonly pvpMicros: number;
+  readonly pvpCents: number;
+  readonly margenMicroporcentaje: number;
+}

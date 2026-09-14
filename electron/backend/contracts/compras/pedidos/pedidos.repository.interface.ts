@@ -82,6 +82,12 @@ export default interface PedidosRepository {
   savePedido(command: PedidoSaveRecord): Promise<number>;
 
   /**
+   * Recepciona atómicamente un Pedido pendiente
+   * aplicando sus efectos canónicos sobre Artículos.
+   */
+  recepcionarPedido(idPedido: number): Promise<void>;
+
+  /**
    * Elimina lógicamente un pedido todavía pendiente.
    */
   deletePedido(idPedido: number): Promise<void>;
