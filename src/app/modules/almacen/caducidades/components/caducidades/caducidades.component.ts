@@ -33,9 +33,9 @@ import {
   TEXT_SEARCH_DELAY_MS,
 } from '@modules/almacen/caducidades/components/caducidades/caducidades.component.private';
 import { DialogService } from '@osumi/angular-tools';
-import AlmacenWorkspaceService from '@services/almacen-workspace.service';
-import AlmacenService from '@services/almacen.service';
-import ArticulosService from '@services/articulos.service';
+import AlmacenWorkspaceService from '@services/almacen/almacen-workspace.service';
+import AlmacenService from '@services/almacen/almacen.service';
+import ArticulosService from '@services/articulos/articulos.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatEuros, formatInteger as formatIntegerValue } from '@utils/format.utils';
 

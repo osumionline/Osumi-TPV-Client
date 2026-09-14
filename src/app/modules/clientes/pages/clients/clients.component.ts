@@ -27,9 +27,9 @@ import ClientSalesComponent from '@modules/clientes/components/client-sales/clie
 import ClientSearchComponent from '@modules/clientes/components/client-search/client-search.component';
 import ClientSectionTabsComponent from '@modules/clientes/components/client-section-tabs/client-section-tabs.component';
 import { DialogService } from '@osumi/angular-tools';
-import AppDataService from '@services/app-data.service';
-import ClienteProteccionDatosPrintService from '@services/cliente-proteccion-datos-print.service';
-import ClientesService from '@services/clientes.service';
+import AppDataService from '@services/application/app-data.service';
+import ClienteProteccionDatosPrintService from '@services/clientes/cliente-proteccion-datos-print.service';
+import ClientesService from '@services/clientes/clientes.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 /**

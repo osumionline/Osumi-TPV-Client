@@ -25,9 +25,9 @@ import type {
 import HistoricalSaleDetailComponent from '@modules/ventas/components/historical-sale-detail/historical-sale-detail.component';
 import HistoricalSaleEmailFormComponent from '@modules/ventas/components/historical-sale-email-form/historical-sale-email-form.component';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
-import VentaTicketDocumentService from '@services/venta-ticket-document.service';
-import VentaTicketEmailService from '@services/venta-ticket-email.service';
-import VentasHistoricoService from '@services/ventas-historico.service';
+import VentaTicketDocumentService from '@services/ventas/venta-ticket-document.service';
+import VentaTicketEmailService from '@services/ventas/venta-ticket-email.service';
+import VentasHistoricoService from '@services/ventas/ventas-historico.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 /**

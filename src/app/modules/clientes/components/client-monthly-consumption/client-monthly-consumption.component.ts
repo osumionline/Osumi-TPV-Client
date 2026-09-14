@@ -18,7 +18,7 @@ import type {
   ClienteConsumoMensualPoint,
   ClienteConsumoMensualResultado,
 } from '@desktop-contracts/clientes/cliente-consumo-mensual.interface';
-import ClientesService from '@services/clientes.service';
+import ClientesService from '@services/clientes/clientes.service';
 import { formatShortMonthName } from '@utils/date.utils';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatEuros } from '@utils/format.utils';

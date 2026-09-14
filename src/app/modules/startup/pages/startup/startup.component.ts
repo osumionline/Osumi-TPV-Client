@@ -4,7 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Router } from '@angular/router';
-import ApplicationStartupService from '@services/application-startup.service';
+import ApplicationStartupService from '@services/application/application-startup.service';
 
 @Component({
   selector: 'otpv-startup',

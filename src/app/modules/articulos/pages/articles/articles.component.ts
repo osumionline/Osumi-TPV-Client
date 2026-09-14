@@ -23,8 +23,8 @@ import ArticleWorkspaceComponent from '@modules/articulos/components/article-wor
 import ArticlesTabsComponent from '@modules/articulos/components/articles-tabs/articles-tabs.component';
 import ArticleSearchComponent from '@modules/ventas/components/article-search/article-search.component';
 import { DialogService } from '@osumi/angular-tools';
-import AppDataService from '@services/app-data.service';
-import ArticulosService from '@services/articulos.service';
+import AppDataService from '@services/application/app-data.service';
+import ArticulosService from '@services/articulos/articulos.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { firstValueFrom } from 'rxjs';
 

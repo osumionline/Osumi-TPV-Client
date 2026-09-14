@@ -1,6 +1,6 @@
 import type { ArticuloInterface } from '@desktop-contracts/articulos/articulo.interface';
 import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.interface';
-import ArticulosService from '@services/articulos.service';
+import ArticulosService from '@services/articulos/articulos.service';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 describe('ArticulosService', (): void => {

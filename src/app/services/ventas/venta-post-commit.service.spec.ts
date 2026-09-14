@@ -2,11 +2,11 @@ import { TestBed } from '@angular/core/testing';
 import type { ClienteFacturaDocumentoConsulta } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type CrearClienteFacturaDesdeVentaCommand from '@desktop-contracts/clientes/crear-cliente-factura-desde-venta-command.interface';
-import ClientesService from '@services/clientes.service';
-import ReservasService from '@services/reservas.service';
-import VentaPostCommitService from '@services/venta-post-commit.service';
-import VentaTicketBaiService from '@services/venta-ticket-bai.service';
-import VentaTicketDocumentService from '@services/venta-ticket-document.service';
+import ClientesService from '@services/clientes/clientes.service';
+import ReservasService from '@services/ventas/reservas.service';
+import VentaPostCommitService from '@services/ventas/venta-post-commit.service';
+import VentaTicketBaiService from '@services/ventas/venta-ticket-bai.service';
+import VentaTicketDocumentService from '@services/ventas/venta-ticket-document.service';
 
 describe('VentaPostCommitService', (): void => {
   let clientesService: FakeClientesService;

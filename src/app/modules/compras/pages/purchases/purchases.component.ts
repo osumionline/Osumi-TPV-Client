@@ -5,8 +5,8 @@ import PurchasesTabsComponent from '@modules/compras/components/purchases-tabs/p
 import MarcasComponent from '@modules/compras/marcas/components/marcas/marcas.component';
 import PedidosComponent from '@modules/compras/pedidos/components/pedidos/pedidos.component';
 import { DialogService } from '@osumi/angular-tools';
-import AppDataService from '@services/app-data.service';
-import ComprasWorkspaceService from '@services/compras-workspace.service';
+import AppDataService from '@services/application/app-data.service';
+import ComprasWorkspaceService from '@services/compras/compras-workspace.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 /**

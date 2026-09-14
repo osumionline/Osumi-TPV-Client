@@ -2,7 +2,7 @@ import { inject, Service } from '@angular/core';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import buildClienteProteccionDatosDocument from '@model/clientes/cliente-proteccion-datos-document.builder';
 import type Cliente from '@model/clientes/cliente.model';
-import ProvinciasService from '@services/provincias.service';
+import ProvinciasService from '@services/application/provincias.service';
 import { printHtmlDocument } from '@utils/print.utils';
 
 @Service()

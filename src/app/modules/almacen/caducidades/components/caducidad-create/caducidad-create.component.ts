@@ -21,7 +21,7 @@ import type {
   CaducidadCreateCommand,
 } from '@desktop-contracts/almacen/caducidades/caducidad-create.interface';
 import SEARCH_DELAY_MS from '@modules/almacen/caducidades/components/caducidad-create/caducidad-create.component.private';
-import AlmacenService from '@services/almacen.service';
+import AlmacenService from '@services/almacen/almacen.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatEuros } from '@utils/format.utils';
 

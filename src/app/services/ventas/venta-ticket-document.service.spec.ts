@@ -1,9 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
-import VentaTicketDocumentService from '@services/venta-ticket-document.service';
-import VentasContextService from '@services/ventas-context.service';
-import VentasTicketsService from '@services/ventas-tickets.service';
+import VentaTicketDocumentService from '@services/ventas/venta-ticket-document.service';
+import VentasContextService from '@services/ventas/ventas-context.service';
+import VentasTicketsService from '@services/ventas/ventas-tickets.service';
 
 describe('VentaTicketDocumentService', (): void => {
   let originalDesktopDescriptor: PropertyDescriptor | undefined;

@@ -23,7 +23,7 @@ import { DialogService } from '@osumi/angular-tools';
 import BpsToPercentPipe from '@pipes/bps-to-percent.pipe';
 import IsoDateToSpanishPipe from '@pipes/iso-date-to-spanish.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
-import ReservasService from '@services/reservas.service';
+import ReservasService from '@services/ventas/reservas.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 @Component({

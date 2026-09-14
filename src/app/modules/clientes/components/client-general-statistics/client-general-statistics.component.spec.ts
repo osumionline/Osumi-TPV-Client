@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import type { ClienteEstadisticasGeneralesInterface } from '@desktop-contracts/clientes/cliente-estadisticas.interface';
 import ClientGeneralStatisticsComponent from '@modules/clientes/components/client-general-statistics/client-general-statistics.component';
 import ClientMonthlyConsumptionComponent from '@modules/clientes/components/client-monthly-consumption/client-monthly-consumption.component';
-import ClientesService from '@services/clientes.service';
+import ClientesService from '@services/clientes/clientes.service';
 
 describe('ClientGeneralStatisticsComponent', (): void => {
   let fixture: ComponentFixture<ClientGeneralStatisticsComponent>;

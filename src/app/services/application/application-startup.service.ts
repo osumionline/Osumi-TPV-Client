@@ -1,12 +1,12 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { computed, inject, Service, signal } from '@angular/core';
 import type ApplicationStartupStatus from '@app/model/startup/application-startup-status.type';
-import CategoriasService from '@services/categorias.service';
-import ClientesService from '@services/clientes.service';
-import EmpleadosService from '@services/empleados.service';
-import MarcasService from '@services/marcas.service';
-import ProveedoresService from '@services/proveedores.service';
-import ProvinciasService from '@services/provincias.service';
+import ProvinciasService from '@services/application/provincias.service';
+import CategoriasService from '@services/articulos/categorias.service';
+import ClientesService from '@services/clientes/clientes.service';
+import MarcasService from '@services/compras/marcas.service';
+import ProveedoresService from '@services/compras/proveedores.service';
+import EmpleadosService from '@services/empleados/empleados.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 @Service()

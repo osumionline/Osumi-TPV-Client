@@ -2,8 +2,8 @@ import { inject } from '@angular/core';
 import type { CanActivateFn, UrlTree } from '@angular/router';
 import { Router } from '@angular/router';
 import type ApplicationStateResult from '@desktop-contracts/application/application-state-result.interface';
-import ApplicationStartupService from '@services/application-startup.service';
-import ApplicationStateService from '@services/application-state.service';
+import ApplicationStartupService from '@services/application/application-startup.service';
+import ApplicationStateService from '@services/application/application-state.service';
 
 const startupGuard: CanActivateFn = async (): Promise<boolean | UrlTree> => {
   const applicationStateService: ApplicationStateService = inject(ApplicationStateService);

@@ -21,7 +21,7 @@ import {
   setArticuloFotoPrincipal,
 } from '@model/articulos/articulo-photo.utils';
 import ArticlePhotoCropComponent from '@modules/articulos/components/article-photo-crop/article-photo-crop.component';
-import FilesService from '@services/files.service';
+import FilesService from '@services/application/files.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 /**

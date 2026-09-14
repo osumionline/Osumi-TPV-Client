@@ -1,5 +1,5 @@
 import type PedidoListadoWorkspaceState from '@model/compras/pedidos/pedido-listado-workspace.interface';
-import ComprasWorkspaceService from '@services/compras-workspace.service';
+import ComprasWorkspaceService from '@services/compras/compras-workspace.service';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 let service: ComprasWorkspaceService;

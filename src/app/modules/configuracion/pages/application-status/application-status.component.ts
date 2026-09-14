@@ -2,7 +2,7 @@ import type { Signal } from '@angular/core';
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import type ApplicationStateResult from '@desktop-contracts/application/application-state-result.interface';
-import ApplicationStateService from '@services/application-state.service';
+import ApplicationStateService from '@services/application/application-state.service';
 
 @Component({
   selector: 'otpv-application-status',

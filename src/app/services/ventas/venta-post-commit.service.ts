@@ -1,8 +1,8 @@
 import { inject, Service } from '@angular/core';
-import ClientesService from '@services/clientes.service';
-import ReservasService from '@services/reservas.service';
-import VentaTicketBaiService from '@services/venta-ticket-bai.service';
-import VentaTicketDocumentService from '@services/venta-ticket-document.service';
+import ClientesService from '@services/clientes/clientes.service';
+import ReservasService from '@services/ventas/reservas.service';
+import VentaTicketBaiService from '@services/ventas/venta-ticket-bai.service';
+import VentaTicketDocumentService from '@services/ventas/venta-ticket-document.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 @Service()

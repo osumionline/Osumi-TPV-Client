@@ -4,7 +4,7 @@ import ArticuloVenta from '@model/ventas/articulo-venta.model';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
 import type VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
 import type { VentaWorkspaceState } from '@model/ventas/venta-workspace.interface';
-import VentasService from '@services/ventas.service';
+import VentasService from '@services/ventas/ventas.service';
 
 const createArticulo = (publicId: string, pvpCents: number = 1_000): ArticuloVenta => {
   const articulo: ArticuloVenta = new ArticuloVenta();

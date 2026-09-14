@@ -24,7 +24,7 @@ import type ClienteFacturasState from '@model/clientes/cliente-facturas-state.in
 import ClientInvoiceEmailFormComponent from '@modules/clientes/components/client-invoice-email-form/client-invoice-email-form.component';
 import ESTADO_LABELS from '@modules/clientes/components/client-invoices/client-invoices.component.private';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
-import ClientesService from '@services/clientes.service';
+import ClientesService from '@services/clientes/clientes.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 /**

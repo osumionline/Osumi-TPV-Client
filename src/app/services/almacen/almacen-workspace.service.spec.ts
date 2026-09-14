@@ -1,7 +1,7 @@
 import type CaducidadesWorkspaceState from '@model/almacen/caducidades-workspace.interface';
 import type { InventarioDraftEntry } from '@model/almacen/inventario/inventario-draft.interface';
 import type InventarioWorkspaceState from '@model/almacen/inventario/inventario-workspace.interface';
-import AlmacenWorkspaceService from '@services/almacen-workspace.service';
+import AlmacenWorkspaceService from '@services/almacen/almacen-workspace.service';
 
 describe('AlmacenWorkspaceService', (): void => {
   it('conserva la sección activa durante la sesión', (): void => {

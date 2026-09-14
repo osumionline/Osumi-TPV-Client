@@ -38,8 +38,8 @@ import {
   PEDIDOS_RECEPCIONADOS_COLUMNS,
 } from '@modules/compras/pedidos/components/pedidos/pedidos.component.private';
 import { DialogService } from '@osumi/angular-tools';
-import ComprasWorkspaceService from '@services/compras-workspace.service';
-import ComprasService from '@services/compras.service';
+import ComprasWorkspaceService from '@services/compras/compras-workspace.service';
+import ComprasService from '@services/compras/compras.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatEuros } from '@utils/format.utils';
 

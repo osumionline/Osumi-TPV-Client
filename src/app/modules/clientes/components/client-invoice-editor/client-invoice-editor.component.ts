@@ -30,8 +30,8 @@ import type { VentaHistoricoDetalle } from '@desktop-contracts/ventas/venta-hist
 import HistoricalSaleDetailComponent from '@modules/ventas/components/historical-sale-detail/historical-sale-detail.component';
 import { DialogService } from '@osumi/angular-tools';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
-import ClientesService from '@services/clientes.service';
-import VentasHistoricoService from '@services/ventas-historico.service';
+import ClientesService from '@services/clientes/clientes.service';
+import VentasHistoricoService from '@services/ventas/ventas-historico.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 /**

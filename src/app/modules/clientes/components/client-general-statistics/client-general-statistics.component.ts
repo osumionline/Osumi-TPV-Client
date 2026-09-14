@@ -19,7 +19,7 @@ import type { ClienteEstadisticasGeneralesInterface } from '@desktop-contracts/c
 import ClientMonthlyConsumptionComponent from '@modules/clientes/components/client-monthly-consumption/client-monthly-consumption.component';
 import IsoDateToSpanishPipe from '@pipes/iso-date-to-spanish.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
-import ClientesService from '@services/clientes.service';
+import ClientesService from '@services/clientes/clientes.service';
 import { formatMonthName } from '@utils/date.utils';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatDecimal } from '@utils/format.utils';

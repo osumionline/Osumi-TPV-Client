@@ -17,7 +17,7 @@ import type ClienteEstadisticasState from '@model/clientes/cliente-estadisticas-
 import type Cliente from '@model/clientes/cliente.model';
 import IsoDateToSpanishPipe from '@pipes/iso-date-to-spanish.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
-import ClientesService from '@services/clientes.service';
+import ClientesService from '@services/clientes/clientes.service';
 
 @Component({
   selector: 'otpv-client-statistics',

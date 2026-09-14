@@ -29,7 +29,7 @@ import type {
   ClientFormInvalidSection,
   ClientFormSection,
 } from '@modules/clientes/components/client-form/client-form.component.private';
-import ProvinciasService from '@services/provincias.service';
+import ProvinciasService from '@services/application/provincias.service';
 
 @Component({
   selector: 'otpv-client-form',

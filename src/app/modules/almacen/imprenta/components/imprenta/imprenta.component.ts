@@ -41,7 +41,7 @@ import {
   type ImprentaPreviewSlot,
 } from '@modules/almacen/imprenta/components/imprenta/imprenta.component.private';
 import { DialogService } from '@osumi/angular-tools';
-import AlmacenService from '@services/almacen.service';
+import AlmacenService from '@services/almacen/almacen.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatEuros } from '@utils/format.utils';
 import { QRCodeComponent } from 'angularx-qrcode';

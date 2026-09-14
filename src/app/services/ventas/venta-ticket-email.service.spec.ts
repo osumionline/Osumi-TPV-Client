@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import type { VentaTicketEmailCommand } from '@desktop-contracts/ventas/venta-ticket-email.interface';
-import VentaTicketDocumentService from '@services/venta-ticket-document.service';
-import VentaTicketEmailService from '@services/venta-ticket-email.service';
-import VentasTicketsService from '@services/ventas-tickets.service';
+import VentaTicketDocumentService from '@services/ventas/venta-ticket-document.service';
+import VentaTicketEmailService from '@services/ventas/venta-ticket-email.service';
+import VentasTicketsService from '@services/ventas/ventas-tickets.service';
 
 describe('VentaTicketEmailService', (): void => {
   let originalDesktopDescriptor: PropertyDescriptor | undefined;

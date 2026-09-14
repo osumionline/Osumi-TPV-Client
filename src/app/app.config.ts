@@ -22,8 +22,8 @@ import {
 } from '@angular/router';
 import routes from '@app/app.routes';
 import type ApplicationStateResult from '@desktop-contracts/application/application-state-result.interface';
-import ApplicationStateService from '@services/application-state.service';
-import SpanishPaginatorIntlService from '@services/spanish-paginator-intl.service';
+import ApplicationStateService from '@services/application/application-state.service';
+import SpanishPaginatorIntlService from '@services/application/spanish-paginator-intl.service';
 
 registerLocaleData(localeEs);
 

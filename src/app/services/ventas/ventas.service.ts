@@ -5,19 +5,18 @@ import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devol
 import type Cliente from '@model/clientes/cliente.model';
 import type Empleado from '@model/empleados/empleado.model';
 import type ArticuloVenta from '@model/ventas/articulo-venta.model';
+import type UltimaVentaResumen from '@model/ventas/ultima-venta-resumen.interface';
 import type VentaDevolucionOrigen from '@model/ventas/venta-devolucion-origen.interface';
 import type VentaDevolucionSeleccion from '@model/ventas/venta-devolucion-seleccion.interface';
 import VentaEnCurso from '@model/ventas/venta-en-curso.model';
 import VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
+import type VentaLineaReservaOrigen from '@model/ventas/venta-linea-reserva-origen.interface';
+import type VentaReservaOrigen from '@model/ventas/venta-reserva-origen.interface';
 import type VentaVariosData from '@model/ventas/venta-varios-data.interface';
 import type {
   VentaFocusTarget,
   VentaWorkspaceState,
 } from '@model/ventas/venta-workspace.interface';
-
-import type VentaLineaReservaOrigen from '@model/ventas/venta-linea-reserva-origen.interface';
-import type VentaReservaOrigen from '@model/ventas/venta-reserva-origen.interface';
-import type UltimaVentaResumen from '@model/ventas/ultima-venta-resumen.interface';
 
 /**
  * Mantiene las ventas abiertas y su workspace durante toda la sesión de la aplicación.

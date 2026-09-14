@@ -20,7 +20,7 @@ import type {
 } from '@desktop-contracts/articulos/articulo-estadisticas.interface';
 import { rescaleScaledInteger } from '@model/articulos/articulo-scaled-decimal.utils';
 import type ArticuloWorkspaceTab from '@model/articulos/articulo-workspace-tab.interface';
-import ArticulosService from '@services/articulos.service';
+import ArticulosService from '@services/articulos/articulos.service';
 import { formatShortMonthName } from '@utils/date.utils';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatEuros, formatInteger } from '@utils/format.utils';

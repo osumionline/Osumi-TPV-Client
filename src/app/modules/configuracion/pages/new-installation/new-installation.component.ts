@@ -29,8 +29,8 @@ import { InstallationFormModel } from '@model/configuracion/installation-form.mo
 import installationFormSchema from '@model/configuracion/installation-form.schema';
 import InstallationStep from '@model/configuracion/installation-step.type';
 import { DialogService } from '@osumi/angular-tools';
-import ApplicationStateService from '@services/application-state.service';
-import DesktopConfigurationService from '@services/desktop-configuration.service';
+import ApplicationStateService from '@services/application/application-state.service';
+import DesktopConfigurationService from '@services/application/desktop-configuration.service';
 
 @Component({
   selector: 'otpv-new-installation',

@@ -15,8 +15,8 @@ import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clien
 import type EmitirClienteFacturaCommand from '@desktop-contracts/clientes/emitir-cliente-factura-command.interface';
 import ClientInvoiceEditorComponent from '@modules/clientes/components/client-invoice-editor/client-invoice-editor.component';
 import { DialogService } from '@osumi/angular-tools';
-import ClientesService from '@services/clientes.service';
-import VentasHistoricoService from '@services/ventas-historico.service';
+import ClientesService from '@services/clientes/clientes.service';
+import VentasHistoricoService from '@services/ventas/ventas-historico.service';
 import type { Observable } from 'rxjs';
 import { of } from 'rxjs';
 

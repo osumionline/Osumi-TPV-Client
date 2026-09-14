@@ -82,10 +82,10 @@ import {
   type PurchaseOrderTextField,
 } from '@modules/compras/pedidos/pages/purchase-order/purchase-order.component.private';
 import { DialogService } from '@osumi/angular-tools';
-import AppDataService from '@services/app-data.service';
-import ComprasService from '@services/compras.service';
-import MarcasService from '@services/marcas.service';
-import ProveedoresService from '@services/proveedores.service';
+import AppDataService from '@services/application/app-data.service';
+import ComprasService from '@services/compras/compras.service';
+import MarcasService from '@services/compras/marcas.service';
+import ProveedoresService from '@services/compras/proveedores.service';
 import { getErrorMessage } from '@utils/error.utils';
 import type { Observable } from 'rxjs';
 

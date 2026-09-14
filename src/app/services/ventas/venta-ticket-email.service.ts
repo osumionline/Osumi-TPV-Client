@@ -1,7 +1,7 @@
 import { inject, Service } from '@angular/core';
 import type { VentaTicketEmailCommand } from '@desktop-contracts/ventas/venta-ticket-email.interface';
-import VentaTicketDocumentService from '@services/venta-ticket-document.service';
-import VentasTicketsService from '@services/ventas-tickets.service';
+import VentaTicketDocumentService from '@services/ventas/venta-ticket-document.service';
+import VentasTicketsService from '@services/ventas/ventas-tickets.service';
 
 @Service()
 export default class VentaTicketEmailService {

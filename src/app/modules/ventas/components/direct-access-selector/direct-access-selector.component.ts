@@ -10,7 +10,7 @@ import {
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import type AccesoDirectoVenta from '@model/ventas/acceso-directo-venta.model';
-import VentasArticulosService from '@services/ventas-articulos.service';
+import VentasArticulosService from '@services/ventas/ventas-articulos.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 /**

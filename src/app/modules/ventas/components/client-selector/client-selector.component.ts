@@ -18,7 +18,7 @@ import createClienteCommand from '@model/clientes/cliente-form-command.mapper';
 import type ClienteFormModel from '@model/clientes/cliente-form.model';
 import type Cliente from '@model/clientes/cliente.model';
 import ClientFormComponent from '@modules/clientes/components/client-form/client-form.component';
-import ClientesService from '@services/clientes.service';
+import ClientesService from '@services/clientes/clientes.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { normalizeTextForSearch } from '@utils/string.utils';
 

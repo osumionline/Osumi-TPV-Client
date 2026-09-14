@@ -6,9 +6,10 @@ import WarehouseTabsComponent from '@modules/almacen/components/warehouse-tabs/w
 import ImprentaComponent from '@modules/almacen/imprenta/components/imprenta/imprenta.component';
 import InventoryComponent from '@modules/almacen/inventario/components/inventory/inventory.component';
 import { DialogService } from '@osumi/angular-tools';
-import AlmacenWorkspaceService from '@services/almacen-workspace.service';
-import AppDataService from '@services/app-data.service';
+import AlmacenWorkspaceService from '@services/almacen/almacen-workspace.service';
+import AppDataService from '@services/application/app-data.service';
 import { getErrorMessage } from '@utils/error.utils';
+
 /**
  * Página principal del módulo de Almacén.
  */

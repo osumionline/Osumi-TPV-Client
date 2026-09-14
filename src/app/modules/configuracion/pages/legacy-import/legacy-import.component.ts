@@ -30,7 +30,7 @@ import LegacyImportProgress from '@desktop-contracts/legacy-import/legacy-import
 import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-import/legacy-import-review-decision.type';
 import LegacyImportStartResult from '@desktop-contracts/legacy-import/legacy-import-start-result.interface';
 import LegacyImportConflictResolutionComponent from '@modules/configuracion/components/legacy-import-conflict-resolution/legacy-import-conflict-resolution.component';
-import DesktopLegacyImportService from '@services/desktop-legacy-import.service';
+import DesktopLegacyImportService from '@services/application/desktop-legacy-import.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatInteger as formatIntegerValue } from '@utils/format.utils';
 

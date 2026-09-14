@@ -31,14 +31,14 @@ import type {
   HistoricalSalesTab,
 } from '@modules/ventas/components/historical-sales/historical-sales.component.private';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
-import ClienteProteccionDatosPrintService from '@services/cliente-proteccion-datos-print.service';
-import ClientesService from '@services/clientes.service';
-import VentaTicketBaiService from '@services/venta-ticket-bai.service';
-import VentaTicketDocumentService from '@services/venta-ticket-document.service';
-import VentaTicketEmailService from '@services/venta-ticket-email.service';
-import VentasContextService from '@services/ventas-context.service';
-import VentasHistoricoService from '@services/ventas-historico.service';
-import VentasPostventaService from '@services/ventas-postventa.service';
+import ClienteProteccionDatosPrintService from '@services/clientes/cliente-proteccion-datos-print.service';
+import ClientesService from '@services/clientes/clientes.service';
+import VentaTicketBaiService from '@services/ventas/venta-ticket-bai.service';
+import VentaTicketDocumentService from '@services/ventas/venta-ticket-document.service';
+import VentaTicketEmailService from '@services/ventas/venta-ticket-email.service';
+import VentasContextService from '@services/ventas/ventas-context.service';
+import VentasHistoricoService from '@services/ventas/ventas-historico.service';
+import VentasPostventaService from '@services/ventas/ventas-postventa.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 /**

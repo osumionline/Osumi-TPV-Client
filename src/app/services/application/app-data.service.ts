@@ -1,6 +1,6 @@
 import { inject, Service, signal, type Signal, type WritableSignal } from '@angular/core';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
-import DesktopConfigurationService from '@services/desktop-configuration.service';
+import DesktopConfigurationService from '@services/application/desktop-configuration.service';
 
 /**
  * Mantiene en memoria la configuración global de la instalación.

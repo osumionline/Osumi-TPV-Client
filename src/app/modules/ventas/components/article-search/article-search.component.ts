@@ -20,8 +20,8 @@ import { MatIcon } from '@angular/material/icon';
 import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type ArticuloVenta from '@model/ventas/articulo-venta.model';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
-import ComprasService from '@services/compras.service';
-import VentasArticulosService from '@services/ventas-articulos.service';
+import ComprasService from '@services/compras/compras.service';
+import VentasArticulosService from '@services/ventas/ventas-articulos.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 interface ArticleSearchResult {

@@ -6,7 +6,7 @@ import type {
   ClienteConsumoMensualResultado,
 } from '@desktop-contracts/clientes/cliente-consumo-mensual.interface';
 import ClientMonthlyConsumptionComponent from '@modules/clientes/components/client-monthly-consumption/client-monthly-consumption.component';
-import ClientesService from '@services/clientes.service';
+import ClientesService from '@services/clientes/clientes.service';
 
 describe('ClientMonthlyConsumptionComponent', (): void => {
   let fixture: ComponentFixture<ClientMonthlyConsumptionComponent>;

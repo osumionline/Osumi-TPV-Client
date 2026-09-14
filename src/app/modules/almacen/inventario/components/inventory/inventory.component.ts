@@ -61,12 +61,12 @@ import {
   type InventarioKeyboardField,
 } from '@modules/almacen/inventario/components/inventory/inventory.component.private';
 import { DialogService } from '@osumi/angular-tools';
-import AlmacenWorkspaceService from '@services/almacen-workspace.service';
-import AlmacenService from '@services/almacen.service';
-import ArticulosService from '@services/articulos.service';
-import CategoriasService from '@services/categorias.service';
-import MarcasService from '@services/marcas.service';
-import ProveedoresService from '@services/proveedores.service';
+import AlmacenWorkspaceService from '@services/almacen/almacen-workspace.service';
+import AlmacenService from '@services/almacen/almacen.service';
+import ArticulosService from '@services/articulos/articulos.service';
+import CategoriasService from '@services/articulos/categorias.service';
+import MarcasService from '@services/compras/marcas.service';
+import ProveedoresService from '@services/compras/proveedores.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { formatDecimal } from '@utils/format.utils';
 

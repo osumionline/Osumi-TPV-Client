@@ -2,7 +2,7 @@ import type MarcaEstadisticasFiltros from '@model/marcas/marca-estadisticas-filt
 import type MarcaFormModel from '@model/marcas/marca-form.model';
 import type MarcaWorkspace from '@model/marcas/marca-workspace.interface';
 import Marca from '@model/marcas/marca.model';
-import MarcasService from '@services/marcas.service';
+import MarcasService from '@services/compras/marcas.service';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 let service: MarcasService;

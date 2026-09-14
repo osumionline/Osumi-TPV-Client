@@ -4,7 +4,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 import type MarcaWorkspaceSection from '@model/marcas/marca-workspace-section.type';
 import MarcaSectionTabsComponent from '@modules/compras/marcas/components/marca-section-tabs/marca-section-tabs.component';
-import MarcasService from '@services/marcas.service';
+import MarcasService from '@services/compras/marcas.service';
 
 /**
  * Muestra el workspace principal de gestión de Marcas.

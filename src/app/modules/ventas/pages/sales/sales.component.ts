@@ -21,11 +21,11 @@ import ReservationManagerComponent from '@modules/ventas/components/reservation-
 import SaleWorkspaceComponent from '@modules/ventas/components/sale-workspace/sale-workspace.component';
 import SalesTabsComponent from '@modules/ventas/components/sales-tabs/sales-tabs.component';
 import { DialogService } from '@osumi/angular-tools';
-import ClienteProteccionDatosPrintService from '@services/cliente-proteccion-datos-print.service';
-import ClientesService from '@services/clientes.service';
-import EmpleadosService from '@services/empleados.service';
-import VentasContextService from '@services/ventas-context.service';
-import VentasService from '@services/ventas.service';
+import ClienteProteccionDatosPrintService from '@services/clientes/cliente-proteccion-datos-print.service';
+import ClientesService from '@services/clientes/clientes.service';
+import EmpleadosService from '@services/empleados/empleados.service';
+import VentasContextService from '@services/ventas/ventas-context.service';
+import VentasService from '@services/ventas/ventas.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 interface PendingReservasLoad {

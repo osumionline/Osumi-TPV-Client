@@ -5,7 +5,7 @@ import type GuardarVentaResult from '@desktop-contracts/ventas/guardar-venta-res
 import mapVentaToGuardarVentaCommand from '@model/ventas/guardar-venta-command.mapper';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
 import type { VentaFinalizacionResultado } from '@model/ventas/venta-finalizacion-resultado.interface';
-import VentasContextService from '@services/ventas-context.service';
+import VentasContextService from '@services/ventas/ventas-context.service';
 
 @Service()
 export default class VentasPersistenciaService {

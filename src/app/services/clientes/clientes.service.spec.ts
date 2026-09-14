@@ -29,7 +29,7 @@ import createClienteFormInitialValue from '@model/clientes/cliente-form.initial-
 import type ClienteFormModel from '@model/clientes/cliente-form.model';
 import type ClienteWorkspace from '@model/clientes/cliente-workspace.interface';
 import Cliente from '@model/clientes/cliente.model';
-import ClientesService from '@services/clientes.service';
+import ClientesService from '@services/clientes/clientes.service';
 
 describe('ClientesService', (): void => {
   let originalDesktopDescriptor: PropertyDescriptor | undefined;

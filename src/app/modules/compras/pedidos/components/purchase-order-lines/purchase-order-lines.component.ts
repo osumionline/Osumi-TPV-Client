@@ -39,7 +39,7 @@ import ArticleSearchComponent from '@modules/ventas/components/article-search/ar
 import { DialogService } from '@osumi/angular-tools';
 import BpsToPercentPipe from '@pipes/bps-to-percent.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
-import ComprasService from '@services/compras.service';
+import ComprasService from '@services/compras/compras.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 /**

@@ -5,7 +5,7 @@ import type ClienteFacturaEmailCommand from '@desktop-contracts/clientes/cliente
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type ClienteFacturasState from '@model/clientes/cliente-facturas-state.interface';
 import ClientInvoicesComponent from '@modules/clientes/components/client-invoices/client-invoices.component';
-import ClientesService from '@services/clientes.service';
+import ClientesService from '@services/clientes/clientes.service';
 
 describe('ClientInvoicesComponent', (): void => {
   let fixture: ComponentFixture<ClientInvoicesComponent>;

@@ -3,8 +3,8 @@ import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
 import buildVentaGiftTicketDocument from '@model/ventas/venta-gift-ticket-document.builder';
 import buildVentaTicketDocument from '@model/ventas/venta-ticket-document.builder';
-import VentasContextService from '@services/ventas-context.service';
-import VentasTicketsService from '@services/ventas-tickets.service';
+import VentasContextService from '@services/ventas/ventas-context.service';
+import VentasTicketsService from '@services/ventas/ventas-tickets.service';
 
 interface VentaTicketDocumentSnapshot {
   readonly html: string;

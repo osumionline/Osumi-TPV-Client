@@ -6,9 +6,9 @@ import type {
   VentasHistoricoResultado,
 } from '@desktop-contracts/ventas/venta-historico.interface';
 import ClientSalesComponent from '@modules/clientes/components/client-sales/client-sales.component';
-import VentaTicketDocumentService from '@services/venta-ticket-document.service';
-import VentaTicketEmailService from '@services/venta-ticket-email.service';
-import VentasHistoricoService from '@services/ventas-historico.service';
+import VentaTicketDocumentService from '@services/ventas/venta-ticket-document.service';
+import VentaTicketEmailService from '@services/ventas/venta-ticket-email.service';
+import VentasHistoricoService from '@services/ventas/ventas-historico.service';
 
 describe('ClientSalesComponent', (): void => {
   let fixture: ComponentFixture<ClientSalesComponent>;

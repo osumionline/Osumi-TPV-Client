@@ -42,10 +42,10 @@ import ArticleMarginSuggestionsComponent from '@modules/articulos/components/art
 import BrandQuickCreateComponent from '@modules/articulos/components/brand-quick-create/brand-quick-create.component';
 import ProviderQuickCreateComponent from '@modules/articulos/components/provider-quick-create/provider-quick-create.component';
 import { DialogService } from '@osumi/angular-tools';
-import AppDataService from '@services/app-data.service';
-import CategoriasService from '@services/categorias.service';
-import MarcasService from '@services/marcas.service';
-import ProveedoresService from '@services/proveedores.service';
+import AppDataService from '@services/application/app-data.service';
+import CategoriasService from '@services/articulos/categorias.service';
+import MarcasService from '@services/compras/marcas.service';
+import ProveedoresService from '@services/compras/proveedores.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 /**
