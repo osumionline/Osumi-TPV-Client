@@ -1,0 +1,87 @@
+<section class="brands">
+    <header class="brands__toolbar">
+        <h2>
+            Marcas
+        </h2>
+
+        <div class="brands__toolbar-actions">
+            @if (marcasService.workspace(); as workspace) {
+            <strong class="brands__name">
+                {{ workspace.draft.nombre || 'Nueva marca' }}
+            </strong>
+
+            <button mat-icon-button
+                    type="button"
+                    matTooltip="Cerrar ficha"
+                    aria-label="Cerrar ficha de marca"
+                    [disabled]="marcasService.dirty()"
+                    (click)="closeMarca()">
+                <mat-icon>
+                    close
+                </mat-icon>
+            </button>
+            }
+
+            <button mat-icon-button
+                    type="button"
+                    matTooltip="Buscar marca"
+                    aria-label="Buscar marca"
+                    disabled>
+                <mat-icon>
+                    search
+                </mat-icon>
+            </button>
+
+            <button mat-icon-button
+                    type="button"
+                    matTooltip="Nueva marca"
+                    aria-label="Crear una marca nueva"
+                    [disabled]="marcasService.dirty()"
+                    (click)="newMarca()">
+                <mat-icon>
+                    add
+                </mat-icon>
+            </button>
+        </div>
+    </header>
+
+    @if (marcasService.workspace(); as workspace) {
+    <otpv-marca-section-tabs [workspace]="workspace"
+                             (selectSectionEvent)="selectSection($event)" />
+
+    <div class="brands__workspace">
+        @switch (workspace.activeSection) {
+        @case ('data') {
+        <section class="brands__section-state">
+            <h3>
+                Datos de la marca
+            </h3>
+
+            <p>
+                La ficha de datos se incorporará en el siguiente bloque funcional.
+            </p>
+        </section>
+        }
+
+        @case ('statistics') {
+        <section class="brands__section-state">
+            <h3>
+                Estadísticas
+            </h3>
+
+            <p>
+                Las estadísticas de la marca se incorporarán más adelante.
+            </p>
+        </section>
+        }
+        }
+    </div>
+    }
+    @else {
+    <div class="brands__state">
+        <p>
+            Elige una marca de la lista.
+        </p>
+    </div>
+    }
+</section>

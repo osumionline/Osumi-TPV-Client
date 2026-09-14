@@ -1,4 +1,4 @@
-import { Service, signal, Signal, WritableSignal } from '@angular/core';
+import { Service, signal, type Signal, type WritableSignal } from '@angular/core';
 import type ComprasSection from '@model/compras/compras-section.type';
 import type PedidoListadoWorkspaceState from '@model/compras/pedidos/pedido-listado-workspace.interface';
 
@@ -24,9 +24,12 @@ export default class ComprasWorkspaceService {
   }
 
   /**
-   * Restaura Compras a su sección inicial.
+   * Limpia el estado visual conservado del módulo
+   * y restaura Pedidos como sección inicial.
    */
   clear(): void {
+    this.pedidosGuardadosState = null;
+    this.pedidosRecepcionadosState = null;
     this.activeSectionSignal.set('orders');
   }
 

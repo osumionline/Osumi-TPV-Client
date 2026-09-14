@@ -2,11 +2,12 @@ import { Component, computed, inject, type OnInit, type Signal } from '@angular/
 import HeaderComponent from '@app/components/header/header.component';
 import type ComprasSection from '@model/compras/compras-section.type';
 import PurchasesTabsComponent from '@modules/compras/components/purchases-tabs/purchases-tabs.component';
+import MarcasComponent from '@modules/compras/marcas/components/marcas/marcas.component';
+import PedidosComponent from '@modules/compras/pedidos/components/pedidos/pedidos.component';
 import { DialogService } from '@osumi/angular-tools';
 import AppDataService from '@services/app-data.service';
-import { getErrorMessage } from '@utils/error.utils';
-import PedidosComponent from '@modules/compras/pedidos/components/pedidos/pedidos.component';
 import ComprasWorkspaceService from '@services/compras-workspace.service';
+import { getErrorMessage } from '@utils/error.utils';
 
 /**
  * Página principal del módulo de Compras.
@@ -15,7 +16,7 @@ import ComprasWorkspaceService from '@services/compras-workspace.service';
   selector: 'otpv-purchases',
   templateUrl: './purchases.component.html',
   styleUrl: './purchases.component.scss',
-  imports: [HeaderComponent, PedidosComponent, PurchasesTabsComponent],
+  imports: [HeaderComponent, MarcasComponent, PedidosComponent, PurchasesTabsComponent],
 })
 export default class PurchasesComponent implements OnInit {
   private readonly dialog: DialogService = inject(DialogService);

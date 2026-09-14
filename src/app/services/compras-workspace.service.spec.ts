@@ -1,6 +1,6 @@
 import type PedidoListadoWorkspaceState from '@model/compras/pedidos/pedido-listado-workspace.interface';
 import ComprasWorkspaceService from '@services/compras-workspace.service';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 let service: ComprasWorkspaceService;
 
@@ -34,12 +34,16 @@ describe('ComprasWorkspaceService', (): void => {
     expect(service.activeSection()).toBe('suppliers');
   });
 
-  it('restaura Pedidos al limpiar el workspace', (): void => {
+  it('limpia el workspace y restaura Pedidos como sección inicial', (): void => {
     service.selectSection('brands');
+    service.setPedidosGuardadosState(STATE);
+    service.setPedidosRecepcionadosState(STATE);
 
     service.clear();
 
     expect(service.activeSection()).toBe('orders');
+    expect(service.getPedidosGuardadosState()).toBeNull();
+    expect(service.getPedidosRecepcionadosState()).toBeNull();
   });
 
   it('mantiene independientes los dos listados de Pedidos', (): void => {
