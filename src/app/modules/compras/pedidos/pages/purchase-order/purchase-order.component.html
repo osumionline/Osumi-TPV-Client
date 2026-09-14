@@ -220,7 +220,7 @@
                     </mat-checkbox>
                 </div>
 
-                <label class="otpv-field purchase-order__date">
+                <label class="otpv-field purchase-order__date purchase-order__date--order">
                     <span class="otpv-field__label">
                         Fecha pedido
                     </span>
@@ -232,7 +232,7 @@
                            (change)="onTextInput('fechaPedido', $event)">
                 </label>
 
-                <label class="otpv-field purchase-order__date">
+                <label class="otpv-field purchase-order__date purchase-order__date--payment">
                     <span class="otpv-field__label">
                         Fecha pago
                     </span>
@@ -265,18 +265,6 @@
                         </mat-select>
                     </mat-form-field>
                 </div>
-
-                <label class="otpv-field purchase-order__notes">
-                    <span class="otpv-field__label">
-                        Observaciones
-                    </span>
-
-                    <textarea class="otpv-control otpv-control--textarea"
-                              rows="3"
-                              [disabled]="processing()"
-                              [value]="order.observaciones"
-                              (input)="onTextInput('observaciones', $event)"></textarea>
-                </label>
             </section>
 
             <otpv-purchase-order-lines [lines]="lines()"
@@ -311,6 +299,18 @@
                 </div>
                 }
 
+                <label class="otpv-field purchase-order__notes">
+                    <span class="otpv-field__label">
+                        Observaciones
+                    </span>
+
+                    <textarea class="otpv-control otpv-control--textarea"
+                              rows="6"
+                              [disabled]="processing()"
+                              [value]="order.observaciones"
+                              (input)="onTextInput('observaciones', $event)"></textarea>
+                </label>
+
                 @if (totals(); as orderTotals) {
                 <div class="purchase-order__totals-wrapper">
                     <otpv-purchase-order-totals [totals]="orderTotals"
@@ -326,6 +326,7 @@
                 </div>
                 }
             </div>
+
         </div>
         }
     </section>

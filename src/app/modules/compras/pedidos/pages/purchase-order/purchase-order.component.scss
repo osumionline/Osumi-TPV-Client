@@ -92,49 +92,53 @@
 
     .purchase-order__header-grid {
         display: grid;
-        grid-template-columns: repeat(12, minmax(0, 1fr));
+        grid-template-columns:
+            minmax(220px, 1.45fr) minmax(180px, 1.25fr) minmax(120px, 0.72fr) minmax(170px, 1fr) max-content minmax(145px, 0.9fr) minmax(145px, 0.9fr) minmax(160px, 1fr);
+        grid-template-areas:
+            "provider payment type number flags date-order date-payment columns";
         align-items: end;
         gap: 12px;
     }
 
     .purchase-order__provider {
-        grid-column: span 3;
+        grid-area: provider;
     }
 
     .purchase-order__payment {
-        grid-column: span 3;
+        grid-area: payment;
     }
 
     .purchase-order__type {
-        grid-column: span 2;
+        grid-area: type;
     }
 
     .purchase-order__number {
-        grid-column: span 2;
+        grid-area: number;
     }
 
     .purchase-order__flags {
         display: flex;
         min-height: 40px;
-        grid-column: span 2;
+        grid-area: flags;
         align-items: center;
         gap: 12px;
+        white-space: nowrap;
     }
 
-    .purchase-order__date {
-        grid-column: span 2;
+    .purchase-order__date--order {
+        grid-area: date-order;
+    }
+
+    .purchase-order__date--payment {
+        grid-area: date-payment;
     }
 
     .purchase-order__columns {
-        grid-column: span 3;
+        grid-area: columns;
 
         mat-form-field {
             width: 100%;
         }
-    }
-
-    .purchase-order__notes {
-        grid-column: span 5;
     }
 
     .purchase-order__provider-control {
@@ -154,24 +158,54 @@
     }
 
     .purchase-order__footer {
-        display: flex;
-        align-items: flex-start;
+        display: grid;
+        grid-template-columns:
+            minmax(260px, 0.85fr) minmax(340px, 1.15fr) minmax(520px, 1.5fr);
+        grid-template-areas:
+            "files notes totals";
+        align-items: stretch;
         gap: 20px;
         margin-top: 20px;
     }
 
     .purchase-order__files-wrapper {
         min-width: 0;
-        max-width: 520px;
-        flex: 1 1 360px;
+        grid-area: files;
+    }
+
+    .purchase-order__notes {
+        display: flex;
+        min-width: 0;
+        grid-area: notes;
+        flex-direction: column;
+
+        .otpv-control--textarea {
+            min-height: 180px;
+            flex: 1;
+            resize: vertical;
+        }
     }
 
     .purchase-order__totals-wrapper {
         display: flex;
         min-width: 0;
-        flex: 0 1 760px;
-        justify-content: flex-end;
-        margin-left: auto;
+        grid-area: totals;
+        justify-content: stretch;
+
+        otpv-purchase-order-totals {
+            width: 100%;
+        }
+    }
+}
+
+@media (width <=1450px) {
+    .purchase-order {
+        .purchase-order__header-grid {
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            grid-template-areas:
+                "provider provider provider payment payment payment type type number number flags flags"
+                "date-order date-order date-payment date-payment columns columns columns . . . . .";
+        }
     }
 }
 
@@ -179,43 +213,28 @@
     .purchase-order {
         .purchase-order__header-grid {
             grid-template-columns: repeat(6, minmax(0, 1fr));
+            grid-template-areas:
+                "provider provider provider payment payment payment"
+                "type type number number flags flags"
+                "date-order date-order date-payment date-payment columns columns";
         }
 
-        .purchase-order__provider,
-        .purchase-order__payment,
-        .purchase-order__columns {
-            grid-column: span 3;
+        .purchase-order__footer {
+            grid-template-columns: minmax(0, 1fr);
+            grid-template-areas:
+                "files"
+                "notes"
+                "totals";
         }
 
-        .purchase-order__type,
-        .purchase-order__number,
-        .purchase-order__flags,
-        .purchase-order__date {
-            grid-column: span 2;
-        }
-
-        .purchase-order__notes {
-            grid-column: span 6;
-        }
-    }
-
-    .purchase-order__footer {
-        flex-direction: column;
-    }
-
-    .purchase-order__files-wrapper,
-    .purchase-order__totals-wrapper {
-        width: 100%;
-        max-width: none;
-        flex-basis: auto;
-    }
-
-    .purchase-order__totals-wrapper {
-        justify-content: stretch;
-        margin-left: 0;
-
-        otpv-purchase-order-totals {
+        .purchase-order__files-wrapper,
+        .purchase-order__notes,
+        .purchase-order__totals-wrapper {
             width: 100%;
+        }
+
+        .purchase-order__totals-wrapper {
+            justify-content: stretch;
         }
     }
 }
