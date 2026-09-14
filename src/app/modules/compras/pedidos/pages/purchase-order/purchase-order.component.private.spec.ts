@@ -1523,6 +1523,62 @@ describe('purchase-order.component.private', (): void => {
     expect(() => buildPurchaseOrderDirtyFingerprint(state, [])).not.toThrow();
   });
 
+  it('detecta los cambios informativos editables de un pedido recepcionado', (): void => {
+    const state: PurchaseOrderFormState = createExistingPurchaseOrderFormState(
+      createPedido({
+        recepcionado: true,
+        fechaRecepcionado: '2026-09-12T10:00:00.000Z',
+      }),
+    );
+
+    const line: PurchaseOrderLineState = createExistingPurchaseOrderLineState(createPedidoLinea());
+
+    const fingerprint: string = buildPurchaseOrderDirtyFingerprint(state, [line]);
+
+    const changes: readonly Partial<PurchaseOrderFormState>[] = [
+      {
+        idProveedor: 2,
+      },
+      {
+        idTipoPago: 11,
+        formaPago: 'Paypal',
+      },
+      {
+        tipo: 'albaran',
+      },
+      {
+        numero: 'FAC-8-EDITADA',
+      },
+      {
+        fechaPedido: '2026-09-09',
+      },
+      {
+        fechaPago: '2026-09-15',
+      },
+      {
+        europeo: true,
+      },
+      {
+        observaciones: 'Observaciones posteriores',
+      },
+      {
+        columnasVisibles: [4, 6],
+      },
+    ];
+
+    for (const change of changes) {
+      expect(
+        buildPurchaseOrderDirtyFingerprint(
+          {
+            ...state,
+            ...change,
+          },
+          [line],
+        ),
+      ).not.toBe(fingerprint);
+    }
+  });
+
   it('permite recepcionar un pedido persistido pendiente con líneas válidas', (): void => {
     const state: PurchaseOrderFormState = createExistingPurchaseOrderFormState(createPedido());
 

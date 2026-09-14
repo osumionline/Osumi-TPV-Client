@@ -1038,47 +1038,113 @@ describe('TypeOrmPedidosRepository', (): void => {
     expect(await readPedidoLineasPersistence(1)).toEqual(linesBefore);
   });
 
-  it('ignora cambios de líneas al editar información de un pedido recepcionado', async (): Promise<void> => {
+  it('edita información de un pedido recepcionado sin repetir sus efectos canónicos', async (): Promise<void> => {
+    const headerBefore: PedidoPersistenceDatabaseRow = await readPedidoPersistenceRow(3);
+
     const linesBefore: readonly PedidoLineaPersistenceDatabaseRow[] =
       await readPedidoLineasPersistence(3);
+    const articuloBefore: ArticuloRecepcionPersistenceDatabaseRow =
+      await readArticuloRecepcionPersistence(10);
+    const historicosBefore: readonly HistoricoPedidoDatabaseRow[] = await readPedidoHistoricos(3);
 
     await requireRepository().savePedido(
       createSaveRecord({
         id: 3,
-        idProveedor: 1,
-        idTipoPago: 11,
-        formaPago: 'Paypal',
-        numero: '#000051640-EDITADO',
-        fechaPedido: '2026-05-26',
-        fechaPago: '2026-05-29',
+        idProveedor: 3,
+        idTipoPago: 10,
+        formaPago: null,
+        tipo: 'albaran',
+        numero: 'RECIBIDO-EDITADO',
+        importeMicros: 1,
+        portesMicros: 9_000_000,
+        descuentoGlobalBps: 9_999,
+        fechaPedido: '2026-05-25',
+        fechaPago: null,
         recargoEquivalencia: true,
         europeo: false,
-        columnasVisibles: [],
+        observaciones: 'Información modificada después de recepción',
+        columnasVisibles: [4, 6],
         lineas: [
           createLineaSaveRecord({
             id: 200,
             idArticulo: 10,
             orden: 0,
+            codigoBarras: 'NO-DEBE-CREARSE',
             unidades: 999,
             palbMicros: 1,
             pucMicros: 1,
             pvpMicros: 1,
             margenMicroporcentaje: 0,
+            ivaBps: 0,
+            recargoEquivalenciaBps: 0,
+            descuentoBps: 10_000,
           }),
         ],
       }),
     );
 
-    expect(await readPedidoLineasPersistence(3)).toEqual(linesBefore);
-
-    const headerBefore: PedidoPersistenceDatabaseRow = await readPedidoPersistenceRow(3);
-
     const headerAfter: PedidoPersistenceDatabaseRow = await readPedidoPersistenceRow(3);
 
-    expect(headerAfter.numero).toBe('#000051640-EDITADO');
-    expect(headerAfter.importe_micros).toBe(headerBefore.importe_micros);
-    expect(headerAfter.portes_micros).toBe(headerBefore.portes_micros);
-    expect(headerAfter.descuento_bps).toBe(headerBefore.descuento_bps);
+    expect(headerAfter).toMatchObject({
+      id: 3,
+      id_proveedor: 3,
+      id_tipo_pago: 10,
+      forma_pago: 'Tarjeta',
+      tipo: 'albaran',
+      numero: 'RECIBIDO-EDITADO',
+      fecha_pago: null,
+      fecha_pedido: '2026-05-25',
+      europeo: 0,
+      observaciones: 'Información modificada después de recepción',
+
+      importe_micros: headerBefore.importe_micros,
+      portes_micros: headerBefore.portes_micros,
+      descuento_bps: headerBefore.descuento_bps,
+      recargo_equivalencia: headerBefore.recargo_equivalencia,
+      recepcionado: 1,
+    });
+
+    expect(headerAfter.fecha_recepcionado).toBe(headerBefore.fecha_recepcionado);
+
+    expect(await readOptionalColumns(3)).toEqual([
+      {
+        id_columna: 1,
+        visible: 0,
+      },
+      {
+        id_columna: 4,
+        visible: 1,
+      },
+      {
+        id_columna: 5,
+        visible: 0,
+      },
+      {
+        id_columna: 6,
+        visible: 1,
+      },
+      {
+        id_columna: 8,
+        visible: 0,
+      },
+      {
+        id_columna: 9,
+        visible: 0,
+      },
+      {
+        id_columna: 11,
+        visible: 0,
+      },
+      {
+        id_columna: 13,
+        visible: 0,
+      },
+    ]);
+
+    expect(await readPedidoLineasPersistence(3)).toEqual(linesBefore);
+    expect(await readArticuloRecepcionPersistence(10)).toEqual(articuloBefore);
+    expect(await readPedidoHistoricos(3)).toEqual(historicosBefore);
+    expect(await countActiveBarcode('NO-DEBE-CREARSE')).toBe(0);
   });
 
   it('recupera un artículo activo de Pedido exactamente por su ID', async (): Promise<void> => {
