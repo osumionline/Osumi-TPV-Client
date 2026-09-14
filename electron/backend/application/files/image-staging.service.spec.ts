@@ -103,6 +103,39 @@ describe('ImageStagingService', (): void => {
       sha256: 'a'.repeat(64),
     });
   });
+  
+  it('procesa un logo de Marca conservando su purpose', async (): Promise<void> => {
+  const service = new ImageStagingService(
+    new FakeImageProcessor(),
+    new FakeImageStagingStorage(),
+    new FakeAssetUrlBuilder(),
+  );
+
+  const result: StagedImageInterface = await service.stage({
+    purpose: 'brand_image',
+    originalName: 'logo-marca.png',
+    buffer: Buffer.from('original'),
+  });
+
+  expect(result).toMatchObject({
+    purpose: 'brand_image',
+    originalName: 'logo-marca.png',
+    mimeType: 'image/webp',
+    width: 640,
+    height: 480,
+  });
+
+  const record: StagedImageRecord | null = service.getRecord(
+    result.stagingId,
+  );
+
+  expect(record).toMatchObject({
+    stagingId: result.stagingId,
+    purpose: 'brand_image',
+    originalName: 'logo-marca.png',
+    sha256: 'a'.repeat(64),
+  });
+});
 
   it('descarta el fichero y el record temporal', async (): Promise<void> => {
     const storage = new FakeImageStagingStorage();

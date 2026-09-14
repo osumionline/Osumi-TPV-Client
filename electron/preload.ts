@@ -345,15 +345,30 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
   }),
 
   files: Object.freeze({
-    stageArticleImage: (request: StageImageRequest): Promise<StagedImageInterface> =>
-      ipcRenderer.invoke(
-        IPC_CHANNELS.filesStageArticleImage,
-        request,
-      ) as Promise<StagedImageInterface>,
+  stageArticleImage: (
+    request: StageImageRequest,
+  ): Promise<StagedImageInterface> =>
+    ipcRenderer.invoke(
+      IPC_CHANNELS.filesStageArticleImage,
+      request,
+    ) as Promise<StagedImageInterface>,
 
-    discardStagedImage: (stagingId: string): Promise<void> =>
-      ipcRenderer.invoke(IPC_CHANNELS.filesDiscardStagedImage, stagingId) as Promise<void>,
-  }),
+  stageBrandImage: (
+    request: StageImageRequest,
+  ): Promise<StagedImageInterface> =>
+    ipcRenderer.invoke(
+      IPC_CHANNELS.filesStageBrandImage,
+      request,
+    ) as Promise<StagedImageInterface>,
+
+  discardStagedImage: (
+    stagingId: string,
+  ): Promise<void> =>
+    ipcRenderer.invoke(
+      IPC_CHANNELS.filesDiscardStagedImage,
+      stagingId,
+    ) as Promise<void>,
+}),
 
   printing: Object.freeze({
     getPrinters: (): Promise<readonly PrinterInterface[]> =>
