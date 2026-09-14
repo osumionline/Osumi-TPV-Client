@@ -1,5 +1,6 @@
 import type ActualizarMarcaRecordCommand from '@backend/contracts/marcas/actualizar-marca-record-command.interface';
 import type CrearMarcaRecordCommand from '@backend/contracts/marcas/crear-marca-record-command.interface';
+import type { ArchivoCreateRecord } from '@backend/domain/files/archivo-record.interface';
 import type MarcaRecord from '@backend/domain/marcas/marca-record.interface';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
@@ -291,6 +292,159 @@ describe('TypeOrmMarcaRepository', (): void => {
       'La marca que se intenta eliminar no existe o ya está dada de baja.',
     );
   });
+
+  it('crea una marca enlazando su nuevo logo en la misma persistencia', async (): Promise<void> => {
+    const marca: MarcaRecord = await requireRepository().create(
+      createCommand({
+        nombre: 'Marca con logo',
+        nuevoLogo: createBrandLogo(),
+      }),
+    );
+
+    expect(marca.fotoRelativePath).toBe('files/brands/brand-logo-new.webp');
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const rows: readonly {
+      readonly purpose: string;
+      readonly relative_path: string;
+    }[] = await dataSource.query(
+      `
+      SELECT
+        a.purpose,
+        a.relative_path
+      FROM marca m
+
+      INNER JOIN archivo a
+        ON a.id = m.id_archivo
+
+      WHERE m.id = ?
+    `,
+      [marca.id],
+    );
+
+    expect(rows).toEqual([
+      {
+        purpose: 'brand_image',
+        relative_path: 'files/brands/brand-logo-new.webp',
+      },
+    ]);
+  });
+
+  it('permite quitar el logo sin eliminar su archivo persistido', async (): Promise<void> => {
+    const marca: MarcaRecord = await requireRepository().update(
+      1,
+      updateCommand({
+        logo: {
+          action: 'remove',
+        },
+      }),
+    );
+
+    expect(marca.fotoRelativePath).toBeNull();
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const brandRows: readonly {
+      readonly id_archivo: number | null;
+    }[] = await dataSource.query(`
+    SELECT id_archivo
+    FROM marca
+    WHERE id = 1
+  `);
+
+    expect(brandRows[0]?.id_archivo).toBeNull();
+
+    const fileRows: readonly {
+      readonly deleted_at: string | null;
+    }[] = await dataSource.query(`
+    SELECT deleted_at
+    FROM archivo
+    WHERE id = 1
+  `);
+
+    expect(fileRows).toEqual([
+      {
+        deleted_at: null,
+      },
+    ]);
+  });
+
+  it('sustituye el logo conservando intacto el archivo anterior', async (): Promise<void> => {
+    const marca: MarcaRecord = await requireRepository().update(
+      1,
+      updateCommand({
+        logo: {
+          action: 'replace',
+          nuevoArchivo: createBrandLogo(),
+        },
+      }),
+    );
+
+    expect(marca.fotoRelativePath).toBe('files/brands/brand-logo-new.webp');
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const rows: readonly {
+      readonly id_archivo: number | null;
+      readonly relative_path: string | null;
+    }[] = await dataSource.query(`
+    SELECT
+      m.id_archivo,
+      a.relative_path
+    FROM marca m
+
+    LEFT JOIN archivo a
+      ON a.id = m.id_archivo
+
+    WHERE m.id = 1
+  `);
+
+    expect(rows[0]?.id_archivo).not.toBe(1);
+    expect(rows[0]?.relative_path).toBe('files/brands/brand-logo-new.webp');
+
+    const previousRows: readonly {
+      readonly deleted_at: string | null;
+    }[] = await dataSource.query(`
+    SELECT deleted_at
+    FROM archivo
+    WHERE id = 1
+  `);
+
+    expect(previousRows).toEqual([
+      {
+        deleted_at: null,
+      },
+    ]);
+  });
+
+  it('rechaza un archivo que no sea un logo WebP preparado para Marcas', async (): Promise<void> => {
+    await expect(
+      requireRepository().update(
+        1,
+        updateCommand({
+          logo: {
+            action: 'replace',
+            nuevoArchivo: createBrandLogo({
+              purpose: 'article_image',
+            }),
+          },
+        }),
+      ),
+    ).rejects.toThrow('El logo nuevo no pertenece al almacenamiento de imágenes de Marcas.');
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const rows: readonly {
+      readonly id_archivo: number | null;
+    }[] = await dataSource.query(`
+    SELECT id_archivo
+    FROM marca
+    WHERE id = 1
+  `);
+
+    expect(rows[0]?.id_archivo).toBe(1);
+  });
 });
 
 /**
@@ -305,6 +459,7 @@ function createCommand(overrides: Partial<CrearMarcaRecordCommand> = {}): CrearM
     web: 'https://nueva.example.com',
     observaciones: 'Nueva observación',
     crearProveedor: false,
+    nuevoLogo: null,
     ...overrides,
   };
 }
@@ -312,7 +467,9 @@ function createCommand(overrides: Partial<CrearMarcaRecordCommand> = {}): CrearM
 /**
  * Construye un comando de actualización de Marca.
  */
-function updateCommand(): ActualizarMarcaRecordCommand {
+function updateCommand(
+  overrides: Partial<ActualizarMarcaRecordCommand> = {},
+): ActualizarMarcaRecordCommand {
   return {
     nombre: 'Marca B actualizada',
     telefono: '944999999',
@@ -320,6 +477,29 @@ function updateCommand(): ActualizarMarcaRecordCommand {
     direccion: 'Dirección actualizada',
     web: 'https://actualizada.example.com',
     observaciones: 'Observaciones actualizadas',
+    logo: {
+      action: 'keep',
+    },
+    ...overrides,
+  };
+}
+
+/**
+ * Construye los metadatos de un logo WebP preparado.
+ */
+function createBrandLogo(overrides: Partial<ArchivoCreateRecord> = {}): ArchivoCreateRecord {
+  return {
+    publicId: 'brand-logo-new',
+    purpose: 'brand_image',
+    originalName: 'brand-logo.png',
+    internalName: 'brand-logo-new.webp',
+    relativePath: 'files/brands/brand-logo-new.webp',
+    mimeType: 'image/webp',
+    sizeBytes: 4321,
+    sha256: 'b'.repeat(64),
+    width: 900,
+    height: 600,
+    ...overrides,
   };
 }
 

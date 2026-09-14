@@ -93,6 +93,7 @@ describe('MarcasService', (): void => {
       web: 'https://example.com',
       observaciones: null,
       crearProveedor: true,
+      nuevoLogo: null,
     });
 
     expect(result.nombre).toBe('Marca nueva');
@@ -149,6 +150,9 @@ describe('MarcasService', (): void => {
       direccion: 'Dirección actualizada',
       web: 'https://actualizada.example.com',
       observaciones: 'Observaciones nuevas',
+      logo: {
+        action: 'keep',
+      },
     });
 
     expect(result.nombre).toBe('Nombre nuevo');

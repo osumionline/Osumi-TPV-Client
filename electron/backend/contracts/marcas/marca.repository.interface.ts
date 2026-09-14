@@ -20,12 +20,14 @@ export default interface MarcaRepository {
   existsActiveByName(nombre: string, excludeId: number | null): Promise<boolean>;
 
   /**
-   * Crea una nueva marca y devuelve su estado persistido.
+   * Crea una nueva marca, persiste su logo si procede
+   * y devuelve su estado definitivo.
    */
   create(command: CrearMarcaRecordCommand): Promise<MarcaRecord>;
 
   /**
-   * Actualiza los datos editables de una marca activa.
+   * Actualiza los datos y el estado del logo
+   * de una marca activa.
    */
   update(id: number, command: ActualizarMarcaRecordCommand): Promise<MarcaRecord>;
 

@@ -1,9 +1,11 @@
 import type ActualizarMarcaRecordCommand from '@backend/contracts/marcas/actualizar-marca-record-command.interface';
 import type CrearMarcaRecordCommand from '@backend/contracts/marcas/crear-marca-record-command.interface';
 import type MarcaRepository from '@backend/contracts/marcas/marca.repository.interface';
+import { ArchivoCreateRecord } from '@backend/domain/files/archivo-record.interface';
 import type MarcaRecord from '@backend/domain/marcas/marca-record.interface';
 import { getLastInsertId } from '@infrastructure/database/typeorm/sqlite.utils';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
+import insertArchivo from '@infrastructure/database/typeorm/typeorm-archivo.utils';
 import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
 import { randomUUID } from 'node:crypto';
 import type { DataSource, QueryRunner } from 'typeorm';
@@ -11,6 +13,7 @@ import type { DataSource, QueryRunner } from 'typeorm';
 interface MarcaDatabaseRow {
   readonly id: number;
   readonly public_id: string;
+  readonly id_archivo: number | null;
   readonly nombre: string;
   readonly direccion: string | null;
   readonly telefono: string | null;
@@ -18,6 +21,11 @@ interface MarcaDatabaseRow {
   readonly web: string | null;
   readonly observaciones: string | null;
   readonly foto_relative_path: string | null;
+}
+
+interface MarcaLogoPersistence {
+  readonly idArchivo: number | null;
+  readonly relativePath: string | null;
 }
 
 export default class TypeOrmMarcaRepository implements MarcaRepository {
@@ -31,6 +39,7 @@ export default class TypeOrmMarcaRepository implements MarcaRepository {
             SELECT
               m.id,
               m.public_id,
+              m.id_archivo,
               m.nombre,
               m.direccion,
               m.telefono,
@@ -65,6 +74,7 @@ export default class TypeOrmMarcaRepository implements MarcaRepository {
         SELECT
           m.id,
           m.public_id,
+          m.id_archivo,
           m.nombre,
           m.direccion,
           m.telefono,
@@ -134,10 +144,19 @@ export default class TypeOrmMarcaRepository implements MarcaRepository {
     return runDataSourceTransaction(
       dataSource,
       async (queryRunner: QueryRunner): Promise<MarcaRecord> => {
+        let idArchivo: number | null = null;
+
+        if (command.nuevoLogo !== null) {
+          this.validateNewBrandImage(command.nuevoLogo);
+
+          idArchivo = await insertArchivo(queryRunner, command.nuevoLogo);
+        }
+
         await queryRunner.query(
           `
             INSERT INTO marca (
               public_id,
+              id_archivo,
               nombre,
               direccion,
               telefono,
@@ -147,10 +166,11 @@ export default class TypeOrmMarcaRepository implements MarcaRepository {
               created_at,
               updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `,
           [
             publicId,
+            idArchivo,
             command.nombre,
             command.direccion,
             command.telefono,
@@ -176,7 +196,7 @@ export default class TypeOrmMarcaRepository implements MarcaRepository {
           publicId,
           nombre: command.nombre,
           direccion: command.direccion,
-          fotoRelativePath: null,
+          fotoRelativePath: command.nuevoLogo?.relativePath ?? null,
           telefono: command.telefono,
           email: command.email,
           web: command.web,
@@ -197,16 +217,25 @@ export default class TypeOrmMarcaRepository implements MarcaRepository {
     return runDataSourceTransaction(
       dataSource,
       async (queryRunner: QueryRunner): Promise<MarcaRecord> => {
-        const current: MarcaRecord = await this.requireActiveMarca(
+        const currentRow: MarcaDatabaseRow = await this.requireActiveMarca(
           queryRunner,
           id,
           'La marca que se intenta actualizar no existe.',
+        );
+
+        const current: MarcaRecord = this.toRecord(currentRow);
+
+        const logo: MarcaLogoPersistence = await this.resolveLogoUpdate(
+          queryRunner,
+          currentRow,
+          command.logo,
         );
 
         await queryRunner.query(
           `
             UPDATE marca
             SET
+              id_archivo = ?,
               nombre = ?,
               direccion = ?,
               telefono = ?,
@@ -219,6 +248,7 @@ export default class TypeOrmMarcaRepository implements MarcaRepository {
               AND deleted_at IS NULL
           `,
           [
+            logo.idArchivo,
             command.nombre,
             command.direccion,
             command.telefono,
@@ -234,6 +264,7 @@ export default class TypeOrmMarcaRepository implements MarcaRepository {
           ...current,
           nombre: command.nombre,
           direccion: command.direccion,
+          fotoRelativePath: logo.relativePath,
           telefono: command.telefono,
           email: command.email,
           web: command.web,
@@ -281,12 +312,13 @@ export default class TypeOrmMarcaRepository implements MarcaRepository {
     queryRunner: QueryRunner,
     id: number,
     errorMessage: string,
-  ): Promise<MarcaRecord> {
+  ): Promise<MarcaDatabaseRow> {
     const rows: readonly MarcaDatabaseRow[] = (await queryRunner.query(
       `
         SELECT
           m.id,
           m.public_id,
+          m.id_archivo,
           m.nombre,
           m.direccion,
           m.telefono,
@@ -316,7 +348,53 @@ export default class TypeOrmMarcaRepository implements MarcaRepository {
       throw new Error(errorMessage);
     }
 
-    return this.toRecord(row);
+    return row;
+  }
+
+  /**
+   * Resuelve qué archivo de logo debe quedar enlazado
+   * después de actualizar la Marca.
+   */
+  private async resolveLogoUpdate(
+    queryRunner: QueryRunner,
+    current: MarcaDatabaseRow,
+    logo: ActualizarMarcaRecordCommand['logo'],
+  ): Promise<MarcaLogoPersistence> {
+    switch (logo.action) {
+      case 'keep':
+        return {
+          idArchivo: current.id_archivo,
+          relativePath: current.foto_relative_path,
+        };
+
+      case 'remove':
+        return {
+          idArchivo: null,
+          relativePath: null,
+        };
+
+      case 'replace':
+        this.validateNewBrandImage(logo.nuevoArchivo);
+
+        return {
+          idArchivo: await insertArchivo(queryRunner, logo.nuevoArchivo),
+          relativePath: logo.nuevoArchivo.relativePath,
+        };
+    }
+  }
+
+  /**
+   * Comprueba que un archivo nuevo sea un WebP
+   * preparado específicamente para logos de Marca.
+   */
+  private validateNewBrandImage(archivo: ArchivoCreateRecord): void {
+    if (
+      archivo.purpose !== 'brand_image' ||
+      archivo.mimeType !== 'image/webp' ||
+      !archivo.relativePath.startsWith('files/brands/')
+    ) {
+      throw new Error('El logo nuevo no pertenece al almacenamiento de imágenes de Marcas.');
+    }
   }
 
   /**

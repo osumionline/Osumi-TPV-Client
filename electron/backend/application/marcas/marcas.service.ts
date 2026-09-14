@@ -39,13 +39,15 @@ export default class MarcasService {
   async create(command: CrearMarcaCommand): Promise<MarcaInterface> {
     this.requireCommand(command);
 
-    const editableFields: ActualizarMarcaRecordCommand = this.normalizeEditableFields(command);
+    const editableFields: Omit<ActualizarMarcaRecordCommand, 'logo'> =
+      this.normalizeEditableFields(command);
 
     await this.ensureNameAvailable(editableFields.nombre, null);
 
     const recordCommand: CrearMarcaRecordCommand = {
       ...editableFields,
       crearProveedor: command.crearProveedor === true,
+      nuevoLogo: null,
     };
 
     const marca: MarcaRecord = await this.marcaRepository.create(recordCommand);
@@ -68,11 +70,19 @@ export default class MarcasService {
       throw new Error('La marca indicada no existe o ya no está activa.');
     }
 
-    const recordCommand: ActualizarMarcaRecordCommand = this.normalizeEditableFields(command);
+    const editableFields: Omit<ActualizarMarcaRecordCommand, 'logo'> =
+      this.normalizeEditableFields(command);
 
-    if (!this.areNamesEquivalent(current.nombre, recordCommand.nombre)) {
-      await this.ensureNameAvailable(recordCommand.nombre, validId);
+    if (!this.areNamesEquivalent(current.nombre, editableFields.nombre)) {
+      await this.ensureNameAvailable(editableFields.nombre, validId);
     }
+
+    const recordCommand: ActualizarMarcaRecordCommand = {
+      ...editableFields,
+      logo: {
+        action: 'keep',
+      },
+    };
 
     const marca: MarcaRecord = await this.marcaRepository.update(validId, recordCommand);
 
@@ -94,7 +104,7 @@ export default class MarcasService {
    */
   private normalizeEditableFields(
     command: CrearMarcaCommand | ActualizarMarcaCommand,
-  ): ActualizarMarcaRecordCommand {
+  ): Omit<ActualizarMarcaRecordCommand, 'logo'> {
     return {
       nombre: this.requireText(command.nombre, 'nombre de la marca', 100),
       telefono: this.normalizeOptionalText(command.telefono),
