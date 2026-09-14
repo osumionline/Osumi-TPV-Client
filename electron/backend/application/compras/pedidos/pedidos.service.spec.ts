@@ -32,6 +32,7 @@ class FakePedidosRepository implements PedidosRepository {
   lastGetPedidoId: number | null = null;
   lastGetPedidoLineasId: number | null = null;
   lastSavedCommand: PedidoSaveRecord | null = null;
+  lastRecepcionadoPedidoId: number | null = null;
   lastDeletedPedidoId: number | null = null;
 
   pedidoResult: PedidoCabeceraRecord | null = {
@@ -268,10 +269,12 @@ class FakePedidosRepository implements PedidosRepository {
   }
 
   /**
-   * Simula una recepción válida para mantener completo
-   * el contrato del repository en estos tests.
+   * Conserva el identificador del Pedido solicitado
+   * para recepción.
    */
-  recepcionarPedido(): Promise<void> {
+  recepcionarPedido(idPedido: number): Promise<void> {
+    this.lastRecepcionadoPedidoId = idPedido;
+
     return Promise.resolve();
   }
 
@@ -1033,5 +1036,29 @@ describe('PedidosService', (): void => {
     );
 
     expect(repository.lastGetPedidoArchivosId).toBeNull();
+  });
+
+  it('delega la recepción de un pedido válido', async (): Promise<void> => {
+    const repository = new FakePedidosRepository();
+    const service = new PedidosService(repository);
+
+    await service.recepcionarPedido(9);
+
+    expect(repository.lastRecepcionadoPedidoId).toBe(9);
+  });
+
+  it('rechaza un identificador inválido antes de recepcionar', async (): Promise<void> => {
+    const repository = new FakePedidosRepository();
+    const service = new PedidosService(repository);
+
+    await expect(service.recepcionarPedido(0)).rejects.toThrow(
+      'El identificador del pedido no es válido.',
+    );
+
+    await expect(service.recepcionarPedido(Number.MAX_SAFE_INTEGER + 1)).rejects.toThrow(
+      'El identificador del pedido no es válido.',
+    );
+
+    expect(repository.lastRecepcionadoPedidoId).toBeNull();
   });
 });

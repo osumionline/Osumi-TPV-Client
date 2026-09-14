@@ -136,6 +136,15 @@ export default function registerComprasIpc(
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.comprasRecepcionarPedido,
+    async (event, idPedido: number): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await pedidosService.recepcionarPedido(idPedido);
+    },
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.comprasGetPedidoArticuloById,
     async (event, idArticulo: number): Promise<PedidoArticuloInterface | null> => {
       assertTrustedSender(event, getMainWindow);

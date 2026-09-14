@@ -82,6 +82,11 @@ export default interface ComprasApi {
   deletePedido(idPedido: number): Promise<void>;
 
   /**
+   * Recepciona definitivamente un Pedido pendiente.
+   */
+  recepcionarPedido(idPedido: number): Promise<void>;
+
+  /**
    * Recupera un artículo activo por ID para
    * incorporarlo a un Pedido.
    */

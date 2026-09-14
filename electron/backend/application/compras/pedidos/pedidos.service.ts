@@ -211,6 +211,16 @@ export default class PedidosService {
   }
 
   /**
+   * Recepciona un Pedido pendiente aplicando sus
+   * efectos canónicos de forma atómica.
+   */
+  async recepcionarPedido(idPedido: number): Promise<void> {
+    this.validatePedidoId(idPedido);
+
+    await this.pedidosRepository.recepcionarPedido(idPedido);
+  }
+
+  /**
    * Elimina un pedido todavía pendiente.
    */
   async deletePedido(idPedido: number): Promise<void> {

@@ -107,6 +107,13 @@ export default class ComprasService {
   }
 
   /**
+   * Recepciona definitivamente un Pedido pendiente.
+   */
+  recepcionarPedido(idPedido: number): Promise<void> {
+    return window.osumiDesktop.compras.recepcionarPedido(idPedido);
+  }
+
+  /**
    * Recupera un artículo activo por ID preparado
    * para incorporarlo a un Pedido.
    */
