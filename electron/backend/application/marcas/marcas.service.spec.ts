@@ -1,8 +1,12 @@
 import MarcasService from '@backend/application/marcas/marcas.service';
+import type ImageAssetPromoter from '@backend/contracts/files/image-asset-promoter.interface';
+import type StagedImageDiscarder from '@backend/contracts/files/staged-image-discarder.interface';
 import type ActualizarMarcaRecordCommand from '@backend/contracts/marcas/actualizar-marca-record-command.interface';
 import type CrearMarcaRecordCommand from '@backend/contracts/marcas/crear-marca-record-command.interface';
 import type MarcaRepository from '@backend/contracts/marcas/marca.repository.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
+import type { ImageAssetPurpose } from '@backend/domain/files/image-asset.interface';
+import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.interface';
 import type MarcaRecord from '@backend/domain/marcas/marca-record.interface';
 import type ActualizarMarcaCommand from '@desktop-contracts/marcas/actualizar-marca-command.interface';
 import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
@@ -16,6 +20,66 @@ let lastCreateCommand: CrearMarcaRecordCommand | null;
 let lastUpdateId: number | null;
 let lastUpdateCommand: ActualizarMarcaRecordCommand | null;
 let lastDeactivateId: number | null;
+let createError: Error | null;
+let updateError: Error | null;
+
+class FakeImageAssetPromoter implements ImageAssetPromoter {
+  readonly preparedRequests: {
+    readonly stagingId: string;
+    readonly purpose: ImageAssetPurpose;
+  }[] = [];
+
+  readonly rolledBackIds: string[] = [];
+
+  /**
+   * Simula la promoción de un logo staged.
+   */
+  prepare(stagingId: string, expectedPurpose: ImageAssetPurpose): Promise<PreparedImageAsset> {
+    this.preparedRequests.push({
+      stagingId,
+      purpose: expectedPurpose,
+    });
+
+    return Promise.resolve({
+      stagingId,
+      archivo: {
+        publicId: `file-${stagingId}`,
+        purpose: expectedPurpose,
+        originalName: `${stagingId}.png`,
+        internalName: `file-${stagingId}.webp`,
+        relativePath: `files/brands/file-${stagingId}.webp`,
+        mimeType: 'image/webp',
+        sizeBytes: 100,
+        sha256: 'a'.repeat(64),
+        width: 800,
+        height: 600,
+      },
+    });
+  }
+
+  /**
+   * Registra una copia definitiva revertida.
+   */
+  rollback(prepared: PreparedImageAsset): Promise<void> {
+    this.rolledBackIds.push(prepared.stagingId);
+
+    return Promise.resolve();
+  }
+}
+
+class FakeStagedImageDiscarder implements StagedImageDiscarder {
+  readonly discardedIds: string[] = [];
+  error: Error | null = null;
+
+  /**
+   * Registra el descarte de un staging consumido.
+   */
+  discard(stagingId: string): Promise<void> {
+    this.discardedIds.push(stagingId);
+
+    return this.error === null ? Promise.resolve() : Promise.reject(this.error);
+  }
+}
 
 describe('MarcasService', (): void => {
   beforeEach((): void => {
@@ -35,6 +99,8 @@ describe('MarcasService', (): void => {
     lastUpdateId = null;
     lastUpdateCommand = null;
     lastDeactivateId = null;
+    createError = null;
+    updateError = null;
   });
 
   it('devuelve el maestro activo transformando la ruta del logo', async (): Promise<void> => {
@@ -221,12 +287,196 @@ describe('MarcasService', (): void => {
 
     expect(lastDeactivateId).toBe(2);
   });
+
+  it('crea una marca promocionando y consumiendo su logo staged', async (): Promise<void> => {
+    const promoter: FakeImageAssetPromoter = new FakeImageAssetPromoter();
+    const discarder: FakeStagedImageDiscarder = new FakeStagedImageDiscarder();
+    const service: MarcasService = createService(promoter, discarder);
+
+    const result: MarcaInterface = await service.create(
+      createCreateCommand({
+        logoStagingId: ' staged-logo ',
+      }),
+    );
+
+    expect(promoter.preparedRequests).toEqual([
+      {
+        stagingId: 'staged-logo',
+        purpose: 'brand_image',
+      },
+    ]);
+
+    expect(lastCreateCommand?.nuevoLogo).toMatchObject({
+      purpose: 'brand_image',
+      relativePath: 'files/brands/file-staged-logo.webp',
+    });
+
+    expect(discarder.discardedIds).toEqual(['staged-logo']);
+
+    expect(result.foto).toBe('asset://files/brands/file-staged-logo.webp');
+  });
+
+  it('actualiza una marca conservando el logo si no se indica ninguna acción', async (): Promise<void> => {
+    const promoter: FakeImageAssetPromoter = new FakeImageAssetPromoter();
+    const service: MarcasService = createService(promoter);
+
+    await service.update(1, createUpdateCommand());
+
+    expect(lastUpdateCommand?.logo).toEqual({
+      action: 'keep',
+    });
+
+    expect(promoter.preparedRequests).toHaveLength(0);
+  });
+
+  it('permite quitar el logo sin preparar una nueva imagen', async (): Promise<void> => {
+    const promoter: FakeImageAssetPromoter = new FakeImageAssetPromoter();
+    const service: MarcasService = createService(promoter);
+
+    const result: MarcaInterface = await service.update(
+      1,
+      createUpdateCommand({
+        logo: {
+          action: 'remove',
+        },
+      }),
+    );
+
+    expect(lastUpdateCommand?.logo).toEqual({
+      action: 'remove',
+    });
+
+    expect(promoter.preparedRequests).toHaveLength(0);
+    expect(result.foto).toBeNull();
+  });
+
+  it('sustituye el logo promocionando y consumiendo el nuevo staging', async (): Promise<void> => {
+    const promoter: FakeImageAssetPromoter = new FakeImageAssetPromoter();
+    const discarder: FakeStagedImageDiscarder = new FakeStagedImageDiscarder();
+    const service: MarcasService = createService(promoter, discarder);
+
+    const result: MarcaInterface = await service.update(
+      1,
+      createUpdateCommand({
+        logo: {
+          action: 'replace',
+          stagingId: ' staged-replacement ',
+        },
+      }),
+    );
+
+    expect(promoter.preparedRequests).toEqual([
+      {
+        stagingId: 'staged-replacement',
+        purpose: 'brand_image',
+      },
+    ]);
+
+    expect(lastUpdateCommand?.logo).toEqual({
+      action: 'replace',
+      nuevoArchivo: expect.objectContaining({
+        purpose: 'brand_image',
+        relativePath: 'files/brands/file-staged-replacement.webp',
+      }),
+    });
+
+    expect(discarder.discardedIds).toEqual(['staged-replacement']);
+
+    expect(result.foto).toBe('asset://files/brands/file-staged-replacement.webp');
+  });
+
+  it('revierte el logo preparado si falla la creación de la marca', async (): Promise<void> => {
+    createError = new Error('Database error');
+
+    const promoter: FakeImageAssetPromoter = new FakeImageAssetPromoter();
+    const discarder: FakeStagedImageDiscarder = new FakeStagedImageDiscarder();
+    const service: MarcasService = createService(promoter, discarder);
+
+    await expect(
+      service.create(
+        createCreateCommand({
+          logoStagingId: 'staged-logo',
+        }),
+      ),
+    ).rejects.toThrow('Database error');
+
+    expect(promoter.rolledBackIds).toEqual(['staged-logo']);
+
+    expect(discarder.discardedIds).toHaveLength(0);
+  });
+
+  it('revierte el logo preparado si falla la actualización de la marca', async (): Promise<void> => {
+    updateError = new Error('Database error');
+
+    const promoter: FakeImageAssetPromoter = new FakeImageAssetPromoter();
+    const discarder: FakeStagedImageDiscarder = new FakeStagedImageDiscarder();
+    const service: MarcasService = createService(promoter, discarder);
+
+    await expect(
+      service.update(
+        1,
+        createUpdateCommand({
+          logo: {
+            action: 'replace',
+            stagingId: 'staged-replacement',
+          },
+        }),
+      ),
+    ).rejects.toThrow('Database error');
+
+    expect(promoter.rolledBackIds).toEqual(['staged-replacement']);
+
+    expect(discarder.discardedIds).toHaveLength(0);
+  });
+
+  it('no convierte en fallido un guardado confirmado si falla la limpieza del staging', async (): Promise<void> => {
+    const promoter: FakeImageAssetPromoter = new FakeImageAssetPromoter();
+    const discarder: FakeStagedImageDiscarder = new FakeStagedImageDiscarder();
+
+    discarder.error = new Error('Staging cleanup error');
+
+    const service: MarcasService = createService(promoter, discarder);
+
+    await expect(
+      service.create(
+        createCreateCommand({
+          logoStagingId: 'staged-logo',
+        }),
+      ),
+    ).resolves.toMatchObject({
+      nombre: 'Marca nueva',
+      foto: 'asset://files/brands/file-staged-logo.webp',
+    });
+
+    expect(discarder.discardedIds).toEqual(['staged-logo']);
+
+    expect(promoter.rolledBackIds).toHaveLength(0);
+  });
+
+  it('rechaza un identificador temporal vacío antes de preparar el logo', async (): Promise<void> => {
+    const promoter: FakeImageAssetPromoter = new FakeImageAssetPromoter();
+    const service: MarcasService = createService(promoter);
+
+    await expect(
+      service.create(
+        createCreateCommand({
+          logoStagingId: '   ',
+        }),
+      ),
+    ).rejects.toThrow('El identificador temporal del logo no es válido.');
+
+    expect(promoter.preparedRequests).toHaveLength(0);
+    expect(lastCreateCommand).toBeNull();
+  });
 });
 
 /**
  * Construye el servicio con dobles controlados para cada test.
  */
-function createService(): MarcasService {
+function createService(
+  promoter: FakeImageAssetPromoter = new FakeImageAssetPromoter(),
+  discarder: FakeStagedImageDiscarder = new FakeStagedImageDiscarder(),
+): MarcasService {
   const repository: MarcaRepository = {
     findAll: (): Promise<readonly MarcaRecord[]> => Promise.resolve(marcas),
 
@@ -242,6 +492,10 @@ function createService(): MarcasService {
     create: (command: CrearMarcaRecordCommand): Promise<MarcaRecord> => {
       lastCreateCommand = command;
 
+      if (createError !== null) {
+        return Promise.reject(createError);
+      }
+
       return Promise.resolve(
         createMarcaRecord({
           id: 3,
@@ -252,7 +506,7 @@ function createService(): MarcasService {
           email: command.email,
           web: command.web,
           observaciones: command.observaciones,
-          fotoRelativePath: null,
+          fotoRelativePath: command.nuevoLogo?.relativePath ?? null,
         }),
       );
     },
@@ -260,6 +514,10 @@ function createService(): MarcasService {
     update: (id: number, command: ActualizarMarcaRecordCommand): Promise<MarcaRecord> => {
       lastUpdateId = id;
       lastUpdateCommand = command;
+
+      if (updateError !== null) {
+        return Promise.reject(updateError);
+      }
 
       const current: MarcaRecord | undefined = marcas.find(
         (marca: MarcaRecord): boolean => marca.id === id,
@@ -277,6 +535,7 @@ function createService(): MarcasService {
         direccion: command.direccion,
         web: command.web,
         observaciones: command.observaciones,
+        fotoRelativePath: resolveUpdatedLogoRelativePath(current, command),
       });
     },
 
@@ -292,7 +551,27 @@ function createService(): MarcasService {
       relativePath === null ? null : `asset://${relativePath}`,
   };
 
-  return new MarcasService(repository, assetUrlBuilder);
+  return new MarcasService(repository, assetUrlBuilder, promoter, discarder);
+}
+
+/**
+ * Resuelve el logo que devolvería el repository fake
+ * después de una actualización.
+ */
+function resolveUpdatedLogoRelativePath(
+  current: MarcaRecord,
+  command: ActualizarMarcaRecordCommand,
+): string | null {
+  switch (command.logo.action) {
+    case 'keep':
+      return current.fotoRelativePath;
+
+    case 'remove':
+      return null;
+
+    case 'replace':
+      return command.logo.nuevoArchivo.relativePath;
+  }
 }
 
 /**

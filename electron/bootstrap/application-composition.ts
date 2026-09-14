@@ -367,7 +367,12 @@ export default function createApplicationComposition(
   );
 
   const marcaRepository: MarcaRepository = new TypeOrmMarcaRepository(operationalDatabase);
-  const marcasService: MarcasService = new MarcasService(marcaRepository, assetUrlBuilder);
+  const marcasService: MarcasService = new MarcasService(
+    marcaRepository,
+    assetUrlBuilder,
+    imageAssetPromotionService,
+    imageStagingService,
+  );
 
   const proveedorRepository: ProveedorRepository = new TypeOrmProveedorRepository(
     operationalDatabase,

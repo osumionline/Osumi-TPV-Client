@@ -1,16 +1,31 @@
+import type ImageAssetPromoter from '@backend/contracts/files/image-asset-promoter.interface';
+import type StagedImageDiscarder from '@backend/contracts/files/staged-image-discarder.interface';
 import type ActualizarMarcaRecordCommand from '@backend/contracts/marcas/actualizar-marca-record-command.interface';
 import type CrearMarcaRecordCommand from '@backend/contracts/marcas/crear-marca-record-command.interface';
+import type MarcaLogoUpdateRecord from '@backend/contracts/marcas/marca-logo-update-record.type';
 import type MarcaRepository from '@backend/contracts/marcas/marca.repository.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
+import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.interface';
 import type MarcaRecord from '@backend/domain/marcas/marca-record.interface';
 import type ActualizarMarcaCommand from '@desktop-contracts/marcas/actualizar-marca-command.interface';
 import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
+import type MarcaLogoUpdateCommand from '@desktop-contracts/marcas/marca-logo-update-command.type';
 import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
 
+interface PreparedMarcaLogoUpdate {
+  readonly record: MarcaLogoUpdateRecord;
+  readonly preparedAsset: PreparedImageAsset | null;
+}
+
 export default class MarcasService {
+  /**
+   * Crea el servicio de gestión de Marcas.
+   */
   constructor(
     private readonly marcaRepository: MarcaRepository,
     private readonly assetUrlBuilder: AssetUrlBuilder,
+    private readonly imageAssetPromoter: ImageAssetPromoter,
+    private readonly stagedImageDiscarder: StagedImageDiscarder,
   ) {}
 
   /**
@@ -33,8 +48,8 @@ export default class MarcasService {
   }
 
   /**
-   * Crea una marca después de normalizar sus datos
-   * y comprobar que no duplica otra marca activa.
+   * Crea una marca después de normalizar sus datos,
+   * validar su nombre y preparar opcionalmente su logo.
    */
   async create(command: CrearMarcaCommand): Promise<MarcaInterface> {
     this.requireCommand(command);
@@ -44,20 +59,41 @@ export default class MarcasService {
 
     await this.ensureNameAvailable(editableFields.nombre, null);
 
-    const recordCommand: CrearMarcaRecordCommand = {
-      ...editableFields,
-      crearProveedor: command.crearProveedor === true,
-      nuevoLogo: null,
-    };
+    const stagingId: string | null = this.normalizeOptionalLogoStagingId(command.logoStagingId);
 
-    const marca: MarcaRecord = await this.marcaRepository.create(recordCommand);
+    let preparedAsset: PreparedImageAsset | null = null;
+    let persisted: boolean = false;
 
-    return this.toInterface(marca);
+    try {
+      if (stagingId !== null) {
+        preparedAsset = await this.imageAssetPromoter.prepare(stagingId, 'brand_image');
+      }
+
+      const recordCommand: CrearMarcaRecordCommand = {
+        ...editableFields,
+        crearProveedor: command.crearProveedor === true,
+        nuevoLogo: preparedAsset?.archivo ?? null,
+      };
+
+      const marca: MarcaRecord = await this.marcaRepository.create(recordCommand);
+
+      persisted = true;
+
+      await this.discardPreparedStaging(preparedAsset);
+
+      return this.toInterface(marca);
+    } catch (error: unknown) {
+      if (!persisted && preparedAsset !== null) {
+        await this.rollbackPreparedAsset(preparedAsset, error);
+      }
+
+      throw error;
+    }
   }
 
   /**
-   * Actualiza una marca activa después de normalizar
-   * sus datos y validar un posible cambio de nombre.
+   * Actualiza una marca activa normalizando sus datos,
+   * validando su nombre y aplicando el cambio de logo.
    */
   async update(id: number, command: ActualizarMarcaCommand): Promise<MarcaInterface> {
     const validId: number = this.validateMarcaId(id);
@@ -77,16 +113,35 @@ export default class MarcasService {
       await this.ensureNameAvailable(editableFields.nombre, validId);
     }
 
-    const recordCommand: ActualizarMarcaRecordCommand = {
-      ...editableFields,
-      logo: {
-        action: 'keep',
-      },
-    };
+    let preparedLogo: PreparedMarcaLogoUpdate | null = null;
+    let persisted: boolean = false;
 
-    const marca: MarcaRecord = await this.marcaRepository.update(validId, recordCommand);
+    try {
+      preparedLogo = await this.prepareLogoUpdate(command.logo);
 
-    return this.toInterface(marca);
+      const recordCommand: ActualizarMarcaRecordCommand = {
+        ...editableFields,
+        logo: preparedLogo.record,
+      };
+
+      const marca: MarcaRecord = await this.marcaRepository.update(validId, recordCommand);
+
+      persisted = true;
+
+      await this.discardPreparedStaging(preparedLogo.preparedAsset);
+
+      return this.toInterface(marca);
+    } catch (error: unknown) {
+      if (
+        !persisted &&
+        preparedLogo?.preparedAsset !== null &&
+        preparedLogo?.preparedAsset !== undefined
+      ) {
+        await this.rollbackPreparedAsset(preparedLogo.preparedAsset, error);
+      }
+
+      throw error;
+    }
   }
 
   /**
@@ -96,6 +151,107 @@ export default class MarcasService {
     const validId: number = this.validateMarcaId(id);
 
     await this.marcaRepository.deactivate(validId);
+  }
+
+  /**
+   * Prepara la modificación solicitada sobre el logo
+   * para que el repository pueda persistirla.
+   */
+  private async prepareLogoUpdate(
+    logo: MarcaLogoUpdateCommand | undefined,
+  ): Promise<PreparedMarcaLogoUpdate> {
+    if (logo === undefined || logo.action === 'keep') {
+      return {
+        record: {
+          action: 'keep',
+        },
+        preparedAsset: null,
+      };
+    }
+
+    if (logo.action === 'remove') {
+      return {
+        record: {
+          action: 'remove',
+        },
+        preparedAsset: null,
+      };
+    }
+
+    const stagingId: string = this.requireLogoStagingId(logo.stagingId);
+
+    const preparedAsset: PreparedImageAsset = await this.imageAssetPromoter.prepare(
+      stagingId,
+      'brand_image',
+    );
+
+    return {
+      record: {
+        action: 'replace',
+        nuevoArchivo: preparedAsset.archivo,
+      },
+      preparedAsset,
+    };
+  }
+
+  /**
+   * Normaliza un identificador temporal opcional
+   * utilizado al crear una Marca.
+   */
+  private normalizeOptionalLogoStagingId(stagingId: string | null | undefined): string | null {
+    if (stagingId === null || stagingId === undefined) {
+      return null;
+    }
+
+    return this.requireLogoStagingId(stagingId);
+  }
+
+  /**
+   * Valida y normaliza un identificador temporal de logo.
+   */
+  private requireLogoStagingId(stagingId: string): string {
+    const normalizedStagingId: string = stagingId.trim();
+
+    if (normalizedStagingId.length === 0) {
+      throw new Error('El identificador temporal del logo no es válido.');
+    }
+
+    return normalizedStagingId;
+  }
+
+  /**
+   * Revierte una copia definitiva preparada cuando
+   * la persistencia SQLite posterior ha fallado.
+   */
+  private async rollbackPreparedAsset(
+    preparedAsset: PreparedImageAsset,
+    originalError: unknown,
+  ): Promise<void> {
+    try {
+      await this.imageAssetPromoter.rollback(preparedAsset);
+    } catch (rollbackError: unknown) {
+      throw new AggregateError(
+        [originalError, rollbackError],
+        'No se ha podido guardar la marca ni limpiar el logo preparado.',
+        {
+          cause: rollbackError,
+        },
+      );
+    }
+  }
+
+  /**
+   * Descarta el staging de un logo ya persistido.
+   *
+   * Un fallo de limpieza posterior al COMMIT no convierte
+   * en fallido un guardado que SQLite ya ha confirmado.
+   */
+  private async discardPreparedStaging(preparedAsset: PreparedImageAsset | null): Promise<void> {
+    if (preparedAsset === null) {
+      return;
+    }
+
+    await Promise.allSettled([this.stagedImageDiscarder.discard(preparedAsset.stagingId)]);
   }
 
   /**
