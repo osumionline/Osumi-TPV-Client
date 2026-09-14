@@ -291,6 +291,23 @@ const statements: readonly string[] = [
       id_articulo INTEGER,
 
       /*
+       * Identidad histórica de la marca en el momento
+       * de persistir la línea.
+       *
+       * No existe FK deliberadamente: este snapshot
+       * debe sobrevivir independientemente de cambios
+       * posteriores en el catálogo de Marcas.
+       *
+       * Es NULL para Varios y para líneas legacy cuyo
+       * artículo no haya podido resolverse.
+       */
+      id_marca_snapshot INTEGER
+        CHECK (
+          id_marca_snapshot IS NULL
+          OR id_marca_snapshot > 0
+        ),
+
+      /*
        * Línea histórica exacta que origina esta
        * devolución.
        *
@@ -477,6 +494,15 @@ const statements: readonly string[] = [
       id_articulo
     )
     WHERE id_articulo IS NOT NULL
+  `,
+
+  `
+    CREATE INDEX idx_linea_venta_marca_snapshot
+    ON linea_venta (
+      id_marca_snapshot,
+      id_venta
+    )
+    WHERE id_marca_snapshot IS NOT NULL
   `,
 
   `

@@ -53,4 +53,35 @@ describe('salesDatabaseSchema', (): void => {
       'CREATE UNIQUE INDEX uq_factura_venta_venta_activa ON factura_venta ( id_venta ) WHERE activa = 1',
     );
   });
+
+  it('conserva la identidad histórica de Marca en cada línea de venta', (): void => {
+    const saleLineStatement: string | undefined = salesDatabaseSchema.statements.find(
+      (statement: string): boolean => statement.includes('CREATE TABLE linea_venta ('),
+    );
+
+    const brandSnapshotIndexStatement: string | undefined = salesDatabaseSchema.statements.find(
+      (statement: string): boolean => statement.includes('idx_linea_venta_marca_snapshot'),
+    );
+
+    expect(saleLineStatement).toBeDefined();
+    expect(brandSnapshotIndexStatement).toBeDefined();
+
+    const normalizedSaleLineStatement: string = (saleLineStatement ?? '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const normalizedBrandSnapshotIndexStatement: string = (brandSnapshotIndexStatement ?? '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    expect(normalizedSaleLineStatement).toContain(
+      'id_marca_snapshot INTEGER CHECK ( id_marca_snapshot IS NULL OR id_marca_snapshot > 0 )',
+    );
+
+    expect(normalizedSaleLineStatement).not.toContain('FOREIGN KEY ( id_marca_snapshot )');
+
+    expect(normalizedBrandSnapshotIndexStatement).toContain(
+      'ON linea_venta ( id_marca_snapshot, id_venta ) WHERE id_marca_snapshot IS NOT NULL',
+    );
+  });
 });
