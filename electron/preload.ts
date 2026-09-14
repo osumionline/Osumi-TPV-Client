@@ -91,6 +91,7 @@ import type LegacyImportPreparationResult from '@desktop-contracts/legacy-import
 import type LegacyImportProgress from '@desktop-contracts/legacy-import/legacy-import-progress.interface';
 import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-import/legacy-import-review-decision.type';
 import type LegacyImportStartResult from '@desktop-contracts/legacy-import/legacy-import-start-result.interface';
+import type ActualizarMarcaCommand from '@desktop-contracts/marcas/actualizar-marca-command.interface';
 import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
 import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
 import type PrinterInterface from '@desktop-contracts/printing/printer.interface';
@@ -381,8 +382,17 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
     getAll: (): Promise<readonly MarcaInterface[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.marcasGetAll) as Promise<readonly MarcaInterface[]>,
 
+    getById: (id: number): Promise<MarcaInterface | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.marcasGetById, id) as Promise<MarcaInterface | null>,
+
     create: (command: CrearMarcaCommand): Promise<MarcaInterface> =>
       ipcRenderer.invoke(IPC_CHANNELS.marcasCreate, command) as Promise<MarcaInterface>,
+
+    update: (id: number, command: ActualizarMarcaCommand): Promise<MarcaInterface> =>
+      ipcRenderer.invoke(IPC_CHANNELS.marcasUpdate, id, command) as Promise<MarcaInterface>,
+
+    deactivate: (id: number): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.marcasDeactivate, id) as Promise<void>,
   }),
 
   proveedores: Object.freeze({

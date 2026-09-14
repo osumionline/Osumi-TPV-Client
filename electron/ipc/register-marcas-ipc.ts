@@ -1,4 +1,5 @@
 import type MarcasService from '@backend/application/marcas/marcas.service';
+import type ActualizarMarcaCommand from '@desktop-contracts/marcas/actualizar-marca-command.interface';
 import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
 import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
 import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
@@ -20,6 +21,15 @@ export default function registerMarcasIpc(
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.marcasGetById,
+    async (event, id: number): Promise<MarcaInterface | null> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return marcasService.getById(id);
+    },
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.marcasCreate,
     async (event, command: CrearMarcaCommand): Promise<MarcaInterface> => {
       assertTrustedSender(event, getMainWindow);
@@ -27,4 +37,19 @@ export default function registerMarcasIpc(
       return marcasService.create(command);
     },
   );
+
+  ipcMain.handle(
+    IPC_CHANNELS.marcasUpdate,
+    async (event, id: number, command: ActualizarMarcaCommand): Promise<MarcaInterface> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return marcasService.update(id, command);
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.marcasDeactivate, async (event, id: number): Promise<void> => {
+    assertTrustedSender(event, getMainWindow);
+
+    await marcasService.deactivate(id);
+  });
 }
