@@ -1,9 +1,9 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.62  
+**Versión:** 2.63  
 **Fecha:** 15 de septiembre de 2026  
-**Base de continuidad:** `v2.62 + main` una vez este documento se suba al repositorio.  
-**Documento anterior:** `Osumi_TPV_Client_Documento_Continuidad_v2.61.md`
+**Base de continuidad:** `v2.63 + main` una vez este documento se suba al repositorio.  
+**Documento anterior:** `Osumi_TPV_Client_Documento_Continuidad_v2.62.md`
 
 ---
 
@@ -3121,55 +3121,195 @@ Solo extraer cuando exista una responsabilidad con nombre propio.
 
 ---
 
-# 30. Controles y apariencia
+# 30. Acceso a GitHub y política de trabajo
 
-Apariencia compartida:
+El usuario ha instalado y conectado el complemento oficial de **GitHub** en su cuenta de ChatGPT.
 
-```text
-src/styles/controls.scss
-```
-
-Layout/ancho/posición:
+Se ha verificado correctamente el acceso al repositorio:
 
 ```text
-SCSS del componente
+osumionline/Osumi-TPV-Client
 ```
 
-No crear wrappers Angular triviales para controles nativos.
-
-Fechas:
+y a su rama principal:
 
 ```text
-<input type="date">
-YYYY-MM-DD
+main
 ```
 
-Dinero/decimal/porcentaje que requiera entrada europea:
+A partir de esta versión, el complemento de GitHub es la vía preferente para consultar el código actual del proyecto.
+
+## 30.1 Uso permitido
+
+GitHub se utilizará **exclusivamente en modo lectura** para:
 
 ```text
-type="text"
-inputmode="decimal"
+leer archivos
+consultar estructura del repositorio
+buscar símbolos / referencias
+consultar ramas
+consultar commits
+consultar pull requests existentes
+consultar estado de CI
+revisar contratos, tests e imports actuales
 ```
+
+El objetivo es disponer siempre del estado real de `main` antes de proponer cambios.
+
+## 30.2 Escritura terminantemente prohibida
+
+Aunque el complemento pueda exponer técnicamente operaciones de escritura, **NO deben utilizarse bajo ninguna circunstancia** dentro de este proyecto.
+
+Quedan expresamente prohibidas:
+
+```text
+crear commits
+hacer push
+crear o modificar ramas
+crear pull requests
+actualizar pull requests
+hacer merge
+modificar archivos
+crear archivos
+borrar archivos
+crear o modificar issues
+añadir comentarios
+añadir labels
+cambiar reviewers
+re-ejecutar workflows
+modificar refs
+cualquier otra acción mutante sobre GitHub
+```
+
+Regla absoluta:
+
+```text
+ChatGPT = análisis + lectura + propuesta
+Usuario = aplicación + pruebas + commit + push
+```
+
+No se debe ejecutar ninguna acción de escritura aunque:
+- el usuario tenga permisos suficientes;
+- el conector muestre acciones disponibles;
+- la modificación sea aparentemente pequeña;
+- pudiera ahorrar tiempo.
+
+Si una tarea requiriera una operación de escritura para completarse, ChatGPT debe explicar qué sería necesario hacer, pero **no ejecutarla**.
+
+## 30.3 Flujo de trabajo obligatorio
+
+Antes de proponer cambios de código:
+
+```text
+1. consultar `main` mediante el complemento GitHub;
+2. revisar los archivos implicados;
+3. buscar usos, contratos, tests y dependencias relevantes;
+4. preparar el cambio exacto;
+5. entregar al usuario el patch/instrucciones;
+6. esperar a que el usuario lo aplique;
+7. esperar a que el usuario ejecute tests/build/lint/pruebas funcionales;
+8. esperar confirmación explícita;
+9. solo entonces avanzar al siguiente mini-hito.
+```
+
+El usuario sigue siendo quien:
+
+```text
+aplica cambios
+ejecuta pruebas
+corrige localmente si procede
+hace commit
+hace push
+```
+
+## 30.4 GitHub connector vs acceso web genérico
+
+Para el repositorio del proyecto:
+
+```text
+preferir GitHub connector
+```
+
+No depender de:
+
+```text
+github.com mediante fetch web genérico
+raw.githubusercontent.com mediante fetch web genérico
+resultados indexados de buscadores
+```
+
+salvo que exista una razón concreta.
+
+El acceso web genérico había fallado previamente con:
+
+```text
+DisabledError
+```
+
+mientras que el complemento GitHub ha sido probado con éxito contra el repositorio real.
+
+## 30.5 Fallback si el complemento deja de funcionar
+
+Si GitHub connector falla o pierde acceso:
+
+```text
+1. comunicar el error exacto;
+2. distinguir fallo de permisos/conexión de error HTTP real;
+3. no asumir que GitHub o el repositorio están caídos;
+4. intentar únicamente las lecturas necesarias;
+5. pedir al usuario solo los archivos concretos imprescindibles como fallback.
+```
+
+No volver automáticamente al flujo de ZIPs si el complemento está operativo.
 
 ---
-
 # 31. Cómo retomar
 
 En una conversación nueva:
 
 1. usar este documento como contexto principal;
-2. intentar revisar `main` actual en:
+2. usar el complemento **GitHub** ya conectado en la cuenta del usuario;
+3. revisar siempre `main` actual en:
 
 ```text
-https://github.com/osumionline/Osumi-TPV-Client
+osumionline/Osumi-TPV-Client
 ```
 
-3. si GitHub falla:
-   - comunicar el **error exacto**;
-   - distinguir respuesta HTTP real (`404`, `403`, `429`, etc.) de fallo de capa de acceso (`DisabledError`, timeout, DNS, etc.);
-   - no atribuir automáticamente el fallo al repositorio;
-   - pedir únicamente los archivos concretos necesarios;
-4. confirmar:
+4. GitHub se usa **SOLO PARA LEER**;
+5. NO ejecutar nunca:
+   - commits;
+   - push;
+   - pull requests;
+   - merges;
+   - creación/modificación/borrado de archivos;
+   - ramas;
+   - issues;
+   - comentarios;
+   - labels;
+   - re-runs;
+   - refs;
+   - ninguna otra acción mutante;
+6. flujo obligatorio:
+
+```text
+ChatGPT
+→ revisa main
+→ analiza
+→ propone cambios
+
+Usuario
+→ aplica
+→ prueba
+→ commit
+→ push
+```
+
+7. si GitHub connector falla:
+   - comunicar el error exacto;
+   - distinguir error HTTP real de fallo de conexión/permisos/capa;
+   - no atribuir automáticamente el problema al repositorio;
+   - pedir únicamente los archivos concretos necesarios como fallback;
+8. confirmar:
 
 ```text
 Hito 13 Artículos ✅
@@ -3190,15 +3330,15 @@ Marcas:
 16.13.7 ⬅️ SIGUIENTE
 ```
 
-5. recordar que `/src/app/services` está reorganizado en subcarpetas;
-6. NO reutilizar rutas antiguas de imports sin comprobar `main`;
-7. continuar exactamente con:
+9. recordar que `/src/app/services` está reorganizado en subcarpetas;
+10. NO reutilizar rutas antiguas de imports sin comprobar `main`;
+11. continuar exactamente con:
 
 ```text
 16.13.7 — Backend de Estadísticas de Marca
 ```
 
-8. contrato estadístico:
+12. contrato estadístico:
    - fuente: `linea_venta.id_marca_snapshot`;
    - mes+año concretos → días;
    - mes Todos + año → meses;
@@ -3208,24 +3348,20 @@ Marcas:
    - líneas negativas de operaciones mixtas ignoradas;
    - solo líneas positivas cuentan;
    - devolver serie + total;
-9. revisar antes del patch:
+13. revisar antes del patch:
    - entidades/schema de Venta y LíneaVenta;
    - repositorios TypeORM relacionados;
    - patrones de estadísticas existentes;
    - Marcas backend service/repository/API/IPC/preload;
    - tests existentes;
-10. separar backend (`16.13.7`) de UI (`16.13.8`);
-11. imports internos siempre por alias absoluto;
-12. todo método nuevo, también en interfaces, lleva JSDoc;
-13. interfaz modificada → adaptar fakes/mocks/specs en el mismo bloque;
-14. usuario aplica y prueba; asistente no hace commits ni ejecuta el proyecto;
-15. esperar confirmación antes de avanzar;
-16. no tocar `12C.9 TicketBAI` sin información de Berein;
-17. no diseñar Proveedores hasta cerrar Marcas;
-18. protocolo GitHub:
-    - intentar `main` primero;
-    - si falla, explicar el error exacto;
-    - ZIP/adjuntos solo como fallback.
+14. separar backend (`16.13.7`) de UI (`16.13.8`);
+15. imports internos siempre por alias absoluto;
+16. todo método nuevo, también en interfaces, lleva JSDoc;
+17. interfaz modificada → adaptar fakes/mocks/specs en el mismo bloque;
+18. usuario aplica y prueba; ChatGPT no modifica el repo;
+19. esperar confirmación antes de avanzar;
+20. no tocar `12C.9 TicketBAI` sin información de Berein;
+21. no diseñar Proveedores hasta cerrar Marcas.
 
 ---
 # 32. Resumen ultracorto
@@ -3233,7 +3369,7 @@ Marcas:
 ```text
 Proyecto: Osumi TPV Client
 Continuidad: 15/09/2026
-Base: v2.62 + main
+Base: v2.63 + main
 
 Hito 13 Artículos ✅
 Hito 14 Clientes ✅
@@ -3291,6 +3427,13 @@ Después:
 16.13.10 Regresión
 16.14 Proveedores
 
+GitHub:
+→ complemento instalado y verificado
+→ usar como vía preferente para leer main
+→ SOLO LECTURA
+→ prohibido commit/push/PR/merge/escritura
+→ ChatGPT analiza; usuario aplica/prueba/commitea/pushea
+
 Refactor:
 → /src/app/services organizado en subcarpetas
 → NO asumir rutas antiguas
@@ -3316,6 +3459,7 @@ Reglas:
 | 2.60 | 14/09/2026 | 16.13.3 cerrado; 16.13.4A/B cerrados; servicios frontend reorganizados; aprobado rediseño barra contextual |
 | 2.61 | 15/09/2026 | 16.13.4 y 16.13.5 cerrados; 16.13.6A/A.1/B cerrados; siguiente 16.13.6C Logo de Marca |
 | **2.62** | **15/09/2026** | **16.13.6 Ficha Datos completamente cerrada, incluidos logo y soft-delete; siguiente 16.13.7 Backend Estadísticas** |
+| **2.63** | **15/09/2026** | **GitHub connector habilitado y verificado; uso estrictamente de solo lectura; flujo ChatGPT analiza / usuario aplica y escribe** |
 
 ---
 # 34. Prompt de arranque recomendado
@@ -3324,7 +3468,7 @@ Reglas:
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.62.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.63.
 
 Estado:
 - Artículos 13 ✅
@@ -3348,15 +3492,26 @@ Estado:
 Punto exacto:
 16.13.7 — Backend de Estadísticas de Marca.
 
+GITHUB:
+- El complemento GitHub está instalado y verificado.
+- Úsalo como vía preferente para revisar `main`.
+- Repositorio: osumionline/Osumi-TPV-Client.
+- GitHub se usa EXCLUSIVAMENTE EN MODO LECTURA.
+- NO puedes crear commits, hacer push, crear PRs, merges, ramas, issues,
+  modificar archivos, borrar archivos, re-ejecutar CI ni realizar ninguna
+  acción de escritura/mutación.
+- Aunque la herramienta exponga acciones de escritura, están prohibidas.
+- ChatGPT analiza y prepara cambios.
+- Yo aplico los cambios, ejecuto tests, hago commit y push.
+
+Si GitHub connector falla:
+- comunica el error exacto;
+- no asumas que el repositorio está caído;
+- pide solo los archivos concretos necesarios como fallback.
+
 IMPORTANTE:
 `/src/app/services` está reorganizado en subcarpetas.
 NO asumas rutas antiguas: revisa `main`.
-
-Antes de proponer cambios:
-- intenta siempre revisar `main` actual en GitHub;
-- si falla, comunica el error exacto;
-- distingue error HTTP real frente a fallo de capa de acceso (`DisabledError`, timeout, DNS, etc.);
-- solo entonces pide los archivos concretos necesarios.
 
 Ficha Datos de Marcas COMPLETAMENTE CERRADA:
 - workspace persistente;
@@ -3407,4 +3562,4 @@ Reglas:
 
 ---
 
-**Fin del documento de continuidad v2.62.**
+**Fin del documento de continuidad v2.63.**
