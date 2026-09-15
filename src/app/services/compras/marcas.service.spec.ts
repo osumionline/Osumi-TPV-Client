@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 let service: MarcasService;
 let filesService: FakeFilesService;
 let originalDesktopDescriptor: PropertyDescriptor | undefined;
+let getAllCalls: number;
 let createCalls: CrearMarcaCommand[];
 let updateCalls: {
   readonly id: number;
@@ -35,7 +36,7 @@ let estadisticasResult: MarcaEstadisticasResultado;
 describe('MarcasService workspace', (): void => {
   beforeEach((): void => {
     originalDesktopDescriptor = Object.getOwnPropertyDescriptor(window, 'osumiDesktop');
-
+    getAllCalls = 0;
     createCalls = [];
     updateCalls = [];
     deactivateCalls = [];
@@ -60,7 +61,11 @@ describe('MarcasService workspace', (): void => {
       configurable: true,
       value: {
         marcas: {
-          getAll: (): Promise<readonly MarcaInterface[]> => Promise.resolve([]),
+          getAll: (): Promise<readonly MarcaInterface[]> => {
+            getAllCalls++;
+
+            return Promise.resolve([]);
+          },
 
           getById: (): Promise<MarcaInterface | null> => Promise.resolve(null),
 
@@ -428,6 +433,56 @@ describe('MarcasService workspace', (): void => {
 
     expect(service.dirty()).toBe(false);
     expect(service.saving()).toBe(false);
+  });
+
+  it('sincroniza altas, cambios y bajas del maestro sin recargarlo', async (): Promise<void> => {
+    createResult = createMarcaInterface(20, 'marca-20', 'Zeta');
+
+    await service.create({
+      nombre: 'Zeta',
+      telefono: null,
+      email: null,
+      direccion: null,
+      web: null,
+      observaciones: null,
+      crearProveedor: false,
+    });
+
+    createResult = createMarcaInterface(21, 'marca-21', 'Alfa');
+
+    await service.create({
+      nombre: 'Alfa',
+      telefono: null,
+      email: null,
+      direccion: null,
+      web: null,
+      observaciones: null,
+      crearProveedor: false,
+    });
+
+    expect(service.marcas().map((marca: Marca): string => marca.nombre)).toEqual(['Alfa', 'Zeta']);
+
+    updateResult = createMarcaInterface(20, 'marca-20', 'Aardvark');
+
+    await service.update(20, {
+      nombre: 'Aardvark',
+      telefono: null,
+      email: null,
+      direccion: null,
+      web: null,
+      observaciones: null,
+    });
+
+    expect(service.marcas().map((marca: Marca): string => marca.nombre)).toEqual([
+      'Aardvark',
+      'Alfa',
+    ]);
+
+    await service.deactivate(21);
+
+    expect(service.marcas().map((marca: Marca): string => marca.nombre)).toEqual(['Aardvark']);
+
+    expect(getAllCalls).toBe(0);
   });
 
   it('conserva el draft dirty y el maestro si falla el guardado', async (): Promise<void> => {

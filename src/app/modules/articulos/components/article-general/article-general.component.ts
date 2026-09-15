@@ -96,6 +96,11 @@ export default class ArticleGeneralComponent implements OnInit {
   readonly marginOptions: Signal<readonly number[]> = computed((): readonly number[] =>
     this.buildMarginOptions(),
   );
+  readonly currentMarcaUnavailable: Signal<boolean> = computed((): boolean => {
+    const idMarca: number | null = this.tab().draft.idMarca;
+
+    return idMarca !== null && this.marcasService.findById(idMarca) === null;
+  });
   readonly marginModalOpen: WritableSignal<boolean> = signal<boolean>(false);
 
   /**

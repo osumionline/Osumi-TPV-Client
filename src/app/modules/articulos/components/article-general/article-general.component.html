@@ -31,6 +31,14 @@
                         Selecciona una marca
                     </option>
 
+                    @if (currentMarcaUnavailable()) {
+                    <option [value]="tab().draft.idMarca"
+                            selected
+                            disabled>
+                        Marca eliminada
+                    </option>
+                    }
+
                     @for (marca of marcasService.marcas(); track marca.id) {
                     @if (marca.id !== null) {
                     <option [value]="marca.id"
