@@ -1,5 +1,7 @@
 import { Component, inject } from '@angular/core';
+import type MarcaFormModel from '@model/marcas/marca-form.model';
 import type MarcaWorkspaceSection from '@model/marcas/marca-workspace-section.type';
+import MarcaFormComponent from '@modules/compras/marcas/components/marca-form/marca-form.component';
 import MarcaSectionTabsComponent from '@modules/compras/marcas/components/marca-section-tabs/marca-section-tabs.component';
 import MarcasService from '@services/compras/marcas.service';
 
@@ -10,7 +12,7 @@ import MarcasService from '@services/compras/marcas.service';
   selector: 'otpv-marcas',
   templateUrl: './marcas.component.html',
   styleUrl: './marcas.component.scss',
-  imports: [MarcaSectionTabsComponent],
+  imports: [MarcaFormComponent, MarcaSectionTabsComponent],
 })
 export default class MarcasComponent {
   readonly marcasService: MarcasService = inject(MarcasService);
@@ -20,5 +22,21 @@ export default class MarcasComponent {
    */
   selectSection(section: MarcaWorkspaceSection): void {
     this.marcasService.seleccionarSeccion(section);
+  }
+
+  /**
+   * Sincroniza el formulario editable con el
+   * draft conservado en el workspace.
+   */
+  updateDraft(model: MarcaFormModel): void {
+    this.marcasService.actualizarDraft(model);
+  }
+
+  /**
+   * Restaura todos los datos editables a la
+   * instantánea base de la ficha.
+   */
+  cancelChanges(): void {
+    this.marcasService.cancelarCambios();
   }
 }

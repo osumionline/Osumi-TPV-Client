@@ -1,0 +1,106 @@
+<form class="brand-form"
+      novalidate
+      (input)="modelChanged()"
+      (submit)="$event.preventDefault()">
+    <section class="brand-form__section">
+        <h3>
+            Datos de la marca
+        </h3>
+
+        <div class="brand-form__row brand-form__row--2">
+            <mat-form-field>
+                <mat-label>
+                    Nombre
+                </mat-label>
+
+                <input #nameInput
+                       matInput
+                       autocomplete="organization"
+                       [formField]="marcaForm.nombre">
+
+                @if (
+                marcaForm.nombre().touched() &&
+                marcaForm.nombre().invalid()
+                ) {
+                <mat-error>
+                    {{ marcaForm.nombre().errors()[0]?.message }}
+                </mat-error>
+                }
+            </mat-form-field>
+
+            <mat-form-field>
+                <mat-label>
+                    Teléfono
+                </mat-label>
+
+                <input matInput
+                       type="tel"
+                       autocomplete="tel"
+                       [formField]="marcaForm.telefono">
+            </mat-form-field>
+        </div>
+
+        <div class="brand-form__row brand-form__row--2">
+            <mat-form-field>
+                <mat-label>
+                    Email
+                </mat-label>
+
+                <input matInput
+                       type="email"
+                       autocomplete="email"
+                       [formField]="marcaForm.email">
+
+                @if (
+                marcaForm.email().touched() &&
+                marcaForm.email().invalid()
+                ) {
+                <mat-error>
+                    {{ marcaForm.email().errors()[0]?.message }}
+                </mat-error>
+                }
+            </mat-form-field>
+
+            <mat-form-field>
+                <mat-label>
+                    Web
+                </mat-label>
+
+                <input matInput
+                       type="url"
+                       autocomplete="url"
+                       [formField]="marcaForm.web">
+            </mat-form-field>
+        </div>
+
+        <mat-form-field class="brand-form__full">
+            <mat-label>
+                Dirección
+            </mat-label>
+
+            <input matInput
+                   autocomplete="street-address"
+                   [formField]="marcaForm.direccion">
+        </mat-form-field>
+
+        <mat-form-field class="brand-form__full">
+            <mat-label>
+                Observaciones
+            </mat-label>
+
+            <textarea matInput
+                      rows="6"
+                      [formField]="marcaForm.observaciones">
+            </textarea>
+        </mat-form-field>
+    </section>
+
+    <div class="brand-form__actions">
+        <button mat-stroked-button
+                type="button"
+                [disabled]="!dirty()"
+                (click)="cancel()">
+            Cancelar
+        </button>
+    </div>
+</form>

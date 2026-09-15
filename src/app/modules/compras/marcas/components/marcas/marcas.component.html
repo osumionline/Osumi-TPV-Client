@@ -6,15 +6,10 @@
     <div class="brands__workspace">
         @switch (workspace.activeSection) {
         @case ('data') {
-        <section class="brands__section-state">
-            <h3>
-                Datos de la marca
-            </h3>
-
-            <p>
-                La ficha de datos se incorporará en el siguiente bloque funcional.
-            </p>
-        </section>
+        <otpv-marca-form [initialValue]="workspace.draft"
+                         [dirty]="marcasService.dirty()"
+                         (modelChangeEvent)="updateDraft($event)"
+                         (cancelEvent)="cancelChanges()" />
         }
 
         @case ('statistics') {
