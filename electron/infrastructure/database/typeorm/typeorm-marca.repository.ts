@@ -1,7 +1,12 @@
 import type ActualizarMarcaRecordCommand from '@backend/contracts/marcas/actualizar-marca-record-command.interface';
 import type CrearMarcaRecordCommand from '@backend/contracts/marcas/crear-marca-record-command.interface';
+import type MarcaEstadisticasRepositoryQuery from '@backend/contracts/marcas/marca-estadisticas-query.interface';
 import type MarcaRepository from '@backend/contracts/marcas/marca.repository.interface';
 import { ArchivoCreateRecord } from '@backend/domain/files/archivo-record.interface';
+import type {
+  MarcaEstadisticasAggregateRecord,
+  MarcaEstadisticasRepositoryResult,
+} from '@backend/domain/marcas/marca-estadisticas-record.interface';
 import type MarcaRecord from '@backend/domain/marcas/marca-record.interface';
 import { getLastInsertId } from '@infrastructure/database/typeorm/sqlite.utils';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
@@ -9,6 +14,17 @@ import insertArchivo from '@infrastructure/database/typeorm/typeorm-archivo.util
 import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
 import { randomUUID } from 'node:crypto';
 import type { DataSource, QueryRunner } from 'typeorm';
+
+interface MarcaEstadisticasAggregateDatabaseRow {
+  readonly year: number;
+  readonly month: number | null;
+  readonly day: number | null;
+  readonly value: number;
+}
+
+interface MarcaEstadisticasYearDatabaseRow {
+  readonly year: number;
+}
 
 interface MarcaDatabaseRow {
   readonly id: number;
@@ -101,6 +117,116 @@ export default class TypeOrmMarcaRepository implements MarcaRepository {
     const row: MarcaDatabaseRow | undefined = rows[0];
 
     return row === undefined ? null : this.toRecord(row);
+  }
+
+  /**
+   * Agrega las ventas históricas positivas de una Marca
+   * según la granularidad temporal solicitada.
+   */
+  async findEstadisticas(
+    query: MarcaEstadisticasRepositoryQuery,
+  ): Promise<MarcaEstadisticasRepositoryResult> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const yearExpression: string = "CAST(strftime('%Y', v.created_at) AS INTEGER)";
+
+    const monthValueExpression: string = "CAST(strftime('%m', v.created_at) AS INTEGER)";
+
+    const dayValueExpression: string = "CAST(strftime('%d', v.created_at) AS INTEGER)";
+
+    const annual: boolean = query.year === null;
+
+    const daily: boolean = query.year !== null && query.month !== null;
+
+    const monthExpression: string = annual ? 'NULL' : monthValueExpression;
+
+    const dayExpression: string = daily ? dayValueExpression : 'NULL';
+
+    const valueExpression: string =
+      query.metric === 'units' ? 'SUM(lv.unidades)' : 'SUM(lv.importe_micros)';
+
+    const conditions: string[] = [
+      'lv.id_marca_snapshot = ?',
+      'lv.unidades > 0',
+      'v.deleted_at IS NULL',
+    ];
+
+    const parameters: number[] = [query.idMarca];
+
+    if (query.year !== null) {
+      conditions.push(`${yearExpression} = ?`);
+
+      parameters.push(query.year);
+    }
+
+    if (query.month !== null) {
+      conditions.push(`${monthValueExpression} = ?`);
+
+      parameters.push(query.month);
+    }
+
+    const groupByExpression: string = annual
+      ? yearExpression
+      : daily
+        ? `${yearExpression}, ${monthValueExpression}, ${dayValueExpression}`
+        : `${yearExpression}, ${monthValueExpression}`;
+
+    const rows: readonly MarcaEstadisticasAggregateDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT
+          ${yearExpression} AS year,
+          ${monthExpression} AS month,
+          ${dayExpression} AS day,
+          ${valueExpression} AS value
+        FROM linea_venta lv
+
+        INNER JOIN venta v
+          ON v.id = lv.id_venta
+
+        WHERE
+          ${conditions.join('\n          AND ')}
+
+        GROUP BY
+          ${groupByExpression}
+
+        ORDER BY
+          ${groupByExpression}
+      `,
+      parameters,
+    )) as readonly MarcaEstadisticasAggregateDatabaseRow[];
+
+    const yearRows: readonly MarcaEstadisticasYearDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT DISTINCT
+          ${yearExpression} AS year
+        FROM linea_venta lv
+
+        INNER JOIN venta v
+          ON v.id = lv.id_venta
+
+        WHERE
+          lv.id_marca_snapshot = ?
+          AND lv.unidades > 0
+          AND v.deleted_at IS NULL
+
+        ORDER BY
+          year
+      `,
+      [query.idMarca],
+    )) as readonly MarcaEstadisticasYearDatabaseRow[];
+
+    return {
+      years: yearRows.map((row: MarcaEstadisticasYearDatabaseRow): number => row.year),
+
+      items: rows.map(
+        (row: MarcaEstadisticasAggregateDatabaseRow): MarcaEstadisticasAggregateRecord => ({
+          year: row.year,
+          month: row.month,
+          day: row.day,
+          value: row.value,
+        }),
+      ),
+    };
   }
 
   /**

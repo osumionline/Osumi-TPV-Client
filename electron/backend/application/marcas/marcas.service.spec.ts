@@ -7,6 +7,7 @@ import type MarcaRepository from '@backend/contracts/marcas/marca.repository.int
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
 import type { ImageAssetPurpose } from '@backend/domain/files/image-asset.interface';
 import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.interface';
+import type { MarcaEstadisticasRepositoryResult } from '@backend/domain/marcas/marca-estadisticas-record.interface';
 import type MarcaRecord from '@backend/domain/marcas/marca-record.interface';
 import type ActualizarMarcaCommand from '@desktop-contracts/marcas/actualizar-marca-command.interface';
 import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
@@ -482,6 +483,16 @@ function createService(
 
     findById: (id: number): Promise<MarcaRecord | null> =>
       Promise.resolve(marcas.find((marca: MarcaRecord): boolean => marca.id === id) ?? null),
+
+    /**
+     * Devuelve unas estadísticas vacías para los tests
+     * del servicio que no ejercitan este caso de uso.
+     */
+    findEstadisticas: (): Promise<MarcaEstadisticasRepositoryResult> =>
+      Promise.resolve({
+        years: [],
+        items: [],
+      }),
 
     existsActiveByName: (nombre: string, excludeId: number | null): Promise<boolean> => {
       lastExcludedId = excludeId;

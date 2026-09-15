@@ -1,5 +1,7 @@
 import type ActualizarMarcaRecordCommand from '@backend/contracts/marcas/actualizar-marca-record-command.interface';
 import type CrearMarcaRecordCommand from '@backend/contracts/marcas/crear-marca-record-command.interface';
+import type MarcaEstadisticasRepositoryQuery from '@backend/contracts/marcas/marca-estadisticas-query.interface';
+import type { MarcaEstadisticasRepositoryResult } from '@backend/domain/marcas/marca-estadisticas-record.interface';
 import type MarcaRecord from '@backend/domain/marcas/marca-record.interface';
 
 export default interface MarcaRepository {
@@ -13,6 +15,14 @@ export default interface MarcaRepository {
    * Recupera una marca activa por su identificador interno.
    */
   findById(id: number): Promise<MarcaRecord | null>;
+
+  /**
+   * Recupera los agregados históricos de ventas
+   * correspondientes a una Marca.
+   */
+  findEstadisticas(
+    query: MarcaEstadisticasRepositoryQuery,
+  ): Promise<MarcaEstadisticasRepositoryResult>;
 
   /**
    * Comprueba si existe otra marca activa con el nombre indicado.

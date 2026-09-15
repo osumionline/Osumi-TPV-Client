@@ -445,6 +445,80 @@ describe('TypeOrmMarcaRepository', (): void => {
 
     expect(rows[0]?.id_archivo).toBe(1);
   });
+
+  it('agrega estadísticas históricas por snapshot contando solo líneas positivas', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await seedMarcaSales(dataSource);
+
+    const daily = await requireRepository().findEstadisticas({
+      idMarca: 1,
+      metric: 'units',
+      year: 2026,
+      month: 9,
+    });
+
+    expect(daily.years).toEqual([2024, 2026]);
+
+    expect(daily.items).toEqual([
+      {
+        year: 2026,
+        month: 9,
+        day: 1,
+        value: 3,
+      },
+      {
+        year: 2026,
+        month: 9,
+        day: 2,
+        value: 1,
+      },
+    ]);
+
+    const monthly = await requireRepository().findEstadisticas({
+      idMarca: 1,
+      metric: 'amount',
+      year: 2026,
+      month: null,
+    });
+
+    expect(monthly.items).toEqual([
+      {
+        year: 2026,
+        month: 9,
+        day: null,
+        value: 3_500_000,
+      },
+      {
+        year: 2026,
+        month: 10,
+        day: null,
+        value: 2_000_000,
+      },
+    ]);
+
+    const annual = await requireRepository().findEstadisticas({
+      idMarca: 1,
+      metric: 'units',
+      year: null,
+      month: null,
+    });
+
+    expect(annual.items).toEqual([
+      {
+        year: 2024,
+        month: null,
+        day: null,
+        value: 4,
+      },
+      {
+        year: 2026,
+        month: null,
+        day: null,
+        value: 6,
+      },
+    ]);
+  });
 });
 
 /**
@@ -687,6 +761,261 @@ async function seedMarcas(dataSource: DataSource): Promise<void> {
       0,
       NULL
     )
+  `);
+}
+
+/**
+ * Inserta ventas suficientes para validar las
+ * estadísticas históricas de una Marca.
+ */
+async function seedMarcaSales(dataSource: DataSource): Promise<void> {
+  await dataSource.query(`
+    INSERT INTO terminal (
+      id,
+      public_id,
+      nombre,
+      codigo
+    )
+    VALUES (
+      1,
+      'terminal-brand-stats',
+      'Terminal estadísticas Marca',
+      'BRAND-STATS'
+    )
+  `);
+
+  await dataSource.query(`
+    INSERT INTO empleado (
+      id,
+      public_id,
+      nombre,
+      password_hash,
+      password_algorithm,
+      color,
+      admin
+    )
+    VALUES (
+      1,
+      'employee-brand-stats',
+      'Empleado estadísticas Marca',
+      'test-hash',
+      'scrypt',
+      '000000',
+      1
+    )
+  `);
+
+  await dataSource.query(`
+    INSERT INTO caja (
+      id,
+      public_id,
+      id_terminal,
+      id_empleado_apertura,
+      apertura
+    )
+    VALUES (
+      1,
+      'cash-brand-stats',
+      1,
+      1,
+      '2024-01-01T00:00:00.000Z'
+    )
+  `);
+
+  await dataSource.query(`
+    INSERT INTO venta (
+      id,
+      public_id,
+      id_caja,
+      id_empleado,
+      numero,
+      total_cents,
+      created_at,
+      deleted_at
+    )
+    VALUES
+      (
+        1,
+        'brand-sale-2024',
+        1,
+        1,
+        1,
+        400,
+        '2024-09-10T10:00:00.000Z',
+        NULL
+      ),
+      (
+        2,
+        'brand-sale-mixed',
+        1,
+        1,
+        2,
+        200,
+        '2026-09-01T10:00:00.000Z',
+        NULL
+      ),
+      (
+        3,
+        'brand-sale-second-day',
+        1,
+        1,
+        3,
+        50,
+        '2026-09-02T10:00:00.000Z',
+        NULL
+      ),
+      (
+        4,
+        'brand-sale-october',
+        1,
+        1,
+        4,
+        200,
+        '2026-10-05T10:00:00.000Z',
+        NULL
+      ),
+      (
+        5,
+        'brand-pure-return',
+        1,
+        1,
+        5,
+        -200,
+        '2026-09-03T10:00:00.000Z',
+        NULL
+      ),
+      (
+        6,
+        'brand-deleted-sale',
+        1,
+        1,
+        6,
+        9900,
+        '2026-09-04T10:00:00.000Z',
+        '2026-09-04T11:00:00.000Z'
+      ),
+      (
+        7,
+        'other-brand-snapshot',
+        1,
+        1,
+        7,
+        700,
+        '2026-09-05T10:00:00.000Z',
+        NULL
+      )
+  `);
+
+  await dataSource.query(`
+    INSERT INTO linea_venta (
+      id,
+      public_id,
+      id_venta,
+      id_articulo,
+      id_marca_snapshot,
+      localizador,
+      marca,
+      nombre_articulo,
+      importe_micros,
+      unidades
+    )
+    VALUES
+      (
+        1,
+        'brand-line-2024',
+        1,
+        1,
+        1,
+        261234,
+        'Marca B',
+        'Artículo relacionado',
+        4000000,
+        4
+      ),
+      (
+        2,
+        'brand-line-positive',
+        2,
+        1,
+        1,
+        261234,
+        'Marca B',
+        'Artículo relacionado',
+        3000000,
+        3
+      ),
+      (
+        3,
+        'brand-line-return',
+        2,
+        1,
+        1,
+        261234,
+        'Marca B',
+        'Artículo relacionado',
+        -1000000,
+        -1
+      ),
+      (
+        4,
+        'brand-line-second-day',
+        3,
+        1,
+        1,
+        261234,
+        'Nombre histórico distinto',
+        'Artículo relacionado',
+        500000,
+        1
+      ),
+      (
+        5,
+        'brand-line-october',
+        4,
+        1,
+        1,
+        261234,
+        'Marca B',
+        'Artículo relacionado',
+        2000000,
+        2
+      ),
+      (
+        6,
+        'brand-line-pure-return',
+        5,
+        1,
+        1,
+        261234,
+        'Marca B',
+        'Artículo relacionado',
+        -2000000,
+        -2
+      ),
+      (
+        7,
+        'brand-line-deleted',
+        6,
+        1,
+        1,
+        261234,
+        'Marca B',
+        'Artículo relacionado',
+        99000000,
+        99
+      ),
+      (
+        8,
+        'brand-line-other-snapshot',
+        7,
+        1,
+        3,
+        261234,
+        'Marca B',
+        'Artículo relacionado',
+        7000000,
+        7
+      )
   `);
 }
 
