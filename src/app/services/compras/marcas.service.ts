@@ -20,12 +20,14 @@ export default class MarcasService {
   private readonly loadedSignal: WritableSignal<boolean> = signal<boolean>(false);
   private readonly workspaceSignal: WritableSignal<MarcaWorkspace | null> =
     signal<MarcaWorkspace | null>(null);
+  private readonly focusNameRequestSignal: WritableSignal<number> = signal<number>(0);
 
   private pendingRequest: Promise<void> | null = null;
 
   readonly marcas: Signal<readonly Marca[]> = this.marcasSignal.asReadonly();
   readonly loaded: Signal<boolean> = this.loadedSignal.asReadonly();
   readonly workspace: Signal<MarcaWorkspace | null> = this.workspaceSignal.asReadonly();
+  readonly focusNameRequest: Signal<number> = this.focusNameRequestSignal.asReadonly();
 
   readonly hasWorkspace: Signal<boolean> = computed((): boolean => this.workspace() !== null);
   readonly dirty: Signal<boolean> = computed((): boolean => {
@@ -62,6 +64,7 @@ export default class MarcasService {
     };
 
     this.workspaceSignal.set(workspace);
+    this.focusNameRequestSignal.update((request: number): number => request + 1);
 
     return workspace;
   }
@@ -87,6 +90,7 @@ export default class MarcasService {
     };
 
     this.workspaceSignal.set(workspace);
+    this.focusNameRequestSignal.update((request: number): number => request + 1);
 
     return workspace;
   }
@@ -211,6 +215,7 @@ export default class MarcasService {
     this.marcasSignal.set([]);
     this.loadedSignal.set(false);
     this.workspaceSignal.set(null);
+    this.focusNameRequestSignal.set(0);
   }
 
   findById(id: number): Marca | null {

@@ -86,4 +86,24 @@ describe('MarcaFormComponent', (): void => {
 
     expect(cancelSpy).toHaveBeenCalledOnce();
   });
+
+  it('enfoca el nombre cuando recibe una nueva solicitud', (): void => {
+    const nameInput: HTMLInputElement | null = fixture.nativeElement.querySelector(
+      'input[autocomplete="organization"]',
+    );
+
+    expect(nameInput).not.toBeNull();
+
+    if (nameInput === null) {
+      return;
+    }
+
+    const focusSpy = vi.spyOn(nameInput, 'focus');
+
+    fixture.componentRef.setInput('focusNameRequest', 1);
+
+    fixture.detectChanges();
+
+    expect(focusSpy).toHaveBeenCalledOnce();
+  });
 });

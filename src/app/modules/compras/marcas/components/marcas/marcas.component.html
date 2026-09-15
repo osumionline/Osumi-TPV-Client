@@ -8,6 +8,7 @@
         @case ('data') {
         <otpv-marca-form [initialValue]="workspace.draft"
                          [dirty]="marcasService.dirty()"
+                         [focusNameRequest]="marcasService.focusNameRequest()"
                          (modelChangeEvent)="updateDraft($event)"
                          (cancelEvent)="cancelChanges()" />
         }

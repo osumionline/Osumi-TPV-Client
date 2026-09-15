@@ -209,6 +209,18 @@ describe('MarcasService workspace', (): void => {
       service.seleccionarSeccion('data');
     }).toThrow('No hay ninguna ficha de marca abierta.');
   });
+
+  it('solicita foco en Nombre al crear o abrir una ficha', (): void => {
+    expect(service.focusNameRequest()).toBe(0);
+
+    service.crearBorrador();
+
+    expect(service.focusNameRequest()).toBe(1);
+
+    service.abrirFicha(createMarca());
+
+    expect(service.focusNameRequest()).toBe(2);
+  });
 });
 
 /**

@@ -34,11 +34,10 @@ export default class MarcaFormComponent {
   readonly initialValue: InputSignal<MarcaFormModel> = input<MarcaFormModel>(
     createMarcaFormInitialValue(),
   );
-
   readonly dirty: InputSignal<boolean> = input<boolean>(false);
+  readonly focusNameRequest: InputSignal<number> = input<number>(0);
 
   readonly modelChangeEvent: OutputEmitterRef<MarcaFormModel> = output<MarcaFormModel>();
-
   readonly cancelEvent: OutputEmitterRef<void> = output<void>();
 
   readonly marcaModel: WritableSignal<MarcaFormModel> = signal<MarcaFormModel>(
@@ -61,6 +60,10 @@ export default class MarcaFormComponent {
       }
 
       this.marcaModel.set(cloneMarcaFormModel(initialValue));
+    });
+    effect((): void => {
+      this.focusNameRequest();
+      this.nameInput()?.nativeElement.focus();
     });
   }
 
