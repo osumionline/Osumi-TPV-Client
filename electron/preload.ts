@@ -121,6 +121,10 @@ import type VentasContextInterface from '@desktop-contracts/ventas/ventas-contex
 import IPC_CHANNELS from '@ipc/channels';
 import type { IpcRendererEvent } from 'electron';
 import { contextBridge, ipcRenderer } from 'electron';
+import type {
+  MarcaEstadisticasConsulta,
+  MarcaEstadisticasResultado,
+} from '@desktop-contracts/marcas/marca-estadisticas.interface';
 
 const desktopApi: OsumiDesktopApi = Object.freeze({
   isElectron: true,
@@ -399,6 +403,14 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
 
     getById: (id: number): Promise<MarcaInterface | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.marcasGetById, id) as Promise<MarcaInterface | null>,
+      
+      getEstadisticas: (
+  consulta: MarcaEstadisticasConsulta,
+): Promise<MarcaEstadisticasResultado> =>
+  ipcRenderer.invoke(
+    IPC_CHANNELS.marcasGetEstadisticas,
+    consulta,
+  ) as Promise<MarcaEstadisticasResultado>,
 
     create: (command: CrearMarcaCommand): Promise<MarcaInterface> =>
       ipcRenderer.invoke(IPC_CHANNELS.marcasCreate, command) as Promise<MarcaInterface>,
