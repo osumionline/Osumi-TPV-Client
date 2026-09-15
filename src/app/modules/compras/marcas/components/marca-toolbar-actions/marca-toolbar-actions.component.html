@@ -8,7 +8,6 @@
             type="button"
             matTooltip="Cerrar ficha"
             aria-label="Cerrar ficha de marca"
-            [disabled]="marcasService.dirty()"
             (click)="closeMarca()">
         <mat-icon>
             close
@@ -20,7 +19,7 @@
             type="button"
             matTooltip="Buscar marca"
             aria-label="Buscar marca"
-            disabled>
+            (click)="openSearch()">
         <mat-icon>
             search
         </mat-icon>
@@ -30,10 +29,18 @@
             type="button"
             matTooltip="Nueva marca"
             aria-label="Crear una marca nueva"
-            [disabled]="marcasService.dirty()"
             (click)="newMarca()">
         <mat-icon>
             add
         </mat-icon>
     </button>
 </div>
+
+@if (searchOpen()) {
+<otpv-marca-search [marcas]="marcasService.marcas()"
+                   [selectedPublicId]="
+                       marcasService.workspace()?.marcaPublicId ?? null
+                   "
+                   (selectEvent)="selectMarca($event)"
+                   (cancelEvent)="closeSearch()" />
+}

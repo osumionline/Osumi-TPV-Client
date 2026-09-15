@@ -1,0 +1,116 @@
+:host {
+    position: fixed;
+    z-index: 1000;
+    inset: 0;
+}
+
+.brand-search {
+    display: flex;
+    width: min(1400px, calc(100vw - 80px));
+    height: min(760px, calc(100vh - 80px));
+    flex-direction: column;
+    overflow: hidden;
+
+    .brand-search__header {
+        display: flex;
+        min-height: 56px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--separator-color);
+
+        h2 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 500;
+        }
+    }
+
+    .brand-search__search {
+        padding: 16px 18px;
+        border-bottom: 1px solid var(--separator-color);
+
+        input {
+            width: 100%;
+        }
+    }
+
+    .brand-search__results {
+        display: grid;
+        min-height: 0;
+        flex: 1;
+        grid-template-columns:
+            repeat(auto-fill, minmax(130px, 160px));
+        align-content: start;
+        gap: 14px;
+        padding: 18px;
+        overflow-y: auto;
+    }
+
+    .brand-search__card {
+        display: flex;
+        min-height: 118px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px;
+        border: 1px solid var(--separator-color);
+        border-radius: 6px;
+        background-color: var(--color-white);
+        cursor: pointer;
+        font: inherit;
+        text-align: center;
+
+        &:hover,
+        &:focus-visible {
+            border-color: var(--main-color);
+        }
+    }
+
+    .brand-search__card--selected {
+        border-color: var(--main-color);
+        box-shadow: inset 0 0 0 1px var(--main-color);
+    }
+
+    .brand-search__image {
+        display: flex;
+        width: 72px;
+        height: 72px;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+
+        img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+    }
+
+    .brand-search__name {
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+    }
+
+    .brand-search__empty {
+        grid-column: 1 / -1;
+        padding: 48px 24px;
+        color: var(--disabled-color);
+        text-align: center;
+    }
+}
+
+@media (width <=720px) {
+    .brand-search {
+        width: calc(100vw - 24px);
+        height: calc(100vh - 24px);
+
+        .brand-search__results {
+            grid-template-columns:
+                repeat(auto-fill, minmax(110px, 1fr));
+        }
+    }
+}
