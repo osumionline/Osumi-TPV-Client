@@ -6,6 +6,7 @@ import MarcaSectionTabsComponent from '@modules/compras/marcas/components/marca-
 import { DialogService } from '@osumi/angular-tools';
 import MarcasService from '@services/compras/marcas.service';
 import { getErrorMessage } from '@utils/error.utils';
+import MarcaStatisticsComponent from '@modules/compras/marcas/components/marca-statistics/marca-statistics.component';
 
 /**
  * Muestra el workspace principal de gestión de Marcas.
@@ -14,7 +15,7 @@ import { getErrorMessage } from '@utils/error.utils';
   selector: 'otpv-marcas',
   templateUrl: './marcas.component.html',
   styleUrl: './marcas.component.scss',
-  imports: [MarcaFormComponent, MarcaSectionTabsComponent],
+  imports: [MarcaFormComponent, MarcaSectionTabsComponent, MarcaStatisticsComponent],
 })
 export default class MarcasComponent {
   readonly marcasService: MarcasService = inject(MarcasService);

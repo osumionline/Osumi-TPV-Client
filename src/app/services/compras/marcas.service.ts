@@ -2,6 +2,10 @@ import { type Signal, type WritableSignal, computed, inject, Service, signal } f
 import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
 import type ActualizarMarcaCommand from '@desktop-contracts/marcas/actualizar-marca-command.interface';
 import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
+import type {
+  MarcaEstadisticasConsulta,
+  MarcaEstadisticasResultado,
+} from '@desktop-contracts/marcas/marca-estadisticas.interface';
 import type MarcaLogoUpdateCommand from '@desktop-contracts/marcas/marca-logo-update-command.type';
 import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
 import type MarcaEstadisticasFiltros from '@model/marcas/marca-estadisticas-filtros.interface';
@@ -297,6 +301,26 @@ export default class MarcasService {
     this.workspaceSignal.set(updatedWorkspace);
 
     return updatedWorkspace;
+  }
+
+  /**
+   * Recupera las estadísticas históricas de una Marca
+   * traduciendo los filtros conservados por el workspace.
+   */
+  async getEstadisticas(
+    idMarca: number,
+    filters: MarcaEstadisticasFiltros,
+  ): Promise<MarcaEstadisticasResultado> {
+    const normalizedFilters: MarcaEstadisticasFiltros = normalizeMarcaEstadisticasFiltros(filters);
+
+    const consulta: MarcaEstadisticasConsulta = {
+      idMarca,
+      tipo: normalizedFilters.tipo,
+      year: normalizedFilters.anio === 'all' ? null : normalizedFilters.anio,
+      month: normalizedFilters.mes === 'all' ? null : normalizedFilters.mes,
+    };
+
+    return window.osumiDesktop.marcas.getEstadisticas(consulta);
   }
 
   /**

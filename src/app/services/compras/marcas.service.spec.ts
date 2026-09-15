@@ -2,6 +2,10 @@ import { TestBed } from '@angular/core/testing';
 import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
 import type ActualizarMarcaCommand from '@desktop-contracts/marcas/actualizar-marca-command.interface';
 import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
+import type {
+  MarcaEstadisticasConsulta,
+  MarcaEstadisticasResultado,
+} from '@desktop-contracts/marcas/marca-estadisticas.interface';
 import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
 import type MarcaEstadisticasFiltros from '@model/marcas/marca-estadisticas-filtros.interface';
 import type MarcaFormModel from '@model/marcas/marca-form.model';
@@ -25,6 +29,8 @@ let createResult: MarcaInterface;
 let updateResult: MarcaInterface;
 let createError: Error | null;
 let updateError: Error | null;
+let estadisticasCalls: MarcaEstadisticasConsulta[];
+let estadisticasResult: MarcaEstadisticasResultado;
 
 describe('MarcasService workspace', (): void => {
   beforeEach((): void => {
@@ -41,6 +47,14 @@ describe('MarcasService workspace', (): void => {
 
     createError = null;
     updateError = null;
+    estadisticasCalls = [];
+
+    estadisticasResult = {
+      tipo: 'amount',
+      availableYears: [2026],
+      points: [],
+      total: 0,
+    };
 
     Object.defineProperty(window, 'osumiDesktop', {
       configurable: true,
@@ -49,6 +63,14 @@ describe('MarcasService workspace', (): void => {
           getAll: (): Promise<readonly MarcaInterface[]> => Promise.resolve([]),
 
           getById: (): Promise<MarcaInterface | null> => Promise.resolve(null),
+
+          getEstadisticas: (
+            consulta: MarcaEstadisticasConsulta,
+          ): Promise<MarcaEstadisticasResultado> => {
+            estadisticasCalls.push(consulta);
+
+            return Promise.resolve(estadisticasResult);
+          },
 
           create: (command: CrearMarcaCommand): Promise<MarcaInterface> => {
             createCalls.push(command);
@@ -618,6 +640,51 @@ describe('MarcasService workspace', (): void => {
 
     expect(service.workspace()).toBeNull();
     expect(service.marcas()).toEqual([]);
+  });
+
+  it('traduce los filtros del workspace al contrato público de estadísticas', async (): Promise<void> => {
+    estadisticasResult = {
+      tipo: 'units',
+      availableYears: [2024, 2026],
+      points: [
+        {
+          year: 2024,
+          month: null,
+          day: null,
+          value: 8,
+        },
+        {
+          year: 2025,
+          month: null,
+          day: null,
+          value: 0,
+        },
+        {
+          year: 2026,
+          month: null,
+          day: null,
+          value: 12,
+        },
+      ],
+      total: 20,
+    };
+
+    const result: MarcaEstadisticasResultado = await service.getEstadisticas(12, {
+      mes: 4,
+      anio: 'all',
+      tipo: 'units',
+    });
+
+    expect(estadisticasCalls).toEqual([
+      {
+        idMarca: 12,
+        tipo: 'units',
+        year: null,
+        month: null,
+      },
+    ]);
+
+    expect(result).toBe(estadisticasResult);
   });
 });
 

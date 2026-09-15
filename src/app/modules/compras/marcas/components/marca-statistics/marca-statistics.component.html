@@ -1,0 +1,113 @@
+<section class="brand-statistics">
+    <div class="brand-statistics__card">
+        <header class="brand-statistics__header">
+            <strong>
+                Ventas de la marca
+            </strong>
+        </header>
+
+        @if (error() !== null) {
+        <div class="brand-statistics__error">
+            <p>
+                {{ error() }}
+            </p>
+
+            <button mat-stroked-button
+                    type="button"
+                    (click)="retry()">
+                Reintentar
+            </button>
+        </div>
+        }
+        @else {
+        <div class="brand-statistics__chart-container">
+            <div echarts
+                 class="brand-statistics__chart"
+                 [options]="chartOptions()">
+            </div>
+
+            @if (loading()) {
+            <div class="brand-statistics__loading">
+                Cargando estadísticas…
+            </div>
+            }
+            @else if (noSales()) {
+            <div class="brand-statistics__empty">
+                No hay ventas para el período seleccionado.
+            </div>
+            }
+        </div>
+        }
+
+        <div class="brand-statistics__filters">
+            <div class="brand-statistics__field">
+                <label for="brand-statistics-month">
+                    Mes
+                </label>
+
+                <mat-select id="brand-statistics-month"
+                            [value]="filters().mes"
+                            [disabled]="filters().anio === 'all'"
+                            (selectionChange)="onMonthChange($event)">
+                    <mat-option value="all">
+                        Todos
+                    </mat-option>
+
+                    @for (option of months; track option.value) {
+                    <mat-option [value]="option.value">
+                        {{ option.label }}
+                    </mat-option>
+                    }
+                </mat-select>
+            </div>
+
+            <div class="brand-statistics__field">
+                <label for="brand-statistics-year">
+                    Año
+                </label>
+
+                <mat-select id="brand-statistics-year"
+                            [value]="filters().anio"
+                            (selectionChange)="onYearChange($event)">
+                    <mat-option value="all">
+                        Todos
+                    </mat-option>
+
+                    @for (option of yearOptions(); track option) {
+                    <mat-option [value]="option">
+                        {{ option }}
+                    </mat-option>
+                    }
+                </mat-select>
+            </div>
+
+            <div class="brand-statistics__field">
+                <label for="brand-statistics-type">
+                    Tipo
+                </label>
+
+                <mat-select id="brand-statistics-type"
+                            [value]="filters().tipo"
+                            (selectionChange)="onTipoChange($event)">
+                    <mat-option value="amount">
+                        Importe
+                    </mat-option>
+
+                    <mat-option value="units">
+                        Unidades
+                    </mat-option>
+                </mat-select>
+            </div>
+        </div>
+
+        <footer class="brand-statistics__total">
+            <span>
+                Total
+            </span>
+
+            <strong>
+                {{ formatTotal() }}
+            </strong>
+        </footer>
+    </div>
+</section>
