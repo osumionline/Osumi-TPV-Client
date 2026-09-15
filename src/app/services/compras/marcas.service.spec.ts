@@ -19,6 +19,8 @@ let updateCalls: {
   readonly id: number;
   readonly command: ActualizarMarcaCommand;
 }[];
+let deactivateCalls: number[];
+let deactivateError: Error | null;
 let createResult: MarcaInterface;
 let updateResult: MarcaInterface;
 let createError: Error | null;
@@ -30,6 +32,8 @@ describe('MarcasService workspace', (): void => {
 
     createCalls = [];
     updateCalls = [];
+    deactivateCalls = [];
+    deactivateError = null;
 
     createResult = createMarcaInterface(20, 'marca-20', 'Nueva marca');
 
@@ -65,7 +69,11 @@ describe('MarcasService workspace', (): void => {
               : Promise.reject(updateError);
           },
 
-          deactivate: (): Promise<void> => Promise.resolve(),
+          deactivate: (id: number): Promise<void> => {
+            deactivateCalls.push(id);
+
+            return deactivateError === null ? Promise.resolve() : Promise.reject(deactivateError);
+          },
         },
       },
     });
@@ -517,6 +525,99 @@ describe('MarcasService workspace', (): void => {
 
     expect(requireWorkspace().draft.foto).toBeNull();
     expect(service.dirty()).toBe(false);
+  });
+
+  it('da de baja la Marca activa, la elimina del maestro y cierra el workspace', async (): Promise<void> => {
+    createResult = createMarcaInterface(12, 'marca-12', 'Bosquimia');
+
+    const marca: Marca = await service.create({
+      nombre: 'Bosquimia',
+      telefono: null,
+      email: null,
+      direccion: null,
+      web: null,
+      observaciones: null,
+      crearProveedor: false,
+    });
+
+    service.abrirFicha(marca);
+
+    await service.deactivateWorkspace();
+
+    expect(deactivateCalls).toEqual([12]);
+
+    expect(service.marcas()).toEqual([]);
+    expect(service.workspace()).toBeNull();
+    expect(service.hasWorkspace()).toBe(false);
+    expect(service.deactivating()).toBe(false);
+  });
+
+  it('no permite dar de baja una Marca todavía no persistida', async (): Promise<void> => {
+    service.crearBorrador();
+
+    await expect(service.deactivateWorkspace()).rejects.toThrow(
+      'No se puede eliminar una marca que todavía no se ha guardado.',
+    );
+
+    expect(deactivateCalls).toEqual([]);
+    expect(service.workspace()).not.toBeNull();
+  });
+
+  it('conserva maestro, workspace y staging si falla la baja', async (): Promise<void> => {
+    createResult = {
+      ...createMarcaInterface(12, 'marca-12', 'Bosquimia'),
+      foto: 'asset://files/brands/bosquimia.webp',
+    };
+
+    const marca: Marca = await service.create({
+      nombre: 'Bosquimia',
+      telefono: null,
+      email: null,
+      direccion: null,
+      web: null,
+      observaciones: null,
+      crearProveedor: false,
+    });
+
+    service.abrirFicha(marca);
+
+    await service.seleccionarLogo(new File(['nuevo-logo'], 'nuevo-logo.png'));
+
+    deactivateError = new Error('No se pudo eliminar.');
+
+    await expect(service.deactivateWorkspace()).rejects.toThrow('No se pudo eliminar.');
+
+    expect(service.marcas()).toEqual([marca]);
+
+    expect(requireWorkspace().logoStagingId).toBe('staging-1');
+
+    expect(filesService.discardCalls).toEqual([]);
+    expect(service.deactivating()).toBe(false);
+  });
+
+  it('limpia el staging pendiente después de una baja confirmada', async (): Promise<void> => {
+    createResult = createMarcaInterface(12, 'marca-12', 'Bosquimia');
+
+    const marca: Marca = await service.create({
+      nombre: 'Bosquimia',
+      telefono: null,
+      email: null,
+      direccion: null,
+      web: null,
+      observaciones: null,
+      crearProveedor: false,
+    });
+
+    service.abrirFicha(marca);
+
+    await service.seleccionarLogo(new File(['nuevo-logo'], 'nuevo-logo.png'));
+
+    await service.deactivateWorkspace();
+
+    expect(filesService.discardCalls).toEqual(['staging-1']);
+
+    expect(service.workspace()).toBeNull();
+    expect(service.marcas()).toEqual([]);
   });
 });
 

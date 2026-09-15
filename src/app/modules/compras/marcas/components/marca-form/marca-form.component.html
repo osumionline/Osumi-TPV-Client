@@ -143,6 +143,20 @@
     </section>
 
     <div class="brand-form__actions">
+        @if (canDelete()) {
+        <button mat-button
+                type="button"
+                [disabled]="processing()"
+                (click)="deleteMarca()">
+            @if (deactivating()) {
+            Eliminando…
+            }
+            @else {
+            Eliminar
+            }
+        </button>
+        }
+
         <span class="brand-form__actions-spacer">
         </span>
 

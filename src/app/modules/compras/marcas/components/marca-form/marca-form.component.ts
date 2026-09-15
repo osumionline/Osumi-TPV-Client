@@ -38,12 +38,15 @@ export default class MarcaFormComponent {
   readonly saving: InputSignal<boolean> = input<boolean>(false);
   readonly saveSuccessful: InputSignal<boolean> = input<boolean>(false);
   readonly focusNameRequest: InputSignal<number> = input<number>(0);
+  readonly canDelete: InputSignal<boolean> = input<boolean>(false);
+  readonly deactivating: InputSignal<boolean> = input<boolean>(false);
 
   readonly modelChangeEvent: OutputEmitterRef<MarcaFormModel> = output<MarcaFormModel>();
   readonly saveEvent: OutputEmitterRef<MarcaFormModel> = output<MarcaFormModel>();
   readonly cancelEvent: OutputEmitterRef<void> = output<void>();
   readonly logoSelectedEvent: OutputEmitterRef<File> = output<File>();
   readonly logoRemoveEvent: OutputEmitterRef<void> = output<void>();
+  readonly deleteEvent: OutputEmitterRef<void> = output<void>();
 
   readonly marcaModel: WritableSignal<MarcaFormModel> = signal<MarcaFormModel>(
     createMarcaFormInitialValue(),
@@ -178,5 +181,16 @@ export default class MarcaFormComponent {
     }
 
     this.logoRemoveEvent.emit();
+  }
+
+  /**
+   * Solicita la baja de la Marca persistida actual.
+   */
+  deleteMarca(): void {
+    if (!this.canDelete() || this.processing()) {
+      return;
+    }
+
+    this.deleteEvent.emit();
   }
 }

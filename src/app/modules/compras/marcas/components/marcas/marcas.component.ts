@@ -154,6 +154,58 @@ export default class MarcasComponent {
   }
 
   /**
+   * Solicita confirmación antes de dar de baja
+   * la Marca persistida actualmente abierta.
+   */
+  deleteMarca(): void {
+    if (this.marcasService.processing()) {
+      return;
+    }
+
+    const workspace = this.marcasService.workspace();
+
+    if (workspace?.marcaId === null || workspace === null) {
+      return;
+    }
+
+    const nombre: string = workspace.baseSnapshot.nombre || workspace.draft.nombre;
+
+    const dirtyMessage: string = this.marcasService.dirty()
+      ? ' Los cambios sin guardar también se perderán.'
+      : '';
+
+    this.dialog
+      .confirm({
+        title: 'Eliminar marca',
+        content: `¿Quieres eliminar la marca "${nombre}"? ` + dirtyMessage,
+      })
+      .subscribe((result: boolean): void => {
+        if (result) {
+          void this.confirmDeleteMarca();
+        }
+      });
+  }
+
+  /**
+   * Ejecuta la baja confirmada de la Marca
+   * y limpia el feedback asociado a la ficha.
+   */
+  private async confirmDeleteMarca(): Promise<void> {
+    this.hideSaveFeedback();
+
+    try {
+      await this.marcasService.deactivateWorkspace();
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido eliminar la marca.'),
+        })
+        .subscribe();
+    }
+  }
+
+  /**
    * Muestra temporalmente la confirmación
    * de guardado correcto.
    */

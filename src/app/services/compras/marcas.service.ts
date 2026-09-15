@@ -31,6 +31,7 @@ export default class MarcasService {
   private readonly focusNameRequestSignal: WritableSignal<number> = signal<number>(0);
   private readonly savingSignal: WritableSignal<boolean> = signal<boolean>(false);
   private readonly logoProcessingSignal: WritableSignal<boolean> = signal<boolean>(false);
+  private readonly deactivatingSignal: WritableSignal<boolean> = signal<boolean>(false);
 
   private pendingRequest: Promise<void> | null = null;
 
@@ -39,9 +40,10 @@ export default class MarcasService {
   readonly workspace: Signal<MarcaWorkspace | null> = this.workspaceSignal.asReadonly();
   readonly focusNameRequest: Signal<number> = this.focusNameRequestSignal.asReadonly();
   readonly saving: Signal<boolean> = this.savingSignal.asReadonly();
+  readonly deactivating: Signal<boolean> = this.deactivatingSignal.asReadonly();
 
   readonly processing: Signal<boolean> = computed(
-    (): boolean => this.saving() || this.logoProcessingSignal(),
+    (): boolean => this.saving() || this.logoProcessingSignal() || this.deactivating(),
   );
 
   readonly hasWorkspace: Signal<boolean> = computed((): boolean => this.workspace() !== null);
@@ -395,6 +397,36 @@ export default class MarcasService {
   }
 
   /**
+   * Da de baja la Marca del workspace actual,
+   * elimina su staging temporal si existe y cierra la ficha.
+   */
+  async deactivateWorkspace(): Promise<void> {
+    if (this.processing()) {
+      throw new Error('Ya hay una operación de marca en curso.');
+    }
+
+    const workspace: MarcaWorkspace = this.requireWorkspace();
+
+    if (workspace.marcaId === null) {
+      throw new Error('No se puede eliminar una marca que todavía no se ha guardado.');
+    }
+
+    this.deactivatingSignal.set(true);
+
+    try {
+      await this.deactivate(workspace.marcaId);
+
+      this.workspaceSignal.set(null);
+
+      if (workspace.logoStagingId !== null) {
+        await Promise.allSettled([this.filesService.discardStagedImage(workspace.logoStagingId)]);
+      }
+    } finally {
+      this.deactivatingSignal.set(false);
+    }
+  }
+
+  /**
    * Crea una marca, refresca la colección global
    * y devuelve su instancia canónica.
    */
@@ -433,6 +465,22 @@ export default class MarcasService {
   }
 
   /**
+   * Da de baja una Marca activa y la elimina
+   * inmediatamente del maestro renderer.
+   */
+  async deactivate(id: number): Promise<void> {
+    await window.osumiDesktop.marcas.deactivate(id);
+
+    if (this.pendingRequest !== null) {
+      await this.pendingRequest;
+    }
+
+    this.marcasSignal.update((marcas: readonly Marca[]): readonly Marca[] =>
+      marcas.filter((marca: Marca): boolean => marca.id !== id),
+    );
+  }
+
+  /**
    * Limpia el maestro y cualquier workspace de Marca
    * conservado en la sesión.
    */
@@ -443,6 +491,7 @@ export default class MarcasService {
     this.focusNameRequestSignal.set(0);
     this.savingSignal.set(false);
     this.logoProcessingSignal.set(false);
+    this.deactivatingSignal.set(false);
   }
 
   findById(id: number): Marca | null {

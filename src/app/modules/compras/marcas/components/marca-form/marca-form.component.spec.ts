@@ -203,4 +203,38 @@ describe('MarcaFormComponent', (): void => {
 
     expect(selectedSpy).toHaveBeenCalledWith(file);
   });
+
+  it('solo solicita eliminar una Marca persistida', (): void => {
+    const deleteSpy = vi.fn();
+
+    component.deleteEvent.subscribe(deleteSpy);
+
+    component.deleteMarca();
+
+    expect(deleteSpy).not.toHaveBeenCalled();
+
+    fixture.componentRef.setInput('canDelete', true);
+
+    fixture.detectChanges();
+
+    component.deleteMarca();
+
+    expect(deleteSpy).toHaveBeenCalledOnce();
+  });
+
+  it('no solicita eliminar durante una operación en curso', (): void => {
+    const deleteSpy = vi.fn();
+
+    component.deleteEvent.subscribe(deleteSpy);
+
+    fixture.componentRef.setInput('canDelete', true);
+
+    fixture.componentRef.setInput('processing', true);
+
+    fixture.detectChanges();
+
+    component.deleteMarca();
+
+    expect(deleteSpy).not.toHaveBeenCalled();
+  });
 });

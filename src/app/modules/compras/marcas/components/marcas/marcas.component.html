@@ -11,13 +11,16 @@
                          [dirty]="marcasService.dirty()"
                          [saving]="marcasService.saving()"
                          [processing]="marcasService.processing()"
+                         [deactivating]="marcasService.deactivating()"
+                         [canDelete]="workspace.marcaId !== null"
                          [saveSuccessful]="saveSuccessful()"
                          [focusNameRequest]="marcasService.focusNameRequest()"
                          (modelChangeEvent)="updateDraft($event)"
                          (logoSelectedEvent)="selectLogo($event)"
                          (logoRemoveEvent)="removeLogo()"
                          (saveEvent)="saveMarca($event)"
-                         (cancelEvent)="cancelChanges()" />
+                         (cancelEvent)="cancelChanges()"
+                         (deleteEvent)="deleteMarca()" />
         }
 
         @case ('statistics') {

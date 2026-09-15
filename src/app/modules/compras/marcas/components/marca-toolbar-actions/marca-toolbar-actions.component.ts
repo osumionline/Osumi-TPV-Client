@@ -28,7 +28,7 @@ export default class MarcaToolbarActionsComponent {
    * Muestra el buscador de Marcas cargadas en memoria.
    */
   openSearch(): void {
-    if (this.marcasService.saving()) {
+    if (this.marcasService.processing()) {
       return;
     }
 
@@ -47,7 +47,7 @@ export default class MarcaToolbarActionsComponent {
    * draft con modificaciones pendientes.
    */
   selectMarca(marca: Marca): void {
-    if (this.marcasService.saving()) {
+    if (this.marcasService.processing()) {
       return;
     }
 
@@ -84,7 +84,7 @@ export default class MarcaToolbarActionsComponent {
    * solicitando confirmación si existe un draft dirty.
    */
   newMarca(): void {
-    if (this.marcasService.saving()) {
+    if (this.marcasService.processing()) {
       return;
     }
 
@@ -115,7 +115,7 @@ export default class MarcaToolbarActionsComponent {
    * cuando contiene cambios pendientes.
    */
   closeMarca(): void {
-    if (this.marcasService.saving()) {
+    if (this.marcasService.processing()) {
       return;
     }
 
