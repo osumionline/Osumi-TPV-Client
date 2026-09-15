@@ -50,6 +50,56 @@ describe('MarcaFormComponent', (): void => {
     expect(component.marcaForm.email().invalid()).toBe(true);
   });
 
+  it('solicita guardar únicamente un formulario válido y dirty', (): void => {
+    const saveSpy = vi.fn();
+
+    component.saveEvent.subscribe(saveSpy);
+
+    component.save(new Event('submit'));
+
+    expect(saveSpy).not.toHaveBeenCalled();
+
+    component.marcaForm.nombre().value.set('Bosquimia');
+
+    fixture.componentRef.setInput('dirty', true);
+
+    fixture.detectChanges();
+
+    component.save(new Event('submit'));
+
+    expect(saveSpy).toHaveBeenCalledOnce();
+
+    expect(saveSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nombre: 'Bosquimia',
+      }),
+    );
+  });
+
+  it('no permite guardar ni cancelar durante un guardado', (): void => {
+    const saveSpy = vi.fn();
+    const cancelSpy = vi.fn();
+
+    component.saveEvent.subscribe(saveSpy);
+
+    component.cancelEvent.subscribe(cancelSpy);
+
+    component.marcaForm.nombre().value.set('Bosquimia');
+
+    fixture.componentRef.setInput('dirty', true);
+
+    fixture.componentRef.setInput('saving', true);
+
+    fixture.detectChanges();
+
+    component.save(new Event('submit'));
+
+    component.cancel();
+
+    expect(saveSpy).not.toHaveBeenCalled();
+    expect(cancelSpy).not.toHaveBeenCalled();
+  });
+
   it('sincroniza una nueva instantánea recibida', (): void => {
     const model: MarcaFormModel = {
       nombre: 'Bosquimia',

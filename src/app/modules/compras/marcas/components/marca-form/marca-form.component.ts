@@ -35,9 +35,12 @@ export default class MarcaFormComponent {
     createMarcaFormInitialValue(),
   );
   readonly dirty: InputSignal<boolean> = input<boolean>(false);
+  readonly saving: InputSignal<boolean> = input<boolean>(false);
+  readonly saveSuccessful: InputSignal<boolean> = input<boolean>(false);
   readonly focusNameRequest: InputSignal<number> = input<number>(0);
 
   readonly modelChangeEvent: OutputEmitterRef<MarcaFormModel> = output<MarcaFormModel>();
+  readonly saveEvent: OutputEmitterRef<MarcaFormModel> = output<MarcaFormModel>();
   readonly cancelEvent: OutputEmitterRef<void> = output<void>();
 
   readonly marcaModel: WritableSignal<MarcaFormModel> = signal<MarcaFormModel>(
@@ -72,6 +75,10 @@ export default class MarcaFormComponent {
    * realizada por el usuario.
    */
   modelChanged(): void {
+    if (this.saving()) {
+      return;
+    }
+
     this.modelChangeEvent.emit(cloneMarcaFormModel(this.marcaModel()));
   }
 
@@ -94,11 +101,29 @@ export default class MarcaFormComponent {
   }
 
   /**
+   * Valida el formulario y solicita persistir
+   * el modelo editable actual.
+   */
+  save(event: Event): void {
+    event.preventDefault();
+
+    if (this.saving() || !this.dirty()) {
+      return;
+    }
+
+    if (!this.validate()) {
+      return;
+    }
+
+    this.saveEvent.emit(cloneMarcaFormModel(this.marcaModel()));
+  }
+
+  /**
    * Solicita restaurar la instantánea base
    * cuando existen cambios pendientes.
    */
   cancel(): void {
-    if (!this.dirty()) {
+    if (this.saving() || !this.dirty()) {
       return;
     }
 

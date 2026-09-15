@@ -1,15 +1,82 @@
+import type ActualizarMarcaCommand from '@desktop-contracts/marcas/actualizar-marca-command.interface';
+import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
+import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
 import type MarcaEstadisticasFiltros from '@model/marcas/marca-estadisticas-filtros.interface';
 import type MarcaFormModel from '@model/marcas/marca-form.model';
 import type MarcaWorkspace from '@model/marcas/marca-workspace.interface';
 import Marca from '@model/marcas/marca.model';
 import MarcasService from '@services/compras/marcas.service';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 let service: MarcasService;
+let originalDesktopDescriptor: PropertyDescriptor | undefined;
+let createCalls: CrearMarcaCommand[];
+let updateCalls: {
+  readonly id: number;
+  readonly command: ActualizarMarcaCommand;
+}[];
+let createResult: MarcaInterface;
+let updateResult: MarcaInterface;
+let createError: Error | null;
+let updateError: Error | null;
 
 describe('MarcasService workspace', (): void => {
   beforeEach((): void => {
+    originalDesktopDescriptor = Object.getOwnPropertyDescriptor(window, 'osumiDesktop');
+
+    createCalls = [];
+    updateCalls = [];
+
+    createResult = createMarcaInterface(20, 'marca-20', 'Nueva marca');
+
+    updateResult = createMarcaInterface(12, 'marca-12', 'Bosquimia');
+
+    createError = null;
+    updateError = null;
+
+    Object.defineProperty(window, 'osumiDesktop', {
+      configurable: true,
+      value: {
+        marcas: {
+          getAll: (): Promise<readonly MarcaInterface[]> => Promise.resolve([]),
+
+          getById: (): Promise<MarcaInterface | null> => Promise.resolve(null),
+
+          create: (command: CrearMarcaCommand): Promise<MarcaInterface> => {
+            createCalls.push(command);
+
+            return createError === null
+              ? Promise.resolve(createResult)
+              : Promise.reject(createError);
+          },
+
+          update: (id: number, command: ActualizarMarcaCommand): Promise<MarcaInterface> => {
+            updateCalls.push({
+              id,
+              command,
+            });
+
+            return updateError === null
+              ? Promise.resolve(updateResult)
+              : Promise.reject(updateError);
+          },
+
+          deactivate: (): Promise<void> => Promise.resolve(),
+        },
+      },
+    });
+
     service = new MarcasService();
+  });
+
+  afterEach((): void => {
+    if (originalDesktopDescriptor !== undefined) {
+      Object.defineProperty(window, 'osumiDesktop', originalDesktopDescriptor);
+
+      return;
+    }
+
+    Reflect.deleteProperty(window, 'osumiDesktop');
   });
 
   it('crea un borrador limpio mostrando únicamente Datos', (): void => {
@@ -221,6 +288,120 @@ describe('MarcasService workspace', (): void => {
 
     expect(service.focusNameRequest()).toBe(2);
   });
+
+  it('crea una Marca desde el workspace y lo convierte en persistido', async (): Promise<void> => {
+    createResult = {
+      ...createMarcaInterface(20, 'marca-20', 'Nueva marca'),
+      email: 'info@marca.test',
+      direccion: 'Calle Nueva 1',
+    };
+
+    service.crearBorrador();
+
+    service.actualizarDraft({
+      ...requireWorkspace().draft,
+      nombre: '  Nueva marca  ',
+      telefono: '   ',
+      email: '  info@marca.test  ',
+      direccion: '  Calle Nueva 1  ',
+      web: '',
+      observaciones: '   ',
+    });
+
+    const marca: Marca = await service.saveWorkspace();
+
+    expect(createCalls).toEqual([
+      {
+        nombre: 'Nueva marca',
+        telefono: null,
+        email: 'info@marca.test',
+        direccion: 'Calle Nueva 1',
+        web: null,
+        observaciones: null,
+        crearProveedor: false,
+      },
+    ]);
+
+    expect(marca.id).toBe(20);
+
+    expect(service.marcas()).toEqual([marca]);
+
+    expect(requireWorkspace()).toMatchObject({
+      marcaId: 20,
+      marcaPublicId: 'marca-20',
+      draft: {
+        nombre: 'Nueva marca',
+        email: 'info@marca.test',
+        direccion: 'Calle Nueva 1',
+      },
+    });
+
+    expect(service.dirty()).toBe(false);
+    expect(service.saving()).toBe(false);
+  });
+  it('actualiza una Marca y sustituye su versión canónica en memoria', async (): Promise<void> => {
+    updateResult = {
+      ...createMarcaInterface(12, 'marca-12', 'Bosquimia renovada'),
+      foto: 'asset://files/brands/bosquimia.webp',
+      email: 'nuevo@bosquimia.test',
+    };
+
+    service.abrirFicha(createMarca());
+
+    service.actualizarDraft({
+      ...requireWorkspace().draft,
+      nombre: ' Bosquimia renovada ',
+      telefono: '',
+      email: ' nuevo@bosquimia.test ',
+      direccion: '',
+      web: '',
+      observaciones: '',
+    });
+
+    const marca: Marca = await service.saveWorkspace();
+
+    expect(updateCalls).toEqual([
+      {
+        id: 12,
+        command: {
+          nombre: 'Bosquimia renovada',
+          telefono: null,
+          email: 'nuevo@bosquimia.test',
+          direccion: null,
+          web: null,
+          observaciones: null,
+        },
+      },
+    ]);
+
+    expect(marca.foto).toBe('asset://files/brands/bosquimia.webp');
+
+    expect(service.findByPublicId('marca-12')).toBe(marca);
+
+    expect(requireWorkspace().baseSnapshot).toEqual(requireWorkspace().draft);
+
+    expect(service.dirty()).toBe(false);
+    expect(service.saving()).toBe(false);
+  });
+
+  it('conserva el draft dirty y el maestro si falla el guardado', async (): Promise<void> => {
+    createError = new Error('No se pudo guardar.');
+
+    service.crearBorrador();
+
+    service.actualizarDraft({
+      ...requireWorkspace().draft,
+      nombre: 'Marca pendiente',
+    });
+
+    await expect(service.saveWorkspace()).rejects.toThrow('No se pudo guardar.');
+
+    expect(service.marcas()).toEqual([]);
+    expect(service.dirty()).toBe(true);
+    expect(service.saving()).toBe(false);
+
+    expect(requireWorkspace().draft.nombre).toBe('Marca pendiente');
+  });
 });
 
 /**
@@ -268,4 +449,22 @@ function requireWorkspace(): MarcaWorkspace {
   }
 
   return workspace;
+}
+
+/**
+ * Construye el contrato público de una Marca
+ * persistida para las pruebas del servicio.
+ */
+function createMarcaInterface(id: number, publicId: string, nombre: string): MarcaInterface {
+  return {
+    id,
+    publicId,
+    nombre,
+    direccion: null,
+    foto: null,
+    telefono: null,
+    email: null,
+    web: null,
+    observaciones: null,
+  };
 }

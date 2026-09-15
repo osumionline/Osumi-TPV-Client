@@ -39,8 +39,22 @@
     .brand-form__actions {
         display: flex;
         padding-top: 4px;
-        justify-content: flex-end;
+        align-items: center;
         gap: 12px;
+    }
+
+    .brand-form__actions-spacer {
+        flex: 1;
+    }
+
+    .brand-form__save-feedback {
+        margin-right: 4px;
+        padding-right: 16px;
+        border-right: 1px solid var(--separator-color);
+        color: var(--color-dark-green);
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
     }
 }
 

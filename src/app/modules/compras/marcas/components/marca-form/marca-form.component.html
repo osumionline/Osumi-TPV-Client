@@ -1,7 +1,9 @@
 <form class="brand-form"
       novalidate
+      [attr.aria-busy]="saving()"
+      [attr.inert]="saving() ? '' : null"
       (input)="modelChanged()"
-      (submit)="$event.preventDefault()">
+      (submit)="save($event)">
     <section class="brand-form__section">
         <h3>
             Datos de la marca
@@ -96,11 +98,33 @@
     </section>
 
     <div class="brand-form__actions">
+        <span class="brand-form__actions-spacer">
+        </span>
+
+        @if (saveSuccessful()) {
+        <span class="brand-form__save-feedback"
+              role="status"
+              aria-live="polite">
+            Marca guardada correctamente
+        </span>
+        }
+
         <button mat-stroked-button
                 type="button"
-                [disabled]="!dirty()"
+                [disabled]="!dirty() || saving()"
                 (click)="cancel()">
             Cancelar
+        </button>
+
+        <button mat-flat-button
+                type="submit"
+                [disabled]="!dirty() || saving()">
+            @if (saving()) {
+            Guardando…
+            }
+            @else {
+            Guardar
+            }
         </button>
     </div>
 </form>
