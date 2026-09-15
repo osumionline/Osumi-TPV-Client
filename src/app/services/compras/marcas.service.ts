@@ -1,6 +1,8 @@
-import { type Signal, type WritableSignal, computed, Service, signal } from '@angular/core';
+import { type Signal, type WritableSignal, computed, inject, Service, signal } from '@angular/core';
+import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
 import type ActualizarMarcaCommand from '@desktop-contracts/marcas/actualizar-marca-command.interface';
 import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
+import type MarcaLogoUpdateCommand from '@desktop-contracts/marcas/marca-logo-update-command.type';
 import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
 import type MarcaEstadisticasFiltros from '@model/marcas/marca-estadisticas-filtros.interface';
 import {
@@ -14,17 +16,21 @@ import { areMarcaFormModelsEqual, cloneMarcaFormModel } from '@model/marcas/marc
 import type MarcaWorkspaceSection from '@model/marcas/marca-workspace-section.type';
 import type MarcaWorkspace from '@model/marcas/marca-workspace.interface';
 import Marca from '@model/marcas/marca.model';
+import FilesService from '@services/application/files.service';
 
 type MarcaPersistableCommand = Omit<ActualizarMarcaCommand, 'logo'>;
 
 @Service()
 export default class MarcasService {
+  private readonly filesService: FilesService = inject(FilesService);
+
   private readonly marcasSignal: WritableSignal<readonly Marca[]> = signal<readonly Marca[]>([]);
   private readonly loadedSignal: WritableSignal<boolean> = signal<boolean>(false);
   private readonly workspaceSignal: WritableSignal<MarcaWorkspace | null> =
     signal<MarcaWorkspace | null>(null);
   private readonly focusNameRequestSignal: WritableSignal<number> = signal<number>(0);
   private readonly savingSignal: WritableSignal<boolean> = signal<boolean>(false);
+  private readonly logoProcessingSignal: WritableSignal<boolean> = signal<boolean>(false);
 
   private pendingRequest: Promise<void> | null = null;
 
@@ -33,6 +39,10 @@ export default class MarcasService {
   readonly workspace: Signal<MarcaWorkspace | null> = this.workspaceSignal.asReadonly();
   readonly focusNameRequest: Signal<number> = this.focusNameRequestSignal.asReadonly();
   readonly saving: Signal<boolean> = this.savingSignal.asReadonly();
+
+  readonly processing: Signal<boolean> = computed(
+    (): boolean => this.saving() || this.logoProcessingSignal(),
+  );
 
   readonly hasWorkspace: Signal<boolean> = computed((): boolean => this.workspace() !== null);
   readonly dirty: Signal<boolean> = computed((): boolean => {
@@ -64,6 +74,7 @@ export default class MarcasService {
       marcaPublicId: null,
       draft,
       baseSnapshot: cloneMarcaFormModel(draft),
+      logoStagingId: null,
       activeSection: 'data',
       estadisticasFiltros: createMarcaEstadisticasFiltrosIniciales(),
     };
@@ -90,6 +101,7 @@ export default class MarcasService {
       marcaPublicId: marca.publicId,
       draft,
       baseSnapshot: cloneMarcaFormModel(draft),
+      logoStagingId: null,
       activeSection: 'data',
       estadisticasFiltros: createMarcaEstadisticasFiltrosIniciales(),
     };
@@ -141,13 +153,121 @@ export default class MarcasService {
   }
 
   /**
-   * Restaura el draft a la instantánea base de la ficha.
+   * Prepara un nuevo logo temporal para la ficha
+   * y sustituye de forma segura cualquier staging anterior.
    */
-  cancelarCambios(): MarcaWorkspace {
+  async seleccionarLogo(file: File): Promise<MarcaWorkspace> {
+    if (this.processing()) {
+      throw new Error('Ya hay una operación de marca en curso.');
+    }
+
     const workspace: MarcaWorkspace = this.requireWorkspace();
+
+    this.logoProcessingSignal.set(true);
+
+    try {
+      const stagedImage: StagedImageInterface = await this.filesService.stageBrandImage(file);
+
+      if (workspace.logoStagingId !== null) {
+        try {
+          await this.filesService.discardStagedImage(workspace.logoStagingId);
+        } catch (discardError: unknown) {
+          try {
+            await this.filesService.discardStagedImage(stagedImage.stagingId);
+          } catch (cleanupError: unknown) {
+            throw new AggregateError(
+              [discardError, cleanupError],
+              'No se han podido limpiar correctamente los logos temporales.',
+              {
+                cause: cleanupError,
+              },
+            );
+          }
+
+          throw discardError;
+        }
+      }
+
+      const updatedWorkspace: MarcaWorkspace = {
+        ...workspace,
+        logoStagingId: stagedImage.stagingId,
+        draft: {
+          ...workspace.draft,
+          foto: stagedImage.url,
+        },
+      };
+
+      this.workspaceSignal.set(updatedWorkspace);
+
+      return updatedWorkspace;
+    } finally {
+      this.logoProcessingSignal.set(false);
+    }
+  }
+
+  /**
+   * Quita el logo del draft y elimina cualquier
+   * staging temporal que estuviera asociado a él.
+   */
+  async quitarLogo(): Promise<MarcaWorkspace> {
+    if (this.processing()) {
+      throw new Error('Ya hay una operación de marca en curso.');
+    }
+
+    const workspace: MarcaWorkspace = this.requireWorkspace();
+
+    if (workspace.draft.foto === null && workspace.logoStagingId === null) {
+      return workspace;
+    }
+
+    if (workspace.logoStagingId !== null) {
+      this.logoProcessingSignal.set(true);
+
+      try {
+        await this.filesService.discardStagedImage(workspace.logoStagingId);
+      } finally {
+        this.logoProcessingSignal.set(false);
+      }
+    }
 
     const updatedWorkspace: MarcaWorkspace = {
       ...workspace,
+      logoStagingId: null,
+      draft: {
+        ...workspace.draft,
+        foto: null,
+      },
+    };
+
+    this.workspaceSignal.set(updatedWorkspace);
+
+    return updatedWorkspace;
+  }
+
+  /**
+   * Restaura el draft a la instantánea base y elimina
+   * cualquier logo temporal todavía no persistido.
+   */
+  async cancelarCambios(): Promise<MarcaWorkspace> {
+    if (this.processing()) {
+      throw new Error('Ya hay una operación de marca en curso.');
+    }
+
+    const workspace: MarcaWorkspace = this.requireWorkspace();
+
+    if (workspace.logoStagingId !== null) {
+      this.logoProcessingSignal.set(true);
+
+      try {
+        await this.filesService.discardStagedImage(workspace.logoStagingId);
+      } finally {
+        this.logoProcessingSignal.set(false);
+      }
+    }
+
+    const updatedWorkspace: MarcaWorkspace = {
+      ...workspace,
+      logoStagingId: null,
       draft: cloneMarcaFormModel(workspace.baseSnapshot),
     };
 
@@ -178,9 +298,30 @@ export default class MarcasService {
   }
 
   /**
-   * Cierra la ficha de Marca actualmente abierta.
+   * Cierra la ficha actual eliminando antes cualquier
+   * logo temporal que todavía no haya sido persistido.
    */
-  cerrarFicha(): void {
+  async cerrarFicha(): Promise<void> {
+    if (this.processing()) {
+      throw new Error('Ya hay una operación de marca en curso.');
+    }
+
+    const workspace: MarcaWorkspace | null = this.workspace();
+
+    if (workspace === null) {
+      return;
+    }
+
+    if (workspace.logoStagingId !== null) {
+      this.logoProcessingSignal.set(true);
+
+      try {
+        await this.filesService.discardStagedImage(workspace.logoStagingId);
+      } finally {
+        this.logoProcessingSignal.set(false);
+      }
+    }
+
     this.workspaceSignal.set(null);
   }
 
@@ -189,7 +330,7 @@ export default class MarcasService {
    * con la Marca canónica devuelta por el backend.
    */
   async saveWorkspace(): Promise<Marca> {
-    if (this.saving()) {
+    if (this.processing()) {
       throw new Error('Ya hay un guardado de marca en curso.');
     }
 
@@ -200,13 +341,35 @@ export default class MarcasService {
     this.savingSignal.set(true);
 
     try {
-      const marca: Marca =
-        workspace.marcaId === null
-          ? await this.create({
-              ...command,
-              crearProveedor: false,
-            })
-          : await this.update(workspace.marcaId, command);
+      let marca: Marca;
+
+      if (workspace.marcaId === null) {
+        const createCommand: CrearMarcaCommand =
+          workspace.logoStagingId === null
+            ? {
+                ...command,
+                crearProveedor: false,
+              }
+            : {
+                ...command,
+                crearProveedor: false,
+                logoStagingId: workspace.logoStagingId,
+              };
+
+        marca = await this.create(createCommand);
+      } else {
+        const logo: MarcaLogoUpdateCommand | undefined = this.createLogoUpdateCommand(workspace);
+
+        const updateCommand: ActualizarMarcaCommand =
+          logo === undefined
+            ? command
+            : {
+                ...command,
+                logo,
+              };
+
+        marca = await this.update(workspace.marcaId, updateCommand);
+      }
 
       if (marca.id === null || marca.publicId === null) {
         throw new Error('La marca guardada no contiene una identidad válida.');
@@ -218,6 +381,7 @@ export default class MarcasService {
         ...workspace,
         marcaId: marca.id,
         marcaPublicId: marca.publicId,
+        logoStagingId: null,
         draft: cloneMarcaFormModel(persistedModel),
         baseSnapshot: cloneMarcaFormModel(persistedModel),
       };
@@ -278,6 +442,7 @@ export default class MarcasService {
     this.workspaceSignal.set(null);
     this.focusNameRequestSignal.set(0);
     this.savingSignal.set(false);
+    this.logoProcessingSignal.set(false);
   }
 
   findById(id: number): Marca | null {
@@ -286,6 +451,31 @@ export default class MarcasService {
 
   findByPublicId(publicId: string): Marca | null {
     return this.marcas().find((marca: Marca): boolean => marca.publicId === publicId) ?? null;
+  }
+
+  /**
+   * Determina la modificación de logo necesaria
+   * para una Marca ya persistida.
+   */
+  private createLogoUpdateCommand(workspace: MarcaWorkspace): MarcaLogoUpdateCommand | undefined {
+    if (workspace.logoStagingId !== null) {
+      return {
+        action: 'replace',
+        stagingId: workspace.logoStagingId,
+      };
+    }
+
+    if (workspace.draft.foto === workspace.baseSnapshot.foto) {
+      return undefined;
+    }
+
+    if (workspace.draft.foto === null && workspace.baseSnapshot.foto !== null) {
+      return {
+        action: 'remove',
+      };
+    }
+
+    throw new Error('El estado editable del logo de la marca no es coherente.');
   }
 
   /**

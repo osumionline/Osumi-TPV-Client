@@ -1,13 +1,58 @@
 <form class="brand-form"
       novalidate
-      [attr.aria-busy]="saving()"
-      [attr.inert]="saving() ? '' : null"
+      [attr.aria-busy]="saving() || processing()"
+      [attr.inert]="saving() || processing() ? '' : null"
       (input)="modelChanged()"
       (submit)="save($event)">
     <section class="brand-form__section">
         <h3>
             Datos de la marca
         </h3>
+
+        <div class="brand-form__logo">
+            <div class="brand-form__logo-preview">
+                @if (marcaModel().foto; as logoUrl) {
+                <img [src]="logoUrl"
+                     alt="Logo de la marca">
+                }
+                @else {
+                <span>
+                    Sin logo
+                </span>
+                }
+            </div>
+
+            <div class="brand-form__logo-actions">
+                <span class="brand-form__logo-label">
+                    Logo
+                </span>
+
+                <input #logoInput
+                       class="brand-form__logo-input"
+                       type="file"
+                       accept="image/*"
+                       [disabled]="saving() || processing()"
+                       (change)="onLogoSelected($event)">
+
+                <button mat-stroked-button
+                        type="button"
+                        [disabled]="saving() || processing()"
+                        (click)="selectLogo()">
+                    Seleccionar imagen
+                </button>
+
+                <button mat-button
+                        type="button"
+                        [disabled]="
+                            marcaModel().foto === null ||
+                            saving() ||
+                            processing()
+                        "
+                        (click)="removeLogo()">
+                    Quitar logo
+                </button>
+            </div>
+        </div>
 
         <div class="brand-form__row brand-form__row--2">
             <mat-form-field>
@@ -111,14 +156,14 @@
 
         <button mat-stroked-button
                 type="button"
-                [disabled]="!dirty() || saving()"
+                [disabled]="!dirty() || saving() || processing()"
                 (click)="cancel()">
             Cancelar
         </button>
 
         <button mat-flat-button
                 type="submit"
-                [disabled]="!dirty() || saving()">
+                [disabled]="!dirty() || saving() || processing()">
             @if (saving()) {
             Guardando…
             }

@@ -6,6 +6,7 @@ import type Marca from '@model/marcas/marca.model';
 import MarcaSearchComponent from '@modules/compras/marcas/components/marca-search/marca-search.component';
 import { DialogService } from '@osumi/angular-tools';
 import MarcasService from '@services/compras/marcas.service';
+import { getErrorMessage } from '@utils/error.utils';
 
 /**
  * Muestra las acciones contextuales disponibles
@@ -59,7 +60,7 @@ export default class MarcaToolbarActionsComponent {
     }
 
     if (workspace === null || !this.marcasService.dirty()) {
-      this.openMarca(marca);
+      void this.openMarca(marca);
 
       return;
     }
@@ -73,7 +74,7 @@ export default class MarcaToolbarActionsComponent {
       })
       .subscribe((result: boolean): void => {
         if (result) {
-          this.openMarca(marca);
+          void this.openMarca(marca);
         }
       });
   }
@@ -90,7 +91,7 @@ export default class MarcaToolbarActionsComponent {
     const workspace = this.marcasService.workspace();
 
     if (workspace === null || !this.marcasService.dirty()) {
-      this.createMarcaDraft();
+      void this.createMarcaDraft();
 
       return;
     }
@@ -104,7 +105,7 @@ export default class MarcaToolbarActionsComponent {
       })
       .subscribe((result: boolean): void => {
         if (result) {
-          this.createMarcaDraft();
+          void this.createMarcaDraft();
         }
       });
   }
@@ -125,7 +126,7 @@ export default class MarcaToolbarActionsComponent {
     }
 
     if (!this.marcasService.dirty()) {
-      this.marcasService.cerrarFicha();
+      void this.closeCurrentMarca();
 
       return;
     }
@@ -138,26 +139,64 @@ export default class MarcaToolbarActionsComponent {
       })
       .subscribe((result: boolean): void => {
         if (result) {
-          this.marcasService.cerrarFicha();
+          void this.closeCurrentMarca();
         }
       });
   }
 
   /**
-   * Sustituye el workspace actual por la Marca indicada
-   * y cierra el buscador.
+   * Descarta de forma segura la ficha actual,
+   * abre la Marca indicada y cierra el buscador.
    */
-  private openMarca(marca: Marca): void {
-    this.marcasService.abrirFicha(marca);
-    this.closeSearch();
+  private async openMarca(marca: Marca): Promise<void> {
+    try {
+      await this.marcasService.cerrarFicha();
+
+      this.marcasService.abrirFicha(marca);
+
+      this.closeSearch();
+    } catch (error: unknown) {
+      this.showWorkspaceError(error);
+    }
   }
 
   /**
-   * Sustituye el workspace actual por un nuevo
-   * borrador vacío de Marca.
+   * Descarta de forma segura la ficha actual y
+   * abre un nuevo borrador vacío de Marca.
    */
-  private createMarcaDraft(): void {
-    this.marcasService.crearBorrador();
-    this.closeSearch();
+  private async createMarcaDraft(): Promise<void> {
+    try {
+      await this.marcasService.cerrarFicha();
+
+      this.marcasService.crearBorrador();
+
+      this.closeSearch();
+    } catch (error: unknown) {
+      this.showWorkspaceError(error);
+    }
+  }
+
+  /**
+   * Cierra de forma segura la ficha actualmente abierta.
+   */
+  private async closeCurrentMarca(): Promise<void> {
+    try {
+      await this.marcasService.cerrarFicha();
+    } catch (error: unknown) {
+      this.showWorkspaceError(error);
+    }
+  }
+
+  /**
+   * Muestra un error producido mientras se descarta
+   * el workspace actual de Marca.
+   */
+  private showWorkspaceError(error: unknown): void {
+    this.dialog
+      .alert({
+        title: 'Error',
+        content: getErrorMessage(error, 'No se ha podido descartar la ficha actual.'),
+      })
+      .subscribe();
   }
 }

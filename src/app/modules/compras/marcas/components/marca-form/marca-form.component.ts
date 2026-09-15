@@ -42,15 +42,20 @@ export default class MarcaFormComponent {
   readonly modelChangeEvent: OutputEmitterRef<MarcaFormModel> = output<MarcaFormModel>();
   readonly saveEvent: OutputEmitterRef<MarcaFormModel> = output<MarcaFormModel>();
   readonly cancelEvent: OutputEmitterRef<void> = output<void>();
+  readonly logoSelectedEvent: OutputEmitterRef<File> = output<File>();
+  readonly logoRemoveEvent: OutputEmitterRef<void> = output<void>();
 
   readonly marcaModel: WritableSignal<MarcaFormModel> = signal<MarcaFormModel>(
     createMarcaFormInitialValue(),
   );
+  readonly processing: InputSignal<boolean> = input<boolean>(false);
 
   readonly marcaForm: FieldTree<MarcaFormModel> = form(this.marcaModel, marcaFormSchema);
 
   private readonly nameInput: Signal<ElementRef<HTMLInputElement> | undefined> =
     viewChild<ElementRef<HTMLInputElement>>('nameInput');
+  private readonly logoInput: Signal<ElementRef<HTMLInputElement> | undefined> =
+    viewChild<ElementRef<HTMLInputElement>>('logoInput');
 
   constructor() {
     effect((): void => {
@@ -75,7 +80,7 @@ export default class MarcaFormComponent {
    * realizada por el usuario.
    */
   modelChanged(): void {
-    if (this.saving()) {
+    if (this.saving() || this.processing()) {
       return;
     }
 
@@ -107,7 +112,7 @@ export default class MarcaFormComponent {
   save(event: Event): void {
     event.preventDefault();
 
-    if (this.saving() || !this.dirty()) {
+    if (this.saving() || this.processing() || !this.dirty()) {
       return;
     }
 
@@ -123,10 +128,55 @@ export default class MarcaFormComponent {
    * cuando existen cambios pendientes.
    */
   cancel(): void {
-    if (this.saving() || !this.dirty()) {
+    if (this.saving() || this.processing() || !this.dirty()) {
       return;
     }
 
     this.cancelEvent.emit();
+  }
+
+  /**
+   * Abre el selector nativo de archivos para
+   * elegir un nuevo logo de Marca.
+   */
+  selectLogo(): void {
+    if (this.saving() || this.processing()) {
+      return;
+    }
+
+    this.logoInput()?.nativeElement.click();
+  }
+
+  /**
+   * Comunica el archivo elegido y reinicia el input
+   * para permitir volver a seleccionar el mismo fichero.
+   */
+  onLogoSelected(event: Event): void {
+    if (this.saving() || this.processing()) {
+      return;
+    }
+
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
+    const file: File | null = inputElement.files?.item(0) ?? null;
+
+    inputElement.value = '';
+
+    if (file === null) {
+      return;
+    }
+
+    this.logoSelectedEvent.emit(file);
+  }
+
+  /**
+   * Solicita quitar el logo visible del draft.
+   */
+  removeLogo(): void {
+    if (this.saving() || this.processing() || this.marcaModel().foto === null) {
+      return;
+    }
+
+    this.logoRemoveEvent.emit();
   }
 }

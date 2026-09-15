@@ -8,7 +8,7 @@
             type="button"
             matTooltip="Cerrar ficha"
             aria-label="Cerrar ficha de marca"
-            [disabled]="marcasService.saving()"
+            [disabled]="marcasService.processing()"
             (click)="closeMarca()">
         <mat-icon>
             close
@@ -20,7 +20,7 @@
             type="button"
             matTooltip="Buscar marca"
             aria-label="Buscar marca"
-            [disabled]="marcasService.saving()"
+            [disabled]="marcasService.processing()"
             (click)="openSearch()">
         <mat-icon>
             search
@@ -31,7 +31,7 @@
             type="button"
             matTooltip="Nueva marca"
             aria-label="Crear una marca nueva"
-            [disabled]="marcasService.saving()"
+            [disabled]="marcasService.processing()"
             (click)="newMarca()">
         <mat-icon>
             add

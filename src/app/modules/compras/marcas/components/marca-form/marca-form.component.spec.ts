@@ -156,4 +156,51 @@ describe('MarcaFormComponent', (): void => {
 
     expect(focusSpy).toHaveBeenCalledOnce();
   });
+
+  it('solicita quitar el logo cuando existe uno visible', (): void => {
+    const removeSpy = vi.fn();
+
+    component.logoRemoveEvent.subscribe(removeSpy);
+
+    fixture.componentRef.setInput('initialValue', {
+      nombre: 'Bosquimia',
+      telefono: '',
+      email: '',
+      direccion: '',
+      web: '',
+      observaciones: '',
+      foto: 'asset://files/brands/logo.webp',
+    });
+
+    fixture.detectChanges();
+
+    component.removeLogo();
+
+    expect(removeSpy).toHaveBeenCalledOnce();
+  });
+
+  it('comunica el archivo seleccionado como nuevo logo', (): void => {
+    const selectedSpy = vi.fn();
+
+    component.logoSelectedEvent.subscribe(selectedSpy);
+
+    const file: File = new File(['logo'], 'logo.png', {
+      type: 'image/png',
+    });
+
+    const inputElement: HTMLInputElement = document.createElement('input');
+
+    Object.defineProperty(inputElement, 'files', {
+      configurable: true,
+      value: {
+        item: (index: number): File | null => (index === 0 ? file : null),
+      },
+    });
+
+    component.onLogoSelected({
+      target: inputElement,
+    } as unknown as Event);
+
+    expect(selectedSpy).toHaveBeenCalledWith(file);
+  });
 });

@@ -20,6 +20,18 @@ export default class FilesService {
   }
 
   /**
+   * Envía un logo seleccionado al staging de Marcas.
+   */
+  async stageBrandImage(file: File): Promise<StagedImageInterface> {
+    const bytes: Uint8Array = new Uint8Array(await file.arrayBuffer());
+
+    return window.osumiDesktop.files.stageBrandImage({
+      originalName: file.name.trim() === '' ? null : file.name,
+      bytes,
+    });
+  }
+
+  /**
    * Descarta una imagen temporal que ya no forma
    * parte de ningún draft.
    */

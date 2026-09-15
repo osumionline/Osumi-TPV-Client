@@ -1,3 +1,5 @@
+import { TestBed } from '@angular/core/testing';
+import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
 import type ActualizarMarcaCommand from '@desktop-contracts/marcas/actualizar-marca-command.interface';
 import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
 import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
@@ -5,10 +7,12 @@ import type MarcaEstadisticasFiltros from '@model/marcas/marca-estadisticas-filt
 import type MarcaFormModel from '@model/marcas/marca-form.model';
 import type MarcaWorkspace from '@model/marcas/marca-workspace.interface';
 import Marca from '@model/marcas/marca.model';
+import FilesService from '@services/application/files.service';
 import MarcasService from '@services/compras/marcas.service';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 let service: MarcasService;
+let filesService: FakeFilesService;
 let originalDesktopDescriptor: PropertyDescriptor | undefined;
 let createCalls: CrearMarcaCommand[];
 let updateCalls: {
@@ -66,7 +70,19 @@ describe('MarcasService workspace', (): void => {
       },
     });
 
-    service = new MarcasService();
+    filesService = new FakeFilesService();
+
+    TestBed.configureTestingModule({
+      providers: [
+        MarcasService,
+        {
+          provide: FilesService,
+          useValue: filesService,
+        },
+      ],
+    });
+
+    service = TestBed.inject(MarcasService);
   });
 
   afterEach((): void => {
@@ -145,7 +161,7 @@ describe('MarcasService workspace', (): void => {
     expect(service.dirty()).toBe(false);
   });
 
-  it('cancela las modificaciones restaurando la instantánea base', (): void => {
+  it('cancela las modificaciones restaurando la instantánea base', async (): Promise<void> => {
     service.abrirFicha(createMarca());
 
     const original: MarcaFormModel = requireWorkspace().baseSnapshot;
@@ -158,7 +174,7 @@ describe('MarcasService workspace', (): void => {
 
     expect(service.dirty()).toBe(true);
 
-    const cancelled = service.cancelarCambios();
+    const cancelled = await service.cancelarCambios();
 
     expect(cancelled.draft).toEqual(original);
     expect(cancelled.draft).not.toBe(cancelled.baseSnapshot);
@@ -241,10 +257,10 @@ describe('MarcasService workspace', (): void => {
     });
   });
 
-  it('cierra únicamente la ficha conservando el maestro', (): void => {
+  it('cierra únicamente la ficha conservando el maestro', async (): Promise<void> => {
     service.abrirFicha(createMarca());
 
-    service.cerrarFicha();
+    await service.cerrarFicha();
 
     expect(service.workspace()).toBeNull();
     expect(service.hasWorkspace()).toBe(false);
@@ -263,10 +279,10 @@ describe('MarcasService workspace', (): void => {
     expect(service.loaded()).toBe(false);
   });
 
-  it('impide operar sobre una ficha inexistente', (): void => {
-    expect((): void => {
-      service.cancelarCambios();
-    }).toThrow('No hay ninguna ficha de marca abierta.');
+  it('impide operar sobre una ficha inexistente', async (): Promise<void> => {
+    await expect(service.cancelarCambios()).rejects.toThrow(
+      'No hay ninguna ficha de marca abierta.',
+    );
 
     expect((): void => {
       service.actualizarDraft(createDraft());
@@ -402,6 +418,106 @@ describe('MarcasService workspace', (): void => {
 
     expect(requireWorkspace().draft.nombre).toBe('Marca pendiente');
   });
+
+  it('sustituye un staging anterior solo después de preparar el nuevo', async (): Promise<void> => {
+    service.crearBorrador();
+
+    await service.seleccionarLogo(new File(['logo-1'], 'logo-1.png'));
+
+    expect(requireWorkspace().logoStagingId).toBe('staging-1');
+    expect(requireWorkspace().draft.foto).toBe('asset://staging/logo-1.webp');
+
+    filesService.nextStagedImage = createStagedImage('staging-2', 'asset://staging/logo-2.webp');
+
+    await service.seleccionarLogo(new File(['logo-2'], 'logo-2.png'));
+
+    expect(filesService.discardCalls).toEqual(['staging-1']);
+    expect(requireWorkspace().logoStagingId).toBe('staging-2');
+    expect(requireWorkspace().draft.foto).toBe('asset://staging/logo-2.webp');
+  });
+
+  it('descarta el logo temporal al cancelar y restaura el logo persistido', async (): Promise<void> => {
+    service.abrirFicha(createMarca());
+
+    await service.seleccionarLogo(new File(['nuevo'], 'nuevo.png'));
+
+    expect(service.dirty()).toBe(true);
+
+    await service.cancelarCambios();
+
+    expect(filesService.discardCalls).toEqual(['staging-1']);
+    expect(requireWorkspace().logoStagingId).toBeNull();
+    expect(requireWorkspace().draft.foto).toBe('asset://files/brands/bosquimia.webp');
+    expect(service.dirty()).toBe(false);
+  });
+
+  it('envía el staging al crear una Marca con logo', async (): Promise<void> => {
+    createResult = {
+      ...createMarcaInterface(20, 'marca-20', 'Nueva marca'),
+      foto: 'asset://files/brands/marca-20.webp',
+    };
+
+    service.crearBorrador();
+    service.actualizarDraft({
+      ...requireWorkspace().draft,
+      nombre: 'Nueva marca',
+    });
+
+    await service.seleccionarLogo(new File(['logo'], 'logo.png'));
+    await service.saveWorkspace();
+
+    expect(createCalls).toEqual([
+      {
+        nombre: 'Nueva marca',
+        telefono: null,
+        email: null,
+        direccion: null,
+        web: null,
+        observaciones: null,
+        crearProveedor: false,
+        logoStagingId: 'staging-1',
+      },
+    ]);
+
+    expect(requireWorkspace().logoStagingId).toBeNull();
+    expect(requireWorkspace().draft.foto).toBe('asset://files/brands/marca-20.webp');
+    expect(service.dirty()).toBe(false);
+  });
+
+  it('envía remove al guardar una Marca cuyo logo se ha quitado', async (): Promise<void> => {
+    updateResult = {
+      ...createMarcaInterface(12, 'marca-12', 'Bosquimia'),
+      foto: null,
+    };
+
+    service.abrirFicha(createMarca());
+
+    await service.quitarLogo();
+
+    expect(service.dirty()).toBe(true);
+
+    await service.saveWorkspace();
+
+    expect(updateCalls).toEqual([
+      {
+        id: 12,
+        command: {
+          nombre: 'Bosquimia',
+          telefono: '944000000',
+          email: 'info@bosquimia.example.com',
+          direccion: 'Calle Mayor 1',
+          web: 'https://bosquimia.example.com',
+          observaciones: 'Observaciones originales',
+          logo: {
+            action: 'remove',
+          },
+        },
+      },
+    ]);
+
+    expect(requireWorkspace().draft.foto).toBeNull();
+    expect(service.dirty()).toBe(false);
+  });
 });
 
 /**
@@ -466,5 +582,58 @@ function createMarcaInterface(id: number, publicId: string, nombre: string): Mar
     email: null,
     web: null,
     observaciones: null,
+  };
+}
+
+/**
+ * Simula las operaciones renderer de staging
+ * necesarias para las pruebas de Marcas.
+ */
+class FakeFilesService extends FilesService {
+  readonly stageBrandCalls: File[] = [];
+  readonly discardCalls: string[] = [];
+
+  nextStagedImage: StagedImageInterface = createStagedImage(
+    'staging-1',
+    'asset://staging/logo-1.webp',
+  );
+
+  stageError: Error | null = null;
+  discardError: Error | null = null;
+
+  /**
+   * Simula la preparación temporal de un logo.
+   */
+  override stageBrandImage(file: File): Promise<StagedImageInterface> {
+    this.stageBrandCalls.push(file);
+
+    return this.stageError === null
+      ? Promise.resolve(this.nextStagedImage)
+      : Promise.reject(this.stageError);
+  }
+
+  /**
+   * Simula la eliminación de un staging temporal.
+   */
+  override discardStagedImage(stagingId: string): Promise<void> {
+    this.discardCalls.push(stagingId);
+
+    return this.discardError === null ? Promise.resolve() : Promise.reject(this.discardError);
+  }
+}
+
+/**
+ * Construye un logo temporal representativo.
+ */
+function createStagedImage(stagingId: string, url: string): StagedImageInterface {
+  return {
+    stagingId,
+    purpose: 'brand_image',
+    originalName: 'logo.png',
+    url,
+    mimeType: 'image/webp',
+    sizeBytes: 1024,
+    width: 640,
+    height: 480,
   };
 }

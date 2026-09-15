@@ -7,6 +7,7 @@ export default interface MarcaWorkspace {
   readonly marcaPublicId: string | null;
   readonly draft: MarcaFormModel;
   readonly baseSnapshot: MarcaFormModel;
+  readonly logoStagingId: string | null;
   readonly activeSection: MarcaWorkspaceSection;
   readonly estadisticasFiltros: MarcaEstadisticasFiltros;
 }

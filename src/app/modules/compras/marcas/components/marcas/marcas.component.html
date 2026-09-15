@@ -1,7 +1,8 @@
 <section class="brands">
     @if (marcasService.workspace(); as workspace) {
     <otpv-marca-section-tabs [workspace]="workspace"
-                             (selectSectionEvent)="selectSection($event)" />
+                             (selectSectionEvent)="selectSection($event)"
+                             [disabled]="marcasService.processing()" />
 
     <div class="brands__workspace">
         @switch (workspace.activeSection) {
@@ -9,9 +10,12 @@
         <otpv-marca-form [initialValue]="workspace.draft"
                          [dirty]="marcasService.dirty()"
                          [saving]="marcasService.saving()"
+                         [processing]="marcasService.processing()"
                          [saveSuccessful]="saveSuccessful()"
                          [focusNameRequest]="marcasService.focusNameRequest()"
                          (modelChangeEvent)="updateDraft($event)"
+                         (logoSelectedEvent)="selectLogo($event)"
+                         (logoRemoveEvent)="removeLogo()"
                          (saveEvent)="saveMarca($event)"
                          (cancelEvent)="cancelChanges()" />
         }

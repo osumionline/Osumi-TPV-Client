@@ -38,6 +38,10 @@ export default class MarcasComponent {
    * Cambia la sección activa de la ficha de Marca.
    */
   selectSection(section: MarcaWorkspaceSection): void {
+    if (this.marcasService.processing()) {
+      return;
+    }
+
     this.hideSaveFeedback();
 
     this.marcasService.seleccionarSeccion(section);
@@ -54,17 +58,26 @@ export default class MarcasComponent {
   }
 
   /**
-   * Restaura todos los datos editables a la
-   * instantánea base de la ficha.
+   * Restaura todos los datos editables y elimina
+   * cualquier logo temporal todavía pendiente.
    */
-  cancelChanges(): void {
-    if (this.marcasService.saving()) {
+  async cancelChanges(): Promise<void> {
+    if (this.marcasService.processing()) {
       return;
     }
 
     this.hideSaveFeedback();
 
-    this.marcasService.cancelarCambios();
+    try {
+      await this.marcasService.cancelarCambios();
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido descartar el logo temporal.'),
+        })
+        .subscribe();
+    }
   }
 
   /**
@@ -72,7 +85,7 @@ export default class MarcasComponent {
    * feedback temporal cuando finaliza correctamente.
    */
   async saveMarca(model: MarcaFormModel): Promise<void> {
-    if (this.marcasService.saving()) {
+    if (this.marcasService.processing()) {
       return;
     }
 
@@ -89,6 +102,52 @@ export default class MarcasComponent {
         .alert({
           title: 'Error',
           content: getErrorMessage(error, 'No se ha podido guardar la marca.'),
+        })
+        .subscribe();
+    }
+  }
+
+  /**
+   * Prepara el logo seleccionado y actualiza
+   * el preview conservado en el workspace.
+   */
+  async selectLogo(file: File): Promise<void> {
+    if (this.marcasService.processing()) {
+      return;
+    }
+
+    this.hideSaveFeedback();
+
+    try {
+      await this.marcasService.seleccionarLogo(file);
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido preparar el logo seleccionado.'),
+        })
+        .subscribe();
+    }
+  }
+
+  /**
+   * Quita el logo del draft y limpia cualquier
+   * staging temporal asociado.
+   */
+  async removeLogo(): Promise<void> {
+    if (this.marcasService.processing()) {
+      return;
+    }
+
+    this.hideSaveFeedback();
+
+    try {
+      await this.marcasService.quitarLogo();
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido quitar el logo.'),
         })
         .subscribe();
     }
