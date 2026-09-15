@@ -1,9 +1,9 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.61  
+**Versión:** 2.62  
 **Fecha:** 15 de septiembre de 2026  
-**Base de continuidad:** `v2.61 + main` una vez este documento se suba al repositorio.  
-**Documento anterior:** `Osumi_TPV_Client_Documento_Continuidad_v2.60.md`
+**Base de continuidad:** `v2.62 + main` una vez este documento se suba al repositorio.  
+**Documento anterior:** `Osumi_TPV_Client_Documento_Continuidad_v2.61.md`
 
 ---
 
@@ -36,25 +36,16 @@ CTRL Normalización de controles                   ✅ CERRADA
     16.13.1 Snapshot histórico Marca en Ventas    ✅ CERRADO
     16.13.2 Backend CRUD/soft-delete              ✅ CERRADO
     16.13.3 Infraestructura logo                  ✅ CERRADO
-      16.13.3A Persistencia SQLite                ✅
-      16.13.3B Staging / promoción / rollback     ✅
-      16.13.3C Integración pública brand_image    ✅
-
     16.13.4 Workspace + pantalla base             ✅ CERRADO
-      16.13.4A Workspace                          ✅
-      16.13.4B Pantalla base inicial              ✅
-      16.13.4C Barra contextual Compras            ✅
-
     16.13.5 Buscador en memoria                   ✅ CERRADO
-
-    16.13.6 Ficha Datos                           🟦 EN DESARROLLO
+    16.13.6 Ficha Datos                           ✅ CERRADO
       16.13.6A Formulario + dirty + Cancelar      ✅
       16.13.6A.1 Foco automático Nombre           ✅
       16.13.6B CREATE / UPDATE + Guardar          ✅
-      16.13.6C Logo Marca                         ⬅️ SIGUIENTE
-      16.13.6D Soft-delete + regresión Datos      ⬜
+      16.13.6C Logo Marca                         ✅
+      16.13.6D Soft-delete + regresión Datos      ✅
 
-    16.13.7 Backend Estadísticas                  ⬜
+    16.13.7 Backend Estadísticas                  ⬅️ SIGUIENTE
     16.13.8 UI Estadísticas                       ⬜
     16.13.9 Sincronización maestro global         ⬜
     16.13.10 Regresión integral                   ⬜
@@ -68,14 +59,32 @@ TicketBAI ordinario permanece cerrado. `12C.9 — TicketBAI devoluciones/mixtas`
 
 El **Hito 15 — Almacén**, REF, CTRL y **Pedidos 16.1–16.12** siguen cerrados. No reabrirlos salvo regresión real demostrada.
 
-Desde `v2.60` se ha avanzado de forma importante en Marcas:
+Desde `v2.61` se ha cerrado por completo la ficha de Datos de Marcas:
 
 ```text
-16.13.4C Barra contextual integrada               ✅
-16.13.5 Buscador en memoria                       ✅
-16.13.6A Formulario Datos                         ✅
-16.13.6A.1 Foco automático Nombre                 ✅
-16.13.6B CREATE / UPDATE + Guardar                ✅
+16.13.6C Logo de Marca                            ✅
+16.13.6D Soft-delete + regresión integral Datos   ✅
+16.13.6 Ficha Datos                               ✅ CERRADO
+```
+
+La ficha de Datos incluye ya:
+
+```text
+workspace persistente
+dirty derivado
+foco automático Nombre
+Signal Forms
+validación
+CREATE
+UPDATE
+Guardar
+Cancelar
+feedback de éxito
+logo keep / replace / remove
+staging / preview / cleanup
+soft-delete
+protección processing
+regresión funcional completa
 ```
 
 La reorganización de `/src/app/services` en subcarpetas sigue vigente y debe considerarse la estructura canónica del frontend.
@@ -91,7 +100,7 @@ Esto es un fallo de la capa de acceso, no una respuesta HTTP del repositorio.
 El siguiente mini-hito exacto es:
 
 ```text
-16.13.6C — Logo de Marca
+16.13.7 — Backend de Estadísticas de Marca
 ```
 
 ---
@@ -107,9 +116,12 @@ Están cerrados, probados y subidos a `main`:
 16.13.3 Infraestructura de logo
 16.13.4 Workspace + pantalla base
 16.13.5 Buscador en memoria
-16.13.6A Formulario Datos
-16.13.6A.1 Foco automático en Nombre
-16.13.6B CREATE / UPDATE + Guardar
+16.13.6 Ficha Datos completa
+  16.13.6A Formulario + dirty + Cancelar
+  16.13.6A.1 Foco automático Nombre
+  16.13.6B CREATE / UPDATE + Guardar
+  16.13.6C Logo Marca
+  16.13.6D Soft-delete + regresión integral
 ```
 
 También sigue vigente:
@@ -124,63 +136,82 @@ También sigue vigente:
 El siguiente mini-hito es:
 
 ```text
-16.13.6C — Logo de Marca
+16.13.7 — Backend de Estadísticas de Marca
 ```
 
-Objetivo exacto:
+Contrato funcional de Estadísticas ya acordado:
 
 ```text
-mostrar logo actual
-seleccionar imagen
-stageBrandImage()
-preview del staging
-dirty
-quitar logo
-keep / replace / remove
-guardar create/update con logo
-Cancelar restaura logo/baseSnapshot
-Cancelar limpia staging temporal
-cambiar de Marca / Nueva con dirty limpia staging al descartar
-cerrar ficha dirty limpia staging al confirmar descarte
-errores de persistencia conservan draft/staging correctamente
+Filtros:
+- Mes
+- Año
+- Tipo
+
+Tipo:
+- Importe ventas
+- Unidades
+
+Valores iniciales:
+- mes actual
+- año actual
+- importe
+
+Desglose:
+- mes concreto + año concreto
+  → días
+
+- Mes = Todos + año concreto
+  → meses
+
+- Año = Todos
+  → fuerza Mes = Todos
+  → años
+
+Total:
+→ mostrar total de la selección
 ```
 
-Infraestructura ya disponible y cerrada:
+Fuente histórica obligatoria:
 
 ```text
-files.stageBrandImage()
-files.discardStagedImage()
-
-CrearMarcaCommand.logoStagingId?: string | null
-
-ActualizarMarcaCommand.logo? =
-  keep
-  remove
-  replace + stagingId
-
-backend:
-→ promoción brand_image
-→ WebP
-→ files/brands/
-→ archivo metadata
-→ rollback si falla persistencia
+linea_venta.id_marca_snapshot
 ```
 
-Regla importante para 16.13.6C:
+NO usar:
 
 ```text
-el renderer NO inventa rutas físicas
-el renderer NO elige purpose
-solo trabaja con stagingId + URL de preview pública
+articulo.id_marca actual
+linea_venta.marca textual
+heurísticas por nombre
 ```
 
-Después:
+Regla de devoluciones:
 
 ```text
-16.13.6D — Soft-delete + regresión integral de Datos
+devoluciones puras
+→ ignoradas
+
+operación mixta
+→ contar solo líneas positivas de venta
+→ ignorar líneas negativas de devolución
+
+aplica tanto a:
+→ importe
+→ unidades
 ```
 
-No avanzar a Estadísticas hasta cerrar toda `16.13.6`.
+Antes del patch de `16.13.7` revisar en `main`:
+
+```text
+schema / entidades de venta
+repositorios de ventas o estadísticas existentes
+servicios backend de Marcas
+MarcasApi / IPC
+patrones de estadísticas ya usados en Artículos o Clientes
+tests SQL/TypeORM relevantes
+```
+
+No diseñar todavía la UI final de Estadísticas; `16.13.7` debe cerrar primero contrato, query, aplicación y API backend.
 
 ---
 # 3. Repositorios y referencias
@@ -1262,7 +1293,7 @@ La relación Marca ↔ Proveedor se dejará para `16.14 — Proveedores`.
 ---
 # 17. Logo de Marca
 
-Infraestructura backend/common ya cerrada:
+Infraestructura backend/common cerrada:
 
 ```text
 purpose = brand_image
@@ -1273,7 +1304,7 @@ files/brands/
 archivo metadata
 ```
 
-API pública renderer ya disponible:
+API pública renderer:
 
 ```text
 files.stageBrandImage()
@@ -1301,83 +1332,74 @@ ActualizarMarcaCommand.logo?:
   omitido → keep
 ```
 
-Persistencia backend:
+Renderer cerrado en `16.13.6C`:
 
 ```text
-create + staging
-→ promote
-→ INSERT archivo
-→ marca.id_archivo
-
-update keep
-→ conservar logo
-
-update remove
-→ marca.id_archivo = NULL
-
-update replace
-→ promote nuevo
-→ INSERT archivo
-→ enlazar nuevo
-```
-
-El archivo persistido anterior no se borra automáticamente al hacer remove/replace; la limpieza segura de huérfanos persistidos es una responsabilidad separada.
-
-## 17.1 Siguiente mini-hito: 16.13.6C
-
-Debe completar la capa renderer:
-
-```text
-logo actual
-selección
+mostrar logo persistido
+seleccionar fichero
+stageBrandImage()
 preview temporal
-quitar
-dirty
-keep
-replace
-remove
+reemplazar staging
+quitar logo
+Cancelar
+cleanup al descartar workspace
+guardar create/update con logo
 ```
 
-Ciclo esperado:
+Modelo de estado:
 
 ```text
-seleccionar/cambiar logo
-→ stageBrandImage()
-→ stagingId + preview
-→ draft dirty
+baseSnapshot.foto
+→ logo persistido
 
-Guardar Marca nueva
+draft.foto
+→ logo visible actual, persistido o preview
+
+logoStagingId
+→ staging temporal pendiente
+```
+
+Guardar:
+
+```text
+Marca nueva + staging
 → CrearMarcaCommand.logoStagingId
 
-Guardar existente con sustitución
-→ ActualizarMarcaCommand.logo = replace + stagingId
+Marca existente + staging
+→ logo = replace + stagingId
 
-Guardar existente quitando logo
-→ ActualizarMarcaCommand.logo = remove
+Marca existente con logo quitado
+→ logo = remove
 
-Guardar existente sin tocar logo
-→ keep / propiedad omitida según diseño final renderer
+Marca existente sin tocar logo
+→ logo omitido = keep
 ```
 
-Cancelar:
+Error de guardado:
 
 ```text
-→ restaurar logo de baseSnapshot
-→ limpiar cualquier staging temporal no consumido
-→ clean
+→ staging permanece
+→ preview permanece
+→ dirty permanece
+→ reintento posible
 ```
 
-Descartar workspace dirty al:
+Cancelar / cambiar de Marca / Nueva / Cerrar:
 
 ```text
-seleccionar otra Marca
-Nueva Marca
-Cerrar ficha
+→ descartar staging temporal
+→ restaurar/descartar workspace según acción
 ```
 
-debe limpiar también el staging temporal asociado al draft descartado.
+La limpieza del staging pendiente al descartar workspace quedó integrada con las confirmaciones dirty.
 
-No exponer rutas físicas al renderer.
+El archivo persistido anterior no se borra automáticamente al hacer remove/replace; la limpieza segura de huérfanos persistidos sigue siendo responsabilidad separada.
+
+Resultado:
+
+```text
+16.13.6C ✅ CERRADO
+```
 
 ---
 # 18. Workspace / persistencia de sesión de Marcas
@@ -1466,30 +1488,33 @@ Referencia conceptual: patrón ya utilizado en Clientes.
 
 # 20. Guardar / Cancelar / Eliminar Marca
 
-## 20.1 Guardar ✅ create/update sin logo ya implementado
+## 20.1 Guardar ✅
+
+Flujo:
 
 ```text
 validar formulario
 → persistir
-→ actualizar maestro global en memoria directamente
+→ actualizar maestro global en memoria
 → reconciliar respuesta canónica
 → actualizar baseSnapshot
 → clean
-→ mensaje de éxito temporal junto a acciones
+→ mensaje temporal de éxito
 ```
 
-Alta actual:
+Alta:
 
 ```text
 crearProveedor = false
-logoStagingId omitido hasta 16.13.6C
+logoStagingId opcional
 ```
 
-Edición actual:
+Edición:
 
 ```text
-logo omitido
-→ keep
+logo omitido → keep
+logo replace + stagingId
+logo remove
 ```
 
 Tras primer Guardar de una Marca nueva:
@@ -1500,36 +1525,57 @@ Tras primer Guardar de una Marca nueva:
 → se habilita pestaña Estadísticas
 ```
 
-## 20.2 Cancelar ✅ datos textuales; logo pendiente 16.13.6C
-
-Actualmente:
+## 20.2 Cancelar ✅
 
 ```text
 → restaurar baseSnapshot
+→ limpiar staging temporal si existe
+→ restaurar logo persistido
 → clean
 ```
 
-En `16.13.6C` debe ampliarse a:
+## 20.3 Eliminar ✅
 
-```text
-→ restaurar logo
-→ limpiar staging temporal
-```
-
-## 20.3 Eliminar ⬜ 16.13.6D
-
-Solo marca existente:
+Solo Marca persistida:
 
 ```text
 botón Eliminar visible
 → confirmación
-→ soft-delete
+→ si dirty, avisar también de pérdida de cambios
+→ deactivate()
+→ quitar inmediatamente del maestro renderer
+→ cerrar workspace
 ```
 
 Marca nueva:
 
 ```text
 sin botón Eliminar
+```
+
+Durante la baja:
+
+```text
+deactivating = true
+processing = true
+→ bloquear acciones incompatibles
+```
+
+Si falla backend:
+
+```text
+→ maestro intacto
+→ workspace intacto
+→ staging intacto
+→ reintento posible
+```
+
+Tras COMMIT de baja:
+
+```text
+→ quitar del maestro
+→ cerrar workspace
+→ cleanup de staging pendiente best-effort
 ```
 
 Soft-delete significa exclusivamente:
@@ -1543,11 +1589,20 @@ No:
 ```text
 NO poner articulo.id_marca = NULL
 NO borrar proveedor_marca
-NO borrar logo
+NO borrar logo persistido
 NO borrar metadata/fichero físico
+NO tocar ventas históricas
+NO tocar snapshots históricos
 ```
 
-La marca desaparece de maestros activos/buscadores.
+La Marca desaparece de maestros activos/buscador.
+
+Resultado:
+
+```text
+16.13.6D ✅ CERRADO
+16.13.6 Ficha Datos ✅ CERRADO
+```
 
 ---
 # 21. Marca eliminada y Artículos
@@ -2628,11 +2683,11 @@ Resultado:
 
 ---
 
-## 27.6 16.13.6 — Ficha Datos 🟦 EN DESARROLLO
+## 27.6 16.13.6 — Ficha Datos ✅ CERRADO
 
 ### 27.6.1 16.13.6A — Formulario + dirty + Cancelar ✅
 
-Se creó `MarcaFormComponent` con Angular Signal Forms.
+`MarcaFormComponent` con Angular Signal Forms.
 
 Campos:
 
@@ -2644,8 +2699,6 @@ Web
 Dirección
 Observaciones
 ```
-
-`foto` permanece dentro de `MarcaFormModel`, aunque todavía no se edita visualmente, para preservar el valor canónico y preparar 16.13.6C.
 
 Validación:
 
@@ -2664,38 +2717,15 @@ formulario local
 → dirty computed
 ```
 
-Cancelar:
-
-```text
-→ baseSnapshot
-→ dirty false
-```
+Cancelar restaura `baseSnapshot`.
 
 ### 27.6.2 16.13.6A.1 — Foco automático Nombre ✅
 
-Al:
-
-```text
-crear nueva Marca
-seleccionar Marca existente
-```
-
-se solicita foco explícito al campo Nombre.
-
-Implementación:
-
-```text
-MarcasService.focusNameRequest
-→ contador
-→ MarcaFormComponent effect
-→ focus()
-```
-
-No se enlaza el foco al `draft`, evitando robar foco mientras se editan otros campos.
+Al crear una nueva Marca o seleccionar una existente se solicita foco explícito mediante `focusNameRequest`.
 
 ### 27.6.3 16.13.6B — CREATE / UPDATE + Guardar ✅
 
-`MarcasService` expone:
+`MarcasService`:
 
 ```text
 saving
@@ -2703,57 +2733,12 @@ saveWorkspace()
 update()
 ```
 
-`saveWorkspace()`:
-
-```text
-workspace actual
-→ normalizar textos
-→ create o update
-→ respuesta MarcaInterface canónica
-→ upsert maestro global
-→ reconciliar workspace
-→ draft/baseSnapshot canónicos
-→ dirty false
-```
-
-Normalización renderer antes del backend:
-
-```text
-nombre.trim()
-opcionales trim()
-opcionales vacíos → null
-```
+`saveWorkspace()` reconcilia la respuesta canónica, actualiza el maestro y deja `draft/baseSnapshot` limpios.
 
 Alta:
 
 ```text
-CrearMarcaCommand
-→ crearProveedor = false
-→ sin logo todavía
-```
-
-Edición:
-
-```text
-ActualizarMarcaCommand
-→ sin logo todavía
-→ omitido = keep
-```
-
-Maestro global:
-
-```text
-create/update
-→ inserta o sustituye por publicId
-→ reordena por nombre con locale es / sensitivity base
-```
-
-Marca nueva tras Guardar:
-
-```text
-→ mismo workspace
-→ recibe marcaId/publicId
-→ Estadísticas pasa a estar disponible
+crearProveedor = false
 ```
 
 UI:
@@ -2762,129 +2747,181 @@ UI:
 Guardar
 Cancelar
 Guardando…
+feedback "Marca guardada correctamente"
+```
+
+### 27.6.4 16.13.6C — Logo Marca ✅
+
+Se reutiliza la infraestructura común de imágenes.
+
+Renderer:
+
+```text
+FilesService.stageBrandImage()
+FilesService.discardStagedImage()
+```
+
+Workspace:
+
+```text
+logoStagingId
+```
+
+Lifecycle cerrado:
+
+```text
+seleccionar → staging + preview
+seleccionar otra → nuevo staging + cleanup anterior
+quitar → foto null
+Cancelar → cleanup + restaurar baseSnapshot
+guardar nueva → logoStagingId
+guardar existente → keep / replace / remove
+error guardado → conservar staging + preview + dirty
+```
+
+Al descartar workspace por cambio de Marca, Nueva o Cerrar se limpia también el staging temporal.
+
+`processing` agrupa:
+
+```text
 saving
-feedback temporal:
-"Marca guardada correctamente"
+logoProcessing
+deactivating
 ```
 
-El feedback replica el patrón ya usado en Artículos.
+Se usa `inject(FilesService)` siguiendo el patrón moderno del frontend; los tests usan `TestBed` + fake provider.
 
-Durante guardado se bloquean:
+### 27.6.5 16.13.6D — Soft-delete + regresión integral ✅
 
-```text
-Guardar
-Cancelar
-Buscar
-Nueva
-Cerrar ficha
-```
-
-Errores:
+`MarcasService` añade:
 
 ```text
-→ alert
-→ draft intacto
-→ baseSnapshot intacto
-→ maestro intacto
-→ dirty true
-→ saving false
-```
-
-Tests cubren:
-
-```text
-create desde workspace
-update desde workspace
-normalización opcionales
-sincronización maestro
-workspace limpio tras éxito
-fallo conserva draft/dirty/maestro
-formulario no guarda si inválido
-formulario bloqueado durante saving
-```
-
-### 27.6.4 16.13.6C — Logo Marca ⬅️ SIGUIENTE
-
-Implementar renderer sobre la infraestructura cerrada en 16.13.3:
-
-```text
-logo actual
-seleccionar
-stageBrandImage()
-preview
-quitar
-keep
-replace
-remove
-cleanup staging
-Cancelar
-discard workspace dirty
-Guardar create/update con logo
-```
-
-Debe manejar correctamente:
-
-```text
-Marca nueva
-Marca existente con logo
-Marca existente sin logo
-reemplazo
-eliminación
-selección sucesiva de varias imágenes
-cancelación
-error de staging
-error de persistencia
-```
-
-### 27.6.5 16.13.6D — Soft-delete + regresión Datos ⬜
-
-Después del logo:
-
-```text
-Eliminar solo existente
-confirmación
+deactivating
 deactivate()
-quitar del maestro activo
-cerrar workspace
-regresión integral de Datos
+deactivateWorkspace()
 ```
 
-No avanzar a Estadísticas hasta cerrar 16.13.6D.
+Baja:
+
+```text
+backend deactivate
+→ actualizar maestro
+→ cerrar workspace
+→ cleanup staging post-commit best-effort
+```
+
+Error backend:
+
+```text
+→ maestro intacto
+→ workspace intacto
+→ staging intacto
+```
+
+UI:
+
+```text
+Eliminar solo en persistidas
+confirmación
+aviso adicional si dirty
+"Eliminando…" durante operación
+```
+
+Se corrigieron además los guards de `MarcaToolbarActionsComponent` para usar `processing()` y no solo `saving()`.
+
+Regresión funcional superada para alta/edición/cancelación/guardado/logo/búsqueda/navegación/soft-delete.
+
+Resultado:
+
+```text
+16.13.6 ✅ CERRADO
+```
 
 ---
-## 27.7 16.13.7 — Backend Estadísticas ⬜
+## 27.7 16.13.7 — Backend Estadísticas ⬅️ SIGUIENTE
 
-Consulta agregada por:
+Contrato aprobado:
+
+Filtros:
+
+```text
+mes
+año
+tipo
+```
+
+Tipo:
+
+```text
+amount
+units
+```
+
+Granularidad:
+
+```text
+mes concreto + año concreto
+→ días
+
+Mes = Todos + año concreto
+→ meses
+
+Año = Todos
+→ Mes = Todos
+→ años
+```
+
+Fuente histórica:
 
 ```text
 linea_venta.id_marca_snapshot
 ```
 
-Modos:
+Reglas:
 
 ```text
-días
-meses
-años
+NO usar marca actual del artículo
+NO usar texto de marca como identidad
+NO recalcular historia tras renombrar/reasignar artículos
 ```
 
-Métricas:
+Devoluciones:
+
+```text
+ignorar devoluciones puras
+ignorar líneas negativas en operaciones mixtas
+contar únicamente líneas positivas de venta
+```
+
+Aplica a:
 
 ```text
 importe
 unidades
 ```
 
-Devoluciones:
+Salida backend a diseñar en este bloque:
 
 ```text
-IGNORADAS
+serie temporal según granularidad
+total de la selección
 ```
 
-Backend devuelve también el total.
+Antes de proponer el patch:
+
+```text
+revisar main actual
+revisar schema/entidades venta
+revisar repositorios/queries existentes
+revisar patrón estadístico de otros dominios
+definir contrato público preciso
+añadir tests SQL/TypeORM
+exponer service/API/IPC/preload
+```
+
+No implementar todavía la representación visual final; eso corresponde a `16.13.8`.
 
 ---
-
 ## 27.8 16.13.8 — UI Estadísticas ⬜
 
 ```text
@@ -3149,10 +3186,8 @@ Marcas:
 16.13.3 ✅
 16.13.4 ✅
 16.13.5 ✅
-16.13.6A ✅
-16.13.6A.1 ✅
-16.13.6B ✅
-16.13.6C ⬅️ SIGUIENTE
+16.13.6 ✅
+16.13.7 ⬅️ SIGUIENTE
 ```
 
 5. recordar que `/src/app/services` está reorganizado en subcarpetas;
@@ -3160,53 +3195,34 @@ Marcas:
 7. continuar exactamente con:
 
 ```text
-16.13.6C — Logo de Marca
+16.13.7 — Backend de Estadísticas de Marca
 ```
 
-8. objetivo del bloque:
-
-```text
-mostrar logo persistido
-seleccionar imagen
-stageBrandImage()
-preview
-quitar logo
-keep/replace/remove
-guardar create/update con staging
-limpiar staging al cancelar
-limpiar staging al descartar workspace
-preservar staging/draft correctamente ante errores
-```
-
-9. revisar antes del patch, según `main`:
-
-```text
-MarcaFormComponent
-MarcasComponent
-MarcaToolbarActionsComponent
-MarcasService
-MarcaFormModel / Workspace
-FilesService o acceso window.osumiDesktop.files
-StageImageRequest
-StagedImageInterface
-FilesApi
-CrearMarcaCommand
-ActualizarMarcaCommand
-MarcaLogoUpdateCommand
-tests de imagen/staging renderer existentes
-patrón de imagen de Artículos si existe
-```
-
-10. no duplicar infraestructura de imágenes: reutilizar `files.stageBrandImage()` y `discardStagedImage()`;
-11. después de `16.13.6C`, avanzar a `16.13.6D — Soft-delete + regresión Datos`;
-12. imports internos siempre por alias absoluto;
-13. todo método nuevo, también en interfaces, lleva JSDoc;
-14. interfaz modificada → adaptar fakes/mocks/specs en el mismo bloque;
-15. usuario aplica y prueba; asistente no hace commits ni ejecuta el proyecto;
-16. esperar confirmación antes de avanzar;
-17. no tocar `12C.9 TicketBAI` sin información de Berein;
-18. no diseñar Proveedores hasta cerrar Marcas;
-19. protocolo GitHub:
+8. contrato estadístico:
+   - fuente: `linea_venta.id_marca_snapshot`;
+   - mes+año concretos → días;
+   - mes Todos + año → meses;
+   - año Todos → forzar mes Todos → años;
+   - tipo `amount | units`;
+   - devoluciones puras ignoradas;
+   - líneas negativas de operaciones mixtas ignoradas;
+   - solo líneas positivas cuentan;
+   - devolver serie + total;
+9. revisar antes del patch:
+   - entidades/schema de Venta y LíneaVenta;
+   - repositorios TypeORM relacionados;
+   - patrones de estadísticas existentes;
+   - Marcas backend service/repository/API/IPC/preload;
+   - tests existentes;
+10. separar backend (`16.13.7`) de UI (`16.13.8`);
+11. imports internos siempre por alias absoluto;
+12. todo método nuevo, también en interfaces, lleva JSDoc;
+13. interfaz modificada → adaptar fakes/mocks/specs en el mismo bloque;
+14. usuario aplica y prueba; asistente no hace commits ni ejecuta el proyecto;
+15. esperar confirmación antes de avanzar;
+16. no tocar `12C.9 TicketBAI` sin información de Berein;
+17. no diseñar Proveedores hasta cerrar Marcas;
+18. protocolo GitHub:
     - intentar `main` primero;
     - si falla, explicar el error exacto;
     - ZIP/adjuntos solo como fallback.
@@ -3217,7 +3233,7 @@ patrón de imagen de Artículos si existe
 ```text
 Proyecto: Osumi TPV Client
 Continuidad: 15/09/2026
-Base: v2.61 + main
+Base: v2.62 + main
 
 Hito 13 Artículos ✅
 Hito 14 Clientes ✅
@@ -3239,70 +3255,41 @@ MARCAS:
 16.13.3 Infraestructura logo ✅
 16.13.4 Workspace + pantalla base ✅
 16.13.5 Buscador en memoria ✅
+16.13.6 Ficha Datos ✅ COMPLETAMENTE CERRADO
 
-16.13.6 Ficha Datos 🟦
-
-16.13.6A ✅
+Datos incluye:
 → Signal Forms
-→ Nombre obligatorio
-→ Email opcional válido
 → dirty computed
+→ foco Nombre
 → Cancelar
-→ draft persistente
-
-16.13.6A.1 ✅
-→ foco automático en Nombre al crear/seleccionar
-
-16.13.6B ✅
 → Guardar
-→ CREATE
-→ UPDATE
-→ crearProveedor=false
-→ update logo omitido = keep
-→ saving
-→ reconciliación canónica
-→ upsert maestro inmediato
-→ dirty false
-→ feedback temporal
-→ errores conservan draft
+→ CREATE/UPDATE
+→ maestro inmediato
+→ logo staging/preview
+→ keep/replace/remove
+→ cleanup staging
+→ soft-delete
+→ processing
+→ regresión integral superada
 
 SIGUIENTE:
-16.13.6C Logo de Marca
+16.13.7 Backend Estadísticas
 
-Ya existe infraestructura:
-→ stageBrandImage()
-→ discardStagedImage()
-→ WebP
-→ brand_image
-→ files/brands/
-→ create logoStagingId
-→ update keep/remove/replace
-→ promoción/rollback backend
-
-16.13.6C debe hacer:
-→ preview
-→ selección
-→ staging
-→ replace/remove/keep
-→ cleanup al Cancelar
-→ cleanup al descartar workspace
-→ Guardar con logo
+Contrato:
+→ fuente linea_venta.id_marca_snapshot
+→ mes+año → días
+→ mes Todos+año → meses
+→ año Todos → años
+→ amount | units
+→ ignorar devoluciones
+→ en mixtas, ignorar líneas negativas
+→ serie + total
 
 Después:
-16.13.6D Soft-delete + regresión Datos
-16.13.7 Backend Estadísticas
 16.13.8 UI Estadísticas
 16.13.9 Maestro global integral
 16.13.10 Regresión
 16.14 Proveedores
-
-UI Compras:
-COMPRAS
-PEDIDOS | MARCAS | PROVEEDORES                 contexto derecha
-
-Marcas:
-→ Buscar + Nueva
-→ con ficha: nombre + cerrar + Buscar + Nueva
 
 Refactor:
 → /src/app/services organizado en subcarpetas
@@ -3327,7 +3314,8 @@ Reglas:
 | 2.58 | 14/09/2026 | 16.13.1 + 16.13.2 cerrados; 16.13.3A/B cerrados; siguiente 16.13.3C |
 | 2.59 | 14/09/2026 | Protocolo explícito de acceso a GitHub/main y fallback por archivos |
 | 2.60 | 14/09/2026 | 16.13.3 cerrado; 16.13.4A/B cerrados; servicios frontend reorganizados; aprobado rediseño barra contextual |
-| **2.61** | **15/09/2026** | **16.13.4 y 16.13.5 cerrados; 16.13.6A/A.1/B cerrados; siguiente 16.13.6C Logo de Marca** |
+| 2.61 | 15/09/2026 | 16.13.4 y 16.13.5 cerrados; 16.13.6A/A.1/B cerrados; siguiente 16.13.6C Logo de Marca |
+| **2.62** | **15/09/2026** | **16.13.6 Ficha Datos completamente cerrada, incluidos logo y soft-delete; siguiente 16.13.7 Backend Estadísticas** |
 
 ---
 # 34. Prompt de arranque recomendado
@@ -3336,7 +3324,7 @@ Reglas:
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.61.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.62.
 
 Estado:
 - Artículos 13 ✅
@@ -3354,13 +3342,11 @@ Estado:
     - 16.13.3 Infraestructura logo ✅
     - 16.13.4 Workspace + pantalla base ✅
     - 16.13.5 Buscador en memoria ✅
-    - 16.13.6A Formulario Datos ✅
-    - 16.13.6A.1 Foco Nombre ✅
-    - 16.13.6B CREATE / UPDATE + Guardar ✅
-    - 16.13.6C Logo ⬅️ SIGUIENTE
+    - 16.13.6 Ficha Datos ✅
+    - 16.13.7 Backend Estadísticas ⬅️ SIGUIENTE
 
 Punto exacto:
-16.13.6C — Logo de Marca.
+16.13.7 — Backend de Estadísticas de Marca.
 
 IMPORTANTE:
 `/src/app/services` está reorganizado en subcarpetas.
@@ -3372,48 +3358,43 @@ Antes de proponer cambios:
 - distingue error HTTP real frente a fallo de capa de acceso (`DisabledError`, timeout, DNS, etc.);
 - solo entonces pide los archivos concretos necesarios.
 
-Estado renderer de Marcas:
-- barra contextual integrada en tabs Compras;
-- buscador totalmente en memoria;
-- cambio/nueva/cierre con protección dirty;
+Ficha Datos de Marcas COMPLETAMENTE CERRADA:
 - workspace persistente;
-- Signal Form Datos;
-- Nombre obligatorio;
+- dirty computed;
+- buscador en memoria;
+- barra contextual;
+- Signal Forms;
+- validación;
 - foco automático Nombre;
-- Cancelar;
-- Guardar create/update;
-- saving;
+- CREATE/UPDATE;
+- Guardar/Cancelar;
 - feedback temporal;
-- maestro actualizado inmediatamente;
-- respuesta backend canónica reconstruye draft/baseSnapshot.
+- maestro renderer inmediato;
+- logo stage/preview;
+- keep/replace/remove;
+- cleanup de staging;
+- soft-delete;
+- processing;
+- regresión funcional completa.
 
-Infraestructura de logo ya existente:
-- files.stageBrandImage();
-- files.discardStagedImage();
-- CrearMarcaCommand.logoStagingId?;
-- ActualizarMarcaCommand.logo?;
-- keep/remove/replace;
-- WebP;
-- purpose brand_image;
-- files/brands/;
-- promoción/rollback en backend.
+Contrato de Estadísticas aprobado:
+- fuente histórica: linea_venta.id_marca_snapshot;
+- mes concreto + año concreto → días;
+- mes Todos + año concreto → meses;
+- año Todos → forzar mes Todos → años;
+- tipo = amount | units;
+- devoluciones puras ignoradas;
+- en operación mixta solo cuentan líneas positivas;
+- líneas negativas se ignoran;
+- devolver serie temporal + total.
 
-16.13.6C debe implementar SOLO la capa renderer y lifecycle:
-- mostrar logo;
-- seleccionar imagen;
-- staging y preview;
-- reemplazar;
-- quitar;
-- dirty;
-- guardar create/update con logo;
-- limpiar staging al Cancelar;
-- limpiar staging al descartar workspace;
-- manejo correcto de errores.
-
-Después:
-16.13.6D — Soft-delete + regresión integral de Datos.
-
-No avances a Estadísticas antes de cerrar 16.13.6.
+16.13.7 debe centrarse en backend:
+- contratos;
+- query/repositorio;
+- aplicación;
+- API/IPC/preload;
+- tests.
+La UI final corresponde a 16.13.8.
 
 Reglas:
 - imports internos por alias absoluto;
@@ -3426,4 +3407,4 @@ Reglas:
 
 ---
 
-**Fin del documento de continuidad v2.61.**
+**Fin del documento de continuidad v2.62.**
