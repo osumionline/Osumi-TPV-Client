@@ -1,9 +1,9 @@
 # Osumi TPV Client — Documento de continuidad y relevo
 
-**Versión:** 2.60  
-**Fecha:** 14 de septiembre de 2026  
-**Base de continuidad:** `v2.60 + main` una vez este documento se suba al repositorio.  
-**Documento anterior:** `Osumi_TPV_Client_Documento_Continuidad_v2.59.md`
+**Versión:** 2.61  
+**Fecha:** 15 de septiembre de 2026  
+**Base de continuidad:** `v2.61 + main` una vez este documento se suba al repositorio.  
+**Documento anterior:** `Osumi_TPV_Client_Documento_Continuidad_v2.60.md`
 
 ---
 
@@ -40,13 +40,20 @@ CTRL Normalización de controles                   ✅ CERRADA
       16.13.3B Staging / promoción / rollback     ✅
       16.13.3C Integración pública brand_image    ✅
 
-    16.13.4 Workspace + pantalla base             🟦 EN DESARROLLO
+    16.13.4 Workspace + pantalla base             ✅ CERRADO
       16.13.4A Workspace                          ✅
       16.13.4B Pantalla base inicial              ✅
-      16.13.4C Barra contextual Compras            ⬅️ SIGUIENTE
+      16.13.4C Barra contextual Compras            ✅
 
-    16.13.5 Buscador en memoria                   ⬜
-    16.13.6 Ficha Datos                           ⬜
+    16.13.5 Buscador en memoria                   ✅ CERRADO
+
+    16.13.6 Ficha Datos                           🟦 EN DESARROLLO
+      16.13.6A Formulario + dirty + Cancelar      ✅
+      16.13.6A.1 Foco automático Nombre           ✅
+      16.13.6B CREATE / UPDATE + Guardar          ✅
+      16.13.6C Logo Marca                         ⬅️ SIGUIENTE
+      16.13.6D Soft-delete + regresión Datos      ⬜
+
     16.13.7 Backend Estadísticas                  ⬜
     16.13.8 UI Estadísticas                       ⬜
     16.13.9 Sincronización maestro global         ⬜
@@ -61,38 +68,30 @@ TicketBAI ordinario permanece cerrado. `12C.9 — TicketBAI devoluciones/mixtas`
 
 El **Hito 15 — Almacén**, REF, CTRL y **Pedidos 16.1–16.12** siguen cerrados. No reabrirlos salvo regresión real demostrada.
 
-Desde `v2.59` se ha avanzado en Marcas:
+Desde `v2.60` se ha avanzado de forma importante en Marcas:
 
 ```text
-16.13.3C Integración pública brand_image          ✅ CERRADO
-16.13.4A Workspace                                ✅ CERRADO
-16.13.4B Pantalla base inicial                    ✅ CERRADO
+16.13.4C Barra contextual integrada               ✅
+16.13.5 Buscador en memoria                       ✅
+16.13.6A Formulario Datos                         ✅
+16.13.6A.1 Foco automático Nombre                 ✅
+16.13.6B CREATE / UPDATE + Guardar                ✅
 ```
 
-Además, el usuario ha realizado una reorganización amplia del frontend:
+La reorganización de `/src/app/services` en subcarpetas sigue vigente y debe considerarse la estructura canónica del frontend.
+
+En las sesiones recientes, el acceso directo a GitHub desde ChatGPT ha seguido fallando con:
 
 ```text
-/src/app/services
-→ servicios reorganizados en subcarpetas por dominio/responsabilidad
-→ imports internos actualizados
-→ tests pasan
-→ aplicación arranca correctamente
+Failed to fetch https://github.com/osumionline/Osumi-TPV-Client: DisabledError
 ```
 
-Este cambio está confirmado funcionalmente por el usuario y ya está subido a `main`.
-
-En esta sesión concreta no se ha podido inspeccionar el commit desde GitHub porque la capa web devuelve:
-
-```text
-DisabledError
-```
-
-Esto NO implica un problema de permisos ni visibilidad del repositorio.
+Esto es un fallo de la capa de acceso, no una respuesta HTTP del repositorio.
 
 El siguiente mini-hito exacto es:
 
 ```text
-16.13.4C — Barra contextual integrada de Compras
+16.13.6C — Logo de Marca
 ```
 
 ---
@@ -102,92 +101,86 @@ Están cerrados, probados y subidos a `main`:
 
 ```text
 16.1–16.12 Pedidos
+
 16.13.1 Snapshot histórico Marca en Ventas
 16.13.2 Backend CRUD/soft-delete de Marcas
-16.13.3 Infraestructura de logo completa
-16.13.4A Workspace de Compras/Marcas
-16.13.4B Pantalla base inicial de Marcas
+16.13.3 Infraestructura de logo
+16.13.4 Workspace + pantalla base
+16.13.5 Buscador en memoria
+16.13.6A Formulario Datos
+16.13.6A.1 Foco automático en Nombre
+16.13.6B CREATE / UPDATE + Guardar
 ```
 
-También está subido y validado por el usuario:
+También sigue vigente:
 
 ```text
-reorganización de /src/app/services
-→ servicios agrupados en subcarpetas
-→ imports corregidos
-→ tests verdes
-→ aplicación arranca
+/src/app/services
+→ servicios agrupados por dominio/responsabilidad
+→ imports internos actualizados
+→ no asumir rutas planas antiguas
 ```
 
 El siguiente mini-hito es:
 
 ```text
-16.13.4C — Barra contextual integrada de Compras
+16.13.6C — Logo de Marca
 ```
 
-Objetivo visual/arquitectónico:
+Objetivo exacto:
 
 ```text
-eliminar la cabecera redundante propia de Marcas
-
-barra de pestañas Compras:
-PEDIDOS | MARCAS | PROVEEDORES                 zona contextual derecha
+mostrar logo actual
+seleccionar imagen
+stageBrandImage()
+preview del staging
+dirty
+quitar logo
+keep / replace / remove
+guardar create/update con logo
+Cancelar restaura logo/baseSnapshot
+Cancelar limpia staging temporal
+cambiar de Marca / Nueva con dirty limpia staging al descartar
+cerrar ficha dirty limpia staging al confirmar descarte
+errores de persistencia conservan draft/staging correctamente
 ```
 
-Comportamiento aprobado:
+Infraestructura ya disponible y cerrada:
 
 ```text
-PEDIDOS
-→ pestaña Pedidos activa
-→ zona derecha vacía
+files.stageBrandImage()
+files.discardStagedImage()
 
-MARCAS sin ficha
-→ pestaña Marcas activa
-→ derecha: Buscar + Nueva
+CrearMarcaCommand.logoStagingId?: string | null
 
-MARCAS con ficha
-→ pestaña Marcas activa
-→ derecha: nombre Marca + cerrar + Buscar + Nueva
+ActualizarMarcaCommand.logo? =
+  keep
+  remove
+  replace + stagingId
 
-PROVEEDORES sin ficha
-→ pestaña Proveedores activa
-→ derecha: Buscar + Nuevo
-
-PROVEEDORES con ficha
-→ pestaña Proveedores activa
-→ derecha: nombre Proveedor + cerrar + Buscar + Nuevo
+backend:
+→ promoción brand_image
+→ WebP
+→ files/brands/
+→ archivo metadata
+→ rollback si falla persistencia
 ```
 
-Principio arquitectónico:
+Regla importante para 16.13.6C:
 
 ```text
-PurchasesTabsComponent
-→ navegación genérica
-→ NO conoce dominios concretos ni acciones de Marca/Proveedor
-
-PurchasesComponent
-→ compone la barra
-→ proyecta acciones contextuales según activeSection
-
-acciones de Marca
-→ pertenecen funcionalmente a Marcas
-→ aunque se rendericen visualmente dentro de la barra superior
+el renderer NO inventa rutas físicas
+el renderer NO elige purpose
+solo trabaja con stagingId + URL de preview pública
 ```
 
-Antes del patch:
+Después:
 
 ```text
-1. intentar leer main actual en GitHub;
-2. tener en cuenta la nueva reorganización de /src/app/services;
-3. no asumir rutas antiguas de servicios;
-4. revisar PurchasesTabsComponent;
-5. revisar PurchasesComponent;
-6. revisar MarcasComponent;
-7. revisar MarcasService en su nueva ruta;
-8. revisar workspace actual.
+16.13.6D — Soft-delete + regresión integral de Datos
 ```
 
-No avanzar a `16.13.5` hasta cerrar y validar visualmente `16.13.4C`.
+No avanzar a Estadísticas hasta cerrar toda `16.13.6`.
 
 ---
 # 3. Repositorios y referencias
@@ -997,20 +990,34 @@ El listado tradicional del TPV antiguo no se recupera porque el número de marca
 
 ## 14.1 Estado de bienvenida
 
-Al entrar sin marca seleccionada:
+El diseño final usa la barra contextual integrada de Compras:
 
 ```text
-Marcas                               buscar   nueva
-──────────────────────────────────────────────────
-          Elige una marca de la lista.
+COMPRAS
+PEDIDOS | MARCAS | PROVEEDORES                 buscar   nueva
+──────────────────────────────────────────────────────────────
+                 Elige una marca de la lista.
 ```
 
-Acciones:
+No existe una segunda cabecera propia de Marcas.
+
+Reglas:
 
 ```text
-buscar marca
-crear nueva marca
+Pedidos
+→ zona contextual derecha vacía
+
+Marcas
+→ Buscar + Nueva
+
+Marca abierta
+→ nombre + cerrar + Buscar + Nueva
+
+Proveedores
+→ reutilizará el mismo patrón en 16.14
 ```
+
+`PurchasesTabsComponent` sigue siendo genérico y recibe/proyecta las acciones contextuales sin conocer la lógica concreta de Marcas o Proveedores.
 
 ## 14.2 Buscador
 
@@ -1029,35 +1036,62 @@ logo pequeño si existe
 nombre
 ```
 
-La colección de marcas ya está precargada en memoria al inicio de la aplicación.
+La colección de marcas está precargada en memoria.
 
-Regla:
+Implementación cerrada:
 
 ```text
-escribir en buscador
-→ filtrar maestro en memoria
+abrir modal
+→ mostrar todas las marcas
+
+escribir
+→ filtrar localmente marcasService.marcas()
 → NO IPC
 → NO SQLite
 ```
 
-Normalizar búsqueda para evitar problemas por:
+Búsqueda normalizada:
 
 ```text
-mayúsculas
-minúsculas
-acentos
-espacios
+mayúsculas/minúsculas
+acentos/diacríticos
+espacios de búsqueda
 ```
 
-Seleccionar tarjeta:
+El modal:
+
+```text
+→ marca visualmente la Marca activa
+→ permite cerrar por botón
+→ permite cerrar por backdrop
+→ permite cerrar con Escape
+```
+
+Seleccionar la misma Marca:
+
+```text
+→ solo cerrar buscador
+→ NO reemplazar workspace
+```
+
+Seleccionar otra Marca con workspace clean:
 
 ```text
 → cerrar modal
-→ abrir detalle de marca
+→ abrir Marca seleccionada
 ```
 
----
+Seleccionar otra Marca con dirty:
 
+```text
+→ confirmación
+→ aceptar: descartar + abrir destino
+→ cancelar: conservar workspace actual
+```
+
+Nueva Marca con dirty y Cerrar ficha con dirty usan la misma protección de descarte.
+
+---
 # 15. Ficha de Marca
 
 Estados:
@@ -1111,17 +1145,124 @@ Logo
 Nombre
 ```
 
+Validación renderer ya implementada:
+
+```text
+Nombre
+→ obligatorio
+→ no puede ser solo espacios
+
+Email
+→ opcional
+→ si existe, formato email válido
+```
+
+La ficha usa Angular Signal Forms.
+
+Flujo actual:
+
+```text
+usuario escribe
+→ MarcaFormComponent actualiza modelo local
+→ modelChangeEvent
+→ MarcasService.actualizarDraft()
+→ dirty computed compara draft/baseSnapshot
+```
+
+Cancelar:
+
+```text
+→ MarcasService.cancelarCambios()
+→ draft = clone(baseSnapshot)
+→ dirty false
+```
+
+Foco:
+
+```text
+Nueva Marca
+→ foco Nombre
+
+seleccionar Marca
+→ foco Nombre
+
+editar otros campos
+→ NO roba el foco
+```
+
+La petición de foco se resuelve con un contador `focusNameRequest`, no con autofocus ligado al draft.
+
+Persistencia ya implementada en `16.13.6B`:
+
+```text
+Guardar
+→ validar formulario
+→ saving = true
+→ bloquear acciones incompatibles
+→ saveWorkspace()
+```
+
+Alta:
+
+```text
+CrearMarcaCommand
+→ crearProveedor = false
+→ logoStagingId todavía omitido en 16.13.6B
+```
+
+Edición:
+
+```text
+ActualizarMarcaCommand
+→ logo omitido
+→ backend interpreta keep
+```
+
+Tras éxito:
+
+```text
+respuesta MarcaInterface canónica
+→ upsert inmediato en maestro en memoria
+→ mantener mismo workspace
+→ actualizar marcaId/publicId si era nueva
+→ draft = datos canónicos
+→ baseSnapshot = datos canónicos
+→ dirty false
+→ nueva Marca pasa a disponer de Estadísticas
+→ feedback "Marca guardada correctamente" temporal
+```
+
+El maestro se mantiene ordenado por nombre tras create/update.
+
+Si falla el guardado:
+
+```text
+→ draft intacto
+→ baseSnapshot intacto
+→ maestro intacto
+→ dirty sigue true
+→ saving vuelve a false
+→ alert de error
+```
+
+Durante `saving` se bloquean:
+
+```text
+Guardar
+Cancelar
+Buscar
+Nueva Marca
+Cerrar ficha
+```
+
 **No gestionar proveedores dentro de Marcas.**
 
 La relación Marca ↔ Proveedor se dejará para `16.14 — Proveedores`.
 
 ---
-
 # 17. Logo de Marca
 
-No copiar la gestión física legacy `marcas/{id}.webp`.
-
-Usar infraestructura común moderna:
+Infraestructura backend/common ya cerrada:
 
 ```text
 purpose = brand_image
@@ -1132,31 +1273,113 @@ files/brands/
 archivo metadata
 ```
 
-Comportamiento:
+API pública renderer ya disponible:
+
+```text
+files.stageBrandImage()
+files.discardStagedImage()
+```
+
+Regla de seguridad:
+
+```text
+renderer NO elige purpose
+stageBrandImage() fuerza brand_image en backend
+```
+
+Contratos:
+
+```text
+CrearMarcaCommand.logoStagingId?: string | null
+
+MarcaLogoUpdateCommand =
+  keep
+  remove
+  replace + stagingId
+
+ActualizarMarcaCommand.logo?:
+  omitido → keep
+```
+
+Persistencia backend:
+
+```text
+create + staging
+→ promote
+→ INSERT archivo
+→ marca.id_archivo
+
+update keep
+→ conservar logo
+
+update remove
+→ marca.id_archivo = NULL
+
+update replace
+→ promote nuevo
+→ INSERT archivo
+→ enlazar nuevo
+```
+
+El archivo persistido anterior no se borra automáticamente al hacer remove/replace; la limpieza segura de huérfanos persistidos es una responsabilidad separada.
+
+## 17.1 Siguiente mini-hito: 16.13.6C
+
+Debe completar la capa renderer:
+
+```text
+logo actual
+selección
+preview temporal
+quitar
+dirty
+keep
+replace
+remove
+```
+
+Ciclo esperado:
 
 ```text
 seleccionar/cambiar logo
+→ stageBrandImage()
+→ stagingId + preview
 → draft dirty
-→ preview
 
-Guardar
-→ confirmar/materializar
+Guardar Marca nueva
+→ CrearMarcaCommand.logoStagingId
 
-Cancelar
-→ restaurar logo anterior
-→ limpiar staging
+Guardar existente con sustitución
+→ ActualizarMarcaCommand.logo = replace + stagingId
 
-marca nueva cancelada
-→ limpiar staging
+Guardar existente quitando logo
+→ ActualizarMarcaCommand.logo = remove
 
-quitar logo
-→ permitido
+Guardar existente sin tocar logo
+→ keep / propiedad omitida según diseño final renderer
 ```
+
+Cancelar:
+
+```text
+→ restaurar logo de baseSnapshot
+→ limpiar cualquier staging temporal no consumido
+→ clean
+```
+
+Descartar workspace dirty al:
+
+```text
+seleccionar otra Marca
+Nueva Marca
+Cerrar ficha
+```
+
+debe limpiar también el staging temporal asociado al draft descartado.
 
 No exponer rutas físicas al renderer.
 
 ---
-
 # 18. Workspace / persistencia de sesión de Marcas
 
 Marcas debe conservar su estado visual durante toda la sesión.
@@ -1243,29 +1466,57 @@ Referencia conceptual: patrón ya utilizado en Clientes.
 
 # 20. Guardar / Cancelar / Eliminar Marca
 
-## 20.1 Guardar
+## 20.1 Guardar ✅ create/update sin logo ya implementado
 
 ```text
-validar nombre
+validar formulario
 → persistir
 → actualizar maestro global en memoria directamente
+→ reconciliar respuesta canónica
 → actualizar baseSnapshot
 → clean
 → mensaje de éxito temporal junto a acciones
 ```
 
-No depender de reiniciar ni de un reload accidental para actualizar el maestro.
+Alta actual:
 
-## 20.2 Cancelar
+```text
+crearProveedor = false
+logoStagingId omitido hasta 16.13.6C
+```
+
+Edición actual:
+
+```text
+logo omitido
+→ keep
+```
+
+Tras primer Guardar de una Marca nueva:
+
+```text
+→ se mantiene la misma ficha
+→ obtiene id/publicId
+→ se habilita pestaña Estadísticas
+```
+
+## 20.2 Cancelar ✅ datos textuales; logo pendiente 16.13.6C
+
+Actualmente:
 
 ```text
 → restaurar baseSnapshot
-→ restaurar logo
-→ limpiar staging
 → clean
 ```
 
-## 20.3 Eliminar
+En `16.13.6C` debe ampliarse a:
+
+```text
+→ restaurar logo
+→ limpiar staging temporal
+```
+
+## 20.3 Eliminar ⬜ 16.13.6D
 
 Solo marca existente:
 
@@ -1299,7 +1550,6 @@ NO borrar metadata/fichero físico
 La marca desaparece de maestros activos/buscadores.
 
 ---
-
 # 21. Marca eliminada y Artículos
 
 Regla aprobada:
@@ -1919,7 +2169,7 @@ Resultado:
 
 ---
 
-## 27.3 16.13.3 — Infraestructura de logo 🟦 EN DESARROLLO
+## 27.3 16.13.3 — Infraestructura de logo ✅ CERRADO
 
 Principio:
 
@@ -2172,7 +2422,7 @@ Resultado:
 
 ---
 
-## 27.4 16.13.4 — Workspace + pantalla base 🟦 EN DESARROLLO
+## 27.4 16.13.4 — Workspace + pantalla base ✅ CERRADO
 
 ### 27.4.1 16.13.4A — Workspace ✅
 
@@ -2207,7 +2457,7 @@ Marca persistida:
 data | statistics
 ```
 
-Filtros estadísticos:
+Filtros estadísticos iniciales:
 
 ```text
 mes actual
@@ -2232,73 +2482,30 @@ Salir a otro apartado:
 → sin confirmación
 ```
 
-También se amplió el workspace de Compras para conservar:
+`ComprasWorkspaceService` ya existía para Pedidos, por lo que se amplió —no se duplicó— para conservar:
 
 ```text
 activeSection = orders | brands | suppliers
 ```
 
-Importante:
-
-```text
-ComprasWorkspaceService ya existía por Pedidos
-→ NO crear servicio duplicado
-→ se fusionó activeSection con los estados existentes
-→ listados de Pedidos siguen conservando su workspace independiente
-```
+Los dos estados de listados de Pedidos siguen siendo independientes.
 
 ### 27.4.2 16.13.4B — Pantalla base inicial ✅
 
-Se sustituyó el placeholder de Marcas por una pantalla real inicial.
-
-Estado sin ficha:
+Se sustituyó el placeholder por una pantalla real con:
 
 ```text
-Marcas
-Buscar (todavía inactivo)
-Nueva
-"Elige una marca de la lista."
-```
-
-Estado nueva Marca:
-
-```text
-Nueva marca
+bienvenida
+Nueva Marca
 DATOS
+DATOS | ESTADÍSTICAS para persistidas
 ```
 
-Marca persistida:
+Se validó que navegar fuera y volver conserva el workspace.
 
-```text
-nombre
-DATOS | ESTADÍSTICAS
-```
+### 27.4.3 16.13.4C — Barra contextual integrada de Compras ✅
 
-Se validó funcionalmente que:
-
-```text
-Compras → Marcas
-→ Nueva marca
-→ salir a otro apartado
-→ volver a Compras
-→ regresar a Marcas
-→ conservar workspace
-```
-
-### 27.4.3 16.13.4C — Barra contextual integrada de Compras ⬅️ SIGUIENTE
-
-Después de ver la pantalla real, se aprobó un rediseño para ganar espacio vertical.
-
-Problema actual:
-
-```text
-COMPRAS
-barra Pedidos/Marcas/Proveedores
-cabecera Marcas + acciones
-contenido
-```
-
-Nuevo diseño:
+Rediseño final validado visualmente:
 
 ```text
 COMPRAS
@@ -2306,19 +2513,20 @@ PEDIDOS | MARCAS | PROVEEDORES                    acciones contextuales
 contenido
 ```
 
-Acciones:
+Pedidos:
 
 ```text
-Pedidos
-→ ninguna
+→ derecha vacía
+```
 
-Marcas
-→ buscar + nueva
-→ si hay ficha: nombre + cerrar + buscar + nueva
+Marcas:
 
-Proveedores
-→ buscar + nuevo
-→ si hay ficha: nombre + cerrar + buscar + nuevo
+```text
+sin ficha
+→ Buscar + Nueva
+
+con ficha
+→ nombre + cerrar + Buscar + Nueva
 ```
 
 Arquitectura:
@@ -2326,55 +2534,324 @@ Arquitectura:
 ```text
 PurchasesTabsComponent
 → navegación genérica
-→ zona proyectable de acciones a la derecha
+→ ng-content / zona proyectable derecha
 
 PurchasesComponent
-→ decide qué acciones contextuales proyectar
+→ compone acciones según sección
 
-MarcasComponent
-→ elimina su cabecera redundante
-→ se centra solo en workspace/contenido
+MarcaToolbarActionsComponent
+→ lógica contextual de Marcas
 ```
 
-No cerrar 16.13.4 hasta validar este rediseño.
+Se eliminó completamente la cabecera redundante interna de `MarcasComponent`.
+
+El patrón queda preparado para Proveedores.
+
+Resultado:
+
+```text
+16.13.4 ✅ CERRADO
+```
 
 ---
-## 27.5 16.13.5 — Buscador en memoria ⬜
+
+## 27.5 16.13.5 — Buscador en memoria ✅ CERRADO
+
+Implementado:
 
 ```text
 modal
-texto
+input de búsqueda
 tarjetas
-logo + nombre
-filtro local
-sin IPC mientras se escribe
-selección
-protección dirty al cambiar de marca
+logo opcional + nombre
+marca activa resaltada
 ```
 
----
-
-## 27.6 16.13.6 — Ficha Datos ⬜
+Al abrir:
 
 ```text
-Nombre *
-Teléfono
-Email
-Dirección
-Web
-Observaciones
-Logo
-Guardar
-Cancelar
-Eliminar solo existente
-feedback temporal
-dirty derivado
+→ muestra todas las marcas
 ```
 
-Sin gestión de Proveedores.
+Mientras se escribe:
+
+```text
+→ filtro exclusivamente renderer
+→ marcasService.marcas()
+→ sin IPC
+→ sin SQLite
+```
+
+Normalización:
+
+```text
+case-insensitive
+diacríticos/acento-insensitive
+```
+
+Cierre:
+
+```text
+botón
+backdrop
+Escape
+```
+
+Selección:
+
+```text
+misma marca
+→ cerrar buscador
+
+otra marca clean
+→ abrir directamente
+
+otra marca dirty
+→ confirmar descarte
+```
+
+También quedaron definitivos:
+
+```text
+Nueva Marca con dirty
+→ confirmación
+
+Cerrar ficha con dirty
+→ confirmación
+```
+
+Resultado:
+
+```text
+16.13.5 ✅ CERRADO
+```
 
 ---
 
+## 27.6 16.13.6 — Ficha Datos 🟦 EN DESARROLLO
+
+### 27.6.1 16.13.6A — Formulario + dirty + Cancelar ✅
+
+Se creó `MarcaFormComponent` con Angular Signal Forms.
+
+Campos:
+
+```text
+Nombre
+Teléfono
+Email
+Web
+Dirección
+Observaciones
+```
+
+`foto` permanece dentro de `MarcaFormModel`, aunque todavía no se edita visualmente, para preservar el valor canónico y preparar 16.13.6C.
+
+Validación:
+
+```text
+Nombre obligatorio
+Nombre no puede ser solo espacios
+Email opcional con formato válido
+```
+
+Flujo:
+
+```text
+formulario local
+→ modelChangeEvent
+→ MarcasService.actualizarDraft()
+→ dirty computed
+```
+
+Cancelar:
+
+```text
+→ baseSnapshot
+→ dirty false
+```
+
+### 27.6.2 16.13.6A.1 — Foco automático Nombre ✅
+
+Al:
+
+```text
+crear nueva Marca
+seleccionar Marca existente
+```
+
+se solicita foco explícito al campo Nombre.
+
+Implementación:
+
+```text
+MarcasService.focusNameRequest
+→ contador
+→ MarcaFormComponent effect
+→ focus()
+```
+
+No se enlaza el foco al `draft`, evitando robar foco mientras se editan otros campos.
+
+### 27.6.3 16.13.6B — CREATE / UPDATE + Guardar ✅
+
+`MarcasService` expone:
+
+```text
+saving
+saveWorkspace()
+update()
+```
+
+`saveWorkspace()`:
+
+```text
+workspace actual
+→ normalizar textos
+→ create o update
+→ respuesta MarcaInterface canónica
+→ upsert maestro global
+→ reconciliar workspace
+→ draft/baseSnapshot canónicos
+→ dirty false
+```
+
+Normalización renderer antes del backend:
+
+```text
+nombre.trim()
+opcionales trim()
+opcionales vacíos → null
+```
+
+Alta:
+
+```text
+CrearMarcaCommand
+→ crearProveedor = false
+→ sin logo todavía
+```
+
+Edición:
+
+```text
+ActualizarMarcaCommand
+→ sin logo todavía
+→ omitido = keep
+```
+
+Maestro global:
+
+```text
+create/update
+→ inserta o sustituye por publicId
+→ reordena por nombre con locale es / sensitivity base
+```
+
+Marca nueva tras Guardar:
+
+```text
+→ mismo workspace
+→ recibe marcaId/publicId
+→ Estadísticas pasa a estar disponible
+```
+
+UI:
+
+```text
+Guardar
+Cancelar
+Guardando…
+saving
+feedback temporal:
+"Marca guardada correctamente"
+```
+
+El feedback replica el patrón ya usado en Artículos.
+
+Durante guardado se bloquean:
+
+```text
+Guardar
+Cancelar
+Buscar
+Nueva
+Cerrar ficha
+```
+
+Errores:
+
+```text
+→ alert
+→ draft intacto
+→ baseSnapshot intacto
+→ maestro intacto
+→ dirty true
+→ saving false
+```
+
+Tests cubren:
+
+```text
+create desde workspace
+update desde workspace
+normalización opcionales
+sincronización maestro
+workspace limpio tras éxito
+fallo conserva draft/dirty/maestro
+formulario no guarda si inválido
+formulario bloqueado durante saving
+```
+
+### 27.6.4 16.13.6C — Logo Marca ⬅️ SIGUIENTE
+
+Implementar renderer sobre la infraestructura cerrada en 16.13.3:
+
+```text
+logo actual
+seleccionar
+stageBrandImage()
+preview
+quitar
+keep
+replace
+remove
+cleanup staging
+Cancelar
+discard workspace dirty
+Guardar create/update con logo
+```
+
+Debe manejar correctamente:
+
+```text
+Marca nueva
+Marca existente con logo
+Marca existente sin logo
+reemplazo
+eliminación
+selección sucesiva de varias imágenes
+cancelación
+error de staging
+error de persistencia
+```
+
+### 27.6.5 16.13.6D — Soft-delete + regresión Datos ⬜
+
+Después del logo:
+
+```text
+Eliminar solo existente
+confirmación
+deactivate()
+quitar del maestro activo
+cerrar workspace
+regresión integral de Datos
+```
+
+No avanzar a Estadísticas hasta cerrar 16.13.6D.
+
+---
 ## 27.7 16.13.7 — Backend Estadísticas ⬜
 
 Consulta agregada por:
@@ -2426,11 +2903,17 @@ Solo marca persistida.
 
 ## 27.9 16.13.9 — Sincronización maestro global ⬜
 
-Comprobar:
+Parte ya implementada:
 
 ```text
 crear
-renombrar
+renombrar/update
+→ upsert inmediato en maestro renderer
+```
+
+Queda la verificación integral:
+
+```text
 logo
 eliminar
 selectores
@@ -2646,9 +3129,9 @@ https://github.com/osumionline/Osumi-TPV-Client
 
 3. si GitHub falla:
    - comunicar el **error exacto**;
-   - distinguir una respuesta HTTP real (`404`, `403`, `429`, etc.) de un fallo de la capa de acceso (`DisabledError`, timeout, DNS, etc.);
+   - distinguir respuesta HTTP real (`404`, `403`, `429`, etc.) de fallo de capa de acceso (`DisabledError`, timeout, DNS, etc.);
    - no atribuir automáticamente el fallo al repositorio;
-   - pedir solo los archivos concretos necesarios para el bloque activo;
+   - pedir únicamente los archivos concretos necesarios;
 4. confirmar:
 
 ```text
@@ -2657,57 +3140,73 @@ Hito 14 Clientes ✅
 Hito 15 Almacén ✅
 REF ✅
 CTRL ✅
+
 Pedidos 16.1–16.12 ✅
 
 Marcas:
 16.13.1 ✅
 16.13.2 ✅
 16.13.3 ✅
-16.13.4A ✅
-16.13.4B ✅
-16.13.4C ⬅️ SIGUIENTE
+16.13.4 ✅
+16.13.5 ✅
+16.13.6A ✅
+16.13.6A.1 ✅
+16.13.6B ✅
+16.13.6C ⬅️ SIGUIENTE
 ```
 
-5. tener en cuenta que `/src/app/services` ha sido reorganizado en subcarpetas;
+5. recordar que `/src/app/services` está reorganizado en subcarpetas;
 6. NO reutilizar rutas antiguas de imports sin comprobar `main`;
 7. continuar exactamente con:
 
 ```text
-16.13.4C — Barra contextual integrada de Compras
+16.13.6C — Logo de Marca
 ```
 
 8. objetivo del bloque:
 
 ```text
-eliminar cabecera redundante de Marcas
-integrar acciones a la derecha de tabs Compras
-mantener PurchasesTabs genérico
-preparar patrón reutilizable para Proveedores
+mostrar logo persistido
+seleccionar imagen
+stageBrandImage()
+preview
+quitar logo
+keep/replace/remove
+guardar create/update con staging
+limpiar staging al cancelar
+limpiar staging al descartar workspace
+preservar staging/draft correctamente ante errores
 ```
 
-9. revisar antes del patch:
+9. revisar antes del patch, según `main`:
 
 ```text
-PurchasesComponent
-PurchasesTabsComponent
+MarcaFormComponent
 MarcasComponent
-MarcasService en su NUEVA ruta
-ComprasWorkspaceService en su NUEVA ruta
-tests asociados
+MarcaToolbarActionsComponent
+MarcasService
+MarcaFormModel / Workspace
+FilesService o acceso window.osumiDesktop.files
+StageImageRequest
+StagedImageInterface
+FilesApi
+CrearMarcaCommand
+ActualizarMarcaCommand
+MarcaLogoUpdateCommand
+tests de imagen/staging renderer existentes
+patrón de imagen de Artículos si existe
 ```
 
-10. después de 16.13.4C:
-   - prueba visual;
-   - cerrar 16.13.4;
-   - avanzar a 16.13.5 Buscador de Marcas;
-11. imports internos siempre por alias absoluto;
-12. todo método nuevo, también en interfaces, lleva JSDoc;
-13. interfaz modificada → adaptar fakes/mocks/specs en el mismo bloque;
-14. usuario aplica y prueba; asistente no hace commits ni ejecuta el proyecto;
-15. esperar confirmación antes de avanzar;
-16. no tocar `12C.9 TicketBAI` sin información de Berein;
-17. no diseñar Proveedores hasta cerrar Marcas;
-18. protocolo GitHub:
+10. no duplicar infraestructura de imágenes: reutilizar `files.stageBrandImage()` y `discardStagedImage()`;
+11. después de `16.13.6C`, avanzar a `16.13.6D — Soft-delete + regresión Datos`;
+12. imports internos siempre por alias absoluto;
+13. todo método nuevo, también en interfaces, lleva JSDoc;
+14. interfaz modificada → adaptar fakes/mocks/specs en el mismo bloque;
+15. usuario aplica y prueba; asistente no hace commits ni ejecuta el proyecto;
+16. esperar confirmación antes de avanzar;
+17. no tocar `12C.9 TicketBAI` sin información de Berein;
+18. no diseñar Proveedores hasta cerrar Marcas;
+19. protocolo GitHub:
     - intentar `main` primero;
     - si falla, explicar el error exacto;
     - ZIP/adjuntos solo como fallback.
@@ -2717,8 +3216,8 @@ tests asociados
 
 ```text
 Proyecto: Osumi TPV Client
-Continuidad: 14/09/2026
-Base: v2.60 + main
+Continuidad: 15/09/2026
+Base: v2.61 + main
 
 Hito 13 Artículos ✅
 Hito 14 Clientes ✅
@@ -2738,60 +3237,76 @@ MARCAS:
 16.13.1 Snapshot histórico ✅
 16.13.2 Backend CRUD/soft-delete ✅
 16.13.3 Infraestructura logo ✅
+16.13.4 Workspace + pantalla base ✅
+16.13.5 Buscador en memoria ✅
 
-16.13.4 Workspace + pantalla base 🟦
-16.13.4A Workspace ✅
-→ draft/baseSnapshot
+16.13.6 Ficha Datos 🟦
+
+16.13.6A ✅
+→ Signal Forms
+→ Nombre obligatorio
+→ Email opcional válido
 → dirty computed
-→ data/statistics
-→ filtros persistentes
-→ activeSection Compras persistente
+→ Cancelar
+→ draft persistente
 
-16.13.4B Pantalla base ✅
-→ bienvenida
-→ nueva Marca
-→ tabs internas
-→ navegación conserva estado
+16.13.6A.1 ✅
+→ foco automático en Nombre al crear/seleccionar
+
+16.13.6B ✅
+→ Guardar
+→ CREATE
+→ UPDATE
+→ crearProveedor=false
+→ update logo omitido = keep
+→ saving
+→ reconciliación canónica
+→ upsert maestro inmediato
+→ dirty false
+→ feedback temporal
+→ errores conservan draft
 
 SIGUIENTE:
-16.13.4C Barra contextual integrada Compras
+16.13.6C Logo de Marca
 
-Nuevo diseño:
+Ya existe infraestructura:
+→ stageBrandImage()
+→ discardStagedImage()
+→ WebP
+→ brand_image
+→ files/brands/
+→ create logoStagingId
+→ update keep/remove/replace
+→ promoción/rollback backend
+
+16.13.6C debe hacer:
+→ preview
+→ selección
+→ staging
+→ replace/remove/keep
+→ cleanup al Cancelar
+→ cleanup al descartar workspace
+→ Guardar con logo
+
+Después:
+16.13.6D Soft-delete + regresión Datos
+16.13.7 Backend Estadísticas
+16.13.8 UI Estadísticas
+16.13.9 Maestro global integral
+16.13.10 Regresión
+16.14 Proveedores
+
+UI Compras:
 COMPRAS
 PEDIDOS | MARCAS | PROVEEDORES                 contexto derecha
-
-Pedidos:
-→ derecha vacía
 
 Marcas:
 → Buscar + Nueva
 → con ficha: nombre + cerrar + Buscar + Nueva
 
-Proveedores:
-→ Buscar + Nuevo
-→ con ficha: nombre + cerrar + Buscar + Nuevo
-
-Arquitectura:
-→ PurchasesTabs genérico
-→ zona proyectable derecha
-→ acciones siguen perteneciendo al dominio activo
-→ eliminar cabecera redundante de Marcas
-
-Refactor adicional:
-→ /src/app/services reorganizado en subcarpetas
-→ imports corregidos
-→ tests verdes
-→ aplicación arranca
+Refactor:
+→ /src/app/services organizado en subcarpetas
 → NO asumir rutas antiguas
-
-Después:
-16.13.5 Buscador en memoria
-16.13.6 Ficha Datos
-16.13.7 Backend Estadísticas
-16.13.8 UI Estadísticas
-16.13.9 Maestro global
-16.13.10 Regresión
-16.14 Proveedores
 
 Reglas:
 → JSDoc en todos los métodos nuevos, también interfaces
@@ -2811,7 +3326,8 @@ Reglas:
 | 2.57 | 14/09/2026 | 16.10–16.12 cerrados; Pedidos cerrado; contrato y plan de Marcas aprobados |
 | 2.58 | 14/09/2026 | 16.13.1 + 16.13.2 cerrados; 16.13.3A/B cerrados; siguiente 16.13.3C |
 | 2.59 | 14/09/2026 | Protocolo explícito de acceso a GitHub/main y fallback por archivos |
-| **2.60** | **14/09/2026** | **16.13.3 cerrado; 16.13.4A/B cerrados; servicios frontend reorganizados; aprobado rediseño barra contextual; siguiente 16.13.4C** |
+| 2.60 | 14/09/2026 | 16.13.3 cerrado; 16.13.4A/B cerrados; servicios frontend reorganizados; aprobado rediseño barra contextual |
+| **2.61** | **15/09/2026** | **16.13.4 y 16.13.5 cerrados; 16.13.6A/A.1/B cerrados; siguiente 16.13.6C Logo de Marca** |
 
 ---
 # 34. Prompt de arranque recomendado
@@ -2820,7 +3336,7 @@ Reglas:
 Estoy continuando el desarrollo de Osumi TPV Client.
 
 Usa como contexto principal el archivo
-“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.60.
+“Osumi TPV Client — Documento de continuidad y relevo”, versión 2.61.
 
 Estado:
 - Artículos 13 ✅
@@ -2836,17 +3352,19 @@ Estado:
     - 16.13.1 Snapshot histórico ✅
     - 16.13.2 Backend CRUD/soft-delete ✅
     - 16.13.3 Infraestructura logo ✅
-    - 16.13.4A Workspace ✅
-    - 16.13.4B Pantalla base ✅
-    - 16.13.4C Barra contextual ⬅️ SIGUIENTE
+    - 16.13.4 Workspace + pantalla base ✅
+    - 16.13.5 Buscador en memoria ✅
+    - 16.13.6A Formulario Datos ✅
+    - 16.13.6A.1 Foco Nombre ✅
+    - 16.13.6B CREATE / UPDATE + Guardar ✅
+    - 16.13.6C Logo ⬅️ SIGUIENTE
 
 Punto exacto:
-16.13.4C — Barra contextual integrada de Compras.
+16.13.6C — Logo de Marca.
 
 IMPORTANTE:
-El usuario ha reorganizado completamente `/src/app/services` en subcarpetas.
-Todos los imports fueron corregidos, tests pasan y la aplicación arranca.
-NO asumas rutas antiguas de servicios: revisa `main`.
+`/src/app/services` está reorganizado en subcarpetas.
+NO asumas rutas antiguas: revisa `main`.
 
 Antes de proponer cambios:
 - intenta siempre revisar `main` actual en GitHub;
@@ -2854,26 +3372,48 @@ Antes de proponer cambios:
 - distingue error HTTP real frente a fallo de capa de acceso (`DisabledError`, timeout, DNS, etc.);
 - solo entonces pide los archivos concretos necesarios.
 
-Diseño aprobado para 16.13.4C:
-- mantener cabecera COMPRAS;
-- usar una sola barra para tabs + acciones contextuales;
-- Pedidos: derecha vacía;
-- Marcas: Buscar + Nueva;
-- Marca abierta: nombre + cerrar + Buscar + Nueva;
-- Proveedores: patrón equivalente en el futuro;
-- eliminar la cabecera redundante propia de Marcas;
-- PurchasesTabsComponent debe seguir siendo genérico;
-- las acciones contextuales deben proyectarse/componerse desde PurchasesComponent o componentes de dominio.
+Estado renderer de Marcas:
+- barra contextual integrada en tabs Compras;
+- buscador totalmente en memoria;
+- cambio/nueva/cierre con protección dirty;
+- workspace persistente;
+- Signal Form Datos;
+- Nombre obligatorio;
+- foco automático Nombre;
+- Cancelar;
+- Guardar create/update;
+- saving;
+- feedback temporal;
+- maestro actualizado inmediatamente;
+- respuesta backend canónica reconstruye draft/baseSnapshot.
 
-Workspace Marcas:
-- draft + baseSnapshot;
-- dirty computed;
-- marca activa;
-- data/statistics;
-- filtros estadísticas persistentes;
-- salir a otro módulo conserva todo.
+Infraestructura de logo ya existente:
+- files.stageBrandImage();
+- files.discardStagedImage();
+- CrearMarcaCommand.logoStagingId?;
+- ActualizarMarcaCommand.logo?;
+- keep/remove/replace;
+- WebP;
+- purpose brand_image;
+- files/brands/;
+- promoción/rollback en backend.
 
-No empieces 16.13.5 hasta cerrar y validar visualmente 16.13.4C.
+16.13.6C debe implementar SOLO la capa renderer y lifecycle:
+- mostrar logo;
+- seleccionar imagen;
+- staging y preview;
+- reemplazar;
+- quitar;
+- dirty;
+- guardar create/update con logo;
+- limpiar staging al Cancelar;
+- limpiar staging al descartar workspace;
+- manejo correcto de errores.
+
+Después:
+16.13.6D — Soft-delete + regresión integral de Datos.
+
+No avances a Estadísticas antes de cerrar 16.13.6.
 
 Reglas:
 - imports internos por alias absoluto;
@@ -2886,4 +3426,4 @@ Reglas:
 
 ---
 
-**Fin del documento de continuidad v2.60.**
+**Fin del documento de continuidad v2.61.**
