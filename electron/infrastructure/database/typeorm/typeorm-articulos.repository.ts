@@ -85,6 +85,7 @@ interface ArticuloArchivoDatabaseRow {
 interface ArticuloUpdateDatabaseRow {
   readonly id: number;
   readonly localizador: number;
+  readonly id_marca: number;
   readonly stock: number;
 }
 
@@ -594,12 +595,14 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
         idArticulo,
       );
 
-      await this.requireActiveReference(
-        queryRunner,
-        'marca',
-        command.idMarca,
-        'La marca seleccionada no existe.',
-      );
+      if (command.idMarca !== current.id_marca) {
+        await this.requireActiveReference(
+          queryRunner,
+          'marca',
+          command.idMarca,
+          'La marca seleccionada no existe.',
+        );
+      }
 
       if (command.idProveedor !== null) {
         await this.requireActiveReference(
@@ -1146,6 +1149,7 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
       SELECT
         id,
         localizador,
+        id_marca,
         stock
       FROM articulo
       WHERE

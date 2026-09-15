@@ -559,6 +559,89 @@ describe('TypeOrmArticulosRepository', (): void => {
       },
     ]);
   });
+
+  it('permite editar un artículo conservando una Marca que ha sido dada de baja', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(`
+    UPDATE marca
+    SET deleted_at = CURRENT_TIMESTAMP
+    WHERE id = 1
+  `);
+
+    await requireRepository().update(
+      createUpdateCommand({
+        nombre: 'Artículo con Marca histórica',
+        idMarca: 1,
+      }),
+    );
+
+    const articulo: ArticuloRecord | null = await requireRepository().findById(1);
+
+    expect(articulo).toMatchObject({
+      id: 1,
+      nombre: 'Artículo con Marca histórica',
+      idMarca: 1,
+    });
+  });
+
+  it('no permite cambiar un artículo a una Marca dada de baja', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(`
+    INSERT INTO marca (
+      id,
+      public_id,
+      nombre,
+      deleted_at
+    )
+    VALUES (
+      2,
+      'deleted-brand',
+      'Marca eliminada',
+      CURRENT_TIMESTAMP
+    )
+  `);
+
+    await expect(
+      requireRepository().update(
+        createUpdateCommand({
+          idMarca: 2,
+        }),
+      ),
+    ).rejects.toThrow('La marca seleccionada no existe.');
+
+    const articulo: ArticuloRecord | null = await requireRepository().findById(1);
+
+    expect(articulo?.idMarca).toBe(1);
+  });
+
+  it('no permite crear un artículo utilizando una Marca dada de baja', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(`
+    INSERT INTO marca (
+      id,
+      public_id,
+      nombre,
+      deleted_at
+    )
+    VALUES (
+      2,
+      'deleted-brand',
+      'Marca eliminada',
+      CURRENT_TIMESTAMP
+    )
+  `);
+
+    await expect(
+      requireRepository().create(
+        createNewArticleCommand({
+          idMarca: 2,
+        }),
+      ),
+    ).rejects.toThrow('La marca seleccionada no existe.');
+  });
 });
 
 /**
