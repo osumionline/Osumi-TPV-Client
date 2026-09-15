@@ -6,10 +6,17 @@
     display: flex;
     min-height: 44px;
     align-items: stretch;
-    padding: 0 24px;
-    overflow-x: auto;
     border-bottom: 1px solid var(--separator-color);
     background-color: var(--color-white);
+
+    .purchases-tabs__navigation {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        align-items: stretch;
+        padding-left: 24px;
+        overflow-x: auto;
+    }
 
     .purchases-tabs__item {
         min-width: max-content;
@@ -31,5 +38,17 @@
         border-bottom-color: var(--main-color);
         font-weight: 600;
         opacity: 1;
+    }
+
+    .purchases-tabs__actions {
+        display: flex;
+        min-width: 0;
+        flex: 0 0 auto;
+        align-items: center;
+        padding: 0 16px 0 12px;
+
+        &:empty {
+            display: none;
+        }
     }
 }

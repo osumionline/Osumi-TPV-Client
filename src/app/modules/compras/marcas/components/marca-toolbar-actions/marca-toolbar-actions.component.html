@@ -1,0 +1,39 @@
+<div class="brand-actions">
+    @if (marcasService.workspace(); as workspace) {
+    <strong class="brand-actions__name">
+        {{ workspace.draft.nombre || 'Nueva marca' }}
+    </strong>
+
+    <button mat-icon-button
+            type="button"
+            matTooltip="Cerrar ficha"
+            aria-label="Cerrar ficha de marca"
+            [disabled]="marcasService.dirty()"
+            (click)="closeMarca()">
+        <mat-icon>
+            close
+        </mat-icon>
+    </button>
+    }
+
+    <button mat-icon-button
+            type="button"
+            matTooltip="Buscar marca"
+            aria-label="Buscar marca"
+            disabled>
+        <mat-icon>
+            search
+        </mat-icon>
+    </button>
+
+    <button mat-icon-button
+            type="button"
+            matTooltip="Nueva marca"
+            aria-label="Crear una marca nueva"
+            [disabled]="marcasService.dirty()"
+            (click)="newMarca()">
+        <mat-icon>
+            add
+        </mat-icon>
+    </button>
+</div>

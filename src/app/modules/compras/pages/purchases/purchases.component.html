@@ -10,7 +10,14 @@
         </header>
 
         <otpv-purchases-tabs [activeSection]="activeSection()"
-                             (selectSectionEvent)="selectSection($event)" />
+                             (selectSectionEvent)="selectSection($event)">
+            @switch (activeSection()) {
+            @case ('brands') {
+            <otpv-marca-toolbar-actions />
+            }
+            }
+        </otpv-purchases-tabs>
+
 
         <div class="purchases__content">
             @switch (activeSection()) {

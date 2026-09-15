@@ -11,37 +11,6 @@
     flex-direction: column;
     background-color: var(--color-white);
 
-    .brands__toolbar {
-        display: flex;
-        min-height: 64px;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        padding: 0 16px;
-        border-bottom: 1px solid var(--separator-color);
-
-        h2 {
-            font-size: 22px;
-            font-weight: 400;
-            line-height: 1.2;
-        }
-    }
-
-    .brands__toolbar-actions {
-        display: flex;
-        min-width: 0;
-        align-items: center;
-        gap: 4px;
-    }
-
-    .brands__name {
-        max-width: 420px;
-        margin-right: 4px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
     .brands__workspace {
         min-height: 0;
         flex: 1;
