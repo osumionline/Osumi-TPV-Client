@@ -1,9 +1,14 @@
 import { computed, inject, Service, signal, type Signal, type WritableSignal } from '@angular/core';
 import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
+import type ActualizarComercialCommand from '@desktop-contracts/proveedores/actualizar-comercial-command.interface';
 import type ActualizarProveedorCommand from '@desktop-contracts/proveedores/actualizar-proveedor-command.interface';
+import type CrearComercialCommand from '@desktop-contracts/proveedores/crear-comercial-command.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
 import type ProveedorLogoUpdateCommand from '@desktop-contracts/proveedores/proveedor-logo-update-command.type';
-import type { ProveedorInterface } from '@desktop-contracts/proveedores/proveedor.interface';
+import type {
+  ComercialInterface,
+  ProveedorInterface,
+} from '@desktop-contracts/proveedores/proveedor.interface';
 import createComercialFormInitialValue from '@model/proveedores/comercial-form.initial-value';
 import createComercialFormModel from '@model/proveedores/comercial-form.mapper';
 import type ComercialFormModel from '@model/proveedores/comercial-form.model';
@@ -41,6 +46,8 @@ export default class ProveedoresService {
   private readonly loadedSignal: WritableSignal<boolean> = signal<boolean>(false);
   private readonly workspaceSignal: WritableSignal<ProveedorWorkspace | null> =
     signal<ProveedorWorkspace | null>(null);
+  private readonly comercialSavingSignal: WritableSignal<boolean> = signal<boolean>(false);
+  private readonly comercialDeactivatingSignal: WritableSignal<boolean> = signal<boolean>(false);
 
   private pendingRequest: Promise<void> | null = null;
 
@@ -50,9 +57,16 @@ export default class ProveedoresService {
   readonly focusNameRequest: Signal<number> = this.focusNameRequestSignal.asReadonly();
   readonly saving: Signal<boolean> = this.savingSignal.asReadonly();
   readonly deactivating: Signal<boolean> = this.deactivatingSignal.asReadonly();
+  readonly comercialSaving: Signal<boolean> = this.comercialSavingSignal.asReadonly();
+  readonly comercialDeactivating: Signal<boolean> = this.comercialDeactivatingSignal.asReadonly();
 
   readonly processing: Signal<boolean> = computed(
-    (): boolean => this.saving() || this.logoProcessingSignal() || this.deactivating(),
+    (): boolean =>
+      this.saving() ||
+      this.logoProcessingSignal() ||
+      this.deactivating() ||
+      this.comercialSaving() ||
+      this.comercialDeactivating(),
   );
 
   readonly hasWorkspace: Signal<boolean> = computed((): boolean => this.workspace() !== null);
@@ -80,6 +94,20 @@ export default class ProveedoresService {
   readonly hasUnsavedChanges: Signal<boolean> = computed(
     (): boolean => this.dirty() || this.comercialDirty(),
   );
+
+  readonly workspaceProveedor: Signal<Proveedor | null> = computed((): Proveedor | null => {
+    const workspace: ProveedorWorkspace | null = this.workspace();
+
+    if (workspace === null || workspace.proveedorId === null) {
+      return null;
+    }
+
+    return (
+      this.proveedores().find(
+        (proveedor: Proveedor): boolean => proveedor.id === workspace.proveedorId,
+      ) ?? null
+    );
+  });
 
   load(): Promise<void> {
     if (this.loaded()) {
@@ -422,6 +450,125 @@ export default class ProveedoresService {
   }
 
   /**
+   * Persiste el Comercial actualmente abierto
+   * y reconcilia inmediatamente el Proveedor canónico.
+   */
+  async saveComercialWorkspace(): Promise<Comercial> {
+    if (this.processing()) {
+      throw new Error('Ya hay una operación de proveedor en curso.');
+    }
+
+    const workspace = this.requirePersistedWorkspace();
+
+    const comercialWorkspace: ProveedorComercialWorkspace =
+      this.requireComercialWorkspace(workspace);
+
+    const proveedor: Proveedor = this.requireCanonicalWorkspaceProveedor(workspace);
+
+    const command: CrearComercialCommand = this.createComercialPersistableCommand(
+      comercialWorkspace.draft,
+    );
+
+    this.comercialSavingSignal.set(true);
+
+    try {
+      let persistedInterface: ComercialInterface;
+
+      if (comercialWorkspace.state === 'new') {
+        persistedInterface = await window.osumiDesktop.proveedores.createComercial(
+          workspace.proveedorId,
+          command,
+        );
+      } else {
+        if (comercialWorkspace.comercialId === null) {
+          throw new Error('El Comercial persistido no contiene un identificador válido.');
+        }
+
+        const updateCommand: ActualizarComercialCommand = command;
+
+        persistedInterface = await window.osumiDesktop.proveedores.updateComercial(
+          workspace.proveedorId,
+          comercialWorkspace.comercialId,
+          updateCommand,
+        );
+      }
+
+      if (this.pendingRequest !== null) {
+        await this.pendingRequest;
+      }
+
+      const comercial: Comercial = new Comercial().fromInterface(persistedInterface);
+
+      this.upsertComercial(proveedor, comercial);
+
+      const persistedModel: ComercialFormModel = createComercialFormModel(comercial);
+
+      const currentWorkspace: ProveedorWorkspace = this.requirePersistedWorkspace();
+
+      this.workspaceSignal.set({
+        ...currentWorkspace,
+        activeSection: 'commercials',
+        comercialWorkspace: {
+          comercialId: comercial.id,
+          comercialPublicId: comercial.publicId,
+          state: 'existing',
+          draft: cloneComercialFormModel(persistedModel),
+          baseSnapshot: cloneComercialFormModel(persistedModel),
+        },
+      });
+
+      return comercial;
+    } finally {
+      this.comercialSavingSignal.set(false);
+    }
+  }
+
+  /**
+   * Da de baja el Comercial persistido abierto,
+   * actualiza el Proveedor canónico y cierra su editor.
+   */
+  async deactivateComercialWorkspace(): Promise<void> {
+    if (this.processing()) {
+      throw new Error('Ya hay una operación de proveedor en curso.');
+    }
+
+    const workspace = this.requirePersistedWorkspace();
+
+    const comercialWorkspace: ProveedorComercialWorkspace =
+      this.requireComercialWorkspace(workspace);
+
+    if (comercialWorkspace.state !== 'existing' || comercialWorkspace.comercialId === null) {
+      throw new Error('No se puede eliminar un Comercial que todavía no se ha guardado.');
+    }
+
+    const proveedor: Proveedor = this.requireCanonicalWorkspaceProveedor(workspace);
+
+    this.comercialDeactivatingSignal.set(true);
+
+    try {
+      await window.osumiDesktop.proveedores.deactivateComercial(
+        workspace.proveedorId,
+        comercialWorkspace.comercialId,
+      );
+
+      if (this.pendingRequest !== null) {
+        await this.pendingRequest;
+      }
+
+      this.removeComercial(proveedor, comercialWorkspace.comercialId);
+
+      const currentWorkspace: ProveedorWorkspace = this.requirePersistedWorkspace();
+
+      this.workspaceSignal.set({
+        ...currentWorkspace,
+        comercialWorkspace: null,
+      });
+    } finally {
+      this.comercialDeactivatingSignal.set(false);
+    }
+  }
+
+  /**
    * Cierra únicamente el workspace local
    * del Comercial seleccionado.
    */
@@ -598,6 +745,8 @@ export default class ProveedoresService {
     this.savingSignal.set(false);
     this.logoProcessingSignal.set(false);
     this.deactivatingSignal.set(false);
+    this.comercialSavingSignal.set(false);
+    this.comercialDeactivatingSignal.set(false);
   }
 
   findById(id: number): Proveedor | null {
@@ -729,14 +878,20 @@ export default class ProveedoresService {
    * Obtiene el workspace garantizando que el
    * Proveedor ya dispone de identidad persistida.
    */
-  private requirePersistedWorkspace(): ProveedorWorkspace {
+  private requirePersistedWorkspace(): ProveedorWorkspace & {
+    readonly proveedorId: number;
+    readonly proveedorPublicId: string;
+  } {
     const workspace: ProveedorWorkspace = this.requireWorkspace();
 
     if (workspace.proveedorId === null || workspace.proveedorPublicId === null) {
       throw new Error('La operación requiere un proveedor persistido.');
     }
 
-    return workspace;
+    return workspace as ProveedorWorkspace & {
+      readonly proveedorId: number;
+      readonly proveedorPublicId: string;
+    };
   }
 
   /**
@@ -749,6 +904,86 @@ export default class ProveedoresService {
     }
 
     return workspace.comercialWorkspace;
+  }
+
+  /**
+   * Construye los datos persistibles
+   * desde el draft de Comercial.
+   */
+  private createComercialPersistableCommand(model: ComercialFormModel): CrearComercialCommand {
+    return {
+      nombre: model.nombre.trim(),
+      telefono: this.normalizeOptionalText(model.telefono),
+      email: this.normalizeOptionalText(model.email),
+      observaciones: this.normalizeOptionalText(model.observaciones),
+    };
+  }
+
+  /**
+   * Recupera el Proveedor canónico asociado al
+   * workspace antes de ejecutar un CRUD de Comercial.
+   */
+  private requireCanonicalWorkspaceProveedor(workspace: ProveedorWorkspace): Proveedor {
+    if (workspace.proveedorId === null) {
+      throw new Error('La operación requiere un proveedor persistido.');
+    }
+
+    const proveedor: Proveedor | null = this.findById(workspace.proveedorId);
+
+    if (proveedor === null) {
+      throw new Error('El proveedor abierto no existe en el maestro activo.');
+    }
+
+    return proveedor;
+  }
+
+  /**
+   * Inserta o sustituye un Comercial dentro del
+   * Proveedor canónico sin realizar ninguna recarga.
+   */
+  private upsertComercial(proveedorBase: Proveedor, comercial: Comercial): void {
+    const proveedor: Proveedor =
+      proveedorBase.id === null
+        ? proveedorBase
+        : (this.findById(proveedorBase.id) ?? proveedorBase);
+
+    const comerciales: Comercial[] = [
+      ...proveedor.comerciales.filter(
+        (item: Comercial): boolean => item.publicId !== comercial.publicId,
+      ),
+      comercial,
+    ].sort((left: Comercial, right: Comercial): number =>
+      left.nombre.localeCompare(right.nombre, 'es', {
+        sensitivity: 'base',
+      }),
+    );
+
+    const updatedProveedor: Proveedor = new Proveedor().fromInterface({
+      ...proveedor.toInterface(),
+      comerciales: comerciales.map((item: Comercial): ComercialInterface => item.toInterface()),
+    });
+
+    this.upsertProveedor(updatedProveedor);
+  }
+
+  /**
+   * Elimina un Comercial del Proveedor canónico
+   * después de confirmar su soft-delete.
+   */
+  private removeComercial(proveedorBase: Proveedor, idComercial: number): void {
+    const proveedor: Proveedor =
+      proveedorBase.id === null
+        ? proveedorBase
+        : (this.findById(proveedorBase.id) ?? proveedorBase);
+
+    const updatedProveedor: Proveedor = new Proveedor().fromInterface({
+      ...proveedor.toInterface(),
+      comerciales: proveedor.comerciales
+        .filter((comercial: Comercial): boolean => comercial.id !== idComercial)
+        .map((comercial: Comercial): ComercialInterface => comercial.toInterface()),
+    });
+
+    this.upsertProveedor(updatedProveedor);
   }
 
   private loadData(): Promise<void> {

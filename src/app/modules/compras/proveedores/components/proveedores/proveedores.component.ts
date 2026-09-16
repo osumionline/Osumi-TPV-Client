@@ -1,6 +1,9 @@
 import { Component, DestroyRef, inject, signal, type WritableSignal } from '@angular/core';
+import type ComercialFormModel from '@model/proveedores/comercial-form.model';
+import Comercial from '@model/proveedores/comercial.model';
 import type ProveedorFormModel from '@model/proveedores/proveedor-form.model';
 import type ProveedorWorkspaceSection from '@model/proveedores/proveedor-workspace-section.type';
+import ProveedorComercialesComponent from '@modules/compras/proveedores/components/proveedor-comerciales/proveedor-comerciales.component';
 import ProveedorFormComponent from '@modules/compras/proveedores/components/proveedor-form/proveedor-form.component';
 import ProveedorMarcasComponent from '@modules/compras/proveedores/components/proveedor-marcas/proveedor-marcas.component';
 import ProveedorSectionTabsComponent from '@modules/compras/proveedores/components/proveedor-section-tabs/proveedor-section-tabs.component';
@@ -17,7 +20,12 @@ import { getErrorMessage } from '@utils/error.utils';
   selector: 'otpv-proveedores',
   templateUrl: './proveedores.component.html',
   styleUrl: './proveedores.component.scss',
-  imports: [ProveedorFormComponent, ProveedorMarcasComponent, ProveedorSectionTabsComponent],
+  imports: [
+    ProveedorComercialesComponent,
+    ProveedorFormComponent,
+    ProveedorMarcasComponent,
+    ProveedorSectionTabsComponent,
+  ],
 })
 export default class ProveedoresComponent {
   readonly proveedoresService: ProveedoresService = inject(ProveedoresService);
@@ -26,12 +34,15 @@ export default class ProveedoresComponent {
   private readonly destroyRef: DestroyRef = inject(DestroyRef);
 
   private saveFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
+  private commercialSaveFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
 
   readonly saveSuccessful: WritableSignal<boolean> = signal<boolean>(false);
+  readonly commercialSaveSuccessful: WritableSignal<boolean> = signal<boolean>(false);
 
   constructor() {
     this.destroyRef.onDestroy((): void => {
       this.clearSaveFeedbackTimeout();
+      this.clearCommercialSaveFeedbackTimeout();
     });
   }
 
@@ -230,6 +241,229 @@ export default class ProveedoresComponent {
           void this.confirmDeleteProveedor();
         }
       });
+  }
+
+  /**
+   * Abre un Comercial persistido, solicitando
+   * confirmación si se perdería otro draft dirty.
+   */
+  selectComercial(comercial: Comercial): void {
+    if (this.proveedoresService.processing()) {
+      return;
+    }
+
+    const current = this.proveedoresService.workspace()?.comercialWorkspace ?? null;
+
+    if (current?.state === 'existing' && current.comercialId === comercial.id) {
+      return;
+    }
+
+    this.hideCommercialSaveFeedback();
+
+    this.runAfterComercialDiscardConfirmation((): void => {
+      this.proveedoresService.abrirComercial(comercial);
+    });
+  }
+
+  /**
+   * Inicia un Comercial nuevo, confirmando antes
+   * el descarte del Comercial dirty actual.
+   */
+  newComercial(): void {
+    if (this.proveedoresService.processing()) {
+      return;
+    }
+
+    this.hideCommercialSaveFeedback();
+
+    this.runAfterComercialDiscardConfirmation((): void => {
+      this.proveedoresService.crearBorradorComercial();
+    });
+  }
+
+  /**
+   * Sincroniza el formulario de Comercial
+   * con su workspace independiente.
+   */
+  updateComercialDraft(model: ComercialFormModel): void {
+    if (this.proveedoresService.processing()) {
+      return;
+    }
+
+    this.hideCommercialSaveFeedback();
+
+    this.proveedoresService.actualizarComercialDraft(model);
+  }
+
+  /**
+   * Persiste el Comercial actual sin guardar
+   * ni modificar el draft principal del Proveedor.
+   */
+  async saveComercial(model: ComercialFormModel): Promise<void> {
+    if (this.proveedoresService.processing()) {
+      return;
+    }
+
+    this.hideCommercialSaveFeedback();
+
+    this.proveedoresService.actualizarComercialDraft(model);
+
+    try {
+      await this.proveedoresService.saveComercialWorkspace();
+
+      this.showCommercialSaveFeedback();
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido guardar el comercial.'),
+        })
+        .subscribe();
+    }
+  }
+
+  /**
+   * Cancela únicamente el Comercial activo.
+   *
+   * Un Comercial nuevo se cierra; uno existente
+   * vuelve a su propia instantánea base.
+   */
+  cancelComercial(): void {
+    if (this.proveedoresService.processing()) {
+      return;
+    }
+
+    const comercialWorkspace = this.proveedoresService.workspace()?.comercialWorkspace ?? null;
+
+    if (comercialWorkspace === null) {
+      return;
+    }
+
+    this.hideCommercialSaveFeedback();
+
+    if (comercialWorkspace.state === 'new') {
+      this.proveedoresService.cerrarComercial();
+
+      return;
+    }
+
+    this.proveedoresService.cancelarCambiosComercial();
+  }
+
+  /**
+   * Solicita confirmación antes de dar
+   * de baja el Comercial seleccionado.
+   */
+  deleteComercial(): void {
+    if (this.proveedoresService.processing()) {
+      return;
+    }
+
+    const comercialWorkspace = this.proveedoresService.workspace()?.comercialWorkspace ?? null;
+
+    if (comercialWorkspace === null || comercialWorkspace.state !== 'existing') {
+      return;
+    }
+
+    const nombre: string =
+      comercialWorkspace.baseSnapshot.nombre || comercialWorkspace.draft.nombre;
+
+    const dirtyMessage: string = this.proveedoresService.comercialDirty()
+      ? ' Los cambios sin guardar también se perderán.'
+      : '';
+
+    this.dialog
+      .confirm({
+        title: 'Eliminar comercial',
+        content: `¿Quieres eliminar el comercial "${nombre}"?${dirtyMessage}`,
+      })
+      .subscribe((result: boolean): void => {
+        if (result) {
+          void this.confirmDeleteComercial();
+        }
+      });
+  }
+
+  /**
+   * Ejecuta una sustitución del Comercial actual
+   * directamente o después de confirmar su descarte.
+   */
+  private runAfterComercialDiscardConfirmation(action: () => void): void {
+    if (!this.proveedoresService.comercialDirty()) {
+      action();
+
+      return;
+    }
+
+    this.dialog
+      .confirm({
+        title: 'Descartar cambios',
+        content:
+          'El comercial actual contiene cambios sin guardar. ' +
+          '¿Quieres descartarlos y continuar?',
+      })
+      .subscribe((result: boolean): void => {
+        if (result) {
+          action();
+        }
+      });
+  }
+
+  /**
+   * Ejecuta la baja confirmada del Comercial.
+   */
+  private async confirmDeleteComercial(): Promise<void> {
+    this.hideCommercialSaveFeedback();
+
+    try {
+      await this.proveedoresService.deactivateComercialWorkspace();
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido eliminar el comercial.'),
+        })
+        .subscribe();
+    }
+  }
+
+  /**
+   * Muestra temporalmente el feedback
+   * del guardado independiente de Comercial.
+   */
+  private showCommercialSaveFeedback(): void {
+    this.clearCommercialSaveFeedbackTimeout();
+
+    this.commercialSaveSuccessful.set(true);
+
+    this.commercialSaveFeedbackTimeout = setTimeout((): void => {
+      this.commercialSaveSuccessful.set(false);
+      this.commercialSaveFeedbackTimeout = null;
+    }, 3000);
+  }
+
+  /**
+   * Oculta cualquier feedback previo
+   * del guardado de Comercial.
+   */
+  private hideCommercialSaveFeedback(): void {
+    this.clearCommercialSaveFeedbackTimeout();
+
+    this.commercialSaveSuccessful.set(false);
+  }
+
+  /**
+   * Cancela el timeout pendiente del
+   * feedback de Comercial.
+   */
+  private clearCommercialSaveFeedbackTimeout(): void {
+    if (this.commercialSaveFeedbackTimeout === null) {
+      return;
+    }
+
+    clearTimeout(this.commercialSaveFeedbackTimeout);
+
+    this.commercialSaveFeedbackTimeout = null;
   }
 
   private async confirmDeleteProveedor(): Promise<void> {

@@ -1,0 +1,176 @@
+<section class="supplier-commercials">
+    <div class="supplier-commercials__selector">
+        <mat-form-field class="supplier-commercials__select">
+            <mat-label>
+                Comercial
+            </mat-label>
+
+            <mat-select [value]="workspace()?.comercialId"
+                        [disabled]="processing() || comerciales().length === 0"
+                        (selectionChange)="selectComercial($event.value)">
+                @for (comercial of comerciales(); track comercial.publicId) {
+                <mat-option [value]="comercial.id">
+                    {{ comercial.nombre }}
+                </mat-option>
+                }
+            </mat-select>
+
+            @if (comerciales().length === 0) {
+            <mat-hint>
+                Este proveedor todavía no tiene comerciales.
+            </mat-hint>
+            }
+        </mat-form-field>
+
+        <button mat-flat-button
+                type="button"
+                [disabled]="processing()"
+                (click)="newComercial()">
+            Nuevo comercial
+        </button>
+    </div>
+
+    @if (workspace(); as comercialWorkspace) {
+    <form class="supplier-commercials__form"
+          novalidate
+          [attr.aria-busy]="saving() || processing()"
+          [attr.inert]="processing() ? '' : null"
+          (input)="modelChanged()"
+          (submit)="save($event)">
+        <h3>
+            @if (comercialWorkspace.state === 'new') {
+            Nuevo comercial
+            }
+            @else {
+            Datos del comercial
+            }
+        </h3>
+
+        <div class="supplier-commercials__row supplier-commercials__row--2">
+            <mat-form-field>
+                <mat-label>
+                    Nombre
+                </mat-label>
+
+                <input #nameInput
+                       matInput
+                       autocomplete="name"
+                       [formField]="comercialForm.nombre">
+
+                @if (
+                comercialForm.nombre().touched() &&
+                comercialForm.nombre().invalid()
+                ) {
+                <mat-error>
+                    {{ comercialForm.nombre().errors()[0]?.message }}
+                </mat-error>
+                }
+            </mat-form-field>
+
+            <mat-form-field>
+                <mat-label>
+                    Teléfono
+                </mat-label>
+
+                <input matInput
+                       type="tel"
+                       autocomplete="tel"
+                       [formField]="comercialForm.telefono">
+            </mat-form-field>
+        </div>
+
+        <mat-form-field class="supplier-commercials__full">
+            <mat-label>
+                Email
+            </mat-label>
+
+            <input matInput
+                   type="email"
+                   autocomplete="email"
+                   [formField]="comercialForm.email">
+
+            @if (
+            comercialForm.email().touched() &&
+            comercialForm.email().invalid()
+            ) {
+            <mat-error>
+                {{ comercialForm.email().errors()[0]?.message }}
+            </mat-error>
+            }
+        </mat-form-field>
+
+        <mat-form-field class="supplier-commercials__full">
+            <mat-label>
+                Observaciones
+            </mat-label>
+
+            <textarea matInput
+                      rows="6"
+                      [formField]="comercialForm.observaciones">
+            </textarea>
+        </mat-form-field>
+
+        <div class="supplier-commercials__actions">
+            @if (comercialWorkspace.state === 'existing') {
+            <button mat-button
+                    type="button"
+                    [disabled]="processing()"
+                    (click)="deleteComercial()">
+                @if (deactivating()) {
+                Eliminando…
+                }
+                @else {
+                Eliminar
+                }
+            </button>
+            }
+
+            <span class="supplier-commercials__actions-spacer">
+            </span>
+
+            @if (saveSuccessful()) {
+            <span class="supplier-commercials__save-feedback"
+                  role="status"
+                  aria-live="polite">
+                Comercial guardado correctamente
+            </span>
+            }
+
+            <button mat-stroked-button
+                    type="button"
+                    [disabled]="
+                        processing() ||
+                        (
+                            comercialWorkspace.state === 'existing' &&
+                            !dirty()
+                        )
+                    "
+                    (click)="cancel()">
+                Cancelar
+            </button>
+
+            <button mat-flat-button
+                    type="submit"
+                    [disabled]="!dirty() || processing()">
+                @if (saving()) {
+                Guardando…
+                }
+                @else {
+                Guardar
+                }
+            </button>
+        </div>
+    </form>
+    }
+    @else {
+    <div class="supplier-commercials__empty">
+        <h3>
+            Comerciales
+        </h3>
+
+        <p>
+            Elige un comercial existente o crea uno nuevo.
+        </p>
+    </div>
+    }
+</section>

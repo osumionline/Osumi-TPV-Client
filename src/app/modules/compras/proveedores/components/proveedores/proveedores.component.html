@@ -36,15 +36,19 @@
         }
 
         @case ('commercials') {
-        <section class="suppliers__section-state">
-            <h3>
-                Comerciales
-            </h3>
-
-            <p>
-                La gestión de comerciales se incorporará más adelante.
-            </p>
-        </section>
+        <otpv-proveedor-comerciales [comerciales]="proveedoresService.workspaceProveedor()?.comerciales ?? []"
+                                    [workspace]="workspace.comercialWorkspace"
+                                    [dirty]="proveedoresService.comercialDirty()"
+                                    [saving]="proveedoresService.comercialSaving()"
+                                    [processing]="proveedoresService.processing()"
+                                    [deactivating]="proveedoresService.comercialDeactivating()"
+                                    [saveSuccessful]="commercialSaveSuccessful()"
+                                    (newEvent)="newComercial()"
+                                    (selectEvent)="selectComercial($event)"
+                                    (modelChangeEvent)="updateComercialDraft($event)"
+                                    (saveEvent)="saveComercial($event)"
+                                    (cancelEvent)="cancelComercial()"
+                                    (deleteEvent)="deleteComercial()" />
         }
         }
     </div>

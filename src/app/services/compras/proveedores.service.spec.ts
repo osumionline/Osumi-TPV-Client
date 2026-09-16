@@ -1,8 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
+import type ActualizarComercialCommand from '@desktop-contracts/proveedores/actualizar-comercial-command.interface';
 import type ActualizarProveedorCommand from '@desktop-contracts/proveedores/actualizar-proveedor-command.interface';
+import type CrearComercialCommand from '@desktop-contracts/proveedores/crear-comercial-command.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
-import type { ProveedorInterface } from '@desktop-contracts/proveedores/proveedor.interface';
+import type {
+  ComercialInterface,
+  ProveedorInterface,
+} from '@desktop-contracts/proveedores/proveedor.interface';
 import type ProveedorWorkspace from '@model/proveedores/proveedor-workspace.interface';
 import Proveedor from '@model/proveedores/proveedor.model';
 import FilesService from '@services/application/files.service';
@@ -31,6 +36,30 @@ let deactivateCalls: number[];
 let deactivateError: Error | null;
 let filesService: FakeFilesService;
 
+let createComercialCalls: {
+  readonly idProveedor: number;
+  readonly command: CrearComercialCommand;
+}[];
+
+let createComercialResult: ComercialInterface;
+let createComercialError: Error | null;
+
+let updateComercialCalls: {
+  readonly idProveedor: number;
+  readonly idComercial: number;
+  readonly command: ActualizarComercialCommand;
+}[];
+
+let updateComercialResult: ComercialInterface;
+let updateComercialError: Error | null;
+
+let deactivateComercialCalls: {
+  readonly idProveedor: number;
+  readonly idComercial: number;
+}[];
+
+let deactivateComercialError: Error | null;
+
 describe('ProveedoresService', (): void => {
   beforeEach((): void => {
     originalDesktopDescriptor = Object.getOwnPropertyDescriptor(window, 'osumiDesktop');
@@ -50,6 +79,22 @@ describe('ProveedoresService', (): void => {
     deactivateCalls = [];
     deactivateError = null;
     filesService = new FakeFilesService();
+
+    createComercialCalls = [];
+    createComercialResult = createComercialInterface(121, 'comercial-121', 12, 'Comercial nuevo');
+    createComercialError = null;
+
+    updateComercialCalls = [];
+    updateComercialResult = createComercialInterface(
+      120,
+      'comercial-12',
+      12,
+      'Comercial actualizado',
+    );
+    updateComercialError = null;
+
+    deactivateComercialCalls = [];
+    deactivateComercialError = null;
 
     Object.defineProperty(window, 'osumiDesktop', {
       configurable: true,
@@ -89,6 +134,47 @@ describe('ProveedoresService', (): void => {
             deactivateCalls.push(id);
 
             return deactivateError === null ? Promise.resolve() : Promise.reject(deactivateError);
+          },
+
+          createComercial: (
+            idProveedor: number,
+            command: CrearComercialCommand,
+          ): Promise<ComercialInterface> => {
+            createComercialCalls.push({
+              idProveedor,
+              command,
+            });
+
+            return createComercialError === null
+              ? Promise.resolve(createComercialResult)
+              : Promise.reject(createComercialError);
+          },
+
+          updateComercial: (
+            idProveedor: number,
+            idComercial: number,
+            command: ActualizarComercialCommand,
+          ): Promise<ComercialInterface> => {
+            updateComercialCalls.push({
+              idProveedor,
+              idComercial,
+              command,
+            });
+
+            return updateComercialError === null
+              ? Promise.resolve(updateComercialResult)
+              : Promise.reject(updateComercialError);
+          },
+
+          deactivateComercial: (idProveedor: number, idComercial: number): Promise<void> => {
+            deactivateComercialCalls.push({
+              idProveedor,
+              idComercial,
+            });
+
+            return deactivateComercialError === null
+              ? Promise.resolve()
+              : Promise.reject(deactivateComercialError);
           },
         },
       },
@@ -866,6 +952,202 @@ describe('ProveedoresService', (): void => {
 
     expect(service.dirty()).toBe(false);
   });
+
+  it('crea un Comercial desde su workspace y lo reconcilia sin recargar proveedores', async (): Promise<void> => {
+    getAllResult = [createProveedorInterface(12, 'proveedor-12', 'Proveedor')];
+
+    await service.load();
+
+    const proveedor: Proveedor | null = service.findById(12);
+
+    if (proveedor === null) {
+      throw new Error('Proveedor de prueba inexistente.');
+    }
+
+    service.abrirFicha(proveedor);
+
+    const comercialWorkspace = service.crearBorradorComercial();
+
+    service.actualizarComercialDraft({
+      ...comercialWorkspace.draft,
+      nombre: '  Comercial nuevo  ',
+      telefono: '  600111222  ',
+      email: '  nuevo@example.com  ',
+      observaciones: '   ',
+    });
+
+    createComercialResult = createComercialInterface(121, 'comercial-121', 12, 'Comercial nuevo', {
+      telefono: '600111222',
+      email: 'nuevo@example.com',
+      observaciones: null,
+    });
+
+    const comercial = await service.saveComercialWorkspace();
+
+    expect(createComercialCalls).toEqual([
+      {
+        idProveedor: 12,
+        command: {
+          nombre: 'Comercial nuevo',
+          telefono: '600111222',
+          email: 'nuevo@example.com',
+          observaciones: null,
+        },
+      },
+    ]);
+
+    expect(comercial.id).toBe(121);
+
+    expect(service.findById(12)?.comerciales.map((item): string => item.nombre)).toEqual([
+      'Comercial',
+      'Comercial nuevo',
+    ]);
+
+    expect(requireWorkspace().comercialWorkspace).toMatchObject({
+      comercialId: 121,
+      comercialPublicId: 'comercial-121',
+      state: 'existing',
+      draft: {
+        nombre: 'Comercial nuevo',
+      },
+      baseSnapshot: {
+        nombre: 'Comercial nuevo',
+      },
+    });
+
+    expect(service.comercialDirty()).toBe(false);
+
+    /*
+     * Solo existe la carga inicial.
+     * El CREATE no hace reload.
+     */
+    expect(getAllCalls).toBe(1);
+  });
+
+  it('actualiza un Comercial y sustituye inmediatamente su versión canónica', async (): Promise<void> => {
+    getAllResult = [createProveedorInterface(12, 'proveedor-12', 'Proveedor')];
+
+    await service.load();
+
+    const proveedor: Proveedor | null = service.findById(12);
+
+    const comercial = proveedor?.comerciales[0];
+
+    if (proveedor === null || comercial === undefined) {
+      throw new Error('Escenario de prueba incompleto.');
+    }
+
+    service.abrirFicha(proveedor);
+
+    const workspace = service.abrirComercial(comercial);
+
+    service.actualizarComercialDraft({
+      ...workspace.draft,
+      nombre: 'Comercial actualizado',
+      telefono: '',
+    });
+
+    updateComercialResult = createComercialInterface(
+      120,
+      'comercial-12',
+      12,
+      'Comercial actualizado',
+      {
+        telefono: null,
+      },
+    );
+
+    await service.saveComercialWorkspace();
+
+    expect(updateComercialCalls).toEqual([
+      {
+        idProveedor: 12,
+        idComercial: 120,
+        command: {
+          nombre: 'Comercial actualizado',
+          telefono: null,
+          email: 'comercial@example.com',
+          observaciones: 'Observaciones comercial',
+        },
+      },
+    ]);
+
+    expect(service.findById(12)?.comerciales).toHaveLength(1);
+
+    expect(service.findById(12)?.comerciales[0]?.nombre).toBe('Comercial actualizado');
+
+    expect(service.comercialDirty()).toBe(false);
+
+    expect(getAllCalls).toBe(1);
+  });
+
+  it('elimina un Comercial del maestro canónico sin recargar proveedores', async (): Promise<void> => {
+    getAllResult = [createProveedorInterface(12, 'proveedor-12', 'Proveedor')];
+
+    await service.load();
+
+    const proveedor: Proveedor | null = service.findById(12);
+
+    const comercial = proveedor?.comerciales[0];
+
+    if (proveedor === null || comercial === undefined) {
+      throw new Error('Escenario de prueba incompleto.');
+    }
+
+    service.abrirFicha(proveedor);
+
+    service.abrirComercial(comercial);
+
+    await service.deactivateComercialWorkspace();
+
+    expect(deactivateComercialCalls).toEqual([
+      {
+        idProveedor: 12,
+        idComercial: 120,
+      },
+    ]);
+
+    expect(service.findById(12)?.comerciales).toEqual([]);
+
+    expect(requireWorkspace().comercialWorkspace).toBeNull();
+
+    expect(service.comercialDirty()).toBe(false);
+
+    expect(getAllCalls).toBe(1);
+  });
+
+  it('conserva el draft dirty si falla el guardado del Comercial', async (): Promise<void> => {
+    getAllResult = [createProveedorInterface(12, 'proveedor-12', 'Proveedor')];
+
+    await service.load();
+
+    const proveedor: Proveedor | null = service.findById(12);
+
+    if (proveedor === null) {
+      throw new Error('Proveedor de prueba inexistente.');
+    }
+
+    service.abrirFicha(proveedor);
+
+    const comercialWorkspace = service.crearBorradorComercial();
+
+    service.actualizarComercialDraft({
+      ...comercialWorkspace.draft,
+      nombre: 'Pendiente',
+    });
+
+    createComercialError = new Error('No se pudo guardar.');
+
+    await expect(service.saveComercialWorkspace()).rejects.toThrow('No se pudo guardar.');
+
+    expect(service.comercialDirty()).toBe(true);
+
+    expect(requireWorkspace().comercialWorkspace?.draft.nombre).toBe('Pendiente');
+
+    expect(service.comercialSaving()).toBe(false);
+
+    expect(service.findById(12)?.comerciales).toHaveLength(1);
+  });
 });
 
 function createProveedorInterface(
@@ -1001,5 +1283,24 @@ function createStagedImage(stagingId: string, url: string): StagedImageInterface
     sizeBytes: 1024,
     width: 640,
     height: 480,
+  };
+}
+
+function createComercialInterface(
+  id: number,
+  publicId: string,
+  idProveedor: number,
+  nombre: string,
+  overrides: Partial<ComercialInterface> = {},
+): ComercialInterface {
+  return {
+    id,
+    publicId,
+    idProveedor,
+    nombre,
+    telefono: '600000000',
+    email: 'comercial@example.com',
+    observaciones: 'Observaciones comercial',
+    ...overrides,
   };
 }
