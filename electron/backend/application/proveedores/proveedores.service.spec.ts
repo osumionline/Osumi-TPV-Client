@@ -1,8 +1,12 @@
 import ProveedoresService from '@backend/application/proveedores/proveedores.service';
+import type ImageAssetPromoter from '@backend/contracts/files/image-asset-promoter.interface';
+import type StagedImageDiscarder from '@backend/contracts/files/staged-image-discarder.interface';
 import type ActualizarProveedorRecordCommand from '@backend/contracts/proveedores/actualizar-proveedor-record-command.interface';
 import type CrearProveedorRecordCommand from '@backend/contracts/proveedores/crear-proveedor-record-command.interface';
 import type ProveedorRepository from '@backend/contracts/proveedores/proveedor.repository.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
+import type { ImageAssetPurpose } from '@backend/domain/files/image-asset.interface';
+import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.interface';
 import type ProveedorRecord from '@backend/domain/proveedores/proveedor-record.interface';
 import type ActualizarProveedorCommand from '@desktop-contracts/proveedores/actualizar-proveedor-command.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
@@ -19,6 +23,67 @@ let lastCreateCommand: CrearProveedorRecordCommand | null;
 let lastUpdateId: number | null;
 let lastUpdateCommand: ActualizarProveedorRecordCommand | null;
 let lastDeactivateId: number | null;
+let createError: Error | null;
+let updateError: Error | null;
+
+class FakeImageAssetPromoter implements ImageAssetPromoter {
+  readonly preparedRequests: {
+    readonly stagingId: string;
+    readonly purpose: ImageAssetPurpose;
+  }[] = [];
+
+  readonly rolledBackIds: string[] = [];
+
+  /**
+   * Simula la promoción de un logo staged.
+   */
+  prepare(stagingId: string, expectedPurpose: ImageAssetPurpose): Promise<PreparedImageAsset> {
+    this.preparedRequests.push({
+      stagingId,
+      purpose: expectedPurpose,
+    });
+
+    return Promise.resolve({
+      stagingId,
+      archivo: {
+        publicId: `file-${stagingId}`,
+        purpose: expectedPurpose,
+        originalName: `${stagingId}.png`,
+        internalName: `file-${stagingId}.webp`,
+        relativePath: `files/providers/file-${stagingId}.webp`,
+        mimeType: 'image/webp',
+        sizeBytes: 100,
+        sha256: 'a'.repeat(64),
+        width: 800,
+        height: 600,
+      },
+    });
+  }
+
+  /**
+   * Registra una copia definitiva revertida.
+   */
+  rollback(prepared: PreparedImageAsset): Promise<void> {
+    this.rolledBackIds.push(prepared.stagingId);
+
+    return Promise.resolve();
+  }
+}
+
+class FakeStagedImageDiscarder implements StagedImageDiscarder {
+  readonly discardedIds: string[] = [];
+
+  error: Error | null = null;
+
+  /**
+   * Registra el descarte de un staging consumido.
+   */
+  discard(stagingId: string): Promise<void> {
+    this.discardedIds.push(stagingId);
+
+    return this.error === null ? Promise.resolve() : Promise.reject(this.error);
+  }
+}
 
 describe('ProveedoresService', (): void => {
   beforeEach((): void => {
@@ -41,6 +106,8 @@ describe('ProveedoresService', (): void => {
     lastUpdateId = null;
     lastUpdateCommand = null;
     lastDeactivateId = null;
+    createError = null;
+    updateError = null;
   });
 
   it('devuelve el maestro activo transformando la foto y los comerciales', async (): Promise<void> => {
@@ -105,6 +172,7 @@ describe('ProveedoresService', (): void => {
       web: 'https://nuevo.example.com',
       observaciones: null,
       idsMarcas: [2, 1],
+      nuevoLogo: null,
     });
     expect(result).toMatchObject({
       id: 3,
@@ -166,6 +234,9 @@ describe('ProveedoresService', (): void => {
         web: '  https://actualizado.example.com  ',
         observaciones: '  Nuevas observaciones  ',
         idsMarcas: [2, 2, 1],
+        logo: {
+          action: 'keep',
+        },
       }),
     );
 
@@ -182,6 +253,9 @@ describe('ProveedoresService', (): void => {
       web: 'https://actualizado.example.com',
       observaciones: 'Nuevas observaciones',
       idsMarcas: [2, 1],
+      logo: {
+        action: 'keep',
+      },
     });
     expect(result).toMatchObject({
       id: 1,
@@ -256,13 +330,210 @@ describe('ProveedoresService', (): void => {
 
     expect(lastDeactivateId).toBe(2);
   });
+
+  it('crea un proveedor promocionando y consumiendo su logo staged', async (): Promise<void> => {
+    const promoter = new FakeImageAssetPromoter();
+    const discarder = new FakeStagedImageDiscarder();
+
+    const service: ProveedoresService = createService(promoter, discarder);
+
+    const result: ProveedorInterface = await service.create(
+      createCreateCommand({
+        logoStagingId: ' staged-logo ',
+      }),
+    );
+
+    expect(promoter.preparedRequests).toEqual([
+      {
+        stagingId: 'staged-logo',
+        purpose: 'provider_image',
+      },
+    ]);
+
+    expect(lastCreateCommand?.nuevoLogo).toMatchObject({
+      purpose: 'provider_image',
+      relativePath: 'files/providers/file-staged-logo.webp',
+    });
+
+    expect(discarder.discardedIds).toEqual(['staged-logo']);
+
+    expect(result.foto).toBe('asset://files/providers/file-staged-logo.webp');
+  });
+
+  it('actualiza un proveedor conservando el logo por defecto', async (): Promise<void> => {
+    const promoter = new FakeImageAssetPromoter();
+
+    const service: ProveedoresService = createService(promoter);
+
+    await service.update(1, createUpdateCommand());
+
+    expect(lastUpdateCommand?.logo).toEqual({
+      action: 'keep',
+    });
+
+    expect(promoter.preparedRequests).toHaveLength(0);
+  });
+
+  it('permite quitar el logo sin preparar una nueva imagen', async (): Promise<void> => {
+    const promoter = new FakeImageAssetPromoter();
+
+    const service: ProveedoresService = createService(promoter);
+
+    const result: ProveedorInterface = await service.update(
+      1,
+      createUpdateCommand({
+        logo: {
+          action: 'remove',
+        },
+      }),
+    );
+
+    expect(lastUpdateCommand?.logo).toEqual({
+      action: 'remove',
+    });
+
+    expect(promoter.preparedRequests).toHaveLength(0);
+
+    expect(result.foto).toBeNull();
+  });
+
+  it('sustituye el logo promocionando y consumiendo el nuevo staging', async (): Promise<void> => {
+    const promoter = new FakeImageAssetPromoter();
+
+    const discarder = new FakeStagedImageDiscarder();
+
+    const service: ProveedoresService = createService(promoter, discarder);
+
+    const result: ProveedorInterface = await service.update(
+      1,
+      createUpdateCommand({
+        logo: {
+          action: 'replace',
+          stagingId: ' staged-replacement ',
+        },
+      }),
+    );
+
+    expect(promoter.preparedRequests).toEqual([
+      {
+        stagingId: 'staged-replacement',
+        purpose: 'provider_image',
+      },
+    ]);
+
+    expect(lastUpdateCommand?.logo).toEqual({
+      action: 'replace',
+      nuevoArchivo: expect.objectContaining({
+        purpose: 'provider_image',
+        relativePath: 'files/providers/file-staged-replacement.webp',
+      }),
+    });
+
+    expect(discarder.discardedIds).toEqual(['staged-replacement']);
+
+    expect(result.foto).toBe('asset://files/providers/file-staged-replacement.webp');
+  });
+
+  it('revierte el logo preparado si falla la creación del proveedor', async (): Promise<void> => {
+    createError = new Error('Database error');
+
+    const promoter = new FakeImageAssetPromoter();
+
+    const discarder = new FakeStagedImageDiscarder();
+
+    const service: ProveedoresService = createService(promoter, discarder);
+
+    await expect(
+      service.create(
+        createCreateCommand({
+          logoStagingId: 'staged-logo',
+        }),
+      ),
+    ).rejects.toThrow('Database error');
+
+    expect(promoter.rolledBackIds).toEqual(['staged-logo']);
+
+    expect(discarder.discardedIds).toHaveLength(0);
+  });
+
+  it('revierte el logo preparado si falla la actualización del proveedor', async (): Promise<void> => {
+    updateError = new Error('Database error');
+
+    const promoter = new FakeImageAssetPromoter();
+
+    const discarder = new FakeStagedImageDiscarder();
+
+    const service: ProveedoresService = createService(promoter, discarder);
+
+    await expect(
+      service.update(
+        1,
+        createUpdateCommand({
+          logo: {
+            action: 'replace',
+            stagingId: 'staged-replacement',
+          },
+        }),
+      ),
+    ).rejects.toThrow('Database error');
+
+    expect(promoter.rolledBackIds).toEqual(['staged-replacement']);
+
+    expect(discarder.discardedIds).toHaveLength(0);
+  });
+
+  it('no convierte en fallido un guardado confirmado si falla la limpieza del staging', async (): Promise<void> => {
+    const promoter = new FakeImageAssetPromoter();
+
+    const discarder = new FakeStagedImageDiscarder();
+
+    discarder.error = new Error('Staging cleanup error');
+
+    const service: ProveedoresService = createService(promoter, discarder);
+
+    await expect(
+      service.create(
+        createCreateCommand({
+          logoStagingId: 'staged-logo',
+        }),
+      ),
+    ).resolves.toMatchObject({
+      nombre: 'Proveedor nuevo',
+      foto: 'asset://files/providers/file-staged-logo.webp',
+    });
+
+    expect(discarder.discardedIds).toEqual(['staged-logo']);
+
+    expect(promoter.rolledBackIds).toHaveLength(0);
+  });
+
+  it('rechaza un identificador temporal vacío antes de preparar el logo', async (): Promise<void> => {
+    const promoter = new FakeImageAssetPromoter();
+
+    const service: ProveedoresService = createService(promoter);
+
+    await expect(
+      service.create(
+        createCreateCommand({
+          logoStagingId: '   ',
+        }),
+      ),
+    ).rejects.toThrow('El identificador temporal del logo no es válido.');
+
+    expect(promoter.preparedRequests).toHaveLength(0);
+
+    expect(lastCreateCommand).toBeNull();
+  });
 });
 
 /**
  * Construye el servicio con dobles controlados
  * para cada test.
  */
-function createService(): ProveedoresService {
+function createService(
+  promoter: FakeImageAssetPromoter = new FakeImageAssetPromoter(),
+  discarder: FakeStagedImageDiscarder = new FakeStagedImageDiscarder(),
+): ProveedoresService {
   const repository: ProveedorRepository = {
     findAll: (): Promise<readonly ProveedorRecord[]> => Promise.resolve(proveedores),
 
@@ -283,6 +554,10 @@ function createService(): ProveedoresService {
     create: (command: CrearProveedorRecordCommand): Promise<ProveedorRecord> => {
       lastCreateCommand = command;
 
+      if (createError !== null) {
+        return Promise.reject(createError);
+      }
+
       return Promise.resolve(
         createProveedorRecord({
           id: 3,
@@ -293,7 +568,7 @@ function createService(): ProveedoresService {
           email: command.email,
           web: command.web,
           observaciones: command.observaciones,
-          fotoRelativePath: null,
+          fotoRelativePath: command.nuevoLogo?.relativePath ?? null,
           marcas: [...command.idsMarcas],
           comerciales: [],
         }),
@@ -303,6 +578,10 @@ function createService(): ProveedoresService {
     update: (id: number, command: ActualizarProveedorRecordCommand): Promise<ProveedorRecord> => {
       lastUpdateId = id;
       lastUpdateCommand = command;
+
+      if (updateError !== null) {
+        return Promise.reject(updateError);
+      }
 
       const current: ProveedorRecord | undefined = proveedores.find(
         (proveedor: ProveedorRecord): boolean => proveedor.id === id,
@@ -336,7 +615,7 @@ function createService(): ProveedoresService {
       relativePath === null ? null : `asset://${relativePath}`,
   };
 
-  return new ProveedoresService(repository, assetUrlBuilder);
+  return new ProveedoresService(repository, assetUrlBuilder, promoter, discarder);
 }
 
 /**
@@ -347,7 +626,7 @@ function createProveedorRecord(overrides: Partial<ProveedorRecord> = {}): Provee
     id: 1,
     publicId: 'proveedor-1',
     nombre: 'Proveedor existente',
-    fotoRelativePath: 'files/brands/proveedor-1.webp',
+    fotoRelativePath: 'files/providers/proveedor-1.webp',
     direccion: 'Dirección original',
     telefono: '944000001',
     email: 'proveedor@example.com',
@@ -377,7 +656,7 @@ function createProveedorInterface(overrides: Partial<ProveedorInterface> = {}): 
     id: 1,
     publicId: 'proveedor-1',
     nombre: 'Proveedor existente',
-    foto: 'asset://files/brands/proveedor-1.webp',
+    foto: 'asset://files/providers/proveedor-1.webp',
     direccion: 'Dirección original',
     telefono: '944000001',
     email: 'proveedor@example.com',
@@ -433,4 +712,24 @@ function createUpdateCommand(
     idsMarcas: [2],
     ...overrides,
   };
+}
+
+/**
+ * Resuelve el logo que devolvería el repository fake
+ * después de una actualización.
+ */
+function resolveUpdatedLogoRelativePath(
+  current: ProveedorRecord,
+  command: ActualizarProveedorRecordCommand,
+): string | null {
+  switch (command.logo.action) {
+    case 'keep':
+      return current.fotoRelativePath;
+
+    case 'remove':
+      return null;
+
+    case 'replace':
+      return command.logo.nuevoArchivo.relativePath;
+  }
 }

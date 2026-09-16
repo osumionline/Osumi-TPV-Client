@@ -1,3 +1,5 @@
+import type ProveedorLogoUpdateCommand from '@desktop-contracts/proveedores/proveedor-logo-update-command.type';
+
 export default interface ActualizarProveedorCommand {
   readonly nombre: string;
   readonly direccion: string | null;
@@ -6,4 +8,11 @@ export default interface ActualizarProveedorCommand {
   readonly telefono: string | null;
   readonly observaciones: string | null;
   readonly idsMarcas: readonly number[];
+
+  /**
+   * Modificación solicitada sobre el logo.
+   *
+   * Si se omite se interpreta como `keep`.
+   */
+  readonly logo?: ProveedorLogoUpdateCommand;
 }

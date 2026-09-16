@@ -6,4 +6,10 @@ export default interface CrearProveedorCommand {
   readonly telefono: string | null;
   readonly observaciones: string | null;
   readonly idsMarcas: readonly number[];
+
+  /**
+   * Identificador temporal del logo seleccionado,
+   * si el alta debe incluir una imagen.
+   */
+  readonly logoStagingId?: string | null;
 }

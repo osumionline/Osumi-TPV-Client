@@ -1,10 +1,12 @@
 import type ActualizarProveedorRecordCommand from '@backend/contracts/proveedores/actualizar-proveedor-record-command.interface';
 import type CrearProveedorRecordCommand from '@backend/contracts/proveedores/crear-proveedor-record-command.interface';
 import type ProveedorRepository from '@backend/contracts/proveedores/proveedor.repository.interface';
+import type { ArchivoCreateRecord } from '@backend/domain/files/archivo-record.interface';
 import type ComercialRecord from '@backend/domain/proveedores/comercial-record.interface';
 import type ProveedorRecord from '@backend/domain/proveedores/proveedor-record.interface';
 import { getLastInsertId } from '@infrastructure/database/typeorm/sqlite.utils';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
+import insertArchivo from '@infrastructure/database/typeorm/typeorm-archivo.utils';
 import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
 import { randomUUID } from 'node:crypto';
 import type { DataSource, QueryRunner } from 'typeorm';
@@ -12,6 +14,7 @@ import type { DataSource, QueryRunner } from 'typeorm';
 interface ProveedorDatabaseRow {
   readonly id: number;
   readonly public_id: string;
+  readonly id_archivo: number | null;
   readonly nombre: string;
   readonly direccion: string | null;
   readonly telefono: string | null;
@@ -19,6 +22,11 @@ interface ProveedorDatabaseRow {
   readonly web: string | null;
   readonly observaciones: string | null;
   readonly foto_relative_path: string | null;
+}
+
+interface ProveedorLogoPersistence {
+  readonly idArchivo: number | null;
+  readonly relativePath: string | null;
 }
 
 interface ProveedorMarcaDatabaseRow {
@@ -77,6 +85,7 @@ export default class TypeOrmProveedorRepository implements ProveedorRepository {
         SELECT
           p.id,
           p.public_id,
+          p.id_archivo,
           p.nombre,
           p.direccion,
           p.telefono,
@@ -188,11 +197,12 @@ export default class TypeOrmProveedorRepository implements ProveedorRepository {
   }
 
   /**
-   * Crea un proveedor y relaciona las marcas seleccionadas
-   * dentro de una única transacción.
+   * Crea un proveedor, su logo opcional y sus relaciones
+   * activas con marcas dentro de una única transacción.
    */
   async create(command: CrearProveedorRecordCommand): Promise<ProveedorRecord> {
     const dataSource: DataSource = await this.applicationDatabase.connect();
+
     const publicId: string = randomUUID();
     const timestamp: string = new Date().toISOString();
 
@@ -203,23 +213,33 @@ export default class TypeOrmProveedorRepository implements ProveedorRepository {
           await this.requireActiveMarca(queryRunner, idMarca);
         }
 
+        let idArchivo: number | null = null;
+
+        if (command.nuevoLogo !== null) {
+          this.validateNewProviderImage(command.nuevoLogo);
+
+          idArchivo = await insertArchivo(queryRunner, command.nuevoLogo);
+        }
+
         await queryRunner.query(
           `
-            INSERT INTO proveedor (
-              public_id,
-              nombre,
-              direccion,
-              telefono,
-              email,
-              web,
-              observaciones,
-              created_at,
-              updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `,
+          INSERT INTO proveedor (
+            public_id,
+            id_archivo,
+            nombre,
+            direccion,
+            telefono,
+            email,
+            web,
+            observaciones,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
           [
             publicId,
+            idArchivo,
             command.nombre,
             command.direccion,
             command.telefono,
@@ -239,14 +259,14 @@ export default class TypeOrmProveedorRepository implements ProveedorRepository {
         for (const idMarca of command.idsMarcas) {
           await queryRunner.query(
             `
-              INSERT INTO proveedor_marca (
-                id_proveedor,
-                id_marca,
-                created_at,
-                updated_at
-              )
-              VALUES (?, ?, ?, ?)
-            `,
+            INSERT INTO proveedor_marca (
+              id_proveedor,
+              id_marca,
+              created_at,
+              updated_at
+            )
+            VALUES (?, ?, ?, ?)
+          `,
             [idProveedor, idMarca, timestamp, timestamp],
           );
         }
@@ -255,7 +275,7 @@ export default class TypeOrmProveedorRepository implements ProveedorRepository {
           id: idProveedor,
           publicId,
           nombre: command.nombre,
-          fotoRelativePath: null,
+          fotoRelativePath: command.nuevoLogo?.relativePath ?? null,
           direccion: command.direccion,
           telefono: command.telefono,
           email: command.email,
@@ -269,18 +289,19 @@ export default class TypeOrmProveedorRepository implements ProveedorRepository {
   }
 
   /**
-   * Actualiza los datos de un proveedor activo y sincroniza
-   * únicamente sus relaciones con marcas actualmente activas.
+   * Actualiza los datos, logo y relaciones activas
+   * de un proveedor dentro de una única transacción.
    *
-   * Las relaciones con marcas dadas de baja se conservan
-   * físicamente para no perder información histórica.
+   * Las relaciones con marcas eliminadas permanecen
+   * físicamente intactas.
    */
   async update(id: number, command: ActualizarProveedorRecordCommand): Promise<ProveedorRecord> {
     const dataSource: DataSource = await this.applicationDatabase.connect();
+
     const timestamp: string = new Date().toISOString();
 
     await runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
-      await this.requireActiveProveedor(
+      const current: ProveedorDatabaseRow = await this.requireActiveProveedor(
         queryRunner,
         id,
         'El proveedor que se intenta actualizar no existe.',
@@ -290,10 +311,17 @@ export default class TypeOrmProveedorRepository implements ProveedorRepository {
         await this.requireActiveMarca(queryRunner, idMarca);
       }
 
+      const logo: ProveedorLogoPersistence = await this.resolveLogoUpdate(
+        queryRunner,
+        current,
+        command.logo,
+      );
+
       await queryRunner.query(
         `
           UPDATE proveedor
           SET
+            id_archivo = ?,
             nombre = ?,
             direccion = ?,
             telefono = ?,
@@ -306,6 +334,7 @@ export default class TypeOrmProveedorRepository implements ProveedorRepository {
             AND deleted_at IS NULL
         `,
         [
+          logo.idArchivo,
           command.nombre,
           command.direccion,
           command.telefono,
@@ -448,33 +477,96 @@ export default class TypeOrmProveedorRepository implements ProveedorRepository {
   }
 
   /**
-   * Comprueba que un proveedor siga activo dentro
-   * de la transacción en curso.
+   * Resuelve qué archivo de logo debe quedar enlazado
+   * después de actualizar el Proveedor.
+   */
+  private async resolveLogoUpdate(
+    queryRunner: QueryRunner,
+    current: ProveedorDatabaseRow,
+    logo: ActualizarProveedorRecordCommand['logo'],
+  ): Promise<ProveedorLogoPersistence> {
+    switch (logo.action) {
+      case 'keep':
+        return {
+          idArchivo: current.id_archivo,
+          relativePath: current.foto_relative_path,
+        };
+
+      case 'remove':
+        return {
+          idArchivo: null,
+          relativePath: null,
+        };
+
+      case 'replace':
+        this.validateNewProviderImage(logo.nuevoArchivo);
+
+        return {
+          idArchivo: await insertArchivo(queryRunner, logo.nuevoArchivo),
+          relativePath: logo.nuevoArchivo.relativePath,
+        };
+    }
+  }
+
+  /**
+   * Comprueba que un archivo nuevo sea un WebP
+   * preparado específicamente para Proveedores.
+   */
+  private validateNewProviderImage(archivo: ArchivoCreateRecord): void {
+    if (
+      archivo.purpose !== 'provider_image' ||
+      archivo.mimeType !== 'image/webp' ||
+      !archivo.relativePath.startsWith('files/providers/')
+    ) {
+      throw new Error('El logo nuevo no pertenece al almacenamiento de imágenes de Proveedores.');
+    }
+  }
+
+  /**
+   * Recupera un proveedor activo dentro de la
+   * transacción o lanza el error indicado.
    */
   private async requireActiveProveedor(
     queryRunner: QueryRunner,
     idProveedor: number,
     errorMessage: string,
-  ): Promise<void> {
-    const rows: readonly {
-      readonly id: number;
-    }[] = (await queryRunner.query(
+  ): Promise<ProveedorDatabaseRow> {
+    const rows: readonly ProveedorDatabaseRow[] = (await queryRunner.query(
       `
-        SELECT id
-        FROM proveedor
+        SELECT
+          p.id,
+          p.public_id,
+          p.id_archivo,
+          p.nombre,
+          p.direccion,
+          p.telefono,
+          p.email,
+          p.web,
+          p.observaciones,
+          a.relative_path
+            AS foto_relative_path
+        FROM proveedor p
+
+        LEFT JOIN archivo a
+          ON a.id = p.id_archivo
+          AND a.deleted_at IS NULL
+
         WHERE
-          id = ?
-          AND deleted_at IS NULL
+          p.id = ?
+          AND p.deleted_at IS NULL
+
         LIMIT 1
       `,
       [idProveedor],
-    )) as readonly {
-      readonly id: number;
-    }[];
+    )) as readonly ProveedorDatabaseRow[];
 
-    if (rows.length === 0) {
+    const row: ProveedorDatabaseRow | undefined = rows[0];
+
+    if (row === undefined) {
       throw new Error(errorMessage);
     }
+
+    return row;
   }
 
   /**
@@ -508,6 +600,7 @@ export default class TypeOrmProveedorRepository implements ProveedorRepository {
         SELECT
           p.id,
           p.public_id,
+          p.id_archivo,
           p.nombre,
           p.direccion,
           p.telefono,

@@ -380,6 +380,8 @@ export default function createApplicationComposition(
   const proveedoresService: ProveedoresService = new ProveedoresService(
     proveedorRepository,
     assetUrlBuilder,
+    imageAssetPromotionService,
+    imageStagingService,
   );
 
   const empleadoRepository: EmpleadoRepository = new TypeOrmEmpleadoRepository(operationalDatabase);

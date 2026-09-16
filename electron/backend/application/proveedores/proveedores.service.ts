@@ -1,20 +1,34 @@
+import type ImageAssetPromoter from '@backend/contracts/files/image-asset-promoter.interface';
+import type StagedImageDiscarder from '@backend/contracts/files/staged-image-discarder.interface';
 import type ActualizarProveedorRecordCommand from '@backend/contracts/proveedores/actualizar-proveedor-record-command.interface';
 import type CrearProveedorRecordCommand from '@backend/contracts/proveedores/crear-proveedor-record-command.interface';
+import type ProveedorLogoUpdateRecord from '@backend/contracts/proveedores/proveedor-logo-update-record.type';
 import type ProveedorRepository from '@backend/contracts/proveedores/proveedor.repository.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
+import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.interface';
 import type ComercialRecord from '@backend/domain/proveedores/comercial-record.interface';
 import type ProveedorRecord from '@backend/domain/proveedores/proveedor-record.interface';
 import type ActualizarProveedorCommand from '@desktop-contracts/proveedores/actualizar-proveedor-command.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
+import type ProveedorLogoUpdateCommand from '@desktop-contracts/proveedores/proveedor-logo-update-command.type';
 import type {
   ComercialInterface,
   ProveedorInterface,
 } from '@desktop-contracts/proveedores/proveedor.interface';
 
+type ProveedorEditableFields = Omit<ActualizarProveedorRecordCommand, 'logo'>;
+
+interface PreparedProveedorLogoUpdate {
+  readonly record: ProveedorLogoUpdateRecord;
+  readonly preparedAsset: PreparedImageAsset | null;
+}
+
 export default class ProveedoresService {
   constructor(
     private readonly proveedorRepository: ProveedorRepository,
     private readonly assetUrlBuilder: AssetUrlBuilder,
+    private readonly imageAssetPromoter: ImageAssetPromoter,
+    private readonly stagedImageDiscarder: StagedImageDiscarder,
   ) {}
 
   /**
@@ -41,23 +55,49 @@ export default class ProveedoresService {
 
   /**
    * Crea un proveedor después de normalizar sus datos,
-   * validar su nombre y las relaciones con marcas.
+   * validar su nombre, marcas y logo opcional.
    */
   async create(command: CrearProveedorCommand): Promise<ProveedorInterface> {
     this.requireCommand(command);
 
-    const recordCommand: CrearProveedorRecordCommand = this.normalizeEditableFields(command);
+    const editableFields: ProveedorEditableFields = this.normalizeEditableFields(command);
 
-    await this.ensureNameAvailable(recordCommand.nombre, null);
+    await this.ensureNameAvailable(editableFields.nombre, null);
 
-    const proveedor: ProveedorRecord = await this.proveedorRepository.create(recordCommand);
+    const stagingId: string | null = this.normalizeOptionalLogoStagingId(command.logoStagingId);
 
-    return this.toInterface(proveedor);
+    let preparedAsset: PreparedImageAsset | null = null;
+    let persisted: boolean = false;
+
+    try {
+      if (stagingId !== null) {
+        preparedAsset = await this.imageAssetPromoter.prepare(stagingId, 'provider_image');
+      }
+
+      const recordCommand: CrearProveedorRecordCommand = {
+        ...editableFields,
+        nuevoLogo: preparedAsset?.archivo ?? null,
+      };
+
+      const proveedor: ProveedorRecord = await this.proveedorRepository.create(recordCommand);
+
+      persisted = true;
+
+      await this.discardPreparedStaging(preparedAsset);
+
+      return this.toInterface(proveedor);
+    } catch (error: unknown) {
+      if (!persisted && preparedAsset !== null) {
+        await this.rollbackPreparedAsset(preparedAsset, error);
+      }
+
+      throw error;
+    }
   }
 
   /**
    * Actualiza un proveedor activo después de normalizar
-   * sus datos y validar su nombre y relaciones con marcas.
+   * sus datos y aplicar la modificación solicitada al logo.
    */
   async update(id: number, command: ActualizarProveedorCommand): Promise<ProveedorInterface> {
     const validId: number = this.validateProveedorId(id);
@@ -70,18 +110,44 @@ export default class ProveedoresService {
       throw new Error('El proveedor indicado no existe o ya no está activo.');
     }
 
-    const recordCommand: ActualizarProveedorRecordCommand = this.normalizeEditableFields(command);
+    const editableFields: ProveedorEditableFields = this.normalizeEditableFields(command);
 
-    if (!this.areNamesEquivalent(current.nombre, recordCommand.nombre)) {
-      await this.ensureNameAvailable(recordCommand.nombre, validId);
+    if (!this.areNamesEquivalent(current.nombre, editableFields.nombre)) {
+      await this.ensureNameAvailable(editableFields.nombre, validId);
     }
 
-    const proveedor: ProveedorRecord = await this.proveedorRepository.update(
-      validId,
-      recordCommand,
-    );
+    let preparedLogo: PreparedProveedorLogoUpdate | null = null;
+    let persisted: boolean = false;
 
-    return this.toInterface(proveedor);
+    try {
+      preparedLogo = await this.prepareLogoUpdate(command.logo);
+
+      const recordCommand: ActualizarProveedorRecordCommand = {
+        ...editableFields,
+        logo: preparedLogo.record,
+      };
+
+      const proveedor: ProveedorRecord = await this.proveedorRepository.update(
+        validId,
+        recordCommand,
+      );
+
+      persisted = true;
+
+      await this.discardPreparedStaging(preparedLogo.preparedAsset);
+
+      return this.toInterface(proveedor);
+    } catch (error: unknown) {
+      if (
+        !persisted &&
+        preparedLogo?.preparedAsset !== null &&
+        preparedLogo?.preparedAsset !== undefined
+      ) {
+        await this.rollbackPreparedAsset(preparedLogo.preparedAsset, error);
+      }
+
+      throw error;
+    }
   }
 
   /**
@@ -94,12 +160,113 @@ export default class ProveedoresService {
   }
 
   /**
+   * Prepara la modificación solicitada sobre el logo
+   * para que el repository pueda persistirla.
+   */
+  private async prepareLogoUpdate(
+    logo: ProveedorLogoUpdateCommand | undefined,
+  ): Promise<PreparedProveedorLogoUpdate> {
+    if (logo === undefined || logo.action === 'keep') {
+      return {
+        record: {
+          action: 'keep',
+        },
+        preparedAsset: null,
+      };
+    }
+
+    if (logo.action === 'remove') {
+      return {
+        record: {
+          action: 'remove',
+        },
+        preparedAsset: null,
+      };
+    }
+
+    const stagingId: string = this.requireLogoStagingId(logo.stagingId);
+
+    const preparedAsset: PreparedImageAsset = await this.imageAssetPromoter.prepare(
+      stagingId,
+      'provider_image',
+    );
+
+    return {
+      record: {
+        action: 'replace',
+        nuevoArchivo: preparedAsset.archivo,
+      },
+      preparedAsset,
+    };
+  }
+
+  /**
+   * Normaliza un identificador temporal opcional
+   * utilizado al crear un Proveedor.
+   */
+  private normalizeOptionalLogoStagingId(stagingId: string | null | undefined): string | null {
+    if (stagingId === null || stagingId === undefined) {
+      return null;
+    }
+
+    return this.requireLogoStagingId(stagingId);
+  }
+
+  /**
+   * Valida y normaliza un identificador temporal de logo.
+   */
+  private requireLogoStagingId(stagingId: string): string {
+    const normalizedStagingId: string = stagingId.trim();
+
+    if (normalizedStagingId.length === 0) {
+      throw new Error('El identificador temporal del logo no es válido.');
+    }
+
+    return normalizedStagingId;
+  }
+
+  /**
+   * Revierte una copia definitiva preparada cuando
+   * la persistencia SQLite posterior ha fallado.
+   */
+  private async rollbackPreparedAsset(
+    preparedAsset: PreparedImageAsset,
+    originalError: unknown,
+  ): Promise<void> {
+    try {
+      await this.imageAssetPromoter.rollback(preparedAsset);
+    } catch (rollbackError: unknown) {
+      throw new AggregateError(
+        [originalError, rollbackError],
+        'No se ha podido guardar el proveedor ni limpiar el logo preparado.',
+        {
+          cause: rollbackError,
+        },
+      );
+    }
+  }
+
+  /**
+   * Descarta el staging de un logo ya persistido.
+   *
+   * Un fallo de limpieza posterior al COMMIT no convierte
+   * en fallido un guardado que SQLite ya ha confirmado.
+   */
+  private async discardPreparedStaging(preparedAsset: PreparedImageAsset | null): Promise<void> {
+    if (preparedAsset === null) {
+      return;
+    }
+
+    await Promise.allSettled([this.stagedImageDiscarder.discard(preparedAsset.stagingId)]);
+  }
+
+  /**
    * Normaliza los campos editables comunes al alta
    * y a la actualización de un proveedor.
    */
   private normalizeEditableFields(
     command: CrearProveedorCommand | ActualizarProveedorCommand,
-  ): ActualizarProveedorRecordCommand {
+  ): ProveedorEditableFields {
     return {
       nombre: this.requireText(command.nombre, 'nombre del proveedor', 150),
       direccion: this.normalizeOptionalText(command.direccion),

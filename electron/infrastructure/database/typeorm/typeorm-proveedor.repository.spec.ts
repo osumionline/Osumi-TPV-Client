@@ -1,5 +1,6 @@
 import type ActualizarProveedorRecordCommand from '@backend/contracts/proveedores/actualizar-proveedor-record-command.interface';
 import type CrearProveedorRecordCommand from '@backend/contracts/proveedores/crear-proveedor-record-command.interface';
+import type { ArchivoCreateRecord } from '@backend/domain/files/archivo-record.interface';
 import type ProveedorRecord from '@backend/domain/proveedores/proveedor-record.interface';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
@@ -57,7 +58,7 @@ describe('TypeOrmProveedorRepository', (): void => {
       id: 1,
       publicId: 'proveedor-b',
       nombre: 'Proveedor B',
-      fotoRelativePath: 'files/brands/proveedor-b.webp',
+      fotoRelativePath: 'files/providers/proveedor-b.webp',
       direccion: 'Dirección original',
       telefono: '944000001',
       email: 'proveedor-b@example.com',
@@ -182,7 +183,7 @@ describe('TypeOrmProveedorRepository', (): void => {
       id: 1,
       publicId: 'proveedor-b',
       nombre: 'Proveedor B actualizado',
-      fotoRelativePath: 'files/brands/proveedor-b.webp',
+      fotoRelativePath: 'files/providers/proveedor-b.webp',
       direccion: 'Dirección actualizada',
       telefono: '944999999',
       email: 'actualizado@example.com',
@@ -407,6 +408,160 @@ describe('TypeOrmProveedorRepository', (): void => {
       'El proveedor que se intenta eliminar no existe o ya está dado de baja.',
     );
   });
+
+  it('crea un proveedor enlazando su nuevo logo en la misma transacción', async (): Promise<void> => {
+    const proveedor: ProveedorRecord = await requireRepository().create(
+      createCommand({
+        nombre: 'Proveedor con logo',
+        nuevoLogo: createProviderLogo(),
+      }),
+    );
+
+    expect(proveedor.fotoRelativePath).toBe('files/providers/provider-logo-new.webp');
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const rows: readonly {
+      readonly purpose: string;
+      readonly relative_path: string;
+    }[] = await dataSource.query(
+      `
+      SELECT
+        a.purpose,
+        a.relative_path
+      FROM proveedor p
+
+      INNER JOIN archivo a
+        ON a.id = p.id_archivo
+
+      WHERE p.id = ?
+    `,
+      [proveedor.id],
+    );
+
+    expect(rows).toEqual([
+      {
+        purpose: 'provider_image',
+        relative_path: 'files/providers/provider-logo-new.webp',
+      },
+    ]);
+  });
+
+  it('permite quitar el logo sin eliminar su archivo persistido', async (): Promise<void> => {
+    const proveedor: ProveedorRecord = await requireRepository().update(
+      1,
+      updateCommand({
+        logo: {
+          action: 'remove',
+        },
+      }),
+    );
+
+    expect(proveedor.fotoRelativePath).toBeNull();
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const providerRows: readonly {
+      readonly id_archivo: number | null;
+    }[] = await dataSource.query(`
+    SELECT id_archivo
+    FROM proveedor
+    WHERE id = 1
+  `);
+
+    expect(providerRows[0]?.id_archivo).toBeNull();
+
+    const fileRows: readonly {
+      readonly deleted_at: string | null;
+    }[] = await dataSource.query(`
+    SELECT deleted_at
+    FROM archivo
+    WHERE id = 1
+  `);
+
+    expect(fileRows).toEqual([
+      {
+        deleted_at: null,
+      },
+    ]);
+  });
+
+  it('sustituye el logo conservando intacto el archivo anterior', async (): Promise<void> => {
+    const proveedor: ProveedorRecord = await requireRepository().update(
+      1,
+      updateCommand({
+        logo: {
+          action: 'replace',
+          nuevoArchivo: createProviderLogo(),
+        },
+      }),
+    );
+
+    expect(proveedor.fotoRelativePath).toBe('files/providers/provider-logo-new.webp');
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const rows: readonly {
+      readonly id_archivo: number | null;
+      readonly relative_path: string | null;
+    }[] = await dataSource.query(`
+    SELECT
+      p.id_archivo,
+      a.relative_path
+    FROM proveedor p
+
+    LEFT JOIN archivo a
+      ON a.id = p.id_archivo
+
+    WHERE p.id = 1
+  `);
+
+    expect(rows[0]?.id_archivo).not.toBe(1);
+
+    expect(rows[0]?.relative_path).toBe('files/providers/provider-logo-new.webp');
+
+    const previousRows: readonly {
+      readonly deleted_at: string | null;
+    }[] = await dataSource.query(`
+    SELECT deleted_at
+    FROM archivo
+    WHERE id = 1
+  `);
+
+    expect(previousRows).toEqual([
+      {
+        deleted_at: null,
+      },
+    ]);
+  });
+
+  it('rechaza un archivo que no sea un logo WebP preparado para Proveedores', async (): Promise<void> => {
+    await expect(
+      requireRepository().update(
+        1,
+        updateCommand({
+          logo: {
+            action: 'replace',
+            nuevoArchivo: createProviderLogo({
+              purpose: 'article_image',
+            }),
+          },
+        }),
+      ),
+    ).rejects.toThrow('El logo nuevo no pertenece al almacenamiento de imágenes de Proveedores.');
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const rows: readonly {
+      readonly id_archivo: number | null;
+    }[] = await dataSource.query(`
+    SELECT id_archivo
+    FROM proveedor
+    WHERE id = 1
+  `);
+
+    expect(rows[0]?.id_archivo).toBe(1);
+  });
 });
 
 /**
@@ -423,6 +578,7 @@ function createCommand(
     web: 'https://nuevo.example.com',
     observaciones: 'Nueva observación',
     idsMarcas: [],
+    nuevoLogo: null,
     ...overrides,
   };
 }
@@ -441,6 +597,9 @@ function updateCommand(
     web: 'https://actualizado.example.com',
     observaciones: 'Observaciones actualizadas',
     idsMarcas: [2],
+    logo: {
+      action: 'keep',
+    },
     ...overrides,
   };
 }
@@ -480,10 +639,10 @@ async function seedProveedores(dataSource: DataSource): Promise<void> {
       VALUES (
         1,
         'proveedor-b-file',
-        'brand_image',
+        'provider_image',
         'proveedor-b.png',
         'proveedor-b.webp',
-        'files/brands/proveedor-b.webp',
+        'files/providers/proveedor-b.webp',
         'image/webp',
         1234,
         ?,
@@ -643,4 +802,24 @@ function requireDatabase(): TypeOrmApplicationDatabase {
   }
 
   return applicationDatabase;
+}
+
+/**
+ * Construye los metadatos de un logo WebP
+ * preparado específicamente para Proveedores.
+ */
+function createProviderLogo(overrides: Partial<ArchivoCreateRecord> = {}): ArchivoCreateRecord {
+  return {
+    publicId: 'provider-logo-new',
+    purpose: 'provider_image',
+    originalName: 'provider-logo.png',
+    internalName: 'provider-logo-new.webp',
+    relativePath: 'files/providers/provider-logo-new.webp',
+    mimeType: 'image/webp',
+    sizeBytes: 4321,
+    sha256: 'b'.repeat(64),
+    width: 900,
+    height: 600,
+    ...overrides,
+  };
 }
