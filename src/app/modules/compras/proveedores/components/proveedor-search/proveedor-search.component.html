@@ -46,19 +46,13 @@
                         selectedPublicId() === proveedor.publicId
                     "
                     (click)="select(proveedor)">
+                @if (proveedor.foto !== null) {
                 <span class="supplier-search__image">
-                    @if (proveedor.foto !== null) {
                     <img [src]="proveedor.foto"
                          [attr.alt]="'Logo de ' + proveedor.nombre"
                          loading="lazy">
-                    }
-                    @else {
-                    <mat-icon aria-hidden="true">
-                        business
-                    </mat-icon>
-                    }
                 </span>
-
+                }
                 <span class="supplier-search__name">
                     {{ proveedor.nombre }}
                 </span>

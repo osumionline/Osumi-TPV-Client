@@ -1,8 +1,11 @@
 import { TestBed } from '@angular/core/testing';
+import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
 import type ActualizarProveedorCommand from '@desktop-contracts/proveedores/actualizar-proveedor-command.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
 import type { ProveedorInterface } from '@desktop-contracts/proveedores/proveedor.interface';
+import type ProveedorWorkspace from '@model/proveedores/proveedor-workspace.interface';
 import Proveedor from '@model/proveedores/proveedor.model';
+import FilesService from '@services/application/files.service';
 import ProveedoresService from '@services/compras/proveedores.service';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -26,6 +29,7 @@ let updateError: Error | null;
 
 let deactivateCalls: number[];
 let deactivateError: Error | null;
+let filesService: FakeFilesService;
 
 describe('ProveedoresService', (): void => {
   beforeEach((): void => {
@@ -45,6 +49,7 @@ describe('ProveedoresService', (): void => {
 
     deactivateCalls = [];
     deactivateError = null;
+    filesService = new FakeFilesService();
 
     Object.defineProperty(window, 'osumiDesktop', {
       configurable: true,
@@ -90,7 +95,13 @@ describe('ProveedoresService', (): void => {
     });
 
     TestBed.configureTestingModule({
-      providers: [ProveedoresService],
+      providers: [
+        ProveedoresService,
+        {
+          provide: FilesService,
+          useValue: filesService,
+        },
+      ],
     });
 
     service = TestBed.inject(ProveedoresService);
@@ -567,7 +578,7 @@ describe('ProveedoresService', (): void => {
     expect(service.comercialDirty()).toBe(false);
   });
 
-  it('conserva el workspace hasta que se cierra explícitamente', (): void => {
+  it('conserva el workspace hasta que se cierra explícitamente', async (): Promise<void> => {
     service.crearBorrador();
 
     const workspace = service.workspace();
@@ -581,7 +592,7 @@ describe('ProveedoresService', (): void => {
      */
     expect(service.workspace()).toBe(workspace);
 
-    service.cerrarFicha();
+    await service.cerrarFicha();
 
     expect(service.workspace()).toBeNull();
     expect(service.hasWorkspace()).toBe(false);
@@ -599,6 +610,202 @@ describe('ProveedoresService', (): void => {
     expect(service.dirty()).toBe(false);
     expect(service.proveedores()).toEqual([]);
     expect(service.loaded()).toBe(false);
+  });
+
+  it('crea un Proveedor desde el workspace normalizando los textos', async (): Promise<void> => {
+    createResult = createProveedorInterface(20, 'proveedor-20', 'Proveedor nuevo', {
+      telefono: null,
+      email: 'info@example.com',
+      direccion: 'Calle Nueva 1',
+      web: null,
+      observaciones: null,
+      marcas: [],
+    });
+
+    service.crearBorrador();
+
+    const workspace = requireWorkspace();
+
+    service.actualizarDraft({
+      ...workspace.draft,
+      nombre: '  Proveedor nuevo  ',
+      telefono: '   ',
+      email: '  info@example.com  ',
+      direccion: '  Calle Nueva 1  ',
+      web: '',
+      observaciones: '   ',
+    });
+
+    const proveedor = await service.saveWorkspace();
+
+    expect(createCalls).toEqual([
+      {
+        nombre: 'Proveedor nuevo',
+        telefono: null,
+        email: 'info@example.com',
+        direccion: 'Calle Nueva 1',
+        web: null,
+        observaciones: null,
+        idsMarcas: [],
+      },
+    ]);
+
+    expect(proveedor.id).toBe(20);
+    expect(service.dirty()).toBe(false);
+    expect(service.saving()).toBe(false);
+
+    expect(requireWorkspace().proveedorId).toBe(20);
+  });
+
+  it('sustituye un staging anterior únicamente después de preparar el nuevo', async (): Promise<void> => {
+    service.crearBorrador();
+
+    await service.seleccionarLogo(new File(['logo-1'], 'logo-1.png'));
+
+    expect(requireWorkspace().logoStagingId).toBe('staging-1');
+
+    filesService.nextStagedImage = createStagedImage('staging-2', 'asset://staging/logo-2.webp');
+
+    await service.seleccionarLogo(new File(['logo-2'], 'logo-2.png'));
+
+    expect(filesService.discardCalls).toEqual(['staging-1']);
+
+    expect(requireWorkspace().logoStagingId).toBe('staging-2');
+  });
+
+  it('descarta el logo temporal al cancelar y restaura el persistido', async (): Promise<void> => {
+    const proveedor = new Proveedor().fromInterface(
+      createProveedorInterface(12, 'proveedor-12', 'Proveedor', {
+        foto: 'asset://files/providers/proveedor.webp',
+      }),
+    );
+
+    service.abrirFicha(proveedor);
+
+    await service.seleccionarLogo(new File(['nuevo'], 'nuevo.png'));
+
+    await service.cancelarCambios();
+
+    expect(filesService.discardCalls).toEqual(['staging-1']);
+
+    expect(requireWorkspace().draft.foto).toBe('asset://files/providers/proveedor.webp');
+
+    expect(service.dirty()).toBe(false);
+  });
+
+  it('envía el staging al crear un Proveedor con logo', async (): Promise<void> => {
+    createResult = createProveedorInterface(20, 'proveedor-20', 'Proveedor', {
+      foto: 'asset://files/providers/proveedor-20.webp',
+      marcas: [],
+    });
+
+    service.crearBorrador();
+
+    service.actualizarDraft({
+      ...requireWorkspace().draft,
+      nombre: 'Proveedor',
+    });
+
+    await service.seleccionarLogo(new File(['logo'], 'logo.png'));
+
+    await service.saveWorkspace();
+
+    expect(createCalls).toEqual([
+      {
+        nombre: 'Proveedor',
+        telefono: null,
+        email: null,
+        direccion: null,
+        web: null,
+        observaciones: null,
+        idsMarcas: [],
+        logoStagingId: 'staging-1',
+      },
+    ]);
+
+    expect(requireWorkspace().logoStagingId).toBeNull();
+
+    expect(service.dirty()).toBe(false);
+  });
+
+  it('envía remove al quitar un logo persistido', async (): Promise<void> => {
+    const proveedor = new Proveedor().fromInterface(
+      createProveedorInterface(12, 'proveedor-12', 'Proveedor', {
+        foto: 'asset://files/providers/proveedor.webp',
+      }),
+    );
+
+    updateResult = createProveedorInterface(12, 'proveedor-12', 'Proveedor', {
+      foto: null,
+    });
+
+    service.abrirFicha(proveedor);
+
+    await service.quitarLogo();
+
+    await service.saveWorkspace();
+
+    expect(updateCalls[0]).toEqual({
+      id: 12,
+      command: expect.objectContaining({
+        logo: {
+          action: 'remove',
+        },
+      }),
+    });
+
+    expect(requireWorkspace().draft.foto).toBeNull();
+
+    expect(service.dirty()).toBe(false);
+  });
+
+  it('envía replace al sustituir el logo persistido', async (): Promise<void> => {
+    const proveedor = new Proveedor().fromInterface(
+      createProveedorInterface(12, 'proveedor-12', 'Proveedor', {
+        foto: 'asset://files/providers/proveedor.webp',
+      }),
+    );
+
+    updateResult = createProveedorInterface(12, 'proveedor-12', 'Proveedor', {
+      foto: 'asset://files/providers/nuevo.webp',
+    });
+
+    service.abrirFicha(proveedor);
+
+    await service.seleccionarLogo(new File(['nuevo'], 'nuevo.png'));
+
+    await service.saveWorkspace();
+
+    expect(updateCalls[0]).toEqual({
+      id: 12,
+      command: expect.objectContaining({
+        logo: {
+          action: 'replace',
+          stagingId: 'staging-1',
+        },
+      }),
+    });
+  });
+
+  it('conserva draft y staging si falla el guardado', async (): Promise<void> => {
+    createError = new Error('No se pudo guardar.');
+
+    service.crearBorrador();
+
+    service.actualizarDraft({
+      ...requireWorkspace().draft,
+      nombre: 'Proveedor pendiente',
+    });
+
+    await service.seleccionarLogo(new File(['logo'], 'logo.png'));
+
+    await expect(service.saveWorkspace()).rejects.toThrow('No se pudo guardar.');
+
+    expect(requireWorkspace().logoStagingId).toBe('staging-1');
+
+    expect(service.dirty()).toBe(true);
+
+    expect(service.saving()).toBe(false);
   });
 });
 
@@ -683,5 +890,57 @@ function createDeferred<T>(): {
 
       resolvePromise(value);
     },
+  };
+}
+
+function requireWorkspace(): ProveedorWorkspace {
+  const workspace: ProveedorWorkspace | null = service.workspace();
+
+  if (workspace === null) {
+    throw new Error('Workspace de prueba inexistente.');
+  }
+
+  return workspace;
+}
+
+class FakeFilesService extends FilesService {
+  readonly stageProviderCalls: File[] = [];
+
+  readonly discardCalls: string[] = [];
+
+  nextStagedImage: StagedImageInterface = createStagedImage(
+    'staging-1',
+    'asset://staging/logo-1.webp',
+  );
+
+  stageError: Error | null = null;
+
+  discardError: Error | null = null;
+
+  override stageProviderImage(file: File): Promise<StagedImageInterface> {
+    this.stageProviderCalls.push(file);
+
+    return this.stageError === null
+      ? Promise.resolve(this.nextStagedImage)
+      : Promise.reject(this.stageError);
+  }
+
+  override discardStagedImage(stagingId: string): Promise<void> {
+    this.discardCalls.push(stagingId);
+
+    return this.discardError === null ? Promise.resolve() : Promise.reject(this.discardError);
+  }
+}
+
+function createStagedImage(stagingId: string, url: string): StagedImageInterface {
+  return {
+    stagingId,
+    purpose: 'provider_image',
+    originalName: 'logo.png',
+    url,
+    mimeType: 'image/webp',
+    sizeBytes: 1024,
+    width: 640,
+    height: 480,
   };
 }

@@ -1,0 +1,189 @@
+<form class="supplier-form"
+      novalidate
+      [attr.aria-busy]="saving() || processing()"
+      [attr.inert]="saving() || processing() ? '' : null"
+      (input)="modelChanged()"
+      (submit)="save($event)">
+    <section class="supplier-form__section">
+        <h3>
+            Datos del proveedor
+        </h3>
+
+        <div class="supplier-form__logo">
+            <div class="supplier-form__logo-preview">
+                @if (proveedorModel().foto; as logoUrl) {
+                <img [src]="logoUrl"
+                     alt="Logo del proveedor">
+                }
+                @else {
+                <span>
+                    Sin logo
+                </span>
+                }
+            </div>
+
+            <div class="supplier-form__logo-actions">
+                <span class="supplier-form__logo-label">
+                    Logo
+                </span>
+
+                <input #logoInput
+                       class="supplier-form__logo-input"
+                       type="file"
+                       accept="image/*"
+                       [disabled]="saving() || processing()"
+                       (change)="onLogoSelected($event)">
+
+                <button mat-stroked-button
+                        type="button"
+                        [disabled]="saving() || processing()"
+                        (click)="selectLogo()">
+                    Seleccionar imagen
+                </button>
+
+                <button mat-button
+                        type="button"
+                        [disabled]="
+                            proveedorModel().foto === null ||
+                            saving() ||
+                            processing()
+                        "
+                        (click)="removeLogo()">
+                    Quitar logo
+                </button>
+            </div>
+        </div>
+
+        <div class="supplier-form__row supplier-form__row--2">
+            <mat-form-field>
+                <mat-label>
+                    Nombre
+                </mat-label>
+
+                <input #nameInput
+                       matInput
+                       autocomplete="organization"
+                       [formField]="proveedorForm.nombre">
+
+                @if (
+                proveedorForm.nombre().touched() &&
+                proveedorForm.nombre().invalid()
+                ) {
+                <mat-error>
+                    {{ proveedorForm.nombre().errors()[0]?.message }}
+                </mat-error>
+                }
+            </mat-form-field>
+
+            <mat-form-field>
+                <mat-label>
+                    Teléfono
+                </mat-label>
+
+                <input matInput
+                       type="tel"
+                       autocomplete="tel"
+                       [formField]="proveedorForm.telefono">
+            </mat-form-field>
+        </div>
+
+        <div class="supplier-form__row supplier-form__row--2">
+            <mat-form-field>
+                <mat-label>
+                    Email
+                </mat-label>
+
+                <input matInput
+                       type="email"
+                       autocomplete="email"
+                       [formField]="proveedorForm.email">
+
+                @if (
+                proveedorForm.email().touched() &&
+                proveedorForm.email().invalid()
+                ) {
+                <mat-error>
+                    {{ proveedorForm.email().errors()[0]?.message }}
+                </mat-error>
+                }
+            </mat-form-field>
+
+            <mat-form-field>
+                <mat-label>
+                    Web
+                </mat-label>
+
+                <input matInput
+                       type="url"
+                       autocomplete="url"
+                       [formField]="proveedorForm.web">
+            </mat-form-field>
+        </div>
+
+        <mat-form-field class="supplier-form__full">
+            <mat-label>
+                Dirección
+            </mat-label>
+
+            <input matInput
+                   autocomplete="street-address"
+                   [formField]="proveedorForm.direccion">
+        </mat-form-field>
+
+        <mat-form-field class="supplier-form__full">
+            <mat-label>
+                Observaciones
+            </mat-label>
+
+            <textarea matInput
+                      rows="6"
+                      [formField]="proveedorForm.observaciones">
+            </textarea>
+        </mat-form-field>
+    </section>
+
+    <div class="supplier-form__actions">
+        @if (canDelete()) {
+        <button mat-button
+                type="button"
+                [disabled]="processing()"
+                (click)="deleteProveedor()">
+            @if (deactivating()) {
+            Eliminando…
+            }
+            @else {
+            Eliminar
+            }
+        </button>
+        }
+
+        <span class="supplier-form__actions-spacer">
+        </span>
+
+        @if (saveSuccessful()) {
+        <span class="supplier-form__save-feedback"
+              role="status"
+              aria-live="polite">
+            Proveedor guardado correctamente
+        </span>
+        }
+
+        <button mat-stroked-button
+                type="button"
+                [disabled]="!dirty() || saving() || processing()"
+                (click)="cancel()">
+            Cancelar
+        </button>
+
+        <button mat-flat-button
+                type="submit"
+                [disabled]="!dirty() || saving() || processing()">
+            @if (saving()) {
+            Guardando…
+            }
+            @else {
+            Guardar
+            }
+        </button>
+    </div>
+</form>

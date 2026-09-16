@@ -8,6 +8,7 @@
             type="button"
             matTooltip="Cerrar ficha"
             aria-label="Cerrar ficha de proveedor"
+            [disabled]="proveedoresService.processing()"
             (click)="closeProveedor()">
         <mat-icon>
             close
@@ -19,6 +20,7 @@
             type="button"
             matTooltip="Buscar proveedor"
             aria-label="Buscar proveedor"
+            [disabled]="proveedoresService.processing()"
             (click)="openSearch()">
         <mat-icon>
             search
@@ -29,6 +31,7 @@
             type="button"
             matTooltip="Nuevo proveedor"
             aria-label="Crear un proveedor nuevo"
+            [disabled]="proveedoresService.processing()"
             (click)="newProveedor()">
         <mat-icon>
             add

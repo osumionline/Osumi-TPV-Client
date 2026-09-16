@@ -6,11 +6,8 @@ import type Proveedor from '@model/proveedores/proveedor.model';
 import ProveedorSearchComponent from '@modules/compras/proveedores/components/proveedor-search/proveedor-search.component';
 import { DialogService } from '@osumi/angular-tools';
 import ProveedoresService from '@services/compras/proveedores.service';
+import { getErrorMessage } from '@utils/error.utils';
 
-/**
- * Muestra las acciones contextuales disponibles
- * para la sección de Proveedores de Compras.
- */
 @Component({
   selector: 'otpv-proveedor-toolbar-actions',
   templateUrl: './proveedor-toolbar-actions.component.html',
@@ -19,32 +16,27 @@ import ProveedoresService from '@services/compras/proveedores.service';
 })
 export default class ProveedorToolbarActionsComponent {
   readonly proveedoresService: ProveedoresService = inject(ProveedoresService);
-
   private readonly dialog: DialogService = inject(DialogService);
 
   readonly searchOpen: WritableSignal<boolean> = signal<boolean>(false);
 
-  /**
-   * Muestra el buscador de Proveedores
-   * ya cargados en memoria.
-   */
   openSearch(): void {
+    if (this.proveedoresService.processing()) {
+      return;
+    }
+
     this.searchOpen.set(true);
   }
 
-  /**
-   * Cierra el buscador sin modificar
-   * la ficha actualmente abierta.
-   */
   closeSearch(): void {
     this.searchOpen.set(false);
   }
 
-  /**
-   * Abre el Proveedor seleccionado protegiendo
-   * cualquier cambio pendiente del workspace.
-   */
   selectProveedor(proveedor: Proveedor): void {
+    if (this.proveedoresService.processing()) {
+      return;
+    }
+
     const workspace = this.proveedoresService.workspace();
 
     if (workspace?.proveedorPublicId === proveedor.publicId) {
@@ -54,7 +46,7 @@ export default class ProveedorToolbarActionsComponent {
     }
 
     if (workspace === null || !this.proveedoresService.hasUnsavedChanges()) {
-      this.openProveedor(proveedor);
+      void this.openProveedor(proveedor);
 
       return;
     }
@@ -68,18 +60,18 @@ export default class ProveedorToolbarActionsComponent {
       })
       .subscribe((result: boolean): void => {
         if (result) {
-          this.openProveedor(proveedor);
+          void this.openProveedor(proveedor);
         }
       });
   }
 
-  /**
-   * Abre un borrador nuevo protegiendo
-   * cualquier cambio pendiente.
-   */
   newProveedor(): void {
+    if (this.proveedoresService.processing()) {
+      return;
+    }
+
     if (!this.proveedoresService.hasUnsavedChanges()) {
-      this.createProveedorDraft();
+      void this.createProveedorDraft();
 
       return;
     }
@@ -93,22 +85,22 @@ export default class ProveedorToolbarActionsComponent {
       })
       .subscribe((result: boolean): void => {
         if (result) {
-          this.createProveedorDraft();
+          void this.createProveedorDraft();
         }
       });
   }
 
-  /**
-   * Cierra la ficha actual protegiendo cualquier
-   * cambio pendiente del Proveedor o Comercial.
-   */
   closeProveedor(): void {
+    if (this.proveedoresService.processing()) {
+      return;
+    }
+
     if (this.proveedoresService.workspace() === null) {
       return;
     }
 
     if (!this.proveedoresService.hasUnsavedChanges()) {
-      this.proveedoresService.cerrarFicha();
+      void this.closeCurrentProveedor();
 
       return;
     }
@@ -121,32 +113,49 @@ export default class ProveedorToolbarActionsComponent {
       })
       .subscribe((result: boolean): void => {
         if (result) {
-          this.proveedoresService.cerrarFicha();
+          void this.closeCurrentProveedor();
         }
       });
   }
 
-  /**
-   * Descarta la ficha anterior y abre
-   * el Proveedor persistido indicado.
-   */
-  private openProveedor(proveedor: Proveedor): void {
-    this.proveedoresService.cerrarFicha();
+  private async openProveedor(proveedor: Proveedor): Promise<void> {
+    try {
+      await this.proveedoresService.cerrarFicha();
 
-    this.proveedoresService.abrirFicha(proveedor);
+      this.proveedoresService.abrirFicha(proveedor);
 
-    this.closeSearch();
+      this.closeSearch();
+    } catch (error: unknown) {
+      this.showWorkspaceError(error);
+    }
   }
 
-  /**
-   * Descarta la ficha anterior y crea
-   * el workspace vacío del nuevo Proveedor.
-   */
-  private createProveedorDraft(): void {
-    this.proveedoresService.cerrarFicha();
+  private async createProveedorDraft(): Promise<void> {
+    try {
+      await this.proveedoresService.cerrarFicha();
 
-    this.proveedoresService.crearBorrador();
+      this.proveedoresService.crearBorrador();
 
-    this.closeSearch();
+      this.closeSearch();
+    } catch (error: unknown) {
+      this.showWorkspaceError(error);
+    }
+  }
+
+  private async closeCurrentProveedor(): Promise<void> {
+    try {
+      await this.proveedoresService.cerrarFicha();
+    } catch (error: unknown) {
+      this.showWorkspaceError(error);
+    }
+  }
+
+  private showWorkspaceError(error: unknown): void {
+    this.dialog
+      .alert({
+        title: 'Error',
+        content: getErrorMessage(error, 'No se ha podido descartar la ficha actual.'),
+      })
+      .subscribe();
   }
 }

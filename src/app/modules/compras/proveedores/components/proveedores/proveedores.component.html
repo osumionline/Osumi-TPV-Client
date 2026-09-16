@@ -1,20 +1,26 @@
 <section class="suppliers">
     @if (proveedoresService.workspace(); as workspace) {
     <otpv-proveedor-section-tabs [workspace]="workspace"
+                                 [disabled]="proveedoresService.processing()"
                                  (selectSectionEvent)="selectSection($event)" />
 
     <div class="suppliers__workspace">
         @switch (workspace.activeSection) {
         @case ('data') {
-        <section class="suppliers__section-state">
-            <h3>
-                Datos del proveedor
-            </h3>
-
-            <p>
-                La ficha de datos se incorporará en el siguiente bloque funcional.
-            </p>
-        </section>
+        <otpv-proveedor-form [initialValue]="workspace.draft"
+                             [dirty]="proveedoresService.dirty()"
+                             [saving]="proveedoresService.saving()"
+                             [processing]="proveedoresService.processing()"
+                             [deactivating]="proveedoresService.deactivating()"
+                             [canDelete]="workspace.proveedorId !== null"
+                             [saveSuccessful]="saveSuccessful()"
+                             [focusNameRequest]="proveedoresService.focusNameRequest()"
+                             (modelChangeEvent)="updateDraft($event)"
+                             (logoSelectedEvent)="selectLogo($event)"
+                             (logoRemoveEvent)="removeLogo()"
+                             (saveEvent)="saveProveedor($event)"
+                             (cancelEvent)="cancelChanges()"
+                             (deleteEvent)="deleteProveedor()" />
         }
 
         @case ('brands') {

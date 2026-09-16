@@ -1,6 +1,8 @@
-import { computed, Service, signal, type Signal, type WritableSignal } from '@angular/core';
+import { computed, inject, Service, signal, type Signal, type WritableSignal } from '@angular/core';
+import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
 import type ActualizarProveedorCommand from '@desktop-contracts/proveedores/actualizar-proveedor-command.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
+import type ProveedorLogoUpdateCommand from '@desktop-contracts/proveedores/proveedor-logo-update-command.type';
 import type { ProveedorInterface } from '@desktop-contracts/proveedores/proveedor.interface';
 import createComercialFormInitialValue from '@model/proveedores/comercial-form.initial-value';
 import createComercialFormModel from '@model/proveedores/comercial-form.mapper';
@@ -21,25 +23,37 @@ import {
 import type ProveedorWorkspaceSection from '@model/proveedores/proveedor-workspace-section.type';
 import type ProveedorWorkspace from '@model/proveedores/proveedor-workspace.interface';
 import Proveedor from '@model/proveedores/proveedor.model';
+import FilesService from '@services/application/files.service';
+
+type ProveedorPersistableCommand = Omit<ActualizarProveedorCommand, 'logo'>;
 
 @Service()
 export default class ProveedoresService {
+  private readonly filesService: FilesService = inject(FilesService);
+
+  private readonly focusNameRequestSignal: WritableSignal<number> = signal<number>(0);
+  private readonly savingSignal: WritableSignal<boolean> = signal<boolean>(false);
+  private readonly logoProcessingSignal: WritableSignal<boolean> = signal<boolean>(false);
+  private readonly deactivatingSignal: WritableSignal<boolean> = signal<boolean>(false);
   private readonly proveedoresSignal: WritableSignal<readonly Proveedor[]> = signal<
     readonly Proveedor[]
   >([]);
-
   private readonly loadedSignal: WritableSignal<boolean> = signal<boolean>(false);
-
   private readonly workspaceSignal: WritableSignal<ProveedorWorkspace | null> =
     signal<ProveedorWorkspace | null>(null);
 
   private pendingRequest: Promise<void> | null = null;
 
   readonly proveedores: Signal<readonly Proveedor[]> = this.proveedoresSignal.asReadonly();
-
   readonly loaded: Signal<boolean> = this.loadedSignal.asReadonly();
-
   readonly workspace: Signal<ProveedorWorkspace | null> = this.workspaceSignal.asReadonly();
+  readonly focusNameRequest: Signal<number> = this.focusNameRequestSignal.asReadonly();
+  readonly saving: Signal<boolean> = this.savingSignal.asReadonly();
+  readonly deactivating: Signal<boolean> = this.deactivatingSignal.asReadonly();
+
+  readonly processing: Signal<boolean> = computed(
+    (): boolean => this.saving() || this.logoProcessingSignal() || this.deactivating(),
+  );
 
   readonly hasWorkspace: Signal<boolean> = computed((): boolean => this.workspace() !== null);
 
@@ -98,6 +112,8 @@ export default class ProveedoresService {
 
     this.workspaceSignal.set(workspace);
 
+    this.focusNameRequestSignal.update((request: number): number => request + 1);
+
     return workspace;
   }
 
@@ -123,6 +139,8 @@ export default class ProveedoresService {
     };
 
     this.workspaceSignal.set(workspace);
+
+    this.focusNameRequestSignal.update((request: number): number => request + 1);
 
     return workspace;
   }
@@ -155,6 +173,98 @@ export default class ProveedoresService {
   }
 
   /**
+   * Prepara un nuevo logo temporal y sustituye
+   * de forma segura cualquier staging anterior.
+   */
+  async seleccionarLogo(file: File): Promise<ProveedorWorkspace> {
+    if (this.processing()) {
+      throw new Error('Ya hay una operación de proveedor en curso.');
+    }
+
+    const workspace: ProveedorWorkspace = this.requireWorkspace();
+
+    this.logoProcessingSignal.set(true);
+
+    try {
+      const stagedImage: StagedImageInterface = await this.filesService.stageProviderImage(file);
+
+      if (workspace.logoStagingId !== null) {
+        try {
+          await this.filesService.discardStagedImage(workspace.logoStagingId);
+        } catch (discardError: unknown) {
+          try {
+            await this.filesService.discardStagedImage(stagedImage.stagingId);
+          } catch (cleanupError: unknown) {
+            throw new AggregateError(
+              [discardError, cleanupError],
+              'No se han podido limpiar correctamente los logos temporales.',
+              {
+                cause: cleanupError,
+              },
+            );
+          }
+
+          throw discardError;
+        }
+      }
+
+      const updatedWorkspace: ProveedorWorkspace = {
+        ...workspace,
+        logoStagingId: stagedImage.stagingId,
+        draft: {
+          ...workspace.draft,
+          foto: stagedImage.url,
+        },
+      };
+
+      this.workspaceSignal.set(updatedWorkspace);
+
+      return updatedWorkspace;
+    } finally {
+      this.logoProcessingSignal.set(false);
+    }
+  }
+
+  /**
+   * Quita el logo del draft y elimina cualquier
+   * staging temporal asociado.
+   */
+  async quitarLogo(): Promise<ProveedorWorkspace> {
+    if (this.processing()) {
+      throw new Error('Ya hay una operación de proveedor en curso.');
+    }
+
+    const workspace: ProveedorWorkspace = this.requireWorkspace();
+
+    if (workspace.draft.foto === null && workspace.logoStagingId === null) {
+      return workspace;
+    }
+
+    if (workspace.logoStagingId !== null) {
+      this.logoProcessingSignal.set(true);
+
+      try {
+        await this.filesService.discardStagedImage(workspace.logoStagingId);
+      } finally {
+        this.logoProcessingSignal.set(false);
+      }
+    }
+
+    const updatedWorkspace: ProveedorWorkspace = {
+      ...workspace,
+      logoStagingId: null,
+      draft: {
+        ...workspace.draft,
+        foto: null,
+      },
+    };
+
+    this.workspaceSignal.set(updatedWorkspace);
+
+    return updatedWorkspace;
+  }
+
+  /**
    * Sustituye el draft principal del Proveedor
    * por una copia independiente del modelo recibido.
    */
@@ -173,13 +283,26 @@ export default class ProveedoresService {
 
   /**
    * Restaura Datos y Marcas a la instantánea
-   * base del Proveedor.
+   * base y elimina cualquier logo temporal.
    *
-   * El Comercial activo es independiente y no
-   * se modifica mediante esta operación.
+   * El Comercial activo es independiente.
    */
-  cancelarCambios(): ProveedorWorkspace {
+  async cancelarCambios(): Promise<ProveedorWorkspace> {
+    if (this.processing()) {
+      throw new Error('Ya hay una operación de proveedor en curso.');
+    }
+
     const workspace: ProveedorWorkspace = this.requireWorkspace();
+
+    if (workspace.logoStagingId !== null) {
+      this.logoProcessingSignal.set(true);
+
+      try {
+        await this.filesService.discardStagedImage(workspace.logoStagingId);
+      } finally {
+        this.logoProcessingSignal.set(false);
+      }
+    }
 
     const updatedWorkspace: ProveedorWorkspace = {
       ...workspace,
@@ -312,11 +435,97 @@ export default class ProveedoresService {
   }
 
   /**
-   * Cierra completamente la ficha del
-   * Proveedor actualmente abierto.
+   * Cierra la ficha actual eliminando antes
+   * cualquier logo temporal no persistido.
    */
-  cerrarFicha(): void {
+  async cerrarFicha(): Promise<void> {
+    if (this.processing()) {
+      throw new Error('Ya hay una operación de proveedor en curso.');
+    }
+
+    const workspace: ProveedorWorkspace | null = this.workspace();
+
+    if (workspace === null) {
+      return;
+    }
+
+    if (workspace.logoStagingId !== null) {
+      this.logoProcessingSignal.set(true);
+
+      try {
+        await this.filesService.discardStagedImage(workspace.logoStagingId);
+      } finally {
+        this.logoProcessingSignal.set(false);
+      }
+    }
+
     this.workspaceSignal.set(null);
+  }
+
+  /**
+   * Persiste el workspace principal y lo
+   * reconcilia con el Proveedor canónico.
+   */
+  async saveWorkspace(): Promise<Proveedor> {
+    if (this.processing()) {
+      throw new Error('Ya hay un guardado de proveedor en curso.');
+    }
+
+    const workspace: ProveedorWorkspace = this.requireWorkspace();
+
+    const command: ProveedorPersistableCommand = this.createPersistableCommand(workspace.draft);
+
+    this.savingSignal.set(true);
+
+    try {
+      let proveedor: Proveedor;
+
+      if (workspace.proveedorId === null) {
+        const createCommand: CrearProveedorCommand =
+          workspace.logoStagingId === null
+            ? command
+            : {
+                ...command,
+                logoStagingId: workspace.logoStagingId,
+              };
+
+        proveedor = await this.create(createCommand);
+      } else {
+        const logo: ProveedorLogoUpdateCommand | undefined =
+          this.createLogoUpdateCommand(workspace);
+
+        const updateCommand: ActualizarProveedorCommand =
+          logo === undefined
+            ? command
+            : {
+                ...command,
+                logo,
+              };
+
+        proveedor = await this.update(workspace.proveedorId, updateCommand);
+      }
+
+      if (proveedor.id === null || proveedor.publicId === null) {
+        throw new Error('El proveedor guardado no contiene una identidad válida.');
+      }
+
+      const persistedModel: ProveedorFormModel = createProveedorFormModel(proveedor);
+
+      const updatedWorkspace: ProveedorWorkspace = {
+        ...workspace,
+        proveedorId: proveedor.id,
+        proveedorPublicId: proveedor.publicId,
+        logoStagingId: null,
+        draft: cloneProveedorFormModel(persistedModel),
+        baseSnapshot: cloneProveedorFormModel(persistedModel),
+      };
+
+      this.workspaceSignal.set(updatedWorkspace);
+
+      return proveedor;
+    } finally {
+      this.savingSignal.set(false);
+    }
   }
 
   /**
@@ -385,6 +594,10 @@ export default class ProveedoresService {
     this.proveedoresSignal.set([]);
     this.loadedSignal.set(false);
     this.workspaceSignal.set(null);
+    this.focusNameRequestSignal.set(0);
+    this.savingSignal.set(false);
+    this.logoProcessingSignal.set(false);
+    this.deactivatingSignal.set(false);
   }
 
   findById(id: number): Proveedor | null {
@@ -396,6 +609,89 @@ export default class ProveedoresService {
       this.proveedores().find((proveedor: Proveedor): boolean => proveedor.publicId === publicId) ??
       null
     );
+  }
+
+  /**
+   * Da de baja el Proveedor del workspace,
+   * elimina su staging pendiente y cierra la ficha.
+   */
+  async deactivateWorkspace(): Promise<void> {
+    if (this.processing()) {
+      throw new Error('Ya hay una operación de proveedor en curso.');
+    }
+
+    const workspace: ProveedorWorkspace = this.requireWorkspace();
+
+    if (workspace.proveedorId === null) {
+      throw new Error('No se puede eliminar un proveedor que todavía no se ha guardado.');
+    }
+
+    this.deactivatingSignal.set(true);
+
+    try {
+      await this.deactivate(workspace.proveedorId);
+
+      this.workspaceSignal.set(null);
+
+      if (workspace.logoStagingId !== null) {
+        await Promise.allSettled([this.filesService.discardStagedImage(workspace.logoStagingId)]);
+      }
+    } finally {
+      this.deactivatingSignal.set(false);
+    }
+  }
+
+  /**
+   * Determina la modificación de logo necesaria
+   * para un Proveedor persistido.
+   */
+  private createLogoUpdateCommand(
+    workspace: ProveedorWorkspace,
+  ): ProveedorLogoUpdateCommand | undefined {
+    if (workspace.logoStagingId !== null) {
+      return {
+        action: 'replace',
+        stagingId: workspace.logoStagingId,
+      };
+    }
+
+    if (workspace.draft.foto === workspace.baseSnapshot.foto) {
+      return undefined;
+    }
+
+    if (workspace.draft.foto === null && workspace.baseSnapshot.foto !== null) {
+      return {
+        action: 'remove',
+      };
+    }
+
+    throw new Error('El estado editable del logo del proveedor no es coherente.');
+  }
+
+  /**
+   * Construye los datos persistibles
+   * desde el draft del Proveedor.
+   */
+  private createPersistableCommand(model: ProveedorFormModel): ProveedorPersistableCommand {
+    return {
+      nombre: model.nombre.trim(),
+      telefono: this.normalizeOptionalText(model.telefono),
+      email: this.normalizeOptionalText(model.email),
+      direccion: this.normalizeOptionalText(model.direccion),
+      web: this.normalizeOptionalText(model.web),
+      observaciones: this.normalizeOptionalText(model.observaciones),
+      idsMarcas: [...new Set(model.marcas)],
+    };
+  }
+
+  /**
+   * Convierte un texto opcional vacío en null
+   * y elimina espacios exteriores.
+   */
+  private normalizeOptionalText(value: string): string | null {
+    const normalizedValue: string = value.trim();
+
+    return normalizedValue === '' ? null : normalizedValue;
   }
 
   /**
