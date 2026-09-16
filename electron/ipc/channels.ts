@@ -58,14 +58,17 @@ const IPC_CHANNELS = {
   comprasDeletePedidoPdf: 'compras:delete-pedido-pdf',
 
   marcasGetAll: 'marcas:get-all',
-marcasGetById: 'marcas:get-by-id',
-marcasGetEstadisticas: 'marcas:get-estadisticas',
-marcasCreate: 'marcas:create',
-marcasUpdate: 'marcas:update',
-marcasDeactivate: 'marcas:deactivate',
+  marcasGetById: 'marcas:get-by-id',
+  marcasGetEstadisticas: 'marcas:get-estadisticas',
+  marcasCreate: 'marcas:create',
+  marcasUpdate: 'marcas:update',
+  marcasDeactivate: 'marcas:deactivate',
 
   proveedoresGetAll: 'proveedores:get-all',
+  proveedoresGetById: 'proveedores:get-by-id',
   proveedoresCreate: 'proveedores:create',
+  proveedoresUpdate: 'proveedores:update',
+  proveedoresDeactivate: 'proveedores:deactivate',
 
   empleadosGetAll: 'empleados:get-all',
 

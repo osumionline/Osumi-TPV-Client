@@ -93,9 +93,14 @@ import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-impor
 import type LegacyImportStartResult from '@desktop-contracts/legacy-import/legacy-import-start-result.interface';
 import type ActualizarMarcaCommand from '@desktop-contracts/marcas/actualizar-marca-command.interface';
 import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
+import type {
+  MarcaEstadisticasConsulta,
+  MarcaEstadisticasResultado,
+} from '@desktop-contracts/marcas/marca-estadisticas.interface';
 import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
 import type PrinterInterface from '@desktop-contracts/printing/printer.interface';
 import type PrintingSettings from '@desktop-contracts/printing/printing-settings.interface';
+import type ActualizarProveedorCommand from '@desktop-contracts/proveedores/actualizar-proveedor-command.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
 import type { ProveedorInterface } from '@desktop-contracts/proveedores/proveedor.interface';
 import type CrearReservaCommand from '@desktop-contracts/reservas/crear-reserva-command.interface';
@@ -121,10 +126,6 @@ import type VentasContextInterface from '@desktop-contracts/ventas/ventas-contex
 import IPC_CHANNELS from '@ipc/channels';
 import type { IpcRendererEvent } from 'electron';
 import { contextBridge, ipcRenderer } from 'electron';
-import type {
-  MarcaEstadisticasConsulta,
-  MarcaEstadisticasResultado,
-} from '@desktop-contracts/marcas/marca-estadisticas.interface';
 
 const desktopApi: OsumiDesktopApi = Object.freeze({
   isElectron: true,
@@ -349,30 +350,21 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
   }),
 
   files: Object.freeze({
-  stageArticleImage: (
-    request: StageImageRequest,
-  ): Promise<StagedImageInterface> =>
-    ipcRenderer.invoke(
-      IPC_CHANNELS.filesStageArticleImage,
-      request,
-    ) as Promise<StagedImageInterface>,
+    stageArticleImage: (request: StageImageRequest): Promise<StagedImageInterface> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.filesStageArticleImage,
+        request,
+      ) as Promise<StagedImageInterface>,
 
-  stageBrandImage: (
-    request: StageImageRequest,
-  ): Promise<StagedImageInterface> =>
-    ipcRenderer.invoke(
-      IPC_CHANNELS.filesStageBrandImage,
-      request,
-    ) as Promise<StagedImageInterface>,
+    stageBrandImage: (request: StageImageRequest): Promise<StagedImageInterface> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.filesStageBrandImage,
+        request,
+      ) as Promise<StagedImageInterface>,
 
-  discardStagedImage: (
-    stagingId: string,
-  ): Promise<void> =>
-    ipcRenderer.invoke(
-      IPC_CHANNELS.filesDiscardStagedImage,
-      stagingId,
-    ) as Promise<void>,
-}),
+    discardStagedImage: (stagingId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.filesDiscardStagedImage, stagingId) as Promise<void>,
+  }),
 
   printing: Object.freeze({
     getPrinters: (): Promise<readonly PrinterInterface[]> =>
@@ -403,14 +395,12 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
 
     getById: (id: number): Promise<MarcaInterface | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.marcasGetById, id) as Promise<MarcaInterface | null>,
-      
-      getEstadisticas: (
-  consulta: MarcaEstadisticasConsulta,
-): Promise<MarcaEstadisticasResultado> =>
-  ipcRenderer.invoke(
-    IPC_CHANNELS.marcasGetEstadisticas,
-    consulta,
-  ) as Promise<MarcaEstadisticasResultado>,
+
+    getEstadisticas: (consulta: MarcaEstadisticasConsulta): Promise<MarcaEstadisticasResultado> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.marcasGetEstadisticas,
+        consulta,
+      ) as Promise<MarcaEstadisticasResultado>,
 
     create: (command: CrearMarcaCommand): Promise<MarcaInterface> =>
       ipcRenderer.invoke(IPC_CHANNELS.marcasCreate, command) as Promise<MarcaInterface>,
@@ -426,8 +416,21 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
     getAll: (): Promise<readonly ProveedorInterface[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.proveedoresGetAll) as Promise<readonly ProveedorInterface[]>,
 
+    getById: (id: number): Promise<ProveedorInterface | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.proveedoresGetById, id) as Promise<ProveedorInterface | null>,
+
     create: (command: CrearProveedorCommand): Promise<ProveedorInterface> =>
       ipcRenderer.invoke(IPC_CHANNELS.proveedoresCreate, command) as Promise<ProveedorInterface>,
+
+    update: (id: number, command: ActualizarProveedorCommand): Promise<ProveedorInterface> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.proveedoresUpdate,
+        id,
+        command,
+      ) as Promise<ProveedorInterface>,
+
+    deactivate: (id: number): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.proveedoresDeactivate, id) as Promise<void>,
   }),
 
   empleados: Object.freeze({
