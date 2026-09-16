@@ -75,6 +75,7 @@ import type PrinterProvider from '@backend/contracts/printing/printer.provider.i
 import type PrintingSettingsRepository from '@backend/contracts/printing/printing-settings.repository.interface';
 import type ProveedorRepository from '@backend/contracts/proveedores/proveedor.repository.interface';
 import type ReservasRepository from '@backend/contracts/reservas/reservas.repository.interface';
+import type LegacyPasswordVerifier from '@backend/contracts/security/legacy-password-verifier.interface';
 import type PasswordHasher from '@backend/contracts/security/password-hasher.interface';
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
@@ -150,6 +151,7 @@ import NodeLegacyImportRunner from '@infrastructure/legacy-import/node-legacy-im
 import YauzlLegacyImportDumpAnalyzer from '@infrastructure/legacy-import/yauzl-legacy-import-dump.analyzer';
 import YauzlLegacyImportPackageConfigurationReader from '@infrastructure/legacy-import/yauzl-legacy-import-package-configuration.reader';
 import YauzlLegacyImportPackageInspector from '@infrastructure/legacy-import/yauzl-legacy-import-package.inspector';
+import BcryptLegacyPasswordVerifier from '@infrastructure/security/bcrypt-legacy-password-verifier';
 import NodeScryptPasswordHasher from '@infrastructure/security/node-scrypt-password-hasher';
 import TicketBaiWsTicketBaiClient from '@infrastructure/ticket-bai/ticket-bai-ws.client';
 import registerAlmacenIpc from '@ipc/almacen/register-almacen-ipc';
@@ -228,6 +230,8 @@ export default function createApplicationComposition(
    * Infraestructura de SQLite.
    */
   const passwordHasher: PasswordHasher = new NodeScryptPasswordHasher();
+
+  const legacyPasswordVerifier: LegacyPasswordVerifier = new BcryptLegacyPasswordVerifier();
 
   const dataSourceFactory: TypeOrmDataSourceFactory = new TypeOrmDataSourceFactory();
 
@@ -385,7 +389,12 @@ export default function createApplicationComposition(
   );
 
   const empleadoRepository: EmpleadoRepository = new TypeOrmEmpleadoRepository(operationalDatabase);
-  const empleadosService: EmpleadosService = new EmpleadosService(empleadoRepository);
+
+  const empleadosService: EmpleadosService = new EmpleadosService(
+    empleadoRepository,
+    passwordHasher,
+    legacyPasswordVerifier,
+  );
 
   const clienteRepository: ClienteRepository = new TypeOrmClienteRepository(operationalDatabase);
   const clientesService: ClientesService = new ClientesService(clienteRepository);

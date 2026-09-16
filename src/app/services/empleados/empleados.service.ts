@@ -1,5 +1,7 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { computed, Service, signal } from '@angular/core';
+import type AutenticarEmpleadoCommand from '@desktop-contracts/empleados/autenticar-empleado-command.interface';
+import type AutenticarEmpleadoResult from '@desktop-contracts/empleados/autenticar-empleado-result.type';
 import type EmpleadoInterface from '@desktop-contracts/empleados/empleado.interface';
 import Empleado from '@model/empleados/empleado.model';
 
@@ -8,13 +10,11 @@ export default class EmpleadosService {
   private readonly empleadosSignal: WritableSignal<readonly Empleado[]> = signal<
     readonly Empleado[]
   >([]);
-
   private readonly loadedSignal: WritableSignal<boolean> = signal<boolean>(false);
 
   private pendingRequest: Promise<void> | null = null;
 
   readonly empleados: Signal<readonly Empleado[]> = this.empleadosSignal.asReadonly();
-
   readonly loaded: Signal<boolean> = this.loadedSignal.asReadonly();
 
   readonly empleadoDefecto: Signal<Empleado | null> = computed((): Empleado | null => {
@@ -38,6 +38,19 @@ export default class EmpleadosService {
   clear(): void {
     this.empleadosSignal.set([]);
     this.loadedSignal.set(false);
+  }
+
+  /**
+   * Comprueba las credenciales de un empleado sin exponer
+   * información de autenticación al renderer.
+   */
+  authenticate(idEmpleado: number, password: string): Promise<AutenticarEmpleadoResult> {
+    const command: AutenticarEmpleadoCommand = {
+      idEmpleado,
+      password,
+    };
+
+    return window.osumiDesktop.empleados.authenticate(command);
   }
 
   findById(id: number): Empleado | null {

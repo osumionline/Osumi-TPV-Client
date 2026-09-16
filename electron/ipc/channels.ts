@@ -74,6 +74,7 @@ const IPC_CHANNELS = {
   proveedoresDeactivateComercial: 'proveedores:deactivate-comercial',
 
   empleadosGetAll: 'empleados:get-all',
+  empleadosAuthenticate: 'empleados:authenticate',
 
   clientesGetAll: 'clientes:get-all',
   clientesCreate: 'clientes:create',

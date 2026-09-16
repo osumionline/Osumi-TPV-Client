@@ -82,6 +82,8 @@ import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type { InstallationResult } from '@desktop-contracts/configuration/installation-result.interface';
 import OsumiDesktopApi from '@desktop-contracts/desktop-api';
+import type AutenticarEmpleadoCommand from '@desktop-contracts/empleados/autenticar-empleado-command.interface';
+import type AutenticarEmpleadoResult from '@desktop-contracts/empleados/autenticar-empleado-result.type';
 import type EmpleadoInterface from '@desktop-contracts/empleados/empleado.interface';
 import type StageImageRequest from '@desktop-contracts/files/stage-image-request.interface';
 import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
@@ -476,6 +478,12 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
   empleados: Object.freeze({
     getAll: (): Promise<readonly EmpleadoInterface[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.empleadosGetAll) as Promise<readonly EmpleadoInterface[]>,
+
+    authenticate: (command: AutenticarEmpleadoCommand): Promise<AutenticarEmpleadoResult> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.empleadosAuthenticate,
+        command,
+      ) as Promise<AutenticarEmpleadoResult>,
   }),
 
   categorias: Object.freeze({
