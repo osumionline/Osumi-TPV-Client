@@ -599,6 +599,7 @@ function createService(
         email: command.email,
         web: command.web,
         observaciones: command.observaciones,
+        fotoRelativePath: resolveUpdatedLogoRelativePath(current, command),
         marcas: [...command.idsMarcas],
       });
     },
