@@ -1,0 +1,37 @@
+<div class="supplier-actions">
+    @if (proveedoresService.workspace(); as workspace) {
+    <strong class="supplier-actions__name">
+        {{ workspace.draft.nombre || 'Nuevo proveedor' }}
+    </strong>
+
+    <button mat-icon-button
+            type="button"
+            matTooltip="Cerrar ficha"
+            aria-label="Cerrar ficha de proveedor"
+            (click)="closeProveedor()">
+        <mat-icon>
+            close
+        </mat-icon>
+    </button>
+    }
+
+    <button mat-icon-button
+            type="button"
+            matTooltip="Buscar proveedor"
+            aria-label="Buscar proveedor"
+            disabled>
+        <mat-icon>
+            search
+        </mat-icon>
+    </button>
+
+    <button mat-icon-button
+            type="button"
+            matTooltip="Nuevo proveedor"
+            aria-label="Crear un proveedor nuevo"
+            (click)="newProveedor()">
+        <mat-icon>
+            add
+        </mat-icon>
+    </button>
+</div>

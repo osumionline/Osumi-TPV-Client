@@ -365,6 +365,241 @@ describe('ProveedoresService', (): void => {
     expect(service.loaded()).toBe(true);
     expect(service.findById(30)?.nombre).toBe('Proveedor recargado');
   });
+
+  it('crea un borrador limpio mostrando únicamente Datos', (): void => {
+    const workspace = service.crearBorrador();
+
+    expect(workspace).toEqual({
+      proveedorId: null,
+      proveedorPublicId: null,
+      draft: {
+        nombre: '',
+        telefono: '',
+        email: '',
+        direccion: '',
+        web: '',
+        observaciones: '',
+        foto: null,
+        marcas: [],
+      },
+      baseSnapshot: {
+        nombre: '',
+        telefono: '',
+        email: '',
+        direccion: '',
+        web: '',
+        observaciones: '',
+        foto: null,
+        marcas: [],
+      },
+      logoStagingId: null,
+      activeSection: 'data',
+      comercialWorkspace: null,
+    });
+
+    expect(service.hasWorkspace()).toBe(true);
+    expect(service.dirty()).toBe(false);
+    expect(service.comercialDirty()).toBe(false);
+    expect(service.hasUnsavedChanges()).toBe(false);
+  });
+
+  it('abre un proveedor persistido con un draft independiente', (): void => {
+    const proveedor: Proveedor = new Proveedor().fromInterface(
+      createProveedorInterface(12, 'proveedor-12', 'Distribuciones Norte', {
+        foto: 'asset://files/providers/proveedor-12.webp',
+        marcas: [3, 1],
+      }),
+    );
+
+    const workspace = service.abrirFicha(proveedor);
+
+    expect(workspace).toMatchObject({
+      proveedorId: 12,
+      proveedorPublicId: 'proveedor-12',
+      activeSection: 'data',
+      logoStagingId: null,
+      comercialWorkspace: null,
+      draft: {
+        nombre: 'Distribuciones Norte',
+        telefono: '944000000',
+        email: 'proveedor@example.com',
+        direccion: 'Dirección',
+        web: 'https://proveedor.example.com',
+        observaciones: 'Observaciones',
+        foto: 'asset://files/providers/proveedor-12.webp',
+        marcas: [3, 1],
+      },
+    });
+
+    expect(workspace.draft).not.toBe(workspace.baseSnapshot);
+
+    expect(workspace.draft.marcas).not.toBe(workspace.baseSnapshot.marcas);
+
+    expect(service.dirty()).toBe(false);
+  });
+
+  it('deriva el dirty principal de Datos, Marcas y Logo', (): void => {
+    const proveedor: Proveedor = new Proveedor().fromInterface(
+      createProveedorInterface(12, 'proveedor-12', 'Proveedor', {
+        marcas: [3, 1],
+      }),
+    );
+
+    service.abrirFicha(proveedor);
+
+    const original = service.workspace();
+
+    if (original === null) {
+      throw new Error('Workspace de prueba inexistente.');
+    }
+
+    service.actualizarDraft({
+      ...original.draft,
+      telefono: '944111111',
+    });
+
+    expect(service.dirty()).toBe(true);
+
+    service.actualizarDraft({
+      ...original.baseSnapshot,
+      marcas: [1, 3],
+    });
+
+    /*
+     * El orden de las mismas Marcas
+     * no altera el estado persistible.
+     */
+    expect(service.dirty()).toBe(false);
+
+    service.actualizarDraft({
+      ...original.baseSnapshot,
+      marcas: [1, 2, 3],
+    });
+
+    expect(service.dirty()).toBe(true);
+  });
+
+  it('permite únicamente Datos mientras el proveedor no está persistido', (): void => {
+    service.crearBorrador();
+
+    expect(service.seleccionarSeccion('data').activeSection).toBe('data');
+
+    expect((): void => {
+      service.seleccionarSeccion('brands');
+    }).toThrow('Las secciones Marcas y Comerciales requieren un proveedor persistido.');
+
+    expect((): void => {
+      service.seleccionarSeccion('commercials');
+    }).toThrow('Las secciones Marcas y Comerciales requieren un proveedor persistido.');
+  });
+
+  it('permite Datos, Marcas y Comerciales para un proveedor persistido', (): void => {
+    const proveedor: Proveedor = new Proveedor().fromInterface(
+      createProveedorInterface(12, 'proveedor-12', 'Proveedor'),
+    );
+
+    service.abrirFicha(proveedor);
+
+    expect(service.seleccionarSeccion('brands').activeSection).toBe('brands');
+
+    expect(service.seleccionarSeccion('commercials').activeSection).toBe('commercials');
+
+    expect(service.seleccionarSeccion('data').activeSection).toBe('data');
+  });
+
+  it('mantiene separado el dirty de Comercial del dirty principal', (): void => {
+    const proveedor: Proveedor = new Proveedor().fromInterface(
+      createProveedorInterface(12, 'proveedor-12', 'Proveedor'),
+    );
+
+    service.abrirFicha(proveedor);
+
+    const comercialWorkspace = service.crearBorradorComercial();
+
+    expect(comercialWorkspace.state).toBe('new');
+
+    expect(service.dirty()).toBe(false);
+    expect(service.comercialDirty()).toBe(false);
+
+    service.actualizarComercialDraft({
+      ...comercialWorkspace.draft,
+      nombre: 'Nuevo comercial',
+    });
+
+    expect(service.dirty()).toBe(false);
+    expect(service.comercialDirty()).toBe(true);
+    expect(service.hasUnsavedChanges()).toBe(true);
+
+    service.cancelarCambiosComercial();
+
+    expect(service.dirty()).toBe(false);
+    expect(service.comercialDirty()).toBe(false);
+    expect(service.hasUnsavedChanges()).toBe(false);
+  });
+
+  it('abre un comercial existente únicamente dentro de su proveedor', (): void => {
+    const proveedor: Proveedor = new Proveedor().fromInterface(
+      createProveedorInterface(12, 'proveedor-12', 'Proveedor'),
+    );
+
+    service.abrirFicha(proveedor);
+
+    const comercial = proveedor.comerciales[0];
+
+    if (comercial === undefined) {
+      throw new Error('Comercial de prueba inexistente.');
+    }
+
+    const comercialWorkspace = service.abrirComercial(comercial);
+
+    expect(comercialWorkspace).toMatchObject({
+      comercialId: 120,
+      comercialPublicId: 'comercial-12',
+      state: 'existing',
+      draft: {
+        nombre: 'Comercial',
+        telefono: '600000000',
+        email: 'comercial@example.com',
+        observaciones: 'Observaciones comercial',
+      },
+    });
+
+    expect(service.comercialDirty()).toBe(false);
+  });
+
+  it('conserva el workspace hasta que se cierra explícitamente', (): void => {
+    service.crearBorrador();
+
+    const workspace = service.workspace();
+
+    expect(workspace).not.toBeNull();
+
+    /*
+     * La navegación de Compras no llama a
+     * cerrarFicha(), por lo que destruir/recrear
+     * el componente visual no elimina este estado.
+     */
+    expect(service.workspace()).toBe(workspace);
+
+    service.cerrarFicha();
+
+    expect(service.workspace()).toBeNull();
+    expect(service.hasWorkspace()).toBe(false);
+    expect(service.dirty()).toBe(false);
+    expect(service.comercialDirty()).toBe(false);
+  });
+
+  it('clear elimina también el workspace conservado', (): void => {
+    service.crearBorrador();
+
+    service.clear();
+
+    expect(service.workspace()).toBeNull();
+    expect(service.hasWorkspace()).toBe(false);
+    expect(service.dirty()).toBe(false);
+    expect(service.proveedores()).toEqual([]);
+    expect(service.loaded()).toBe(false);
+  });
 });
 
 function createProveedorInterface(

@@ -15,6 +15,9 @@
             @case ('brands') {
             <otpv-marca-toolbar-actions />
             }
+            @case ('suppliers') {
+            <otpv-proveedor-toolbar-actions />
+            }
             }
         </otpv-purchases-tabs>
 
@@ -28,12 +31,7 @@
             <otpv-marcas />
             }
             @case ('suppliers') {
-            <section class="purchases__state">
-                <h2>PROVEEDORES</h2>
-                <p>
-                    La gestión de proveedores se incorporará después de completar Pedidos.
-                </p>
-            </section>
+            <otpv-proveedores />
             }
             }
         </div>

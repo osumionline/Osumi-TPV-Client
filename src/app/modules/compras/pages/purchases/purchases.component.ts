@@ -5,6 +5,8 @@ import PurchasesTabsComponent from '@modules/compras/components/purchases-tabs/p
 import MarcaToolbarActionsComponent from '@modules/compras/marcas/components/marca-toolbar-actions/marca-toolbar-actions.component';
 import MarcasComponent from '@modules/compras/marcas/components/marcas/marcas.component';
 import PedidosComponent from '@modules/compras/pedidos/components/pedidos/pedidos.component';
+import ProveedorToolbarActionsComponent from '@modules/compras/proveedores/components/proveedor-toolbar-actions/proveedor-toolbar-actions.component';
+import ProveedoresComponent from '@modules/compras/proveedores/components/proveedores/proveedores.component';
 import { DialogService } from '@osumi/angular-tools';
 import AppDataService from '@services/application/app-data.service';
 import ComprasWorkspaceService from '@services/compras/compras-workspace.service';
@@ -22,6 +24,8 @@ import { getErrorMessage } from '@utils/error.utils';
     MarcaToolbarActionsComponent,
     MarcasComponent,
     PedidosComponent,
+    ProveedorToolbarActionsComponent,
+    ProveedoresComponent,
     PurchasesTabsComponent,
   ],
 })

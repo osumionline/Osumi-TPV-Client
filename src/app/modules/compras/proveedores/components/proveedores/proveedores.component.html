@@ -1,0 +1,57 @@
+<section class="suppliers">
+    @if (proveedoresService.workspace(); as workspace) {
+    <otpv-proveedor-section-tabs [workspace]="workspace"
+                                 (selectSectionEvent)="selectSection($event)" />
+
+    <div class="suppliers__workspace">
+        @switch (workspace.activeSection) {
+        @case ('data') {
+        <section class="suppliers__section-state">
+            <h3>
+                Datos del proveedor
+            </h3>
+
+            <p>
+                La ficha de datos se incorporará en el siguiente bloque funcional.
+            </p>
+        </section>
+        }
+
+        @case ('brands') {
+        <section class="suppliers__section-state">
+            <h3>
+                Marcas
+            </h3>
+
+            <p>
+                La gestión de marcas asociadas se incorporará más adelante.
+            </p>
+        </section>
+        }
+
+        @case ('commercials') {
+        <section class="suppliers__section-state">
+            <h3>
+                Comerciales
+            </h3>
+
+            <p>
+                La gestión de comerciales se incorporará más adelante.
+            </p>
+        </section>
+        }
+        }
+    </div>
+    }
+    @else {
+    <div class="suppliers__state">
+        <h2>
+            PROVEEDORES
+        </h2>
+
+        <p>
+            Busca un proveedor existente o crea uno nuevo.
+        </p>
+    </div>
+    }
+</section>
