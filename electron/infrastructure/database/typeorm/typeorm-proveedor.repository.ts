@@ -1,3 +1,4 @@
+import type ActualizarProveedorRecordCommand from '@backend/contracts/proveedores/actualizar-proveedor-record-command.interface';
 import type CrearProveedorRecordCommand from '@backend/contracts/proveedores/crear-proveedor-record-command.interface';
 import type ProveedorRepository from '@backend/contracts/proveedores/proveedor.repository.interface';
 import type ComercialRecord from '@backend/domain/proveedores/comercial-record.interface';
@@ -56,19 +57,134 @@ export default class TypeOrmProveedorRepository implements ProveedorRepository {
     const comercialesByProveedor: ReadonlyMap<number, readonly ComercialRecord[]> =
       this.groupComerciales(comerciales);
 
-    return proveedores.map((proveedor: ProveedorDatabaseRow): ProveedorRecord => ({
-      id: proveedor.id,
-      publicId: proveedor.public_id,
-      nombre: proveedor.nombre,
-      fotoRelativePath: proveedor.foto_relative_path,
-      direccion: proveedor.direccion,
-      telefono: proveedor.telefono,
-      email: proveedor.email,
-      web: proveedor.web,
-      observaciones: proveedor.observaciones,
-      marcas: marcasByProveedor.get(proveedor.id) ?? [],
-      comerciales: comercialesByProveedor.get(proveedor.id) ?? [],
-    }));
+    return proveedores.map((proveedor: ProveedorDatabaseRow): ProveedorRecord =>
+      this.toRecord(
+        proveedor,
+        marcasByProveedor.get(proveedor.id) ?? [],
+        comercialesByProveedor.get(proveedor.id) ?? [],
+      ),
+    );
+  }
+
+  /**
+   * Recupera un proveedor activo por su identificador interno.
+   */
+  async findById(id: number): Promise<ProveedorRecord | null> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const rows: readonly ProveedorDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT
+          p.id,
+          p.public_id,
+          p.nombre,
+          p.direccion,
+          p.telefono,
+          p.email,
+          p.web,
+          p.observaciones,
+          a.relative_path
+            AS foto_relative_path
+        FROM proveedor p
+
+        LEFT JOIN archivo a
+          ON a.id = p.id_archivo
+          AND a.deleted_at IS NULL
+
+        WHERE
+          p.id = ?
+          AND p.deleted_at IS NULL
+
+        LIMIT 1
+      `,
+      [id],
+    )) as readonly ProveedorDatabaseRow[];
+
+    const proveedor: ProveedorDatabaseRow | undefined = rows[0];
+
+    if (proveedor === undefined) {
+      return null;
+    }
+
+    const marcas: readonly ProveedorMarcaDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT
+          pm.id_proveedor,
+          pm.id_marca
+        FROM proveedor_marca pm
+
+        INNER JOIN marca m
+          ON m.id = pm.id_marca
+          AND m.deleted_at IS NULL
+
+        WHERE
+          pm.id_proveedor = ?
+
+        ORDER BY
+          m.nombre COLLATE NOCASE,
+          pm.id_marca
+      `,
+      [id],
+    )) as readonly ProveedorMarcaDatabaseRow[];
+
+    const comerciales: readonly ComercialDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT
+          c.id,
+          c.public_id,
+          c.id_proveedor,
+          c.nombre,
+          c.telefono,
+          c.email,
+          c.observaciones
+        FROM comercial c
+
+        WHERE
+          c.id_proveedor = ?
+          AND c.deleted_at IS NULL
+
+        ORDER BY
+          c.nombre COLLATE NOCASE,
+          c.id
+      `,
+      [id],
+    )) as readonly ComercialDatabaseRow[];
+
+    return this.toRecord(
+      proveedor,
+      marcas.map((row: ProveedorMarcaDatabaseRow): number => row.id_marca),
+      comerciales.map((row: ComercialDatabaseRow): ComercialRecord => this.toComercialRecord(row)),
+    );
+  }
+
+  /**
+   * Comprueba si existe otro proveedor activo
+   * con el mismo nombre.
+   */
+  async existsActiveByName(nombre: string, excludeId: number | null): Promise<boolean> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const rows: readonly {
+      readonly total: number;
+    }[] = (await dataSource.query(
+      `
+        SELECT
+          COUNT(*) AS total
+        FROM proveedor
+        WHERE
+          deleted_at IS NULL
+          AND nombre = ? COLLATE NOCASE
+          AND (
+            ? IS NULL
+            OR id <> ?
+          )
+      `,
+      [nombre, excludeId, excludeId],
+    )) as readonly {
+      readonly total: number;
+    }[];
+
+    return (rows[0]?.total ?? 0) > 0;
   }
 
   /**
@@ -153,20 +269,233 @@ export default class TypeOrmProveedorRepository implements ProveedorRepository {
   }
 
   /**
-   * Comprueba que una marca seleccionada siga activa.
+   * Actualiza los datos de un proveedor activo y sincroniza
+   * únicamente sus relaciones con marcas actualmente activas.
+   *
+   * Las relaciones con marcas dadas de baja se conservan
+   * físicamente para no perder información histórica.
    */
-  private async requireActiveMarca(queryRunner: QueryRunner, idMarca: number): Promise<void> {
-    const rows: readonly { readonly id: number }[] = (await queryRunner.query(
-      `
-          SELECT id
-          FROM marca
+  async update(id: number, command: ActualizarProveedorRecordCommand): Promise<ProveedorRecord> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+    const timestamp: string = new Date().toISOString();
+
+    await runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
+      await this.requireActiveProveedor(
+        queryRunner,
+        id,
+        'El proveedor que se intenta actualizar no existe.',
+      );
+
+      for (const idMarca of command.idsMarcas) {
+        await this.requireActiveMarca(queryRunner, idMarca);
+      }
+
+      await queryRunner.query(
+        `
+          UPDATE proveedor
+          SET
+            nombre = ?,
+            direccion = ?,
+            telefono = ?,
+            email = ?,
+            web = ?,
+            observaciones = ?,
+            updated_at = ?
           WHERE
             id = ?
             AND deleted_at IS NULL
-          LIMIT 1
         `,
+        [
+          command.nombre,
+          command.direccion,
+          command.telefono,
+          command.email,
+          command.web,
+          command.observaciones,
+          timestamp,
+          id,
+        ],
+      );
+
+      await this.syncActiveMarcas(queryRunner, id, command.idsMarcas, timestamp);
+    });
+
+    const updated: ProveedorRecord | null = await this.findById(id);
+
+    if (updated === null) {
+      throw new Error('No se ha podido recuperar el proveedor actualizado.');
+    }
+
+    return updated;
+  }
+
+  /**
+   * Da de baja lógicamente un proveedor y todos sus
+   * comerciales activos dentro de una única transacción.
+   *
+   * No se modifican sus marcas, artículos, pedidos,
+   * archivos ni ninguna otra referencia histórica.
+   */
+  async deactivate(id: number): Promise<void> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+    const timestamp: string = new Date().toISOString();
+
+    await runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
+      await this.requireActiveProveedor(
+        queryRunner,
+        id,
+        'El proveedor que se intenta eliminar no existe o ya está dado de baja.',
+      );
+
+      await queryRunner.query(
+        `
+          UPDATE proveedor
+          SET
+            deleted_at = ?,
+            updated_at = ?
+          WHERE
+            id = ?
+            AND deleted_at IS NULL
+        `,
+        [timestamp, timestamp, id],
+      );
+
+      await queryRunner.query(
+        `
+          UPDATE comercial
+          SET
+            deleted_at = ?,
+            updated_at = ?
+          WHERE
+            id_proveedor = ?
+            AND deleted_at IS NULL
+        `,
+        [timestamp, timestamp, id],
+      );
+    });
+  }
+
+  /**
+   * Sincroniza las marcas activas de un proveedor.
+   *
+   * Las relaciones existentes con marcas que ya están
+   * dadas de baja no se eliminan ni se modifican.
+   */
+  private async syncActiveMarcas(
+    queryRunner: QueryRunner,
+    idProveedor: number,
+    idsMarcas: readonly number[],
+    timestamp: string,
+  ): Promise<void> {
+    if (idsMarcas.length === 0) {
+      await queryRunner.query(
+        `
+          DELETE FROM proveedor_marca
+          WHERE
+            id_proveedor = ?
+            AND id_marca IN (
+              SELECT id
+              FROM marca
+              WHERE deleted_at IS NULL
+            )
+        `,
+        [idProveedor],
+      );
+    } else {
+      const placeholders: string = idsMarcas.map((): string => '?').join(', ');
+
+      await queryRunner.query(
+        `
+          DELETE FROM proveedor_marca
+          WHERE
+            id_proveedor = ?
+            AND id_marca IN (
+              SELECT id
+              FROM marca
+              WHERE deleted_at IS NULL
+            )
+            AND id_marca NOT IN (${placeholders})
+        `,
+        [idProveedor, ...idsMarcas],
+      );
+    }
+
+    for (const idMarca of idsMarcas) {
+      await queryRunner.query(
+        `
+          INSERT INTO proveedor_marca (
+            id_proveedor,
+            id_marca,
+            created_at,
+            updated_at
+          )
+          SELECT
+            ?,
+            ?,
+            ?,
+            ?
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM proveedor_marca
+            WHERE
+              id_proveedor = ?
+              AND id_marca = ?
+          )
+        `,
+        [idProveedor, idMarca, timestamp, timestamp, idProveedor, idMarca],
+      );
+    }
+  }
+
+  /**
+   * Comprueba que un proveedor siga activo dentro
+   * de la transacción en curso.
+   */
+  private async requireActiveProveedor(
+    queryRunner: QueryRunner,
+    idProveedor: number,
+    errorMessage: string,
+  ): Promise<void> {
+    const rows: readonly {
+      readonly id: number;
+    }[] = (await queryRunner.query(
+      `
+        SELECT id
+        FROM proveedor
+        WHERE
+          id = ?
+          AND deleted_at IS NULL
+        LIMIT 1
+      `,
+      [idProveedor],
+    )) as readonly {
+      readonly id: number;
+    }[];
+
+    if (rows.length === 0) {
+      throw new Error(errorMessage);
+    }
+  }
+
+  /**
+   * Comprueba que una marca seleccionada siga activa.
+   */
+  private async requireActiveMarca(queryRunner: QueryRunner, idMarca: number): Promise<void> {
+    const rows: readonly {
+      readonly id: number;
+    }[] = (await queryRunner.query(
+      `
+        SELECT id
+        FROM marca
+        WHERE
+          id = ?
+          AND deleted_at IS NULL
+        LIMIT 1
+      `,
       [idMarca],
-    )) as readonly { readonly id: number }[];
+    )) as readonly {
+      readonly id: number;
+    }[];
 
     if (rows.length === 0) {
       throw new Error('Una de las marcas seleccionadas no existe.');
@@ -270,19 +599,50 @@ export default class TypeOrmProveedorRepository implements ProveedorRepository {
     for (const row of rows) {
       const current: ComercialRecord[] = result.get(row.id_proveedor) ?? [];
 
-      current.push({
-        id: row.id,
-        publicId: row.public_id,
-        idProveedor: row.id_proveedor,
-        nombre: row.nombre,
-        telefono: row.telefono,
-        email: row.email,
-        observaciones: row.observaciones,
-      });
+      current.push(this.toComercialRecord(row));
 
       result.set(row.id_proveedor, current);
     }
 
     return result;
+  }
+
+  /**
+   * Convierte una fila de proveedor y sus relaciones
+   * activas al modelo de dominio.
+   */
+  private toRecord(
+    proveedor: ProveedorDatabaseRow,
+    marcas: readonly number[],
+    comerciales: readonly ComercialRecord[],
+  ): ProveedorRecord {
+    return {
+      id: proveedor.id,
+      publicId: proveedor.public_id,
+      nombre: proveedor.nombre,
+      fotoRelativePath: proveedor.foto_relative_path,
+      direccion: proveedor.direccion,
+      telefono: proveedor.telefono,
+      email: proveedor.email,
+      web: proveedor.web,
+      observaciones: proveedor.observaciones,
+      marcas: [...marcas],
+      comerciales: [...comerciales],
+    };
+  }
+
+  /**
+   * Convierte una fila de comercial al modelo de dominio.
+   */
+  private toComercialRecord(row: ComercialDatabaseRow): ComercialRecord {
+    return {
+      id: row.id,
+      publicId: row.public_id,
+      idProveedor: row.id_proveedor,
+      nombre: row.nombre,
+      telefono: row.telefono,
+      email: row.email,
+      observaciones: row.observaciones,
+    };
   }
 }
