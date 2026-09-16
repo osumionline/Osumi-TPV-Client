@@ -32,6 +32,18 @@ export default class FilesService {
   }
 
   /**
+   * Envía un logo seleccionado al staging de Proveedores.
+   */
+  async stageProviderImage(file: File): Promise<StagedImageInterface> {
+    const bytes: Uint8Array = new Uint8Array(await file.arrayBuffer());
+
+    return window.osumiDesktop.files.stageProviderImage({
+      originalName: file.name.trim() === '' ? null : file.name,
+      bytes,
+    });
+  }
+
+  /**
    * Descarta una imagen temporal que ya no forma
    * parte de ningún draft.
    */

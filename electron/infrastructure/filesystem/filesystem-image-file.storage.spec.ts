@@ -40,6 +40,31 @@ describe('FilesystemImageFileStorage', (): void => {
     expect(persisted).toEqual(image.buffer);
   });
 
+  it('guarda un logo de Proveedor en su directorio específico', async (): Promise<void> => {
+    tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-images-'));
+
+    const storage = new FilesystemImageFileStorage(tempDirectory);
+
+    const image: ProcessedImage = createProcessedImage();
+
+    const result: StoredImageFile = await storage.save(
+      'provider_image',
+      'provider-public-id',
+      image,
+    );
+
+    expect(result).toEqual({
+      internalName: 'provider-public-id.webp',
+      relativePath: 'files/providers/provider-public-id.webp',
+    });
+
+    const persisted: Buffer = await readFile(
+      join(tempDirectory, 'providers', 'provider-public-id.webp'),
+    );
+
+    expect(persisted).toEqual(image.buffer);
+  });
+
   it('elimina un archivo administrado', async (): Promise<void> => {
     tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-images-'));
 

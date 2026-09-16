@@ -15,6 +15,12 @@ export default interface FilesApi {
   stageBrandImage(request: StageImageRequest): Promise<StagedImageInterface>;
 
   /**
+   * Convierte y almacena temporalmente una imagen
+   * destinada al logo de un Proveedor.
+   */
+  stageProviderImage(request: StageImageRequest): Promise<StagedImageInterface>;
+
+  /**
    * Descarta una imagen temporal que ya no forma
    * parte de ningún draft activo.
    */

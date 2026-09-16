@@ -19,11 +19,7 @@ export default function registerFilesIpc(
     async (event, request: StageImageRequest): Promise<StagedImageInterface> => {
       assertTrustedSender(event, getMainWindow);
 
-      return stageImage(
-        request,
-        'article_image',
-        imageStagingService,
-      );
+      return stageImage(request, 'article_image', imageStagingService);
     },
   );
 
@@ -32,11 +28,16 @@ export default function registerFilesIpc(
     async (event, request: StageImageRequest): Promise<StagedImageInterface> => {
       assertTrustedSender(event, getMainWindow);
 
-      return stageImage(
-        request,
-        'brand_image',
-        imageStagingService,
-      );
+      return stageImage(request, 'brand_image', imageStagingService);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.filesStageProviderImage,
+    async (event, request: StageImageRequest): Promise<StagedImageInterface> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return stageImage(request, 'provider_image', imageStagingService);
     },
   );
 

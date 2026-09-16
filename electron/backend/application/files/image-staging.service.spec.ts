@@ -135,6 +135,37 @@ describe('ImageStagingService', (): void => {
     });
   });
 
+  it('procesa un logo de Proveedor conservando su purpose', async (): Promise<void> => {
+    const service = new ImageStagingService(
+      new FakeImageProcessor(),
+      new FakeImageStagingStorage(),
+      new FakeAssetUrlBuilder(),
+    );
+
+    const result: StagedImageInterface = await service.stage({
+      purpose: 'provider_image',
+      originalName: 'logo-proveedor.png',
+      buffer: Buffer.from('original'),
+    });
+
+    expect(result).toMatchObject({
+      purpose: 'provider_image',
+      originalName: 'logo-proveedor.png',
+      mimeType: 'image/webp',
+      width: 640,
+      height: 480,
+    });
+
+    const record: StagedImageRecord | null = service.getRecord(result.stagingId);
+
+    expect(record).toMatchObject({
+      stagingId: result.stagingId,
+      purpose: 'provider_image',
+      originalName: 'logo-proveedor.png',
+      sha256: 'a'.repeat(64),
+    });
+  });
+
   it('descarta el fichero y el record temporal', async (): Promise<void> => {
     const storage = new FakeImageStagingStorage();
 
