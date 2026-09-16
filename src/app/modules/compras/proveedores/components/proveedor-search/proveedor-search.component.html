@@ -1,0 +1,74 @@
+<div class="overlay">
+    <button class="overlay__backdrop"
+            type="button"
+            aria-label="Cerrar buscador de proveedores"
+            (click)="cancel()">
+    </button>
+
+    <section class="supplier-search overlay__panel"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="supplier-search-title"
+             (keydown.escape)="cancel()">
+        <header class="supplier-search__header">
+            <h2 id="supplier-search-title">
+                Proveedores
+            </h2>
+
+            <button mat-icon-button
+                    type="button"
+                    aria-label="Cerrar buscador de proveedores"
+                    (click)="cancel()">
+                <mat-icon>
+                    close
+                </mat-icon>
+            </button>
+        </header>
+
+        <div class="supplier-search__search">
+            <input #searchInput
+                   class="otpv-control"
+                   type="search"
+                   autocomplete="off"
+                   placeholder="Introduce el nombre a buscar"
+                   [value]="query()"
+                   (input)="updateQuery($event)">
+        </div>
+
+        <div class="supplier-search__results">
+            @for (
+            proveedor of filteredProveedores();
+            track proveedor.publicId
+            ) {
+            <button class="supplier-search__card"
+                    type="button"
+                    [class.supplier-search__card--selected]="
+                        selectedPublicId() === proveedor.publicId
+                    "
+                    (click)="select(proveedor)">
+                <span class="supplier-search__image">
+                    @if (proveedor.foto !== null) {
+                    <img [src]="proveedor.foto"
+                         [attr.alt]="'Logo de ' + proveedor.nombre"
+                         loading="lazy">
+                    }
+                    @else {
+                    <mat-icon aria-hidden="true">
+                        business
+                    </mat-icon>
+                    }
+                </span>
+
+                <span class="supplier-search__name">
+                    {{ proveedor.nombre }}
+                </span>
+            </button>
+            }
+            @empty {
+            <div class="supplier-search__empty">
+                No se han encontrado proveedores.
+            </div>
+            }
+        </div>
+    </section>
+</div>

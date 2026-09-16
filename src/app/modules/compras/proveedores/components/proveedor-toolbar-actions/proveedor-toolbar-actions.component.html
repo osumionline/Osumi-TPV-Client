@@ -19,7 +19,7 @@
             type="button"
             matTooltip="Buscar proveedor"
             aria-label="Buscar proveedor"
-            disabled>
+            (click)="openSearch()">
         <mat-icon>
             search
         </mat-icon>
@@ -35,3 +35,12 @@
         </mat-icon>
     </button>
 </div>
+
+@if (searchOpen()) {
+<otpv-proveedor-search [proveedores]="proveedoresService.proveedores()"
+                       [selectedPublicId]="
+                            proveedoresService.workspace()?.proveedorPublicId ?? null
+                        "
+                       (selectEvent)="selectProveedor($event)"
+                       (cancelEvent)="closeSearch()" />
+}
