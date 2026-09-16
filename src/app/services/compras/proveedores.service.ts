@@ -1,5 +1,6 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { Service, signal } from '@angular/core';
+import type ActualizarProveedorCommand from '@desktop-contracts/proveedores/actualizar-proveedor-command.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
 import type { ProveedorInterface } from '@desktop-contracts/proveedores/proveedor.interface';
 import Proveedor from '@model/proveedores/proveedor.model';
@@ -29,7 +30,7 @@ export default class ProveedoresService {
   }
 
   /**
-   * Crea un proveedor, refresca la colección global
+   * Crea un proveedor, reconcilia el maestro global
    * y devuelve su instancia canónica.
    */
   async create(command: CrearProveedorCommand): Promise<Proveedor> {
@@ -42,26 +43,55 @@ export default class ProveedoresService {
 
     const proveedor: Proveedor = new Proveedor().fromInterface(createdProveedor);
 
-    this.proveedoresSignal.update((proveedores: readonly Proveedor[]): readonly Proveedor[] =>
-      [
-        ...proveedores.filter(
-          (item: Proveedor): boolean => item.publicId !== createdProveedor.publicId,
-        ),
-        proveedor,
-      ].sort((left: Proveedor, right: Proveedor): number =>
-        left.nombre.localeCompare(right.nombre, 'es', {
-          sensitivity: 'base',
-        }),
-      ),
-    );
+    this.upsertProveedor(proveedor);
     this.loadedSignal.set(true);
 
     return proveedor;
   }
 
+  /**
+   * Actualiza un proveedor persistido, reconcilia el
+   * maestro global y devuelve su instancia canónica.
+   */
+  async update(id: number, command: ActualizarProveedorCommand): Promise<Proveedor> {
+    const updatedProveedor: ProveedorInterface = await window.osumiDesktop.proveedores.update(
+      id,
+      command,
+    );
+
+    if (this.pendingRequest !== null) {
+      await this.pendingRequest;
+    }
+
+    const proveedor: Proveedor = new Proveedor().fromInterface(updatedProveedor);
+
+    this.upsertProveedor(proveedor);
+    this.loadedSignal.set(true);
+
+    return proveedor;
+  }
+
+  /**
+   * Da de baja un proveedor activo y lo elimina
+   * inmediatamente del maestro renderer.
+   */
+  async deactivate(id: number): Promise<void> {
+    await window.osumiDesktop.proveedores.deactivate(id);
+
+    if (this.pendingRequest !== null) {
+      await this.pendingRequest;
+    }
+
+    this.proveedoresSignal.update((proveedores: readonly Proveedor[]): readonly Proveedor[] =>
+      proveedores.filter((proveedor: Proveedor): boolean => proveedor.id !== id),
+    );
+  }
+
+  /**
+   * Limpia completamente el maestro de Proveedores.
+   */
   clear(): void {
     this.proveedoresSignal.set([]);
-
     this.loadedSignal.set(false);
   }
 
@@ -73,6 +103,23 @@ export default class ProveedoresService {
     return (
       this.proveedores().find((proveedor: Proveedor): boolean => proveedor.publicId === publicId) ??
       null
+    );
+  }
+
+  /**
+   * Inserta o sustituye un Proveedor canónico en
+   * el maestro global manteniendo el orden alfabético.
+   */
+  private upsertProveedor(proveedor: Proveedor): void {
+    this.proveedoresSignal.update((proveedores: readonly Proveedor[]): readonly Proveedor[] =>
+      [
+        ...proveedores.filter((item: Proveedor): boolean => item.publicId !== proveedor.publicId),
+        proveedor,
+      ].sort((left: Proveedor, right: Proveedor): number =>
+        left.nombre.localeCompare(right.nombre, 'es', {
+          sensitivity: 'base',
+        }),
+      ),
     );
   }
 
@@ -95,7 +142,6 @@ export default class ProveedoresService {
       );
 
       this.proveedoresSignal.set(proveedores);
-
       this.loadedSignal.set(true);
     } finally {
       this.pendingRequest = null;
