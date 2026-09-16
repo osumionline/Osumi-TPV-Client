@@ -90,6 +90,8 @@ export default class ArticleGeneralComponent implements OnInit {
   readonly creatingProveedor: WritableSignal<boolean> = signal<boolean>(false);
   readonly marcaCreateError: WritableSignal<string | null> = signal<string | null>(null);
   readonly proveedorCreateError: WritableSignal<string | null> = signal<string | null>(null);
+  readonly marginModalOpen: WritableSignal<boolean> = signal<boolean>(false);
+
   readonly fiscalOptions: Signal<readonly ArticleFiscalOption[]> = computed(
     (): readonly ArticleFiscalOption[] => this.buildFiscalOptions(),
   );
@@ -101,7 +103,11 @@ export default class ArticleGeneralComponent implements OnInit {
 
     return idMarca !== null && this.marcasService.findById(idMarca) === null;
   });
-  readonly marginModalOpen: WritableSignal<boolean> = signal<boolean>(false);
+  readonly currentProveedorUnavailable: Signal<boolean> = computed((): boolean => {
+    const idProveedor: number | null = this.tab().draft.idProveedor;
+
+    return idProveedor !== null && this.proveedoresService.findById(idProveedor) === null;
+  });
 
   /**
    * Carga los datos maestros necesarios para General.

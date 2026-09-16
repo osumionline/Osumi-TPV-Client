@@ -616,6 +616,126 @@ describe('TypeOrmArticulosRepository', (): void => {
     expect(articulo?.idMarca).toBe(1);
   });
 
+  it('permite conservar la referencia histórica a un Proveedor eliminado', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+        UPDATE proveedor
+        SET
+          deleted_at = '2026-01-01T00:00:00.000Z'
+        WHERE id = 1
+      `,
+    );
+
+    await requireRepository().update(
+      createUpdateCommand({
+        nombre: 'Artículo con proveedor histórico',
+        idProveedor: 1,
+      }),
+    );
+
+    const articulo: ArticuloRecord | null = await requireRepository().findById(1);
+
+    expect(articulo).toMatchObject({
+      id: 1,
+      nombre: 'Artículo con proveedor histórico',
+      idProveedor: 1,
+    });
+  });
+
+  it('no permite asignar un Proveedor eliminado al crear un artículo', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+        UPDATE proveedor
+        SET
+          deleted_at = '2026-01-01T00:00:00.000Z'
+        WHERE id = 1
+      `,
+    );
+
+    await expect(
+      requireRepository().create(
+        createNewArticleCommand({
+          idProveedor: 1,
+        }),
+      ),
+    ).rejects.toThrow('El proveedor seleccionado no existe.');
+  });
+
+  it('no permite seleccionar otro Proveedor que ya está eliminado', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+        INSERT INTO proveedor (
+          id,
+          public_id,
+          nombre,
+          deleted_at
+        )
+        VALUES (
+          2,
+          'provider-deleted-public-id',
+          'Proveedor eliminado',
+          '2026-01-01T00:00:00.000Z'
+        )
+      `,
+    );
+
+    await expect(
+      requireRepository().update(
+        createUpdateCommand({
+          idProveedor: 2,
+        }),
+      ),
+    ).rejects.toThrow('El proveedor seleccionado no existe.');
+
+    const articulo: ArticuloRecord | null = await requireRepository().findById(1);
+
+    expect(articulo?.idProveedor).toBe(1);
+  });
+
+  it('permite sustituir un Proveedor histórico eliminado por otro activo', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+        UPDATE proveedor
+        SET
+          deleted_at = '2026-01-01T00:00:00.000Z'
+        WHERE id = 1
+      `,
+    );
+
+    await dataSource.query(
+      `
+        INSERT INTO proveedor (
+          id,
+          public_id,
+          nombre
+        )
+        VALUES (
+          2,
+          'provider-active-public-id',
+          'Proveedor activo nuevo'
+        )
+      `,
+    );
+
+    await requireRepository().update(
+      createUpdateCommand({
+        idProveedor: 2,
+      }),
+    );
+
+    const articulo: ArticuloRecord | null = await requireRepository().findById(1);
+
+    expect(articulo?.idProveedor).toBe(2);
+  });
+
   it('no permite crear un artículo utilizando una Marca dada de baja', async (): Promise<void> => {
     const dataSource: DataSource = await requireDatabase().connect();
 

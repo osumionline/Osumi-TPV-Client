@@ -143,6 +143,14 @@
                         Sin proveedor
                     </option>
 
+                    @if (currentProveedorUnavailable()) {
+                    <option [value]="tab().draft.idProveedor"
+                            selected
+                            disabled>
+                        Proveedor eliminado
+                    </option>
+                    }
+
                     @for (proveedor of proveedoresService.proveedores(); track proveedor.id) {
                     @if (proveedor.id !== null) {
                     <option [value]="proveedor.id"

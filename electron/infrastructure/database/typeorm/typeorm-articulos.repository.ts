@@ -86,6 +86,7 @@ interface ArticuloUpdateDatabaseRow {
   readonly id: number;
   readonly localizador: number;
   readonly id_marca: number;
+  readonly id_proveedor: number | null;
   readonly stock: number;
 }
 
@@ -604,7 +605,7 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
         );
       }
 
-      if (command.idProveedor !== null) {
+      if (command.idProveedor !== current.id_proveedor && command.idProveedor !== null) {
         await this.requireActiveReference(
           queryRunner,
           'proveedor',
@@ -1150,6 +1151,7 @@ export default class TypeOrmArticulosRepository implements ArticulosRepository {
         id,
         localizador,
         id_marca,
+        id_proveedor,
         stock
       FROM articulo
       WHERE
