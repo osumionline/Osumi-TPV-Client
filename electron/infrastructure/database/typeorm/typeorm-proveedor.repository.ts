@@ -1,4 +1,6 @@
+import type ActualizarComercialRecordCommand from '@backend/contracts/proveedores/actualizar-comercial-record-command.interface';
 import type ActualizarProveedorRecordCommand from '@backend/contracts/proveedores/actualizar-proveedor-record-command.interface';
+import type CrearComercialRecordCommand from '@backend/contracts/proveedores/crear-comercial-record-command.interface';
 import type CrearProveedorRecordCommand from '@backend/contracts/proveedores/crear-proveedor-record-command.interface';
 import type ProveedorRepository from '@backend/contracts/proveedores/proveedor.repository.interface';
 import type { ArchivoCreateRecord } from '@backend/domain/files/archivo-record.interface';
@@ -402,6 +404,207 @@ export default class TypeOrmProveedorRepository implements ProveedorRepository {
         [timestamp, timestamp, id],
       );
     });
+  }
+
+  /**
+   * Crea un Comercial bajo un Proveedor activo.
+   */
+  async createComercial(command: CrearComercialRecordCommand): Promise<ComercialRecord> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const publicId: string = randomUUID();
+
+    const timestamp: string = new Date().toISOString();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<ComercialRecord> => {
+        await this.requireActiveProveedor(
+          queryRunner,
+          command.idProveedor,
+          'El proveedor indicado no existe o ya no está activo.',
+        );
+
+        await queryRunner.query(
+          `
+            INSERT INTO comercial (
+              public_id,
+              id_proveedor,
+              nombre,
+              telefono,
+              email,
+              observaciones,
+              created_at,
+              updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+          [
+            publicId,
+            command.idProveedor,
+            command.nombre,
+            command.telefono,
+            command.email,
+            command.observaciones,
+            timestamp,
+            timestamp,
+          ],
+        );
+
+        const idComercial: number = await getLastInsertId(
+          queryRunner,
+          'No se ha podido obtener el identificador del comercial creado.',
+        );
+
+        return {
+          id: idComercial,
+          publicId,
+          idProveedor: command.idProveedor,
+          nombre: command.nombre,
+          telefono: command.telefono,
+          email: command.email,
+          observaciones: command.observaciones,
+        };
+      },
+    );
+  }
+
+  /**
+   * Actualiza un Comercial activo sin permitir
+   * cambiar el Proveedor al que pertenece.
+   */
+  async updateComercial(
+    idProveedor: number,
+    idComercial: number,
+    command: ActualizarComercialRecordCommand,
+  ): Promise<ComercialRecord> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const timestamp: string = new Date().toISOString();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<ComercialRecord> => {
+        const current: ComercialDatabaseRow = await this.requireActiveComercial(
+          queryRunner,
+          idProveedor,
+          idComercial,
+          'El comercial indicado no existe, ya no está activo o no pertenece al proveedor.',
+        );
+
+        await queryRunner.query(
+          `
+            UPDATE comercial
+            SET
+              nombre = ?,
+              telefono = ?,
+              email = ?,
+              observaciones = ?,
+              updated_at = ?
+            WHERE
+              id = ?
+              AND id_proveedor = ?
+              AND deleted_at IS NULL
+          `,
+          [
+            command.nombre,
+            command.telefono,
+            command.email,
+            command.observaciones,
+            timestamp,
+            idComercial,
+            idProveedor,
+          ],
+        );
+
+        return this.toComercialRecord({
+          ...current,
+          nombre: command.nombre,
+          telefono: command.telefono,
+          email: command.email,
+          observaciones: command.observaciones,
+        });
+      },
+    );
+  }
+
+  /**
+   * Da de baja lógicamente un Comercial
+   * perteneciente a un Proveedor activo.
+   */
+  async deactivateComercial(idProveedor: number, idComercial: number): Promise<void> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const timestamp: string = new Date().toISOString();
+
+    await runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
+      await this.requireActiveComercial(
+        queryRunner,
+        idProveedor,
+        idComercial,
+        'El comercial que se intenta eliminar no existe, ya está dado de baja o no pertenece al proveedor.',
+      );
+
+      await queryRunner.query(
+        `
+            UPDATE comercial
+            SET
+              deleted_at = ?,
+              updated_at = ?
+            WHERE
+              id = ?
+              AND id_proveedor = ?
+              AND deleted_at IS NULL
+          `,
+        [timestamp, timestamp, idComercial, idProveedor],
+      );
+    });
+  }
+
+  /**
+   * Recupera un Comercial activo comprobando
+   * también que su Proveedor siga activo y que
+   * la relación entre ambos sea la esperada.
+   */
+  private async requireActiveComercial(
+    queryRunner: QueryRunner,
+    idProveedor: number,
+    idComercial: number,
+    errorMessage: string,
+  ): Promise<ComercialDatabaseRow> {
+    const rows: readonly ComercialDatabaseRow[] = (await queryRunner.query(
+      `
+          SELECT
+            c.id,
+            c.public_id,
+            c.id_proveedor,
+            c.nombre,
+            c.telefono,
+            c.email,
+            c.observaciones
+          FROM comercial c
+
+          INNER JOIN proveedor p
+            ON p.id = c.id_proveedor
+            AND p.deleted_at IS NULL
+
+          WHERE
+            c.id = ?
+            AND c.id_proveedor = ?
+            AND c.deleted_at IS NULL
+
+          LIMIT 1
+        `,
+      [idComercial, idProveedor],
+    )) as readonly ComercialDatabaseRow[];
+
+    const row: ComercialDatabaseRow | undefined = rows[0];
+
+    if (row === undefined) {
+      throw new Error(errorMessage);
+    }
+
+    return row;
   }
 
   /**

@@ -11,6 +11,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DataSource } from 'typeorm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type ActualizarComercialRecordCommand from '@backend/contracts/proveedores/actualizar-comercial-record-command.interface';
+import type CrearComercialRecordCommand from '@backend/contracts/proveedores/crear-comercial-record-command.interface';
+import type ComercialRecord from '@backend/domain/proveedores/comercial-record.interface';
 
 let tempDirectory: string | null = null;
 let applicationDatabase: TypeOrmApplicationDatabase | null = null;
@@ -562,6 +565,172 @@ describe('TypeOrmProveedorRepository', (): void => {
 
     expect(rows[0]?.id_archivo).toBe(1);
   });
+
+  it('crea un Comercial únicamente dentro de un Proveedor activo', async (): Promise<void> => {
+    const comercial: ComercialRecord = await requireRepository().createComercial(
+      createComercialRecordCommand(),
+    );
+
+    expect(comercial).toMatchObject({
+      idProveedor: 1,
+      nombre: 'Comercial nuevo',
+      telefono: '600111222',
+      email: 'nuevo-comercial@example.com',
+      observaciones: 'Nueva observación',
+    });
+
+    expect(comercial.publicId).not.toBe('');
+
+    const proveedor: ProveedorRecord | null = await requireRepository().findById(1);
+
+    expect(
+      proveedor?.comerciales.some((item: ComercialRecord): boolean => item.id === comercial.id),
+    ).toBe(true);
+  });
+
+  it('rechaza crear un Comercial bajo un Proveedor eliminado o inexistente', async (): Promise<void> => {
+    await expect(
+      requireRepository().createComercial(
+        createComercialRecordCommand({
+          idProveedor: 2,
+        }),
+      ),
+    ).rejects.toThrow('El proveedor indicado no existe o ya no está activo.');
+
+    await expect(
+      requireRepository().createComercial(
+        createComercialRecordCommand({
+          idProveedor: 999,
+        }),
+      ),
+    ).rejects.toThrow('El proveedor indicado no existe o ya no está activo.');
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const rows: readonly {
+      readonly total: number;
+    }[] = await dataSource.query(`
+        SELECT
+          COUNT(*) AS total
+        FROM comercial
+        WHERE nombre = 'Comercial nuevo'
+      `);
+
+    expect(rows[0]?.total).toBe(0);
+  });
+
+  it('actualiza un Comercial activo sin modificar su Proveedor', async (): Promise<void> => {
+    const comercial: ComercialRecord = await requireRepository().updateComercial(
+      1,
+      1,
+      updateComercialRecordCommand(),
+    );
+
+    expect(comercial).toEqual({
+      id: 1,
+      publicId: 'comercial-activo',
+      idProveedor: 1,
+      nombre: 'Comercial actualizado',
+      telefono: null,
+      email: 'actualizado@example.com',
+      observaciones: 'Observación actualizada',
+    });
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const rows: readonly {
+      readonly id_proveedor: number;
+      readonly nombre: string;
+      readonly deleted_at: string | null;
+    }[] = await dataSource.query(`
+        SELECT
+          id_proveedor,
+          nombre,
+          deleted_at
+        FROM comercial
+        WHERE id = 1
+      `);
+
+    expect(rows).toEqual([
+      {
+        id_proveedor: 1,
+        nombre: 'Comercial actualizado',
+        deleted_at: null,
+      },
+    ]);
+  });
+
+  it('impide modificar un Comercial desde otro Proveedor', async (): Promise<void> => {
+    const otroProveedor: ProveedorRecord = await requireRepository().create(
+      createCommand({
+        nombre: 'Otro proveedor',
+      }),
+    );
+
+    await expect(
+      requireRepository().updateComercial(otroProveedor.id, 1, updateComercialRecordCommand()),
+    ).rejects.toThrow(
+      'El comercial indicado no existe, ya no está activo o no pertenece al proveedor.',
+    );
+
+    const original: ProveedorRecord | null = await requireRepository().findById(1);
+
+    expect(original?.comerciales[0]?.nombre).toBe('Comercial activo');
+  });
+
+  it('no permite modificar un Comercial ya eliminado', async (): Promise<void> => {
+    await expect(
+      requireRepository().updateComercial(1, 2, updateComercialRecordCommand()),
+    ).rejects.toThrow(
+      'El comercial indicado no existe, ya no está activo o no pertenece al proveedor.',
+    );
+  });
+
+  it('da de baja únicamente el Comercial indicado', async (): Promise<void> => {
+    await requireRepository().deactivateComercial(1, 1);
+
+    const proveedor: ProveedorRecord | null = await requireRepository().findById(1);
+
+    expect(proveedor?.comerciales).toEqual([]);
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const rows: readonly {
+      readonly updated_at: string;
+      readonly deleted_at: string | null;
+    }[] = await dataSource.query(`
+        SELECT
+          updated_at,
+          deleted_at
+        FROM comercial
+        WHERE id = 1
+      `);
+
+    expect(rows[0]?.deleted_at).not.toBeNull();
+
+    expect(rows[0]?.updated_at).toBe(rows[0]?.deleted_at);
+
+    /*
+     * El Proveedor sigue activo.
+     */
+    await expect(requireRepository().findById(1)).resolves.not.toBeNull();
+  });
+
+  it('impide dar de baja un Comercial desde otro Proveedor', async (): Promise<void> => {
+    const otroProveedor: ProveedorRecord = await requireRepository().create(
+      createCommand({
+        nombre: 'Otro proveedor',
+      }),
+    );
+
+    await expect(requireRepository().deactivateComercial(otroProveedor.id, 1)).rejects.toThrow(
+      'El comercial que se intenta eliminar no existe, ya está dado de baja o no pertenece al proveedor.',
+    );
+
+    const proveedor: ProveedorRecord | null = await requireRepository().findById(1);
+
+    expect(proveedor?.comerciales).toHaveLength(1);
+  });
 });
 
 /**
@@ -820,6 +989,31 @@ function createProviderLogo(overrides: Partial<ArchivoCreateRecord> = {}): Archi
     sha256: 'b'.repeat(64),
     width: 900,
     height: 600,
+    ...overrides,
+  };
+}
+
+function createComercialRecordCommand(
+  overrides: Partial<CrearComercialRecordCommand> = {},
+): CrearComercialRecordCommand {
+  return {
+    idProveedor: 1,
+    nombre: 'Comercial nuevo',
+    telefono: '600111222',
+    email: 'nuevo-comercial@example.com',
+    observaciones: 'Nueva observación',
+    ...overrides,
+  };
+}
+
+function updateComercialRecordCommand(
+  overrides: Partial<ActualizarComercialRecordCommand> = {},
+): ActualizarComercialRecordCommand {
+  return {
+    nombre: 'Comercial actualizado',
+    telefono: null,
+    email: 'actualizado@example.com',
+    observaciones: 'Observación actualizada',
     ...overrides,
   };
 }

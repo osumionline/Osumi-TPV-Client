@@ -1,16 +1,24 @@
 import ProveedoresService from '@backend/application/proveedores/proveedores.service';
 import type ImageAssetPromoter from '@backend/contracts/files/image-asset-promoter.interface';
 import type StagedImageDiscarder from '@backend/contracts/files/staged-image-discarder.interface';
+import type ActualizarComercialRecordCommand from '@backend/contracts/proveedores/actualizar-comercial-record-command.interface';
 import type ActualizarProveedorRecordCommand from '@backend/contracts/proveedores/actualizar-proveedor-record-command.interface';
+import type CrearComercialRecordCommand from '@backend/contracts/proveedores/crear-comercial-record-command.interface';
 import type CrearProveedorRecordCommand from '@backend/contracts/proveedores/crear-proveedor-record-command.interface';
 import type ProveedorRepository from '@backend/contracts/proveedores/proveedor.repository.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
 import type { ImageAssetPurpose } from '@backend/domain/files/image-asset.interface';
 import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.interface';
+import type ComercialRecord from '@backend/domain/proveedores/comercial-record.interface';
 import type ProveedorRecord from '@backend/domain/proveedores/proveedor-record.interface';
+import type ActualizarComercialCommand from '@desktop-contracts/proveedores/actualizar-comercial-command.interface';
 import type ActualizarProveedorCommand from '@desktop-contracts/proveedores/actualizar-proveedor-command.interface';
+import type CrearComercialCommand from '@desktop-contracts/proveedores/crear-comercial-command.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
-import type { ProveedorInterface } from '@desktop-contracts/proveedores/proveedor.interface';
+import type {
+  ComercialInterface,
+  ProveedorInterface,
+} from '@desktop-contracts/proveedores/proveedor.interface';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 let proveedores: readonly ProveedorRecord[];
@@ -25,6 +33,16 @@ let lastUpdateCommand: ActualizarProveedorRecordCommand | null;
 let lastDeactivateId: number | null;
 let createError: Error | null;
 let updateError: Error | null;
+let lastCreateComercialCommand: CrearComercialRecordCommand | null;
+let lastUpdateComercial: {
+  readonly idProveedor: number;
+  readonly idComercial: number;
+  readonly command: ActualizarComercialRecordCommand;
+} | null;
+let lastDeactivateComercial: {
+  readonly idProveedor: number;
+  readonly idComercial: number;
+} | null;
 
 class FakeImageAssetPromoter implements ImageAssetPromoter {
   readonly preparedRequests: {
@@ -108,6 +126,9 @@ describe('ProveedoresService', (): void => {
     lastDeactivateId = null;
     createError = null;
     updateError = null;
+    lastCreateComercialCommand = null;
+    lastUpdateComercial = null;
+    lastDeactivateComercial = null;
   });
 
   it('devuelve el maestro activo transformando la foto y los comerciales', async (): Promise<void> => {
@@ -524,6 +545,127 @@ describe('ProveedoresService', (): void => {
 
     expect(lastCreateCommand).toBeNull();
   });
+
+  it('crea un Comercial normalizando sus campos y asociándolo al Proveedor', async (): Promise<void> => {
+    const service: ProveedoresService = createService();
+
+    const command: CrearComercialCommand = {
+      nombre: '  Comercial nuevo  ',
+      telefono: '  600111222  ',
+      email: '  comercial@empresa.test  ',
+      observaciones: '   ',
+    };
+
+    const result: ComercialInterface = await service.createComercial(1, command);
+
+    expect(lastCreateComercialCommand).toEqual({
+      idProveedor: 1,
+      nombre: 'Comercial nuevo',
+      telefono: '600111222',
+      email: 'comercial@empresa.test',
+      observaciones: null,
+    });
+
+    expect(result).toEqual({
+      id: 20,
+      publicId: 'comercial-20',
+      idProveedor: 1,
+      nombre: 'Comercial nuevo',
+      telefono: '600111222',
+      email: 'comercial@empresa.test',
+      observaciones: null,
+    });
+  });
+
+  it('valida Nombre, email e identificador del Proveedor al crear un Comercial', async (): Promise<void> => {
+    const service: ProveedoresService = createService();
+
+    await expect(service.createComercial(0, createComercialCommand())).rejects.toThrow(
+      'El identificador del proveedor no es válido.',
+    );
+
+    await expect(
+      service.createComercial(
+        1,
+        createComercialCommand({
+          nombre: '   ',
+        }),
+      ),
+    ).rejects.toThrow('El nombre del comercial no puede estar vacío.');
+
+    await expect(
+      service.createComercial(
+        1,
+        createComercialCommand({
+          email: 'email-invalido',
+        }),
+      ),
+    ).rejects.toThrow('El email indicado no tiene un formato válido.');
+
+    expect(lastCreateComercialCommand).toBeNull();
+  });
+
+  it('actualiza un Comercial conservando su pertenencia al Proveedor', async (): Promise<void> => {
+    const service: ProveedoresService = createService();
+
+    const result: ComercialInterface = await service.updateComercial(1, 10, {
+      nombre: '  Comercial renovado  ',
+      telefono: '   ',
+      email: ' renovado@example.com ',
+      observaciones: '  Nueva nota  ',
+    });
+
+    expect(lastUpdateComercial).toEqual({
+      idProveedor: 1,
+      idComercial: 10,
+      command: {
+        nombre: 'Comercial renovado',
+        telefono: null,
+        email: 'renovado@example.com',
+        observaciones: 'Nueva nota',
+      },
+    });
+
+    expect(result).toMatchObject({
+      id: 10,
+      publicId: 'comercial-10',
+      idProveedor: 1,
+      nombre: 'Comercial renovado',
+    });
+  });
+
+  it('rechaza identificadores inválidos al modificar un Comercial', async (): Promise<void> => {
+    const service: ProveedoresService = createService();
+
+    await expect(service.updateComercial(0, 10, createUpdateComercialCommand())).rejects.toThrow(
+      'El identificador del proveedor no es válido.',
+    );
+
+    await expect(service.updateComercial(1, 0, createUpdateComercialCommand())).rejects.toThrow(
+      'El identificador del comercial no es válido.',
+    );
+
+    expect(lastUpdateComercial).toBeNull();
+  });
+
+  it('no permite actualizar un Comercial desde otro Proveedor', async (): Promise<void> => {
+    const service: ProveedoresService = createService();
+
+    await expect(service.updateComercial(2, 10, createUpdateComercialCommand())).rejects.toThrow(
+      'Comercial inexistente.',
+    );
+  });
+
+  it('da de baja el Comercial dentro del contexto de su Proveedor', async (): Promise<void> => {
+    const service: ProveedoresService = createService();
+
+    await service.deactivateComercial(1, 10);
+
+    expect(lastDeactivateComercial).toEqual({
+      idProveedor: 1,
+      idComercial: 10,
+    });
+  });
 });
 
 /**
@@ -606,6 +748,57 @@ function createService(
 
     deactivate: (id: number): Promise<void> => {
       lastDeactivateId = id;
+
+      return Promise.resolve();
+    },
+
+    createComercial: (command: CrearComercialRecordCommand): Promise<ComercialRecord> => {
+      lastCreateComercialCommand = command;
+
+      return Promise.resolve({
+        id: 20,
+        publicId: 'comercial-20',
+        idProveedor: command.idProveedor,
+        nombre: command.nombre,
+        telefono: command.telefono,
+        email: command.email,
+        observaciones: command.observaciones,
+      });
+    },
+
+    updateComercial: (
+      idProveedor: number,
+      idComercial: number,
+      command: ActualizarComercialRecordCommand,
+    ): Promise<ComercialRecord> => {
+      lastUpdateComercial = {
+        idProveedor,
+        idComercial,
+        command,
+      };
+
+      const current: ComercialRecord | undefined = proveedores
+        .flatMap((proveedor: ProveedorRecord): readonly ComercialRecord[] => proveedor.comerciales)
+        .find(
+          (comercial: ComercialRecord): boolean =>
+            comercial.id === idComercial && comercial.idProveedor === idProveedor,
+        );
+
+      if (current === undefined) {
+        return Promise.reject(new Error('Comercial inexistente.'));
+      }
+
+      return Promise.resolve({
+        ...current,
+        ...command,
+      });
+    },
+
+    deactivateComercial: (idProveedor: number, idComercial: number): Promise<void> => {
+      lastDeactivateComercial = {
+        idProveedor,
+        idComercial,
+      };
 
       return Promise.resolve();
     },
@@ -733,4 +926,28 @@ function resolveUpdatedLogoRelativePath(
     case 'replace':
       return command.logo.nuevoArchivo.relativePath;
   }
+}
+
+function createComercialCommand(
+  overrides: Partial<CrearComercialCommand> = {},
+): CrearComercialCommand {
+  return {
+    nombre: 'Comercial nuevo',
+    telefono: null,
+    email: null,
+    observaciones: null,
+    ...overrides,
+  };
+}
+
+function createUpdateComercialCommand(
+  overrides: Partial<ActualizarComercialCommand> = {},
+): ActualizarComercialCommand {
+  return {
+    nombre: 'Comercial actualizado',
+    telefono: null,
+    email: null,
+    observaciones: null,
+    ...overrides,
+  };
 }

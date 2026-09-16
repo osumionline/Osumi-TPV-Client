@@ -100,9 +100,14 @@ import type {
 import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
 import type PrinterInterface from '@desktop-contracts/printing/printer.interface';
 import type PrintingSettings from '@desktop-contracts/printing/printing-settings.interface';
+import type ActualizarComercialCommand from '@desktop-contracts/proveedores/actualizar-comercial-command.interface';
 import type ActualizarProveedorCommand from '@desktop-contracts/proveedores/actualizar-proveedor-command.interface';
+import type CrearComercialCommand from '@desktop-contracts/proveedores/crear-comercial-command.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
-import type { ProveedorInterface } from '@desktop-contracts/proveedores/proveedor.interface';
+import type {
+  ComercialInterface,
+  ProveedorInterface,
+} from '@desktop-contracts/proveedores/proveedor.interface';
 import type CrearReservaCommand from '@desktop-contracts/reservas/crear-reserva-command.interface';
 import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
 import AppInfo from '@desktop-contracts/system/app-info.interface';
@@ -437,6 +442,35 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
 
     deactivate: (id: number): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.proveedoresDeactivate, id) as Promise<void>,
+
+    createComercial: (
+      idProveedor: number,
+      command: CrearComercialCommand,
+    ): Promise<ComercialInterface> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.proveedoresCreateComercial,
+        idProveedor,
+        command,
+      ) as Promise<ComercialInterface>,
+
+    updateComercial: (
+      idProveedor: number,
+      idComercial: number,
+      command: ActualizarComercialCommand,
+    ): Promise<ComercialInterface> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.proveedoresUpdateComercial,
+        idProveedor,
+        idComercial,
+        command,
+      ) as Promise<ComercialInterface>,
+
+    deactivateComercial: (idProveedor: number, idComercial: number): Promise<void> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.proveedoresDeactivateComercial,
+        idProveedor,
+        idComercial,
+      ) as Promise<void>,
   }),
 
   empleados: Object.freeze({

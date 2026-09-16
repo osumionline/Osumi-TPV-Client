@@ -1,6 +1,11 @@
+import type ActualizarComercialCommand from '@desktop-contracts/proveedores/actualizar-comercial-command.interface';
 import type ActualizarProveedorCommand from '@desktop-contracts/proveedores/actualizar-proveedor-command.interface';
+import type CrearComercialCommand from '@desktop-contracts/proveedores/crear-comercial-command.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
-import type { ProveedorInterface } from '@desktop-contracts/proveedores/proveedor.interface';
+import type {
+  ComercialInterface,
+  ProveedorInterface,
+} from '@desktop-contracts/proveedores/proveedor.interface';
 
 export default interface ProveedoresApi {
   /**
@@ -27,4 +32,26 @@ export default interface ProveedoresApi {
    * Da de baja lógicamente un proveedor activo.
    */
   deactivate(id: number): Promise<void>;
+
+  /**
+   * Crea un Comercial dentro de un
+   * Proveedor activo.
+   */
+  createComercial(idProveedor: number, command: CrearComercialCommand): Promise<ComercialInterface>;
+
+  /**
+   * Actualiza un Comercial perteneciente
+   * al Proveedor indicado.
+   */
+  updateComercial(
+    idProveedor: number,
+    idComercial: number,
+    command: ActualizarComercialCommand,
+  ): Promise<ComercialInterface>;
+
+  /**
+   * Da de baja un Comercial perteneciente
+   * al Proveedor indicado.
+   */
+  deactivateComercial(idProveedor: number, idComercial: number): Promise<void>;
 }

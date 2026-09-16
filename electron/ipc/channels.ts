@@ -69,6 +69,9 @@ const IPC_CHANNELS = {
   proveedoresCreate: 'proveedores:create',
   proveedoresUpdate: 'proveedores:update',
   proveedoresDeactivate: 'proveedores:deactivate',
+  proveedoresCreateComercial: 'proveedores:create-comercial',
+  proveedoresUpdateComercial: 'proveedores:update-comercial',
+  proveedoresDeactivateComercial: 'proveedores:deactivate-comercial',
 
   empleadosGetAll: 'empleados:get-all',
 

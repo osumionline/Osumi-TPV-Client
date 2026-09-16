@@ -1,6 +1,8 @@
 import type ImageAssetPromoter from '@backend/contracts/files/image-asset-promoter.interface';
 import type StagedImageDiscarder from '@backend/contracts/files/staged-image-discarder.interface';
+import type ActualizarComercialRecordCommand from '@backend/contracts/proveedores/actualizar-comercial-record-command.interface';
 import type ActualizarProveedorRecordCommand from '@backend/contracts/proveedores/actualizar-proveedor-record-command.interface';
+import type CrearComercialRecordCommand from '@backend/contracts/proveedores/crear-comercial-record-command.interface';
 import type CrearProveedorRecordCommand from '@backend/contracts/proveedores/crear-proveedor-record-command.interface';
 import type ProveedorLogoUpdateRecord from '@backend/contracts/proveedores/proveedor-logo-update-record.type';
 import type ProveedorRepository from '@backend/contracts/proveedores/proveedor.repository.interface';
@@ -8,7 +10,9 @@ import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.in
 import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.interface';
 import type ComercialRecord from '@backend/domain/proveedores/comercial-record.interface';
 import type ProveedorRecord from '@backend/domain/proveedores/proveedor-record.interface';
+import type ActualizarComercialCommand from '@desktop-contracts/proveedores/actualizar-comercial-command.interface';
 import type ActualizarProveedorCommand from '@desktop-contracts/proveedores/actualizar-proveedor-command.interface';
+import type CrearComercialCommand from '@desktop-contracts/proveedores/crear-comercial-command.interface';
 import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
 import type ProveedorLogoUpdateCommand from '@desktop-contracts/proveedores/proveedor-logo-update-command.type';
 import type {
@@ -157,6 +161,126 @@ export default class ProveedoresService {
     const validId: number = this.validateProveedorId(id);
 
     await this.proveedorRepository.deactivate(validId);
+  }
+
+  /**
+   * Crea un Comercial independiente dentro
+   * de un Proveedor activo.
+   */
+  async createComercial(
+    idProveedor: number,
+    command: CrearComercialCommand,
+  ): Promise<ComercialInterface> {
+    const validProveedorId: number = this.validateProveedorId(idProveedor);
+
+    this.requireComercialCommand(command);
+
+    const editableFields: ActualizarComercialRecordCommand =
+      this.normalizeComercialEditableFields(command);
+
+    const recordCommand: CrearComercialRecordCommand = {
+      idProveedor: validProveedorId,
+      ...editableFields,
+    };
+
+    const comercial: ComercialRecord =
+      await this.proveedorRepository.createComercial(recordCommand);
+
+    return this.toComercialInterface(comercial);
+  }
+
+  /**
+   * Actualiza un Comercial comprobando que
+   * continúe perteneciendo al Proveedor indicado.
+   */
+  async updateComercial(
+    idProveedor: number,
+    idComercial: number,
+    command: ActualizarComercialCommand,
+  ): Promise<ComercialInterface> {
+    const validProveedorId: number = this.validateProveedorId(idProveedor);
+
+    const validComercialId: number = this.validateComercialId(idComercial);
+
+    this.requireComercialCommand(command);
+
+    const editableFields: ActualizarComercialRecordCommand =
+      this.normalizeComercialEditableFields(command);
+
+    const comercial: ComercialRecord = await this.proveedorRepository.updateComercial(
+      validProveedorId,
+      validComercialId,
+      editableFields,
+    );
+
+    return this.toComercialInterface(comercial);
+  }
+
+  /**
+   * Da de baja un Comercial activo del
+   * Proveedor al que pertenece.
+   */
+  async deactivateComercial(idProveedor: number, idComercial: number): Promise<void> {
+    const validProveedorId: number = this.validateProveedorId(idProveedor);
+
+    const validComercialId: number = this.validateComercialId(idComercial);
+
+    await this.proveedorRepository.deactivateComercial(validProveedorId, validComercialId);
+  }
+
+  /**
+   * Normaliza los campos editables comunes
+   * al alta y edición de un Comercial.
+   */
+  private normalizeComercialEditableFields(
+    command: CrearComercialCommand | ActualizarComercialCommand,
+  ): ActualizarComercialRecordCommand {
+    return {
+      nombre: this.requireText(command.nombre, 'nombre del comercial', 100),
+      telefono: this.normalizeOptionalText(command.telefono),
+      email: this.normalizeOptionalEmail(command.email),
+      observaciones: this.normalizeOptionalText(command.observaciones),
+    };
+  }
+
+  /**
+   * Valida un identificador interno
+   * de Comercial.
+   */
+  private validateComercialId(id: number): number {
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      throw new Error('El identificador del comercial no es válido.');
+    }
+
+    return id;
+  }
+
+  /**
+   * Comprueba que el command de Comercial
+   * tenga una estructura mínima válida.
+   */
+  private requireComercialCommand(
+    command: CrearComercialCommand | ActualizarComercialCommand,
+  ): void {
+    if (typeof command !== 'object' || command === null) {
+      throw new Error('Los datos del comercial no son válidos.');
+    }
+  }
+
+  /**
+   * Convierte un Comercial de dominio
+   * a su contrato público.
+   */
+  private toComercialInterface(comercial: ComercialRecord): ComercialInterface {
+    return {
+      id: comercial.id,
+      publicId: comercial.publicId,
+      idProveedor: comercial.idProveedor,
+      nombre: comercial.nombre,
+      telefono: comercial.telefono,
+      email: comercial.email,
+      observaciones: comercial.observaciones,
+    };
   }
 
   /**
@@ -333,15 +457,9 @@ export default class ProveedoresService {
       web: proveedor.web,
       observaciones: proveedor.observaciones,
       marcas: [...proveedor.marcas],
-      comerciales: proveedor.comerciales.map((comercial: ComercialRecord): ComercialInterface => ({
-        id: comercial.id,
-        publicId: comercial.publicId,
-        idProveedor: comercial.idProveedor,
-        nombre: comercial.nombre,
-        telefono: comercial.telefono,
-        email: comercial.email,
-        observaciones: comercial.observaciones,
-      })),
+      comerciales: proveedor.comerciales.map((comercial: ComercialRecord): ComercialInterface =>
+        this.toComercialInterface(comercial),
+      ),
     };
   }
 
