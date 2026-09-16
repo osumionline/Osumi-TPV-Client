@@ -1,0 +1,92 @@
+<section class="supplier-brands">
+    <header class="supplier-brands__header">
+        <div>
+            <h3>
+                Marcas del proveedor
+            </h3>
+
+            <p>
+                Selecciona las marcas que suministra este proveedor.
+            </p>
+        </div>
+
+        <span class="supplier-brands__count">
+            {{ selectedIds().length }}
+            seleccionadas
+        </span>
+    </header>
+
+    <div class="supplier-brands__search">
+        <input class="otpv-control"
+               type="search"
+               autocomplete="off"
+               placeholder="Buscar marca"
+               [value]="query()"
+               [disabled]="processing()"
+               (input)="updateQuery($event)">
+    </div>
+
+    <div class="supplier-brands__results">
+        @for (
+        marca of filteredMarcas();
+        track marca.publicId
+        ) {
+        <div class="supplier-brands__item"
+             [class.supplier-brands__item--selected]="isSelected(marca)">
+            <mat-checkbox [checked]="isSelected(marca)"
+                          [disabled]="processing()"
+                          (change)="toggleMarca(marca, $event.checked)">
+            </mat-checkbox>
+
+            @if (marca.foto !== null) {
+            <span class="supplier-brands__image">
+                <img [src]="marca.foto"
+                     [attr.alt]="'Logo de ' + marca.nombre"
+                     loading="lazy">
+            </span>
+            }
+
+            <span class="supplier-brands__name">
+                {{ marca.nombre }}
+            </span>
+        </div>
+        }
+        @empty {
+        <div class="supplier-brands__empty">
+            No se han encontrado marcas.
+        </div>
+        }
+    </div>
+
+    <footer class="supplier-brands__actions">
+        <span class="supplier-brands__actions-spacer">
+        </span>
+
+        @if (saveSuccessful()) {
+        <span class="supplier-brands__save-feedback"
+              role="status"
+              aria-live="polite">
+            Proveedor guardado correctamente
+        </span>
+        }
+
+        <button mat-stroked-button
+                type="button"
+                [disabled]="!dirty() || saving() || processing()"
+                (click)="cancel()">
+            Cancelar
+        </button>
+
+        <button mat-flat-button
+                type="button"
+                [disabled]="!dirty() || saving() || processing()"
+                (click)="save()">
+            @if (saving()) {
+            Guardando…
+            }
+            @else {
+            Guardar
+            }
+        </button>
+    </footer>
+</section>

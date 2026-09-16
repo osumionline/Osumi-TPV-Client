@@ -2,8 +2,10 @@ import { Component, DestroyRef, inject, signal, type WritableSignal } from '@ang
 import type ProveedorFormModel from '@model/proveedores/proveedor-form.model';
 import type ProveedorWorkspaceSection from '@model/proveedores/proveedor-workspace-section.type';
 import ProveedorFormComponent from '@modules/compras/proveedores/components/proveedor-form/proveedor-form.component';
+import ProveedorMarcasComponent from '@modules/compras/proveedores/components/proveedor-marcas/proveedor-marcas.component';
 import ProveedorSectionTabsComponent from '@modules/compras/proveedores/components/proveedor-section-tabs/proveedor-section-tabs.component';
 import { DialogService } from '@osumi/angular-tools';
+import MarcasService from '@services/compras/marcas.service';
 import ProveedoresService from '@services/compras/proveedores.service';
 import { getErrorMessage } from '@utils/error.utils';
 
@@ -15,13 +17,12 @@ import { getErrorMessage } from '@utils/error.utils';
   selector: 'otpv-proveedores',
   templateUrl: './proveedores.component.html',
   styleUrl: './proveedores.component.scss',
-  imports: [ProveedorFormComponent, ProveedorSectionTabsComponent],
+  imports: [ProveedorFormComponent, ProveedorMarcasComponent, ProveedorSectionTabsComponent],
 })
 export default class ProveedoresComponent {
   readonly proveedoresService: ProveedoresService = inject(ProveedoresService);
-
+  readonly marcasService: MarcasService = inject(MarcasService);
   private readonly dialog: DialogService = inject(DialogService);
-
   private readonly destroyRef: DestroyRef = inject(DestroyRef);
 
   private saveFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -32,6 +33,54 @@ export default class ProveedoresComponent {
     this.destroyRef.onDestroy((): void => {
       this.clearSaveFeedbackTimeout();
     });
+  }
+
+  /**
+   * Actualiza únicamente la selección de Marcas
+   * dentro del draft principal compartido.
+   */
+  updateMarcas(idsMarcas: readonly number[]): void {
+    if (this.proveedoresService.processing()) {
+      return;
+    }
+
+    const workspace = this.proveedoresService.workspace();
+
+    if (workspace === null) {
+      return;
+    }
+
+    this.hideSaveFeedback();
+
+    this.proveedoresService.actualizarDraft({
+      ...workspace.draft,
+      marcas: [...idsMarcas],
+    });
+  }
+
+  /**
+   * Guarda desde la pestaña Marcas el mismo
+   * draft principal utilizado por Datos.
+   */
+  async saveMarcas(): Promise<void> {
+    if (this.proveedoresService.processing() || !this.proveedoresService.dirty()) {
+      return;
+    }
+
+    this.hideSaveFeedback();
+
+    try {
+      await this.proveedoresService.saveWorkspace();
+
+      this.showSaveFeedback();
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se han podido guardar las marcas del proveedor.'),
+        })
+        .subscribe();
+    }
   }
 
   /**

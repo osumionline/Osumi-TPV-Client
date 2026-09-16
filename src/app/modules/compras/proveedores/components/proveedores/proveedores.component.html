@@ -24,15 +24,15 @@
         }
 
         @case ('brands') {
-        <section class="suppliers__section-state">
-            <h3>
-                Marcas
-            </h3>
-
-            <p>
-                La gestión de marcas asociadas se incorporará más adelante.
-            </p>
-        </section>
+        <otpv-proveedor-marcas [marcas]="marcasService.marcas()"
+                               [selectedIds]="workspace.draft.marcas"
+                               [dirty]="proveedoresService.dirty()"
+                               [saving]="proveedoresService.saving()"
+                               [processing]="proveedoresService.processing()"
+                               [saveSuccessful]="saveSuccessful()"
+                               (selectionChangeEvent)="updateMarcas($event)"
+                               (saveEvent)="saveMarcas()"
+                               (cancelEvent)="cancelChanges()" />
         }
 
         @case ('commercials') {

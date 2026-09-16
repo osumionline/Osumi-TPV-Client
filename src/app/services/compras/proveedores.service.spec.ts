@@ -807,6 +807,65 @@ describe('ProveedoresService', (): void => {
 
     expect(service.saving()).toBe(false);
   });
+
+  it('comparte el dirty entre Datos y Marcas y Cancelar restaura ambas partes', async (): Promise<void> => {
+    const proveedor: Proveedor = new Proveedor().fromInterface(
+      createProveedorInterface(12, 'proveedor-12', 'Proveedor', {
+        marcas: [1, 2],
+      }),
+    );
+
+    service.abrirFicha(proveedor);
+
+    service.actualizarDraft({
+      ...requireWorkspace().draft,
+      telefono: '944111111',
+      marcas: [2, 3],
+    });
+
+    expect(service.dirty()).toBe(true);
+
+    expect(requireWorkspace().draft.marcas).toEqual([2, 3]);
+
+    await service.cancelarCambios();
+
+    expect(requireWorkspace().draft.telefono).toBe('944000000');
+
+    expect(requireWorkspace().draft.marcas).toEqual([1, 2]);
+
+    expect(service.dirty()).toBe(false);
+  });
+
+  it('persiste la selección editable de Marcas mediante idsMarcas', async (): Promise<void> => {
+    const proveedor: Proveedor = new Proveedor().fromInterface(
+      createProveedorInterface(12, 'proveedor-12', 'Proveedor', {
+        marcas: [1],
+      }),
+    );
+
+    updateResult = createProveedorInterface(12, 'proveedor-12', 'Proveedor', {
+      marcas: [2, 3],
+    });
+
+    service.abrirFicha(proveedor);
+
+    service.actualizarDraft({
+      ...requireWorkspace().draft,
+      marcas: [2, 3],
+    });
+
+    await service.saveWorkspace();
+
+    expect(updateCalls).toHaveLength(1);
+
+    expect(updateCalls[0]?.command.idsMarcas).toEqual([2, 3]);
+
+    expect(requireWorkspace().draft.marcas).toEqual([2, 3]);
+
+    expect(requireWorkspace().baseSnapshot.marcas).toEqual([2, 3]);
+
+    expect(service.dirty()).toBe(false);
+  });
 });
 
 function createProveedorInterface(
