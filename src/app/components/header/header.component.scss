@@ -12,18 +12,29 @@
     color: var(--main-color-contrast);
     box-shadow: 0 2px 4px rgb(0 0 0 / 20%);
 
+    .header__brand,
+    .header__management {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
     .header__brand {
         display: flex;
         align-items: center;
         gap: 8px;
-        min-width: max-content;
         font-weight: 500;
+
+        span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
     }
 
     .header__navigation {
         display: flex;
         min-width: 0;
-        flex: 1;
+        flex: 0 1 auto;
         align-items: stretch;
         overflow-x: auto;
         overflow-y: hidden;
@@ -32,20 +43,30 @@
         &::-webkit-scrollbar {
             display: none;
         }
+    }
+
+    .header__management {
+        display: flex;
+        align-items: stretch;
+        justify-content: flex-end;
+    }
+
+    .header__navigation,
+    .header__management {
 
         a,
         button {
             min-width: max-content;
             color: var(--main-color-contrast);
-            border-radius: 0;
+            border-radius: 6px;
         }
 
         button:disabled {
             color: rgb(255 255 255 / 45%);
         }
+    }
 
-        .header__item--selected {
-            background-color: rgb(255 255 255 / 16%);
-        }
+    .header__item--selected {
+        background-color: rgb(255 255 255 / 16%);
     }
 }

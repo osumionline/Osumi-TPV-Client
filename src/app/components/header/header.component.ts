@@ -28,7 +28,7 @@ export default class HeaderComponent {
 
   readonly appName: InputSignal<string> = input<string>('Osumi TPV');
 
-  readonly items: readonly HeaderItem[] = [
+  readonly navigationItems: readonly HeaderItem[] = [
     {
       id: 'ventas',
       label: 'Ventas',
@@ -65,11 +65,12 @@ export default class HeaderComponent {
       icon: 'payments',
       route: null,
     },
-    {
-      id: 'gestion',
-      label: 'Gestión',
-      icon: 'settings',
-      route: null,
-    },
   ];
+
+  readonly managementItem: HeaderItem = {
+    id: 'gestion',
+    label: 'Gestión',
+    icon: 'settings',
+    route: '/gestion',
+  };
 }

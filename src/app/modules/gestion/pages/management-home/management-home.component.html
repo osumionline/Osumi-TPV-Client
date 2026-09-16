@@ -1,0 +1,40 @@
+<section class="management-home">
+    <header class="management-home__header">
+        <span class="management-home__eyebrow">
+            Gestión
+        </span>
+
+        <h1>
+            Gestión de Osumi TPV
+        </h1>
+
+        <p>
+            Selecciona el apartado que quieres gestionar.
+        </p>
+    </header>
+
+    <div class="management-home__modules">
+        @for (module of modules; track module.id) {
+        <a class="management-home__module"
+           [routerLink]="module.route">
+            <div class="management-home__module-icon">
+                <mat-icon>{{ module.icon }}</mat-icon>
+            </div>
+
+            <div class="management-home__module-content">
+                <strong>
+                    {{ module.title }}
+                </strong>
+
+                <span>
+                    {{ module.description }}
+                </span>
+            </div>
+
+            <mat-icon class="management-home__module-arrow">
+                arrow_forward
+            </mat-icon>
+        </a>
+        }
+    </div>
+</section>

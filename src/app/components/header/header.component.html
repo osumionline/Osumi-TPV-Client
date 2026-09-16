@@ -8,7 +8,7 @@
     </div>
 
     <nav class="header__navigation">
-        @for (item of items; track item.id) {
+        @for (item of navigationItems; track item.id) {
         @if (item.route !== null) {
         <a mat-button
            [routerLink]="item.route"
@@ -25,5 +25,14 @@
         </button>
         }
         }
+    </nav>
+
+    <nav class="header__management">
+        <a mat-button
+           [routerLink]="managementItem.route"
+           [class.header__item--selected]="selectedOption() === managementItem.id">
+            <mat-icon>{{ managementItem.icon }}</mat-icon>
+            {{ managementItem.label }}
+        </a>
     </nav>
 </header>

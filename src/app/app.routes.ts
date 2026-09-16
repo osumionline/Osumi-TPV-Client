@@ -62,6 +62,11 @@ const routes: Routes = [
     loadComponent: () => import('@modules/almacen/pages/warehouse/warehouse.component'),
   },
   {
+    path: 'gestion',
+    canActivate: [readyApplicationGuard],
+    loadChildren: () => import('@modules/gestion/gestion.routes').then((module) => module.default),
+  },
+  {
     path: '',
     pathMatch: 'full',
     redirectTo: 'startup',
