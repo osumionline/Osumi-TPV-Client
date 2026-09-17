@@ -10,6 +10,7 @@ import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-d
 import LegacyImportMasterDataImporter from '@infrastructure/legacy-import/legacy-import-master-data.importer';
 import LegacyImportPublicIdFactory from '@infrastructure/legacy-import/legacy-import-public-id.factory';
 import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value.reader';
+import NodeScryptPasswordHasher from '@infrastructure/security/node-scrypt-password-hasher';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -19,6 +20,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 interface ImportedEmployeePermissionRow {
   readonly id_empleado: number;
   readonly id_permiso: number;
+}
+
+interface ImportedEmployeeRow {
+  readonly id: number;
+  readonly password_hash: string;
+  readonly password_algorithm: 'scrypt' | 'bcrypt_legacy';
 }
 
 class FakeLegacyImportDumpReader implements LegacyImportDumpReader {
@@ -113,6 +120,7 @@ describe('LegacyImportMasterDataImporter', (): void => {
       new FakeLegacyImportDumpReader(inserts),
       new LegacySqlValueReader(),
       new LegacyImportPublicIdFactory(),
+      new NodeScryptPasswordHasher(),
     );
 
     const result: LegacyImportPhaseResult = await importer.import(
@@ -153,15 +161,66 @@ describe('LegacyImportMasterDataImporter', (): void => {
       },
     ]);
   });
+
+  it('asigna 123456 con scrypt a empleados legacy sin contraseña utilizable', async (): Promise<void> => {
+    const inserts: readonly LegacySqlInsert[] = [
+      createLegacyEmployeeInsert(1, null),
+
+      createLegacyEmployeeInsert(2, null, null),
+
+      createLegacyEmployeeInsert(3, null, 'hash-no-valido'),
+    ];
+
+    const passwordHasher: NodeScryptPasswordHasher = new NodeScryptPasswordHasher();
+
+    const importer: LegacyImportMasterDataImporter = new LegacyImportMasterDataImporter(
+      new FakeLegacyImportDumpReader(inserts),
+      new LegacySqlValueReader(),
+      new LegacyImportPublicIdFactory(),
+      passwordHasher,
+    );
+
+    const result: LegacyImportPhaseResult = await importer.import(
+      requireQueryRunner(),
+      createExecutionCommand(inserts.length),
+      (progress): void => {
+        void progress;
+      },
+    );
+
+    expect(result).toEqual({
+      importedRows: 3,
+      skippedRows: 0,
+      warningCount: 2,
+    });
+
+    const employees: readonly ImportedEmployeeRow[] = await readEmployees();
+
+    expect(employees[0]?.password_algorithm).toBe('bcrypt_legacy');
+
+    expect(employees[0]?.password_hash).toBe('$2y$10$legacyPasswordHashForImportTest');
+
+    expect(employees[1]?.password_algorithm).toBe('scrypt');
+
+    expect(await passwordHasher.verify('123456', employees[1]?.password_hash ?? '')).toBe(true);
+
+    expect(employees[2]?.password_algorithm).toBe('scrypt');
+
+    expect(await passwordHasher.verify('123456', employees[2]?.password_hash ?? '')).toBe(true);
+  });
 });
 
-function createLegacyEmployeeInsert(id: number, deletedAt: string | null): LegacySqlInsert {
+function createLegacyEmployeeInsert(
+  id: number,
+  deletedAt: string | null,
+  passwordHash: string | null = '$2y$10$legacyPasswordHashForImportTest',
+): LegacySqlInsert {
   return {
     tableName: 'empleado',
     values: new Map<string, string | null>([
       ['id', String(id)],
       ['nombre', `Empleado ${id}`],
-      ['pass', '$2y$10$legacyPasswordHashForImportTest'],
+      ['pass', passwordHash],
       ['color', '336699'],
       ['created_at', '2025-01-01T10:00:00.000Z'],
       ['updated_at', '2025-01-01T10:00:00.000Z'],
@@ -237,4 +296,17 @@ async function readEmployeePermissions(): Promise<readonly ImportedEmployeePermi
         id_permiso
     `,
   )) as readonly ImportedEmployeePermissionRow[];
+}
+
+async function readEmployees(): Promise<readonly ImportedEmployeeRow[]> {
+  return (await requireDataSource().query(
+    `
+      SELECT
+        id,
+        password_hash,
+        password_algorithm
+      FROM empleado
+      ORDER BY id
+    `,
+  )) as readonly ImportedEmployeeRow[];
 }

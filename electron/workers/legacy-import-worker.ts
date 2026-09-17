@@ -32,6 +32,7 @@ import LegacyImportSalesDataImporter from '@infrastructure/legacy-import/legacy-
 import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value.reader';
 import MariaDbInsertParser from '@infrastructure/legacy-import/maria-db-insert.parser';
 import YauzlLegacyImportDumpReader from '@infrastructure/legacy-import/yauzl-legacy-import-dump.reader';
+import NodeScryptPasswordHasher from '@infrastructure/security/node-scrypt-password-hasher';
 import { parentPort, workerData } from 'node:worker_threads';
 
 function getErrorMessage(error: unknown): string {
@@ -83,11 +84,14 @@ async function run(): Promise<void> {
 
   const imageProcessor: ImageProcessor = new SharpImageProcessor();
 
+  const legacyEmployeePasswordHasher: NodeScryptPasswordHasher = new NodeScryptPasswordHasher();
+
   const legacyImportMasterDataImporter: LegacyImportMasterDataImporter =
     new LegacyImportMasterDataImporter(
       legacyImportDumpReader,
       legacySqlValueReader,
       legacyImportPublicIdFactory,
+      legacyEmployeePasswordHasher,
     );
 
   const legacyImportCatalogReader: DefaultLegacyImportCatalogReader =

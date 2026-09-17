@@ -1,13 +1,13 @@
 import type LegacyImportDumpReader from '@backend/contracts/legacy-import/legacy-import-dump-reader.interface';
 import type LegacyImportPhaseImporter from '@backend/contracts/legacy-import/legacy-import-phase-importer.interface';
 import type LegacyImportProgressListener from '@backend/contracts/legacy-import/legacy-import-progress-listener.type';
+import type PasswordHasher from '@backend/contracts/security/password-hasher.interface';
 import type LegacyImportExecutionCommand from '@backend/domain/legacy-import/legacy-import-execution-command.interface';
 import type LegacyImportPhaseResult from '@backend/domain/legacy-import/legacy-import-phase-result.interface';
 import type LegacySqlInsert from '@backend/domain/legacy-import/legacy-sql-insert.interface';
 import { GESTION_PERMISSIONS } from '@desktop-contracts/configuration/empleados/gestion-permissions.constants';
 import LegacyImportPublicIdFactory from '@infrastructure/legacy-import/legacy-import-public-id.factory';
 import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value.reader';
-import DISABLED_LEGACY_PASSWORD_HASH from '@infrastructure/security/disabled-legacy-password-hash.constant';
 import type { QueryRunner } from 'typeorm';
 
 interface LegacyEmployeeRow {
@@ -108,6 +108,8 @@ interface MutableImportCounters {
   warningCount: number;
 }
 
+const LEGACY_DEFAULT_EMPLOYEE_PASSWORD: string = '123456';
+
 const MASTER_DATA_TABLES: readonly string[] = [
   'empleado',
   'empleado_rol',
@@ -124,6 +126,7 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
     private readonly dumpReader: LegacyImportDumpReader,
     private readonly valueReader: LegacySqlValueReader,
     private readonly publicIdFactory: LegacyImportPublicIdFactory,
+    private readonly passwordHasher: PasswordHasher,
   ) {}
 
   async import(
@@ -441,10 +444,17 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
     counters: MutableImportCounters,
   ): Promise<void> {
     for (const employee of state.employees) {
-      let passwordHash: string = employee.passwordHash ?? DISABLED_LEGACY_PASSWORD_HASH;
+      let passwordHash: string;
+      let passwordAlgorithm: 'scrypt' | 'bcrypt_legacy';
 
-      if (employee.passwordHash === null || !this.isBcryptHash(employee.passwordHash)) {
-        passwordHash = DISABLED_LEGACY_PASSWORD_HASH;
+      if (employee.passwordHash !== null && this.isBcryptHash(employee.passwordHash)) {
+        passwordHash = employee.passwordHash;
+
+        passwordAlgorithm = 'bcrypt_legacy';
+      } else {
+        passwordHash = await this.passwordHasher.hash(LEGACY_DEFAULT_EMPLOYEE_PASSWORD);
+
+        passwordAlgorithm = 'scrypt';
 
         counters.warningCount++;
       }
@@ -453,33 +463,33 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
 
       await queryRunner.query(
         `
-          INSERT INTO empleado (
-            id,
-            public_id,
-            nombre,
-            password_hash,
-            password_algorithm,
-            color,
-            admin,
-            activo,
-            created_at,
-            updated_at,
-            deleted_at
-          )
-          VALUES (
-            ?,
-            ?,
-            ?,
-            ?,
-            'bcrypt_legacy',
-            ?,
-            0,
-            ?,
-            ?,
-            ?,
-            ?
-          )
-        `,
+        INSERT INTO empleado (
+          id,
+          public_id,
+          nombre,
+          password_hash,
+          password_algorithm,
+          color,
+          admin,
+          activo,
+          created_at,
+          updated_at,
+          deleted_at
+        )
+        VALUES (
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          0,
+          ?,
+          ?,
+          ?,
+          ?
+        )
+      `,
         [
           employee.id,
 
@@ -487,6 +497,7 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
 
           employee.name,
           passwordHash,
+          passwordAlgorithm,
           color,
 
           employee.deletedAt === null ? 1 : 0,
