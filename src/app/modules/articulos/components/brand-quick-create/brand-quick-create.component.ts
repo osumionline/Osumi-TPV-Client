@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
-import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
+import type CrearMarcaCommand from '@desktop-contracts/compras/marcas/crear-marca-command.interface';
 
 type BrandTextField = 'nombre' | 'telefono' | 'email' | 'direccion' | 'web' | 'observaciones';
 

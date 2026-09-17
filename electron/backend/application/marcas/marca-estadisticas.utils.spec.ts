@@ -1,5 +1,5 @@
 import createMarcaEstadisticasResult from '@backend/application/marcas/marca-estadisticas.utils';
-import type { MarcaEstadisticasResultado } from '@desktop-contracts/marcas/marca-estadisticas.interface';
+import type { MarcaEstadisticasResultado } from '@desktop-contracts/compras/marcas/marca-estadisticas.interface';
 import { describe, expect, it } from 'vitest';
 
 describe('marca-estadisticas.utils', (): void => {

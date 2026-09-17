@@ -1,5 +1,5 @@
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
-import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
+import type ReservaInterface from '@desktop-contracts/ventas/reservas/reserva.interface';
 import buildReservaTicketDocument from '@model/reservas/reserva-ticket-document.builder';
 
 describe('buildReservaTicketDocument', (): void => {

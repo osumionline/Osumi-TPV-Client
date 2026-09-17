@@ -1,15 +1,15 @@
 import type MarcasService from '@backend/application/marcas/marcas.service';
-import type ActualizarMarcaCommand from '@desktop-contracts/marcas/actualizar-marca-command.interface';
-import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
-import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
+import type ActualizarMarcaCommand from '@desktop-contracts/compras/marcas/actualizar-marca-command.interface';
+import type CrearMarcaCommand from '@desktop-contracts/compras/marcas/crear-marca-command.interface';
+import type {
+  MarcaEstadisticasConsulta,
+  MarcaEstadisticasResultado,
+} from '@desktop-contracts/compras/marcas/marca-estadisticas.interface';
+import type MarcaInterface from '@desktop-contracts/compras/marcas/marca.interface';
 import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
 import { assertTrustedSender } from '@ipc/assert-trusted-sender';
 import IPC_CHANNELS from '@ipc/channels';
 import { ipcMain } from 'electron';
-import type {
-  MarcaEstadisticasConsulta,
-  MarcaEstadisticasResultado,
-} from '@desktop-contracts/marcas/marca-estadisticas.interface';
 
 export default function registerMarcasIpc(
   getMainWindow: MainWindowProvider,
@@ -32,23 +32,15 @@ export default function registerMarcasIpc(
       return marcasService.getById(id);
     },
   );
-  
-  ipcMain.handle(
-  IPC_CHANNELS.marcasGetEstadisticas,
-  async (
-    event,
-    consulta: MarcaEstadisticasConsulta,
-  ): Promise<MarcaEstadisticasResultado> => {
-    assertTrustedSender(
-      event,
-      getMainWindow,
-    );
 
-    return marcasService.getEstadisticas(
-      consulta,
-    );
-  },
-);
+  ipcMain.handle(
+    IPC_CHANNELS.marcasGetEstadisticas,
+    async (event, consulta: MarcaEstadisticasConsulta): Promise<MarcaEstadisticasResultado> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return marcasService.getEstadisticas(consulta);
+    },
+  );
 
   ipcMain.handle(
     IPC_CHANNELS.marcasCreate,

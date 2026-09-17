@@ -2,8 +2,8 @@ import PrintingService from '@backend/application/printing/printing.service';
 import type HtmlDocumentRenderer from '@backend/contracts/printing/html-document-renderer.interface';
 import type PrinterProvider from '@backend/contracts/printing/printer.provider.interface';
 import type PrintingSettingsRepository from '@backend/contracts/printing/printing-settings.repository.interface';
-import type PrinterInterface from '@desktop-contracts/printing/printer.interface';
-import type PrintingSettings from '@desktop-contracts/printing/printing-settings.interface';
+import type PrinterInterface from '@desktop-contracts/configuration/printing/printer.interface';
+import type PrintingSettings from '@desktop-contracts/configuration/printing/printing-settings.interface';
 import { Buffer } from 'node:buffer';
 import { describe, expect, it } from 'vitest';
 

@@ -1,4 +1,4 @@
-import type EmpleadoInterface from '@desktop-contracts/empleados/empleado.interface';
+import type EmpleadoInterface from '@desktop-contracts/configuration/empleados/empleado.interface';
 
 export default class Empleado {
   id: number | null = null;

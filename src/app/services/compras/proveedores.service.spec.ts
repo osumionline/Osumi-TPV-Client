@@ -1,13 +1,13 @@
 import { TestBed } from '@angular/core/testing';
-import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
-import type ActualizarComercialCommand from '@desktop-contracts/proveedores/actualizar-comercial-command.interface';
-import type ActualizarProveedorCommand from '@desktop-contracts/proveedores/actualizar-proveedor-command.interface';
-import type CrearComercialCommand from '@desktop-contracts/proveedores/crear-comercial-command.interface';
-import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
+import type ActualizarComercialCommand from '@desktop-contracts/compras/proveedores/actualizar-comercial-command.interface';
+import type ActualizarProveedorCommand from '@desktop-contracts/compras/proveedores/actualizar-proveedor-command.interface';
+import type CrearComercialCommand from '@desktop-contracts/compras/proveedores/crear-comercial-command.interface';
+import type CrearProveedorCommand from '@desktop-contracts/compras/proveedores/crear-proveedor-command.interface';
 import type {
   ComercialInterface,
   ProveedorInterface,
-} from '@desktop-contracts/proveedores/proveedor.interface';
+} from '@desktop-contracts/compras/proveedores/proveedor.interface';
+import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
 import type ProveedorWorkspace from '@model/proveedores/proveedor-workspace.interface';
 import Proveedor from '@model/proveedores/proveedor.model';
 import FilesService from '@services/application/files.service';

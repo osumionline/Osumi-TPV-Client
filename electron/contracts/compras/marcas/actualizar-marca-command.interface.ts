@@ -1,4 +1,4 @@
-import type MarcaLogoUpdateCommand from '@desktop-contracts/marcas/marca-logo-update-command.type';
+import type MarcaLogoUpdateCommand from '@desktop-contracts/compras/marcas/marca-logo-update-command.type';
 
 export default interface ActualizarMarcaCommand {
   readonly nombre: string;

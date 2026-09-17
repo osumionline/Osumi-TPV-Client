@@ -1,4 +1,4 @@
-import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
+import type MarcaInterface from '@desktop-contracts/compras/marcas/marca.interface';
 
 export default class Marca {
   id: number | null = null;

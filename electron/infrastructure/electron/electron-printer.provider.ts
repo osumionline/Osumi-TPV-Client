@@ -1,5 +1,5 @@
 import type PrinterProvider from '@backend/contracts/printing/printer.provider.interface';
-import type PrinterInterface from '@desktop-contracts/printing/printer.interface';
+import type PrinterInterface from '@desktop-contracts/configuration/printing/printer.interface';
 import type { BrowserWindow, PrinterInfo } from 'electron';
 
 type MainWindowProvider = () => BrowserWindow | null;

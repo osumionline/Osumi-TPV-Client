@@ -10,15 +10,15 @@ import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.in
 import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.interface';
 import type ComercialRecord from '@backend/domain/proveedores/comercial-record.interface';
 import type ProveedorRecord from '@backend/domain/proveedores/proveedor-record.interface';
-import type ActualizarComercialCommand from '@desktop-contracts/proveedores/actualizar-comercial-command.interface';
-import type ActualizarProveedorCommand from '@desktop-contracts/proveedores/actualizar-proveedor-command.interface';
-import type CrearComercialCommand from '@desktop-contracts/proveedores/crear-comercial-command.interface';
-import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
-import type ProveedorLogoUpdateCommand from '@desktop-contracts/proveedores/proveedor-logo-update-command.type';
+import type ActualizarComercialCommand from '@desktop-contracts/compras/proveedores/actualizar-comercial-command.interface';
+import type ActualizarProveedorCommand from '@desktop-contracts/compras/proveedores/actualizar-proveedor-command.interface';
+import type CrearComercialCommand from '@desktop-contracts/compras/proveedores/crear-comercial-command.interface';
+import type CrearProveedorCommand from '@desktop-contracts/compras/proveedores/crear-proveedor-command.interface';
+import type ProveedorLogoUpdateCommand from '@desktop-contracts/compras/proveedores/proveedor-logo-update-command.type';
 import type {
   ComercialInterface,
   ProveedorInterface,
-} from '@desktop-contracts/proveedores/proveedor.interface';
+} from '@desktop-contracts/compras/proveedores/proveedor.interface';
 
 type ProveedorEditableFields = Omit<ActualizarProveedorRecordCommand, 'logo'>;
 

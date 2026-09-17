@@ -1,5 +1,5 @@
-import type CrearReservaCommand from '@desktop-contracts/reservas/crear-reserva-command.interface';
-import type { CrearReservaLineaCommand } from '@desktop-contracts/reservas/crear-reserva-command.interface';
+import type CrearReservaCommand from '@desktop-contracts/ventas/reservas/crear-reserva-command.interface';
+import type { CrearReservaLineaCommand } from '@desktop-contracts/ventas/reservas/crear-reserva-command.interface';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
 import {
   getVentaLineaDescuentoSnapshot,

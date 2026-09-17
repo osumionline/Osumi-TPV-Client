@@ -1,4 +1,4 @@
-import type { ComercialInterface } from '@desktop-contracts/proveedores/proveedor.interface';
+import type { ComercialInterface } from '@desktop-contracts/compras/proveedores/proveedor.interface';
 
 export default class Comercial {
   id: number | null = null;

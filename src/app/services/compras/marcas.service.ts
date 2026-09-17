@@ -1,13 +1,13 @@
 import { type Signal, type WritableSignal, computed, inject, Service, signal } from '@angular/core';
-import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
-import type ActualizarMarcaCommand from '@desktop-contracts/marcas/actualizar-marca-command.interface';
-import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
+import type ActualizarMarcaCommand from '@desktop-contracts/compras/marcas/actualizar-marca-command.interface';
+import type CrearMarcaCommand from '@desktop-contracts/compras/marcas/crear-marca-command.interface';
 import type {
   MarcaEstadisticasConsulta,
   MarcaEstadisticasResultado,
-} from '@desktop-contracts/marcas/marca-estadisticas.interface';
-import type MarcaLogoUpdateCommand from '@desktop-contracts/marcas/marca-logo-update-command.type';
-import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
+} from '@desktop-contracts/compras/marcas/marca-estadisticas.interface';
+import type MarcaLogoUpdateCommand from '@desktop-contracts/compras/marcas/marca-logo-update-command.type';
+import type MarcaInterface from '@desktop-contracts/compras/marcas/marca.interface';
+import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
 import type MarcaEstadisticasFiltros from '@model/marcas/marca-estadisticas-filtros.interface';
 import {
   createMarcaEstadisticasFiltrosIniciales,

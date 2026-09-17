@@ -1,11 +1,11 @@
 import type {
-  default as ReservaInterface,
-  ReservaLineaInterface,
-} from '@desktop-contracts/reservas/reserva.interface';
-import type {
   GuardarVentaCommand,
   GuardarVentaLineaCommand,
 } from '@desktop-contracts/ventas/guardar-venta-command.interface';
+import type {
+  default as ReservaInterface,
+  ReservaLineaInterface,
+} from '@desktop-contracts/ventas/reservas/reserva.interface';
 import type { VentaDevolucionLineaInterface } from '@desktop-contracts/ventas/venta-devolucion.interface';
 import Cliente from '@model/clientes/cliente.model';
 import Empleado from '@model/empleados/empleado.model';

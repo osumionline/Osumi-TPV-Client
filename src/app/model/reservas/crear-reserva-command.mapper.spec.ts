@@ -1,4 +1,4 @@
-import type CrearReservaCommand from '@desktop-contracts/reservas/crear-reserva-command.interface';
+import type CrearReservaCommand from '@desktop-contracts/ventas/reservas/crear-reserva-command.interface';
 import Cliente from '@model/clientes/cliente.model';
 import mapVentaToCrearReservaCommand from '@model/reservas/crear-reserva-command.mapper';
 import VentaEnCurso from '@model/ventas/venta-en-curso.model';

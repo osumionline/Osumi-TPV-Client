@@ -1,6 +1,6 @@
 import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';
 import type CategoriaRecord from '@backend/domain/categorias/categoria-record.interface';
-import type CategoriaInterface from '@desktop-contracts/categorias/categoria.interface';
+import type CategoriaInterface from '@desktop-contracts/articulos/categorias/categoria.interface';
 
 export default class CategoriasService {
   constructor(private readonly categoriaRepository: CategoriaRepository) {}

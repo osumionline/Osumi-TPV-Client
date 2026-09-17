@@ -1,7 +1,7 @@
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
+import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 import type TerminalInterface from '@desktop-contracts/terminales/terminal.interface';
-import type TipoPagoInterface from '@desktop-contracts/tipos-pago/tipo-pago.interface';
 
 export default interface VentasContextInterface {
   readonly appData: AppData;

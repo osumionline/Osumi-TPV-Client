@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
-import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
+import type CrearProveedorCommand from '@desktop-contracts/compras/proveedores/crear-proveedor-command.interface';
 import type Marca from '@model/marcas/marca.model';
 
 type ProviderTextField = 'nombre' | 'direccion' | 'email' | 'web' | 'telefono' | 'observaciones';

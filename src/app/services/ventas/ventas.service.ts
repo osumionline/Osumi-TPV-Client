@@ -1,6 +1,6 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { computed, Service, signal } from '@angular/core';
-import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
+import type ReservaInterface from '@desktop-contracts/ventas/reservas/reserva.interface';
 import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devolucion.interface';
 import type Cliente from '@model/clientes/cliente.model';
 import type Empleado from '@model/empleados/empleado.model';

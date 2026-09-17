@@ -3,9 +3,9 @@ import type LegacyPasswordVerifier from '@backend/contracts/security/legacy-pass
 import type PasswordHasher from '@backend/contracts/security/password-hasher.interface';
 import type EmpleadoAuthenticationRecord from '@backend/domain/empleados/empleado-authentication-record.interface';
 import type EmpleadoRecord from '@backend/domain/empleados/empleado-record.interface';
-import type AutenticarEmpleadoCommand from '@desktop-contracts/empleados/autenticar-empleado-command.interface';
-import type AutenticarEmpleadoResult from '@desktop-contracts/empleados/autenticar-empleado-result.type';
-import type EmpleadoInterface from '@desktop-contracts/empleados/empleado.interface';
+import type AutenticarEmpleadoCommand from '@desktop-contracts/configuration/empleados/autenticar-empleado-command.interface';
+import type AutenticarEmpleadoResult from '@desktop-contracts/configuration/empleados/autenticar-empleado-result.type';
+import type EmpleadoInterface from '@desktop-contracts/configuration/empleados/empleado.interface';
 
 export default class EmpleadosService {
   constructor(

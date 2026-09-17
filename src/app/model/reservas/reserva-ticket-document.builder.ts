@@ -2,7 +2,7 @@ import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type {
   default as ReservaInterface,
   ReservaLineaInterface,
-} from '@desktop-contracts/reservas/reserva.interface';
+} from '@desktop-contracts/ventas/reservas/reserva.interface';
 import {
   formatTicketMicros,
   renderTicketBusinessHeader,

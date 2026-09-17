@@ -28,7 +28,7 @@ import type {
 } from '@desktop-contracts/compras/pedidos/pedido-cabecera.interface';
 import type PedidoLineaInterface from '@desktop-contracts/compras/pedidos/pedido-linea.interface';
 import type { PedidoTipo } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
-import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
+import type CrearProveedorCommand from '@desktop-contracts/compras/proveedores/crear-proveedor-command.interface';
 import type PurchaseOrderArticleFlowState from '@model/compras/pedidos/purchase-order-article-flow.interface';
 import {
   getPurchaseOrderReturnedArticleId,

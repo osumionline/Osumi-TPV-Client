@@ -1,5 +1,5 @@
 import type CategoriasService from '@backend/application/categorias/categorias.service';
-import type CategoriaInterface from '@desktop-contracts/categorias/categoria.interface';
+import type CategoriaInterface from '@desktop-contracts/articulos/categorias/categoria.interface';
 import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
 import { assertTrustedSender } from '@ipc/assert-trusted-sender';
 import IPC_CHANNELS from '@ipc/channels';

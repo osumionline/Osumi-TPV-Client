@@ -4,7 +4,7 @@ import type LegacyImportProgressListener from '@backend/contracts/legacy-import/
 import type LegacyImportExecutionCommand from '@backend/domain/legacy-import/legacy-import-execution-command.interface';
 import type LegacyImportPhaseResult from '@backend/domain/legacy-import/legacy-import-phase-result.interface';
 import type LegacySqlInsert from '@backend/domain/legacy-import/legacy-sql-insert.interface';
-import { GESTION_PERMISSIONS } from '@desktop-contracts/empleados/gestion-permissions.constants';
+import { GESTION_PERMISSIONS } from '@desktop-contracts/configuration/empleados/gestion-permissions.constants';
 import LegacyImportPublicIdFactory from '@infrastructure/legacy-import/legacy-import-public-id.factory';
 import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value.reader';
 import DISABLED_LEGACY_PASSWORD_HASH from '@infrastructure/security/disabled-legacy-password-hash.constant';

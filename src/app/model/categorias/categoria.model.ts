@@ -1,4 +1,4 @@
-import type CategoriaInterface from '@desktop-contracts/categorias/categoria.interface';
+import type CategoriaInterface from '@desktop-contracts/articulos/categorias/categoria.interface';
 
 export default class Categoria {
   id: number | null = null;

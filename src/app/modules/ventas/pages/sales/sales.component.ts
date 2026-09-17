@@ -11,7 +11,7 @@ import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import HeaderComponent from '@app/components/header/header.component';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
-import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
+import type ReservaInterface from '@desktop-contracts/ventas/reservas/reserva.interface';
 import type Cliente from '@model/clientes/cliente.model';
 import type Empleado from '@model/empleados/empleado.model';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';

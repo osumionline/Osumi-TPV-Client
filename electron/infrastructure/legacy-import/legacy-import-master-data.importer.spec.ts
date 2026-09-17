@@ -3,7 +3,7 @@ import type LegacyImportSqlInsertListener from '@backend/contracts/legacy-import
 import type LegacyImportExecutionCommand from '@backend/domain/legacy-import/legacy-import-execution-command.interface';
 import type LegacyImportPhaseResult from '@backend/domain/legacy-import/legacy-import-phase-result.interface';
 import type LegacySqlInsert from '@backend/domain/legacy-import/legacy-sql-insert.interface';
-import { GESTION_PERMISSIONS } from '@desktop-contracts/empleados/gestion-permissions.constants';
+import { GESTION_PERMISSIONS } from '@desktop-contracts/configuration/empleados/gestion-permissions.constants';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';

@@ -1,5 +1,5 @@
-import type CrearReservaCommand from '@desktop-contracts/reservas/crear-reserva-command.interface';
-import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
+import type CrearReservaCommand from '@desktop-contracts/ventas/reservas/crear-reserva-command.interface';
+import type ReservaInterface from '@desktop-contracts/ventas/reservas/reserva.interface';
 
 export default interface ReservasApi {
   create(command: CrearReservaCommand): Promise<string>;

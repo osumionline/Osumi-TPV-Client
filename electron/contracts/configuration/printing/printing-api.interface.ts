@@ -1,5 +1,5 @@
-import type PrinterInterface from '@desktop-contracts/printing/printer.interface';
-import type PrintingSettings from '@desktop-contracts/printing/printing-settings.interface';
+import type PrinterInterface from '@desktop-contracts/configuration/printing/printer.interface';
+import type PrintingSettings from '@desktop-contracts/configuration/printing/printing-settings.interface';
 
 export default interface PrintingApi {
   getPrinters(): Promise<readonly PrinterInterface[]>;

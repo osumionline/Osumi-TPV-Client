@@ -14,7 +14,7 @@ import {
 } from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
-import type AutenticarEmpleadoResult from '@desktop-contracts/empleados/autenticar-empleado-result.type';
+import type AutenticarEmpleadoResult from '@desktop-contracts/configuration/empleados/autenticar-empleado-result.type';
 import type Empleado from '@model/empleados/empleado.model';
 import EmpleadosService from '@services/empleados/empleados.service';
 

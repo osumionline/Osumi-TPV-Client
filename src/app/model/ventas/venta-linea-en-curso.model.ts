@@ -1,6 +1,6 @@
 import { BASIS_POINTS_TOTAL, PERCENT_TOTAL } from '@constants/percentage.constants';
-import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
-import type { ReservaLineaInterface } from '@desktop-contracts/reservas/reserva.interface';
+import type ReservaInterface from '@desktop-contracts/ventas/reservas/reserva.interface';
+import type { ReservaLineaInterface } from '@desktop-contracts/ventas/reservas/reserva.interface';
 import type { VentaDevolucionLineaInterface } from '@desktop-contracts/ventas/venta-devolucion.interface';
 import type ArticuloVenta from '@model/ventas/articulo-venta.model';
 import type VentaLineaDevolucionOrigen from '@model/ventas/venta-linea-devolucion-origen.interface';

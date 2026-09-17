@@ -1,24 +1,24 @@
+import createMarcaEstadisticasResult from '@backend/application/marcas/marca-estadisticas.utils';
 import type ImageAssetPromoter from '@backend/contracts/files/image-asset-promoter.interface';
 import type StagedImageDiscarder from '@backend/contracts/files/staged-image-discarder.interface';
 import type ActualizarMarcaRecordCommand from '@backend/contracts/marcas/actualizar-marca-record-command.interface';
 import type CrearMarcaRecordCommand from '@backend/contracts/marcas/crear-marca-record-command.interface';
+import type MarcaEstadisticasRepositoryQuery from '@backend/contracts/marcas/marca-estadisticas-query.interface';
 import type MarcaLogoUpdateRecord from '@backend/contracts/marcas/marca-logo-update-record.type';
 import type MarcaRepository from '@backend/contracts/marcas/marca.repository.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
 import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.interface';
-import type MarcaRecord from '@backend/domain/marcas/marca-record.interface';
-import type ActualizarMarcaCommand from '@desktop-contracts/marcas/actualizar-marca-command.interface';
-import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
-import type MarcaLogoUpdateCommand from '@desktop-contracts/marcas/marca-logo-update-command.type';
-import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
-import createMarcaEstadisticasResult from '@backend/application/marcas/marca-estadisticas.utils';
-import type MarcaEstadisticasRepositoryQuery from '@backend/contracts/marcas/marca-estadisticas-query.interface';
 import type { MarcaEstadisticasRepositoryResult } from '@backend/domain/marcas/marca-estadisticas-record.interface';
+import type MarcaRecord from '@backend/domain/marcas/marca-record.interface';
+import type ActualizarMarcaCommand from '@desktop-contracts/compras/marcas/actualizar-marca-command.interface';
+import type CrearMarcaCommand from '@desktop-contracts/compras/marcas/crear-marca-command.interface';
 import type {
   MarcaEstadisticasConsulta,
   MarcaEstadisticasResultado,
   MarcaEstadisticasTipo,
-} from '@desktop-contracts/marcas/marca-estadisticas.interface';
+} from '@desktop-contracts/compras/marcas/marca-estadisticas.interface';
+import type MarcaLogoUpdateCommand from '@desktop-contracts/compras/marcas/marca-logo-update-command.type';
+import type MarcaInterface from '@desktop-contracts/compras/marcas/marca.interface';
 
 interface PreparedMarcaLogoUpdate {
   readonly record: MarcaLogoUpdateRecord;
@@ -54,96 +54,52 @@ export default class MarcasService {
 
     return marca === null ? null : this.toInterface(marca);
   }
-  
+
   /**
- * Recupera las estadísticas históricas de ventas
- * correspondientes a los filtros de una Marca.
- */
-async getEstadisticas(
-  consulta: MarcaEstadisticasConsulta,
-): Promise<MarcaEstadisticasResultado> {
-  if (
-    typeof consulta !== 'object' ||
-    consulta === null
-  ) {
-    throw new Error(
-      'La consulta de estadísticas no es válida.',
-    );
-  }
+   * Recupera las estadísticas históricas de ventas
+   * correspondientes a los filtros de una Marca.
+   */
+  async getEstadisticas(consulta: MarcaEstadisticasConsulta): Promise<MarcaEstadisticasResultado> {
+    if (typeof consulta !== 'object' || consulta === null) {
+      throw new Error('La consulta de estadísticas no es válida.');
+    }
 
-  const idMarca: number =
-    this.validateMarcaId(
-      consulta.idMarca,
-    );
+    const idMarca: number = this.validateMarcaId(consulta.idMarca);
 
-  if (
-    !this.isEstadisticasTipo(
-      consulta.tipo,
-    )
-  ) {
-    throw new Error(
-      'El tipo de estadísticas no es válido.',
-    );
-  }
+    if (!this.isEstadisticasTipo(consulta.tipo)) {
+      throw new Error('El tipo de estadísticas no es válido.');
+    }
 
-  if (
-    consulta.year !== null &&
-    (
-      !Number.isSafeInteger(
-        consulta.year,
-      ) ||
-      consulta.year < 1 ||
-      consulta.year > 9999
-    )
-  ) {
-    throw new Error(
-      'El año de las estadísticas no es válido.',
-    );
-  }
+    if (
+      consulta.year !== null &&
+      (!Number.isSafeInteger(consulta.year) || consulta.year < 1 || consulta.year > 9999)
+    ) {
+      throw new Error('El año de las estadísticas no es válido.');
+    }
 
-  if (
-    consulta.month !== null &&
-    (
-      !Number.isSafeInteger(
-        consulta.month,
-      ) ||
-      consulta.month < 1 ||
-      consulta.month > 12
-    )
-  ) {
-    throw new Error(
-      'El mes de las estadísticas no es válido.',
-    );
-  }
+    if (
+      consulta.month !== null &&
+      (!Number.isSafeInteger(consulta.month) || consulta.month < 1 || consulta.month > 12)
+    ) {
+      throw new Error('El mes de las estadísticas no es válido.');
+    }
 
-  if (
-    consulta.year === null &&
-    consulta.month !== null
-  ) {
-    throw new Error(
-      'No se puede seleccionar un mes sin seleccionar un año.',
-    );
-  }
+    if (consulta.year === null && consulta.month !== null) {
+      throw new Error('No se puede seleccionar un mes sin seleccionar un año.');
+    }
 
-  const repositoryQuery:
-    MarcaEstadisticasRepositoryQuery = {
+    const repositoryQuery: MarcaEstadisticasRepositoryQuery = {
       idMarca,
       metric: consulta.tipo,
       year: consulta.year,
       month: consulta.month,
     };
 
-  const repositoryResult:
-    MarcaEstadisticasRepositoryResult =
-    await this.marcaRepository.findEstadisticas(
-      repositoryQuery,
-    );
+    const repositoryResult: MarcaEstadisticasRepositoryResult =
+      await this.marcaRepository.findEstadisticas(repositoryQuery);
 
-  return createMarcaEstadisticasResult(
-    consulta,
-    repositoryResult,
-  );
-}
+    return createMarcaEstadisticasResult(consulta, repositoryResult);
+  }
 
   /**
    * Crea una marca después de normalizar sus datos,
@@ -250,19 +206,14 @@ async getEstadisticas(
 
     await this.marcaRepository.deactivate(validId);
   }
-  
+
   /**
- * Comprueba el tipo solicitado para las
- * estadísticas históricas de una Marca.
- */
-private isEstadisticasTipo(
-  value: unknown,
-): value is MarcaEstadisticasTipo {
-  return (
-    value === 'amount' ||
-    value === 'units'
-  );
-}
+   * Comprueba el tipo solicitado para las
+   * estadísticas históricas de una Marca.
+   */
+  private isEstadisticasTipo(value: unknown): value is MarcaEstadisticasTipo {
+    return value === 'amount' || value === 'units';
+  }
 
   /**
    * Prepara la modificación solicitada sobre el logo

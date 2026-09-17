@@ -6,7 +6,7 @@ import type {
   VentasContextRecord,
 } from '@backend/domain/ventas/ventas-context-record.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
-import type TipoPagoInterface from '@desktop-contracts/tipos-pago/tipo-pago.interface';
+import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 import type VentasContextInterface from '@desktop-contracts/ventas/ventas-context.interface';
 
 /**

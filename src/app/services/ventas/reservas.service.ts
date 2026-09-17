@@ -1,6 +1,6 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { Service, signal } from '@angular/core';
-import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
+import type ReservaInterface from '@desktop-contracts/ventas/reservas/reserva.interface';
 import mapVentaToCrearReservaCommand from '@model/reservas/crear-reserva-command.mapper';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
 import { getErrorMessage } from '@utils/error.utils';

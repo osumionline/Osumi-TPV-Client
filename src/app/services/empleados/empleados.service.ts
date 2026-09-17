@@ -1,8 +1,8 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { computed, Service, signal } from '@angular/core';
-import type AutenticarEmpleadoCommand from '@desktop-contracts/empleados/autenticar-empleado-command.interface';
-import type AutenticarEmpleadoResult from '@desktop-contracts/empleados/autenticar-empleado-result.type';
-import type EmpleadoInterface from '@desktop-contracts/empleados/empleado.interface';
+import type AutenticarEmpleadoCommand from '@desktop-contracts/configuration/empleados/autenticar-empleado-command.interface';
+import type AutenticarEmpleadoResult from '@desktop-contracts/configuration/empleados/autenticar-empleado-result.type';
+import type EmpleadoInterface from '@desktop-contracts/configuration/empleados/empleado.interface';
 import Empleado from '@model/empleados/empleado.model';
 
 @Service()

@@ -1,5 +1,5 @@
 import RoleGroup from '@backend/domain/permissions/role-group.interface';
-import permissionIds from '@desktop-contracts/permissions/permission-ids.constants';
+import permissionIds from '@desktop-contracts/configuration/permissions/permission-ids.constants';
 
 const roleCatalog: Readonly<Record<string, RoleGroup>> = {
   ventas: {

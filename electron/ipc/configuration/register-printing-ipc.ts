@@ -1,6 +1,6 @@
 import type PrintingService from '@backend/application/printing/printing.service';
-import type PrinterInterface from '@desktop-contracts/printing/printer.interface';
-import type PrintingSettings from '@desktop-contracts/printing/printing-settings.interface';
+import type PrinterInterface from '@desktop-contracts/configuration/printing/printer.interface';
+import type PrintingSettings from '@desktop-contracts/configuration/printing/printing-settings.interface';
 import { assertTrustedSender, type MainWindowProvider } from '@ipc/assert-trusted-sender';
 import IPC_CHANNELS from '@ipc/channels';
 import { ipcMain } from 'electron';

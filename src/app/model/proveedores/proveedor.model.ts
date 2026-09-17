@@ -1,7 +1,7 @@
 import type {
   ComercialInterface,
   ProveedorInterface,
-} from '@desktop-contracts/proveedores/proveedor.interface';
+} from '@desktop-contracts/compras/proveedores/proveedor.interface';
 import Comercial from '@model/proveedores/comercial.model';
 
 export default class Proveedor {

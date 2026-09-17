@@ -6,7 +6,7 @@ import type {
   MarcaEstadisticasConsulta,
   MarcaEstadisticasPoint,
   MarcaEstadisticasResultado,
-} from '@desktop-contracts/marcas/marca-estadisticas.interface';
+} from '@desktop-contracts/compras/marcas/marca-estadisticas.interface';
 
 /**
  * Convierte los agregados SQLite en una serie

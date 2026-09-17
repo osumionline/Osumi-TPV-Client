@@ -3,18 +3,18 @@ import type ImageAssetPromoter from '@backend/contracts/files/image-asset-promot
 import type StagedImageDiscarder from '@backend/contracts/files/staged-image-discarder.interface';
 import type ActualizarMarcaRecordCommand from '@backend/contracts/marcas/actualizar-marca-record-command.interface';
 import type CrearMarcaRecordCommand from '@backend/contracts/marcas/crear-marca-record-command.interface';
+import type MarcaEstadisticasRepositoryQuery from '@backend/contracts/marcas/marca-estadisticas-query.interface';
 import type MarcaRepository from '@backend/contracts/marcas/marca.repository.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
 import type { ImageAssetPurpose } from '@backend/domain/files/image-asset.interface';
 import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.interface';
 import type { MarcaEstadisticasRepositoryResult } from '@backend/domain/marcas/marca-estadisticas-record.interface';
 import type MarcaRecord from '@backend/domain/marcas/marca-record.interface';
-import type ActualizarMarcaCommand from '@desktop-contracts/marcas/actualizar-marca-command.interface';
-import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
-import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
+import type ActualizarMarcaCommand from '@desktop-contracts/compras/marcas/actualizar-marca-command.interface';
+import type CrearMarcaCommand from '@desktop-contracts/compras/marcas/crear-marca-command.interface';
+import type { MarcaEstadisticasResultado } from '@desktop-contracts/compras/marcas/marca-estadisticas.interface';
+import type MarcaInterface from '@desktop-contracts/compras/marcas/marca.interface';
 import { beforeEach, describe, expect, it } from 'vitest';
-import type MarcaEstadisticasRepositoryQuery from '@backend/contracts/marcas/marca-estadisticas-query.interface';
-import type { MarcaEstadisticasResultado } from '@desktop-contracts/marcas/marca-estadisticas.interface';
 
 let marcas: readonly MarcaRecord[];
 let existingNames: ReadonlySet<string>;
@@ -25,10 +25,8 @@ let lastUpdateCommand: ActualizarMarcaRecordCommand | null;
 let lastDeactivateId: number | null;
 let createError: Error | null;
 let updateError: Error | null;
-let estadisticasResult:
-  MarcaEstadisticasRepositoryResult;
-let lastEstadisticasQuery:
-  MarcaEstadisticasRepositoryQuery | null;
+let estadisticasResult: MarcaEstadisticasRepositoryResult;
+let lastEstadisticasQuery: MarcaEstadisticasRepositoryQuery | null;
 
 class FakeImageAssetPromoter implements ImageAssetPromoter {
   readonly preparedRequests: {
@@ -480,101 +478,77 @@ describe('MarcasService', (): void => {
     expect(promoter.preparedRequests).toHaveLength(0);
     expect(lastCreateCommand).toBeNull();
   });
-  
+
   it('obtiene estadísticas de una Marca y completa la serie temporal', async (): Promise<void> => {
-  estadisticasResult = {
-    years: [
-      2025,
-      2026,
-    ],
-    items: [
-      {
-        year: 2026,
-        month: 9,
-        day: null,
-        value: 3_500_000,
-      },
-    ],
-  };
+    estadisticasResult = {
+      years: [2025, 2026],
+      items: [
+        {
+          year: 2026,
+          month: 9,
+          day: null,
+          value: 3_500_000,
+        },
+      ],
+    };
 
-  const service: MarcasService =
-    createService();
+    const service: MarcasService = createService();
 
-  const result:
-    MarcaEstadisticasResultado =
-    await service.getEstadisticas({
+    const result: MarcaEstadisticasResultado = await service.getEstadisticas({
       idMarca: 1,
       tipo: 'amount',
       year: 2026,
       month: null,
     });
 
-  expect(
-    lastEstadisticasQuery,
-  ).toEqual({
-    idMarca: 1,
-    metric: 'amount',
-    year: 2026,
-    month: null,
-  });
-
-  expect(
-    result.points,
-  ).toHaveLength(12);
-
-  expect(
-    result.points[8],
-  ).toEqual({
-    year: 2026,
-    month: 9,
-    day: null,
-    value: 3_500_000,
-  });
-
-  expect(
-    result.total,
-  ).toBe(3_500_000);
-});
-
-it('rechaza un mes inválido antes de consultar el repository', async (): Promise<void> => {
-  const service: MarcasService =
-    createService();
-
-  await expect(
-    service.getEstadisticas({
+    expect(lastEstadisticasQuery).toEqual({
       idMarca: 1,
-      tipo: 'units',
+      metric: 'amount',
       year: 2026,
-      month: 13,
-    }),
-  ).rejects.toThrow(
-    'El mes de las estadísticas no es válido.',
-  );
+      month: null,
+    });
 
-  expect(
-    lastEstadisticasQuery,
-  ).toBeNull();
-});
+    expect(result.points).toHaveLength(12);
 
-it('rechaza un mes concreto cuando el año es Todos', async (): Promise<void> => {
-  const service: MarcasService =
-    createService();
-
-  await expect(
-    service.getEstadisticas({
-      idMarca: 1,
-      tipo: 'units',
-      year: null,
+    expect(result.points[8]).toEqual({
+      year: 2026,
       month: 9,
-    }),
-  ).rejects.toThrow(
-    'No se puede seleccionar un mes sin seleccionar un año.',
-  );
+      day: null,
+      value: 3_500_000,
+    });
 
-  expect(
-    lastEstadisticasQuery,
-  ).toBeNull();
-});
+    expect(result.total).toBe(3_500_000);
+  });
+
+  it('rechaza un mes inválido antes de consultar el repository', async (): Promise<void> => {
+    const service: MarcasService = createService();
+
+    await expect(
+      service.getEstadisticas({
+        idMarca: 1,
+        tipo: 'units',
+        year: 2026,
+        month: 13,
+      }),
+    ).rejects.toThrow('El mes de las estadísticas no es válido.');
+
+    expect(lastEstadisticasQuery).toBeNull();
+  });
+
+  it('rechaza un mes concreto cuando el año es Todos', async (): Promise<void> => {
+    const service: MarcasService = createService();
+
+    await expect(
+      service.getEstadisticas({
+        idMarca: 1,
+        tipo: 'units',
+        year: null,
+        month: 9,
+      }),
+    ).rejects.toThrow('No se puede seleccionar un mes sin seleccionar un año.');
+
+    expect(lastEstadisticasQuery).toBeNull();
+  });
 });
 
 /**
@@ -591,18 +565,16 @@ function createService(
       Promise.resolve(marcas.find((marca: MarcaRecord): boolean => marca.id === id) ?? null),
 
     /**
- * Devuelve los agregados estadísticos configurados
- * y registra la consulta recibida.
- */
-findEstadisticas: (
-  query: MarcaEstadisticasRepositoryQuery,
-): Promise<MarcaEstadisticasRepositoryResult> => {
-  lastEstadisticasQuery = query;
+     * Devuelve los agregados estadísticos configurados
+     * y registra la consulta recibida.
+     */
+    findEstadisticas: (
+      query: MarcaEstadisticasRepositoryQuery,
+    ): Promise<MarcaEstadisticasRepositoryResult> => {
+      lastEstadisticasQuery = query;
 
-  return Promise.resolve(
-    estadisticasResult,
-  );
-},
+      return Promise.resolve(estadisticasResult);
+    },
 
     existsActiveByName: (nombre: string, excludeId: number | null): Promise<boolean> => {
       lastExcludedId = excludeId;

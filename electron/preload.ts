@@ -35,9 +35,9 @@ import type {
 } from '@desktop-contracts/articulos/articulo-historico.interface';
 import type { ArticuloSaveInterface } from '@desktop-contracts/articulos/articulo-save.interface';
 import type { ArticuloInterface } from '@desktop-contracts/articulos/articulo.interface';
+import type CategoriaInterface from '@desktop-contracts/articulos/categorias/categoria.interface';
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
-import type CategoriaInterface from '@desktop-contracts/categorias/categoria.interface';
 import type ActualizarClienteCommand from '@desktop-contracts/clientes/actualizar-cliente-command.interface';
 import type ActualizarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/actualizar-cliente-factura-borrador-command.interface';
 import type AnularClienteFacturaCommand from '@desktop-contracts/clientes/anular-cliente-factura-command.interface';
@@ -64,6 +64,13 @@ import type CrearClienteFacturaBorradorCommand from '@desktop-contracts/clientes
 import type CrearClienteFacturaDesdeVentaCommand from '@desktop-contracts/clientes/crear-cliente-factura-desde-venta-command.interface';
 import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clientes/eliminar-cliente-factura-borrador-command.interface';
 import type EmitirClienteFacturaCommand from '@desktop-contracts/clientes/emitir-cliente-factura-command.interface';
+import type ActualizarMarcaCommand from '@desktop-contracts/compras/marcas/actualizar-marca-command.interface';
+import type CrearMarcaCommand from '@desktop-contracts/compras/marcas/crear-marca-command.interface';
+import type {
+  MarcaEstadisticasConsulta,
+  MarcaEstadisticasResultado,
+} from '@desktop-contracts/compras/marcas/marca-estadisticas.interface';
+import type MarcaInterface from '@desktop-contracts/compras/marcas/marca.interface';
 import type { PedidoArchivoInterface } from '@desktop-contracts/compras/pedidos/pedido-archivo.interface';
 import type PedidoArticuloInterface from '@desktop-contracts/compras/pedidos/pedido-articulo.interface';
 import type {
@@ -78,15 +85,25 @@ import type {
   PedidosGuardadosResultado,
   PedidosRecepcionadosResultado,
 } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
+import type ActualizarComercialCommand from '@desktop-contracts/compras/proveedores/actualizar-comercial-command.interface';
+import type ActualizarProveedorCommand from '@desktop-contracts/compras/proveedores/actualizar-proveedor-command.interface';
+import type CrearComercialCommand from '@desktop-contracts/compras/proveedores/crear-comercial-command.interface';
+import type CrearProveedorCommand from '@desktop-contracts/compras/proveedores/crear-proveedor-command.interface';
+import type {
+  ComercialInterface,
+  ProveedorInterface,
+} from '@desktop-contracts/compras/proveedores/proveedor.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type ConfigurationUpdateCommand from '@desktop-contracts/configuration/configuration-update-command.interface';
+import type AutenticarEmpleadoCommand from '@desktop-contracts/configuration/empleados/autenticar-empleado-command.interface';
+import type AutenticarEmpleadoResult from '@desktop-contracts/configuration/empleados/autenticar-empleado-result.type';
+import type EmpleadoInterface from '@desktop-contracts/configuration/empleados/empleado.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type { InstallationResult } from '@desktop-contracts/configuration/installation-result.interface';
+import type PrinterInterface from '@desktop-contracts/configuration/printing/printer.interface';
+import type PrintingSettings from '@desktop-contracts/configuration/printing/printing-settings.interface';
 import type RevealableConfigurationSecret from '@desktop-contracts/configuration/revealable-configuration-secret.type';
 import OsumiDesktopApi from '@desktop-contracts/desktop-api';
-import type AutenticarEmpleadoCommand from '@desktop-contracts/empleados/autenticar-empleado-command.interface';
-import type AutenticarEmpleadoResult from '@desktop-contracts/empleados/autenticar-empleado-result.type';
-import type EmpleadoInterface from '@desktop-contracts/empleados/empleado.interface';
 import type StageImageRequest from '@desktop-contracts/files/stage-image-request.interface';
 import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
 import type LegacyImportAnalysisReport from '@desktop-contracts/legacy-import/legacy-import-analysis-report.interface';
@@ -95,30 +112,13 @@ import type LegacyImportPreparationResult from '@desktop-contracts/legacy-import
 import type LegacyImportProgress from '@desktop-contracts/legacy-import/legacy-import-progress.interface';
 import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-import/legacy-import-review-decision.type';
 import type LegacyImportStartResult from '@desktop-contracts/legacy-import/legacy-import-start-result.interface';
-import type ActualizarMarcaCommand from '@desktop-contracts/marcas/actualizar-marca-command.interface';
-import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
-import type {
-  MarcaEstadisticasConsulta,
-  MarcaEstadisticasResultado,
-} from '@desktop-contracts/marcas/marca-estadisticas.interface';
-import type MarcaInterface from '@desktop-contracts/marcas/marca.interface';
-import type PrinterInterface from '@desktop-contracts/printing/printer.interface';
-import type PrintingSettings from '@desktop-contracts/printing/printing-settings.interface';
-import type ActualizarComercialCommand from '@desktop-contracts/proveedores/actualizar-comercial-command.interface';
-import type ActualizarProveedorCommand from '@desktop-contracts/proveedores/actualizar-proveedor-command.interface';
-import type CrearComercialCommand from '@desktop-contracts/proveedores/crear-comercial-command.interface';
-import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
-import type {
-  ComercialInterface,
-  ProveedorInterface,
-} from '@desktop-contracts/proveedores/proveedor.interface';
-import type CrearReservaCommand from '@desktop-contracts/reservas/crear-reserva-command.interface';
-import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
 import AppInfo from '@desktop-contracts/system/app-info.interface';
 import type AccesoDirectoVentaInterface from '@desktop-contracts/ventas/acceso-directo-venta.interface';
 import type ArticuloVentaInterface from '@desktop-contracts/ventas/articulo-venta.interface';
 import type { GuardarVentaCommand } from '@desktop-contracts/ventas/guardar-venta-command.interface';
 import type GuardarVentaResult from '@desktop-contracts/ventas/guardar-venta-result.interface';
+import type CrearReservaCommand from '@desktop-contracts/ventas/reservas/crear-reserva-command.interface';
+import type ReservaInterface from '@desktop-contracts/ventas/reservas/reserva.interface';
 import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devolucion.interface';
 import type {
   VentaHistoricoConsulta,

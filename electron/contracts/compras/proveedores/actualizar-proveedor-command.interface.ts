@@ -1,4 +1,4 @@
-import type ProveedorLogoUpdateCommand from '@desktop-contracts/proveedores/proveedor-logo-update-command.type';
+import type ProveedorLogoUpdateCommand from '@desktop-contracts/compras/proveedores/proveedor-logo-update-command.type';
 
 export default interface ActualizarProveedorCommand {
   readonly nombre: string;

@@ -17,8 +17,8 @@ import { MatIcon } from '@angular/material/icon';
 import { MatSelect, type MatSelectChange } from '@angular/material/select';
 import { MatSlideToggle } from '@angular/material/slide-toggle';
 import { MatTooltip } from '@angular/material/tooltip';
-import type CrearMarcaCommand from '@desktop-contracts/marcas/crear-marca-command.interface';
-import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
+import type CrearMarcaCommand from '@desktop-contracts/compras/marcas/crear-marca-command.interface';
+import type CrearProveedorCommand from '@desktop-contracts/compras/proveedores/crear-proveedor-command.interface';
 import type { ArticuloDraftPatch } from '@model/articulos/articulo-draft.interface';
 import ArticuloPriceCalculator from '@model/articulos/articulo-price-calculator';
 import {

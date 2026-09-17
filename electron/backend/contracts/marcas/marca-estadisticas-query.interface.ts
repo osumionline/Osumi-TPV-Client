@@ -1,4 +1,4 @@
-import type { MarcaEstadisticasTipo } from '@desktop-contracts/marcas/marca-estadisticas.interface';
+import type { MarcaEstadisticasTipo } from '@desktop-contracts/compras/marcas/marca-estadisticas.interface';
 
 export default interface MarcaEstadisticasRepositoryQuery {
   readonly idMarca: number;

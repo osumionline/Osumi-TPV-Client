@@ -16,7 +16,7 @@ import { MONTH_OPTIONS, type MonthOption } from '@constants/date.constants';
 import type {
   MarcaEstadisticasPoint,
   MarcaEstadisticasResultado,
-} from '@desktop-contracts/marcas/marca-estadisticas.interface';
+} from '@desktop-contracts/compras/marcas/marca-estadisticas.interface';
 import type MarcaEstadisticasFiltros from '@model/marcas/marca-estadisticas-filtros.interface';
 import type MarcaWorkspace from '@model/marcas/marca-workspace.interface';
 import MarcasService from '@services/compras/marcas.service';

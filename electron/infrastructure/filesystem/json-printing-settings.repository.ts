@@ -1,5 +1,5 @@
 import type PrintingSettingsRepository from '@backend/contracts/printing/printing-settings.repository.interface';
-import type PrintingSettings from '@desktop-contracts/printing/printing-settings.interface';
+import type PrintingSettings from '@desktop-contracts/configuration/printing/printing-settings.interface';
 import { readFile, rename, writeFile } from 'node:fs/promises';
 
 const DEFAULT_PRINTING_SETTINGS: PrintingSettings = {

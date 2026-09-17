@@ -1,6 +1,6 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { Service, signal } from '@angular/core';
-import type CategoriaInterface from '@desktop-contracts/categorias/categoria.interface';
+import type CategoriaInterface from '@desktop-contracts/articulos/categorias/categoria.interface';
 import Categoria from '@model/categorias/categoria.model';
 
 interface CategoriasState {

@@ -1,4 +1,4 @@
-import type TipoPagoInterface from '@desktop-contracts/tipos-pago/tipo-pago.interface';
+import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 
 /**
  * Representa una forma de pago disponible para la operativa del TPV.

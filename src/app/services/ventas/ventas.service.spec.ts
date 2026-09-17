@@ -1,4 +1,4 @@
-import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
+import type ReservaInterface from '@desktop-contracts/ventas/reservas/reserva.interface';
 import Cliente from '@model/clientes/cliente.model';
 import ArticuloVenta from '@model/ventas/articulo-venta.model';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';

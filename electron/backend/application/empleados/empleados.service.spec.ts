@@ -4,7 +4,7 @@ import type LegacyPasswordVerifier from '@backend/contracts/security/legacy-pass
 import type PasswordHasher from '@backend/contracts/security/password-hasher.interface';
 import type EmpleadoAuthenticationRecord from '@backend/domain/empleados/empleado-authentication-record.interface';
 import type EmpleadoRecord from '@backend/domain/empleados/empleado-record.interface';
-import type EmpleadoInterface from '@desktop-contracts/empleados/empleado.interface';
+import type EmpleadoInterface from '@desktop-contracts/configuration/empleados/empleado.interface';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 class FakeEmpleadoRepository implements EmpleadoRepository {

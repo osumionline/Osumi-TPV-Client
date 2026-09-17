@@ -1,4 +1,4 @@
 export {
   GESTION_EMPLOYEES_PERMISSIONS,
   GESTION_PERMISSIONS,
-} from '@desktop-contracts/empleados/gestion-permissions.constants';
+} from '@desktop-contracts/configuration/empleados/gestion-permissions.constants';

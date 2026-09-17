@@ -1,5 +1,5 @@
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
-import type AutenticarEmpleadoResult from '@desktop-contracts/empleados/autenticar-empleado-result.type';
+import type AutenticarEmpleadoResult from '@desktop-contracts/configuration/empleados/autenticar-empleado-result.type';
 import Empleado from '@model/empleados/empleado.model';
 import ManagementPasswordDialogComponent from '@modules/gestion/components/management-password-dialog/management-password-dialog.component';
 

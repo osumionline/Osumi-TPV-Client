@@ -1,6 +1,6 @@
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import type EmpleadoInterface from '@desktop-contracts/empleados/empleado.interface';
+import type EmpleadoInterface from '@desktop-contracts/configuration/empleados/empleado.interface';
 import ManagementHomeComponent from '@modules/gestion/pages/management-home/management-home.component';
 import EmpleadosService from '@services/empleados/empleados.service';
 import GestionSessionService from '@services/gestion/gestion-session.service';

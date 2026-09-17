@@ -5,10 +5,10 @@ import type ReservasRepository from '@backend/contracts/reservas/reservas.reposi
 import type ReservaRecord from '@backend/domain/reservas/reserva-record.interface';
 import type { ReservaLineaRecord } from '@backend/domain/reservas/reserva-record.interface';
 import { centsToMicros, microsToCents } from '@backend/utils/money.utils';
-import type CrearReservaCommand from '@desktop-contracts/reservas/crear-reserva-command.interface';
-import type { CrearReservaLineaCommand } from '@desktop-contracts/reservas/crear-reserva-command.interface';
-import type ReservaInterface from '@desktop-contracts/reservas/reserva.interface';
-import type { ReservaLineaInterface } from '@desktop-contracts/reservas/reserva.interface';
+import type CrearReservaCommand from '@desktop-contracts/ventas/reservas/crear-reserva-command.interface';
+import type { CrearReservaLineaCommand } from '@desktop-contracts/ventas/reservas/crear-reserva-command.interface';
+import type ReservaInterface from '@desktop-contracts/ventas/reservas/reserva.interface';
+import type { ReservaLineaInterface } from '@desktop-contracts/ventas/reservas/reserva.interface';
 
 export default class ReservasService {
   constructor(private readonly reservasRepository: ReservasRepository) {}

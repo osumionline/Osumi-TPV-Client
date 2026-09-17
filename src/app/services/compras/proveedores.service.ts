@@ -1,14 +1,14 @@
 import { computed, inject, Service, signal, type Signal, type WritableSignal } from '@angular/core';
-import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
-import type ActualizarComercialCommand from '@desktop-contracts/proveedores/actualizar-comercial-command.interface';
-import type ActualizarProveedorCommand from '@desktop-contracts/proveedores/actualizar-proveedor-command.interface';
-import type CrearComercialCommand from '@desktop-contracts/proveedores/crear-comercial-command.interface';
-import type CrearProveedorCommand from '@desktop-contracts/proveedores/crear-proveedor-command.interface';
-import type ProveedorLogoUpdateCommand from '@desktop-contracts/proveedores/proveedor-logo-update-command.type';
+import type ActualizarComercialCommand from '@desktop-contracts/compras/proveedores/actualizar-comercial-command.interface';
+import type ActualizarProveedorCommand from '@desktop-contracts/compras/proveedores/actualizar-proveedor-command.interface';
+import type CrearComercialCommand from '@desktop-contracts/compras/proveedores/crear-comercial-command.interface';
+import type CrearProveedorCommand from '@desktop-contracts/compras/proveedores/crear-proveedor-command.interface';
+import type ProveedorLogoUpdateCommand from '@desktop-contracts/compras/proveedores/proveedor-logo-update-command.type';
 import type {
   ComercialInterface,
   ProveedorInterface,
-} from '@desktop-contracts/proveedores/proveedor.interface';
+} from '@desktop-contracts/compras/proveedores/proveedor.interface';
+import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
 import createComercialFormInitialValue from '@model/proveedores/comercial-form.initial-value';
 import createComercialFormModel from '@model/proveedores/comercial-form.mapper';
 import type ComercialFormModel from '@model/proveedores/comercial-form.model';
