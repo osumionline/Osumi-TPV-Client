@@ -55,11 +55,21 @@ export default class Empleado {
     };
   }
 
+  /**
+   * Indica si el empleado dispone de un permiso.
+   * Los administradores tienen acceso completo.
+   */
   hasPerm(permiso: number): boolean {
-    return this.permisos.includes(permiso);
+    return this.admin || this.permisos.includes(permiso);
   }
 
+  /**
+   * Indica si el empleado dispone de al menos uno de los permisos indicados.
+   * Los administradores tienen acceso completo.
+   */
   hasAnyPerm(permisos: readonly number[]): boolean {
-    return permisos.some((permiso: number): boolean => this.permisos.includes(permiso));
+    return (
+      this.admin || permisos.some((permiso: number): boolean => this.permisos.includes(permiso))
+    );
   }
 }
