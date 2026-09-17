@@ -219,6 +219,7 @@ async function run(): Promise<void> {
       importedRows: executionSummary.importedRows,
       skippedRows: executionSummary.skippedRows,
       warningCount: executionSummary.warningCount,
+      defaultedEmployeePasswords: executionSummary.defaultedEmployeePasswords,
     };
 
     const message: LegacyImportWorkerMessage = {

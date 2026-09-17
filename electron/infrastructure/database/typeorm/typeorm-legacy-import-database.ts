@@ -49,10 +49,12 @@ export default class TypeOrmLegacyImportDatabase {
       importedRows: number;
       skippedRows: number;
       warningCount: number;
+      defaultedEmployeePasswords: number;
     } = {
       importedRows: 0,
       skippedRows: 0,
       warningCount: command.warningCount,
+      defaultedEmployeePasswords: 0,
     };
 
     try {
@@ -99,6 +101,8 @@ export default class TypeOrmLegacyImportDatabase {
         mutableExecutionSummary.importedRows += phaseResult.importedRows;
         mutableExecutionSummary.skippedRows += phaseResult.skippedRows;
         mutableExecutionSummary.warningCount += phaseResult.warningCount;
+        mutableExecutionSummary.defaultedEmployeePasswords +=
+          phaseResult.defaultedEmployeePasswords ?? 0;
       }
 
       const completedAt: string = new Date().toISOString();
@@ -156,6 +160,7 @@ export default class TypeOrmLegacyImportDatabase {
         importedRows: mutableExecutionSummary.importedRows,
         skippedRows: mutableExecutionSummary.skippedRows,
         warningCount: mutableExecutionSummary.warningCount,
+        defaultedEmployeePasswords: mutableExecutionSummary.defaultedEmployeePasswords,
       };
     } catch (error: unknown) {
       await this.closeDatabaseSafely(queryRunner, dataSource);

@@ -370,10 +370,55 @@
                 </p>
                 }
 
-                @if (result.warningCount > 0) {
+                @if (result.defaultedEmployeePasswords > 0) {
+                <div class="import-staging-ready__warning"
+                     role="alert">
+                    <mat-icon aria-hidden="true">
+                        warning
+                    </mat-icon>
+
+                    <div>
+                        @if (result.defaultedEmployeePasswords === 1) {
+                        <strong>
+                            Se ha importado un empleado sin contraseña utilizable
+                        </strong>
+
+                        <p>
+                            Se le ha asignado automáticamente la contraseña
+                            <strong>123456</strong>.
+                            Cámbiala desde Gestión → Empleados.
+                        </p>
+                        }
+                        @else {
+                        <strong>
+                            Se han importado
+                            {{ formatInteger(result.defaultedEmployeePasswords) }}
+                            empleados sin contraseña utilizable
+                        </strong>
+
+                        <p>
+                            Se les ha asignado automáticamente la contraseña
+                            <strong>123456</strong>.
+                            Cámbiala desde Gestión → Empleados.
+                        </p>
+                        }
+                    </div>
+                </div>
+                }
+
+                @if (
+                result.warningCount -
+                result.defaultedEmployeePasswords >
+                0
+                ) {
                 <p>
-                    La importación ha finalizado con
-                    {{ formatInteger(result.warningCount) }}
+                    La importación ha finalizado además con
+                    {{
+                        formatInteger(
+                            result.warningCount -
+                            result.defaultedEmployeePasswords
+                        )
+                    }}
                     advertencias no bloqueantes.
                 </p>
                 }

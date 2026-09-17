@@ -140,6 +140,7 @@ describe('LegacyImportMasterDataImporter', (): void => {
       importedRows: 6,
       skippedRows: 0,
       warningCount: 0,
+      defaultedEmployeePasswords: 0,
     });
 
     expect(await readEmployeePermissions()).toEqual([
@@ -192,6 +193,7 @@ describe('LegacyImportMasterDataImporter', (): void => {
       importedRows: 3,
       skippedRows: 0,
       warningCount: 2,
+      defaultedEmployeePasswords: 2,
     });
 
     const employees: readonly ImportedEmployeeRow[] = await readEmployees();

@@ -359,6 +359,31 @@
             margin-top: 8px;
         }
     }
+
+    &__warning {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-top: 16px;
+        padding: 14px 16px;
+        border-radius: 12px;
+        background:
+            var(--mat-sys-error-container);
+        color:
+            var(--mat-sys-on-error-container);
+
+        mat-icon {
+            flex: 0 0 auto;
+        }
+
+        strong {
+            display: block;
+        }
+
+        p {
+            margin-top: 6px;
+        }
+    }
 }
 
 @media (max-width: 820px) {

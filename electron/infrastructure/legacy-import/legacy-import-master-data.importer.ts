@@ -106,6 +106,7 @@ interface MutableImportCounters {
   importedRows: number;
   skippedRows: number;
   warningCount: number;
+  defaultedEmployeePasswords: number;
 }
 
 const LEGACY_DEFAULT_EMPLOYEE_PASSWORD: string = '123456';
@@ -158,6 +159,7 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
       importedRows: 0,
       skippedRows: 0,
       warningCount: 0,
+      defaultedEmployeePasswords: 0,
     };
 
     await queryRunner.startTransaction();
@@ -220,6 +222,7 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
       importedRows: counters.importedRows,
       skippedRows: counters.skippedRows,
       warningCount: counters.warningCount,
+      defaultedEmployeePasswords: counters.defaultedEmployeePasswords,
     };
   }
 
@@ -457,6 +460,7 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
         passwordAlgorithm = 'scrypt';
 
         counters.warningCount++;
+        counters.defaultedEmployeePasswords++;
       }
 
       const color: string = this.normalizeColor(employee.color, counters);
