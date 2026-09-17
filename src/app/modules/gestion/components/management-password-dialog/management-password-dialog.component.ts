@@ -1,17 +1,19 @@
-import type { WritableSignal } from '@angular/core';
-import { Component, inject, signal } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { MatButton } from '@angular/material/button';
 import {
-  MAT_DIALOG_DATA,
-  MatDialogActions,
-  MatDialogClose,
-  MatDialogContent,
-  MatDialogRef,
-  MatDialogTitle,
-} from '@angular/material/dialog';
-import { MatFormField, MatLabel } from '@angular/material/form-field';
-import { MatInput } from '@angular/material/input';
+  afterNextRender,
+  Component,
+  ElementRef,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+  type InputSignal,
+  type OutputEmitterRef,
+  type Signal,
+  type WritableSignal,
+} from '@angular/core';
+import { MatButton } from '@angular/material/button';
+import { MatIcon } from '@angular/material/icon';
 import type AutenticarEmpleadoResult from '@desktop-contracts/empleados/autenticar-empleado-result.type';
 import type Empleado from '@model/empleados/empleado.model';
 import EmpleadosService from '@services/empleados/empleados.service';
@@ -23,30 +25,21 @@ import EmpleadosService from '@services/empleados/empleados.service';
   selector: 'otpv-management-password-dialog',
   templateUrl: './management-password-dialog.component.html',
   styleUrl: './management-password-dialog.component.scss',
-  imports: [
-    MatButton,
-    MatDialogActions,
-    MatDialogClose,
-    MatDialogContent,
-    MatDialogTitle,
-    MatFormField,
-    MatInput,
-    MatLabel,
-    ReactiveFormsModule,
-  ],
+  imports: [MatButton, MatIcon],
 })
 export default class ManagementPasswordDialogComponent {
   private readonly empleadosService: EmpleadosService = inject(EmpleadosService);
 
-  private readonly dialogRef: MatDialogRef<ManagementPasswordDialogComponent, boolean> = inject(
-    MatDialogRef<ManagementPasswordDialogComponent, boolean>,
-  );
+  private readonly passwordInput: Signal<ElementRef<HTMLInputElement>> =
+    viewChild.required<ElementRef<HTMLInputElement>>('passwordInput');
 
-  readonly empleado: Empleado = inject<Empleado>(MAT_DIALOG_DATA);
+  readonly empleado: InputSignal<Empleado> = input.required<Empleado>();
 
-  readonly passwordControl: FormControl<string> = new FormControl<string>('', {
-    nonNullable: true,
-  });
+  readonly authenticatedEvent: OutputEmitterRef<void> = output<void>();
+
+  readonly closeEvent: OutputEmitterRef<void> = output<void>();
+
+  readonly password: WritableSignal<string> = signal<string>('');
 
   readonly loading: WritableSignal<boolean> = signal<boolean>(false);
 
@@ -54,15 +47,34 @@ export default class ManagementPasswordDialogComponent {
 
   readonly authenticationUnavailable: WritableSignal<boolean> = signal<boolean>(false);
 
+  constructor() {
+    afterNextRender((): void => {
+      this.passwordInput().nativeElement.focus();
+    });
+  }
+
+  /**
+   * Actualiza la contraseña introducida.
+   */
+  updatePassword(event: Event): void {
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+
+    this.password.set(inputElement.value);
+  }
+
   /**
    * Comprueba la contraseña del empleado seleccionado.
    */
-  async authenticate(): Promise<void> {
+  async submit(event: Event): Promise<void> {
+    event.preventDefault();
+
     if (this.loading() || this.authenticationUnavailable()) {
       return;
     }
 
-    if (this.empleado.id === null) {
+    const empleado: Empleado = this.empleado();
+
+    if (empleado.id === null) {
       this.authenticationUnavailable.set(true);
       this.error.set('Este empleado ya no está disponible.');
 
@@ -74,8 +86,8 @@ export default class ManagementPasswordDialogComponent {
 
     try {
       const result: AutenticarEmpleadoResult = await this.empleadosService.authenticate(
-        this.empleado.id,
-        this.passwordControl.value,
+        empleado.id,
+        this.password(),
       );
 
       await this.handleAuthenticationResult(result);
@@ -86,15 +98,25 @@ export default class ManagementPasswordDialogComponent {
     }
   }
 
+  /**
+   * Solicita el cierre del modal.
+   */
+  close(): void {
+    if (!this.loading()) {
+      this.closeEvent.emit();
+    }
+  }
+
   private async handleAuthenticationResult(result: AutenticarEmpleadoResult): Promise<void> {
     switch (result.status) {
       case 'authenticated':
-        this.dialogRef.close(true);
+        this.authenticatedEvent.emit();
         return;
 
       case 'invalid_password':
-        this.passwordControl.setValue('');
+        this.password.set('');
         this.error.set('Contraseña incorrecta.');
+        this.passwordInput().nativeElement.focus();
         return;
 
       case 'password_unavailable':

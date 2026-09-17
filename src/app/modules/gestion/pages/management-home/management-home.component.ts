@@ -1,14 +1,12 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { Component, computed, inject, signal } from '@angular/core';
 import { MatButton } from '@angular/material/button';
-import { MatDialog } from '@angular/material/dialog';
 import { MatIcon } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
 import type Empleado from '@model/empleados/empleado.model';
 import ManagementPasswordDialogComponent from '@modules/gestion/components/management-password-dialog/management-password-dialog.component';
 import EmpleadosService from '@services/empleados/empleados.service';
 import GestionSessionService from '@services/gestion/gestion-session.service';
-import { firstValueFrom } from 'rxjs';
 
 interface ManagementModuleItem {
   readonly id: 'settings' | 'employees' | 'payment-types' | 'backups';
@@ -25,20 +23,22 @@ interface ManagementModuleItem {
   selector: 'otpv-management-home',
   templateUrl: './management-home.component.html',
   styleUrl: './management-home.component.scss',
-  imports: [MatButton, MatIcon, RouterLink],
+  imports: [ManagementPasswordDialogComponent, MatButton, MatIcon, RouterLink],
 })
 export default class ManagementHomeComponent {
   private readonly empleadosService: EmpleadosService = inject(EmpleadosService);
 
   private readonly gestionSessionService: GestionSessionService = inject(GestionSessionService);
 
-  private readonly dialog: MatDialog = inject(MatDialog);
-
   private readonly activeEmpleadoIdSignal: WritableSignal<number | null> = signal<number | null>(
     this.resolveInitialEmpleadoId(),
   );
 
   readonly empleados: Signal<readonly Empleado[]> = this.empleadosService.empleados;
+
+  readonly passwordModalOpen: WritableSignal<boolean> = signal<boolean>(false);
+
+  readonly selectedEmpleado: WritableSignal<Empleado | null> = signal<Empleado | null>(null);
 
   readonly empleadoGestion: Signal<Empleado | null> = computed((): Empleado | null => {
     const empleadoId: number | null = this.activeEmpleadoIdSignal();
@@ -80,32 +80,39 @@ export default class ManagementHomeComponent {
   /**
    * Solicita las credenciales del empleado seleccionado.
    */
-  async selectEmpleado(empleado: Empleado): Promise<void> {
+  selectEmpleado(empleado: Empleado): void {
     if (empleado.id === null) {
       return;
     }
 
-    const authenticated: boolean | undefined = await firstValueFrom(
-      this.dialog
-        .open<ManagementPasswordDialogComponent, Empleado, boolean>(
-          ManagementPasswordDialogComponent,
-          {
-            data: empleado,
-            width: '440px',
-            maxWidth: 'calc(100vw - 32px)',
-            autoFocus: '.management-password-dialog__password',
-            restoreFocus: true,
-          },
-        )
-        .afterClosed(),
-    );
+    this.selectedEmpleado.set(empleado);
+    this.passwordModalOpen.set(true);
+  }
 
-    if (authenticated !== true) {
+  /**
+   * Cierra el modal de autenticación.
+   */
+  closePasswordModal(): void {
+    this.passwordModalOpen.set(false);
+    this.selectedEmpleado.set(null);
+  }
+
+  /**
+   * Inicia la sesión de Gestión tras autenticar al empleado.
+   */
+  onEmpleadoAuthenticated(): void {
+    const empleado: Empleado | null = this.selectedEmpleado();
+
+    if (empleado?.id === null || empleado === null) {
+      this.closePasswordModal();
+
       return;
     }
 
     this.gestionSessionService.login(empleado.id);
     this.activeEmpleadoIdSignal.set(empleado.id);
+
+    this.closePasswordModal();
   }
 
   /**

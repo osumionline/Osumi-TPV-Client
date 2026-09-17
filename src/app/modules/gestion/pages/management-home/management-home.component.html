@@ -103,3 +103,11 @@
     }
     }
 </section>
+
+@if (passwordModalOpen()) {
+@if (selectedEmpleado(); as empleado) {
+<otpv-management-password-dialog [empleado]="empleado"
+                                 (authenticatedEvent)="onEmpleadoAuthenticated()"
+                                 (closeEvent)="closePasswordModal()" />
+}
+}
