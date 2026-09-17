@@ -11,6 +11,13 @@
     .management-home__header {
         margin-bottom: 40px;
 
+        &.management-home__header--dashboard {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 24px;
+        }
+
         .management-home__eyebrow {
             color: var(--main-color);
             font-size: 0.875rem;
@@ -26,6 +33,82 @@
 
         p {
             margin: 0;
+            opacity: 0.7;
+        }
+    }
+
+    .management-home__change-employee {
+        flex: 0 0 auto;
+
+        mat-icon {
+            margin-right: 8px;
+        }
+    }
+
+    .management-home__employees {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 20px;
+    }
+
+    .management-home__employee {
+        display: flex;
+        min-height: 130px;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: 24px;
+        font: inherit;
+        border: 0;
+        border-radius: 16px;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
+        transition:
+            transform 120ms ease,
+            box-shadow 120ms ease;
+
+        &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgb(0 0 0 / 18%);
+        }
+
+        &:focus-visible {
+            outline: 3px solid var(--main-color);
+            outline-offset: 3px;
+        }
+
+        mat-icon {
+            width: 34px;
+            height: 34px;
+            font-size: 34px;
+        }
+
+        strong {
+            font-size: 1.15rem;
+        }
+    }
+
+    .management-home__empty {
+        display: flex;
+        min-height: 220px;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 12px;
+        padding: 32px;
+        text-align: center;
+        background: var(--mat-sys-surface-container-low, #fff);
+        border: 1px solid var(--mat-sys-outline-variant, #ddd);
+        border-radius: 16px;
+
+        mat-icon {
+            width: 44px;
+            height: 44px;
+            font-size: 44px;
+            opacity: 0.55;
+        }
+
+        span {
             opacity: 0.7;
         }
     }
@@ -98,8 +181,16 @@
     @media (max-width: 800px) {
         padding: 32px 20px;
 
+        .management-home__header--dashboard {
+            flex-direction: column;
+        }
+
         .management-home__modules {
             grid-template-columns: 1fr;
+        }
+
+        .management-home__change-employee {
+            align-self: flex-start;
         }
     }
 }

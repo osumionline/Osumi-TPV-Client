@@ -1,16 +1,30 @@
 <section class="management-home">
-    <header class="management-home__header">
-        <span class="management-home__eyebrow">
-            Gestión
-        </span>
+    @if (empleadoGestion(); as empleado) {
+    <header class="management-home__header management-home__header--dashboard">
+        <div>
+            <span class="management-home__eyebrow">
+                Gestión
+            </span>
 
-        <h1>
-            Gestión de Osumi TPV
-        </h1>
+            <h1>
+                Gestión de Osumi TPV
+            </h1>
 
-        <p>
-            Selecciona el apartado que quieres gestionar.
-        </p>
+            <p>
+                Hola {{ empleado.nombre }}, elige una de las siguientes opciones:
+            </p>
+        </div>
+
+        <button mat-button
+                type="button"
+                class="management-home__change-employee"
+                (click)="changeEmpleado()">
+            <mat-icon>
+                switch_account
+            </mat-icon>
+
+            Cambiar de empleado
+        </button>
     </header>
 
     <div class="management-home__modules">
@@ -18,7 +32,9 @@
         <a class="management-home__module"
            [routerLink]="module.route">
             <div class="management-home__module-icon">
-                <mat-icon>{{ module.icon }}</mat-icon>
+                <mat-icon>
+                    {{ module.icon }}
+                </mat-icon>
             </div>
 
             <div class="management-home__module-content">
@@ -37,4 +53,53 @@
         </a>
         }
     </div>
+    } @else {
+    <header class="management-home__header">
+        <span class="management-home__eyebrow">
+            Gestión
+        </span>
+
+        <h1>
+            Acceso a Gestión
+        </h1>
+
+        <p>
+            Selecciona tu empleado para continuar.
+        </p>
+    </header>
+
+    @if (empleados().length > 0) {
+    <div class="management-home__employees">
+        @for (empleado of empleados(); track empleado.id) {
+        <button type="button"
+                class="management-home__employee"
+                [style.background-color]="empleado.color"
+                [style.color]="empleado.textColor"
+                (click)="selectEmpleado(empleado)">
+            <mat-icon>
+                person
+            </mat-icon>
+
+            <strong>
+                {{ empleado.nombre }}
+            </strong>
+        </button>
+        }
+    </div>
+    } @else {
+    <div class="management-home__empty">
+        <mat-icon>
+            group_off
+        </mat-icon>
+
+        <strong>
+            No hay empleados activos disponibles.
+        </strong>
+
+        <span>
+            No es posible acceder a Gestión hasta que exista al menos un empleado activo.
+        </span>
+    </div>
+    }
+    }
 </section>
