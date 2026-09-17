@@ -1,5 +1,6 @@
 import { inject, Service, signal, type Signal, type WritableSignal } from '@angular/core';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
+import type ConfigurationUpdateCommand from '@desktop-contracts/configuration/configuration-update-command.interface';
 import DesktopConfigurationService from '@services/application/desktop-configuration.service';
 
 /**
@@ -44,6 +45,19 @@ export default class AppDataService {
    */
   private async loadFromDesktop(): Promise<AppData | null> {
     const appData: AppData | null = await this.desktopConfigurationService.getAppData();
+
+    this.appDataSignal.set(appData);
+    this.loadedSignal.set(true);
+
+    return appData;
+  }
+
+  /**
+   * Actualiza la configuración persistida y sincroniza
+   * inmediatamente la caché global del renderer.
+   */
+  async update(command: ConfigurationUpdateCommand): Promise<AppData> {
+    const appData: AppData = await this.desktopConfigurationService.updateAppData(command);
 
     this.appDataSignal.set(appData);
     this.loadedSignal.set(true);

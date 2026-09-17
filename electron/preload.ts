@@ -79,6 +79,7 @@ import type {
   PedidosRecepcionadosResultado,
 } from '@desktop-contracts/compras/pedidos/pedido-listado.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
+import type ConfigurationUpdateCommand from '@desktop-contracts/configuration/configuration-update-command.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type { InstallationResult } from '@desktop-contracts/configuration/installation-result.interface';
 import OsumiDesktopApi from '@desktop-contracts/desktop-api';
@@ -351,6 +352,9 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
   configuration: Object.freeze({
     getAppData: (): Promise<AppData | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.configurationGetAppData) as Promise<AppData | null>,
+
+    updateAppData: (command: ConfigurationUpdateCommand): Promise<AppData> =>
+      ipcRenderer.invoke(IPC_CHANNELS.configurationUpdateAppData, command) as Promise<AppData>,
 
     install: (command: InstallationCommand): Promise<InstallationResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.configurationInstall, command) as Promise<InstallationResult>,

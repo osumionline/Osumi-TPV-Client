@@ -1,6 +1,7 @@
 import type ConfigurationService from '@backend/application/configuration/configuration.service';
 import type InstallationService from '@backend/application/configuration/installation.service';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
+import type ConfigurationUpdateCommand from '@desktop-contracts/configuration/configuration-update-command.interface';
 import type { InstallationResult } from '@desktop-contracts/configuration/installation-result.interface';
 import { assertTrustedSender, type MainWindowProvider } from '@ipc/assert-trusted-sender';
 import IPC_CHANNELS from '@ipc/channels';
@@ -19,6 +20,15 @@ export default function registerConfigurationIpc(
 
     return configurationService.load();
   });
+
+  ipcMain.handle(
+    IPC_CHANNELS.configurationUpdateAppData,
+    async (event, command: ConfigurationUpdateCommand): Promise<AppData> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return configurationService.update(command);
+    },
+  );
 
   ipcMain.handle(
     IPC_CHANNELS.configurationInstall,

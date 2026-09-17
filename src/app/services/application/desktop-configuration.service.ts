@@ -1,5 +1,6 @@
 import { Service } from '@angular/core';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
+import type ConfigurationUpdateCommand from '@desktop-contracts/configuration/configuration-update-command.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type { InstallationResult } from '@desktop-contracts/configuration/installation-result.interface';
 
@@ -17,5 +18,12 @@ export default class DesktopConfigurationService {
    */
   install(command: InstallationCommand): Promise<InstallationResult> {
     return window.osumiDesktop.configuration.install(command);
+  }
+
+  /**
+   * Actualiza los ajustes generales persistidos de la aplicación.
+   */
+  updateAppData(command: ConfigurationUpdateCommand): Promise<AppData> {
+    return window.osumiDesktop.configuration.updateAppData(command);
   }
 }

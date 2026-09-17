@@ -9,6 +9,7 @@ const IPC_CHANNELS = {
 
   configurationGetAppData: 'configuration:get-app-data',
   configurationInstall: 'configuration:install',
+  configurationUpdateAppData: 'configuration:update-app-data',
 
   printingGetPrinters: 'printing:get-printers',
   printingGetSettings: 'printing:get-settings',
