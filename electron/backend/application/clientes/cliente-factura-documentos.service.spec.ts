@@ -2,9 +2,12 @@ import ClienteFacturaDocumentosService from '@backend/application/clientes/clien
 import ConfigurationService from '@backend/application/configuration/configuration.service';
 import type ClienteFacturaDocumentosRepository from '@backend/contracts/clientes/cliente-factura-documentos.repository.interface';
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
+import type LogoStorage from '@backend/contracts/configuration/logo-storage.interface';
+import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
 import type { ClienteFacturaDocumentoRecord } from '@backend/domain/clientes/cliente-factura-documento-record.interface';
 import type { ClienteFacturaDocumentoInterface } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
+import type { InstallationSecretsData } from '@desktop-contracts/configuration/installation-command.interface';
 import { describe, expect, it } from 'vitest';
 
 class FakeClienteFacturaDocumentosRepository implements ClienteFacturaDocumentosRepository {
@@ -283,9 +286,43 @@ function createService(
   appDataRepository: AppDataRepository,
 ): ClienteFacturaDocumentosService {
   return new ClienteFacturaDocumentosService(
-    new ConfigurationService(appDataRepository),
+    new ConfigurationService(
+      appDataRepository,
+      createEmptySecretStorage(),
+      createNoopLogoStorage(),
+    ),
     repository,
   );
+}
+
+/**
+ * Crea un almacenamiento de secretos vacío para pruebas
+ * que únicamente necesitan consultar AppData.
+ */
+function createEmptySecretStorage(): SecretStorage {
+  return {
+    exists: (): Promise<boolean> => Promise.resolve(false),
+
+    load: (): Promise<InstallationSecretsData | null> => Promise.resolve(null),
+
+    save: (): Promise<void> => Promise.resolve(),
+
+    delete: (): Promise<void> => Promise.resolve(),
+  };
+}
+
+/**
+ * Crea un almacenamiento de logo neutro para pruebas
+ * que únicamente necesitan consultar AppData.
+ */
+function createNoopLogoStorage(): LogoStorage {
+  return {
+    exists: (): Promise<boolean> => Promise.resolve(false),
+
+    save: (): Promise<void> => Promise.resolve(),
+
+    delete: (): Promise<void> => Promise.resolve(),
+  };
 }
 
 /**

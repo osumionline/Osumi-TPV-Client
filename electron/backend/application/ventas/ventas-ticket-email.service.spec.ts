@@ -2,6 +2,7 @@ import ConfigurationService from '@backend/application/configuration/configurati
 import VentasTicketEmailService from '@backend/application/ventas/ventas-ticket-email.service';
 import VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
+import type LogoStorage from '@backend/contracts/configuration/logo-storage.interface';
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
 import type {
   EmailSendRequest,
@@ -37,7 +38,11 @@ describe('VentasTicketEmailService', (): void => {
 
     emailSender = new FakeEmailSender();
 
-    const configurationService: ConfigurationService = new ConfigurationService(appDataRepository);
+    const configurationService: ConfigurationService = new ConfigurationService(
+      appDataRepository,
+      secretStorage,
+      createNoopLogoStorage(),
+    );
 
     const ventasTicketsService: VentasTicketsService = new VentasTicketsService(
       ventasTicketsRepository,
@@ -401,4 +406,18 @@ function createTicketRecord(
  */
 function createPdf(): Uint8Array {
   return new TextEncoder().encode('%PDF-1.7\nticket\n%%EOF');
+}
+
+/**
+ * Crea un almacenamiento de logo neutro para pruebas
+ * que no necesitan manipular el logo de la aplicación.
+ */
+function createNoopLogoStorage(): LogoStorage {
+  return {
+    exists: (): Promise<boolean> => Promise.resolve(false),
+
+    save: (): Promise<void> => Promise.resolve(),
+
+    delete: (): Promise<void> => Promise.resolve(),
+  };
 }

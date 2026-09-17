@@ -1,6 +1,7 @@
 import ClienteFacturaEmailService from '@backend/application/clientes/cliente-factura-email.service';
 import ConfigurationService from '@backend/application/configuration/configuration.service';
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
+import type LogoStorage from '@backend/contracts/configuration/logo-storage.interface';
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
 import type {
   EmailSendRequest,
@@ -30,7 +31,7 @@ describe('ClienteFacturaEmailService', (): void => {
     emailSender = new FakeEmailSender();
 
     service = new ClienteFacturaEmailService(
-      new ConfigurationService(appDataRepository),
+      new ConfigurationService(appDataRepository, secretStorage, createNoopLogoStorage()),
       secretStorage,
       documentoProvider,
       pdfProvider,
@@ -404,5 +405,19 @@ function createDocumento(): ClienteFacturaDocumentoInterface {
     subtotalCents: 1_000,
     descuentoCents: 0,
     totalCents: 1_210,
+  };
+}
+
+/**
+ * Crea un almacenamiento de logo neutro para pruebas
+ * que no necesitan manipular el logo de la aplicación.
+ */
+function createNoopLogoStorage(): LogoStorage {
+  return {
+    exists: (): Promise<boolean> => Promise.resolve(false),
+
+    save: (): Promise<void> => Promise.resolve(),
+
+    delete: (): Promise<void> => Promise.resolve(),
   };
 }

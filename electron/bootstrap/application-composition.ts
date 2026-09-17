@@ -194,10 +194,21 @@ export default function createApplicationComposition(
     applicationPaths.appDataFile,
   );
 
-  const configurationService: ConfigurationService = new ConfigurationService(appDataRepository);
+  const imageProcessor: ImageProcessor = new SharpImageProcessor();
 
   const operationalSecretStorage: SecretStorage = new ElectronSafeStorageSecretStorage(
     applicationPaths.secretsFile,
+  );
+
+  const operationalLogoStorage: LogoStorage = new ElectronLogoStorage(
+    applicationPaths.logoFile,
+    imageProcessor,
+  );
+
+  const configurationService: ConfigurationService = new ConfigurationService(
+    appDataRepository,
+    operationalSecretStorage,
+    operationalLogoStorage,
   );
 
   /*
@@ -208,7 +219,6 @@ export default function createApplicationComposition(
     applicationPaths.stagingAppDataFile,
   );
 
-  const imageProcessor: ImageProcessor = new SharpImageProcessor();
   const stagingLogoStorage: LogoStorage = new ElectronLogoStorage(
     applicationPaths.stagingLogoFile,
     imageProcessor,
