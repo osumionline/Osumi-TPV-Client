@@ -106,4 +106,39 @@
             margin-left: 16px;
         }
     }
+
+    .printer-settings-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+
+        .printer-field {
+            width: min(600px, 100%);
+        }
+
+        >button {
+            margin-top: 8px;
+        }
+    }
+
+    .printer-warning {
+        margin: 0 0 16px;
+        color: var(--mat-sys-error);
+    }
+}
+
+@media (max-width: 900px) {
+    .main {
+        .printer-settings-row {
+            flex-direction: column;
+
+            .printer-field {
+                width: 100%;
+            }
+
+            >button {
+                margin-top: 0;
+            }
+        }
+    }
 }

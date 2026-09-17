@@ -3,6 +3,7 @@ import {
   ElementRef,
   Signal,
   WritableSignal,
+  computed,
   inject,
   signal,
   viewChild,
@@ -23,6 +24,7 @@ import type {
   InstallationResult,
   InstallationValidationError,
 } from '@desktop-contracts/configuration/installation-result.interface';
+import type PrinterInterface from '@desktop-contracts/configuration/printing/printer.interface';
 import createInstallationCommand from '@model/configuracion/installation-command.mapper';
 import createInstallationFormInitialValue from '@model/configuracion/installation-form.initial-value';
 import { InstallationFormModel } from '@model/configuracion/installation-form.model';
@@ -31,6 +33,8 @@ import InstallationStep from '@model/configuracion/installation-step.type';
 import { DialogService } from '@osumi/angular-tools';
 import ApplicationStateService from '@services/application/application-state.service';
 import DesktopConfigurationService from '@services/application/desktop-configuration.service';
+import DesktopPrintingService from '@services/application/desktop-printing.service';
+import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'otpv-new-installation',
@@ -59,6 +63,7 @@ export default class NewInstallationComponent {
   private readonly router: Router = inject(Router);
   private readonly applicationStateService: ApplicationStateService =
     inject(ApplicationStateService);
+  private readonly desktopPrintingService: DesktopPrintingService = inject(DesktopPrintingService);
 
   private readonly acceptedLogoTypes: readonly string[] = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -79,15 +84,66 @@ export default class NewInstallationComponent {
   readonly logoMimeType: WritableSignal<string> = signal<string>('');
   readonly logoError: WritableSignal<string> = signal<string>('');
   readonly saving: WritableSignal<boolean> = signal<boolean>(false);
+  readonly printers: WritableSignal<readonly PrinterInterface[]> = signal<
+    readonly PrinterInterface[]
+  >([]);
+  readonly ticketPrinterDeviceName: WritableSignal<string> = signal<string>('');
+  readonly printersLoading: WritableSignal<boolean> = signal<boolean>(false);
+  readonly printerError: WritableSignal<string> = signal<string>('');
+
+  readonly selectedPrinterUnavailable: Signal<boolean> = computed((): boolean => {
+    const deviceName: string = this.ticketPrinterDeviceName();
+
+    if (deviceName === '') {
+      return false;
+    }
+
+    return !this.printers().some(
+      (printer: PrinterInterface): boolean => printer.deviceName === deviceName,
+    );
+  });
 
   readonly ticketEmailBusinessVariable: string = '{nombreNegocio}';
   readonly ticketEmailReferenceVariable: string = '{referencia}';
   readonly ticketEmailSubjectPlaceholder: string = '{nombreNegocio} - Ticket {referencia}';
 
+  constructor() {
+    void this.refreshPrinters();
+  }
+
+  /**
+   * Actualiza el listado de impresoras disponibles
+   * manteniendo la selección actual del usuario.
+   */
+  async refreshPrinters(): Promise<void> {
+    this.printersLoading.set(true);
+    this.printerError.set('');
+
+    try {
+      const printers: readonly PrinterInterface[] = await this.desktopPrintingService.getPrinters();
+
+      this.printers.set(printers);
+    } catch (error: unknown) {
+      console.error('Error obteniendo las impresoras:', error);
+
+      this.printerError.set('No se ha podido obtener el listado de impresoras.');
+    } finally {
+      this.printersLoading.set(false);
+    }
+  }
+
+  /**
+   * Abre el selector de archivo para elegir
+   * el logo inicial del negocio.
+   */
   addLogo(): void {
     this.logoInput().nativeElement.click();
   }
 
+  /**
+   * Procesa el archivo seleccionado como logo
+   * y prepara su contenido para la instalación.
+   */
   async onLogoChange(event: Event): Promise<void> {
     const input: HTMLInputElement = event.target as HTMLInputElement;
     const files: FileList | null = input.files;
@@ -118,6 +174,10 @@ export default class NewInstallationComponent {
     }
   }
 
+  /**
+   * Elimina el logo seleccionado de la
+   * configuración inicial.
+   */
   removeLogo(): void {
     this.installationForm.negocio.logoDataUrl().value.set('');
     this.logoFileName.set('');
@@ -125,6 +185,10 @@ export default class NewInstallationComponent {
     this.logoError.set('');
   }
 
+  /**
+   * Navega al paso indicado de la instalación
+   * después de validar el paso actual.
+   */
   irAPaso(paso: InstallationStep): void {
     const currentStep: InstallationStep = this.paso();
     if (paso > currentStep && !this.validateStep(currentStep)) {
@@ -134,6 +198,9 @@ export default class NewInstallationComponent {
     this.paso.set(paso);
   }
 
+  /**
+   * Selecciona todos los tipos de IVA disponibles.
+   */
   selectAllIvas(): void {
     const optionsLength: number = this.installationForm.fiscalidad.ivaOptions.length;
 
@@ -142,6 +209,9 @@ export default class NewInstallationComponent {
     }
   }
 
+  /**
+   * Deselecciona todos los tipos de IVA disponibles.
+   */
   selectNoneIvas(): void {
     const optionsLength: number = this.installationForm.fiscalidad.ivaOptions.length;
 
@@ -150,6 +220,9 @@ export default class NewInstallationComponent {
     }
   }
 
+  /**
+   * Selecciona todos los márgenes disponibles.
+   */
   selectAllMargins(): void {
     const optionsLength: number = this.installationForm.fiscalidad.marginOptions.length;
 
@@ -158,11 +231,30 @@ export default class NewInstallationComponent {
     }
   }
 
+  /**
+   * Deselecciona todos los márgenes disponibles.
+   */
   selectNoneMargins(): void {
     const optionsLength: number = this.installationForm.fiscalidad.marginOptions.length;
 
     for (let index: number = 0; index < optionsLength; index++) {
       this.installationForm.fiscalidad.marginOptions[index].selected().value.set(false);
+    }
+  }
+
+  private async saveTicketPrinterConfiguration(): Promise<boolean> {
+    try {
+      const deviceName: string = this.ticketPrinterDeviceName();
+
+      await this.desktopPrintingService.setTicketPrinterDeviceName(
+        deviceName === '' ? null : deviceName,
+      );
+
+      return true;
+    } catch (error: unknown) {
+      console.error('Error guardando la impresora de tickets:', error);
+
+      return false;
     }
   }
 
@@ -174,6 +266,10 @@ export default class NewInstallationComponent {
     return errors.map((error: InstallationValidationError): string => error.message).join('<br>');
   }
 
+  /**
+   * Valida la configuración y ejecuta
+   * la instalación inicial de la aplicación.
+   */
   async saveConfiguration(): Promise<void> {
     this.installationForm().markAsTouched();
 
@@ -204,9 +300,22 @@ export default class NewInstallationComponent {
 
         return;
       }
+
+      const printerSaved: boolean = await this.saveTicketPrinterConfiguration();
+
       await this.applicationStateService.refresh();
 
       this.clearSensitiveData();
+
+      if (!printerSaved) {
+        await firstValueFrom(
+          this.dialog.alert({
+            title: 'Aviso',
+            content:
+              'La instalación ha finalizado correctamente, pero no se ha podido guardar la impresora de tickets. Podrás configurarla posteriormente desde Gestión → Ajustes.',
+          }),
+        );
+      }
 
       await this.router.navigateByUrl('/ventas');
     } catch (error: unknown) {
