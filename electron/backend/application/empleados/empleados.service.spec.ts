@@ -274,7 +274,6 @@ describe('EmpleadosService', (): void => {
 
     const result: EmpleadoInterface = await service.create({
       nombre: '  Ane  ',
-      hasPassword: true,
       password: 'secreto',
       color: '#12abEF',
       permisos: [20, 18, 20],
@@ -309,35 +308,19 @@ describe('EmpleadosService', (): void => {
     });
   });
 
-  it('crea un empleado sin contraseña', async (): Promise<void> => {
-    repository.createdEmpleado = createEmpleadoRecord({
-      id: 2,
-      publicId: 'empleado-2',
-      nombre: 'Ane',
-      hasPassword: false,
-      color: '00FF00',
-      admin: false,
-      permisos: [],
-    });
-
-    await service.create({
-      nombre: 'Ane',
-      hasPassword: false,
-      password: null,
-      color: '#00FF00',
-      permisos: [],
-    });
+  it('rechaza crear un empleado con contraseña vacía', async (): Promise<void> => {
+    await expect(
+      service.create({
+        nombre: 'Ane',
+        password: '',
+        color: '#00FF00',
+        permisos: [],
+      }),
+    ).rejects.toThrow('Debes indicar una contraseña para el empleado.');
 
     expect(passwordHasher.hashRequests).toHaveLength(0);
 
-    expect(repository.createRequests).toEqual([
-      {
-        nombre: 'Ane',
-        passwordHash: null,
-        color: '00FF00',
-        permisos: [],
-      },
-    ]);
+    expect(repository.createRequests).toHaveLength(0);
   });
 
   it('rechaza crear un empleado con nombre duplicado', async (): Promise<void> => {
@@ -346,7 +329,6 @@ describe('EmpleadosService', (): void => {
     await expect(
       service.create({
         nombre: 'Ane',
-        hasPassword: true,
         password: 'secreto',
         color: '#00FF00',
         permisos: [],
@@ -373,7 +355,6 @@ describe('EmpleadosService', (): void => {
 
     const result: EmpleadoInterface = await service.update(1, {
       nombre: '  Nombre nuevo  ',
-      hasPassword: true,
       password: null,
       color: '#abcdef',
       permisos: [21, 18, 21],
@@ -386,7 +367,6 @@ describe('EmpleadosService', (): void => {
         idEmpleado: 1,
         command: {
           nombre: 'Nombre nuevo',
-          hasPassword: true,
           passwordHash: null,
           color: 'ABCDEF',
           permisos: [18, 21],
@@ -399,7 +379,7 @@ describe('EmpleadosService', (): void => {
     expect(result.color).toBe('#ABCDEF');
   });
 
-  it('exige una nueva contraseña al activarla en un empleado que no tenía', async (): Promise<void> => {
+  it('exige una contraseña al editar un empleado legacy que no tenía', async (): Promise<void> => {
     repository.findByIdResult = createEmpleadoRecord({
       admin: false,
       hasPassword: false,
@@ -408,12 +388,11 @@ describe('EmpleadosService', (): void => {
     await expect(
       service.update(1, {
         nombre: 'Ane',
-        hasPassword: true,
         password: null,
         color: '#00FF00',
         permisos: [],
       }),
-    ).rejects.toThrow('Debes indicar una contraseña al activarla para este empleado.');
+    ).rejects.toThrow('Debes indicar una contraseña para este empleado.');
 
     expect(repository.updateRequests).toHaveLength(0);
   });
@@ -433,7 +412,6 @@ describe('EmpleadosService', (): void => {
 
     await service.update(1, {
       nombre: 'Iñigo',
-      hasPassword: true,
       password: 'nuevo-secreto',
       color: '#FF0000',
       permisos: [18],
@@ -444,65 +422,12 @@ describe('EmpleadosService', (): void => {
     expect(repository.updateRequests[0]?.command.passwordHash).toBe('nuevo-hash');
   });
 
-  it('permite quitar la contraseña a un empleado no administrador', async (): Promise<void> => {
-    repository.findByIdResult = createEmpleadoRecord({
-      admin: false,
-      hasPassword: true,
-    });
-
-    repository.updatedEmpleado = createEmpleadoRecord({
-      admin: false,
-      hasPassword: false,
-    });
-
-    await service.update(1, {
-      nombre: 'Iñigo',
-      hasPassword: false,
-      password: null,
-      color: '#FF0000',
-      permisos: [],
-    });
-
-    expect(repository.updateRequests).toEqual([
-      {
-        idEmpleado: 1,
-        command: {
-          nombre: 'Iñigo',
-          hasPassword: false,
-          passwordHash: null,
-          color: 'FF0000',
-          permisos: [],
-        },
-      },
-    ]);
-  });
-
-  it('impide quitar la contraseña a un administrador', async (): Promise<void> => {
-    repository.findByIdResult = createEmpleadoRecord({
-      admin: true,
-      hasPassword: true,
-    });
-
-    await expect(
-      service.update(1, {
-        nombre: 'Iñigo',
-        hasPassword: false,
-        password: null,
-        color: '#FF0000',
-        permisos: [],
-      }),
-    ).rejects.toThrow('Un empleado administrador debe tener contraseña.');
-
-    expect(repository.updateRequests).toHaveLength(0);
-  });
-
   it('rechaza actualizar un empleado inexistente', async (): Promise<void> => {
     repository.findByIdResult = null;
 
     await expect(
       service.update(99, {
         nombre: 'Ane',
-        hasPassword: false,
         password: null,
         color: '#00FF00',
         permisos: [],

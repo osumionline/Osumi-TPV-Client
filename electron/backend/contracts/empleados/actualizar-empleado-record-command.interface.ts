@@ -1,12 +1,10 @@
 export default interface ActualizarEmpleadoRecordCommand {
   readonly nombre: string;
-  readonly hasPassword: boolean;
 
   /**
    * Nuevo hash scrypt.
    *
-   * null conserva la contraseña cuando hasPassword=true
-   * o la desactiva cuando hasPassword=false.
+   * null conserva la contraseña actualmente almacenada.
    */
   readonly passwordHash: string | null;
 

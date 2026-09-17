@@ -1,13 +1,10 @@
 export default interface CrearEmpleadoCommand {
   readonly nombre: string;
-  readonly hasPassword: boolean;
 
   /**
-   * Contraseña inicial.
-   *
-   * Debe ser null cuando el empleado no usa contraseña.
+   * Contraseña inicial obligatoria del empleado.
    */
-  readonly password: string | null;
+  readonly password: string;
 
   readonly color: string;
   readonly permisos: readonly number[];

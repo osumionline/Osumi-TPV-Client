@@ -168,18 +168,7 @@ export default class TypeOrmEmpleadoRepository implements EmpleadoRepository {
             NULL
           )
         `,
-        [
-          randomUUID(),
-          command.nombre,
-
-          command.passwordHash ?? DISABLED_LEGACY_PASSWORD_HASH,
-
-          command.passwordHash === null ? 'bcrypt_legacy' : 'scrypt',
-
-          command.color,
-          now,
-          now,
-        ],
+        [randomUUID(), command.nombre, command.passwordHash, 'scrypt', command.color, now, now],
       );
 
       const rows: readonly EmpleadoIdRow[] = (await queryRunner.query(
@@ -235,24 +224,7 @@ export default class TypeOrmEmpleadoRepository implements EmpleadoRepository {
     try {
       const now: string = new Date().toISOString();
 
-      if (!command.hasPassword) {
-        await queryRunner.query(
-          `
-            UPDATE empleado
-            SET
-              nombre = ?,
-              password_hash = ?,
-              password_algorithm = 'bcrypt_legacy',
-              color = ?,
-              updated_at = ?
-            WHERE
-              id = ?
-              AND activo = 1
-              AND deleted_at IS NULL
-          `,
-          [command.nombre, DISABLED_LEGACY_PASSWORD_HASH, command.color, now, idEmpleado],
-        );
-      } else if (command.passwordHash !== null) {
+      if (command.passwordHash !== null) {
         await queryRunner.query(
           `
             UPDATE empleado
@@ -271,9 +243,8 @@ export default class TypeOrmEmpleadoRepository implements EmpleadoRepository {
         );
       } else {
         /*
-         * passwordHash=null y hasPassword=true:
-         * conservamos exactamente la contraseña
-         * actualmente persistida.
+         * passwordHash=null conserva exactamente
+         * la contraseña actualmente persistida.
          */
         await queryRunner.query(
           `

@@ -77,6 +77,9 @@ const IPC_CHANNELS = {
 
   empleadosGetAll: 'empleados:get-all',
   empleadosAuthenticate: 'empleados:authenticate',
+  empleadosCreate: 'empleados:create',
+  empleadosUpdate: 'empleados:update',
+  empleadosDeactivate: 'empleados:deactivate',
 
   clientesGetAll: 'clientes:get-all',
   clientesCreate: 'clientes:create',

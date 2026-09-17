@@ -41,7 +41,7 @@ export default class EmpleadosService {
       throw new Error('Ya existe un empleado con ese nombre.');
     }
 
-    const passwordHash: string | null = await this.resolveCreatePassword(command);
+    const passwordHash: string = await this.resolveCreatePassword(command.password);
 
     const recordCommand: CrearEmpleadoRecordCommand = {
       nombre,
@@ -57,6 +57,9 @@ export default class EmpleadosService {
 
   /**
    * Actualiza los datos de un empleado activo.
+   *
+   * Una contraseña null conserva la actualmente
+   * almacenada. Una contraseña no vacía la sustituye.
    */
   async update(idEmpleado: number, command: ActualizarEmpleadoCommand): Promise<EmpleadoInterface> {
     this.validateEmployeeId(idEmpleado);
@@ -77,16 +80,14 @@ export default class EmpleadosService {
       throw new Error('Ya existe otro empleado con ese nombre.');
     }
 
-    if (existing.admin && !command.hasPassword) {
-      throw new Error('Un empleado administrador debe tener contraseña.');
-    }
-
-    const passwordHash: string | null = await this.resolveUpdatePassword(existing, command);
+    const passwordHash: string | null = await this.resolveUpdatePassword(
+      existing,
+      command.password,
+    );
 
     const recordCommand: ActualizarEmpleadoRecordCommand = {
       nombre,
       color,
-      hasPassword: command.hasPassword,
       passwordHash,
       permisos,
     };
@@ -207,51 +208,44 @@ export default class EmpleadosService {
     return normalized.sort((first: number, second: number): number => first - second);
   }
 
-  private async resolveCreatePassword(command: CrearEmpleadoCommand): Promise<string | null> {
-    if (!command.hasPassword) {
-      if (command.password !== null) {
-        throw new Error('No debe indicarse una contraseña para un empleado sin contraseña.');
-      }
-
-      return null;
-    }
-
-    if (command.password === null || command.password === '') {
+  private async resolveCreatePassword(password: string): Promise<string> {
+    if (typeof password !== 'string' || password.length === 0) {
       throw new Error('Debes indicar una contraseña para el empleado.');
     }
 
-    return this.passwordHasher.hash(command.password);
+    return this.passwordHasher.hash(password);
   }
 
   private async resolveUpdatePassword(
     existing: EmpleadoRecord,
-    command: ActualizarEmpleadoCommand,
+    password: string | null,
   ): Promise<string | null> {
-    if (!command.hasPassword) {
-      if (command.password !== null) {
-        throw new Error('No debe indicarse una contraseña para un empleado sin contraseña.');
+    if (password === null) {
+      /*
+       * Durante la transición legacy todavía podemos
+       * encontrarnos con empleados importados que no
+       * tengan una contraseña utilizable.
+       *
+       * No permitimos guardar otros cambios sobre ellos
+       * sin asignar antes una contraseña.
+       */
+      if (!existing.hasPassword) {
+        throw new Error('Debes indicar una contraseña para este empleado.');
       }
 
       return null;
     }
 
-    if (command.password === '') {
+    if (typeof password !== 'string' || password.length === 0) {
       throw new Error('La nueva contraseña no puede estar vacía.');
     }
 
-    if (command.password !== null) {
-      return this.passwordHasher.hash(command.password);
-    }
-
-    if (!existing.hasPassword) {
-      throw new Error('Debes indicar una contraseña al activarla para este empleado.');
-    }
-
-    return null;
+    return this.passwordHasher.hash(password);
   }
 
   /**
-   * Valida la estructura básica de una petición de autenticación.
+   * Valida la estructura básica de una petición
+   * de autenticación.
    */
   private validateAuthenticationCommand(command: AutenticarEmpleadoCommand): void {
     if (!Number.isSafeInteger(command.idEmpleado) || command.idEmpleado <= 0) {
@@ -264,7 +258,8 @@ export default class EmpleadosService {
   }
 
   /**
-   * Comprueba una contraseña usando el algoritmo persistido.
+   * Comprueba una contraseña usando
+   * el algoritmo persistido.
    */
   private async verifyPassword(
     password: string,
@@ -280,8 +275,8 @@ export default class EmpleadosService {
   }
 
   /**
-   * Convierte de forma transparente una contraseña bcrypt
-   * válida al algoritmo scrypt actual.
+   * Convierte de forma transparente una contraseña
+   * bcrypt válida al algoritmo scrypt actual.
    */
   private async migrateLegacyPassword(
     password: string,

@@ -95,8 +95,10 @@ import type {
 } from '@desktop-contracts/compras/proveedores/proveedor.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type ConfigurationUpdateCommand from '@desktop-contracts/configuration/configuration-update-command.interface';
+import type ActualizarEmpleadoCommand from '@desktop-contracts/configuration/empleados/actualizar-empleado-command.interface';
 import type AutenticarEmpleadoCommand from '@desktop-contracts/configuration/empleados/autenticar-empleado-command.interface';
 import type AutenticarEmpleadoResult from '@desktop-contracts/configuration/empleados/autenticar-empleado-result.type';
+import type CrearEmpleadoCommand from '@desktop-contracts/configuration/empleados/crear-empleado-command.interface';
 import type EmpleadoInterface from '@desktop-contracts/configuration/empleados/empleado.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type { InstallationResult } from '@desktop-contracts/configuration/installation-result.interface';
@@ -492,6 +494,19 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         IPC_CHANNELS.empleadosAuthenticate,
         command,
       ) as Promise<AutenticarEmpleadoResult>,
+
+    create: (command: CrearEmpleadoCommand): Promise<EmpleadoInterface> =>
+      ipcRenderer.invoke(IPC_CHANNELS.empleadosCreate, command) as Promise<EmpleadoInterface>,
+
+    update: (idEmpleado: number, command: ActualizarEmpleadoCommand): Promise<EmpleadoInterface> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.empleadosUpdate,
+        idEmpleado,
+        command,
+      ) as Promise<EmpleadoInterface>,
+
+    deactivate: (idEmpleado: number): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.empleadosDeactivate, idEmpleado) as Promise<void>,
   }),
 
   categorias: Object.freeze({

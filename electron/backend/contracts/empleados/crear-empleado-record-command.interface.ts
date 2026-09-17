@@ -2,10 +2,9 @@ export default interface CrearEmpleadoRecordCommand {
   readonly nombre: string;
 
   /**
-   * Hash scrypt de la contraseña.
-   * null crea el empleado sin contraseña.
+   * Hash scrypt de la contraseña obligatoria.
    */
-  readonly passwordHash: string | null;
+  readonly passwordHash: string;
 
   /**
    * Color hexadecimal normalizado sin #.
