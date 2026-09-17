@@ -48,6 +48,12 @@ export interface ConfigurationTicketBaiUpdateData {
 }
 
 export interface ConfigurationIntegrationsUpdateData {
+  /**
+   * Nueva clave utilizada por el sistema de copias.
+   * null conserva el valor actualmente almacenado.
+   */
+  readonly backupApiKey: string | null;
+
   readonly ventaOnline: ConfigurationOnlineStoreUpdateData;
   readonly emailSmtp: ConfigurationEmailSmtpUpdateData;
   readonly ticketBai: ConfigurationTicketBaiUpdateData;

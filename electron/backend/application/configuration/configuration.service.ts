@@ -205,13 +205,7 @@ export default class ConfigurationService {
 
     return {
       secretApi: this.resolveOnlineStoreSecret(currentAppData, existing, integrations.ventaOnline),
-
-      /*
-       * Este bloque de Ajustes no modifica la clave
-       * utilizada por el futuro módulo de copias.
-       */
-      backupApiKey: existing.backupApiKey,
-
+      backupApiKey: integrations.backupApiKey ?? existing.backupApiKey,
       emailSmtpPass: this.resolveEmailSmtpPassword(
         currentAppData,
         existing,

@@ -85,7 +85,9 @@ function isIntegrationsData(value: unknown): boolean {
     (ticketBai['environment'] === 'test' || ticketBai['environment'] === 'production') &&
     hasNullableString(ticketBai, 'token');
 
-  return validOnlineStore && validEmailSmtp && validTicketBai;
+  const validBackupApiKey: boolean = hasNullableString(value, 'backupApiKey');
+
+  return validBackupApiKey && validOnlineStore && validEmailSmtp && validTicketBai;
 }
 
 /**
@@ -225,7 +227,11 @@ function validateIntegrations(command: ConfigurationUpdateCommand, errors: strin
     return;
   }
 
-  const { ventaOnline, emailSmtp, ticketBai } = command.integrations;
+  const { backupApiKey, ventaOnline, emailSmtp, ticketBai } = command.integrations;
+
+  if (backupApiKey === '') {
+    errors.push('La nueva clave de copias de seguridad no puede estar vacía.');
+  }
 
   if (ventaOnline.active) {
     if (ventaOnline.urlApi.trim() === '') {

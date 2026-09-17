@@ -61,5 +61,40 @@ export default function createSettingsCommand(
       fechaCaducidad: model.opciones.fechaCaducidad,
       empleados: model.opciones.empleados,
     },
+
+    integrations: {
+      backupApiKey: toOptionalSecret(model.backup.backupApiKey),
+
+      ventaOnline: {
+        active: model.ventaOnline.active,
+        urlApi: model.ventaOnline.urlApi,
+        secretApi: toOptionalSecret(model.ventaOnline.secretApi),
+      },
+
+      emailSmtp: {
+        active: model.emailSmtp.active,
+        host: model.emailSmtp.host,
+        port: model.emailSmtp.port,
+        secure: model.emailSmtp.secure,
+        user: model.emailSmtp.user,
+        password: toOptionalSecret(model.emailSmtp.password),
+      },
+
+      ticketBai: {
+        active: model.ticketBai.active,
+        nif: model.ticketBai.nif,
+        environment: model.ticketBai.environment,
+        token: toOptionalSecret(model.ticketBai.token),
+      },
+    },
   };
+}
+
+function toOptionalSecret(value: string): string | null {
+  /*
+   * No hacemos trim deliberadamente:
+   * una credencial debe conservarse exactamente
+   * como la ha introducido el usuario.
+   */
+  return value === '' ? null : value;
 }

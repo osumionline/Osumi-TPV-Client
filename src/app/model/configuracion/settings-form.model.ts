@@ -1,3 +1,5 @@
+import type EmailSmtpSecurity from '@desktop-contracts/configuration/email-smtp-security.type';
+import type { TicketBaiEnvironment } from '@desktop-contracts/configuration/ticket-bai-environment.type';
 import type TipoIva from '@desktop-contracts/tipo-iva.type';
 import type {
   IvaOptionFormModel,
@@ -36,6 +38,32 @@ export interface SettingsTaxFormModel {
   marginOptions: MarginOptionFormModel[];
 }
 
+export interface SettingsOnlineStoreFormModel {
+  active: boolean;
+  urlApi: string;
+  secretApi: string;
+}
+
+export interface SettingsEmailSmtpFormModel {
+  active: boolean;
+  host: string;
+  port: number;
+  secure: EmailSmtpSecurity;
+  user: string;
+  password: string;
+}
+
+export interface SettingsTicketBaiFormModel {
+  active: boolean;
+  nif: string;
+  environment: TicketBaiEnvironment;
+  token: string;
+}
+
+export interface SettingsBackupFormModel {
+  backupApiKey: string;
+}
+
 export interface SettingsOptionsFormModel {
   fechaCaducidad: boolean;
   empleados: boolean;
@@ -47,5 +75,11 @@ export interface SettingsFormModel {
   ticket: SettingsTicketFormModel;
   ticketEmail: SettingsTicketEmailFormModel;
   fiscalidad: SettingsTaxFormModel;
+
+  ventaOnline: SettingsOnlineStoreFormModel;
+  emailSmtp: SettingsEmailSmtpFormModel;
+  ticketBai: SettingsTicketBaiFormModel;
+  backup: SettingsBackupFormModel;
+
   opciones: SettingsOptionsFormModel;
 }

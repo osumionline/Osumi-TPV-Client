@@ -149,6 +149,8 @@ describe('ConfigurationService', (): void => {
           environment: 'production',
           token: null,
         },
+
+        backupApiKey: null,
       },
     };
 
@@ -221,6 +223,8 @@ describe('ConfigurationService', (): void => {
           environment: 'test',
           token: 'new-ticketbai-token',
         },
+
+        backupApiKey: null,
       },
 
       logo: {
@@ -272,6 +276,34 @@ describe('ConfigurationService', (): void => {
     await expect(service.revealSecret('otroSecreto')).rejects.toThrow(
       'El secreto solicitado no puede revelarse.',
     );
+  });
+
+  it('actualiza backupApiKey sin modificar los demás secretos', async (): Promise<void> => {
+    const baseCommand: ConfigurationUpdateCommand = createCommand();
+
+    const integrations = baseCommand.integrations;
+
+    if (integrations === undefined) {
+      throw new Error('El comando del test debe incluir integraciones.');
+    }
+
+    const command: ConfigurationUpdateCommand = {
+      ...baseCommand,
+
+      integrations: {
+        ...integrations,
+        backupApiKey: 'new-backup-secret',
+      },
+    };
+
+    await service.update(command);
+
+    expect(secretStorage.value).toEqual({
+      secretApi: 'old-api-secret',
+      backupApiKey: 'new-backup-secret',
+      emailSmtpPass: 'old-smtp-password',
+      ticketBaiToken: 'old-ticketbai-token',
+    });
   });
 });
 
@@ -386,6 +418,8 @@ function createCommand(): ConfigurationUpdateCommand {
         environment: 'production',
         token: null,
       },
+
+      backupApiKey: null,
     },
   };
 }

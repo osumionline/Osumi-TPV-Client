@@ -1,4 +1,6 @@
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
+import type EmailSmtpSecurity from '@desktop-contracts/configuration/email-smtp-security.type';
+import { DEFAULT_TICKET_BAI_ENVIRONMENT } from '@desktop-contracts/configuration/ticket-bai-environment.type';
 import type {
   IvaOptionFormModel,
   MarginOptionFormModel,
@@ -61,6 +63,32 @@ export default function createSettingsFormInitialValue(appData: AppData): Settin
       marginOptions: createMarginOptions(appData),
     },
 
+    ventaOnline: {
+      active: appData.ventaOnline,
+      urlApi: appData.urlApi,
+      secretApi: '',
+    },
+
+    emailSmtp: {
+      active: appData.emailSmtp !== null,
+      host: appData.emailSmtp?.host ?? '',
+      port: appData.emailSmtp?.port ?? 587,
+      secure: resolveEmailSmtpSecurity(appData),
+      user: appData.emailSmtp?.user ?? '',
+      password: '',
+    },
+
+    ticketBai: {
+      active: appData.ticketBai !== null,
+      nif: appData.ticketBai?.nif ?? '',
+      environment: appData.ticketBai?.environment ?? DEFAULT_TICKET_BAI_ENVIRONMENT,
+      token: '',
+    },
+
+    backup: {
+      backupApiKey: '',
+    },
+
     opciones: {
       fechaCaducidad: appData.fechaCad,
       empleados: appData.empleados,
@@ -75,11 +103,25 @@ function createIvaOptions(appData: AppData): IvaOptionFormModel[] {
         iva: number;
         re: number;
       }>,
-    ): IvaOptionFormModel => ({
-      iva: option.iva,
-      re: option.re,
-      selected: appData.ivaList.includes(option.iva),
-    }),
+    ): IvaOptionFormModel => {
+      const currentIndex: number = appData.ivaList.indexOf(option.iva);
+
+      const currentRe: number | undefined =
+        currentIndex === -1 ? undefined : appData.reList[currentIndex];
+
+      return {
+        iva: option.iva,
+
+        /*
+         * Si este IVA ya existe en AppData conservamos
+         * su RE actual. Solo usamos el estándar como
+         * valor por defecto.
+         */
+        re: currentRe ?? option.re,
+
+        selected: appData.ivaList.includes(option.iva),
+      };
+    },
   );
 
   for (let index: number = 0; index < appData.ivaList.length; index++) {
@@ -120,4 +162,14 @@ function createMarginOptions(appData: AppData): MarginOptionFormModel[] {
       value,
       selected: appData.marginList.includes(value),
     }));
+}
+
+function resolveEmailSmtpSecurity(appData: AppData): EmailSmtpSecurity {
+  const security: string | null | undefined = appData.emailSmtp?.secure;
+
+  if (security === 'none' || security === 'tls' || security === 'ssl') {
+    return security;
+  }
+
+  return 'tls';
 }

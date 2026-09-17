@@ -86,6 +86,83 @@ export default function settingsFormSchema(path: SchemaPathTree<SettingsFormMode
       message: `La variable ${unsupportedVariable} no está permitida en el cuerpo.`,
     };
   });
+
+  required(path.ventaOnline.urlApi, {
+    message: 'La URL de la API es obligatoria cuando hay tienda online.',
+    when: ({ valueOf }): boolean => valueOf(path.ventaOnline.active),
+  });
+
+  validate(path.ventaOnline.urlApi, ({ value, valueOf }) => {
+    if (!valueOf(path.ventaOnline.active)) {
+      return null;
+    }
+
+    const urlValue: string = value();
+
+    if (urlValue === '') {
+      return null;
+    }
+
+    try {
+      const url: URL = new URL(urlValue);
+
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        return {
+          kind: 'invalidUrlProtocol',
+          message: 'La URL debe utilizar HTTP o HTTPS.',
+        };
+      }
+
+      return null;
+    } catch {
+      return {
+        kind: 'invalidUrl',
+        message: 'Introduce una URL válida para la API.',
+      };
+    }
+  });
+
+  required(path.emailSmtp.host, {
+    message: 'El servidor SMTP es obligatorio.',
+    when: ({ valueOf }): boolean => valueOf(path.emailSmtp.active),
+  });
+
+  required(path.emailSmtp.secure, {
+    message: 'Debes elegir el tipo de seguridad SMTP.',
+    when: ({ valueOf }): boolean => valueOf(path.emailSmtp.active),
+  });
+
+  required(path.emailSmtp.user, {
+    message: 'El usuario SMTP es obligatorio.',
+    when: ({ valueOf }): boolean => valueOf(path.emailSmtp.active),
+  });
+
+  validate(path.emailSmtp.port, ({ value, valueOf }) => {
+    if (!valueOf(path.emailSmtp.active)) {
+      return null;
+    }
+
+    const port: number = value();
+
+    if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+      return {
+        kind: 'invalidSmtpPort',
+        message: 'El puerto SMTP debe estar entre 1 y 65535.',
+      };
+    }
+
+    return null;
+  });
+
+  required(path.ticketBai.nif, {
+    message: 'El NIF de TicketBAI es obligatorio.',
+    when: ({ valueOf }): boolean => valueOf(path.ticketBai.active),
+  });
+
+  required(path.ticketBai.environment, {
+    message: 'Debes elegir el entorno de TicketBAI.',
+    when: ({ valueOf }): boolean => valueOf(path.ticketBai.active),
+  });
 }
 
 /**
