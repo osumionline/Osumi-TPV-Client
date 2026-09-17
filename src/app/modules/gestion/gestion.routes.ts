@@ -15,7 +15,7 @@ const routes: Routes = [
         path: 'ajustes',
         canActivate: [gestionPermissionGuard],
         loadComponent: () =>
-          import('@modules/gestion/pages/management-placeholder/management-placeholder.component'),
+          import('@modules/gestion/pages/management-settings/management-settings.component'),
         data: {
           requiredPermissions: [GESTION_PERMISSIONS.SETTINGS],
           title: 'Ajustes iniciales',

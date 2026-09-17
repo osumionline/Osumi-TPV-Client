@@ -1,0 +1,378 @@
+<section class="management-settings">
+    <header class="management-settings__header">
+        <div>
+            <h1>Ajustes iniciales</h1>
+            <p>
+                Configura los datos generales y el funcionamiento
+                básico de Osumi TPV.
+            </p>
+        </div>
+
+        <button mat-button
+                type="button"
+                routerLink="/gestion">
+            <mat-icon>chevron_left</mat-icon>
+            Volver
+        </button>
+    </header>
+
+    <form novalidate>
+        <mat-card>
+            <mat-card-content>
+                <h2>Datos del negocio</h2>
+
+                <div class="form-row">
+                    <mat-form-field>
+                        <mat-label>Nombre</mat-label>
+
+                        <input matInput
+                               [formField]="settingsForm.negocio.nombre">
+
+                        @if (
+                        settingsForm.negocio.nombre().touched() &&
+                        settingsForm.negocio.nombre().invalid()
+                        ) {
+                        <mat-error>
+                            {{
+                  settingsForm.negocio.nombre()
+                    .errors()[0]?.message
+                }}
+                        </mat-error>
+                        }
+                    </mat-form-field>
+
+                    <mat-form-field>
+                        <mat-label>Nombre comercial</mat-label>
+
+                        <input matInput
+                               [formField]="settingsForm.negocio.nombreComercial">
+
+                        @if (
+                        settingsForm.negocio.nombreComercial().touched() &&
+                        settingsForm.negocio.nombreComercial().invalid()
+                        ) {
+                        <mat-error>
+                            {{
+                  settingsForm.negocio.nombreComercial()
+                    .errors()[0]?.message
+                }}
+                        </mat-error>
+                        }
+                    </mat-form-field>
+                </div>
+
+                <div class="form-row form-row--three">
+                    <mat-form-field>
+                        <mat-label>CIF</mat-label>
+
+                        <input matInput
+                               [formField]="settingsForm.negocio.cif">
+
+                        @if (
+                        settingsForm.negocio.cif().touched() &&
+                        settingsForm.negocio.cif().invalid()
+                        ) {
+                        <mat-error>
+                            {{
+                  settingsForm.negocio.cif()
+                    .errors()[0]?.message
+                }}
+                        </mat-error>
+                        }
+                    </mat-form-field>
+
+                    <mat-form-field>
+                        <mat-label>Teléfono</mat-label>
+
+                        <input matInput
+                               [formField]="settingsForm.negocio.telefono">
+                    </mat-form-field>
+
+                    <mat-form-field>
+                        <mat-label>Email</mat-label>
+
+                        <input matInput
+                               type="email"
+                               [formField]="settingsForm.negocio.email">
+
+                        @if (
+                        settingsForm.negocio.email().touched() &&
+                        settingsForm.negocio.email().invalid()
+                        ) {
+                        <mat-error>
+                            {{
+                  settingsForm.negocio.email()
+                    .errors()[0]?.message
+                }}
+                        </mat-error>
+                        }
+                    </mat-form-field>
+                </div>
+
+                <div class="form-row">
+                    <mat-form-field>
+                        <mat-label>Dirección</mat-label>
+
+                        <input matInput
+                               [formField]="settingsForm.negocio.direccion">
+                    </mat-form-field>
+
+                    <mat-form-field>
+                        <mat-label>Población</mat-label>
+
+                        <input matInput
+                               [formField]="settingsForm.negocio.poblacion">
+                    </mat-form-field>
+                </div>
+
+                <h2>Redes y web</h2>
+
+                <div class="form-row form-row--four">
+                    <mat-form-field>
+                        <mat-label>Twitter / X</mat-label>
+
+                        <input matInput
+                               [formField]="settingsForm.redes.twitter">
+                    </mat-form-field>
+
+                    <mat-form-field>
+                        <mat-label>Facebook</mat-label>
+
+                        <input matInput
+                               [formField]="settingsForm.redes.facebook">
+                    </mat-form-field>
+
+                    <mat-form-field>
+                        <mat-label>Instagram</mat-label>
+
+                        <input matInput
+                               [formField]="settingsForm.redes.instagram">
+                    </mat-form-field>
+
+                    <mat-form-field>
+                        <mat-label>Web</mat-label>
+
+                        <input matInput
+                               [formField]="settingsForm.redes.web">
+                    </mat-form-field>
+                </div>
+
+                <h2>Ticket</h2>
+
+                <p class="section-help">
+                    Puedes añadir frases personalizadas al pie del
+                    ticket. Escribe una frase por línea.
+                </p>
+
+                <mat-form-field class="full-width">
+                    <mat-label>
+                        Frases personalizadas del ticket
+                    </mat-label>
+
+                    <textarea matInput
+                              rows="5"
+                              [formField]="settingsForm.ticket.frases">
+          </textarea>
+
+                    <mat-hint>
+                        Cada línea se mostrará como una frase independiente.
+                    </mat-hint>
+                </mat-form-field>
+
+                <h2>Email del ticket</h2>
+
+                <p class="section-help">
+                    Variables disponibles:
+                    <code>{{ ticketEmailBusinessVariable }}</code>
+                    y
+                    <code>{{ ticketEmailReferenceVariable }}</code>.
+                </p>
+
+                <mat-form-field class="full-width">
+                    <mat-label>Asunto</mat-label>
+
+                    <input matInput
+                           [formField]="settingsForm.ticketEmail.subjectTemplate">
+
+                    @if (
+                    settingsForm.ticketEmail.subjectTemplate().touched() &&
+                    settingsForm.ticketEmail.subjectTemplate().invalid()
+                    ) {
+                    <mat-error>
+                        {{
+                settingsForm.ticketEmail.subjectTemplate()
+                  .errors()[0]?.message
+              }}
+                    </mat-error>
+                    }
+                </mat-form-field>
+
+                <mat-form-field class="full-width">
+                    <mat-label>Cuerpo</mat-label>
+
+                    <textarea matInput
+                              rows="5"
+                              [formField]="settingsForm.ticketEmail.bodyTemplate">
+          </textarea>
+
+                    @if (
+                    settingsForm.ticketEmail.bodyTemplate().touched() &&
+                    settingsForm.ticketEmail.bodyTemplate().invalid()
+                    ) {
+                    <mat-error>
+                        {{
+                settingsForm.ticketEmail.bodyTemplate()
+                  .errors()[0]?.message
+              }}
+                    </mat-error>
+                    }
+                </mat-form-field>
+
+                <h2>Fiscalidad</h2>
+
+                <p>Tipo de fiscalidad:</p>
+
+                <mat-radio-group class="radio-group"
+                                 [formField]="settingsForm.fiscalidad.tipoIva">
+
+                    <mat-radio-button value="iva">
+                        IVA
+                    </mat-radio-button>
+
+                    <mat-radio-button value="re">
+                        IVA + Recargo de equivalencia
+                    </mat-radio-button>
+                </mat-radio-group>
+
+                <p>
+                    Tipos de IVA
+                    @if (
+                    settingsForm.fiscalidad.tipoIva().value() === 're'
+                    ) {
+                    + Recargo de equivalencia
+                    }
+                </p>
+
+                <div class="option-list">
+                    @for (
+                    option of settingsForm.fiscalidad.ivaOptions;
+                    track option
+                    ) {
+                    <mat-checkbox [formField]="option.selected">
+
+                        {{ option.iva().value() }}
+
+                        @if (
+                        settingsForm.fiscalidad.tipoIva().value() === 're'
+                        ) {
+                        + {{ option.re().value() }}
+                        }
+
+                        %
+                    </mat-checkbox>
+                    }
+                </div>
+
+                @if (
+                settingsForm.fiscalidad.ivaOptions().touched() &&
+                settingsForm.fiscalidad.ivaOptions().invalid()
+                ) {
+                <p class="form-error">
+                    {{
+              settingsForm.fiscalidad.ivaOptions()
+                .errors()[0]?.message
+            }}
+                </p>
+                }
+
+                <div class="option-actions">
+                    <button mat-button
+                            type="button"
+                            (click)="selectAllIvas()">
+                        Marcar todos
+                    </button>
+
+                    <button mat-button
+                            type="button"
+                            (click)="selectNoneIvas()">
+                        Desmarcar todos
+                    </button>
+                </div>
+
+                <p>Márgenes de beneficio:</p>
+
+                <div class="option-list">
+                    @for (
+                    option of settingsForm.fiscalidad.marginOptions;
+                    track option
+                    ) {
+                    <mat-checkbox [formField]="option.selected">
+                        {{ option.value().value() }} %
+                    </mat-checkbox>
+                    }
+                </div>
+
+                @if (
+                settingsForm.fiscalidad.marginOptions().touched() &&
+                settingsForm.fiscalidad.marginOptions().invalid()
+                ) {
+                <p class="form-error">
+                    {{
+              settingsForm.fiscalidad.marginOptions()
+                .errors()[0]?.message
+            }}
+                </p>
+                }
+
+                <div class="option-actions">
+                    <button mat-button
+                            type="button"
+                            (click)="selectAllMargins()">
+                        Marcar todos
+                    </button>
+
+                    <button mat-button
+                            type="button"
+                            (click)="selectNoneMargins()">
+                        Desmarcar todos
+                    </button>
+                </div>
+
+                <h2>Opciones</h2>
+
+                <div class="boolean-options">
+                    <mat-checkbox [formField]="settingsForm.opciones.fechaCaducidad">
+                        Usar fechas de caducidad
+                    </mat-checkbox>
+
+                    <mat-checkbox [formField]="settingsForm.opciones.empleados">
+                        Usar empleados
+                    </mat-checkbox>
+                </div>
+            </mat-card-content>
+
+            <mat-card-actions class="actions">
+                <button mat-button
+                        type="button"
+                        routerLink="/gestion"
+                        [disabled]="saving()">
+                    Cancelar
+                </button>
+
+                <button mat-flat-button
+                        type="button"
+                        [disabled]="saving()"
+                        (click)="save()">
+
+                    <mat-icon>
+                        {{ saving() ? 'hourglass_top' : 'save' }}
+                    </mat-icon>
+
+                    <span>
+                        {{ saving() ? 'Guardando...' : 'Guardar ajustes' }}
+                    </span>
+                </button>
+            </mat-card-actions>
+        </mat-card>
+    </form>
+</section>
