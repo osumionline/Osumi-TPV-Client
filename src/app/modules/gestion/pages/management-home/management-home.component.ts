@@ -2,7 +2,12 @@ import type { Signal, WritableSignal } from '@angular/core';
 import { Component, computed, inject, signal } from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
+import { MatTooltip } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
+import {
+  GESTION_EMPLOYEES_PERMISSIONS,
+  GESTION_PERMISSIONS,
+} from '@constants/gestion-permissions.constants';
 import type Empleado from '@model/empleados/empleado.model';
 import ManagementPasswordDialogComponent from '@modules/gestion/components/management-password-dialog/management-password-dialog.component';
 import EmpleadosService from '@services/empleados/empleados.service';
@@ -14,6 +19,7 @@ interface ManagementModuleItem {
   readonly description: string;
   readonly icon: string;
   readonly route: string;
+  readonly requiredPermissions: readonly number[];
 }
 
 /**
@@ -23,7 +29,7 @@ interface ManagementModuleItem {
   selector: 'otpv-management-home',
   templateUrl: './management-home.component.html',
   styleUrl: './management-home.component.scss',
-  imports: [ManagementPasswordDialogComponent, MatButton, MatIcon, RouterLink],
+  imports: [ManagementPasswordDialogComponent, MatButton, MatIcon, MatTooltip, RouterLink],
 })
 export default class ManagementHomeComponent {
   private readonly empleadosService: EmpleadosService = inject(EmpleadosService);
@@ -53,6 +59,7 @@ export default class ManagementHomeComponent {
       description: 'Configuración general de Osumi TPV.',
       icon: 'settings',
       route: '/gestion/ajustes',
+      requiredPermissions: [GESTION_PERMISSIONS.SETTINGS],
     },
     {
       id: 'employees',
@@ -60,6 +67,7 @@ export default class ManagementHomeComponent {
       description: 'Empleados, contraseñas y permisos.',
       icon: 'badge',
       route: '/gestion/empleados',
+      requiredPermissions: GESTION_EMPLOYEES_PERMISSIONS,
     },
     {
       id: 'payment-types',
@@ -67,6 +75,7 @@ export default class ManagementHomeComponent {
       description: 'Formas de pago disponibles en la aplicación.',
       icon: 'credit_card',
       route: '/gestion/tipos-pago',
+      requiredPermissions: [GESTION_PERMISSIONS.PAYMENT_TYPES],
     },
     {
       id: 'backups',
@@ -74,6 +83,7 @@ export default class ManagementHomeComponent {
       description: 'Gestión de las copias de seguridad.',
       icon: 'cloud_upload',
       route: '/gestion/copias-seguridad',
+      requiredPermissions: [GESTION_PERMISSIONS.BACKUPS],
     },
   ];
 
@@ -141,5 +151,14 @@ export default class ManagementHomeComponent {
     }
 
     return empleadoId;
+  }
+
+  /**
+   * Indica si el empleado autenticado puede acceder a un módulo de Gestión.
+   */
+  canAccessModule(module: ManagementModuleItem): boolean {
+    const empleado: Empleado | null = this.empleadoGestion();
+
+    return empleado?.hasAnyPerm(module.requiredPermissions) ?? false;
   }
 }

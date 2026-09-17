@@ -30,7 +30,12 @@
     <div class="management-home__modules">
         @for (module of modules; track module.id) {
         <a class="management-home__module"
-           [routerLink]="module.route">
+           [class.management-home__module--disabled]="!canAccessModule(module)"
+           [routerLink]="canAccessModule(module) ? module.route : null"
+           [attr.aria-disabled]="!canAccessModule(module)"
+           [matTooltip]="canAccessModule(module) ? '' : 'No tienes permiso para acceder'"
+           matTooltipPosition="above">
+
             <div class="management-home__module-icon">
                 <mat-icon>
                     {{ module.icon }}
@@ -48,7 +53,7 @@
             </div>
 
             <mat-icon class="management-home__module-arrow">
-                arrow_forward
+                {{ canAccessModule(module) ? 'arrow_forward' : 'lock' }}
             </mat-icon>
         </a>
         }
