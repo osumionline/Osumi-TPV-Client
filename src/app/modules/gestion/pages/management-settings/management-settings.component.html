@@ -828,6 +828,92 @@
                     </div>
                 </div>
 
+                <div class="settings-subsection">
+                    <h3>Impresora de tickets</h3>
+
+                    <p class="section-help">
+                        Selecciona la impresora que utilizará este equipo
+                        para imprimir los tickets de venta.
+                    </p>
+
+                    <div class="printer-settings-row">
+                        <mat-form-field>
+                            <mat-label>Impresora</mat-label>
+
+                            <mat-select [value]="ticketPrinterDeviceName()"
+                                        [disabled]="printersLoading()"
+                                        (selectionChange)="ticketPrinterDeviceName.set($event.value)">
+
+                                <mat-option value="">
+                                    Sin impresora seleccionada
+                                </mat-option>
+
+                                @if (selectedPrinterUnavailable()) {
+                                <mat-option [value]="ticketPrinterDeviceName()"
+                                            disabled>
+                                    {{ ticketPrinterDeviceName() }}
+                                    — no disponible
+                                </mat-option>
+                                }
+
+                                @for (
+                                printer of printers();
+                                track printer.deviceName
+                                ) {
+                                <mat-option [value]="printer.deviceName">
+                                    {{ printer.displayName }}
+
+                                    @if (printer.description !== '') {
+                                    — {{ printer.description }}
+                                    }
+                                </mat-option>
+                                }
+                            </mat-select>
+
+                            @if (!printersLoading()) {
+                            <mat-hint>
+                                {{ printers().length }}
+                                {{
+                                    printers().length === 1
+                                        ? 'impresora disponible'
+                                        : 'impresoras disponibles'
+                                }}
+                            </mat-hint>
+                            }
+                        </mat-form-field>
+
+                        <button mat-stroked-button
+                                type="button"
+                                [disabled]="printersLoading() || saving()"
+                                (click)="refreshPrinters()">
+
+                            <mat-icon>
+                                {{
+                                    printersLoading()
+                                        ? 'hourglass_top'
+                                        : 'refresh'
+                                }}
+                            </mat-icon>
+
+                            Actualizar lista
+                        </button>
+                    </div>
+
+                    @if (selectedPrinterUnavailable()) {
+                    <p class="printer-warning">
+                        La impresora configurada actualmente no está
+                        disponible en este equipo. Puedes seleccionar otra
+                        o dejar la configuración sin impresora.
+                    </p>
+                    }
+
+                    @if (printerError() !== '') {
+                    <p class="form-error">
+                        {{ printerError() }}
+                    </p>
+                    }
+                </div>
+
                 <h2>Opciones</h2>
 
                 <div class="boolean-options">

@@ -1,6 +1,7 @@
 import {
   Component,
   ElementRef,
+  computed,
   inject,
   signal,
   viewChild,
@@ -20,6 +21,8 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type ConfigurationUpdateCommand from '@desktop-contracts/configuration/configuration-update-command.interface';
+import type PrinterInterface from '@desktop-contracts/configuration/printing/printer.interface';
+import type PrintingSettings from '@desktop-contracts/configuration/printing/printing-settings.interface';
 import type RevealableConfigurationSecret from '@desktop-contracts/configuration/revealable-configuration-secret.type';
 import createSettingsCommand from '@model/configuracion/settings-command.mapper';
 import createSettingsFormInitialValue from '@model/configuracion/settings-form.initial-value';
@@ -28,6 +31,7 @@ import settingsFormSchema from '@model/configuracion/settings-form.schema';
 import { DialogService } from '@osumi/angular-tools';
 import AppDataService from '@services/application/app-data.service';
 import DesktopConfigurationService from '@services/application/desktop-configuration.service';
+import DesktopPrintingService from '@services/application/desktop-printing.service';
 import { firstValueFrom } from 'rxjs';
 
 type SensitiveSettingsField = RevealableConfigurationSecret | 'emailSmtpPassword';
@@ -55,12 +59,11 @@ type SensitiveSettingsField = RevealableConfigurationSecret | 'emailSmtpPassword
 })
 export default class ManagementSettingsComponent {
   private readonly appDataService: AppDataService = inject(AppDataService);
-
   private readonly desktopConfigurationService: DesktopConfigurationService = inject(
     DesktopConfigurationService,
   );
-
   private readonly dialog: DialogService = inject(DialogService);
+  private readonly desktopPrintingService: DesktopPrintingService = inject(DesktopPrintingService);
 
   private readonly acceptedLogoTypes: readonly string[] = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -79,37 +82,67 @@ export default class ManagementSettingsComponent {
   );
 
   readonly saving: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly logoPreviewUrl: WritableSignal<string> = signal<string>('osumi://assets/logo');
-
   readonly logoDataUrl: WritableSignal<string> = signal<string>('');
-
   readonly logoFileName: WritableSignal<string> = signal<string>('');
-
   readonly logoMimeType: WritableSignal<string> = signal<string>('');
-
   readonly logoError: WritableSignal<string> = signal<string>('');
-
   readonly secretApiVisible: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly backupApiKeyVisible: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly ticketBaiTokenVisible: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly emailSmtpPasswordVisible: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly secretApiRevealed: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly backupApiKeyRevealed: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly ticketBaiTokenRevealed: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly revealingSecret: WritableSignal<RevealableConfigurationSecret | null> =
     signal<RevealableConfigurationSecret | null>(null);
+  readonly printers: WritableSignal<readonly PrinterInterface[]> = signal<
+    readonly PrinterInterface[]
+  >([]);
+  readonly ticketPrinterDeviceName: WritableSignal<string> = signal<string>('');
+  private readonly initialTicketPrinterDeviceName: WritableSignal<string> = signal<string>('');
+  readonly printersLoading: WritableSignal<boolean> = signal<boolean>(false);
+  readonly printerError: WritableSignal<string> = signal<string>('');
+
+  readonly selectedPrinterUnavailable: Signal<boolean> = computed((): boolean => {
+    const deviceName: string = this.ticketPrinterDeviceName();
+
+    if (deviceName === '') {
+      return false;
+    }
+
+    return !this.printers().some(
+      (printer: PrinterInterface): boolean => printer.deviceName === deviceName,
+    );
+  });
 
   readonly ticketEmailBusinessVariable: string = '{nombreNegocio}';
-
   readonly ticketEmailReferenceVariable: string = '{referencia}';
+
+  constructor() {
+    void this.loadPrintingConfiguration();
+  }
+
+  /**
+   * Actualiza el listado de impresoras disponibles
+   * sin modificar la selección realizada por el usuario.
+   */
+  async refreshPrinters(): Promise<void> {
+    this.printersLoading.set(true);
+    this.printerError.set('');
+
+    try {
+      const printers: readonly PrinterInterface[] = await this.desktopPrintingService.getPrinters();
+
+      this.printers.set(printers);
+    } catch (error: unknown) {
+      console.error('Error obteniendo las impresoras:', error);
+
+      this.printerError.set('No se ha podido obtener el listado de impresoras.');
+    } finally {
+      this.printersLoading.set(false);
+    }
+  }
 
   /**
    * Abre el selector de archivo para sustituir
@@ -307,6 +340,7 @@ export default class ManagementSettingsComponent {
 
     try {
       await this.appDataService.update(command);
+      const printerSaved: boolean = await this.savePrinterConfiguration();
 
       this.clearSensitiveFields();
 
@@ -314,10 +348,18 @@ export default class ManagementSettingsComponent {
         this.clearLogoSelection();
       }
 
-      this.dialog.alert({
-        title: 'Información',
-        content: 'Los ajustes se han guardado correctamente.',
-      });
+      if (printerSaved) {
+        this.dialog.alert({
+          title: 'Información',
+          content: 'Los ajustes se han guardado correctamente.',
+        });
+      } else {
+        this.dialog.alert({
+          title: 'Aviso',
+          content:
+            'Los ajustes se han guardado, pero no se ha podido actualizar la impresora de tickets. Actualiza el listado de impresoras y vuelve a intentarlo.',
+        });
+      }
     } catch (error: unknown) {
       console.error('Error guardando los ajustes:', error);
 
@@ -327,6 +369,57 @@ export default class ManagementSettingsComponent {
       });
     } finally {
       this.saving.set(false);
+    }
+  }
+
+  private async loadPrintingConfiguration(): Promise<void> {
+    this.printersLoading.set(true);
+    this.printerError.set('');
+
+    try {
+      const [printers, settings]: [readonly PrinterInterface[], PrintingSettings] =
+        await Promise.all([
+          this.desktopPrintingService.getPrinters(),
+
+          this.desktopPrintingService.getSettings(),
+        ]);
+
+      const deviceName: string = settings.ticketPrinterDeviceName ?? '';
+
+      this.printers.set(printers);
+
+      this.ticketPrinterDeviceName.set(deviceName);
+
+      this.initialTicketPrinterDeviceName.set(deviceName);
+    } catch (error: unknown) {
+      console.error('Error cargando la configuración de impresión:', error);
+
+      this.printerError.set('No se ha podido cargar la configuración de impresión.');
+    } finally {
+      this.printersLoading.set(false);
+    }
+  }
+
+  private async savePrinterConfiguration(): Promise<boolean> {
+    const current: string = this.ticketPrinterDeviceName();
+
+    if (current === this.initialTicketPrinterDeviceName()) {
+      return true;
+    }
+
+    try {
+      const settings: PrintingSettings =
+        await this.desktopPrintingService.setTicketPrinterDeviceName(
+          current === '' ? null : current,
+        );
+
+      this.initialTicketPrinterDeviceName.set(settings.ticketPrinterDeviceName ?? '');
+
+      return true;
+    } catch (error: unknown) {
+      console.error('Error guardando la impresora de tickets:', error);
+
+      return false;
     }
   }
 

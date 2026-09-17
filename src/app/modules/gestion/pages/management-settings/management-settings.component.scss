@@ -164,6 +164,26 @@ code {
     color: var(--mat-sys-error);
 }
 
+.printer-settings-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 12px;
+
+    mat-form-field {
+        width: 100%;
+    }
+
+    >button {
+        margin-top: 8px;
+    }
+}
+
+.printer-warning {
+    margin: 0;
+    color: var(--mat-sys-error);
+}
+
 @media (max-width: 900px) {
 
     .form-row,
@@ -174,5 +194,14 @@ code {
 
     .secret-field-row {
         grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .printer-settings-row {
+        grid-template-columns: 1fr;
+
+        >button {
+            width: fit-content;
+            margin-top: 0;
+        }
     }
 }
