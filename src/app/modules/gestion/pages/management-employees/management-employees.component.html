@@ -1,0 +1,138 @@
+<section class="management-employees">
+    <header class="management-employees__header">
+        <div>
+            <h1>
+                Empleados
+            </h1>
+
+            <p>
+                Gestiona los empleados de la tienda
+                y sus permisos de acceso.
+            </p>
+        </div>
+
+        <button mat-button
+                type="button"
+                routerLink="/gestion">
+            <mat-icon>
+                chevron_left
+            </mat-icon>
+
+            Volver
+        </button>
+    </header>
+
+    <div class="management-employees__layout">
+        <aside class="employee-sidebar">
+            <mat-form-field appearance="outline"
+                            subscriptSizing="dynamic"
+                            class="employee-sidebar__search">
+                <mat-label>
+                    Buscar empleado
+                </mat-label>
+
+                <mat-icon matPrefix>
+                    search
+                </mat-icon>
+
+                <input #searchInput
+                       matInput
+                       type="search"
+                       autocomplete="off"
+                       [value]="searchTerm()"
+                       (input)="updateSearchTerm(searchInput.value)">
+            </mat-form-field>
+
+            <div class="employee-list">
+                @for (
+                empleado of filteredEmpleados();
+                track empleado.id
+                ) {
+                <button type="button"
+                        class="employee-list__item"
+                        [class.employee-list__item--selected]="
+                            selectedEmpleado()?.id === empleado.id
+                        "
+                        [style.backgroundColor]="empleado.color"
+                        [style.color]="empleado.textColor"
+                        (click)="selectEmpleado(empleado)">
+                    <span class="employee-list__name">
+                        {{ empleado.nombre }}
+                    </span>
+
+                    @if (empleado.admin) {
+                    <mat-icon aria-label="Administrador"
+                              title="Administrador">
+                        admin_panel_settings
+                    </mat-icon>
+                    }
+                </button>
+                }
+                @empty {
+                <div class="employee-list__empty">
+                    <mat-icon aria-hidden="true">
+                        person_search
+                    </mat-icon>
+
+                    @if (searchTerm().trim() !== '') {
+                    <p>
+                        No hay empleados que coincidan
+                        con la búsqueda.
+                    </p>
+                    }
+                    @else {
+                    <p>
+                        No hay empleados disponibles.
+                    </p>
+                    }
+                </div>
+                }
+            </div>
+        </aside>
+
+        <main class="employee-content">
+            @if (selectedEmpleado(); as empleado) {
+            <div class="employee-content__selected">
+                <div class="employee-content__avatar"
+                     [style.backgroundColor]="empleado.color"
+                     [style.color]="empleado.textColor">
+                    <mat-icon aria-hidden="true">
+                        person
+                    </mat-icon>
+                </div>
+
+                <div>
+                    <p class="employee-content__eyebrow">
+                        Empleado seleccionado
+                    </p>
+
+                    <h2>
+                        {{ empleado.nombre }}
+                    </h2>
+
+                    <p>
+                        En el siguiente paso se mostrarán aquí
+                        sus datos y permisos.
+                    </p>
+                </div>
+            </div>
+            }
+            @else {
+            <div class="employee-content__welcome">
+                <mat-icon aria-hidden="true">
+                    badge
+                </mat-icon>
+
+                <h2>
+                    Elige un empleado de la lista
+                </h2>
+
+                <p>
+                    Selecciona un empleado para consultar
+                    y gestionar sus datos.
+                </p>
+            </div>
+            }
+        </main>
+    </div>
+</section>

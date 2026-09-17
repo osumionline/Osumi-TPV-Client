@@ -1,0 +1,229 @@
+.management-employees {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px;
+}
+
+.management-employees__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 24px;
+
+    h1 {
+        margin: 0 0 8px;
+    }
+
+    p {
+        margin: 0;
+    }
+}
+
+.management-employees__layout {
+    display: grid;
+    grid-template-columns:
+        minmax(260px, 320px) minmax(0, 1fr);
+    min-height: 560px;
+    overflow: hidden;
+    border: 1px solid var(--mat-sys-outline-variant);
+    border-radius: 16px;
+    background:
+        var(--mat-sys-surface);
+}
+
+.employee-sidebar {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    border-right: 1px solid var(--mat-sys-outline-variant);
+    background:
+        var(--mat-sys-surface-container-low);
+
+    &__search {
+        width: 100%;
+    }
+}
+
+.employee-list {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+
+    &__item {
+        display: flex;
+        width: 100%;
+        min-height: 52px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 14px;
+        border: 2px solid transparent;
+        border-radius: 10px;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+        transition:
+            border-color 120ms ease,
+            transform 120ms ease;
+
+        &:hover {
+            transform: translateY(-1px);
+        }
+
+        &:focus-visible {
+            outline: 3px solid var(--mat-sys-primary);
+            outline-offset: 2px;
+        }
+
+        &--selected {
+            border-color:
+                var(--mat-sys-primary);
+        }
+
+        mat-icon {
+            flex: 0 0 auto;
+        }
+    }
+
+    &__name {
+        min-width: 0;
+        overflow: hidden;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__empty {
+        display: grid;
+        min-height: 180px;
+        place-items: center;
+        align-content: center;
+        gap: 8px;
+        padding: 24px;
+        color:
+            var(--mat-sys-on-surface-variant);
+        text-align: center;
+
+        mat-icon {
+            width: auto;
+            height: auto;
+            font-size: 2rem;
+        }
+
+        p {
+            margin: 0;
+        }
+    }
+}
+
+.employee-content {
+    min-width: 0;
+    padding: 32px;
+
+    &__welcome {
+        display: grid;
+        min-height: 100%;
+        place-items: center;
+        align-content: center;
+        gap: 12px;
+        color:
+            var(--mat-sys-on-surface-variant);
+        text-align: center;
+
+        mat-icon {
+            width: auto;
+            height: auto;
+            font-size: 3rem;
+        }
+
+        h2 {
+            margin: 0;
+            color:
+                var(--mat-sys-on-surface);
+        }
+
+        p {
+            max-width: 480px;
+            margin: 0;
+            line-height: 1.5;
+        }
+    }
+
+    &__selected {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+
+        h2 {
+            margin: 4px 0 8px;
+            font-size: 1.75rem;
+        }
+
+        p {
+            margin: 0;
+        }
+    }
+
+    &__avatar {
+        display: grid;
+        width: 72px;
+        height: 72px;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 50%;
+
+        mat-icon {
+            width: auto;
+            height: auto;
+            font-size: 2rem;
+        }
+    }
+
+    &__eyebrow {
+        color:
+            var(--mat-sys-on-surface-variant);
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+}
+
+@media (max-width: 800px) {
+    .management-employees__layout {
+        grid-template-columns: 1fr;
+    }
+
+    .employee-sidebar {
+        border-right: 0;
+        border-bottom: 1px solid var(--mat-sys-outline-variant);
+    }
+
+    .employee-list {
+        max-height: 280px;
+    }
+
+    .employee-content {
+        min-height: 320px;
+        padding: 24px;
+    }
+}
+
+@media (max-width: 600px) {
+    .management-employees {
+        padding: 16px;
+    }
+
+    .management-employees__header {
+        flex-direction: column;
+    }
+
+    .employee-content__selected {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

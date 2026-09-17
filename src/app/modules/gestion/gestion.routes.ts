@@ -27,7 +27,7 @@ const routes: Routes = [
         path: 'empleados',
         canActivate: [gestionPermissionGuard],
         loadComponent: () =>
-          import('@modules/gestion/pages/management-placeholder/management-placeholder.component'),
+          import('@modules/gestion/pages/management-employees/management-employees.component'),
         data: {
           requiredPermissions: GESTION_EMPLOYEES_PERMISSIONS,
           title: 'Empleados',
