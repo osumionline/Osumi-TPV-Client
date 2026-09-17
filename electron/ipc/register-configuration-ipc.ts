@@ -22,6 +22,15 @@ export default function registerConfigurationIpc(
   });
 
   ipcMain.handle(
+    IPC_CHANNELS.configurationRevealSecret,
+    async (event, secret: unknown): Promise<string | null> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return configurationService.revealSecret(secret);
+    },
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.configurationUpdateAppData,
     async (event, command: ConfigurationUpdateCommand): Promise<AppData> => {
       assertTrustedSender(event, getMainWindow);

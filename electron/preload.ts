@@ -82,6 +82,7 @@ import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type ConfigurationUpdateCommand from '@desktop-contracts/configuration/configuration-update-command.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type { InstallationResult } from '@desktop-contracts/configuration/installation-result.interface';
+import type RevealableConfigurationSecret from '@desktop-contracts/configuration/revealable-configuration-secret.type';
 import OsumiDesktopApi from '@desktop-contracts/desktop-api';
 import type AutenticarEmpleadoCommand from '@desktop-contracts/empleados/autenticar-empleado-command.interface';
 import type AutenticarEmpleadoResult from '@desktop-contracts/empleados/autenticar-empleado-result.type';
@@ -352,6 +353,9 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
   configuration: Object.freeze({
     getAppData: (): Promise<AppData | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.configurationGetAppData) as Promise<AppData | null>,
+
+    revealSecret: (secret: RevealableConfigurationSecret): Promise<string | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.configurationRevealSecret, secret) as Promise<string | null>,
 
     updateAppData: (command: ConfigurationUpdateCommand): Promise<AppData> =>
       ipcRenderer.invoke(IPC_CHANNELS.configurationUpdateAppData, command) as Promise<AppData>,

@@ -39,10 +39,33 @@ export default class ConfigurationService {
   }
 
   /**
+   * Obtiene bajo demanda uno de los secretos operacionales
+   * cuya revelación está expresamente permitida.
+   *
+   * La contraseña SMTP nunca puede obtenerse mediante
+   * este caso de uso.
+   */
+  async revealSecret(secret: unknown): Promise<string | null> {
+    if (secret !== 'secretApi' && secret !== 'backupApiKey' && secret !== 'ticketBaiToken') {
+      throw new Error('El secreto solicitado no puede revelarse.');
+    }
+
+    const secrets: InstallationSecretsData | null = await this.secretStorage.load();
+
+    if (secrets === null) {
+      return null;
+    }
+
+    const value: string | null = secrets[secret];
+
+    return value === '' ? null : value;
+  }
+
+  /**
    * Actualiza los ajustes de la aplicación.
    *
-   * Los secretos nunca se devuelven al renderer:
-   * un valor null conserva el secreto existente cuando
+   * Los secretos no forman parte de AppData.
+   * Un valor null conserva el secreto existente cuando
    * la integración ya estaba activa.
    */
   async update(command: unknown): Promise<AppData> {

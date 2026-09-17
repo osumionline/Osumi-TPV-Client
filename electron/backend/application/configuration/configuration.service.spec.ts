@@ -236,6 +236,43 @@ describe('ConfigurationService', (): void => {
 
     expect(secretStorage.value).toEqual(originalSecrets);
   });
+
+  it('revela los secretos operacionales autorizados', async (): Promise<void> => {
+    await expect(service.revealSecret('secretApi')).resolves.toBe('old-api-secret');
+
+    await expect(service.revealSecret('backupApiKey')).resolves.toBe('backup-secret');
+
+    await expect(service.revealSecret('ticketBaiToken')).resolves.toBe('old-ticketbai-token');
+  });
+
+  it('devuelve null cuando el secreto revelable no está configurado', async (): Promise<void> => {
+    secretStorage.value = {
+      secretApi: '',
+      backupApiKey: '',
+      emailSmtpPass: 'smtp-password',
+      ticketBaiToken: null,
+    };
+
+    await expect(service.revealSecret('secretApi')).resolves.toBeNull();
+
+    await expect(service.revealSecret('backupApiKey')).resolves.toBeNull();
+
+    await expect(service.revealSecret('ticketBaiToken')).resolves.toBeNull();
+
+    secretStorage.value = null;
+
+    await expect(service.revealSecret('secretApi')).resolves.toBeNull();
+  });
+
+  it('impide revelar la contraseña SMTP o cualquier secreto no autorizado', async (): Promise<void> => {
+    await expect(service.revealSecret('emailSmtpPass')).rejects.toThrow(
+      'El secreto solicitado no puede revelarse.',
+    );
+
+    await expect(service.revealSecret('otroSecreto')).rejects.toThrow(
+      'El secreto solicitado no puede revelarse.',
+    );
+  });
 });
 
 function createAppData(): AppData {

@@ -8,6 +8,7 @@ const IPC_CHANNELS = {
   legacyImportProgress: 'legacy-import:progress',
 
   configurationGetAppData: 'configuration:get-app-data',
+  configurationRevealSecret: 'configuration:reveal-secret',
   configurationInstall: 'configuration:install',
   configurationUpdateAppData: 'configuration:update-app-data',
 
