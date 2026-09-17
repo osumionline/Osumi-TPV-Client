@@ -125,6 +125,59 @@
                     </mat-form-field>
                 </div>
 
+                <h2>Logo</h2>
+
+                <p class="section-help">
+                    Este es el logo utilizado actualmente por la aplicación.
+                    Puedes seleccionar uno nuevo para sustituirlo.
+                </p>
+
+                <div class="logo-settings">
+                    <input #logoInput
+                           class="file-input"
+                           type="file"
+                           accept="image/png,image/jpeg,image/webp"
+                           (change)="onLogoChange($event)">
+
+                    <div class="logo-preview">
+                        <img [src]="logoPreviewUrl()"
+                             alt="Logo del negocio">
+                    </div>
+
+                    <div class="logo-actions">
+                        <button mat-stroked-button
+                                type="button"
+                                [disabled]="saving()"
+                                (click)="addLogo()">
+                            <mat-icon>add_photo_alternate</mat-icon>
+
+                            {{ logoDataUrl() === '' ? 'Cambiar logo' : 'Elegir otro logo' }}
+                        </button>
+
+                        @if (logoDataUrl() !== '') {
+                        <button mat-button
+                                type="button"
+                                [disabled]="saving()"
+                                (click)="cancelLogoChange()">
+                            <mat-icon>undo</mat-icon>
+                            Cancelar cambio
+                        </button>
+                        }
+                    </div>
+                </div>
+
+                @if (logoFileName() !== '') {
+                <p class="logo-file-name">
+                    Nuevo logo: {{ logoFileName() }}
+                </p>
+                }
+
+                @if (logoError() !== '') {
+                <p class="form-error">
+                    {{ logoError() }}
+                </p>
+                }
+
                 <h2>Redes y web</h2>
 
                 <div class="form-row form-row--four">
@@ -336,6 +389,443 @@
                             (click)="selectNoneMargins()">
                         Desmarcar todos
                     </button>
+                </div>
+
+                <h2>Integraciones</h2>
+
+                <div class="settings-subsection">
+                    <h3>Tienda online</h3>
+
+                    <p class="section-help">
+                        Configura la conexión con la API de la tienda online.
+                    </p>
+
+                    <mat-radio-group class="radio-group"
+                                     aria-label="Venta online"
+                                     [formField]="settingsForm.ventaOnline.active">
+                        <mat-radio-button [value]="false">
+                            No
+                        </mat-radio-button>
+
+                        <mat-radio-button [value]="true">
+                            Sí
+                        </mat-radio-button>
+                    </mat-radio-group>
+
+                    @if (settingsForm.ventaOnline.active().value()) {
+                    <mat-form-field class="full-width">
+                        <mat-label>URL base de la API</mat-label>
+
+                        <input matInput
+                               placeholder="https://..."
+                               [formField]="settingsForm.ventaOnline.urlApi">
+
+                        @if (
+                        settingsForm.ventaOnline.urlApi().touched() &&
+                        settingsForm.ventaOnline.urlApi().invalid()
+                        ) {
+                        <mat-error>
+                            {{
+                              settingsForm.ventaOnline.urlApi()
+                                .errors()[0]?.message
+                            }}
+                        </mat-error>
+                        }
+                    </mat-form-field>
+
+                    <div class="secret-field-row">
+                        <mat-form-field class="secret-field">
+                            <mat-label>Secreto de la API</mat-label>
+
+                            <input matInput
+                                   autocomplete="off"
+                                   [type]="secretApiVisible() ? 'text' : 'password'"
+                                   [formField]="settingsForm.ventaOnline.secretApi">
+
+                            <button mat-icon-button
+                                    matSuffix
+                                    type="button"
+                                    [attr.aria-label]="
+                                      secretApiVisible()
+                                        ? 'Ocultar secreto'
+                                        : 'Mostrar secreto'
+                                    "
+                                    [matTooltip]="
+                                      secretApiVisible()
+                                        ? 'Ocultar secreto'
+                                        : 'Mostrar secreto'
+                                    "
+                                    (click)="toggleSensitiveVisibility('secretApi')">
+                                <mat-icon>
+                                    {{ secretApiVisible() ? 'visibility_off' : 'visibility' }}
+                                </mat-icon>
+                            </button>
+
+                            <mat-hint>
+                                Déjalo vacío para conservar el secreto actual.
+                            </mat-hint>
+                        </mat-form-field>
+
+                        @if (
+                        !secretApiRevealed() &&
+                        settingsForm.ventaOnline.secretApi().value() === ''
+                        ) {
+                        <button mat-icon-button
+                                type="button"
+                                class="reveal-secret-button"
+                                aria-label="Cargar el secreto almacenado"
+                                matTooltip="Cargar el secreto almacenado"
+                                [disabled]="revealingSecret() !== null"
+                                (click)="revealSecret('secretApi')">
+                            <mat-icon>
+                                {{
+                                  revealingSecret() === 'secretApi'
+                                    ? 'hourglass_top'
+                                    : 'visibility'
+                                }}
+                            </mat-icon>
+                        </button>
+                        }
+                    </div>
+                    }
+                </div>
+
+                <div class="settings-subsection">
+                    <h3>Email SMTP</h3>
+
+                    <p class="section-help">
+                        Configura el servidor utilizado para enviar tickets y
+                        otros documentos por email.
+                    </p>
+
+                    <mat-radio-group class="radio-group"
+                                     aria-label="Email SMTP"
+                                     [formField]="settingsForm.emailSmtp.active">
+                        <mat-radio-button [value]="false">
+                            No
+                        </mat-radio-button>
+
+                        <mat-radio-button [value]="true">
+                            Sí
+                        </mat-radio-button>
+                    </mat-radio-group>
+
+                    @if (settingsForm.emailSmtp.active().value()) {
+                    <div class="form-row form-row--three">
+                        <mat-form-field>
+                            <mat-label>Servidor SMTP</mat-label>
+
+                            <input matInput
+                                   placeholder="smtp.example.com"
+                                   [formField]="settingsForm.emailSmtp.host">
+
+                            @if (
+                            settingsForm.emailSmtp.host().touched() &&
+                            settingsForm.emailSmtp.host().invalid()
+                            ) {
+                            <mat-error>
+                                {{
+                                  settingsForm.emailSmtp.host()
+                                    .errors()[0]?.message
+                                }}
+                            </mat-error>
+                            }
+                        </mat-form-field>
+
+                        <mat-form-field>
+                            <mat-label>Puerto</mat-label>
+
+                            <input matInput
+                                   type="number"
+                                   step="1"
+                                   [formField]="settingsForm.emailSmtp.port">
+
+                            @if (
+                            settingsForm.emailSmtp.port().touched() &&
+                            settingsForm.emailSmtp.port().invalid()
+                            ) {
+                            <mat-error>
+                                {{
+                                  settingsForm.emailSmtp.port()
+                                    .errors()[0]?.message
+                                }}
+                            </mat-error>
+                            }
+                        </mat-form-field>
+
+                        <mat-form-field>
+                            <mat-label>Seguridad</mat-label>
+
+                            <mat-select [formField]="settingsForm.emailSmtp.secure">
+                                <mat-option value="none">
+                                    Sin cifrado
+                                </mat-option>
+
+                                <mat-option value="tls">
+                                    TLS / STARTTLS
+                                </mat-option>
+
+                                <mat-option value="ssl">
+                                    SSL / TLS implícito
+                                </mat-option>
+                            </mat-select>
+                        </mat-form-field>
+                    </div>
+
+                    <div class="form-row">
+                        <mat-form-field>
+                            <mat-label>Usuario SMTP</mat-label>
+
+                            <input matInput
+                                   [formField]="settingsForm.emailSmtp.user">
+
+                            @if (
+                            settingsForm.emailSmtp.user().touched() &&
+                            settingsForm.emailSmtp.user().invalid()
+                            ) {
+                            <mat-error>
+                                {{
+                                  settingsForm.emailSmtp.user()
+                                    .errors()[0]?.message
+                                }}
+                            </mat-error>
+                            }
+                        </mat-form-field>
+
+                        <mat-form-field>
+                            <mat-label>Nueva contraseña SMTP</mat-label>
+
+                            <input matInput
+                                   autocomplete="new-password"
+                                   [type]="emailSmtpPasswordVisible() ? 'text' : 'password'"
+                                   [formField]="settingsForm.emailSmtp.password">
+
+                            <button mat-icon-button
+                                    matSuffix
+                                    type="button"
+                                    [attr.aria-label]="
+                                      emailSmtpPasswordVisible()
+                                        ? 'Ocultar contraseña'
+                                        : 'Mostrar contraseña'
+                                    "
+                                    [matTooltip]="
+                                      emailSmtpPasswordVisible()
+                                        ? 'Ocultar contraseña'
+                                        : 'Mostrar contraseña'
+                                    "
+                                    (click)="toggleSensitiveVisibility('emailSmtpPassword')">
+                                <mat-icon>
+                                    {{
+                                      emailSmtpPasswordVisible()
+                                        ? 'visibility_off'
+                                        : 'visibility'
+                                    }}
+                                </mat-icon>
+                            </button>
+
+                            <mat-hint>
+                                Déjala vacía para conservar la contraseña actual.
+                            </mat-hint>
+                        </mat-form-field>
+                    </div>
+                    }
+                </div>
+
+                <div class="settings-subsection">
+                    <h3>TicketBAI</h3>
+
+                    <p class="section-help">
+                        Configura las credenciales utilizadas para enviar
+                        documentos a TicketBAI.
+                    </p>
+
+                    <mat-radio-group class="radio-group"
+                                     aria-label="TicketBAI"
+                                     [formField]="settingsForm.ticketBai.active">
+                        <mat-radio-button [value]="false">
+                            No
+                        </mat-radio-button>
+
+                        <mat-radio-button [value]="true">
+                            Sí
+                        </mat-radio-button>
+                    </mat-radio-group>
+
+                    @if (settingsForm.ticketBai.active().value()) {
+                    <div class="form-row">
+                        <mat-form-field>
+                            <mat-label>NIF TicketBAI</mat-label>
+
+                            <input matInput
+                                   [formField]="settingsForm.ticketBai.nif">
+
+                            @if (
+                            settingsForm.ticketBai.nif().touched() &&
+                            settingsForm.ticketBai.nif().invalid()
+                            ) {
+                            <mat-error>
+                                {{
+                                  settingsForm.ticketBai.nif()
+                                    .errors()[0]?.message
+                                }}
+                            </mat-error>
+                            }
+                        </mat-form-field>
+
+                        <mat-form-field>
+                            <mat-label>Entorno</mat-label>
+
+                            <mat-select [formField]="settingsForm.ticketBai.environment">
+                                <mat-option value="production">
+                                    Producción
+                                </mat-option>
+
+                                <mat-option value="test">
+                                    Pruebas
+                                </mat-option>
+                            </mat-select>
+
+                            @if (
+                            settingsForm.ticketBai.environment().touched() &&
+                            settingsForm.ticketBai.environment().invalid()
+                            ) {
+                            <mat-error>
+                                {{
+                                  settingsForm.ticketBai.environment()
+                                    .errors()[0]?.message
+                                }}
+                            </mat-error>
+                            }
+                        </mat-form-field>
+                    </div>
+
+                    <div class="secret-field-row">
+                        <mat-form-field class="secret-field">
+                            <mat-label>Token TicketBAI</mat-label>
+
+                            <input matInput
+                                   autocomplete="off"
+                                   [type]="ticketBaiTokenVisible() ? 'text' : 'password'"
+                                   [formField]="settingsForm.ticketBai.token">
+
+                            <button mat-icon-button
+                                    matSuffix
+                                    type="button"
+                                    [attr.aria-label]="
+                                      ticketBaiTokenVisible()
+                                        ? 'Ocultar token'
+                                        : 'Mostrar token'
+                                    "
+                                    [matTooltip]="
+                                      ticketBaiTokenVisible()
+                                        ? 'Ocultar token'
+                                        : 'Mostrar token'
+                                    "
+                                    (click)="toggleSensitiveVisibility('ticketBaiToken')">
+                                <mat-icon>
+                                    {{
+                                      ticketBaiTokenVisible()
+                                        ? 'visibility_off'
+                                        : 'visibility'
+                                    }}
+                                </mat-icon>
+                            </button>
+
+                            <mat-hint>
+                                Déjalo vacío para conservar el token actual.
+                            </mat-hint>
+                        </mat-form-field>
+
+                        @if (
+                        !ticketBaiTokenRevealed() &&
+                        settingsForm.ticketBai.token().value() === ''
+                        ) {
+                        <button mat-icon-button
+                                type="button"
+                                class="reveal-secret-button"
+                                aria-label="Cargar el token TicketBAI almacenado"
+                                matTooltip="Cargar el token almacenado"
+                                [disabled]="revealingSecret() !== null"
+                                (click)="revealSecret('ticketBaiToken')">
+                            <mat-icon>
+                                {{
+                                  revealingSecret() === 'ticketBaiToken'
+                                    ? 'hourglass_top'
+                                    : 'visibility'
+                                }}
+                            </mat-icon>
+                        </button>
+                        }
+                    </div>
+                    }
+                </div>
+
+                <div class="settings-subsection">
+                    <h3>TPV Backup</h3>
+
+                    <p class="section-help">
+                        Si tienes una suscripción con TPV Backup puedes configurar
+                        aquí la clave API utilizada para las copias de seguridad.
+                    </p>
+
+                    <div class="secret-field-row">
+                        <mat-form-field class="secret-field">
+                            <mat-label>Backup API key</mat-label>
+
+                            <input matInput
+                                   autocomplete="off"
+                                   [type]="backupApiKeyVisible() ? 'text' : 'password'"
+                                   [formField]="settingsForm.backup.backupApiKey">
+
+                            <button mat-icon-button
+                                    matSuffix
+                                    type="button"
+                                    [attr.aria-label]="
+                                  backupApiKeyVisible()
+                                    ? 'Ocultar clave'
+                                    : 'Mostrar clave'
+                                "
+                                    [matTooltip]="
+                                  backupApiKeyVisible()
+                                    ? 'Ocultar clave'
+                                    : 'Mostrar clave'
+                                "
+                                    (click)="toggleSensitiveVisibility('backupApiKey')">
+                                <mat-icon>
+                                    {{
+                                  backupApiKeyVisible()
+                                    ? 'visibility_off'
+                                    : 'visibility'
+                                }}
+                                </mat-icon>
+                            </button>
+
+                            <mat-hint>
+                                Déjala vacía para conservar la clave actual.
+                            </mat-hint>
+                        </mat-form-field>
+
+                        @if (
+                        !backupApiKeyRevealed() &&
+                        settingsForm.backup.backupApiKey().value() === ''
+                        ) {
+                        <button mat-icon-button
+                                type="button"
+                                class="reveal-secret-button"
+                                aria-label="Cargar la clave de TPV Backup almacenada"
+                                matTooltip="Cargar la clave almacenada"
+                                [disabled]="revealingSecret() !== null"
+                                (click)="revealSecret('backupApiKey')">
+                            <mat-icon>
+                                {{
+                              revealingSecret() === 'backupApiKey'
+                                ? 'hourglass_top'
+                                : 'visibility'
+                            }}
+                            </mat-icon>
+                        </button>
+                        }
+                    </div>
                 </div>
 
                 <h2>Opciones</h2>
