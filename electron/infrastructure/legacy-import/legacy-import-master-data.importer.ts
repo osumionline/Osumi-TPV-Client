@@ -4,6 +4,7 @@ import type LegacyImportProgressListener from '@backend/contracts/legacy-import/
 import type LegacyImportExecutionCommand from '@backend/domain/legacy-import/legacy-import-execution-command.interface';
 import type LegacyImportPhaseResult from '@backend/domain/legacy-import/legacy-import-phase-result.interface';
 import type LegacySqlInsert from '@backend/domain/legacy-import/legacy-sql-insert.interface';
+import { GESTION_PERMISSIONS } from '@desktop-contracts/empleados/gestion-permissions.constants';
 import LegacyImportPublicIdFactory from '@infrastructure/legacy-import/legacy-import-public-id.factory';
 import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value.reader';
 import DISABLED_LEGACY_PASSWORD_HASH from '@infrastructure/security/disabled-legacy-password-hash.constant';
@@ -171,7 +172,7 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
 
       await this.insertEmployees(queryRunner, command, state, counters);
 
-      await this.insertEmployeePermissions(queryRunner, state, counters);
+      await this.insertEmployeePermissions(queryRunner, command, state, counters);
 
       this.reportProgress(
         command,
@@ -502,6 +503,7 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
 
   private async insertEmployeePermissions(
     queryRunner: QueryRunner,
+    command: LegacyImportExecutionCommand,
     state: LegacyMasterDataState,
     counters: MutableImportCounters,
   ): Promise<void> {
@@ -525,26 +527,68 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
         continue;
       }
 
-      await queryRunner.query(
-        `
-          INSERT INTO empleado_permiso (
-            id_empleado,
-            id_permiso,
-            created_at
-          )
-          VALUES (
-            ?,
-            ?,
-            ?
-          )
-        `,
-        [permission.employeeId, permission.permissionId, permission.createdAt],
+      await this.insertEmployeePermission(
+        queryRunner,
+        permission.employeeId,
+        permission.permissionId,
+        permission.createdAt,
       );
 
       insertedKeys.add(key);
 
       counters.importedRows++;
     }
+
+    /*
+     * En Osumi TPV legacy el acceso a Copias de seguridad
+     * no estaba protegido por un permiso específico.
+     *
+     * Al importar conservamos ese comportamiento concediendo
+     * el nuevo permiso 25 a todos los empleados activos.
+     */
+    for (const employee of state.employees) {
+      if (employee.deletedAt !== null) {
+        continue;
+      }
+
+      const key: string = [employee.id, GESTION_PERMISSIONS.BACKUPS].join(':');
+
+      if (insertedKeys.has(key)) {
+        continue;
+      }
+
+      await this.insertEmployeePermission(
+        queryRunner,
+        employee.id,
+        GESTION_PERMISSIONS.BACKUPS,
+        command.startedAt,
+      );
+
+      insertedKeys.add(key);
+    }
+  }
+
+  private async insertEmployeePermission(
+    queryRunner: QueryRunner,
+    employeeId: number,
+    permissionId: number,
+    createdAt: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+      INSERT INTO empleado_permiso (
+        id_empleado,
+        id_permiso,
+        created_at
+      )
+      VALUES (
+        ?,
+        ?,
+        ?
+      )
+    `,
+      [employeeId, permissionId, createdAt],
+    );
   }
 
   private async insertPaymentTypes(
