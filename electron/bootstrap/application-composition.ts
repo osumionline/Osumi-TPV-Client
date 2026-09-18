@@ -30,6 +30,7 @@ import PrintingService from '@backend/application/printing/printing.service';
 import ProveedoresService from '@backend/application/proveedores/proveedores.service';
 import ReservasService from '@backend/application/reservas/reservas.service';
 import { SystemService } from '@backend/application/system/system.service';
+import TiposPagoService from '@backend/application/tipos-pago/tipos-pago.service';
 import VentaTicketBaiMapper from '@backend/application/ventas/venta-ticket-bai.mapper';
 import VentasArticulosService from '@backend/application/ventas/ventas-articulos.service';
 import VentasContextService from '@backend/application/ventas/ventas-context.service';
@@ -81,6 +82,7 @@ import type ApplicationPaths from '@backend/contracts/system/application-paths.i
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
 import type { ImageProcessor } from '@backend/contracts/system/image-processor.interface';
 import type { TicketBaiClient } from '@backend/contracts/ticket-bai/ticket-bai-client.interface';
+import type TipoPagoRepository from '@backend/contracts/tipos-pago/tipo-pago.repository.interface';
 import type VentaTicketPdfStorage from '@backend/contracts/ventas/venta-ticket-pdf-storage.interface';
 import type VentasArticulosRepository from '@backend/contracts/ventas/ventas-articulos.repository.interface';
 import type VentasContextRepository from '@backend/contracts/ventas/ventas-context.repository.interface';
@@ -111,6 +113,7 @@ import TypeOrmInstallationDatabase from '@infrastructure/database/typeorm/typeor
 import TypeOrmMarcaRepository from '@infrastructure/database/typeorm/typeorm-marca.repository';
 import TypeOrmProveedorRepository from '@infrastructure/database/typeorm/typeorm-proveedor.repository';
 import TypeOrmReservasRepository from '@infrastructure/database/typeorm/typeorm-reservas.repository';
+import TypeOrmTipoPagoRepository from '@infrastructure/database/typeorm/typeorm-tipo-pago.repository';
 import TypeOrmVentasArticulosRepository from '@infrastructure/database/typeorm/typeorm-ventas-articulos.repository';
 import TypeOrmVentasContextRepository from '@infrastructure/database/typeorm/typeorm-ventas-context.repository';
 import TypeOrmVentasDevolucionesRepository from '@infrastructure/database/typeorm/typeorm-ventas-devoluciones.repository';
@@ -169,6 +172,7 @@ import registerCajaIpc from '@ipc/configuration/register-caja-ipc';
 import registerConfigurationIpc from '@ipc/configuration/register-configuration-ipc';
 import registerEmpleadosIpc from '@ipc/configuration/register-empleados-ipc';
 import registerPrintingIpc from '@ipc/configuration/register-printing-ipc';
+import registerTiposPagoIpc from '@ipc/configuration/register-tipos-pago-ipc';
 import registerApplicationIpc from '@ipc/register-application-ipc';
 import registerFilesIpc from '@ipc/register-files-ipc';
 import registerLegacyImportIpc from '@ipc/register-legacy-import-ipc';
@@ -404,6 +408,13 @@ export default function createApplicationComposition(
     empleadoRepository,
     passwordHasher,
     legacyPasswordVerifier,
+  );
+
+  const tipoPagoRepository: TipoPagoRepository = new TypeOrmTipoPagoRepository(operationalDatabase);
+
+  const tiposPagoService: TiposPagoService = new TiposPagoService(
+    tipoPagoRepository,
+    assetUrlBuilder,
   );
 
   const clienteRepository: ClienteRepository = new TypeOrmClienteRepository(operationalDatabase);
@@ -662,6 +673,7 @@ export default function createApplicationComposition(
   registerMarcasIpc(getMainWindow, marcasService);
   registerProveedoresIpc(getMainWindow, proveedoresService);
   registerEmpleadosIpc(getMainWindow, empleadosService);
+  registerTiposPagoIpc(getMainWindow, tiposPagoService);
   registerClientesIpc(
     getMainWindow,
     clientesService,

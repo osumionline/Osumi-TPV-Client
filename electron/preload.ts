@@ -105,6 +105,7 @@ import type { InstallationResult } from '@desktop-contracts/configuration/instal
 import type PrinterInterface from '@desktop-contracts/configuration/printing/printer.interface';
 import type PrintingSettings from '@desktop-contracts/configuration/printing/printing-settings.interface';
 import type RevealableConfigurationSecret from '@desktop-contracts/configuration/revealable-configuration-secret.type';
+import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 import OsumiDesktopApi from '@desktop-contracts/desktop-api';
 import type StageImageRequest from '@desktop-contracts/files/stage-image-request.interface';
 import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
@@ -483,6 +484,11 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         idProveedor,
         idComercial,
       ) as Promise<void>,
+  }),
+
+  tiposPago: Object.freeze({
+    getAll: (): Promise<readonly TipoPagoInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.tiposPagoGetAll) as Promise<readonly TipoPagoInterface[]>,
   }),
 
   empleados: Object.freeze({
