@@ -1,5 +1,15 @@
-import type { Signal, WritableSignal } from '@angular/core';
-import { Component, computed, inject, signal } from '@angular/core';
+import {
+  afterNextRender,
+  Component,
+  computed,
+  inject,
+  Injector,
+  signal,
+  viewChild,
+  type ElementRef,
+  type Signal,
+  type WritableSignal,
+} from '@angular/core';
 import {
   disabled,
   FieldTree,
@@ -12,7 +22,7 @@ import { MatCheckbox } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
-import { MatTabsModule } from '@angular/material/tabs';
+import { MatTabGroup, MatTabsModule } from '@angular/material/tabs';
 import { MatTooltip } from '@angular/material/tooltip';
 import { Router, RouterLink } from '@angular/router';
 import {
@@ -60,6 +70,10 @@ export default class ManagementEmployeesComponent {
   private readonly gestionSessionService: GestionSessionService = inject(GestionSessionService);
   private readonly dialog: DialogService = inject(DialogService);
   private readonly router: Router = inject(Router);
+  private readonly injector: Injector = inject(Injector);
+
+  private readonly nombreInput = viewChild<ElementRef<HTMLInputElement>>('nombreInput');
+  private readonly tabs = viewChild(MatTabGroup);
 
   readonly empleados: Signal<readonly Empleado[]> = this.empleadosService.empleados;
 
@@ -71,6 +85,7 @@ export default class ManagementEmployeesComponent {
   readonly saveSuccessful: WritableSignal<boolean> = signal<boolean>(false);
 
   private saveFeedbackTimeoutId: number | null = null;
+  private nombreFocusPending: boolean = false;
 
   readonly selectedEmpleadoPermisos: WritableSignal<readonly number[]> = signal<readonly number[]>(
     [],
@@ -228,6 +243,7 @@ export default class ManagementEmployeesComponent {
     this.selectedEmpleado.set(empleado);
     this.resetEmpleadoDataForm(empleado);
     this.resetEmpleadoPermissions(empleado);
+    this.focusNombreInput();
   }
 
   /**
@@ -244,6 +260,7 @@ export default class ManagementEmployeesComponent {
     this.creatingEmpleado.set(true);
     this.resetEmpleadoDataForm(null);
     this.resetEmpleadoPermissions(null);
+    this.focusNombreInput();
   }
 
   /**
@@ -421,6 +438,73 @@ export default class ManagementEmployeesComponent {
         );
 
     this.selectedEmpleadoPermisos.set(this.normalizeEmpleadoPermissions(next));
+  }
+
+  /**
+   * Muestra la pestaña Datos y pone el
+   * foco en el nombre del empleado.
+   */
+  private focusNombreInput(): void {
+    const tabs: MatTabGroup | undefined = this.tabs();
+
+    /*
+     * Si el editor todavía no estaba
+     * renderizado, será un alta o la primera
+     * selección desde la pantalla inicial.
+     */
+    if (tabs === undefined) {
+      afterNextRender(
+        (): void => {
+          this.nombreInput()?.nativeElement.focus();
+        },
+        {
+          injector: this.injector,
+        },
+      );
+
+      return;
+    }
+
+    /*
+     * Si ya estamos en Datos no existe
+     * transición de pestaña que pueda
+     * robarnos después el foco.
+     */
+    if (tabs.selectedIndex === 0) {
+      afterNextRender(
+        (): void => {
+          this.nombreInput()?.nativeElement.focus();
+        },
+        {
+          injector: this.injector,
+        },
+      );
+
+      return;
+    }
+
+    /*
+     * Si venimos de Permisos esperamos
+     * expresamente a que Angular Material
+     * termine la transición.
+     */
+    this.nombreFocusPending = true;
+
+    tabs.selectedIndex = 0;
+  }
+
+  /**
+   * Aplica el foco pendiente en Nombre
+   * cuando termina el cambio a la pestaña Datos.
+   */
+  handleTabAnimationDone(): void {
+    if (!this.nombreFocusPending) {
+      return;
+    }
+
+    this.nombreFocusPending = false;
+
+    this.nombreInput()?.nativeElement.focus();
   }
 
   private hasEmpleadoDataChanges(): boolean {

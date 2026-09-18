@@ -1065,4 +1065,127 @@ describe('ManagementEmployeesComponent', (): void => {
      */
     component.selectEmpleado(updatedEmpleado);
   });
+
+  it('pone el foco en Nombre al seleccionar un empleado', async (): Promise<void> => {
+    gestionSessionService.login(2);
+
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+
+    fixture.detectChanges();
+
+    const empleado: Empleado | null = empleadosService.findById(1);
+
+    expect(empleado).not.toBeNull();
+
+    if (empleado === null) {
+      return;
+    }
+
+    component.selectEmpleado(empleado);
+
+    fixture.detectChanges();
+
+    await fixture.whenStable();
+
+    const nombreInput: HTMLInputElement | null = fixture.nativeElement.querySelector(
+      '.employee-form__content input[type="text"]',
+    );
+
+    expect(nombreInput).not.toBeNull();
+
+    expect(document.activeElement).toBe(nombreInput);
+  });
+
+  it('pone el foco en Nombre al iniciar un alta', async (): Promise<void> => {
+    gestionSessionService.login(2);
+
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+
+    fixture.detectChanges();
+
+    component.startCreatingEmpleado();
+
+    fixture.detectChanges();
+
+    await fixture.whenStable();
+
+    const nombreInput: HTMLInputElement | null = fixture.nativeElement.querySelector(
+      '.employee-form__content input[type="text"]',
+    );
+
+    expect(nombreInput).not.toBeNull();
+
+    expect(document.activeElement).toBe(nombreInput);
+  });
+
+  it('pone el foco en Nombre al seleccionar otro empleado desde Permisos', async (): Promise<void> => {
+    gestionSessionService.login(2);
+
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+
+    fixture.detectChanges();
+
+    const empleadoA: Empleado | null = empleadosService.findById(1);
+
+    const empleadoB: Empleado | null = empleadosService.findById(3);
+
+    expect(empleadoA).not.toBeNull();
+
+    expect(empleadoB).not.toBeNull();
+
+    if (empleadoA === null || empleadoB === null) {
+      return;
+    }
+
+    component.selectEmpleado(empleadoA);
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const tabs: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll('[role="tab"]');
+
+    expect(tabs.length).toBeGreaterThan(1);
+
+    tabs[1]?.click();
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    component.selectEmpleado(empleadoB);
+
+    fixture.detectChanges();
+
+    /*
+     * En la aplicación real Angular Material
+     * emite animationDone al finalizar la
+     * transición de Permisos a Datos.
+     *
+     * El entorno de test no ejecuta esa
+     * animación de navegador, por lo que
+     * simulamos explícitamente el evento.
+     */
+    component.handleTabAnimationDone();
+
+    await fixture.whenStable();
+
+    const nombreInput: HTMLInputElement | null = fixture.nativeElement.querySelector(
+      '.employee-form__content input[type="text"]',
+    );
+
+    expect(nombreInput).not.toBeNull();
+
+    expect(document.activeElement).toBe(nombreInput);
+  });
 });
