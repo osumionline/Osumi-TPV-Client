@@ -65,6 +65,9 @@ export default class ManagementEmployeesComponent {
   readonly selectedEmpleadoPermisos: WritableSignal<readonly number[]> = signal<readonly number[]>(
     [],
   );
+  private readonly initialEmpleadoPermisos: WritableSignal<readonly number[]> = signal<
+    readonly number[]
+  >([]);
   readonly empleadoPermissionGroups: readonly EmpleadoPermissionGroup[] =
     EMPLEADO_PERMISSION_GROUPS;
   readonly empleadoDataModel: WritableSignal<EmpleadoDataFormModel> = signal<EmpleadoDataFormModel>(
@@ -93,6 +96,34 @@ export default class ManagementEmployeesComponent {
     (): boolean =>
       this.gestionEmpleado()?.hasPerm(GESTION_PERMISSIONS.EMPLOYEES_PERMISSIONS) ?? false,
   );
+
+  readonly canEditEmpleadoPermissions: Signal<boolean> = computed((): boolean => {
+    if (!this.canManageEmpleadoPermissions()) {
+      return false;
+    }
+
+    if (this.creatingEmpleado()) {
+      return this.canCreateEmpleado();
+    }
+
+    const empleado: Empleado | null = this.selectedEmpleado();
+
+    return empleado !== null && !empleado.admin;
+  });
+
+  readonly empleadoPermissionsDirty: Signal<boolean> = computed((): boolean => {
+    const current: readonly number[] = this.selectedEmpleadoPermisos();
+
+    const initial: readonly number[] = this.initialEmpleadoPermisos();
+
+    if (current.length !== initial.length) {
+      return true;
+    }
+
+    return current.some(
+      (permissionId: number, index: number): boolean => permissionId !== initial[index],
+    );
+  });
 
   readonly canEditEmpleadoData: Signal<boolean> = computed((): boolean => {
     if (this.creatingEmpleado()) {
@@ -125,13 +156,18 @@ export default class ManagementEmployeesComponent {
     },
   );
 
-  readonly canSaveEmpleado: Signal<boolean> = computed(
-    (): boolean =>
-      this.canEditEmpleadoData() &&
-      !this.savingEmpleado() &&
-      this.empleadoDataForm().dirty() &&
-      !this.empleadoDataForm().invalid(),
-  );
+  readonly canSaveEmpleado: Signal<boolean> = computed((): boolean => {
+    if (this.savingEmpleado() || this.empleadoDataForm().invalid()) {
+      return false;
+    }
+
+    const dataChanged: boolean = this.canEditEmpleadoData() && this.empleadoDataForm().dirty();
+
+    const permissionsChanged: boolean =
+      this.canEditEmpleadoPermissions() && this.empleadoPermissionsDirty();
+
+    return dataChanged || permissionsChanged;
+  });
 
   readonly filteredEmpleados: Signal<readonly Empleado[]> = computed((): readonly Empleado[] => {
     const searchTerm: string = this.searchTerm().trim().toLocaleLowerCase('es-ES');
@@ -213,8 +249,29 @@ export default class ManagementEmployeesComponent {
    * que se está creando o editando.
    */
   async saveEmpleado(): Promise<void> {
-    if (this.savingEmpleado() || !this.canEditEmpleadoData()) {
+    if (this.savingEmpleado()) {
       return;
+    }
+
+    if (this.creatingEmpleado()) {
+      if (!this.canCreateEmpleado()) {
+        return;
+      }
+    } else {
+      const empleado: Empleado | null = this.selectedEmpleado();
+
+      if (empleado === null) {
+        return;
+      }
+
+      const dataChanged: boolean = this.canUpdateEmpleado() && this.hasEmpleadoDataChanges();
+
+      const permissionsChanged: boolean =
+        this.canEditEmpleadoPermissions() && this.empleadoPermissionsDirty();
+
+      if (!dataChanged && !permissionsChanged) {
+        return;
+      }
     }
 
     this.empleadoDataForm().markAsTouched();
@@ -257,17 +314,48 @@ export default class ManagementEmployeesComponent {
     return this.selectedEmpleadoPermisos().includes(permissionId);
   }
 
+  /**
+   * Marca o desmarca un permiso del empleado
+   * cuando el usuario puede modificar permisos.
+   */
+  setEmpleadoPermission(permissionId: number, checked: boolean): void {
+    if (!this.canEditEmpleadoPermissions()) {
+      return;
+    }
+
+    const current: readonly number[] = this.selectedEmpleadoPermisos();
+
+    const next: readonly number[] = checked
+      ? [...current, permissionId]
+      : current.filter(
+          (currentPermissionId: number): boolean => currentPermissionId !== permissionId,
+        );
+
+    this.selectedEmpleadoPermisos.set(this.normalizeEmpleadoPermissions(next));
+  }
+
+  private hasEmpleadoDataChanges(): boolean {
+    const empleado: Empleado | null = this.selectedEmpleado();
+
+    if (empleado === null) {
+      return false;
+    }
+
+    const data: EmpleadoDataFormModel = this.empleadoDataModel();
+
+    return (
+      data.nombre.trim() !== empleado.nombre ||
+      data.password !== '' ||
+      data.color.toLowerCase() !== empleado.color.toLowerCase()
+    );
+  }
+
   private createEmpleado(data: EmpleadoDataFormModel): Promise<Empleado> {
     const command: CrearEmpleadoCommand = {
       nombre: data.nombre.trim(),
       password: data.password,
       color: data.color,
-
-      /*
-       * La edición de permisos se incorporará
-       * en el bloque específico de Permisos.
-       */
-      permisos: [],
+      permisos: this.canEditEmpleadoPermissions() ? [...this.selectedEmpleadoPermisos()] : [],
     };
 
     return this.empleadosService.create(command);
@@ -280,40 +368,52 @@ export default class ManagementEmployeesComponent {
       throw new Error('No hay ningún empleado seleccionado para modificar.');
     }
 
+    const canUpdateData: boolean = this.canUpdateEmpleado();
+    const canUpdatePermissions: boolean = this.canEditEmpleadoPermissions();
     const command: ActualizarEmpleadoCommand = {
-      nombre: data.nombre.trim(),
-
-      password: data.password === '' ? null : data.password,
-
-      color: data.color,
+      /*
+       * Sin permiso 21 conservamos
+       * exactamente los datos actuales.
+       */
+      nombre: canUpdateData ? data.nombre.trim() : empleado.nombre,
+      password: canUpdateData && data.password !== '' ? data.password : null,
+      color: canUpdateData ? data.color : empleado.color,
 
       /*
-       * Datos no modifica los permisos.
+       * Sin permiso 23 conservamos
+       * exactamente los permisos actuales.
        */
-      permisos: [...empleado.permisos],
+      permisos: canUpdatePermissions
+        ? [...this.selectedEmpleadoPermisos()]
+        : [...empleado.permisos],
     };
 
     return this.empleadosService.update(empleado.id, command);
   }
 
   private resetEmpleadoPermissions(empleado: Empleado | null): void {
-    if (empleado === null) {
-      this.selectedEmpleadoPermisos.set([]);
+    let permisos: readonly number[] = [];
 
-      return;
-    }
-
-    if (empleado.admin) {
-      this.selectedEmpleadoPermisos.set(
-        EMPLEADO_PERMISSION_GROUPS.flatMap((group: EmpleadoPermissionGroup): readonly number[] =>
+    if (empleado?.admin) {
+      permisos = EMPLEADO_PERMISSION_GROUPS.flatMap(
+        (group: EmpleadoPermissionGroup): readonly number[] =>
           group.permissions.map((permission): number => permission.id),
-        ),
       );
-
-      return;
+    } else if (empleado !== null) {
+      permisos = empleado.permisos;
     }
 
-    this.selectedEmpleadoPermisos.set([...empleado.permisos]);
+    const normalized: readonly number[] = this.normalizeEmpleadoPermissions(permisos);
+
+    this.selectedEmpleadoPermisos.set(normalized);
+
+    this.initialEmpleadoPermisos.set([...normalized]);
+  }
+
+  private normalizeEmpleadoPermissions(permisos: readonly number[]): readonly number[] {
+    return [...new Set<number>(permisos)].sort(
+      (first: number, second: number): number => first - second,
+    );
   }
 
   private resetEmpleadoDataForm(empleado: Empleado | null): void {
