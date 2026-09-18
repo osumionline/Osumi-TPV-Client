@@ -42,7 +42,7 @@ describe('ManagementEmployeesComponent', (): void => {
         hasPassword: true,
         color: '#228844',
         admin: false,
-        permisos: [21],
+        permisos: [21, 23],
       },
     ];
 
@@ -536,5 +536,99 @@ describe('ManagementEmployeesComponent', (): void => {
     expect(component.creatingEmpleado()).toBe(false);
 
     expect(component.selectedEmpleado()).toBeNull();
+  });
+
+  it('permite acceder a Permisos con el permiso 23', (): void => {
+    gestionSessionService.login(3);
+
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+
+    expect(fixture.componentInstance.canManageEmpleadoPermissions()).toBe(true);
+  });
+
+  it('no permite acceder a Permisos sin el permiso 23', (): void => {
+    gestionSessionService.login(1);
+
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+
+    expect(fixture.componentInstance.canManageEmpleadoPermissions()).toBe(false);
+  });
+
+  it('permite acceder a Permisos a un administrador', (): void => {
+    gestionSessionService.login(2);
+
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+
+    expect(fixture.componentInstance.canManageEmpleadoPermissions()).toBe(true);
+  });
+
+  it('carga los permisos almacenados del empleado seleccionado', (): void => {
+    gestionSessionService.login(3);
+
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+
+    const empleado: Empleado | null = empleadosService.findById(1);
+
+    expect(empleado).not.toBeNull();
+
+    if (empleado === null) {
+      return;
+    }
+
+    component.selectEmpleado(empleado);
+
+    expect(component.hasEmpleadoPermission(20)).toBe(true);
+
+    expect(component.hasEmpleadoPermission(21)).toBe(false);
+  });
+
+  it('muestra todos los permisos seleccionados para un administrador', (): void => {
+    gestionSessionService.login(3);
+
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+
+    const empleado: Empleado | null = empleadosService.findById(2);
+
+    expect(empleado).not.toBeNull();
+
+    if (empleado === null) {
+      return;
+    }
+
+    component.selectEmpleado(empleado);
+
+    expect(component.selectedEmpleadoPermisos().length).toBe(25);
+
+    for (let permissionId: number = 1; permissionId <= 25; permissionId++) {
+      expect(component.hasEmpleadoPermission(permissionId)).toBe(true);
+    }
+  });
+
+  it('inicia un nuevo empleado sin permisos seleccionados', (): void => {
+    gestionSessionService.login(2);
+
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+
+    component.startCreatingEmpleado();
+
+    expect(component.selectedEmpleadoPermisos()).toEqual([]);
   });
 });

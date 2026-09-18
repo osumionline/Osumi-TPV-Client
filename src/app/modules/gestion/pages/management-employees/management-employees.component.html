@@ -274,6 +274,63 @@
                             </div>
                         </div>
                     </mat-tab>
+                    @if (canManageEmpleadoPermissions()) {
+                    <mat-tab label="PERMISOS">
+                        <div class="employee-permissions">
+                            @if (selectedEmpleado()?.admin) {
+                            <div class="employee-permissions__admin">
+                                <mat-icon aria-hidden="true">
+                                    admin_panel_settings
+                                </mat-icon>
+
+                                <div>
+                                    <strong>
+                                        Usuario administrador
+                                    </strong>
+
+                                    <p>
+                                        Los administradores disponen
+                                        automáticamente de todos los permisos.
+                                    </p>
+                                </div>
+                            </div>
+                            }
+
+                            <div class="employee-permissions__groups">
+                                @for (
+                                group of empleadoPermissionGroups;
+                                track group.key
+                                ) {
+                                <section class="employee-permissions__group">
+                                    <h3>
+                                        {{ group.name }}
+                                    </h3>
+
+                                    <div class="employee-permissions__items">
+                                        @for (
+                                        permission of group.permissions;
+                                        track permission.id
+                                        ) {
+                                        <div class="employee-permissions__item"
+                                             [matTooltip]="permission.description"
+                                             matTooltipPosition="above">
+                                            <mat-checkbox [checked]="
+                                                                        hasEmpleadoPermission(
+                                                                            permission.id
+                                                                        )
+                                                                    "
+                                                          [disabled]="true">
+                                                {{ permission.name }}
+                                            </mat-checkbox>
+                                        </div>
+                                        }
+                                    </div>
+                                </section>
+                                }
+                            </div>
+                        </div>
+                    </mat-tab>
+                    }
                     <div class="employee-form__actions">
                         <button mat-button
                                 type="button"

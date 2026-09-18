@@ -8,11 +8,17 @@ import {
   readonly as readonlyField,
 } from '@angular/forms/signals';
 import { MatButton } from '@angular/material/button';
+import { MatCheckbox } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatTabsModule } from '@angular/material/tabs';
+import { MatTooltip } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
+import {
+  EMPLEADO_PERMISSION_GROUPS,
+  type EmpleadoPermissionGroup,
+} from '@constants/empleado-permissions.constants';
 import { GESTION_PERMISSIONS } from '@constants/gestion-permissions.constants';
 import type ActualizarEmpleadoCommand from '@desktop-contracts/configuration/empleados/actualizar-empleado-command.interface';
 import type CrearEmpleadoCommand from '@desktop-contracts/configuration/empleados/crear-empleado-command.interface';
@@ -33,7 +39,17 @@ import { getErrorMessage } from '@utils/error.utils';
   selector: 'otpv-management-employees',
   templateUrl: './management-employees.component.html',
   styleUrl: './management-employees.component.scss',
-  imports: [RouterLink, FormField, MatButton, MatFormFieldModule, MatIcon, MatInput, MatTabsModule],
+  imports: [
+    RouterLink,
+    FormField,
+    MatButton,
+    MatCheckbox,
+    MatFormFieldModule,
+    MatIcon,
+    MatInput,
+    MatTabsModule,
+    MatTooltip,
+  ],
 })
 export default class ManagementEmployeesComponent {
   private readonly empleadosService: EmpleadosService = inject(EmpleadosService);
@@ -46,6 +62,11 @@ export default class ManagementEmployeesComponent {
   readonly selectedEmpleado: WritableSignal<Empleado | null> = signal<Empleado | null>(null);
   readonly creatingEmpleado: WritableSignal<boolean> = signal<boolean>(false);
   readonly savingEmpleado: WritableSignal<boolean> = signal<boolean>(false);
+  readonly selectedEmpleadoPermisos: WritableSignal<readonly number[]> = signal<readonly number[]>(
+    [],
+  );
+  readonly empleadoPermissionGroups: readonly EmpleadoPermissionGroup[] =
+    EMPLEADO_PERMISSION_GROUPS;
   readonly empleadoDataModel: WritableSignal<EmpleadoDataFormModel> = signal<EmpleadoDataFormModel>(
     createEmpleadoDataFormInitialValue(null),
   );
@@ -66,6 +87,11 @@ export default class ManagementEmployeesComponent {
 
   readonly canUpdateEmpleado: Signal<boolean> = computed(
     (): boolean => this.gestionEmpleado()?.hasPerm(GESTION_PERMISSIONS.EMPLOYEES_UPDATE) ?? false,
+  );
+
+  readonly canManageEmpleadoPermissions: Signal<boolean> = computed(
+    (): boolean =>
+      this.gestionEmpleado()?.hasPerm(GESTION_PERMISSIONS.EMPLOYEES_PERMISSIONS) ?? false,
   );
 
   readonly canEditEmpleadoData: Signal<boolean> = computed((): boolean => {
@@ -133,10 +159,9 @@ export default class ManagementEmployeesComponent {
    */
   selectEmpleado(empleado: Empleado): void {
     this.creatingEmpleado.set(false);
-
     this.selectedEmpleado.set(empleado);
-
     this.resetEmpleadoDataForm(empleado);
+    this.resetEmpleadoPermissions(empleado);
   }
 
   /**
@@ -149,10 +174,9 @@ export default class ManagementEmployeesComponent {
     }
 
     this.selectedEmpleado.set(null);
-
     this.creatingEmpleado.set(true);
-
     this.resetEmpleadoDataForm(null);
+    this.resetEmpleadoPermissions(null);
   }
 
   /**
@@ -171,6 +195,7 @@ export default class ManagementEmployeesComponent {
       this.selectedEmpleado.set(null);
 
       this.resetEmpleadoDataForm(null);
+      this.resetEmpleadoPermissions(null);
 
       return;
     }
@@ -179,6 +204,7 @@ export default class ManagementEmployeesComponent {
 
     if (empleado !== null) {
       this.resetEmpleadoDataForm(empleado);
+      this.resetEmpleadoPermissions(empleado);
     }
   }
 
@@ -207,10 +233,10 @@ export default class ManagementEmployeesComponent {
         : await this.updateEmpleado(data);
 
       this.creatingEmpleado.set(false);
-
       this.selectedEmpleado.set(empleado);
 
       this.resetEmpleadoDataForm(empleado);
+      this.resetEmpleadoPermissions(empleado);
     } catch (error: unknown) {
       console.error('Error guardando el empleado:', error);
 
@@ -221,6 +247,14 @@ export default class ManagementEmployeesComponent {
     } finally {
       this.savingEmpleado.set(false);
     }
+  }
+
+  /**
+   * Indica si el permiso está seleccionado
+   * para el empleado mostrado actualmente.
+   */
+  hasEmpleadoPermission(permissionId: number): boolean {
+    return this.selectedEmpleadoPermisos().includes(permissionId);
   }
 
   private createEmpleado(data: EmpleadoDataFormModel): Promise<Empleado> {
@@ -260,6 +294,26 @@ export default class ManagementEmployeesComponent {
     };
 
     return this.empleadosService.update(empleado.id, command);
+  }
+
+  private resetEmpleadoPermissions(empleado: Empleado | null): void {
+    if (empleado === null) {
+      this.selectedEmpleadoPermisos.set([]);
+
+      return;
+    }
+
+    if (empleado.admin) {
+      this.selectedEmpleadoPermisos.set(
+        EMPLEADO_PERMISSION_GROUPS.flatMap((group: EmpleadoPermissionGroup): readonly number[] =>
+          group.permissions.map((permission): number => permission.id),
+        ),
+      );
+
+      return;
+    }
+
+    this.selectedEmpleadoPermisos.set([...empleado.permisos]);
   }
 
   private resetEmpleadoDataForm(empleado: Empleado | null): void {
