@@ -6,10 +6,14 @@ import type { EmpleadoDataFormModel } from '@model/empleados/empleado-data-form.
  * de datos de un empleado.
  */
 export default function empleadoDataFormSchema(path: SchemaPathTree<EmpleadoDataFormModel>): void {
+  required(path.nombre, {
+    message: 'El nombre del empleado es obligatorio.',
+  });
+
   validate(path.nombre, ({ value }) => {
     const nombre: string = value().trim();
 
-    if (nombre.length === 0) {
+    if (value() !== '' && nombre.length === 0) {
       return {
         kind: 'required',
         message: 'El nombre del empleado es obligatorio.',

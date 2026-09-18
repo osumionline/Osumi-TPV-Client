@@ -228,11 +228,11 @@
 
                                     @if (
                                     empleadoDataForm
-                                        .confirmPassword()
-                                        .touched() &&
+                                    .confirmPassword()
+                                    .touched() &&
                                     empleadoDataForm
-                                        .confirmPassword()
-                                        .invalid()
+                                    .confirmPassword()
+                                    .invalid()
                                     ) {
                                     <mat-error>
                                         {{
@@ -274,6 +274,35 @@
                             </div>
                         </div>
                     </mat-tab>
+                    <div class="employee-form__actions">
+                        <button mat-button
+                                type="button"
+                                [disabled]="
+                                    savingEmpleado() ||
+                                    (
+                                        !creatingEmpleado() &&
+                                        !empleadoDataForm().dirty()
+                                    )
+                                "
+                                (click)="cancelEmpleadoChanges()">
+                            Cancelar
+                        </button>
+
+                        <button mat-flat-button
+                                type="button"
+                                [disabled]="!canSaveEmpleado()"
+                                (click)="saveEmpleado()">
+                            <mat-icon>
+                                save
+                            </mat-icon>
+
+                            {{
+                                savingEmpleado()
+                                    ? 'Guardando…'
+                                    : 'Guardar'
+                            }}
+                        </button>
+                    </div>
                 </mat-tab-group>
             </form>
             }

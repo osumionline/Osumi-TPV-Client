@@ -1,16 +1,16 @@
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import type ActualizarEmpleadoCommand from '@desktop-contracts/configuration/empleados/actualizar-empleado-command.interface';
+import type CrearEmpleadoCommand from '@desktop-contracts/configuration/empleados/crear-empleado-command.interface';
 import type EmpleadoInterface from '@desktop-contracts/configuration/empleados/empleado.interface';
-import type Empleado from '@model/empleados/empleado.model';
+import Empleado from '@model/empleados/empleado.model';
 import ManagementEmployeesComponent from '@modules/gestion/pages/management-employees/management-employees.component';
 import EmpleadosService from '@services/empleados/empleados.service';
 import GestionSessionService from '@services/gestion/gestion-session.service';
 
 describe('ManagementEmployeesComponent', (): void => {
   let originalDesktopDescriptor: PropertyDescriptor | undefined;
-
   let empleadosService: EmpleadosService;
-
   let gestionSessionService: GestionSessionService;
 
   beforeEach(async (): Promise<void> => {
@@ -63,7 +63,6 @@ describe('ManagementEmployeesComponent', (): void => {
     }).compileComponents();
 
     empleadosService = TestBed.inject(EmpleadosService);
-
     gestionSessionService = TestBed.inject(GestionSessionService);
 
     await empleadosService.load();
@@ -243,7 +242,7 @@ describe('ManagementEmployeesComponent', (): void => {
   });
 
   it('prepara un formulario limpio al iniciar un alta', (): void => {
-    gestionSessionService.login(1);
+    gestionSessionService.login(2);
 
     const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
       ManagementEmployeesComponent,
@@ -316,5 +315,226 @@ describe('ManagementEmployeesComponent', (): void => {
     });
 
     expect(component.empleadoDataForm().dirty()).toBe(false);
+  });
+
+  it('crea un empleado con los datos del formulario', async (): Promise<void> => {
+    gestionSessionService.login(1);
+
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+
+    const createdEmpleado: Empleado = new Empleado();
+
+    createdEmpleado.id = 4;
+    createdEmpleado.publicId = 'empleado-4';
+    createdEmpleado.nombre = 'Leire';
+    createdEmpleado.hasPassword = true;
+    createdEmpleado.color = '#112233';
+    createdEmpleado.admin = false;
+    createdEmpleado.permisos = [];
+
+    const createSpy = vi.spyOn(empleadosService, 'create').mockResolvedValue(createdEmpleado);
+
+    component.startCreatingEmpleado();
+
+    component.empleadoDataForm.nombre().value.set('  Leire  ');
+
+    component.empleadoDataForm.password().value.set('clave');
+
+    component.empleadoDataForm.confirmPassword().value.set('clave');
+
+    component.empleadoDataForm.color().value.set('#112233');
+
+    await component.saveEmpleado();
+
+    expect(createSpy).toHaveBeenCalledWith({
+      nombre: 'Leire',
+      password: 'clave',
+      color: '#112233',
+      permisos: [],
+    } satisfies CrearEmpleadoCommand);
+
+    expect(component.creatingEmpleado()).toBe(false);
+
+    expect(component.selectedEmpleado()).toBe(createdEmpleado);
+
+    expect(component.empleadoDataForm().dirty()).toBe(false);
+  });
+
+  it('actualiza Datos conservando contraseña y permisos cuando la contraseña queda vacía', async (): Promise<void> => {
+    gestionSessionService.login(3);
+
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+
+    const empleado: Empleado | null = empleadosService.findById(1);
+
+    expect(empleado).not.toBeNull();
+
+    if (empleado === null) {
+      return;
+    }
+
+    const updatedEmpleado: Empleado = new Empleado();
+
+    updatedEmpleado.id = 1;
+    updatedEmpleado.publicId = 'empleado-1';
+    updatedEmpleado.nombre = 'Zuriñe nueva';
+    updatedEmpleado.hasPassword = true;
+    updatedEmpleado.color = '#445566';
+    updatedEmpleado.admin = false;
+    updatedEmpleado.permisos = [...empleado.permisos];
+
+    const updateSpy = vi.spyOn(empleadosService, 'update').mockResolvedValue(updatedEmpleado);
+
+    component.selectEmpleado(empleado);
+
+    component.empleadoDataForm.nombre().value.set('Zuriñe nueva');
+
+    component.empleadoDataForm.color().value.set('#445566');
+
+    await component.saveEmpleado();
+
+    expect(updateSpy).toHaveBeenCalledWith(1, {
+      nombre: 'Zuriñe nueva',
+      password: null,
+      color: '#445566',
+      permisos: [...empleado.permisos],
+    } satisfies ActualizarEmpleadoCommand);
+
+    expect(component.selectedEmpleado()).toBe(updatedEmpleado);
+
+    expect(component.empleadoDataForm.password().value()).toBe('');
+  });
+
+  it('envía la nueva contraseña cuando se modifica', async (): Promise<void> => {
+    gestionSessionService.login(3);
+
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+
+    const empleado: Empleado | null = empleadosService.findById(1);
+
+    expect(empleado).not.toBeNull();
+
+    if (empleado === null) {
+      return;
+    }
+
+    const updateSpy = vi.spyOn(empleadosService, 'update').mockResolvedValue(empleado);
+
+    component.selectEmpleado(empleado);
+
+    component.empleadoDataForm.password().value.set('nueva-clave');
+
+    component.empleadoDataForm.confirmPassword().value.set('nueva-clave');
+
+    await component.saveEmpleado();
+
+    expect(updateSpy).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        password: 'nueva-clave',
+      }),
+    );
+  });
+
+  it('no permite modificar Datos sin el permiso 21', async (): Promise<void> => {
+    gestionSessionService.login(1);
+
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+    const empleado: Empleado | null = empleadosService.findById(3);
+
+    expect(empleado).not.toBeNull();
+
+    if (empleado === null) {
+      return;
+    }
+
+    const updateSpy = vi.spyOn(empleadosService, 'update');
+
+    component.selectEmpleado(empleado);
+
+    expect(component.canUpdateEmpleado()).toBe(false);
+    expect(component.canEditEmpleadoData()).toBe(false);
+    expect(component.empleadoDataForm.nombre().readonly()).toBe(true);
+    expect(component.empleadoDataForm.password().readonly()).toBe(true);
+    expect(component.empleadoDataForm.confirmPassword().readonly()).toBe(true);
+    expect(component.empleadoDataForm.color().disabled()).toBe(true);
+
+    component.empleadoDataForm.nombre().value.set('No permitido');
+
+    await component.saveEmpleado();
+
+    expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  it('restaura los datos originales al cancelar una edición', (): void => {
+    gestionSessionService.login(3);
+
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+
+    const empleado: Empleado | null = empleadosService.findById(1);
+
+    expect(empleado).not.toBeNull();
+
+    if (empleado === null) {
+      return;
+    }
+
+    component.selectEmpleado(empleado);
+
+    component.empleadoDataForm.nombre().value.set('Nombre temporal');
+
+    component.empleadoDataForm.password().value.set('temporal');
+
+    component.cancelEmpleadoChanges();
+
+    expect(component.empleadoDataModel()).toEqual({
+      mode: 'edit',
+      nombre: 'Zuriñe',
+      password: '',
+      confirmPassword: '',
+      color: '#336699',
+    });
+
+    expect(component.empleadoDataForm().dirty()).toBe(false);
+  });
+
+  it('sale del modo alta al cancelar', (): void => {
+    gestionSessionService.login(1);
+
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+
+    component.startCreatingEmpleado();
+
+    component.empleadoDataForm.nombre().value.set('Temporal');
+
+    component.cancelEmpleadoChanges();
+
+    expect(component.creatingEmpleado()).toBe(false);
+
+    expect(component.selectedEmpleado()).toBeNull();
   });
 });
