@@ -30,6 +30,7 @@ import { DialogService } from '@osumi/angular-tools';
 import EmpleadosService from '@services/empleados/empleados.service';
 import GestionSessionService from '@services/gestion/gestion-session.service';
 import { getErrorMessage } from '@utils/error.utils';
+import { firstValueFrom } from 'rxjs';
 
 /**
  * Muestra y permite seleccionar los empleados
@@ -62,6 +63,7 @@ export default class ManagementEmployeesComponent {
   readonly selectedEmpleado: WritableSignal<Empleado | null> = signal<Empleado | null>(null);
   readonly creatingEmpleado: WritableSignal<boolean> = signal<boolean>(false);
   readonly savingEmpleado: WritableSignal<boolean> = signal<boolean>(false);
+  readonly deletingEmpleado: WritableSignal<boolean> = signal<boolean>(false);
   readonly saveSuccessful: WritableSignal<boolean> = signal<boolean>(false);
 
   private saveFeedbackTimeoutId: number | null = null;
@@ -95,6 +97,42 @@ export default class ManagementEmployeesComponent {
   readonly canUpdateEmpleado: Signal<boolean> = computed(
     (): boolean => this.gestionEmpleado()?.hasPerm(GESTION_PERMISSIONS.EMPLOYEES_UPDATE) ?? false,
   );
+  
+  readonly canDeleteEmpleado:
+  Signal<boolean> =
+  computed(
+    (): boolean =>
+      this.gestionEmpleado()?.hasPerm(
+        GESTION_PERMISSIONS
+          .EMPLOYEES_DELETE,
+      ) ?? false,
+  );
+
+readonly canDeleteSelectedEmpleado:
+  Signal<boolean> =
+  computed((): boolean => {
+    const gestionEmpleado:
+      Empleado | null =
+      this.gestionEmpleado();
+    const selectedEmpleado:
+      Empleado | null =
+      this.selectedEmpleado();
+    if (
+      gestionEmpleado === null ||
+      selectedEmpleado === null ||
+      selectedEmpleado.id === null
+    ) {
+      return false;
+    }
+    return (
+      this.canDeleteEmpleado() &&
+      !this.creatingEmpleado() &&
+      !this.savingEmpleado() &&
+      !this.deletingEmpleado() &&
+      selectedEmpleado.id !==
+        gestionEmpleado.id
+    );
+  });
 
   readonly canManageEmpleadoPermissions: Signal<boolean> = computed(
     (): boolean =>
@@ -250,6 +288,82 @@ export default class ManagementEmployeesComponent {
       this.resetEmpleadoPermissions(empleado);
     }
   }
+  
+  /**
+ * Solicita confirmación y da de baja
+ * al empleado seleccionado.
+ *
+ * El empleado autenticado nunca puede
+ * eliminarse a sí mismo.
+ */
+async deleteEmpleado(): Promise<void> {
+  if (
+    !this.canDeleteSelectedEmpleado()
+  ) {
+    return;
+  }
+  const empleado:
+    Empleado | null =
+    this.selectedEmpleado();
+  if (
+    empleado === null ||
+    empleado.id === null
+  ) {
+    return;
+  }
+  const confirmed: boolean =
+    await firstValueFrom(
+      this.dialog.confirm({
+        title:
+          'Eliminar empleado',
+        content:
+          `¿Estás seguro de querer eliminar al empleado "${empleado.nombre}"? ` +
+          'El empleado dejará de estar disponible en la aplicación.',
+        warn: true,
+        ok: 'Eliminar',
+        cancel: 'Cancelar',
+      }),
+    );
+  if (!confirmed) {
+    return;
+  }
+  this.clearSaveFeedback();
+  this.deletingEmpleado.set(true);
+  try {
+    await this.empleadosService
+      .deactivate(
+        empleado.id,
+      );
+    this.selectedEmpleado.set(
+      null,
+    );
+    this.creatingEmpleado.set(
+      false,
+    );
+    this.resetEmpleadoDataForm(
+      null,
+    );
+    this.resetEmpleadoPermissions(
+      null,
+    );
+  } catch (error: unknown) {
+    console.error(
+      'Error eliminando el empleado:',
+      error,
+    );
+    this.dialog.alert({
+      title: 'Error',
+      content: getErrorMessage(
+        error,
+        'No se ha podido eliminar el empleado.',
+      ),
+    });
+  } finally {
+    this.deletingEmpleado.set(
+      false,
+    );
+  }
+}
 
   /**
    * Valida y persiste los datos del empleado

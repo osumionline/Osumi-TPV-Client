@@ -7,11 +7,14 @@ import Empleado from '@model/empleados/empleado.model';
 import ManagementEmployeesComponent from '@modules/gestion/pages/management-employees/management-employees.component';
 import EmpleadosService from '@services/empleados/empleados.service';
 import GestionSessionService from '@services/gestion/gestion-session.service';
+import { DialogService } from '@osumi/angular-tools';
+import { of } from 'rxjs';
 
 describe('ManagementEmployeesComponent', (): void => {
   let originalDesktopDescriptor: PropertyDescriptor | undefined;
   let empleadosService: EmpleadosService;
   let gestionSessionService: GestionSessionService;
+  let dialog: DialogService;
 
   beforeEach(async (): Promise<void> => {
     originalDesktopDescriptor = Object.getOwnPropertyDescriptor(window, 'osumiDesktop');
@@ -52,6 +55,7 @@ describe('ManagementEmployeesComponent', (): void => {
       value: {
         empleados: {
           getAll: (): Promise<readonly EmpleadoInterface[]> => Promise.resolve(empleados),
+          deactivate: (): Promise<void> => Promise.resolve(),
         },
       },
     });
@@ -64,6 +68,7 @@ describe('ManagementEmployeesComponent', (): void => {
 
     empleadosService = TestBed.inject(EmpleadosService);
     gestionSessionService = TestBed.inject(GestionSessionService);
+    dialog = TestBed.inject(DialogService);
 
     await empleadosService.load();
   });
@@ -910,4 +915,204 @@ describe('ManagementEmployeesComponent', (): void => {
       vi.useRealTimers();
     }
   });
+  
+  it(
+  'elimina otro empleado después de confirmarlo',
+  async (): Promise<void> => {
+    gestionSessionService.login(2);
+    const fixture:
+      ComponentFixture<
+        ManagementEmployeesComponent
+      > =
+      TestBed.createComponent(
+        ManagementEmployeesComponent,
+      );
+    const component:
+      ManagementEmployeesComponent =
+      fixture.componentInstance;
+    const empleado:
+      Empleado | null =
+      empleadosService.findById(1);
+    expect(
+      empleado,
+    ).not.toBeNull();
+    if (empleado === null) {
+      return;
+    }
+    vi.spyOn(
+      dialog,
+      'confirm',
+    ).mockReturnValue(
+      of(true),
+    );
+    const deactivateSpy =
+      vi.spyOn(
+        empleadosService,
+        'deactivate',
+      );
+    component.selectEmpleado(
+      empleado,
+    );
+    expect(
+      component.canDeleteEmpleado(),
+    ).toBe(true);
+    expect(
+      component
+        .canDeleteSelectedEmpleado(),
+    ).toBe(true);
+    await component.deleteEmpleado();
+    expect(
+      deactivateSpy,
+    ).toHaveBeenCalledWith(1);
+    expect(
+      empleadosService.findById(1),
+    ).toBeNull();
+    expect(
+      component.selectedEmpleado(),
+    ).toBeNull();
+  },
+);
+
+it(
+  'no elimina el empleado si se cancela la confirmación',
+  async (): Promise<void> => {
+    gestionSessionService.login(2);
+    const fixture:
+      ComponentFixture<
+        ManagementEmployeesComponent
+      > =
+      TestBed.createComponent(
+        ManagementEmployeesComponent,
+      );
+    const component:
+      ManagementEmployeesComponent =
+      fixture.componentInstance;
+    const empleado:
+      Empleado | null =
+      empleadosService.findById(1);
+    expect(
+      empleado,
+    ).not.toBeNull();
+    if (empleado === null) {
+      return;
+    }
+    vi.spyOn(
+      dialog,
+      'confirm',
+    ).mockReturnValue(
+      of(false),
+    );
+    const deactivateSpy =
+      vi.spyOn(
+        empleadosService,
+        'deactivate',
+      );
+    component.selectEmpleado(
+      empleado,
+    );
+    await component.deleteEmpleado();
+    expect(
+      deactivateSpy,
+    ).not.toHaveBeenCalled();
+    expect(
+      component.selectedEmpleado(),
+    ).toBe(empleado);
+    expect(
+      empleadosService.findById(1),
+    ).toBe(empleado);
+  },
+);
+
+it(
+  'no permite eliminar empleados sin el permiso 22',
+  async (): Promise<void> => {
+    gestionSessionService.login(3);
+    const fixture:
+      ComponentFixture<
+        ManagementEmployeesComponent
+      > =
+      TestBed.createComponent(
+        ManagementEmployeesComponent,
+      );
+    const component:
+      ManagementEmployeesComponent =
+      fixture.componentInstance;
+    const empleado:
+      Empleado | null =
+      empleadosService.findById(1);
+    expect(
+      empleado,
+    ).not.toBeNull();
+    if (empleado === null) {
+      return;
+    }
+    const deactivateSpy =
+      vi.spyOn(
+        empleadosService,
+        'deactivate',
+      );
+    component.selectEmpleado(
+      empleado,
+    );
+    expect(
+      component.canDeleteEmpleado(),
+    ).toBe(false);
+    expect(
+      component
+        .canDeleteSelectedEmpleado(),
+    ).toBe(false);
+    await component.deleteEmpleado();
+    expect(
+      deactivateSpy,
+    ).not.toHaveBeenCalled();
+  },
+);
+
+it(
+  'no permite que el empleado autenticado se elimine a sí mismo',
+  async (): Promise<void> => {
+    gestionSessionService.login(2);
+    const fixture:
+      ComponentFixture<
+        ManagementEmployeesComponent
+      > =
+      TestBed.createComponent(
+        ManagementEmployeesComponent,
+      );
+    const component:
+      ManagementEmployeesComponent =
+      fixture.componentInstance;
+    const empleado:
+      Empleado | null =
+      empleadosService.findById(2);
+    expect(
+      empleado,
+    ).not.toBeNull();
+    if (empleado === null) {
+      return;
+    }
+    const deactivateSpy =
+      vi.spyOn(
+        empleadosService,
+        'deactivate',
+      );
+    component.selectEmpleado(
+      empleado,
+    );
+    expect(
+      component.canDeleteEmpleado(),
+    ).toBe(true);
+    expect(
+      component
+        .canDeleteSelectedEmpleado(),
+    ).toBe(false);
+    await component.deleteEmpleado();
+    expect(
+      deactivateSpy,
+    ).not.toHaveBeenCalled();
+    expect(
+      component.selectedEmpleado(),
+    ).toBe(empleado);
+  },
+);
 });
