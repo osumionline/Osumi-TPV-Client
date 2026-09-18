@@ -14,12 +14,18 @@ import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltip } from '@angular/material/tooltip';
-import { RouterLink } from '@angular/router';
+import {
+  Router,
+  RouterLink,
+} from '@angular/router';
 import {
   EMPLEADO_PERMISSION_GROUPS,
   type EmpleadoPermissionGroup,
 } from '@constants/empleado-permissions.constants';
-import { GESTION_PERMISSIONS } from '@constants/gestion-permissions.constants';
+import {
+  GESTION_EMPLOYEES_PERMISSIONS,
+  GESTION_PERMISSIONS,
+} from '@constants/gestion-permissions.constants';
 import type ActualizarEmpleadoCommand from '@desktop-contracts/configuration/empleados/actualizar-empleado-command.interface';
 import type CrearEmpleadoCommand from '@desktop-contracts/configuration/empleados/crear-empleado-command.interface';
 import createEmpleadoDataFormInitialValue from '@model/empleados/empleado-data-form.initial-value';
@@ -56,6 +62,7 @@ export default class ManagementEmployeesComponent {
   private readonly empleadosService: EmpleadosService = inject(EmpleadosService);
   private readonly gestionSessionService: GestionSessionService = inject(GestionSessionService);
   private readonly dialog: DialogService = inject(DialogService);
+  private readonly router: Router = inject(Router);
 
   readonly empleados: Signal<readonly Empleado[]> = this.empleadosService.empleados;
 
@@ -401,22 +408,39 @@ async deleteEmpleado(): Promise<void> {
       return;
     }
 
-    const data: EmpleadoDataFormModel = this.empleadoDataModel();
-
-    this.clearSaveFeedback();
-    this.savingEmpleado.set(true);
-
-    try {
-      const empleado: Empleado = this.creatingEmpleado()
-        ? await this.createEmpleado(data)
-        : await this.updateEmpleado(data);
-
-      this.creatingEmpleado.set(false);
-      this.selectedEmpleado.set(empleado);
-
-      this.resetEmpleadoDataForm(empleado);
-      this.resetEmpleadoPermissions(empleado);
-      this.showSaveFeedback();
+    const data: EmpleadoDataFormModel =
+  this.empleadoDataModel();
+const wasCreatingEmpleado: boolean =
+  this.creatingEmpleado();
+this.clearSaveFeedback();
+this.savingEmpleado.set(true);
+try {
+  const empleado: Empleado =
+    wasCreatingEmpleado
+      ? await this.createEmpleado(data)
+      : await this.updateEmpleado(data);
+  this.creatingEmpleado.set(false);
+  this.selectedEmpleado.set(empleado);
+  this.resetEmpleadoDataForm(empleado);
+  this.resetEmpleadoPermissions(empleado);
+  const gestionEmpleadoId:
+    number | null =
+    this.gestionSessionService
+      .empleadoId();
+  if (
+    !wasCreatingEmpleado &&
+    empleado.id !== null &&
+    empleado.id === gestionEmpleadoId &&
+    !empleado.hasAnyPerm(
+      GESTION_EMPLOYEES_PERMISSIONS,
+    )
+  ) {
+    await this.router.navigate([
+      '/gestion',
+    ]);
+    return;
+  }
+  this.showSaveFeedback();
     } catch (error: unknown) {
       console.error('Error guardando el empleado:', error);
 
