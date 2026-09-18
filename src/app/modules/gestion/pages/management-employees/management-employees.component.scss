@@ -23,10 +23,12 @@
 .management-employees__layout {
     display: grid;
     grid-template-columns:
-        minmax(260px, 320px) minmax(0, 1fr);
+        minmax(260px, 320px)
+        minmax(0, 1fr);
     min-height: 560px;
     overflow: hidden;
-    border: 1px solid var(--mat-sys-outline-variant);
+    border: 1px solid
+        var(--mat-sys-outline-variant);
     border-radius: 16px;
     background:
         var(--mat-sys-surface);
@@ -38,12 +40,18 @@
     flex-direction: column;
     gap: 16px;
     padding: 16px;
-    border-right: 1px solid var(--mat-sys-outline-variant);
+    border-right: 1px solid
+        var(--mat-sys-outline-variant);
     background:
         var(--mat-sys-surface-container-low);
 
     &__search {
         width: 100%;
+    }
+
+    &__create {
+        width: 100%;
+        flex: 0 0 auto;
     }
 }
 
@@ -77,7 +85,8 @@
         }
 
         &:focus-visible {
-            outline: 3px solid var(--mat-sys-primary);
+            outline: 3px solid
+                var(--mat-sys-primary);
             outline-offset: 2px;
         }
 
@@ -183,6 +192,13 @@
             height: auto;
             font-size: 2rem;
         }
+
+        &--new {
+            background:
+                var(--mat-sys-primary-container);
+            color:
+                var(--mat-sys-on-primary-container);
+        }
     }
 
     &__eyebrow {
@@ -200,7 +216,8 @@
 
     .employee-sidebar {
         border-right: 0;
-        border-bottom: 1px solid var(--mat-sys-outline-variant);
+        border-bottom: 1px solid
+            var(--mat-sys-outline-variant);
     }
 
     .employee-list {

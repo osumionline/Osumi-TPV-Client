@@ -51,6 +51,7 @@
                 <button type="button"
                         class="employee-list__item"
                         [class.employee-list__item--selected]="
+                            !creatingEmpleado() &&
                             selectedEmpleado()?.id === empleado.id
                         "
                         [style.backgroundColor]="empleado.color"
@@ -88,10 +89,50 @@
                 </div>
                 }
             </div>
+
+            @if (canCreateEmpleado()) {
+            <button mat-flat-button
+                    type="button"
+                    class="employee-sidebar__create"
+                    (click)="startCreatingEmpleado()">
+                <mat-icon>
+                    person_add
+                </mat-icon>
+
+                Nuevo empleado
+            </button>
+            }
         </aside>
 
         <main class="employee-content">
-            @if (selectedEmpleado(); as empleado) {
+            @if (creatingEmpleado()) {
+            <div class="employee-content__selected">
+                <div class="
+                    employee-content__avatar
+                    employee-content__avatar--new
+                ">
+                    <mat-icon aria-hidden="true">
+                        person_add
+                    </mat-icon>
+                </div>
+
+                <div>
+                    <p class="employee-content__eyebrow">
+                        Nuevo empleado
+                    </p>
+
+                    <h2>
+                        Crear empleado
+                    </h2>
+
+                    <p>
+                        En el siguiente paso podrás introducir
+                        sus datos y configurar sus permisos.
+                    </p>
+                </div>
+            </div>
+            }
+            @else if (selectedEmpleado(); as empleado) {
             <div class="employee-content__selected">
                 <div class="employee-content__avatar"
                      [style.backgroundColor]="empleado.color"
