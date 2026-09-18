@@ -62,6 +62,10 @@ export default class ManagementEmployeesComponent {
   readonly selectedEmpleado: WritableSignal<Empleado | null> = signal<Empleado | null>(null);
   readonly creatingEmpleado: WritableSignal<boolean> = signal<boolean>(false);
   readonly savingEmpleado: WritableSignal<boolean> = signal<boolean>(false);
+  readonly saveSuccessful: WritableSignal<boolean> = signal<boolean>(false);
+
+  private saveFeedbackTimeoutId: number | null = null;
+
   readonly selectedEmpleadoPermisos: WritableSignal<readonly number[]> = signal<readonly number[]>(
     [],
   );
@@ -194,6 +198,7 @@ export default class ManagementEmployeesComponent {
    * en el área principal.
    */
   selectEmpleado(empleado: Empleado): void {
+    this.clearSaveFeedback();
     this.creatingEmpleado.set(false);
     this.selectedEmpleado.set(empleado);
     this.resetEmpleadoDataForm(empleado);
@@ -208,6 +213,7 @@ export default class ManagementEmployeesComponent {
     if (!this.canCreateEmpleado()) {
       return;
     }
+    this.clearSaveFeedback();
 
     this.selectedEmpleado.set(null);
     this.creatingEmpleado.set(true);
@@ -225,6 +231,7 @@ export default class ManagementEmployeesComponent {
     if (this.savingEmpleado()) {
       return;
     }
+    this.clearSaveFeedback();
 
     if (this.creatingEmpleado()) {
       this.creatingEmpleado.set(false);
@@ -282,6 +289,7 @@ export default class ManagementEmployeesComponent {
 
     const data: EmpleadoDataFormModel = this.empleadoDataModel();
 
+    this.clearSaveFeedback();
     this.savingEmpleado.set(true);
 
     try {
@@ -294,6 +302,7 @@ export default class ManagementEmployeesComponent {
 
       this.resetEmpleadoDataForm(empleado);
       this.resetEmpleadoPermissions(empleado);
+      this.showSaveFeedback();
     } catch (error: unknown) {
       console.error('Error guardando el empleado:', error);
 
@@ -414,6 +423,35 @@ export default class ManagementEmployeesComponent {
     return [...new Set<number>(permisos)].sort(
       (first: number, second: number): number => first - second,
     );
+  }
+
+  /**
+   * Muestra temporalmente la confirmación
+   * de que el empleado se ha guardado.
+   */
+  private showSaveFeedback(): void {
+    this.clearSaveFeedback();
+
+    this.saveSuccessful.set(true);
+
+    this.saveFeedbackTimeoutId = window.setTimeout((): void => {
+      this.saveSuccessful.set(false);
+
+      this.saveFeedbackTimeoutId = null;
+    }, 4_000);
+  }
+
+  /**
+   * Oculta la confirmación de guardado activa.
+   */
+  private clearSaveFeedback(): void {
+    if (this.saveFeedbackTimeoutId !== null) {
+      window.clearTimeout(this.saveFeedbackTimeoutId);
+
+      this.saveFeedbackTimeoutId = null;
+    }
+
+    this.saveSuccessful.set(false);
   }
 
   private resetEmpleadoDataForm(empleado: Empleado | null): void {

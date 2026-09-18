@@ -858,4 +858,56 @@ describe('ManagementEmployeesComponent', (): void => {
       permisos: [18, 25],
     } satisfies CrearEmpleadoCommand);
   });
+
+  it('muestra temporalmente la confirmación después de guardar', async (): Promise<void> => {
+    vi.useFakeTimers();
+
+    try {
+      gestionSessionService.login(3);
+
+      const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+        ManagementEmployeesComponent,
+      );
+
+      const component: ManagementEmployeesComponent = fixture.componentInstance;
+
+      const empleado: Empleado | null = empleadosService.findById(1);
+
+      expect(empleado).not.toBeNull();
+
+      if (empleado === null) {
+        return;
+      }
+
+      const updatedEmpleado: Empleado = new Empleado();
+
+      updatedEmpleado.id = empleado.id;
+      updatedEmpleado.publicId = empleado.publicId;
+      updatedEmpleado.nombre = 'Zuriñe nueva';
+      updatedEmpleado.hasPassword = true;
+      updatedEmpleado.color = empleado.color;
+      updatedEmpleado.admin = false;
+      updatedEmpleado.permisos = [...empleado.permisos];
+
+      vi.spyOn(empleadosService, 'update').mockResolvedValue(updatedEmpleado);
+
+      component.selectEmpleado(empleado);
+
+      component.empleadoDataForm.nombre().value.set('Zuriñe nueva');
+
+      await component.saveEmpleado();
+
+      expect(component.saveSuccessful()).toBe(true);
+
+      vi.advanceTimersByTime(3_999);
+
+      expect(component.saveSuccessful()).toBe(true);
+
+      vi.advanceTimersByTime(1);
+
+      expect(component.saveSuccessful()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

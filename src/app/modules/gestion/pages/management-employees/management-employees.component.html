@@ -341,6 +341,14 @@
                     }
                 </mat-tab-group>
                 <div class="employee-form__actions">
+                    @if (saveSuccessful()) {
+                    <span class="employee-form__save-feedback"
+                          role="status"
+                          aria-live="polite">
+                        Empleado guardado correctamente
+                    </span>
+                    }
+
                     <button mat-button
                             type="button"
                             [disabled]="
