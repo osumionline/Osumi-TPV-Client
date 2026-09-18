@@ -29,7 +29,7 @@
     border: 1px solid var(--mat-sys-outline-variant);
     border-radius: 16px;
     background:
-        var(--mat-sys-surface);
+        var(--mat-sys-surface-container-low);
 }
 
 .employee-sidebar {
@@ -130,6 +130,8 @@
 .employee-content {
     min-width: 0;
     padding: 32px;
+    background:
+        var(--mat-sys-surface);
 
     &__welcome {
         display: grid;
