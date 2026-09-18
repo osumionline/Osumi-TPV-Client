@@ -341,30 +341,30 @@
                     }
                 </mat-tab-group>
                 <div class="employee-form__actions">
-                	@if (
-canDeleteEmpleado() &&
-!creatingEmpleado() &&
-selectedEmpleado() !== null
-) {
-<button mat-button
-        type="button"
-        class="employee-form__delete"
-        [disabled]="
-            !canDeleteSelectedEmpleado()
-        "
-        (click)="deleteEmpleado()">
-    <mat-icon>
-        delete
-    </mat-icon>
-    {{
-        deletingEmpleado()
-            ? 'Eliminando…'
-            : 'Eliminar'
-    }}
-</button>
-}
-<span class="employee-form__actions-spacer">
-</span>
+                    @if (
+                    canDeleteEmpleado() &&
+                    !creatingEmpleado() &&
+                    selectedEmpleado() !== null
+                    ) {
+                    <button mat-button
+                            type="button"
+                            class="employee-form__delete"
+                            [disabled]="
+                                !canDeleteSelectedEmpleado()
+                            "
+                            (click)="deleteEmpleado()">
+                        <mat-icon>
+                            delete
+                        </mat-icon>
+                        {{
+                            deletingEmpleado()
+                                ? 'Eliminando…'
+                                : 'Eliminar'
+                        }}
+                    </button>
+                    }
+                    <span class="employee-form__actions-spacer">
+                    </span>
 
                     @if (saveSuccessful()) {
                     <span class="employee-form__save-feedback"

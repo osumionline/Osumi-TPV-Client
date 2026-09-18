@@ -1,16 +1,13 @@
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
-import {
-  provideRouter,
-  Router,
-} from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import type ActualizarEmpleadoCommand from '@desktop-contracts/configuration/empleados/actualizar-empleado-command.interface';
 import type CrearEmpleadoCommand from '@desktop-contracts/configuration/empleados/crear-empleado-command.interface';
 import type EmpleadoInterface from '@desktop-contracts/configuration/empleados/empleado.interface';
 import Empleado from '@model/empleados/empleado.model';
 import ManagementEmployeesComponent from '@modules/gestion/pages/management-employees/management-employees.component';
+import { DialogService } from '@osumi/angular-tools';
 import EmpleadosService from '@services/empleados/empleados.service';
 import GestionSessionService from '@services/gestion/gestion-session.service';
-import { DialogService } from '@osumi/angular-tools';
 import { of } from 'rxjs';
 
 describe('ManagementEmployeesComponent', (): void => {
@@ -920,367 +917,152 @@ describe('ManagementEmployeesComponent', (): void => {
       vi.useRealTimers();
     }
   });
-  
-  it(
-  'elimina otro empleado después de confirmarlo',
-  async (): Promise<void> => {
+
+  it('elimina otro empleado después de confirmarlo', async (): Promise<void> => {
     gestionSessionService.login(2);
-    const fixture:
-      ComponentFixture<
-        ManagementEmployeesComponent
-      > =
-      TestBed.createComponent(
-        ManagementEmployeesComponent,
-      );
-    const component:
-      ManagementEmployeesComponent =
-      fixture.componentInstance;
-    const empleado:
-      Empleado | null =
-      empleadosService.findById(1);
-    expect(
-      empleado,
-    ).not.toBeNull();
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+    const empleado: Empleado | null = empleadosService.findById(1);
+    expect(empleado).not.toBeNull();
     if (empleado === null) {
       return;
     }
-    vi.spyOn(
-      dialog,
-      'confirm',
-    ).mockReturnValue(
-      of(true),
-    );
-    const deactivateSpy =
-      vi.spyOn(
-        empleadosService,
-        'deactivate',
-      );
-    component.selectEmpleado(
-      empleado,
-    );
-    expect(
-      component.canDeleteEmpleado(),
-    ).toBe(true);
-    expect(
-      component
-        .canDeleteSelectedEmpleado(),
-    ).toBe(true);
+    vi.spyOn(dialog, 'confirm').mockReturnValue(of(true));
+    const deactivateSpy = vi.spyOn(empleadosService, 'deactivate');
+    component.selectEmpleado(empleado);
+    expect(component.canDeleteEmpleado()).toBe(true);
+    expect(component.canDeleteSelectedEmpleado()).toBe(true);
     await component.deleteEmpleado();
-    expect(
-      deactivateSpy,
-    ).toHaveBeenCalledWith(1);
-    expect(
-      empleadosService.findById(1),
-    ).toBeNull();
-    expect(
-      component.selectedEmpleado(),
-    ).toBeNull();
-  },
-);
+    expect(deactivateSpy).toHaveBeenCalledWith(1);
+    expect(empleadosService.findById(1)).toBeNull();
+    expect(component.selectedEmpleado()).toBeNull();
+  });
 
-it(
-  'no elimina el empleado si se cancela la confirmación',
-  async (): Promise<void> => {
+  it('no elimina el empleado si se cancela la confirmación', async (): Promise<void> => {
     gestionSessionService.login(2);
-    const fixture:
-      ComponentFixture<
-        ManagementEmployeesComponent
-      > =
-      TestBed.createComponent(
-        ManagementEmployeesComponent,
-      );
-    const component:
-      ManagementEmployeesComponent =
-      fixture.componentInstance;
-    const empleado:
-      Empleado | null =
-      empleadosService.findById(1);
-    expect(
-      empleado,
-    ).not.toBeNull();
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+    const empleado: Empleado | null = empleadosService.findById(1);
+    expect(empleado).not.toBeNull();
     if (empleado === null) {
       return;
     }
-    vi.spyOn(
-      dialog,
-      'confirm',
-    ).mockReturnValue(
-      of(false),
-    );
-    const deactivateSpy =
-      vi.spyOn(
-        empleadosService,
-        'deactivate',
-      );
-    component.selectEmpleado(
-      empleado,
-    );
+    vi.spyOn(dialog, 'confirm').mockReturnValue(of(false));
+    const deactivateSpy = vi.spyOn(empleadosService, 'deactivate');
+    component.selectEmpleado(empleado);
     await component.deleteEmpleado();
-    expect(
-      deactivateSpy,
-    ).not.toHaveBeenCalled();
-    expect(
-      component.selectedEmpleado(),
-    ).toBe(empleado);
-    expect(
-      empleadosService.findById(1),
-    ).toBe(empleado);
-  },
-);
+    expect(deactivateSpy).not.toHaveBeenCalled();
+    expect(component.selectedEmpleado()).toBe(empleado);
+    expect(empleadosService.findById(1)).toBe(empleado);
+  });
 
-it(
-  'no permite eliminar empleados sin el permiso 22',
-  async (): Promise<void> => {
+  it('no permite eliminar empleados sin el permiso 22', async (): Promise<void> => {
     gestionSessionService.login(3);
-    const fixture:
-      ComponentFixture<
-        ManagementEmployeesComponent
-      > =
-      TestBed.createComponent(
-        ManagementEmployeesComponent,
-      );
-    const component:
-      ManagementEmployeesComponent =
-      fixture.componentInstance;
-    const empleado:
-      Empleado | null =
-      empleadosService.findById(1);
-    expect(
-      empleado,
-    ).not.toBeNull();
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+    const empleado: Empleado | null = empleadosService.findById(1);
+    expect(empleado).not.toBeNull();
     if (empleado === null) {
       return;
     }
-    const deactivateSpy =
-      vi.spyOn(
-        empleadosService,
-        'deactivate',
-      );
-    component.selectEmpleado(
-      empleado,
-    );
-    expect(
-      component.canDeleteEmpleado(),
-    ).toBe(false);
-    expect(
-      component
-        .canDeleteSelectedEmpleado(),
-    ).toBe(false);
+    const deactivateSpy = vi.spyOn(empleadosService, 'deactivate');
+    component.selectEmpleado(empleado);
+    expect(component.canDeleteEmpleado()).toBe(false);
+    expect(component.canDeleteSelectedEmpleado()).toBe(false);
     await component.deleteEmpleado();
-    expect(
-      deactivateSpy,
-    ).not.toHaveBeenCalled();
-  },
-);
+    expect(deactivateSpy).not.toHaveBeenCalled();
+  });
 
-it(
-  'no permite que el empleado autenticado se elimine a sí mismo',
-  async (): Promise<void> => {
+  it('no permite que el empleado autenticado se elimine a sí mismo', async (): Promise<void> => {
     gestionSessionService.login(2);
-    const fixture:
-      ComponentFixture<
-        ManagementEmployeesComponent
-      > =
-      TestBed.createComponent(
-        ManagementEmployeesComponent,
-      );
-    const component:
-      ManagementEmployeesComponent =
-      fixture.componentInstance;
-    const empleado:
-      Empleado | null =
-      empleadosService.findById(2);
-    expect(
-      empleado,
-    ).not.toBeNull();
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+    const empleado: Empleado | null = empleadosService.findById(2);
+    expect(empleado).not.toBeNull();
     if (empleado === null) {
       return;
     }
-    const deactivateSpy =
-      vi.spyOn(
-        empleadosService,
-        'deactivate',
-      );
-    component.selectEmpleado(
-      empleado,
-    );
-    expect(
-      component.canDeleteEmpleado(),
-    ).toBe(true);
-    expect(
-      component
-        .canDeleteSelectedEmpleado(),
-    ).toBe(false);
+    const deactivateSpy = vi.spyOn(empleadosService, 'deactivate');
+    component.selectEmpleado(empleado);
+    expect(component.canDeleteEmpleado()).toBe(true);
+    expect(component.canDeleteSelectedEmpleado()).toBe(false);
     await component.deleteEmpleado();
-    expect(
-      deactivateSpy,
-    ).not.toHaveBeenCalled();
-    expect(
-      component.selectedEmpleado(),
-    ).toBe(empleado);
-  },
-);
+    expect(deactivateSpy).not.toHaveBeenCalled();
+    expect(component.selectedEmpleado()).toBe(empleado);
+  });
 
-it(
-  'vuelve a Gestión si el empleado se quita a sí mismo todos los permisos de Empleados',
-  async (): Promise<void> => {
+  it('vuelve a Gestión si el empleado se quita a sí mismo todos los permisos de Empleados', async (): Promise<void> => {
     gestionSessionService.login(1);
-    const fixture:
-      ComponentFixture<
-        ManagementEmployeesComponent
-      > =
-      TestBed.createComponent(
-        ManagementEmployeesComponent,
-      );
-    const component:
-      ManagementEmployeesComponent =
-      fixture.componentInstance;
-    const empleado:
-      Empleado | null =
-      empleadosService.findById(1);
-    expect(
-      empleado,
-    ).not.toBeNull();
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+    const empleado: Empleado | null = empleadosService.findById(1);
+    expect(empleado).not.toBeNull();
     if (empleado === null) {
       return;
     }
-    const updatedEmpleado:
-      Empleado =
-      new Empleado();
-    updatedEmpleado.id =
-      empleado.id;
-    updatedEmpleado.publicId =
-      empleado.publicId;
-    updatedEmpleado.nombre =
-      empleado.nombre;
-    updatedEmpleado.hasPassword =
-      empleado.hasPassword;
-    updatedEmpleado.color =
-      empleado.color;
-    updatedEmpleado.admin =
-      false;
-    updatedEmpleado.permisos =
-      [];
-    vi.spyOn(
-      empleadosService,
-      'update',
-    ).mockResolvedValue(
-      updatedEmpleado,
-    );
-    const navigateSpy =
-      vi.spyOn(
-        router,
-        'navigate',
-      ).mockResolvedValue(
-        true,
-      );
-    component.selectEmpleado(
-      empleado,
-    );
-    component.setEmpleadoPermission(
-      20,
-      false,
-    );
-    component.setEmpleadoPermission(
-      23,
-      false,
-    );
+    const updatedEmpleado: Empleado = new Empleado();
+    updatedEmpleado.id = empleado.id;
+    updatedEmpleado.publicId = empleado.publicId;
+    updatedEmpleado.nombre = empleado.nombre;
+    updatedEmpleado.hasPassword = empleado.hasPassword;
+    updatedEmpleado.color = empleado.color;
+    updatedEmpleado.admin = false;
+    updatedEmpleado.permisos = [];
+    vi.spyOn(empleadosService, 'update').mockResolvedValue(updatedEmpleado);
+    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    component.selectEmpleado(empleado);
+    component.setEmpleadoPermission(20, false);
+    component.setEmpleadoPermission(23, false);
     await component.saveEmpleado();
-    expect(
-      navigateSpy,
-    ).toHaveBeenCalledWith([
-      '/gestion',
-    ]);
-    expect(
-      gestionSessionService
-        .empleadoId(),
-    ).toBe(1);
-    expect(
-      component.saveSuccessful(),
-    ).toBe(false);
-  },
-);
+    expect(navigateSpy).toHaveBeenCalledWith(['/gestion']);
+    expect(gestionSessionService.empleadoId()).toBe(1);
+    expect(component.saveSuccessful()).toBe(false);
+  });
 
-it(
-  'permanece en Empleados si al editarse conserva algún permiso 20-24',
-  async (): Promise<void> => {
+  it('permanece en Empleados si al editarse conserva algún permiso 20-24', async (): Promise<void> => {
     gestionSessionService.login(1);
-    const fixture:
-      ComponentFixture<
-        ManagementEmployeesComponent
-      > =
-      TestBed.createComponent(
-        ManagementEmployeesComponent,
-      );
-    const component:
-      ManagementEmployeesComponent =
-      fixture.componentInstance;
-    const empleado:
-      Empleado | null =
-      empleadosService.findById(1);
-    expect(
-      empleado,
-    ).not.toBeNull();
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+    const empleado: Empleado | null = empleadosService.findById(1);
+    expect(empleado).not.toBeNull();
     if (empleado === null) {
       return;
     }
-    const updatedEmpleado:
-      Empleado =
-      new Empleado();
-    updatedEmpleado.id =
-      empleado.id;
-    updatedEmpleado.publicId =
-      empleado.publicId;
-    updatedEmpleado.nombre =
-      empleado.nombre;
-    updatedEmpleado.hasPassword =
-      empleado.hasPassword;
-    updatedEmpleado.color =
-      empleado.color;
-    updatedEmpleado.admin =
-      false;
+    const updatedEmpleado: Empleado = new Empleado();
+    updatedEmpleado.id = empleado.id;
+    updatedEmpleado.publicId = empleado.publicId;
+    updatedEmpleado.nombre = empleado.nombre;
+    updatedEmpleado.hasPassword = empleado.hasPassword;
+    updatedEmpleado.color = empleado.color;
+    updatedEmpleado.admin = false;
     /*
      * Pierde el 23 pero conserva
      * el permiso 20.
      */
-    updatedEmpleado.permisos = [
-      20,
-    ];
-    vi.spyOn(
-      empleadosService,
-      'update',
-    ).mockResolvedValue(
-      updatedEmpleado,
-    );
-    const navigateSpy =
-      vi.spyOn(
-        router,
-        'navigate',
-      ).mockResolvedValue(
-        true,
-      );
-    component.selectEmpleado(
-      empleado,
-    );
-    component.setEmpleadoPermission(
-      23,
-      false,
-    );
+    updatedEmpleado.permisos = [20];
+    vi.spyOn(empleadosService, 'update').mockResolvedValue(updatedEmpleado);
+    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    component.selectEmpleado(empleado);
+    component.setEmpleadoPermission(23, false);
     await component.saveEmpleado();
-    expect(
-      navigateSpy,
-    ).not.toHaveBeenCalled();
-    expect(
-      gestionSessionService
-        .empleadoId(),
-    ).toBe(1);
+    expect(navigateSpy).not.toHaveBeenCalled();
+    expect(gestionSessionService.empleadoId()).toBe(1);
     /*
      * Limpia también el timeout del
      * feedback generado por el guardado.
      */
-    component.selectEmpleado(
-      updatedEmpleado,
-    );
-  },
-);
+    component.selectEmpleado(updatedEmpleado);
+  });
 });

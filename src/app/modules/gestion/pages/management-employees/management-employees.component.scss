@@ -257,14 +257,15 @@
         gap: 8px;
         padding-top: 16px;
         border-top: 1px solid var(--mat-sys-outline-variant);
-        
+
         .employee-form__actions-spacer {
-        flex: 1;
-    }
-    .employee-form__delete {
-        color:
-            var(--mat-sys-error);
-    }
+            flex: 1;
+        }
+
+        .employee-form__delete {
+            color:
+                var(--mat-sys-error);
+        }
 
         .employee-form__save-feedback {
             margin-right: 4px;

@@ -14,10 +14,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltip } from '@angular/material/tooltip';
-import {
-  Router,
-  RouterLink,
-} from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
   EMPLEADO_PERMISSION_GROUPS,
   type EmpleadoPermissionGroup,
@@ -104,31 +101,15 @@ export default class ManagementEmployeesComponent {
   readonly canUpdateEmpleado: Signal<boolean> = computed(
     (): boolean => this.gestionEmpleado()?.hasPerm(GESTION_PERMISSIONS.EMPLOYEES_UPDATE) ?? false,
   );
-  
-  readonly canDeleteEmpleado:
-  Signal<boolean> =
-  computed(
-    (): boolean =>
-      this.gestionEmpleado()?.hasPerm(
-        GESTION_PERMISSIONS
-          .EMPLOYEES_DELETE,
-      ) ?? false,
+
+  readonly canDeleteEmpleado: Signal<boolean> = computed(
+    (): boolean => this.gestionEmpleado()?.hasPerm(GESTION_PERMISSIONS.EMPLOYEES_DELETE) ?? false,
   );
 
-readonly canDeleteSelectedEmpleado:
-  Signal<boolean> =
-  computed((): boolean => {
-    const gestionEmpleado:
-      Empleado | null =
-      this.gestionEmpleado();
-    const selectedEmpleado:
-      Empleado | null =
-      this.selectedEmpleado();
-    if (
-      gestionEmpleado === null ||
-      selectedEmpleado === null ||
-      selectedEmpleado.id === null
-    ) {
+  readonly canDeleteSelectedEmpleado: Signal<boolean> = computed((): boolean => {
+    const gestionEmpleado: Empleado | null = this.gestionEmpleado();
+    const selectedEmpleado: Empleado | null = this.selectedEmpleado();
+    if (gestionEmpleado === null || selectedEmpleado === null || selectedEmpleado.id === null) {
       return false;
     }
     return (
@@ -136,8 +117,7 @@ readonly canDeleteSelectedEmpleado:
       !this.creatingEmpleado() &&
       !this.savingEmpleado() &&
       !this.deletingEmpleado() &&
-      selectedEmpleado.id !==
-        gestionEmpleado.id
+      selectedEmpleado.id !== gestionEmpleado.id
     );
   });
 
@@ -295,34 +275,25 @@ readonly canDeleteSelectedEmpleado:
       this.resetEmpleadoPermissions(empleado);
     }
   }
-  
+
   /**
- * Solicita confirmación y da de baja
- * al empleado seleccionado.
- *
- * El empleado autenticado nunca puede
- * eliminarse a sí mismo.
- */
-async deleteEmpleado(): Promise<void> {
-  if (
-    !this.canDeleteSelectedEmpleado()
-  ) {
-    return;
-  }
-  const empleado:
-    Empleado | null =
-    this.selectedEmpleado();
-  if (
-    empleado === null ||
-    empleado.id === null
-  ) {
-    return;
-  }
-  const confirmed: boolean =
-    await firstValueFrom(
+   * Solicita confirmación y da de baja
+   * al empleado seleccionado.
+   *
+   * El empleado autenticado nunca puede
+   * eliminarse a sí mismo.
+   */
+  async deleteEmpleado(): Promise<void> {
+    if (!this.canDeleteSelectedEmpleado()) {
+      return;
+    }
+    const empleado: Empleado | null = this.selectedEmpleado();
+    if (empleado === null || empleado.id === null) {
+      return;
+    }
+    const confirmed: boolean = await firstValueFrom(
       this.dialog.confirm({
-        title:
-          'Eliminar empleado',
+        title: 'Eliminar empleado',
         content:
           `¿Estás seguro de querer eliminar al empleado "${empleado.nombre}"? ` +
           'El empleado dejará de estar disponible en la aplicación.',
@@ -331,46 +302,27 @@ async deleteEmpleado(): Promise<void> {
         cancel: 'Cancelar',
       }),
     );
-  if (!confirmed) {
-    return;
+    if (!confirmed) {
+      return;
+    }
+    this.clearSaveFeedback();
+    this.deletingEmpleado.set(true);
+    try {
+      await this.empleadosService.deactivate(empleado.id);
+      this.selectedEmpleado.set(null);
+      this.creatingEmpleado.set(false);
+      this.resetEmpleadoDataForm(null);
+      this.resetEmpleadoPermissions(null);
+    } catch (error: unknown) {
+      console.error('Error eliminando el empleado:', error);
+      this.dialog.alert({
+        title: 'Error',
+        content: getErrorMessage(error, 'No se ha podido eliminar el empleado.'),
+      });
+    } finally {
+      this.deletingEmpleado.set(false);
+    }
   }
-  this.clearSaveFeedback();
-  this.deletingEmpleado.set(true);
-  try {
-    await this.empleadosService
-      .deactivate(
-        empleado.id,
-      );
-    this.selectedEmpleado.set(
-      null,
-    );
-    this.creatingEmpleado.set(
-      false,
-    );
-    this.resetEmpleadoDataForm(
-      null,
-    );
-    this.resetEmpleadoPermissions(
-      null,
-    );
-  } catch (error: unknown) {
-    console.error(
-      'Error eliminando el empleado:',
-      error,
-    );
-    this.dialog.alert({
-      title: 'Error',
-      content: getErrorMessage(
-        error,
-        'No se ha podido eliminar el empleado.',
-      ),
-    });
-  } finally {
-    this.deletingEmpleado.set(
-      false,
-    );
-  }
-}
 
   /**
    * Valida y persiste los datos del empleado
@@ -408,39 +360,29 @@ async deleteEmpleado(): Promise<void> {
       return;
     }
 
-    const data: EmpleadoDataFormModel =
-  this.empleadoDataModel();
-const wasCreatingEmpleado: boolean =
-  this.creatingEmpleado();
-this.clearSaveFeedback();
-this.savingEmpleado.set(true);
-try {
-  const empleado: Empleado =
-    wasCreatingEmpleado
-      ? await this.createEmpleado(data)
-      : await this.updateEmpleado(data);
-  this.creatingEmpleado.set(false);
-  this.selectedEmpleado.set(empleado);
-  this.resetEmpleadoDataForm(empleado);
-  this.resetEmpleadoPermissions(empleado);
-  const gestionEmpleadoId:
-    number | null =
-    this.gestionSessionService
-      .empleadoId();
-  if (
-    !wasCreatingEmpleado &&
-    empleado.id !== null &&
-    empleado.id === gestionEmpleadoId &&
-    !empleado.hasAnyPerm(
-      GESTION_EMPLOYEES_PERMISSIONS,
-    )
-  ) {
-    await this.router.navigate([
-      '/gestion',
-    ]);
-    return;
-  }
-  this.showSaveFeedback();
+    const data: EmpleadoDataFormModel = this.empleadoDataModel();
+    const wasCreatingEmpleado: boolean = this.creatingEmpleado();
+    this.clearSaveFeedback();
+    this.savingEmpleado.set(true);
+    try {
+      const empleado: Empleado = wasCreatingEmpleado
+        ? await this.createEmpleado(data)
+        : await this.updateEmpleado(data);
+      this.creatingEmpleado.set(false);
+      this.selectedEmpleado.set(empleado);
+      this.resetEmpleadoDataForm(empleado);
+      this.resetEmpleadoPermissions(empleado);
+      const gestionEmpleadoId: number | null = this.gestionSessionService.empleadoId();
+      if (
+        !wasCreatingEmpleado &&
+        empleado.id !== null &&
+        empleado.id === gestionEmpleadoId &&
+        !empleado.hasAnyPerm(GESTION_EMPLOYEES_PERMISSIONS)
+      ) {
+        await this.router.navigate(['/gestion']);
+        return;
+      }
+      this.showSaveFeedback();
     } catch (error: unknown) {
       console.error('Error guardando el empleado:', error);
 
