@@ -215,4 +215,106 @@ describe('ManagementEmployeesComponent', (): void => {
 
     expect(component.selectedEmpleado()).toBe(empleado);
   });
+
+  it('carga los datos del empleado seleccionado sin cargar su contraseña', (): void => {
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+
+    const empleado: Empleado | null = empleadosService.findById(3);
+
+    expect(empleado).not.toBeNull();
+
+    if (empleado === null) {
+      return;
+    }
+
+    component.selectEmpleado(empleado);
+
+    expect(component.empleadoDataModel()).toEqual({
+      mode: 'edit',
+      nombre: 'Iñigo',
+      password: '',
+      confirmPassword: '',
+      color: '#228844',
+    });
+  });
+
+  it('prepara un formulario limpio al iniciar un alta', (): void => {
+    gestionSessionService.login(1);
+
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+
+    const empleado: Empleado | null = empleadosService.findById(3);
+
+    expect(empleado).not.toBeNull();
+
+    if (empleado === null) {
+      return;
+    }
+
+    component.selectEmpleado(empleado);
+
+    component.empleadoDataForm.nombre().value.set('Nombre modificado');
+    component.empleadoDataForm.nombre().markAsDirty();
+    component.empleadoDataForm.nombre().markAsTouched();
+
+    expect(component.empleadoDataForm().dirty()).toBe(true);
+    expect(component.empleadoDataForm().touched()).toBe(true);
+
+    component.startCreatingEmpleado();
+
+    expect(component.empleadoDataModel()).toEqual({
+      mode: 'create',
+      nombre: '',
+      password: '',
+      confirmPassword: '',
+      color: '#3f51b5',
+    });
+
+    expect(component.empleadoDataForm().dirty()).toBe(false);
+    expect(component.empleadoDataForm().touched()).toBe(false);
+  });
+
+  it('reinicia el formulario al cambiar de empleado', (): void => {
+    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
+      ManagementEmployeesComponent,
+    );
+
+    const component: ManagementEmployeesComponent = fixture.componentInstance;
+
+    const firstEmpleado: Empleado | null = empleadosService.findById(1);
+
+    const secondEmpleado: Empleado | null = empleadosService.findById(3);
+
+    expect(firstEmpleado).not.toBeNull();
+
+    expect(secondEmpleado).not.toBeNull();
+
+    if (firstEmpleado === null || secondEmpleado === null) {
+      return;
+    }
+
+    component.selectEmpleado(firstEmpleado);
+
+    component.empleadoDataForm.password().value.set('temporal');
+
+    component.selectEmpleado(secondEmpleado);
+
+    expect(component.empleadoDataModel()).toEqual({
+      mode: 'edit',
+      nombre: 'Iñigo',
+      password: '',
+      confirmPassword: '',
+      color: '#228844',
+    });
+
+    expect(component.empleadoDataForm().dirty()).toBe(false);
+  });
 });

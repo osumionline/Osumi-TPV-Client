@@ -23,12 +23,10 @@
 .management-employees__layout {
     display: grid;
     grid-template-columns:
-        minmax(260px, 320px)
-        minmax(0, 1fr);
+        minmax(260px, 320px) minmax(0, 1fr);
     min-height: 560px;
     overflow: hidden;
-    border: 1px solid
-        var(--mat-sys-outline-variant);
+    border: 1px solid var(--mat-sys-outline-variant);
     border-radius: 16px;
     background:
         var(--mat-sys-surface);
@@ -40,8 +38,7 @@
     flex-direction: column;
     gap: 16px;
     padding: 16px;
-    border-right: 1px solid
-        var(--mat-sys-outline-variant);
+    border-right: 1px solid var(--mat-sys-outline-variant);
     background:
         var(--mat-sys-surface-container-low);
 
@@ -85,8 +82,7 @@
         }
 
         &:focus-visible {
-            outline: 3px solid
-                var(--mat-sys-primary);
+            outline: 3px solid var(--mat-sys-primary);
             outline-offset: 2px;
         }
 
@@ -164,21 +160,6 @@
         }
     }
 
-    &__selected {
-        display: flex;
-        align-items: center;
-        gap: 20px;
-
-        h2 {
-            margin: 4px 0 8px;
-            font-size: 1.75rem;
-        }
-
-        p {
-            margin: 0;
-        }
-    }
-
     &__avatar {
         display: grid;
         width: 72px;
@@ -209,6 +190,65 @@
     }
 }
 
+.employee-form {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 24px;
+
+    &__header {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+
+        h2 {
+            margin: 4px 0 0;
+            font-size: 1.75rem;
+        }
+    }
+
+    &__content {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        padding: 28px 4px 4px;
+
+        >mat-form-field {
+            width: 100%;
+        }
+    }
+
+    &__passwords {
+        display: grid;
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+        gap: 16px;
+
+        mat-form-field {
+            width: 100%;
+        }
+    }
+
+    &__color {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+
+        >label {
+            font-weight: 600;
+        }
+
+        mat-form-field {
+            width: 160px;
+        }
+
+        input[type='color'] {
+            min-height: 44px;
+            cursor: pointer;
+        }
+    }
+}
+
 @media (max-width: 800px) {
     .management-employees__layout {
         grid-template-columns: 1fr;
@@ -216,8 +256,7 @@
 
     .employee-sidebar {
         border-right: 0;
-        border-bottom: 1px solid
-            var(--mat-sys-outline-variant);
+        border-bottom: 1px solid var(--mat-sys-outline-variant);
     }
 
     .employee-list {
@@ -227,6 +266,10 @@
     .employee-content {
         min-height: 320px;
         padding: 24px;
+    }
+
+    .employee-form__passwords {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -239,7 +282,7 @@
         flex-direction: column;
     }
 
-    .employee-content__selected {
+    .employee-form__header {
         align-items: flex-start;
         flex-direction: column;
     }

@@ -1,11 +1,16 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { Component, computed, inject, signal } from '@angular/core';
+import { FieldTree, FormField, form } from '@angular/forms/signals';
 import { MatButton } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
+import { MatTabsModule } from '@angular/material/tabs';
 import { RouterLink } from '@angular/router';
 import { GESTION_PERMISSIONS } from '@constants/gestion-permissions.constants';
+import createEmpleadoDataFormInitialValue from '@model/empleados/empleado-data-form.initial-value';
+import type { EmpleadoDataFormModel } from '@model/empleados/empleado-data-form.model';
+import empleadoDataFormSchema from '@model/empleados/empleado-data-form.schema';
 import type Empleado from '@model/empleados/empleado.model';
 import EmpleadosService from '@services/empleados/empleados.service';
 import GestionSessionService from '@services/gestion/gestion-session.service';
@@ -18,17 +23,29 @@ import GestionSessionService from '@services/gestion/gestion-session.service';
   selector: 'otpv-management-employees',
   templateUrl: './management-employees.component.html',
   styleUrl: './management-employees.component.scss',
-  imports: [RouterLink, MatButton, MatFormFieldModule, MatIcon, MatInput],
+  imports: [RouterLink, FormField, MatButton, MatFormFieldModule, MatIcon, MatInput, MatTabsModule],
 })
 export default class ManagementEmployeesComponent {
   private readonly empleadosService: EmpleadosService = inject(EmpleadosService);
+
   private readonly gestionSessionService: GestionSessionService = inject(GestionSessionService);
 
   readonly empleados: Signal<readonly Empleado[]> = this.empleadosService.empleados;
 
   readonly searchTerm: WritableSignal<string> = signal<string>('');
+
   readonly selectedEmpleado: WritableSignal<Empleado | null> = signal<Empleado | null>(null);
+
   readonly creatingEmpleado: WritableSignal<boolean> = signal<boolean>(false);
+
+  readonly empleadoDataModel: WritableSignal<EmpleadoDataFormModel> = signal<EmpleadoDataFormModel>(
+    createEmpleadoDataFormInitialValue(null),
+  );
+
+  readonly empleadoDataForm: FieldTree<EmpleadoDataFormModel> = form(
+    this.empleadoDataModel,
+    empleadoDataFormSchema,
+  );
 
   readonly gestionEmpleado: Signal<Empleado | null> = computed((): Empleado | null => {
     const empleadoId: number | null = this.gestionSessionService.empleadoId();
@@ -39,9 +56,11 @@ export default class ManagementEmployeesComponent {
 
     return this.empleadosService.findById(empleadoId);
   });
+
   readonly canCreateEmpleado: Signal<boolean> = computed(
     (): boolean => this.gestionEmpleado()?.hasPerm(GESTION_PERMISSIONS.EMPLOYEES_CREATE) ?? false,
   );
+
   readonly filteredEmpleados: Signal<readonly Empleado[]> = computed((): readonly Empleado[] => {
     const searchTerm: string = this.searchTerm().trim().toLocaleLowerCase('es-ES');
 
@@ -70,6 +89,8 @@ export default class ManagementEmployeesComponent {
     this.creatingEmpleado.set(false);
 
     this.selectedEmpleado.set(empleado);
+
+    this.resetEmpleadoDataForm(empleado);
   }
 
   /**
@@ -84,5 +105,11 @@ export default class ManagementEmployeesComponent {
     this.selectedEmpleado.set(null);
 
     this.creatingEmpleado.set(true);
+
+    this.resetEmpleadoDataForm(null);
+  }
+
+  private resetEmpleadoDataForm(empleado: Empleado | null): void {
+    this.empleadoDataForm().reset(createEmpleadoDataFormInitialValue(empleado));
   }
 }

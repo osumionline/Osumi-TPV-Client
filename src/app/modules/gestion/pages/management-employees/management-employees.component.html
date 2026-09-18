@@ -105,58 +105,177 @@
         </aside>
 
         <main class="employee-content">
-            @if (creatingEmpleado()) {
-            <div class="employee-content__selected">
-                <div class="
-                    employee-content__avatar
-                    employee-content__avatar--new
-                ">
-                    <mat-icon aria-hidden="true">
-                        person_add
-                    </mat-icon>
-                </div>
+            @if (
+            creatingEmpleado() ||
+            selectedEmpleado() !== null
+            ) {
+            <form class="employee-form"
+                  novalidate>
+                <header class="employee-form__header">
+                    @if (creatingEmpleado()) {
+                    <div class="
+                        employee-content__avatar
+                        employee-content__avatar--new
+                    ">
+                        <mat-icon aria-hidden="true">
+                            person_add
+                        </mat-icon>
+                    </div>
 
-                <div>
-                    <p class="employee-content__eyebrow">
-                        Nuevo empleado
-                    </p>
+                    <div>
+                        <p class="employee-content__eyebrow">
+                            Nuevo empleado
+                        </p>
 
-                    <h2>
-                        Crear empleado
-                    </h2>
+                        <h2>
+                            Crear empleado
+                        </h2>
+                    </div>
+                    }
+                    @else if (selectedEmpleado(); as empleado) {
+                    <div class="employee-content__avatar"
+                         [style.backgroundColor]="empleado.color"
+                         [style.color]="empleado.textColor">
+                        <mat-icon aria-hidden="true">
+                            person
+                        </mat-icon>
+                    </div>
 
-                    <p>
-                        En el siguiente paso podrás introducir
-                        sus datos y configurar sus permisos.
-                    </p>
-                </div>
-            </div>
-            }
-            @else if (selectedEmpleado(); as empleado) {
-            <div class="employee-content__selected">
-                <div class="employee-content__avatar"
-                     [style.backgroundColor]="empleado.color"
-                     [style.color]="empleado.textColor">
-                    <mat-icon aria-hidden="true">
-                        person
-                    </mat-icon>
-                </div>
+                    <div>
+                        <p class="employee-content__eyebrow">
+                            Empleado seleccionado
+                        </p>
 
-                <div>
-                    <p class="employee-content__eyebrow">
-                        Empleado seleccionado
-                    </p>
+                        <h2>
+                            {{ empleado.nombre }}
+                        </h2>
+                    </div>
+                    }
+                </header>
 
-                    <h2>
-                        {{ empleado.nombre }}
-                    </h2>
+                <mat-tab-group dynamicHeight>
+                    <mat-tab label="DATOS">
+                        <div class="employee-form__content">
+                            <mat-form-field appearance="outline">
+                                <mat-label>
+                                    Nombre
+                                </mat-label>
 
-                    <p>
-                        En el siguiente paso se mostrarán aquí
-                        sus datos y permisos.
-                    </p>
-                </div>
-            </div>
+                                <input matInput
+                                       type="text"
+                                       autocomplete="off"
+                                       [formField]="empleadoDataForm.nombre">
+
+                                @if (
+                                empleadoDataForm.nombre().touched() &&
+                                empleadoDataForm.nombre().invalid()
+                                ) {
+                                <mat-error>
+                                    {{
+                                        empleadoDataForm
+                                            .nombre()
+                                            .errors()[0]
+                                            ?.message
+                                    }}
+                                </mat-error>
+                                }
+                            </mat-form-field>
+
+                            <div class="employee-form__passwords">
+                                <mat-form-field appearance="outline">
+                                    <mat-label>
+                                        Contraseña
+                                    </mat-label>
+
+                                    <input matInput
+                                           type="password"
+                                           autocomplete="new-password"
+                                           [formField]="empleadoDataForm.password">
+
+                                    @if (!creatingEmpleado()) {
+                                    <mat-hint>
+                                        Déjala vacía para conservar
+                                        la contraseña actual.
+                                    </mat-hint>
+                                    }
+
+                                    @if (
+                                    empleadoDataForm.password().touched() &&
+                                    empleadoDataForm.password().invalid()
+                                    ) {
+                                    <mat-error>
+                                        {{
+                                            empleadoDataForm
+                                                .password()
+                                                .errors()[0]
+                                                ?.message
+                                        }}
+                                    </mat-error>
+                                    }
+                                </mat-form-field>
+
+                                <mat-form-field appearance="outline">
+                                    <mat-label>
+                                        Confirmar contraseña
+                                    </mat-label>
+
+                                    <input matInput
+                                           type="password"
+                                           autocomplete="new-password"
+                                           [formField]="
+                                               empleadoDataForm.confirmPassword
+                                           ">
+
+                                    @if (
+                                    empleadoDataForm
+                                        .confirmPassword()
+                                        .touched() &&
+                                    empleadoDataForm
+                                        .confirmPassword()
+                                        .invalid()
+                                    ) {
+                                    <mat-error>
+                                        {{
+                                            empleadoDataForm
+                                                .confirmPassword()
+                                                .errors()[0]
+                                                ?.message
+                                        }}
+                                    </mat-error>
+                                    }
+                                </mat-form-field>
+                            </div>
+
+                            <div class="employee-form__color">
+                                <label for="employee-color">
+                                    Color
+                                </label>
+
+                                <mat-form-field appearance="outline">
+                                    <input id="employee-color"
+                                           matInput
+                                           type="color"
+                                           [formField]="empleadoDataForm.color">
+
+                                    @if (
+                                    empleadoDataForm.color().touched() &&
+                                    empleadoDataForm.color().invalid()
+                                    ) {
+                                    <mat-error>
+                                        {{
+                                            empleadoDataForm
+                                                .color()
+                                                .errors()[0]
+                                                ?.message
+                                        }}
+                                    </mat-error>
+                                    }
+                                </mat-form-field>
+                            </div>
+                        </div>
+                    </mat-tab>
+                </mat-tab-group>
+            </form>
             }
             @else {
             <div class="employee-content__welcome">
