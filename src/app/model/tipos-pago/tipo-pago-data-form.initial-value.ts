@@ -1,6 +1,4 @@
-import type {
-  TipoPagoDataFormModel,
-} from '@model/tipos-pago/tipo-pago-data-form.model';
+import type { TipoPagoDataFormModel } from '@model/tipos-pago/tipo-pago-data-form.model';
 import type TipoPago from '@model/tipos-pago/tipo-pago.model';
 
 /**
@@ -18,6 +16,7 @@ export default function createTipoPagoDataFormInitialValue(
       nombre: '',
       afectaCaja: false,
       fisico: true,
+      foto: null,
     };
   }
 
@@ -26,5 +25,6 @@ export default function createTipoPagoDataFormInitialValue(
     nombre: tipoPago.nombre,
     afectaCaja: tipoPago.afectaCaja,
     fisico: tipoPago.fisico,
+    foto: tipoPago.foto,
   };
 }

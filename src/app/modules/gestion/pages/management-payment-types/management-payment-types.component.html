@@ -144,100 +144,140 @@
                     </div>
                 </header>
 
-                <mat-tab-group
-    dynamicHeight
-    [selectedIndex]="selectedTabIndex()"
-    (selectedIndexChange)="
+                <mat-tab-group dynamicHeight
+                               [selectedIndex]="selectedTabIndex()"
+                               (selectedIndexChange)="
         handleTabIndexChange($event)
     "
-    (animationDone)="
+                               (animationDone)="
         handleTabAnimationDone()
     ">
                     <mat-tab label="DATOS">
-    <div class="
+                        <div class="
         payment-type-tab
         payment-type-data-form
     ">
-        <mat-form-field appearance="outline">
-            <mat-label>
-                Nombre
-            </mat-label>
+                            <mat-form-field appearance="outline">
+                                <mat-label>
+                                    Nombre
+                                </mat-label>
 
-            <input #nombreInput
-                   matInput
-                   type="text"
-                   autocomplete="off"
-                   [formField]="
+                                <input #nombreInput
+                                       matInput
+                                       type="text"
+                                       autocomplete="off"
+                                       [formField]="
                        tipoPagoDataForm.nombre
                    ">
 
-            @if (
-            tipoPagoDataForm
-                .nombre()
-                .touched() &&
-            tipoPagoDataForm
-                .nombre()
-                .invalid()
-            ) {
-            <mat-error>
-                {{
+                                @if (
+                                tipoPagoDataForm
+                                .nombre()
+                                .touched() &&
+                                tipoPagoDataForm
+                                .nombre()
+                                .invalid()
+                                ) {
+                                <mat-error>
+                                    {{
                     tipoPagoDataForm
                         .nombre()
                         .errors()[0]
                         ?.message
                 }}
-            </mat-error>
-            }
-        </mat-form-field>
+                                </mat-error>
+                                }
+                            </mat-form-field>
 
-        <div class="payment-type-data-form__options">
-            <mat-checkbox
-                [formField]="
+                            <div class="payment-type-data-form__options">
+                                <mat-checkbox [formField]="
                     tipoPagoDataForm.afectaCaja
                 ">
-                El tipo de pago afecta a la caja.
-            </mat-checkbox>
+                                    El tipo de pago afecta a la caja.
+                                </mat-checkbox>
 
-            <mat-checkbox
-                [formField]="
+                                <mat-checkbox [formField]="
                     tipoPagoDataForm.fisico
                 ">
-                Tipo de pago para tienda física.
-            </mat-checkbox>
-        </div>
+                                    Tipo de pago para tienda física.
+                                </mat-checkbox>
+                            </div>
 
-        <div class="payment-type-data-form__logo-placeholder">
-            <mat-icon aria-hidden="true">
-                image
-            </mat-icon>
+                            <div class="payment-type-data-form__logo">
+                                <div class="payment-type-data-form__logo-preview">
+                                    @if (
+                                    tipoPagoDataModel().foto;
+                                    as logoUrl
+                                    ) {
+                                    <img [src]="logoUrl"
+                                         alt="Logo del tipo de pago">
+                                    }
+                                    @else {
+                                    <mat-icon aria-hidden="true">
+                                        image
+                                    </mat-icon>
+                                    }
+                                </div>
 
-            <div>
-                <strong>
-                    Logo
-                </strong>
+                                <div class="payment-type-data-form__logo-content">
+                                    <strong>
+                                        Logo
+                                    </strong>
 
-                <p>
-                    La gestión del logo se añadirá
-                    en el siguiente bloque.
-                </p>
-            </div>
-        </div>
+                                    <p class="payment-type-data-form__logo-hint">
+                                        Obligatorio. Formatos admitidos:
+                                        JPEG, PNG y WebP.
+                                    </p>
 
-        <div class="payment-type-data-form__actions">
-            <button mat-button
-                    type="button"
-                    [disabled]="
-                        !creatingTipoPago() &&
-                        !tipoPagoDataForm().dirty()
-                    "
-                    (click)="
-                        cancelTipoPagoChanges()
-                    ">
-                Cancelar
-            </button>
-        </div>
-    </div>
-</mat-tab>
+                                    <input #logoInput
+                                           class="payment-type-data-form__logo-input"
+                                           type="file"
+                                           accept="image/jpeg,image/png,image/webp"
+                                           [disabled]="logoProcessing()"
+                                           (change)="onLogoSelected($event)">
+
+                                    <button mat-stroked-button
+                                            type="button"
+                                            [disabled]="logoProcessing()"
+                                            (click)="selectLogo()">
+                                        @if (logoProcessing()) {
+                                        Procesando imagen…
+                                        }
+                                        @else if (tipoPagoDataModel().foto !== null) {
+                                        Cambiar imagen
+                                        }
+                                        @else {
+                                        Seleccionar imagen
+                                        }
+                                    </button>
+
+                                    @if (logoError(); as error) {
+                                    <p class="payment-type-data-form__logo-error"
+                                       role="alert">
+                                        {{ error }}
+                                    </p>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="payment-type-data-form__actions">
+                                <button mat-button
+                                        type="button"
+                                        [disabled]="
+                                            logoProcessing() ||
+                                            (
+                                                !creatingTipoPago() &&
+                                                !hasTipoPagoDataChanges()
+                                            )
+                                        "
+                                        (click)="
+                                            cancelTipoPagoChanges()
+                                        ">
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </mat-tab>
 
                     <mat-tab label="ESTADÍSTICAS">
                         <div class="payment-type-tab">
