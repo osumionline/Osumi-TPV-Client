@@ -19,13 +19,17 @@ import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { MatTabsModule } from '@angular/material/tabs';
 import { RouterLink } from '@angular/router';
+import type ActualizarTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/actualizar-tipo-pago-command.interface';
+import type CrearTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/crear-tipo-pago-command.interface';
 import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
 import createTipoPagoDataFormInitialValue from '@model/tipos-pago/tipo-pago-data-form.initial-value';
 import type { TipoPagoDataFormModel } from '@model/tipos-pago/tipo-pago-data-form.model';
 import tipoPagoDataFormSchema from '@model/tipos-pago/tipo-pago-data-form.schema';
-import type TipoPago from '@model/tipos-pago/tipo-pago.model';
+import TipoPago from '@model/tipos-pago/tipo-pago.model';
+import { DialogService } from '@osumi/angular-tools';
 import FilesService from '@services/application/files.service';
 import TiposPagoService from '@services/tipos-pago/tipos-pago.service';
+import { getErrorMessage } from '@utils/error.utils';
 
 const EFECTIVO_SLUG: string = 'efectivo';
 
@@ -53,12 +57,12 @@ export default class ManagementPaymentTypesComponent {
   private readonly injector: Injector = inject(Injector);
   private readonly filesService: FilesService = inject(FilesService);
   private readonly destroyRef: DestroyRef = inject(DestroyRef);
+  private readonly dialog: DialogService = inject(DialogService);
 
   private readonly nombreInput = viewChild<ElementRef<HTMLInputElement>>('nombreInput');
   private readonly logoInput = viewChild<ElementRef<HTMLInputElement>>('logoInput');
 
   private destroyed: boolean = false;
-
   private nombreFocusPending: boolean = false;
 
   readonly searchTerm: WritableSignal<string> = signal<string>('');
@@ -68,6 +72,10 @@ export default class ManagementPaymentTypesComponent {
   readonly tipoPagoDataModel: WritableSignal<TipoPagoDataFormModel> = signal<TipoPagoDataFormModel>(
     createTipoPagoDataFormInitialValue(null),
   );
+  readonly savingTipoPago: WritableSignal<boolean> = signal<boolean>(false);
+  readonly saveSuccessful: WritableSignal<boolean> = signal<boolean>(false);
+
+  private saveFeedbackTimeoutId: number | null = null;
 
   readonly tipoPagoDataForm: FieldTree<TipoPagoDataFormModel> = form(
     this.tipoPagoDataModel,
@@ -83,6 +91,18 @@ export default class ManagementPaymentTypesComponent {
   readonly hasTipoPagoDataChanges: Signal<boolean> = computed(
     (): boolean => this.tipoPagoDataForm().dirty() || this.logoStagingId() !== null,
   );
+
+  readonly canSaveTipoPago: Signal<boolean> = computed((): boolean => {
+    if (this.savingTipoPago() || this.logoProcessing() || this.tipoPagoDataForm().invalid()) {
+      return false;
+    }
+
+    if (this.creatingTipoPago()) {
+      return this.logoStagingId() !== null;
+    }
+
+    return this.selectedTipoPago() !== null && this.hasTipoPagoDataChanges();
+  });
 
   /**
    * Subconjunto configurable desde Gestión.
@@ -114,6 +134,8 @@ export default class ManagementPaymentTypesComponent {
     this.destroyRef.onDestroy((): void => {
       this.destroyed = true;
 
+      this.clearSaveFeedback();
+
       const stagingId: string | null = this.logoStagingId();
 
       if (stagingId === null) {
@@ -137,7 +159,7 @@ export default class ManagementPaymentTypesComponent {
    * y carga sus datos en el formulario.
    */
   async selectTipoPago(tipoPago: TipoPago): Promise<void> {
-    if (this.logoProcessing()) {
+    if (this.savingTipoPago() || this.logoProcessing()) {
       return;
     }
 
@@ -149,6 +171,7 @@ export default class ManagementPaymentTypesComponent {
       }
     }
 
+    this.clearSaveFeedback();
     this.creatingTipoPago.set(false);
     this.selectedTipoPago.set(tipoPago);
     this.resetTipoPagoDataForm(tipoPago);
@@ -160,7 +183,7 @@ export default class ManagementPaymentTypesComponent {
    * tipo de pago.
    */
   async startCreatingTipoPago(): Promise<void> {
-    if (this.logoProcessing()) {
+    if (this.savingTipoPago() || this.logoProcessing()) {
       return;
     }
 
@@ -172,6 +195,7 @@ export default class ManagementPaymentTypesComponent {
       }
     }
 
+    this.clearSaveFeedback();
     this.selectedTipoPago.set(null);
     this.creatingTipoPago.set(true);
     this.resetTipoPagoDataForm(null);
@@ -186,7 +210,7 @@ export default class ManagementPaymentTypesComponent {
    * En edición restaura los datos persistidos.
    */
   async cancelTipoPagoChanges(): Promise<void> {
-    if (this.logoProcessing()) {
+    if (this.savingTipoPago() || this.logoProcessing()) {
       return;
     }
 
@@ -199,6 +223,7 @@ export default class ManagementPaymentTypesComponent {
     }
 
     if (this.creatingTipoPago()) {
+      this.clearSaveFeedback();
       this.creatingTipoPago.set(false);
       this.selectedTipoPago.set(null);
       this.resetTipoPagoDataForm(null);
@@ -210,6 +235,65 @@ export default class ManagementPaymentTypesComponent {
 
     if (tipoPago !== null) {
       this.resetTipoPagoDataForm(tipoPago);
+    }
+  }
+
+  /**
+   * Valida y persiste el tipo de pago
+   * que se está creando o editando.
+   */
+  async saveTipoPago(): Promise<void> {
+    if (this.savingTipoPago() || this.logoProcessing()) {
+      return;
+    }
+
+    if (!this.creatingTipoPago() && this.selectedTipoPago() === null) {
+      return;
+    }
+
+    this.tipoPagoDataForm().markAsTouched();
+
+    if (this.tipoPagoDataForm().invalid()) {
+      return;
+    }
+
+    const data: TipoPagoDataFormModel = this.tipoPagoDataModel();
+
+    const wasCreatingTipoPago: boolean = this.creatingTipoPago();
+
+    this.clearSaveFeedback();
+
+    this.savingTipoPago.set(true);
+
+    try {
+      const tipoPago: TipoPago = wasCreatingTipoPago
+        ? await this.createTipoPago(data)
+        : await this.updateTipoPago(data);
+
+      /*
+       * El backend ya ha promocionado el fichero
+       * definitivo y consumido el staging.
+       *
+       * Desde este momento el componente deja
+       * de ser propietario del staging temporal.
+       */
+      this.logoStagingId.set(null);
+
+      this.creatingTipoPago.set(false);
+      this.selectedTipoPago.set(tipoPago);
+
+      this.resetTipoPagoDataForm(tipoPago);
+
+      this.showSaveFeedback();
+    } catch (error: unknown) {
+      console.error('Error guardando el tipo de pago:', error);
+
+      this.dialog.alert({
+        title: 'Error',
+        content: getErrorMessage(error, 'No se ha podido guardar el tipo de pago.'),
+      });
+    } finally {
+      this.savingTipoPago.set(false);
     }
   }
 
@@ -236,7 +320,7 @@ export default class ManagementPaymentTypesComponent {
    * el logo del tipo de pago.
    */
   selectLogo(): void {
-    if (this.logoProcessing()) {
+    if (this.savingTipoPago() || this.logoProcessing()) {
       return;
     }
 
@@ -249,7 +333,7 @@ export default class ManagementPaymentTypesComponent {
    * cualquier staging anterior.
    */
   async onLogoSelected(event: Event): Promise<void> {
-    if (this.logoProcessing()) {
+    if (this.savingTipoPago() || this.logoProcessing()) {
       return;
     }
 
@@ -322,6 +406,53 @@ export default class ManagementPaymentTypesComponent {
         this.logoProcessing.set(false);
       }
     }
+  }
+
+  /**
+   * Construye el comando de alta y delega
+   * la persistencia en el maestro global.
+   */
+  private createTipoPago(data: TipoPagoDataFormModel): Promise<TipoPago> {
+    const stagingId: string | null = this.logoStagingId();
+
+    if (stagingId === null) {
+      throw new Error('El logo del tipo de pago es obligatorio.');
+    }
+
+    const command: CrearTipoPagoCommand = {
+      nombre: data.nombre.trim(),
+      afectaCaja: data.afectaCaja,
+      fisico: data.fisico,
+      logoStagingId: stagingId,
+    };
+
+    return this.tiposPagoService.create(command);
+  }
+
+  /**
+   * Construye el comando de edición y delega
+   * la persistencia en el maestro global.
+   */
+  private updateTipoPago(data: TipoPagoDataFormModel): Promise<TipoPago> {
+    const tipoPago: TipoPago | null = this.selectedTipoPago();
+
+    if (tipoPago === null || tipoPago.id === null) {
+      throw new Error('No hay ningún tipo de pago seleccionado para modificar.');
+    }
+
+    const command: ActualizarTipoPagoCommand = {
+      nombre: data.nombre.trim(),
+      afectaCaja: data.afectaCaja,
+      fisico: data.fisico,
+
+      /*
+       * null significa conservar el logo
+       * persistido actualmente.
+       */
+      logoStagingId: this.logoStagingId(),
+    };
+
+    return this.tiposPagoService.update(tipoPago.id, command);
   }
 
   /**
@@ -400,6 +531,35 @@ export default class ManagementPaymentTypesComponent {
     }
 
     return 'No se ha podido procesar la imagen seleccionada.';
+  }
+
+  /**
+   * Muestra temporalmente la confirmación
+   * de que el tipo de pago se ha guardado.
+   */
+  private showSaveFeedback(): void {
+    this.clearSaveFeedback();
+
+    this.saveSuccessful.set(true);
+
+    this.saveFeedbackTimeoutId = window.setTimeout((): void => {
+      this.saveSuccessful.set(false);
+
+      this.saveFeedbackTimeoutId = null;
+    }, 4_000);
+  }
+
+  /**
+   * Oculta la confirmación de guardado activa.
+   */
+  private clearSaveFeedback(): void {
+    if (this.saveFeedbackTimeoutId !== null) {
+      window.clearTimeout(this.saveFeedbackTimeoutId);
+
+      this.saveFeedbackTimeoutId = null;
+    }
+
+    this.saveSuccessful.set(false);
   }
 
   private resetTipoPagoDataForm(tipoPago: TipoPago | null): void {

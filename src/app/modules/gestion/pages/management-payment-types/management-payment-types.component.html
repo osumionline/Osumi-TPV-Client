@@ -191,14 +191,14 @@
 
                             <div class="payment-type-data-form__options">
                                 <mat-checkbox [formField]="
-                    tipoPagoDataForm.afectaCaja
-                ">
+                                    tipoPagoDataForm.afectaCaja
+                                ">
                                     El tipo de pago afecta a la caja.
                                 </mat-checkbox>
 
                                 <mat-checkbox [formField]="
-                    tipoPagoDataForm.fisico
-                ">
+                                    tipoPagoDataForm.fisico
+                                ">
                                     Tipo de pago para tienda física.
                                 </mat-checkbox>
                             </div>
@@ -233,7 +233,10 @@
                                            class="payment-type-data-form__logo-input"
                                            type="file"
                                            accept="image/jpeg,image/png,image/webp"
-                                           [disabled]="logoProcessing()"
+                                           [disabled]="
+                                                savingTipoPago() ||
+                                                logoProcessing()
+                                            "
                                            (change)="onLogoSelected($event)">
 
                                     <button mat-stroked-button
@@ -261,19 +264,41 @@
                             </div>
 
                             <div class="payment-type-data-form__actions">
+                                @if (saveSuccessful()) {
+                                <span class="payment-type-data-form__save-feedback"
+                                      role="status"
+                                      aria-live="polite">
+                                    Tipo de pago guardado correctamente
+                                </span>
+                                }
+
                                 <button mat-button
                                         type="button"
                                         [disabled]="
+                                            savingTipoPago() ||
                                             logoProcessing() ||
                                             (
                                                 !creatingTipoPago() &&
                                                 !hasTipoPagoDataChanges()
                                             )
                                         "
-                                        (click)="
-                                            cancelTipoPagoChanges()
-                                        ">
+                                        (click)="cancelTipoPagoChanges()">
                                     Cancelar
+                                </button>
+
+                                <button mat-flat-button
+                                        type="button"
+                                        [disabled]="!canSaveTipoPago()"
+                                        (click)="saveTipoPago()">
+                                    <mat-icon>
+                                        save
+                                    </mat-icon>
+
+                                    {{
+                                        savingTipoPago()
+                                            ? 'Guardando…'
+                                            : 'Guardar'
+                                    }}
                                 </button>
                             </div>
                         </div>

@@ -1,8 +1,10 @@
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import type ActualizarTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/actualizar-tipo-pago-command.interface';
+import type CrearTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/crear-tipo-pago-command.interface';
 import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 import StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
-import type TipoPago from '@model/tipos-pago/tipo-pago.model';
+import TipoPago from '@model/tipos-pago/tipo-pago.model';
 import ManagementPaymentTypesComponent from '@modules/gestion/pages/management-payment-types/management-payment-types.component';
 import FilesService from '@services/application/files.service';
 import TiposPagoService from '@services/tipos-pago/tipos-pago.service';
@@ -90,6 +92,7 @@ describe('ManagementPaymentTypesComponent', (): void => {
     }
 
     Reflect.deleteProperty(window, 'osumiDesktop');
+    vi.restoreAllMocks();
   });
 
   it('muestra solo los tipos de pago configurables y oculta Efectivo', (): void => {
@@ -441,6 +444,208 @@ describe('ManagementPaymentTypesComponent', (): void => {
     expect(component.tipoPagoDataModel().foto).toBe('osumi://assets/files/payment-types/visa.webp');
 
     expect(component.logoError()).toBe('La imagen seleccionada no es válida.');
+  });
+
+  it('crea un tipo de pago y adopta la versión persistida', async (): Promise<void> => {
+    stagePaymentTypeImageMock.mockResolvedValueOnce(
+      createStagedPaymentTypeImage('staging-mastercard', 'osumi://assets/staging/mastercard.webp'),
+    );
+
+    const fixture: ComponentFixture<ManagementPaymentTypesComponent> = TestBed.createComponent(
+      ManagementPaymentTypesComponent,
+    );
+
+    const component: ManagementPaymentTypesComponent = fixture.componentInstance;
+
+    const createdTipoPago: TipoPago = new TipoPago().fromInterface({
+      id: 4,
+      publicId: 'tipo-pago-mastercard',
+      nombre: 'Mastercard',
+      slug: 'mastercard',
+      foto: 'osumi://assets/files/payment-types/mastercard.webp',
+      afectaCaja: false,
+      orden: 3,
+      fisico: true,
+    });
+
+    const createSpy = vi.spyOn(tiposPagoService, 'create').mockResolvedValue(createdTipoPago);
+
+    await component.startCreatingTipoPago();
+
+    component.tipoPagoDataForm.nombre().value.set('  Mastercard  ');
+
+    await component.onLogoSelected(
+      createFileInputEvent(
+        new File(['logo'], 'mastercard.png', {
+          type: 'image/png',
+        }),
+      ),
+    );
+
+    await component.saveTipoPago();
+
+    expect(createSpy).toHaveBeenCalledWith({
+      nombre: 'Mastercard',
+      afectaCaja: false,
+      fisico: true,
+      logoStagingId: 'staging-mastercard',
+    } satisfies CrearTipoPagoCommand);
+
+    expect(component.creatingTipoPago()).toBe(false);
+
+    expect(component.selectedTipoPago()).toBe(createdTipoPago);
+
+    expect(component.tipoPagoDataModel()).toEqual({
+      mode: 'edit',
+      nombre: 'Mastercard',
+      afectaCaja: false,
+      fisico: true,
+      foto: 'osumi://assets/files/payment-types/mastercard.webp',
+    });
+
+    expect(component.tipoPagoDataForm().dirty()).toBe(false);
+
+    /*
+     * El staging ha pasado a ser responsabilidad
+     * del backend y el componente no debe
+     * intentar descartarlo de nuevo.
+     */
+    fixture.destroy();
+
+    expect(discardStagedImageMock).not.toHaveBeenCalled();
+  });
+
+  it('actualiza un tipo de pago conservando el logo cuando no hay staging nuevo', async (): Promise<void> => {
+    const fixture: ComponentFixture<ManagementPaymentTypesComponent> = TestBed.createComponent(
+      ManagementPaymentTypesComponent,
+    );
+
+    const component: ManagementPaymentTypesComponent = fixture.componentInstance;
+
+    const tipoPago: TipoPago = component.tiposPagoConfigurables()[0];
+
+    const updatedTipoPago: TipoPago = new TipoPago().fromInterface({
+      id: 2,
+      publicId: 'tipo-pago-visa',
+      nombre: 'Tarjeta',
+      slug: 'tarjeta',
+      foto: 'osumi://assets/files/payment-types/visa.webp',
+      afectaCaja: true,
+      orden: 1,
+      fisico: false,
+    });
+
+    const updateSpy = vi.spyOn(tiposPagoService, 'update').mockResolvedValue(updatedTipoPago);
+
+    await component.selectTipoPago(tipoPago);
+
+    component.tipoPagoDataForm.nombre().value.set(' Tarjeta ');
+
+    component.tipoPagoDataForm.afectaCaja().value.set(true);
+
+    component.tipoPagoDataForm.fisico().value.set(false);
+
+    await component.saveTipoPago();
+
+    expect(updateSpy).toHaveBeenCalledWith(2, {
+      nombre: 'Tarjeta',
+      afectaCaja: true,
+      fisico: false,
+      logoStagingId: null,
+    } satisfies ActualizarTipoPagoCommand);
+
+    expect(component.selectedTipoPago()).toBe(updatedTipoPago);
+
+    expect(component.tipoPagoDataForm().dirty()).toBe(false);
+  });
+
+  it('envía el staging al sustituir el logo de un tipo de pago', async (): Promise<void> => {
+    stagePaymentTypeImageMock.mockResolvedValueOnce(
+      createStagedPaymentTypeImage('staging-visa-new', 'osumi://assets/staging/visa-new.webp'),
+    );
+
+    const fixture: ComponentFixture<ManagementPaymentTypesComponent> = TestBed.createComponent(
+      ManagementPaymentTypesComponent,
+    );
+
+    const component: ManagementPaymentTypesComponent = fixture.componentInstance;
+
+    const tipoPago: TipoPago = component.tiposPagoConfigurables()[0];
+
+    const updatedTipoPago: TipoPago = new TipoPago().fromInterface({
+      ...tipoPago.toInterface(),
+      foto: 'osumi://assets/files/payment-types/visa-new.webp',
+    });
+
+    const updateSpy = vi.spyOn(tiposPagoService, 'update').mockResolvedValue(updatedTipoPago);
+
+    await component.selectTipoPago(tipoPago);
+
+    await component.onLogoSelected(
+      createFileInputEvent(
+        new File(['nuevo-logo'], 'visa-new.png', {
+          type: 'image/png',
+        }),
+      ),
+    );
+
+    await component.saveTipoPago();
+
+    expect(updateSpy).toHaveBeenCalledWith(
+      2,
+      expect.objectContaining({
+        logoStagingId: 'staging-visa-new',
+      }),
+    );
+
+    fixture.destroy();
+
+    /*
+     * Tampoco se descarta aquí:
+     * Electron ya lo consumió al guardar.
+     */
+    expect(discardStagedImageMock).not.toHaveBeenCalled();
+  });
+
+  it('muestra temporalmente la confirmación después de guardar', async (): Promise<void> => {
+    vi.useFakeTimers();
+
+    try {
+      const fixture: ComponentFixture<ManagementPaymentTypesComponent> = TestBed.createComponent(
+        ManagementPaymentTypesComponent,
+      );
+
+      const component: ManagementPaymentTypesComponent = fixture.componentInstance;
+
+      const tipoPago: TipoPago = component.tiposPagoConfigurables()[0];
+
+      const updatedTipoPago: TipoPago = new TipoPago().fromInterface({
+        ...tipoPago.toInterface(),
+        nombre: 'VISA actualizada',
+      });
+
+      vi.spyOn(tiposPagoService, 'update').mockResolvedValue(updatedTipoPago);
+
+      await component.selectTipoPago(tipoPago);
+
+      component.tipoPagoDataForm.nombre().value.set('VISA actualizada');
+
+      await component.saveTipoPago();
+
+      expect(component.saveSuccessful()).toBe(true);
+
+      vi.advanceTimersByTime(3_999);
+
+      expect(component.saveSuccessful()).toBe(true);
+
+      vi.advanceTimersByTime(1);
+
+      expect(component.saveSuccessful()).toBe(false);
+
+      fixture.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
