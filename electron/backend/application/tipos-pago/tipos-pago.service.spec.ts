@@ -15,6 +15,55 @@ class FakeTipoPagoRepository implements TipoPagoRepository {
   findAll(): Promise<readonly TipoPagoRecord[]> {
     return Promise.resolve(this.tiposPago);
   }
+
+  /**
+   * Busca un tipo de pago activo
+   * dentro del maestro simulado.
+   */
+  findById(id: number): Promise<TipoPagoRecord | null> {
+    return Promise.resolve(
+      this.tiposPago.find((tipoPago: TipoPagoRecord): boolean => tipoPago.id === id) ?? null,
+    );
+  }
+
+  /**
+   * Comprueba si existe un slug
+   * dentro del maestro simulado.
+   */
+  existsActiveBySlug(slug: string, excludeId: number | null): Promise<boolean> {
+    const normalizedSlug: string = slug.toLocaleLowerCase('es-ES');
+
+    return Promise.resolve(
+      this.tiposPago.some(
+        (tipoPago: TipoPagoRecord): boolean =>
+          tipoPago.id !== excludeId && tipoPago.slug.toLocaleLowerCase('es-ES') === normalizedSlug,
+      ),
+    );
+  }
+
+  /**
+   * No se utiliza todavía en los tests
+   * de lectura del servicio.
+   */
+  create(): Promise<TipoPagoRecord> {
+    throw new Error('Create no está configurado en este fake.');
+  }
+
+  /**
+   * No se utiliza todavía en los tests
+   * de lectura del servicio.
+   */
+  update(): Promise<TipoPagoRecord> {
+    throw new Error('Update no está configurado en este fake.');
+  }
+
+  /**
+   * No se utiliza todavía en los tests
+   * de lectura del servicio.
+   */
+  deactivate(): Promise<void> {
+    throw new Error('Deactivate no está configurado en este fake.');
+  }
 }
 
 class FakeAssetUrlBuilder implements AssetUrlBuilder {
