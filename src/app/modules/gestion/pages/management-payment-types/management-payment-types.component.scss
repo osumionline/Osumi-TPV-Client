@@ -255,6 +255,59 @@
     }
 }
 
+.payment-type-data-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+
+    >mat-form-field {
+        width: 100%;
+    }
+
+    &__options {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    &__logo-placeholder {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 20px;
+        border: 1px dashed
+            var(--mat-sys-outline-variant);
+        border-radius: 12px;
+        color:
+            var(--mat-sys-on-surface-variant);
+
+        >mat-icon {
+            flex: 0 0 auto;
+        }
+
+        strong {
+            display: block;
+            margin-bottom: 4px;
+            color:
+                var(--mat-sys-on-surface);
+        }
+
+        p {
+            margin: 0;
+            line-height: 1.5;
+        }
+    }
+
+    &__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        padding-top: 16px;
+        border-top: 1px solid
+            var(--mat-sys-outline-variant);
+    }
+}
+
 @media (max-width: 800px) {
     .management-payment-types__layout {
         grid-template-columns: 1fr;

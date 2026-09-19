@@ -144,28 +144,100 @@
                     </div>
                 </header>
 
-                <mat-tab-group dynamicHeight>
+                <mat-tab-group
+    dynamicHeight
+    [selectedIndex]="selectedTabIndex()"
+    (selectedIndexChange)="
+        handleTabIndexChange($event)
+    "
+    (animationDone)="
+        handleTabAnimationDone()
+    ">
                     <mat-tab label="DATOS">
-                        <div class="payment-type-tab">
-                            <div class="payment-type-tab__placeholder">
-                                <mat-icon aria-hidden="true">
-                                    edit_note
-                                </mat-icon>
+    <div class="
+        payment-type-tab
+        payment-type-data-form
+    ">
+        <mat-form-field appearance="outline">
+            <mat-label>
+                Nombre
+            </mat-label>
 
-                                <div>
-                                    <strong>
-                                        Datos del tipo de pago
-                                    </strong>
+            <input #nombreInput
+                   matInput
+                   type="text"
+                   autocomplete="off"
+                   [formField]="
+                       tipoPagoDataForm.nombre
+                   ">
 
-                                    <p>
-                                        Aquí se configurarán el nombre,
-                                        las opciones de caja y tienda física
-                                        y el logo.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </mat-tab>
+            @if (
+            tipoPagoDataForm
+                .nombre()
+                .touched() &&
+            tipoPagoDataForm
+                .nombre()
+                .invalid()
+            ) {
+            <mat-error>
+                {{
+                    tipoPagoDataForm
+                        .nombre()
+                        .errors()[0]
+                        ?.message
+                }}
+            </mat-error>
+            }
+        </mat-form-field>
+
+        <div class="payment-type-data-form__options">
+            <mat-checkbox
+                [formField]="
+                    tipoPagoDataForm.afectaCaja
+                ">
+                El tipo de pago afecta a la caja.
+            </mat-checkbox>
+
+            <mat-checkbox
+                [formField]="
+                    tipoPagoDataForm.fisico
+                ">
+                Tipo de pago para tienda física.
+            </mat-checkbox>
+        </div>
+
+        <div class="payment-type-data-form__logo-placeholder">
+            <mat-icon aria-hidden="true">
+                image
+            </mat-icon>
+
+            <div>
+                <strong>
+                    Logo
+                </strong>
+
+                <p>
+                    La gestión del logo se añadirá
+                    en el siguiente bloque.
+                </p>
+            </div>
+        </div>
+
+        <div class="payment-type-data-form__actions">
+            <button mat-button
+                    type="button"
+                    [disabled]="
+                        !creatingTipoPago() &&
+                        !tipoPagoDataForm().dirty()
+                    "
+                    (click)="
+                        cancelTipoPagoChanges()
+                    ">
+                Cancelar
+            </button>
+        </div>
+    </div>
+</mat-tab>
 
                     <mat-tab label="ESTADÍSTICAS">
                         <div class="payment-type-tab">

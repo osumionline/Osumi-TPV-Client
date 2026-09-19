@@ -4,8 +4,6 @@ import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/
 import type TipoPago from '@model/tipos-pago/tipo-pago.model';
 import ManagementPaymentTypesComponent from '@modules/gestion/pages/management-payment-types/management-payment-types.component';
 import TiposPagoService from '@services/tipos-pago/tipos-pago.service';
-import { By } from '@angular/platform-browser';
-import { MatTabGroup } from '@angular/material/tabs';
 
 describe('ManagementPaymentTypesComponent', (): void => {
   let originalDesktopDescriptor: PropertyDescriptor | undefined;
@@ -138,63 +136,292 @@ describe('ManagementPaymentTypesComponent', (): void => {
     expect(component.creatingTipoPago()).toBe(true);
   });
 
-  it('vuelve a Datos al seleccionar otro tipo de pago desde Estadísticas', (): void => {
-    const fixture: ComponentFixture<ManagementPaymentTypesComponent> = TestBed.createComponent(
-      ManagementPaymentTypesComponent,
+  it(
+  'vuelve a Datos al seleccionar otro tipo de pago desde Estadísticas',
+  (): void => {
+    const fixture:
+      ComponentFixture<
+        ManagementPaymentTypesComponent
+      > =
+      TestBed.createComponent(
+        ManagementPaymentTypesComponent,
+      );
+
+    const component:
+      ManagementPaymentTypesComponent =
+      fixture.componentInstance;
+
+    const tiposPago:
+      readonly TipoPago[] =
+      component
+        .tiposPagoConfigurables();
+
+    component.selectTipoPago(
+      tiposPago[0],
     );
 
-    const component: ManagementPaymentTypesComponent = fixture.componentInstance;
-
-    const tiposPago: readonly TipoPago[] = component.tiposPagoConfigurables();
-
-    component.selectTipoPago(tiposPago[0]);
-
-    fixture.detectChanges();
-
-    const tabs: MatTabGroup = fixture.debugElement.query(
-      By.directive(MatTabGroup),
-    ).componentInstance;
-
-    tabs.selectedIndex = 1;
-
-    fixture.detectChanges();
-
-    expect(tabs.selectedIndex).toBe(1);
-
-    component.selectTipoPago(tiposPago[1]);
-
-    expect(component.selectedTipoPago()).toBe(tiposPago[1]);
-
-    expect(tabs.selectedIndex).toBe(0);
-  });
-
-  it('vuelve a Datos al iniciar un alta desde Estadísticas', (): void => {
-    const fixture: ComponentFixture<ManagementPaymentTypesComponent> = TestBed.createComponent(
-      ManagementPaymentTypesComponent,
+    component.handleTabIndexChange(
+      1,
     );
 
-    const component: ManagementPaymentTypesComponent = fixture.componentInstance;
+    expect(
+      component
+        .selectedTabIndex(),
+    ).toBe(1);
 
-    component.selectTipoPago(component.tiposPagoConfigurables()[0]);
+    component.selectTipoPago(
+      tiposPago[1],
+    );
+
+    expect(
+      component
+        .selectedTipoPago(),
+    ).toBe(tiposPago[1]);
+
+    expect(
+      component
+        .selectedTabIndex(),
+    ).toBe(0);
+  },
+);
+
+it(
+  'vuelve a Datos al iniciar un alta desde Estadísticas',
+  (): void => {
+    const fixture:
+      ComponentFixture<
+        ManagementPaymentTypesComponent
+      > =
+      TestBed.createComponent(
+        ManagementPaymentTypesComponent,
+      );
+
+    const component:
+      ManagementPaymentTypesComponent =
+      fixture.componentInstance;
+
+    component.selectTipoPago(
+      component
+        .tiposPagoConfigurables()[0],
+    );
+
+    component.handleTabIndexChange(
+      1,
+    );
+
+    expect(
+      component
+        .selectedTabIndex(),
+    ).toBe(1);
+
+    component
+      .startCreatingTipoPago();
+
+    expect(
+      component
+        .creatingTipoPago(),
+    ).toBe(true);
+
+    expect(
+      component
+        .selectedTipoPago(),
+    ).toBeNull();
+
+    expect(
+      component
+        .selectedTabIndex(),
+    ).toBe(0);
+  },
+);
+  
+  it(
+  'carga los datos del tipo seleccionado en el formulario',
+  (): void => {
+    const fixture:
+      ComponentFixture<
+        ManagementPaymentTypesComponent
+      > =
+      TestBed.createComponent(
+        ManagementPaymentTypesComponent,
+      );
+
+    const component:
+      ManagementPaymentTypesComponent =
+      fixture.componentInstance;
+
+    const tipoPago:
+      TipoPago =
+      component
+        .tiposPagoConfigurables()[0];
+
+    component.selectTipoPago(
+      tipoPago,
+    );
+
+    expect(
+      component
+        .tipoPagoDataModel(),
+    ).toEqual({
+      mode: 'edit',
+      nombre: 'VISA',
+      afectaCaja: false,
+      fisico: true,
+    });
+
+    expect(
+      component
+        .tipoPagoDataForm()
+        .dirty(),
+    ).toBe(false);
+  },
+);
+
+it(
+  'inicia el formulario de alta con los valores por defecto',
+  (): void => {
+    const fixture:
+      ComponentFixture<
+        ManagementPaymentTypesComponent
+      > =
+      TestBed.createComponent(
+        ManagementPaymentTypesComponent,
+      );
+
+    const component:
+      ManagementPaymentTypesComponent =
+      fixture.componentInstance;
+
+    component
+      .startCreatingTipoPago();
+
+    expect(
+      component
+        .tipoPagoDataModel(),
+    ).toEqual({
+      mode: 'create',
+      nombre: '',
+      afectaCaja: false,
+      fisico: true,
+    });
+  },
+);
+
+it(
+  'pone el foco en Nombre al seleccionar un tipo de pago',
+  async (): Promise<void> => {
+    const fixture:
+      ComponentFixture<
+        ManagementPaymentTypesComponent
+      > =
+      TestBed.createComponent(
+        ManagementPaymentTypesComponent,
+      );
+
+    const component:
+      ManagementPaymentTypesComponent =
+      fixture.componentInstance;
 
     fixture.detectChanges();
 
-    const tabs: MatTabGroup = fixture.debugElement.query(
-      By.directive(MatTabGroup),
-    ).componentInstance;
-
-    tabs.selectedIndex = 1;
+    component.selectTipoPago(
+      component
+        .tiposPagoConfigurables()[0],
+    );
 
     fixture.detectChanges();
 
-    expect(tabs.selectedIndex).toBe(1);
+    await fixture.whenStable();
 
-    component.startCreatingTipoPago();
+    const nombreInput:
+      HTMLInputElement | null =
+      fixture.nativeElement
+        .querySelector(
+          '.payment-type-data-form input[type="text"]',
+        );
 
-    expect(component.creatingTipoPago()).toBe(true);
+    expect(
+      nombreInput,
+    ).not.toBeNull();
 
-    expect(component.selectedTipoPago()).toBeNull();
+    expect(
+      document.activeElement,
+    ).toBe(nombreInput);
+  },
+);
 
-    expect(tabs.selectedIndex).toBe(0);
-  });
+it(
+  'vuelve a Datos y enfoca Nombre al seleccionar otro tipo desde Estadísticas',
+  async (): Promise<void> => {
+    const fixture:
+      ComponentFixture<
+        ManagementPaymentTypesComponent
+      > =
+      TestBed.createComponent(
+        ManagementPaymentTypesComponent,
+      );
+
+    const component:
+      ManagementPaymentTypesComponent =
+      fixture.componentInstance;
+
+    const tiposPago:
+      readonly TipoPago[] =
+      component
+        .tiposPagoConfigurables();
+
+    component.selectTipoPago(
+      tiposPago[0],
+    );
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    component.handleTabIndexChange(
+      1,
+    );
+
+    fixture.detectChanges();
+
+    expect(
+      component
+        .selectedTabIndex(),
+    ).toBe(1);
+
+    component.selectTipoPago(
+      tiposPago[1],
+    );
+
+    fixture.detectChanges();
+
+    expect(
+      component
+        .selectedTabIndex(),
+    ).toBe(0);
+
+    /*
+     * En la aplicación real Angular Material
+     * emite animationDone al terminar
+     * la transición a Datos.
+     */
+    component
+      .handleTabAnimationDone();
+
+    await fixture.whenStable();
+
+    const nombreInput:
+      HTMLInputElement | null =
+      fixture.nativeElement
+        .querySelector(
+          '.payment-type-data-form input[type="text"]',
+        );
+
+    expect(
+      nombreInput,
+    ).not.toBeNull();
+
+    expect(
+      document.activeElement,
+    ).toBe(nombreInput);
+  },
+);
 });
