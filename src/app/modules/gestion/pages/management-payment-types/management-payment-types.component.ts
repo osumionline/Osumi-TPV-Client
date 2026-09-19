@@ -1,10 +1,17 @@
-import type { Signal, WritableSignal } from '@angular/core';
-import { Component, computed, inject, signal } from '@angular/core';
+import {
+  type Signal,
+  type WritableSignal,
+  Component,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
-import { MatTabsModule } from '@angular/material/tabs';
+import { MatTabGroup, MatTabsModule } from '@angular/material/tabs';
 import { RouterLink } from '@angular/router';
 import type TipoPago from '@model/tipos-pago/tipo-pago.model';
 import TiposPagoService from '@services/tipos-pago/tipos-pago.service';
@@ -24,10 +31,10 @@ const EFECTIVO_SLUG: string = 'efectivo';
 export default class ManagementPaymentTypesComponent {
   private readonly tiposPagoService: TiposPagoService = inject(TiposPagoService);
 
+  private readonly tabs = viewChild(MatTabGroup);
+
   readonly searchTerm: WritableSignal<string> = signal<string>('');
-
   readonly selectedTipoPago: WritableSignal<TipoPago | null> = signal<TipoPago | null>(null);
-
   readonly creatingTipoPago: WritableSignal<boolean> = signal<boolean>(false);
 
   /**
@@ -70,8 +77,9 @@ export default class ManagementPaymentTypesComponent {
    */
   selectTipoPago(tipoPago: TipoPago): void {
     this.creatingTipoPago.set(false);
-
     this.selectedTipoPago.set(tipoPago);
+
+    this.showDataTab();
   }
 
   /**
@@ -80,7 +88,20 @@ export default class ManagementPaymentTypesComponent {
    */
   startCreatingTipoPago(): void {
     this.selectedTipoPago.set(null);
-
     this.creatingTipoPago.set(true);
+
+    this.showDataTab();
+  }
+
+  /**
+   * Devuelve el editor a la pestaña Datos
+   * cuando ya se encuentra renderizado.
+   */
+  private showDataTab(): void {
+    const tabs: MatTabGroup | undefined = this.tabs();
+
+    if (tabs !== undefined) {
+      tabs.selectedIndex = 0;
+    }
   }
 }

@@ -4,6 +4,8 @@ import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/
 import type TipoPago from '@model/tipos-pago/tipo-pago.model';
 import ManagementPaymentTypesComponent from '@modules/gestion/pages/management-payment-types/management-payment-types.component';
 import TiposPagoService from '@services/tipos-pago/tipos-pago.service';
+import { By } from '@angular/platform-browser';
+import { MatTabGroup } from '@angular/material/tabs';
 
 describe('ManagementPaymentTypesComponent', (): void => {
   let originalDesktopDescriptor: PropertyDescriptor | undefined;
@@ -134,5 +136,65 @@ describe('ManagementPaymentTypesComponent', (): void => {
     expect(component.selectedTipoPago()).toBeNull();
 
     expect(component.creatingTipoPago()).toBe(true);
+  });
+
+  it('vuelve a Datos al seleccionar otro tipo de pago desde Estadísticas', (): void => {
+    const fixture: ComponentFixture<ManagementPaymentTypesComponent> = TestBed.createComponent(
+      ManagementPaymentTypesComponent,
+    );
+
+    const component: ManagementPaymentTypesComponent = fixture.componentInstance;
+
+    const tiposPago: readonly TipoPago[] = component.tiposPagoConfigurables();
+
+    component.selectTipoPago(tiposPago[0]);
+
+    fixture.detectChanges();
+
+    const tabs: MatTabGroup = fixture.debugElement.query(
+      By.directive(MatTabGroup),
+    ).componentInstance;
+
+    tabs.selectedIndex = 1;
+
+    fixture.detectChanges();
+
+    expect(tabs.selectedIndex).toBe(1);
+
+    component.selectTipoPago(tiposPago[1]);
+
+    expect(component.selectedTipoPago()).toBe(tiposPago[1]);
+
+    expect(tabs.selectedIndex).toBe(0);
+  });
+
+  it('vuelve a Datos al iniciar un alta desde Estadísticas', (): void => {
+    const fixture: ComponentFixture<ManagementPaymentTypesComponent> = TestBed.createComponent(
+      ManagementPaymentTypesComponent,
+    );
+
+    const component: ManagementPaymentTypesComponent = fixture.componentInstance;
+
+    component.selectTipoPago(component.tiposPagoConfigurables()[0]);
+
+    fixture.detectChanges();
+
+    const tabs: MatTabGroup = fixture.debugElement.query(
+      By.directive(MatTabGroup),
+    ).componentInstance;
+
+    tabs.selectedIndex = 1;
+
+    fixture.detectChanges();
+
+    expect(tabs.selectedIndex).toBe(1);
+
+    component.startCreatingTipoPago();
+
+    expect(component.creatingTipoPago()).toBe(true);
+
+    expect(component.selectedTipoPago()).toBeNull();
+
+    expect(tabs.selectedIndex).toBe(0);
   });
 });
