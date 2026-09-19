@@ -82,6 +82,9 @@ const IPC_CHANNELS = {
   empleadosDeactivate: 'empleados:deactivate',
 
   tiposPagoGetAll: 'tipos-pago:get-all',
+  tiposPagoCreate: 'tipos-pago:create',
+  tiposPagoUpdate: 'tipos-pago:update',
+  tiposPagoDeactivate: 'tipos-pago:deactivate',
 
   clientesGetAll: 'clientes:get-all',
   clientesCreate: 'clientes:create',
