@@ -21,6 +21,12 @@ export default interface FilesApi {
   stageProviderImage(request: StageImageRequest): Promise<StagedImageInterface>;
 
   /**
+   * Convierte y almacena temporalmente una imagen
+   * destinada al icono de un Tipo de pago.
+   */
+  stagePaymentTypeImage(request: StageImageRequest): Promise<StagedImageInterface>;
+
+  /**
    * Descarta una imagen temporal que ya no forma
    * parte de ningún draft activo.
    */

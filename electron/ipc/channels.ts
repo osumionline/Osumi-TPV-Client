@@ -119,6 +119,7 @@ const IPC_CHANNELS = {
   filesStageArticleImage: 'files:stage-article-image',
   filesStageBrandImage: 'files:stage-brand-image',
   filesStageProviderImage: 'files:stage-provider-image',
+  filesStagePaymentTypeImage: 'files:stage-payment-type-image',
   filesDiscardStagedImage: 'files:discard-staged-image',
 
   cajaOpen: 'caja:open',

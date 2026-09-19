@@ -386,6 +386,12 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         request,
       ) as Promise<StagedImageInterface>,
 
+    stagePaymentTypeImage: (request: StageImageRequest): Promise<StagedImageInterface> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.filesStagePaymentTypeImage,
+        request,
+      ) as Promise<StagedImageInterface>,
+
     discardStagedImage: (stagingId: string): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.filesDiscardStagedImage, stagingId) as Promise<void>,
   }),

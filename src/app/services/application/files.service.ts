@@ -44,6 +44,19 @@ export default class FilesService {
   }
 
   /**
+   * Envía un icono seleccionado al staging
+   * de Tipos de pago.
+   */
+  async stagePaymentTypeImage(file: File): Promise<StagedImageInterface> {
+    const bytes: Uint8Array = new Uint8Array(await file.arrayBuffer());
+
+    return window.osumiDesktop.files.stagePaymentTypeImage({
+      originalName: file.name.trim() === '' ? null : file.name,
+      bytes,
+    });
+  }
+
+  /**
    * Descarta una imagen temporal que ya no forma
    * parte de ningún draft.
    */

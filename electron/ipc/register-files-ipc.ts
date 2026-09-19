@@ -42,6 +42,15 @@ export default function registerFilesIpc(
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.filesStagePaymentTypeImage,
+    async (event, request: StageImageRequest): Promise<StagedImageInterface> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return stageImage(request, 'payment_type_icon', imageStagingService);
+    },
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.filesDiscardStagedImage,
     async (event, stagingId: string): Promise<void> => {
       assertTrustedSender(event, getMainWindow);
