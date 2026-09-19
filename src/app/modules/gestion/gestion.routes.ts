@@ -39,7 +39,7 @@ const routes: Routes = [
         path: 'tipos-pago',
         canActivate: [gestionPermissionGuard],
         loadComponent: () =>
-          import('@modules/gestion/pages/management-placeholder/management-placeholder.component'),
+          import('@modules/gestion/pages/management-payment-types/management-payment-types.component'),
         data: {
           requiredPermissions: [GESTION_PERMISSIONS.PAYMENT_TYPES],
           title: 'Tipos de pago',

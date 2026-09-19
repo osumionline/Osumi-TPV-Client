@@ -1,0 +1,211 @@
+<section class="management-payment-types">
+    <header class="management-payment-types__header">
+        <div>
+            <h1>
+                Tipos de pago
+            </h1>
+
+            <p>
+                Gestiona las formas de pago
+                disponibles en Osumi TPV.
+            </p>
+        </div>
+
+        <button mat-button
+                type="button"
+                routerLink="/gestion">
+            <mat-icon>
+                chevron_left
+            </mat-icon>
+
+            Volver
+        </button>
+    </header>
+
+    <div class="management-payment-types__layout">
+        <aside class="payment-type-sidebar">
+            <mat-form-field appearance="outline"
+                            subscriptSizing="dynamic"
+                            class="payment-type-sidebar__search">
+                <mat-label>
+                    Buscar tipo de pago
+                </mat-label>
+
+                <mat-icon matPrefix>
+                    search
+                </mat-icon>
+
+                <input #searchInput
+                       matInput
+                       type="search"
+                       autocomplete="off"
+                       [value]="searchTerm()"
+                       (input)="
+                           updateSearchTerm(
+                               searchInput.value
+                           )
+                       ">
+            </mat-form-field>
+
+            <div class="payment-type-list">
+                @for (
+                tipoPago of filteredTiposPago();
+                track tipoPago.id
+                ) {
+                <button type="button"
+                        class="payment-type-list__item"
+                        [class.payment-type-list__item--selected]="
+                            !creatingTipoPago() &&
+                            selectedTipoPago()?.id === tipoPago.id
+                        "
+                        (click)="selectTipoPago(tipoPago)">
+                    <mat-icon class="payment-type-list__handle"
+                              aria-hidden="true">
+                        drag_indicator
+                    </mat-icon>
+
+                    <span class="payment-type-list__name">
+                        {{ tipoPago.nombre }}
+                    </span>
+                </button>
+                }
+                @empty {
+                <div class="payment-type-list__empty">
+                    <mat-icon aria-hidden="true">
+                        credit_card_off
+                    </mat-icon>
+
+                    @if (searchTerm().trim() !== '') {
+                    <p>
+                        No hay tipos de pago que coincidan
+                        con la búsqueda.
+                    </p>
+                    }
+                    @else {
+                    <p>
+                        No hay tipos de pago configurables.
+                    </p>
+                    }
+                </div>
+                }
+            </div>
+
+            <button mat-flat-button
+                    type="button"
+                    class="payment-type-sidebar__create"
+                    (click)="startCreatingTipoPago()">
+                <mat-icon>
+                    add_circle_outline
+                </mat-icon>
+
+                Añadir nuevo tipo de pago
+            </button>
+        </aside>
+
+        <main class="payment-type-content">
+            @if (
+            creatingTipoPago() ||
+            selectedTipoPago() !== null
+            ) {
+            <div class="payment-type-editor">
+                <header class="payment-type-editor__header">
+                    <div class="
+                        payment-type-content__icon
+                        payment-type-content__icon--active
+                    ">
+                        <mat-icon aria-hidden="true">
+                            {{
+                                creatingTipoPago()
+                                    ? 'add_card'
+                                    : 'credit_card'
+                            }}
+                        </mat-icon>
+                    </div>
+
+                    <div>
+                        @if (creatingTipoPago()) {
+                        <p class="payment-type-content__eyebrow">
+                            Nuevo tipo de pago
+                        </p>
+
+                        <h2>
+                            Crear tipo de pago
+                        </h2>
+                        }
+                        @else if (selectedTipoPago(); as tipoPago) {
+                        <p class="payment-type-content__eyebrow">
+                            Tipo de pago seleccionado
+                        </p>
+
+                        <h2>
+                            {{ tipoPago.nombre }}
+                        </h2>
+                        }
+                    </div>
+                </header>
+
+                <mat-tab-group dynamicHeight>
+                    <mat-tab label="DATOS">
+                        <div class="payment-type-tab">
+                            <div class="payment-type-tab__placeholder">
+                                <mat-icon aria-hidden="true">
+                                    edit_note
+                                </mat-icon>
+
+                                <div>
+                                    <strong>
+                                        Datos del tipo de pago
+                                    </strong>
+
+                                    <p>
+                                        Aquí se configurarán el nombre,
+                                        las opciones de caja y tienda física
+                                        y el logo.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </mat-tab>
+
+                    <mat-tab label="ESTADÍSTICAS">
+                        <div class="payment-type-tab">
+                            <div class="payment-type-tab__placeholder">
+                                <mat-icon aria-hidden="true">
+                                    monitoring
+                                </mat-icon>
+
+                                <div>
+                                    <strong>
+                                        Estadísticas
+                                    </strong>
+
+                                    <p>
+                                        Aquí se mostrará la actividad
+                                        asociada a este tipo de pago.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </mat-tab>
+                </mat-tab-group>
+            </div>
+            }
+            @else {
+            <div class="payment-type-content__welcome">
+                <mat-icon aria-hidden="true">
+                    credit_card
+                </mat-icon>
+
+                <h2>
+                    Elige un tipo de pago de la lista
+                </h2>
+
+                <p>
+                    Selecciona un tipo de pago para consultar
+                    y gestionar sus datos.
+                </p>
+            </div>
+            }
+        </main>
+    </div>
+</section>
