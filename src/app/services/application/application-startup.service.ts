@@ -7,6 +7,7 @@ import ClientesService from '@services/clientes/clientes.service';
 import MarcasService from '@services/compras/marcas.service';
 import ProveedoresService from '@services/compras/proveedores.service';
 import EmpleadosService from '@services/empleados/empleados.service';
+import TiposPagoService from '@services/tipos-pago/tipos-pago.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 @Service()
@@ -14,6 +15,7 @@ export default class ApplicationStartupService {
   private readonly marcasService: MarcasService = inject(MarcasService);
   private readonly proveedoresService: ProveedoresService = inject(ProveedoresService);
   private readonly empleadosService: EmpleadosService = inject(EmpleadosService);
+  private readonly tiposPagoService: TiposPagoService = inject(TiposPagoService);
   private readonly clientesService: ClientesService = inject(ClientesService);
   private readonly categoriasService: CategoriasService = inject(CategoriasService);
   private readonly provinciasService: ProvinciasService = inject(ProvinciasService);
@@ -106,7 +108,7 @@ export default class ApplicationStartupService {
   }
 
   private async runStartupSteps(): Promise<void> {
-    this.totalStepsSignal.set(6);
+    this.totalStepsSignal.set(7);
 
     this.currentStepSignal.set('Cargando marcas…');
     await this.marcasService.load();
@@ -120,16 +122,20 @@ export default class ApplicationStartupService {
     await this.empleadosService.load();
     this.completedStepsSignal.set(3);
 
+    this.currentStepSignal.set('Cargando tipos de pago…');
+    await this.tiposPagoService.load();
+    this.completedStepsSignal.set(4);
+
     this.currentStepSignal.set('Cargando clientes…');
     await this.clientesService.load();
-    this.completedStepsSignal.set(4);
+    this.completedStepsSignal.set(5);
 
     this.currentStepSignal.set('Cargando categorías…');
     await this.categoriasService.load();
-    this.completedStepsSignal.set(5);
+    this.completedStepsSignal.set(6);
 
     this.currentStepSignal.set('Cargando provincias…');
     await this.provinciasService.load();
-    this.completedStepsSignal.set(6);
+    this.completedStepsSignal.set(7);
   }
 }
