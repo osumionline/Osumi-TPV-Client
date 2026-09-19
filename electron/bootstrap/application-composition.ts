@@ -415,6 +415,8 @@ export default function createApplicationComposition(
   const tiposPagoService: TiposPagoService = new TiposPagoService(
     tipoPagoRepository,
     assetUrlBuilder,
+    imageAssetPromotionService,
+    imageStagingService,
   );
 
   const clienteRepository: ClienteRepository = new TypeOrmClienteRepository(operationalDatabase);
