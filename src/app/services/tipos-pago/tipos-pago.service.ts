@@ -1,5 +1,7 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { Service, signal } from '@angular/core';
+import type ActualizarTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/actualizar-tipo-pago-command.interface';
+import type CrearTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/crear-tipo-pago-command.interface';
 import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 import TipoPago from '@model/tipos-pago/tipo-pago.model';
 
@@ -8,13 +10,11 @@ export default class TiposPagoService {
   private readonly tiposPagoSignal: WritableSignal<readonly TipoPago[]> = signal<
     readonly TipoPago[]
   >([]);
-
   private readonly loadedSignal: WritableSignal<boolean> = signal<boolean>(false);
 
   private pendingRequest: Promise<void> | null = null;
 
   readonly tiposPago: Signal<readonly TipoPago[]> = this.tiposPagoSignal.asReadonly();
-
   readonly loaded: Signal<boolean> = this.loadedSignal.asReadonly();
 
   /**
@@ -44,6 +44,46 @@ export default class TiposPagoService {
   clear(): void {
     this.tiposPagoSignal.set([]);
     this.loadedSignal.set(false);
+  }
+
+  /**
+   * Crea un tipo de pago y lo incorpora
+   * inmediatamente al maestro en memoria.
+   */
+  async create(command: CrearTipoPagoCommand): Promise<TipoPago> {
+    const result: TipoPagoInterface = await window.osumiDesktop.tiposPago.create(command);
+
+    const tipoPago: TipoPago = this.toModel(result);
+
+    this.upsertTipoPago(tipoPago);
+
+    return tipoPago;
+  }
+
+  /**
+   * Actualiza un tipo de pago y sustituye
+   * inmediatamente su versión en memoria.
+   */
+  async update(id: number, command: ActualizarTipoPagoCommand): Promise<TipoPago> {
+    const result: TipoPagoInterface = await window.osumiDesktop.tiposPago.update(id, command);
+
+    const tipoPago: TipoPago = this.toModel(result);
+
+    this.upsertTipoPago(tipoPago);
+
+    return tipoPago;
+  }
+
+  /**
+   * Da de baja un tipo de pago y lo retira
+   * inmediatamente del maestro en memoria.
+   */
+  async deactivate(id: number): Promise<void> {
+    await window.osumiDesktop.tiposPago.deactivate(id);
+
+    this.tiposPagoSignal.update((tiposPago: readonly TipoPago[]): readonly TipoPago[] =>
+      tiposPago.filter((tipoPago: TipoPago): boolean => tipoPago.id !== id),
+    );
   }
 
   /**
@@ -102,7 +142,7 @@ export default class TiposPagoService {
       const result: readonly TipoPagoInterface[] = await window.osumiDesktop.tiposPago.getAll();
 
       const tiposPago: readonly TipoPago[] = result.map((tipoPago: TipoPagoInterface): TipoPago =>
-        new TipoPago().fromInterface(tipoPago),
+        this.toModel(tipoPago),
       );
 
       this.tiposPagoSignal.set(this.sortTiposPago(tiposPago));
@@ -111,6 +151,30 @@ export default class TiposPagoService {
     } finally {
       this.pendingRequest = null;
     }
+  }
+
+  /**
+   * Inserta o sustituye un tipo de pago
+   * dentro del maestro canónico en memoria.
+   */
+  private upsertTipoPago(tipoPago: TipoPago): void {
+    this.tiposPagoSignal.update((current: readonly TipoPago[]): readonly TipoPago[] => {
+      const exists: boolean = current.some((item: TipoPago): boolean => item.id === tipoPago.id);
+
+      const updated: readonly TipoPago[] = exists
+        ? current.map((item: TipoPago): TipoPago => (item.id === tipoPago.id ? tipoPago : item))
+        : [...current, tipoPago];
+
+      return this.sortTiposPago(updated);
+    });
+  }
+
+  /**
+   * Convierte el contrato recibido desde
+   * Electron en el modelo del renderer.
+   */
+  private toModel(tipoPago: TipoPagoInterface): TipoPago {
+    return new TipoPago().fromInterface(tipoPago);
   }
 
   /**
