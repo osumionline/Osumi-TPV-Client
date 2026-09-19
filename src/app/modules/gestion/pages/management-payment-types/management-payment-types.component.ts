@@ -30,6 +30,7 @@ import { DialogService } from '@osumi/angular-tools';
 import FilesService from '@services/application/files.service';
 import TiposPagoService from '@services/tipos-pago/tipos-pago.service';
 import { getErrorMessage } from '@utils/error.utils';
+import { firstValueFrom } from 'rxjs';
 
 const EFECTIVO_SLUG: string = 'efectivo';
 
@@ -73,6 +74,7 @@ export default class ManagementPaymentTypesComponent {
     createTipoPagoDataFormInitialValue(null),
   );
   readonly savingTipoPago: WritableSignal<boolean> = signal<boolean>(false);
+  readonly deletingTipoPago: WritableSignal<boolean> = signal<boolean>(false);
   readonly saveSuccessful: WritableSignal<boolean> = signal<boolean>(false);
 
   private saveFeedbackTimeoutId: number | null = null;
@@ -93,7 +95,12 @@ export default class ManagementPaymentTypesComponent {
   );
 
   readonly canSaveTipoPago: Signal<boolean> = computed((): boolean => {
-    if (this.savingTipoPago() || this.logoProcessing() || this.tipoPagoDataForm().invalid()) {
+    if (
+      this.deletingTipoPago() ||
+      this.savingTipoPago() ||
+      this.logoProcessing() ||
+      this.tipoPagoDataForm().invalid()
+    ) {
       return false;
     }
 
@@ -159,7 +166,7 @@ export default class ManagementPaymentTypesComponent {
    * y carga sus datos en el formulario.
    */
   async selectTipoPago(tipoPago: TipoPago): Promise<void> {
-    if (this.savingTipoPago() || this.logoProcessing()) {
+    if (this.deletingTipoPago() || this.savingTipoPago() || this.logoProcessing()) {
       return;
     }
 
@@ -183,7 +190,7 @@ export default class ManagementPaymentTypesComponent {
    * tipo de pago.
    */
   async startCreatingTipoPago(): Promise<void> {
-    if (this.savingTipoPago() || this.logoProcessing()) {
+    if (this.deletingTipoPago() || this.savingTipoPago() || this.logoProcessing()) {
       return;
     }
 
@@ -210,7 +217,7 @@ export default class ManagementPaymentTypesComponent {
    * En edición restaura los datos persistidos.
    */
   async cancelTipoPagoChanges(): Promise<void> {
-    if (this.savingTipoPago() || this.logoProcessing()) {
+    if (this.deletingTipoPago() || this.savingTipoPago() || this.logoProcessing()) {
       return;
     }
 
@@ -243,7 +250,7 @@ export default class ManagementPaymentTypesComponent {
    * que se está creando o editando.
    */
   async saveTipoPago(): Promise<void> {
-    if (this.savingTipoPago() || this.logoProcessing()) {
+    if (this.deletingTipoPago() || this.savingTipoPago() || this.logoProcessing()) {
       return;
     }
 
@@ -298,6 +305,84 @@ export default class ManagementPaymentTypesComponent {
   }
 
   /**
+   * Solicita confirmación y da de baja
+   * el tipo de pago seleccionado.
+   */
+  async deleteTipoPago(): Promise<void> {
+    if (
+      this.deletingTipoPago() ||
+      this.savingTipoPago() ||
+      this.logoProcessing() ||
+      this.creatingTipoPago()
+    ) {
+      return;
+    }
+
+    const tipoPago: TipoPago | null = this.selectedTipoPago();
+
+    if (tipoPago === null || tipoPago.id === null) {
+      return;
+    }
+
+    const confirmed: boolean = await firstValueFrom(
+      this.dialog.confirm({
+        title: 'Eliminar tipo de pago',
+        content:
+          `¿Estás seguro de querer eliminar el tipo de pago "${tipoPago.nombre}"? ` +
+          'Dejará de estar disponible para nuevas operaciones, pero se conservará en el histórico.',
+        warn: true,
+        ok: 'Eliminar',
+        cancel: 'Cancelar',
+      }),
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const stagingId: string | null = this.logoStagingId();
+
+    this.clearSaveFeedback();
+    this.deletingTipoPago.set(true);
+
+    try {
+      await this.tiposPagoService.deactivate(tipoPago.id);
+
+      /*
+       * La baja ya está confirmada en SQLite.
+       * Cerramos la ficha y dejamos de ser
+       * propietarios de cualquier estado editable.
+       */
+      this.selectedTipoPago.set(null);
+      this.creatingTipoPago.set(false);
+      this.resetTipoPagoDataForm(null);
+
+      /*
+       * El staging no forma parte del tipo persistido
+       * que acabamos de eliminar, por lo que debe
+       * limpiarse separadamente.
+       *
+       * Igual que en Marcas, una incidencia limpiando
+       * este temporal no revierte una baja ya confirmada.
+       */
+      if (stagingId !== null) {
+        this.logoStagingId.set(null);
+
+        await Promise.allSettled([this.filesService.discardStagedImage(stagingId)]);
+      }
+    } catch (error: unknown) {
+      console.error('Error eliminando el tipo de pago:', error);
+
+      this.dialog.alert({
+        title: 'Error',
+        content: getErrorMessage(error, 'No se ha podido eliminar el tipo de pago.'),
+      });
+    } finally {
+      this.deletingTipoPago.set(false);
+    }
+  }
+
+  /**
    * Aplica el foco pendiente en Nombre
    * cuando termina el cambio a Datos.
    */
@@ -320,7 +405,7 @@ export default class ManagementPaymentTypesComponent {
    * el logo del tipo de pago.
    */
   selectLogo(): void {
-    if (this.savingTipoPago() || this.logoProcessing()) {
+    if (this.deletingTipoPago() || this.savingTipoPago() || this.logoProcessing()) {
       return;
     }
 
@@ -333,7 +418,7 @@ export default class ManagementPaymentTypesComponent {
    * cualquier staging anterior.
    */
   async onLogoSelected(event: Event): Promise<void> {
-    if (this.savingTipoPago() || this.logoProcessing()) {
+    if (this.deletingTipoPago() || this.savingTipoPago() || this.logoProcessing()) {
       return;
     }
 

@@ -345,6 +345,15 @@
         align-items: center;
     }
 
+    &__actions-spacer {
+        flex: 1;
+    }
+
+    &__delete {
+        color:
+            var(--mat-sys-error);
+    }
+
     &__save-feedback {
         margin-right: 4px;
         padding-right: 16px;

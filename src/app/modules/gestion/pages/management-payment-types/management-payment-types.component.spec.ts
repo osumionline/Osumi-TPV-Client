@@ -6,13 +6,16 @@ import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/
 import StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
 import TipoPago from '@model/tipos-pago/tipo-pago.model';
 import ManagementPaymentTypesComponent from '@modules/gestion/pages/management-payment-types/management-payment-types.component';
+import { DialogService } from '@osumi/angular-tools';
 import FilesService from '@services/application/files.service';
 import TiposPagoService from '@services/tipos-pago/tipos-pago.service';
+import { of } from 'rxjs';
 import { vi } from 'vitest';
 
 describe('ManagementPaymentTypesComponent', (): void => {
   let originalDesktopDescriptor: PropertyDescriptor | undefined;
   let tiposPagoService: TiposPagoService;
+  let dialog: DialogService;
   let stagePaymentTypeImageMock: ReturnType<typeof vi.fn>;
   let discardStagedImageMock: ReturnType<typeof vi.fn>;
 
@@ -60,6 +63,7 @@ describe('ManagementPaymentTypesComponent', (): void => {
       value: {
         tiposPago: {
           getAll: (): Promise<readonly TipoPagoInterface[]> => Promise.resolve(tiposPago),
+          deactivate: (): Promise<void> => Promise.resolve(),
         },
       },
     });
@@ -80,6 +84,7 @@ describe('ManagementPaymentTypesComponent', (): void => {
     }).compileComponents();
 
     tiposPagoService = TestBed.inject(TiposPagoService);
+    dialog = TestBed.inject(DialogService);
 
     await tiposPagoService.load();
   });
@@ -87,11 +92,10 @@ describe('ManagementPaymentTypesComponent', (): void => {
   afterEach((): void => {
     if (originalDesktopDescriptor !== undefined) {
       Object.defineProperty(window, 'osumiDesktop', originalDesktopDescriptor);
-
-      return;
+    } else {
+      Reflect.deleteProperty(window, 'osumiDesktop');
     }
 
-    Reflect.deleteProperty(window, 'osumiDesktop');
     vi.restoreAllMocks();
   });
 
@@ -646,6 +650,84 @@ describe('ManagementPaymentTypesComponent', (): void => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('elimina un tipo de pago confirmado y limpia su staging pendiente', async (): Promise<void> => {
+    stagePaymentTypeImageMock.mockResolvedValueOnce(
+      createStagedPaymentTypeImage(
+        'staging-visa-delete',
+        'osumi://assets/staging/visa-delete.webp',
+      ),
+    );
+
+    const fixture: ComponentFixture<ManagementPaymentTypesComponent> = TestBed.createComponent(
+      ManagementPaymentTypesComponent,
+    );
+
+    const component: ManagementPaymentTypesComponent = fixture.componentInstance;
+
+    const tipoPago: TipoPago = component.tiposPagoConfigurables()[0];
+
+    vi.spyOn(dialog, 'confirm').mockReturnValue(of(true));
+
+    const deactivateSpy = vi.spyOn(tiposPagoService, 'deactivate');
+
+    await component.selectTipoPago(tipoPago);
+
+    await component.onLogoSelected(
+      createFileInputEvent(
+        new File(['nuevo-logo'], 'visa-delete.png', {
+          type: 'image/png',
+        }),
+      ),
+    );
+
+    await component.deleteTipoPago();
+
+    expect(deactivateSpy).toHaveBeenCalledWith(2);
+
+    expect(tiposPagoService.findById(2)).toBeNull();
+
+    expect(component.selectedTipoPago()).toBeNull();
+
+    expect(component.creatingTipoPago()).toBe(false);
+
+    expect(discardStagedImageMock).toHaveBeenCalledWith('staging-visa-delete');
+
+    fixture.destroy();
+
+    /*
+     * El componente ya dejó el staging a null,
+     * por lo que destroy no debe descartarlo
+     * una segunda vez.
+     */
+    expect(discardStagedImageMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('no elimina el tipo de pago si se cancela la confirmación', async (): Promise<void> => {
+    const fixture: ComponentFixture<ManagementPaymentTypesComponent> = TestBed.createComponent(
+      ManagementPaymentTypesComponent,
+    );
+
+    const component: ManagementPaymentTypesComponent = fixture.componentInstance;
+
+    const tipoPago: TipoPago = component.tiposPagoConfigurables()[0];
+
+    vi.spyOn(dialog, 'confirm').mockReturnValue(of(false));
+
+    const deactivateSpy = vi.spyOn(tiposPagoService, 'deactivate');
+
+    await component.selectTipoPago(tipoPago);
+
+    await component.deleteTipoPago();
+
+    expect(deactivateSpy).not.toHaveBeenCalled();
+
+    expect(component.selectedTipoPago()).toBe(tipoPago);
+
+    expect(tiposPagoService.findById(2)).toBe(tipoPago);
+
+    expect(discardStagedImageMock).not.toHaveBeenCalled();
   });
 });
 

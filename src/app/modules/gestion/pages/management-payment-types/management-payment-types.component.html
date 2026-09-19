@@ -58,6 +58,11 @@
                             !creatingTipoPago() &&
                             selectedTipoPago()?.id === tipoPago.id
                         "
+                        [disabled]="
+                            deletingTipoPago() ||
+                            savingTipoPago() ||
+                            logoProcessing()
+                        "
                         (click)="selectTipoPago(tipoPago)">
                     <mat-icon class="payment-type-list__handle"
                               aria-hidden="true">
@@ -93,6 +98,11 @@
             <button mat-flat-button
                     type="button"
                     class="payment-type-sidebar__create"
+                    [disabled]="
+                        deletingTipoPago() ||
+                        savingTipoPago() ||
+                        logoProcessing()
+                    "
                     (click)="startCreatingTipoPago()">
                 <mat-icon>
                     add_circle_outline
@@ -234,6 +244,7 @@
                                            type="file"
                                            accept="image/jpeg,image/png,image/webp"
                                            [disabled]="
+                                                deletingTipoPago() ||
                                                 savingTipoPago() ||
                                                 logoProcessing()
                                             "
@@ -241,7 +252,11 @@
 
                                     <button mat-stroked-button
                                             type="button"
-                                            [disabled]="logoProcessing()"
+                                            [disabled]="
+                                                deletingTipoPago() ||
+                                                savingTipoPago() ||
+                                                logoProcessing()
+                                            "
                                             (click)="selectLogo()">
                                         @if (logoProcessing()) {
                                         Procesando imagen…
@@ -264,6 +279,34 @@
                             </div>
 
                             <div class="payment-type-data-form__actions">
+                                @if (
+                                !creatingTipoPago() &&
+                                selectedTipoPago() !== null
+                                ) {
+                                <button mat-button
+                                        type="button"
+                                        class="payment-type-data-form__delete"
+                                        [disabled]="
+                                            deletingTipoPago() ||
+                                            savingTipoPago() ||
+                                            logoProcessing()
+                                        "
+                                        (click)="deleteTipoPago()">
+                                    <mat-icon>
+                                        delete
+                                    </mat-icon>
+
+                                    {{
+                                        deletingTipoPago()
+                                            ? 'Eliminando…'
+                                            : 'Eliminar'
+                                    }}
+                                </button>
+
+                                <span class="payment-type-data-form__actions-spacer">
+                                </span>
+                                }
+
                                 @if (saveSuccessful()) {
                                 <span class="payment-type-data-form__save-feedback"
                                       role="status"
@@ -277,6 +320,7 @@
                                         [disabled]="
                                             savingTipoPago() ||
                                             logoProcessing() ||
+                                            deletingTipoPago() ||
                                             (
                                                 !creatingTipoPago() &&
                                                 !hasTipoPagoDataChanges()
