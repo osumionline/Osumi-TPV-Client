@@ -115,6 +115,79 @@ describe('PaymentTypeStatisticsComponent', (): void => {
     });
   });
 
+  it('ignora una respuesta antigua si ya existe una consulta más reciente', async (): Promise<void> => {
+    let resolveFirstRequest: (result: TipoPagoEstadisticasResultado) => void = (): void => {
+      throw new Error('La primera consulta no está preparada.');
+    };
+
+    const firstRequest: Promise<TipoPagoEstadisticasResultado> =
+      new Promise<TipoPagoEstadisticasResultado>((resolve): void => {
+        resolveFirstRequest = resolve;
+      });
+
+    const firstResult: TipoPagoEstadisticasResultado = {
+      ...createResult(),
+      totalImporteCents: 1_000,
+    };
+
+    const latestResult: TipoPagoEstadisticasResultado = {
+      ...createResult(),
+      totalImporteCents: 2_000,
+    };
+
+    getEstadisticasMock.mockReturnValueOnce(firstRequest).mockResolvedValueOnce(latestResult);
+
+    const fixture: ComponentFixture<PaymentTypeStatisticsComponent> = TestBed.createComponent(
+      PaymentTypeStatisticsComponent,
+    );
+
+    const component: PaymentTypeStatisticsComponent = fixture.componentInstance;
+
+    fixture.componentRef.setInput('tipoPago', createTipoPago());
+
+    fixture.componentRef.setInput('active', true);
+
+    /*
+     * Primera consulta:
+     * mes actual.
+     *
+     * La dejamos deliberadamente pendiente.
+     */
+    fixture.detectChanges();
+
+    expect(getEstadisticasMock).toHaveBeenCalledTimes(1);
+
+    /*
+     * Lanzamos una segunda consulta más reciente
+     * solicitando el año completo.
+     */
+    component.onMonthChange({
+      value: 'all',
+    } as never);
+
+    fixture.detectChanges();
+
+    await vi.waitFor((): void => {
+      expect(component.result()).toBe(latestResult);
+    });
+
+    expect(getEstadisticasMock).toHaveBeenCalledTimes(2);
+
+    /*
+     * Ahora termina la primera petición.
+     * Su resultado ya es obsoleto y no
+     * debe sustituir el resultado actual.
+     */
+    resolveFirstRequest(firstResult);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(component.result()).toBe(latestResult);
+
+    expect(component.result()?.totalImporteCents).toBe(2_000);
+  });
+
   it('expone el error de la consulta para permitir reintentar', async (): Promise<void> => {
     getEstadisticasMock.mockRejectedValueOnce(new Error('Database error'));
 
