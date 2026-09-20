@@ -1,6 +1,7 @@
 import type TiposPagoService from '@backend/application/tipos-pago/tipos-pago.service';
 import type ActualizarTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/actualizar-tipo-pago-command.interface';
 import type CrearTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/crear-tipo-pago-command.interface';
+import type ReordenarTiposPagoCommand from '@desktop-contracts/configuration/tipos-pago/reordenar-tipos-pago-command.interface';
 import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
 import { assertTrustedSender } from '@ipc/assert-trusted-sender';
@@ -38,6 +39,16 @@ export default function registerTiposPagoIpc(
       assertTrustedSender(event, getMainWindow);
 
       return tiposPagoService.update(id, command);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.tiposPagoReorder,
+
+    async (event, command: ReordenarTiposPagoCommand): Promise<readonly TipoPagoInterface[]> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return tiposPagoService.reorder(command);
     },
   );
 

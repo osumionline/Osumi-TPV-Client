@@ -1,10 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import type ActualizarTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/actualizar-tipo-pago-command.interface';
 import type CrearTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/crear-tipo-pago-command.interface';
+import type ReordenarTiposPagoCommand from '@desktop-contracts/configuration/tipos-pago/reordenar-tipos-pago-command.interface';
 import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 import type TipoPago from '@model/tipos-pago/tipo-pago.model';
 import TiposPagoService from '@services/tipos-pago/tipos-pago.service';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 let service: TiposPagoService;
 let originalDesktopDescriptor: PropertyDescriptor | undefined;
@@ -15,6 +16,8 @@ let updateCalls: {
   readonly command: ActualizarTipoPagoCommand;
 }[];
 let deactivateCalls: number[];
+let reorderCalls: ReordenarTiposPagoCommand[];
+let reorderResult: readonly TipoPagoInterface[];
 let getAllResult: readonly TipoPagoInterface[];
 let createResult: TipoPagoInterface;
 let updateResult: TipoPagoInterface;
@@ -26,6 +29,7 @@ describe('TiposPagoService', (): void => {
     createCalls = [];
     updateCalls = [];
     deactivateCalls = [];
+    reorderCalls = [];
 
     /*
      * Llegan deliberadamente
@@ -86,6 +90,38 @@ describe('TiposPagoService', (): void => {
       fisico: false,
     });
 
+    reorderResult = [
+      createTipoPagoInterface({
+        id: 1,
+        publicId: 'tipo-pago-efectivo',
+        nombre: 'Efectivo',
+        slug: 'efectivo',
+        foto: null,
+        afectaCaja: true,
+        orden: 0,
+      }),
+
+      createTipoPagoInterface({
+        id: 3,
+        publicId: 'tipo-pago-bizum',
+        nombre: 'Bizum',
+        slug: 'bizum',
+        foto: 'osumi://assets/files/payment-types/bizum.webp',
+        afectaCaja: false,
+        orden: 1,
+      }),
+
+      createTipoPagoInterface({
+        id: 2,
+        publicId: 'tipo-pago-visa',
+        nombre: 'VISA',
+        slug: 'visa',
+        foto: 'osumi://assets/files/payment-types/visa.webp',
+        afectaCaja: false,
+        orden: 2,
+      }),
+    ];
+
     Object.defineProperty(window, 'osumiDesktop', {
       configurable: true,
 
@@ -111,6 +147,12 @@ describe('TiposPagoService', (): void => {
             return Promise.resolve(updateResult);
           },
 
+          reorder: (command: ReordenarTiposPagoCommand): Promise<readonly TipoPagoInterface[]> => {
+            reorderCalls.push(command);
+
+            return Promise.resolve(reorderResult);
+          },
+
           deactivate: (id: number): Promise<void> => {
             deactivateCalls.push(id);
 
@@ -130,11 +172,11 @@ describe('TiposPagoService', (): void => {
   afterEach((): void => {
     if (originalDesktopDescriptor !== undefined) {
       Object.defineProperty(window, 'osumiDesktop', originalDesktopDescriptor);
-
-      return;
+    } else {
+      Reflect.deleteProperty(window, 'osumiDesktop');
     }
 
-    Reflect.deleteProperty(window, 'osumiDesktop');
+    vi.restoreAllMocks();
   });
 
   it('carga el maestro una sola vez y lo mantiene ordenado en memoria', async (): Promise<void> => {
@@ -240,6 +282,139 @@ describe('TiposPagoService', (): void => {
       'tarjeta',
       'bizum',
     ]);
+  });
+
+  it('reordena inmediatamente en memoria y adopta después el maestro persistido', async (): Promise<void> => {
+    await service.load();
+
+    let resolveReorder: (value: readonly TipoPagoInterface[]) => void = (): void => {
+      throw new Error('El resolver del reorder no está preparado.');
+    };
+
+    const pendingResponse: Promise<readonly TipoPagoInterface[]> = new Promise<
+      readonly TipoPagoInterface[]
+    >((resolve): void => {
+      resolveReorder = resolve;
+    });
+
+    vi.spyOn(window.osumiDesktop.tiposPago, 'reorder').mockImplementation(
+      (command: ReordenarTiposPagoCommand): Promise<readonly TipoPagoInterface[]> => {
+        reorderCalls.push(command);
+
+        return pendingResponse;
+      },
+    );
+
+    const pending: Promise<void> = service.reorder({
+      ids: [3, 2],
+    });
+
+    expect(service.reordering()).toBe(true);
+
+    /*
+     * Antes de que Electron responda,
+     * la memoria ya refleja el drop.
+     */
+    expect(
+      service.tiposPago().map((tipoPago: TipoPago) => ({
+        slug: tipoPago.slug,
+        orden: tipoPago.orden,
+      })),
+    ).toEqual([
+      {
+        slug: 'efectivo',
+        orden: 0,
+      },
+      {
+        slug: 'bizum',
+        orden: 1,
+      },
+      {
+        slug: 'visa',
+        orden: 2,
+      },
+    ]);
+
+    resolveReorder(reorderResult);
+
+    await pending;
+
+    expect(reorderCalls).toEqual([
+      {
+        ids: [3, 2],
+      },
+    ]);
+
+    expect(service.reordering()).toBe(false);
+
+    expect(service.tiposPago().map((tipoPago: TipoPago): string => tipoPago.slug)).toEqual([
+      'efectivo',
+      'bizum',
+      'visa',
+    ]);
+  });
+
+  it('restaura exactamente el maestro anterior si falla la persistencia del orden', async (): Promise<void> => {
+    await service.load();
+
+    const previous: readonly TipoPago[] = service.tiposPago();
+
+    vi.spyOn(window.osumiDesktop.tiposPago, 'reorder').mockRejectedValueOnce(
+      new Error('Database error'),
+    );
+
+    await expect(
+      service.reorder({
+        ids: [3, 2],
+      }),
+    ).rejects.toThrow('Database error');
+
+    /*
+     * No solo recuperamos el mismo orden:
+     * recuperamos exactamente el snapshot
+     * de modelos anterior al drop.
+     */
+    expect(service.tiposPago()).toBe(previous);
+
+    expect(service.tiposPago().map((tipoPago: TipoPago): string => tipoPago.slug)).toEqual([
+      'efectivo',
+      'visa',
+      'bizum',
+    ]);
+
+    expect(service.reordering()).toBe(false);
+  });
+
+  it('impide iniciar otro reorder mientras hay uno pendiente', async (): Promise<void> => {
+    await service.load();
+
+    let resolveReorder: (value: readonly TipoPagoInterface[]) => void = (): void => {
+      throw new Error('El resolver del reorder no está preparado.');
+    };
+
+    const pendingResponse: Promise<readonly TipoPagoInterface[]> = new Promise<
+      readonly TipoPagoInterface[]
+    >((resolve): void => {
+      resolveReorder = resolve;
+    });
+
+    vi.spyOn(window.osumiDesktop.tiposPago, 'reorder').mockReturnValue(pendingResponse);
+
+    const first: Promise<void> = service.reorder({
+      ids: [3, 2],
+    });
+
+    await expect(
+      service.reorder({
+        ids: [2, 3],
+      }),
+    ).rejects.toThrow('Ya hay una reordenación de tipos de pago en curso.');
+
+    resolveReorder(reorderResult);
+
+    await first;
+
+    expect(service.reordering()).toBe(false);
   });
 
   it('retira inmediatamente del maestro el tipo de pago dado de baja', async (): Promise<void> => {

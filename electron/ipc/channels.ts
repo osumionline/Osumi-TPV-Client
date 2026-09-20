@@ -84,6 +84,7 @@ const IPC_CHANNELS = {
   tiposPagoGetAll: 'tipos-pago:get-all',
   tiposPagoCreate: 'tipos-pago:create',
   tiposPagoUpdate: 'tipos-pago:update',
+  tiposPagoReorder: 'tipos-pago:reorder',
   tiposPagoDeactivate: 'tipos-pago:deactivate',
 
   clientesGetAll: 'clientes:get-all',

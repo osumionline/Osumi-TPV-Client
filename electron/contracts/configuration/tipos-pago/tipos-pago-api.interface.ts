@@ -1,5 +1,6 @@
 import type ActualizarTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/actualizar-tipo-pago-command.interface';
 import type CrearTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/crear-tipo-pago-command.interface';
+import type ReordenarTiposPagoCommand from '@desktop-contracts/configuration/tipos-pago/reordenar-tipos-pago-command.interface';
 import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 
 export default interface TiposPagoApi {
@@ -18,6 +19,12 @@ export default interface TiposPagoApi {
    * Actualiza un tipo de pago configurable.
    */
   update(id: number, command: ActualizarTipoPagoCommand): Promise<TipoPagoInterface>;
+
+  /**
+   * Persiste el nuevo orden de todos los
+   * tipos de pago configurables activos.
+   */
+  reorder(command: ReordenarTiposPagoCommand): Promise<readonly TipoPagoInterface[]>;
 
   /**
    * Da de baja lógicamente un tipo

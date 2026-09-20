@@ -107,6 +107,7 @@ import type PrintingSettings from '@desktop-contracts/configuration/printing/pri
 import type RevealableConfigurationSecret from '@desktop-contracts/configuration/revealable-configuration-secret.type';
 import type ActualizarTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/actualizar-tipo-pago-command.interface';
 import type CrearTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/crear-tipo-pago-command.interface';
+import type ReordenarTiposPagoCommand from '@desktop-contracts/configuration/tipos-pago/reordenar-tipos-pago-command.interface';
 import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 import OsumiDesktopApi from '@desktop-contracts/desktop-api';
 import type StageImageRequest from '@desktop-contracts/files/stage-image-request.interface';
@@ -503,6 +504,11 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
 
     update: (id: number, command: ActualizarTipoPagoCommand): Promise<TipoPagoInterface> =>
       ipcRenderer.invoke(IPC_CHANNELS.tiposPagoUpdate, id, command) as Promise<TipoPagoInterface>,
+
+    reorder: (command: ReordenarTiposPagoCommand): Promise<readonly TipoPagoInterface[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.tiposPagoReorder, command) as Promise<
+        readonly TipoPagoInterface[]
+      >,
 
     deactivate: (id: number): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.tiposPagoDeactivate, id) as Promise<void>,
