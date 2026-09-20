@@ -4,13 +4,16 @@ import type StagedImageDiscarder from '@backend/contracts/files/staged-image-dis
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
 import type ActualizarTipoPagoRecordCommand from '@backend/contracts/tipos-pago/actualizar-tipo-pago-record-command.interface';
 import type CrearTipoPagoRecordCommand from '@backend/contracts/tipos-pago/crear-tipo-pago-record-command.interface';
+import type TipoPagoEstadisticasRepositoryQuery from '@backend/contracts/tipos-pago/tipo-pago-estadisticas-query.interface';
 import type TipoPagoRepository from '@backend/contracts/tipos-pago/tipo-pago.repository.interface';
 import type { ImageAssetPurpose } from '@backend/domain/files/image-asset.interface';
 import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.interface';
+import type { TipoPagoEstadisticasRepositoryResult } from '@backend/domain/tipos-pago/tipo-pago-estadisticas-record.interface';
 import type TipoPagoRecord from '@backend/domain/tipos-pago/tipo-pago-record.interface';
 import type ActualizarTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/actualizar-tipo-pago-command.interface';
 import type CrearTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/crear-tipo-pago-command.interface';
 import type ReordenarTiposPagoCommand from '@desktop-contracts/configuration/tipos-pago/reordenar-tipos-pago-command.interface';
+import type { TipoPagoEstadisticasResultado } from '@desktop-contracts/configuration/tipos-pago/tipo-pago-estadisticas.interface';
 import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -22,6 +25,8 @@ let lastDeactivateId: number | null;
 let lastReorderIds: readonly number[] | null;
 let createError: Error | null;
 let updateError: Error | null;
+let lastEstadisticasQuery: TipoPagoEstadisticasRepositoryQuery | null;
+let estadisticasResult: TipoPagoEstadisticasRepositoryResult;
 
 class FakeImageAssetPromoter implements ImageAssetPromoter {
   readonly preparedRequests: {
@@ -115,6 +120,22 @@ describe('TiposPagoService', (): void => {
     lastReorderIds = null;
     createError = null;
     updateError = null;
+    lastEstadisticasQuery = null;
+
+    estadisticasResult = {
+      years: [2025, 2026],
+      items: [
+        {
+          year: 2026,
+          month: 9,
+          day: 1,
+          importeCents: 1_500,
+        },
+      ],
+      totalImporteCents: 1_500,
+      operaciones: 3,
+      totalGlobalCents: 6_000,
+    };
   });
 
   it('devuelve el maestro activo transformando las rutas de los logos', async (): Promise<void> => {
@@ -454,6 +475,46 @@ describe('TiposPagoService', (): void => {
 
     expect(promoter.rolledBackIds).toEqual(['replacement']);
   });
+
+  it('devuelve las estadísticas del tipo de pago para el período solicitado', async (): Promise<void> => {
+    const service: TiposPagoService = createService();
+
+    const result: TipoPagoEstadisticasResultado = await service.getEstadisticas({
+      idTipoPago: 2,
+      year: 2026,
+      month: 9,
+    });
+
+    expect(lastEstadisticasQuery).toEqual({
+      idTipoPago: 2,
+      year: 2026,
+      month: 9,
+    });
+
+    expect(result.totalImporteCents).toBe(1_500);
+
+    expect(result.operaciones).toBe(3);
+
+    expect(result.importeMedioCents).toBe(500);
+
+    expect(result.porcentajeTotalBps).toBe(2_500);
+
+    expect(result.points).toHaveLength(30);
+  });
+
+  it('rechaza períodos estadísticos incoherentes', async (): Promise<void> => {
+    const service: TiposPagoService = createService();
+
+    await expect(
+      service.getEstadisticas({
+        idTipoPago: 2,
+        year: null,
+        month: 9,
+      }),
+    ).rejects.toThrow('No se puede seleccionar un mes sin seleccionar un año.');
+
+    expect(lastEstadisticasQuery).toBeNull();
+  });
 });
 
 function createService(
@@ -467,6 +528,14 @@ function createService(
       Promise.resolve(
         tiposPago.find((tipoPago: TipoPagoRecord): boolean => tipoPago.id === id) ?? null,
       ),
+
+    findEstadisticas: (
+      query: TipoPagoEstadisticasRepositoryQuery,
+    ): Promise<TipoPagoEstadisticasRepositoryResult> => {
+      lastEstadisticasQuery = query;
+
+      return Promise.resolve(estadisticasResult);
+    },
 
     existsActiveBySlug: (slug: string, excludeId: number | null): Promise<boolean> =>
       Promise.resolve(

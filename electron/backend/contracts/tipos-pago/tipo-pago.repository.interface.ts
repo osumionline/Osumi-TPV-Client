@@ -1,5 +1,7 @@
 import type ActualizarTipoPagoRecordCommand from '@backend/contracts/tipos-pago/actualizar-tipo-pago-record-command.interface';
 import type CrearTipoPagoRecordCommand from '@backend/contracts/tipos-pago/crear-tipo-pago-record-command.interface';
+import type TipoPagoEstadisticasRepositoryQuery from '@backend/contracts/tipos-pago/tipo-pago-estadisticas-query.interface';
+import type { TipoPagoEstadisticasRepositoryResult } from '@backend/domain/tipos-pago/tipo-pago-estadisticas-record.interface';
 import type TipoPagoRecord from '@backend/domain/tipos-pago/tipo-pago-record.interface';
 
 export default interface TipoPagoRepository {
@@ -14,6 +16,14 @@ export default interface TipoPagoRepository {
    * identificador interno.
    */
   findById(id: number): Promise<TipoPagoRecord | null>;
+
+  /**
+   * Recupera los agregados históricos de cobros
+   * correspondientes a un tipo de pago.
+   */
+  findEstadisticas(
+    query: TipoPagoEstadisticasRepositoryQuery,
+  ): Promise<TipoPagoEstadisticasRepositoryResult>;
 
   /**
    * Comprueba si existe otro tipo de pago activo

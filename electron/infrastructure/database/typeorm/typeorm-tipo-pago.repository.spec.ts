@@ -1,6 +1,7 @@
 import type ActualizarTipoPagoRecordCommand from '@backend/contracts/tipos-pago/actualizar-tipo-pago-record-command.interface';
 import type CrearTipoPagoRecordCommand from '@backend/contracts/tipos-pago/crear-tipo-pago-record-command.interface';
 import type { ArchivoCreateRecord } from '@backend/domain/files/archivo-record.interface';
+import type { TipoPagoEstadisticasRepositoryResult } from '@backend/domain/tipos-pago/tipo-pago-estadisticas-record.interface';
 import type TipoPagoRecord from '@backend/domain/tipos-pago/tipo-pago-record.interface';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
@@ -341,6 +342,47 @@ describe('TypeOrmTipoPagoRepository', (): void => {
       'El tipo de pago que se intenta eliminar no existe o ya está dado de baja.',
     );
   });
+
+  it('agrega las estadísticas históricas del tipo de pago y excluye ventas eliminadas', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await seedTipoPagoStatistics(dataSource);
+
+    const result: TipoPagoEstadisticasRepositoryResult = await requireRepository().findEstadisticas(
+      {
+        idTipoPago: 2,
+        year: 2026,
+        month: 9,
+      },
+    );
+
+    expect(result.years).toEqual([2025, 2026]);
+
+    expect(result.items).toEqual([
+      {
+        year: 2026,
+        month: 9,
+        day: 1,
+        importeCents: 1_500,
+      },
+      {
+        year: 2026,
+        month: 9,
+        day: 2,
+        importeCents: -500,
+      },
+    ]);
+
+    expect(result.totalImporteCents).toBe(1_000);
+
+    /*
+     * El día 1 tiene dos líneas VISA
+     * dentro de la misma venta.
+     */
+    expect(result.operaciones).toBe(2);
+
+    expect(result.totalGlobalCents).toBe(1_500);
+  });
 });
 
 function createCommand(
@@ -479,6 +521,207 @@ async function seedTiposPago(dataSource: DataSource): Promise<void> {
         )
     `,
   );
+}
+
+/**
+ * Inserta ventas suficientes para comprobar
+ * agregados, pagos mixtos, devoluciones y bajas.
+ */
+async function seedTipoPagoStatistics(dataSource: DataSource): Promise<void> {
+  await dataSource.query(`
+    INSERT INTO terminal (
+      id,
+      public_id,
+      nombre,
+      codigo
+    )
+    VALUES (
+      1,
+      'terminal-payment-stats',
+      'Terminal estadísticas',
+      'PAY-STATS'
+    )
+  `);
+
+  await dataSource.query(`
+    INSERT INTO empleado (
+      id,
+      public_id,
+      nombre,
+      password_hash,
+      password_algorithm,
+      color,
+      admin,
+      activo
+    )
+    VALUES (
+      1,
+      'empleado-payment-stats',
+      'Empleado estadísticas',
+      'hash-test',
+      'scrypt',
+      'FFFFFF',
+      1,
+      1
+    )
+  `);
+
+  await dataSource.query(`
+    INSERT INTO caja (
+      id,
+      public_id,
+      id_terminal,
+      id_empleado_apertura,
+      apertura
+    )
+    VALUES (
+      1,
+      'caja-payment-stats',
+      1,
+      1,
+      '2025-01-01T08:00:00.000Z'
+    )
+  `);
+
+  await dataSource.query(`
+    INSERT INTO venta (
+      id,
+      public_id,
+      id_caja,
+      id_empleado,
+      numero,
+      total_cents,
+      created_at,
+      deleted_at
+    )
+    VALUES
+      (
+        1,
+        'payment-sale-2025',
+        1,
+        1,
+        1,
+        1000,
+        '2025-12-15T10:00:00.000Z',
+        NULL
+      ),
+      (
+        2,
+        'payment-sale-mixed',
+        1,
+        1,
+        2,
+        2000,
+        '2026-09-01T10:00:00.000Z',
+        NULL
+      ),
+      (
+        3,
+        'payment-sale-return',
+        1,
+        1,
+        3,
+        -500,
+        '2026-09-02T10:00:00.000Z',
+        NULL
+      ),
+      (
+        4,
+        'payment-sale-october',
+        1,
+        1,
+        4,
+        300,
+        '2026-10-01T10:00:00.000Z',
+        NULL
+      ),
+      (
+        5,
+        'payment-sale-deleted',
+        1,
+        1,
+        5,
+        9999,
+        '2026-09-03T10:00:00.000Z',
+        '2026-09-03T11:00:00.000Z'
+      )
+  `);
+
+  await dataSource.query(`
+    INSERT INTO venta_pago (
+      id,
+      public_id,
+      id_venta,
+      id_tipo_pago,
+      orden,
+      importe_cents
+    )
+    VALUES
+      (
+        1,
+        'payment-2025-visa',
+        1,
+        2,
+        0,
+        600
+      ),
+      (
+        2,
+        'payment-2025-cash',
+        1,
+        1,
+        1,
+        400
+      ),
+      (
+        3,
+        'payment-mixed-visa-1',
+        2,
+        2,
+        0,
+        1000
+      ),
+      (
+        4,
+        'payment-mixed-visa-2',
+        2,
+        2,
+        1,
+        500
+      ),
+      (
+        5,
+        'payment-mixed-cash',
+        2,
+        1,
+        2,
+        500
+      ),
+      (
+        6,
+        'payment-return-visa',
+        3,
+        2,
+        0,
+        -500
+      ),
+      (
+        7,
+        'payment-october-visa',
+        4,
+        2,
+        0,
+        300
+      ),
+      (
+        8,
+        'payment-deleted-visa',
+        5,
+        2,
+        0,
+        9999
+      )
+  `);
 }
 
 function requireRepository(): TypeOrmTipoPagoRepository {

@@ -1,7 +1,12 @@
 import type ActualizarTipoPagoRecordCommand from '@backend/contracts/tipos-pago/actualizar-tipo-pago-record-command.interface';
 import type CrearTipoPagoRecordCommand from '@backend/contracts/tipos-pago/crear-tipo-pago-record-command.interface';
+import type TipoPagoEstadisticasRepositoryQuery from '@backend/contracts/tipos-pago/tipo-pago-estadisticas-query.interface';
 import type TipoPagoRepository from '@backend/contracts/tipos-pago/tipo-pago.repository.interface';
 import type { ArchivoCreateRecord } from '@backend/domain/files/archivo-record.interface';
+import type {
+  TipoPagoEstadisticasAggregateRecord,
+  TipoPagoEstadisticasRepositoryResult,
+} from '@backend/domain/tipos-pago/tipo-pago-estadisticas-record.interface';
 import type TipoPagoRecord from '@backend/domain/tipos-pago/tipo-pago-record.interface';
 import { getLastInsertId } from '@infrastructure/database/typeorm/sqlite.utils';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
@@ -26,6 +31,26 @@ interface TipoPagoDatabaseRow {
 
 interface NextOrderDatabaseRow {
   readonly next_order: number;
+}
+
+interface TipoPagoEstadisticasAggregateDatabaseRow {
+  readonly year: number;
+  readonly month: number | null;
+  readonly day: number | null;
+  readonly importe_cents: number;
+}
+
+interface TipoPagoEstadisticasYearDatabaseRow {
+  readonly year: number;
+}
+
+interface TipoPagoEstadisticasSummaryDatabaseRow {
+  readonly total_importe_cents: number;
+  readonly operaciones: number;
+}
+
+interface TipoPagoEstadisticasGlobalDatabaseRow {
+  readonly total_global_cents: number;
 }
 
 export default class TypeOrmTipoPagoRepository implements TipoPagoRepository {
@@ -113,6 +138,174 @@ export default class TypeOrmTipoPagoRepository implements TipoPagoRepository {
     const row: TipoPagoDatabaseRow | undefined = rows[0];
 
     return row === undefined ? null : this.toRecord(row);
+  }
+
+  /**
+   * Recupera la evolución y el resumen histórico
+   * de un tipo de pago para el período solicitado.
+   */
+  async findEstadisticas(
+    query: TipoPagoEstadisticasRepositoryQuery,
+  ): Promise<TipoPagoEstadisticasRepositoryResult> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const yearExpression: string = "CAST(strftime('%Y', v.created_at) AS INTEGER)";
+
+    const monthValueExpression: string = "CAST(strftime('%m', v.created_at) AS INTEGER)";
+
+    const dayValueExpression: string = "CAST(strftime('%d', v.created_at) AS INTEGER)";
+
+    const annual: boolean = query.year === null;
+
+    const daily: boolean = query.year !== null && query.month !== null;
+
+    const monthExpression: string = annual ? 'NULL' : monthValueExpression;
+
+    const dayExpression: string = daily ? dayValueExpression : 'NULL';
+
+    const conditions: string[] = ['vp.id_tipo_pago = ?', 'v.deleted_at IS NULL'];
+
+    const parameters: number[] = [query.idTipoPago];
+
+    if (query.year !== null) {
+      conditions.push(`${yearExpression} = ?`);
+
+      parameters.push(query.year);
+    }
+
+    if (query.month !== null) {
+      conditions.push(`${monthValueExpression} = ?`);
+
+      parameters.push(query.month);
+    }
+
+    const groupByExpression: string = annual
+      ? yearExpression
+      : daily
+        ? `${yearExpression}, ${monthValueExpression}, ${dayValueExpression}`
+        : `${yearExpression}, ${monthValueExpression}`;
+
+    const aggregateRows: readonly TipoPagoEstadisticasAggregateDatabaseRow[] =
+      (await dataSource.query(
+        `
+        SELECT
+          ${yearExpression} AS year,
+          ${monthExpression} AS month,
+          ${dayExpression} AS day,
+          SUM(vp.importe_cents)
+            AS importe_cents
+        FROM venta_pago vp
+
+        INNER JOIN venta v
+          ON v.id = vp.id_venta
+
+        WHERE
+          ${conditions.join('\n          AND ')}
+
+        GROUP BY
+          ${groupByExpression}
+
+        ORDER BY
+          ${groupByExpression}
+      `,
+        parameters,
+      )) as readonly TipoPagoEstadisticasAggregateDatabaseRow[];
+
+    const yearRows: readonly TipoPagoEstadisticasYearDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT DISTINCT
+          ${yearExpression} AS year
+        FROM venta_pago vp
+
+        INNER JOIN venta v
+          ON v.id = vp.id_venta
+
+        WHERE
+          vp.id_tipo_pago = ?
+          AND v.deleted_at IS NULL
+
+        ORDER BY
+          year
+      `,
+      [query.idTipoPago],
+    )) as readonly TipoPagoEstadisticasYearDatabaseRow[];
+
+    const summaryRows: readonly TipoPagoEstadisticasSummaryDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT
+          COALESCE(
+            SUM(vp.importe_cents),
+            0
+          ) AS total_importe_cents,
+
+          COUNT(
+            DISTINCT vp.id_venta
+          ) AS operaciones
+        FROM venta_pago vp
+
+        INNER JOIN venta v
+          ON v.id = vp.id_venta
+
+        WHERE
+          ${conditions.join('\n          AND ')}
+      `,
+      parameters,
+    )) as readonly TipoPagoEstadisticasSummaryDatabaseRow[];
+
+    const globalConditions: string[] = ['v.deleted_at IS NULL'];
+
+    const globalParameters: number[] = [];
+
+    if (query.year !== null) {
+      globalConditions.push(`${yearExpression} = ?`);
+
+      globalParameters.push(query.year);
+    }
+
+    if (query.month !== null) {
+      globalConditions.push(`${monthValueExpression} = ?`);
+
+      globalParameters.push(query.month);
+    }
+
+    const globalRows: readonly TipoPagoEstadisticasGlobalDatabaseRow[] = (await dataSource.query(
+      `
+        SELECT
+          COALESCE(
+            SUM(vp.importe_cents),
+            0
+          ) AS total_global_cents
+        FROM venta_pago vp
+
+        INNER JOIN venta v
+          ON v.id = vp.id_venta
+
+        WHERE
+          ${globalConditions.join('\n          AND ')}
+      `,
+      globalParameters,
+    )) as readonly TipoPagoEstadisticasGlobalDatabaseRow[];
+
+    const summary: TipoPagoEstadisticasSummaryDatabaseRow | undefined = summaryRows[0];
+
+    return {
+      years: yearRows.map((row: TipoPagoEstadisticasYearDatabaseRow): number => row.year),
+
+      items: aggregateRows.map(
+        (row: TipoPagoEstadisticasAggregateDatabaseRow): TipoPagoEstadisticasAggregateRecord => ({
+          year: row.year,
+          month: row.month,
+          day: row.day,
+          importeCents: row.importe_cents,
+        }),
+      ),
+
+      totalImporteCents: summary?.total_importe_cents ?? 0,
+
+      operaciones: summary?.operaciones ?? 0,
+
+      totalGlobalCents: globalRows[0]?.total_global_cents ?? 0,
+    };
   }
 
   /**

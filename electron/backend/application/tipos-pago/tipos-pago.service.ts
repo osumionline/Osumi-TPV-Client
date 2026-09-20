@@ -1,14 +1,21 @@
+import createTipoPagoEstadisticasResult from '@backend/application/tipos-pago/tipo-pago-estadisticas.utils';
 import type ImageAssetPromoter from '@backend/contracts/files/image-asset-promoter.interface';
 import type StagedImageDiscarder from '@backend/contracts/files/staged-image-discarder.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
 import type ActualizarTipoPagoRecordCommand from '@backend/contracts/tipos-pago/actualizar-tipo-pago-record-command.interface';
 import type CrearTipoPagoRecordCommand from '@backend/contracts/tipos-pago/crear-tipo-pago-record-command.interface';
+import type TipoPagoEstadisticasRepositoryQuery from '@backend/contracts/tipos-pago/tipo-pago-estadisticas-query.interface';
 import type TipoPagoRepository from '@backend/contracts/tipos-pago/tipo-pago.repository.interface';
 import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.interface';
+import type { TipoPagoEstadisticasRepositoryResult } from '@backend/domain/tipos-pago/tipo-pago-estadisticas-record.interface';
 import type TipoPagoRecord from '@backend/domain/tipos-pago/tipo-pago-record.interface';
 import type ActualizarTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/actualizar-tipo-pago-command.interface';
 import type CrearTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/crear-tipo-pago-command.interface';
 import ReordenarTiposPagoCommand from '@desktop-contracts/configuration/tipos-pago/reordenar-tipos-pago-command.interface';
+import type {
+  TipoPagoEstadisticasConsulta,
+  TipoPagoEstadisticasResultado,
+} from '@desktop-contracts/configuration/tipos-pago/tipo-pago-estadisticas.interface';
 import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 
 const EFECTIVO_SLUG: string = 'efectivo';
@@ -44,6 +51,55 @@ export default class TiposPagoService {
     return tiposPago.map((tipoPago: TipoPagoRecord): TipoPagoInterface =>
       this.toInterface(tipoPago),
     );
+  }
+
+  /**
+   * Recupera las estadísticas históricas
+   * del tipo de pago solicitado.
+   */
+  async getEstadisticas(
+    consulta: TipoPagoEstadisticasConsulta,
+  ): Promise<TipoPagoEstadisticasResultado> {
+    if (typeof consulta !== 'object' || consulta === null) {
+      throw new Error('La consulta de estadísticas no es válida.');
+    }
+
+    const idTipoPago: number = this.validateTipoPagoId(consulta.idTipoPago);
+
+    if (
+      consulta.year !== null &&
+      (!Number.isSafeInteger(consulta.year) || consulta.year < 1 || consulta.year > 9999)
+    ) {
+      throw new Error('El año de las estadísticas no es válido.');
+    }
+
+    if (
+      consulta.month !== null &&
+      (!Number.isSafeInteger(consulta.month) || consulta.month < 1 || consulta.month > 12)
+    ) {
+      throw new Error('El mes de las estadísticas no es válido.');
+    }
+
+    if (consulta.year === null && consulta.month !== null) {
+      throw new Error('No se puede seleccionar un mes sin seleccionar un año.');
+    }
+
+    const tipoPago: TipoPagoRecord | null = await this.repository.findById(idTipoPago);
+
+    if (tipoPago === null) {
+      throw new Error('El tipo de pago indicado no existe o ya no está activo.');
+    }
+
+    const repositoryQuery: TipoPagoEstadisticasRepositoryQuery = {
+      idTipoPago,
+      year: consulta.year,
+      month: consulta.month,
+    };
+
+    const repositoryResult: TipoPagoEstadisticasRepositoryResult =
+      await this.repository.findEstadisticas(repositoryQuery);
+
+    return createTipoPagoEstadisticasResult(consulta, repositoryResult);
   }
 
   /**
