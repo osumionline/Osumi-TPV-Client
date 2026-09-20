@@ -1,0 +1,137 @@
+<section class="payment-type-statistics">
+    <div class="payment-type-statistics__filters">
+        <div class="payment-type-statistics__field">
+            <label for="payment-type-statistics-month">
+                Mes
+            </label>
+
+            <mat-select id="payment-type-statistics-month"
+                        [value]="filters().mes"
+                        [disabled]="filters().anio === 'all'"
+                        (selectionChange)="onMonthChange($event)">
+                <mat-option value="all">
+                    Todos
+                </mat-option>
+
+                @for (
+                option of months;
+                track option.value
+                ) {
+                <mat-option [value]="option.value">
+                    {{ option.label }}
+                </mat-option>
+                }
+            </mat-select>
+        </div>
+
+        <div class="payment-type-statistics__field">
+            <label for="payment-type-statistics-year">
+                Año
+            </label>
+
+            <mat-select id="payment-type-statistics-year"
+                        [value]="filters().anio"
+                        (selectionChange)="onYearChange($event)">
+                <mat-option value="all">
+                    Todos
+                </mat-option>
+
+                @for (
+                year of yearOptions();
+                track year
+                ) {
+                <mat-option [value]="year">
+                    {{ year }}
+                </mat-option>
+                }
+            </mat-select>
+        </div>
+    </div>
+
+    @if (error() !== null) {
+    <div class="payment-type-statistics__error">
+        <mat-icon aria-hidden="true">
+            error_outline
+        </mat-icon>
+
+        <p>
+            {{ error() }}
+        </p>
+
+        <button mat-stroked-button
+                type="button"
+                (click)="retry()">
+            Reintentar
+        </button>
+    </div>
+    }
+    @else {
+    <div class="payment-type-statistics__metrics">
+        <article class="payment-type-statistics__metric">
+            <span>
+                Importe total
+            </span>
+
+            <strong>
+                {{ formatTotal() }}
+            </strong>
+        </article>
+
+        <article class="payment-type-statistics__metric">
+            <span>
+                Operaciones
+            </span>
+
+            <strong>
+                {{ formatOperations() }}
+            </strong>
+        </article>
+
+        <article class="payment-type-statistics__metric">
+            <span>
+                Importe medio
+            </span>
+
+            <strong>
+                {{ formatAverage() }}
+            </strong>
+        </article>
+
+        <article class="payment-type-statistics__metric">
+            <span>
+                Porcentaje del total
+            </span>
+
+            <strong>
+                {{ formatPercentage() }}
+            </strong>
+        </article>
+    </div>
+
+    <div class="payment-type-statistics__chart-card">
+        <header>
+            <strong>
+                Evolución del importe
+            </strong>
+        </header>
+
+        <div class="payment-type-statistics__chart-container">
+            <div echarts
+                 class="payment-type-statistics__chart"
+                 [options]="chartOptions()">
+            </div>
+
+            @if (loading()) {
+            <div class="payment-type-statistics__loading">
+                Cargando estadísticas…
+            </div>
+            }
+            @else if (noActivity()) {
+            <div class="payment-type-statistics__empty">
+                No hay operaciones para el período seleccionado.
+            </div>
+            }
+        </div>
+    </div>
+    }
+</section>

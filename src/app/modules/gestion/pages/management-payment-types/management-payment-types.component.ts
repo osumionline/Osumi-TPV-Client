@@ -33,6 +33,7 @@ import createTipoPagoDataFormInitialValue from '@model/tipos-pago/tipo-pago-data
 import type { TipoPagoDataFormModel } from '@model/tipos-pago/tipo-pago-data-form.model';
 import tipoPagoDataFormSchema from '@model/tipos-pago/tipo-pago-data-form.schema';
 import TipoPago from '@model/tipos-pago/tipo-pago.model';
+import PaymentTypeStatisticsComponent from '@modules/gestion/components/payment-type-statistics/payment-type-statistics.component';
 import { DialogService } from '@osumi/angular-tools';
 import FilesService from '@services/application/files.service';
 import TiposPagoService from '@services/tipos-pago/tipos-pago.service';
@@ -61,6 +62,7 @@ const EFECTIVO_SLUG: string = 'efectivo';
     CdkDrag,
     CdkDragHandle,
     CdkDropList,
+    PaymentTypeStatisticsComponent,
   ],
 })
 export default class ManagementPaymentTypesComponent {

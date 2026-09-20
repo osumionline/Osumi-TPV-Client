@@ -364,6 +364,7 @@
                     </mat-tab>
 
                     <mat-tab label="ESTADÍSTICAS">
+                        @if (creatingTipoPago()) {
                         <div class="payment-type-tab">
                             <div class="payment-type-tab__placeholder">
                                 <mat-icon aria-hidden="true">
@@ -376,12 +377,18 @@
                                     </strong>
 
                                     <p>
-                                        Aquí se mostrará la actividad
-                                        asociada a este tipo de pago.
+                                        Guarda primero el nuevo tipo de pago
+                                        para poder consultar su actividad.
                                     </p>
                                 </div>
                             </div>
                         </div>
+                        }
+                        @else if (selectedTipoPago(); as tipoPago) {
+                        <otpv-payment-type-statistics [tipoPago]="tipoPago"
+                                                      [active]="selectedTabIndex() === 1">
+                        </otpv-payment-type-statistics>
+                        }
                     </mat-tab>
                 </mat-tab-group>
             </div>

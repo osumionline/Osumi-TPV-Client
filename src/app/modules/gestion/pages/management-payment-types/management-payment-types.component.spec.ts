@@ -1,17 +1,30 @@
+import type { CdkDragDrop } from '@angular/cdk/drag-drop';
+import { Component, input, type InputSignal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import type ActualizarTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/actualizar-tipo-pago-command.interface';
 import type CrearTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/crear-tipo-pago-command.interface';
+import type { TipoPagoEstadisticasResultado } from '@desktop-contracts/configuration/tipos-pago/tipo-pago-estadisticas.interface';
 import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 import StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
 import TipoPago from '@model/tipos-pago/tipo-pago.model';
+import PaymentTypeStatisticsComponent from '@modules/gestion/components/payment-type-statistics/payment-type-statistics.component';
 import ManagementPaymentTypesComponent from '@modules/gestion/pages/management-payment-types/management-payment-types.component';
 import { DialogService } from '@osumi/angular-tools';
 import FilesService from '@services/application/files.service';
 import TiposPagoService from '@services/tipos-pago/tipos-pago.service';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
-import type { CdkDragDrop } from '@angular/cdk/drag-drop';
+
+@Component({
+  selector: 'otpv-payment-type-statistics',
+  template: '',
+  standalone: true,
+})
+class PaymentTypeStatisticsStubComponent {
+  readonly tipoPago: InputSignal<TipoPago> = input.required<TipoPago>();
+  readonly active: InputSignal<boolean> = input<boolean>(false);
+}
 
 describe('ManagementPaymentTypesComponent', (): void => {
   let originalDesktopDescriptor: PropertyDescriptor | undefined;
@@ -64,6 +77,17 @@ describe('ManagementPaymentTypesComponent', (): void => {
       value: {
         tiposPago: {
           getAll: (): Promise<readonly TipoPagoInterface[]> => Promise.resolve(tiposPago),
+
+          getEstadisticas: (): Promise<TipoPagoEstadisticasResultado> =>
+            Promise.resolve({
+              availableYears: [],
+              points: [],
+              totalImporteCents: 0,
+              operaciones: 0,
+              importeMedioCents: 0,
+              porcentajeTotalBps: 0,
+            }),
+
           deactivate: (): Promise<void> => Promise.resolve(),
         },
       },
@@ -82,7 +106,17 @@ describe('ManagementPaymentTypesComponent', (): void => {
           },
         },
       ],
-    }).compileComponents();
+    })
+      .overrideComponent(ManagementPaymentTypesComponent, {
+        remove: {
+          imports: [PaymentTypeStatisticsComponent],
+        },
+
+        add: {
+          imports: [PaymentTypeStatisticsStubComponent],
+        },
+      })
+      .compileComponents();
 
     tiposPagoService = TestBed.inject(TiposPagoService);
     dialog = TestBed.inject(DialogService);
@@ -142,22 +176,6 @@ describe('ManagementPaymentTypesComponent', (): void => {
     component.updateSearchTerm('');
 
     expect(component.canReorderTiposPago()).toBe(true);
-  });
-
-  it('persiste el nuevo orden al completar un drag', async (): Promise<void> => {
-    const fixture: ComponentFixture<ManagementPaymentTypesComponent> = TestBed.createComponent(
-      ManagementPaymentTypesComponent,
-    );
-
-    const component: ManagementPaymentTypesComponent = fixture.componentInstance;
-
-    const reorderSpy = vi.spyOn(tiposPagoService, 'reorder').mockResolvedValueOnce();
-
-    await component.reorderTiposPago(createDropEvent(0, 1));
-
-    expect(reorderSpy).toHaveBeenCalledWith({
-      ids: [3, 2],
-    });
   });
 
   it('persiste el nuevo orden al completar un drag', async (): Promise<void> => {
