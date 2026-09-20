@@ -3,6 +3,7 @@ import {
   Component,
   ElementRef,
   inject,
+  Injector,
   input,
   output,
   signal,
@@ -29,6 +30,7 @@ import EmpleadosService from '@services/empleados/empleados.service';
 })
 export default class ManagementPasswordDialogComponent {
   private readonly empleadosService: EmpleadosService = inject(EmpleadosService);
+  private readonly injector: Injector = inject(Injector);
 
   private readonly passwordInput: Signal<ElementRef<HTMLInputElement>> =
     viewChild.required<ElementRef<HTMLInputElement>>('passwordInput');
@@ -36,15 +38,11 @@ export default class ManagementPasswordDialogComponent {
   readonly empleado: InputSignal<Empleado> = input.required<Empleado>();
 
   readonly authenticatedEvent: OutputEmitterRef<void> = output<void>();
-
   readonly closeEvent: OutputEmitterRef<void> = output<void>();
 
   readonly password: WritableSignal<string> = signal<string>('');
-
   readonly loading: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly error: WritableSignal<string | null> = signal<string | null>(null);
-
   readonly authenticationUnavailable: WritableSignal<boolean> = signal<boolean>(false);
 
   constructor() {
@@ -76,6 +74,7 @@ export default class ManagementPasswordDialogComponent {
 
     if (empleado.id === null) {
       this.authenticationUnavailable.set(true);
+
       this.error.set('Este empleado ya no está disponible.');
 
       return;
@@ -84,17 +83,25 @@ export default class ManagementPasswordDialogComponent {
     this.loading.set(true);
     this.error.set(null);
 
+    let refocusPassword: boolean = false;
+
     try {
       const result: AutenticarEmpleadoResult = await this.empleadosService.authenticate(
         empleado.id,
         this.password(),
       );
 
+      refocusPassword = result.status === 'invalid_password';
+
       await this.handleAuthenticationResult(result);
     } catch {
       this.error.set('No se ha podido comprobar la contraseña. Inténtalo de nuevo.');
     } finally {
       this.loading.set(false);
+    }
+
+    if (refocusPassword) {
+      this.focusPasswordAfterRender();
     }
   }
 
@@ -107,6 +114,25 @@ export default class ManagementPasswordDialogComponent {
     }
   }
 
+  /**
+   * Recupera el foco de la contraseña después
+   * de que Angular haya vuelto a habilitar el input.
+   */
+  private focusPasswordAfterRender(): void {
+    afterNextRender(
+      (): void => {
+        if (this.authenticationUnavailable()) {
+          return;
+        }
+
+        this.passwordInput().nativeElement.focus();
+      },
+      {
+        injector: this.injector,
+      },
+    );
+  }
+
   private async handleAuthenticationResult(result: AutenticarEmpleadoResult): Promise<void> {
     switch (result.status) {
       case 'authenticated':
@@ -116,7 +142,6 @@ export default class ManagementPasswordDialogComponent {
       case 'invalid_password':
         this.password.set('');
         this.error.set('Contraseña incorrecta.');
-        this.passwordInput().nativeElement.focus();
         return;
 
       case 'password_unavailable':

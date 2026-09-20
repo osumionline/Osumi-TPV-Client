@@ -2,6 +2,7 @@ import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import type AutenticarEmpleadoResult from '@desktop-contracts/configuration/empleados/autenticar-empleado-result.type';
 import Empleado from '@model/empleados/empleado.model';
 import ManagementPasswordDialogComponent from '@modules/gestion/components/management-password-dialog/management-password-dialog.component';
+import EmpleadosService from '@services/empleados/empleados.service';
 
 describe('ManagementPasswordDialogComponent', (): void => {
   let originalDesktopDescriptor: PropertyDescriptor | undefined;
@@ -128,6 +129,64 @@ describe('ManagementPasswordDialogComponent', (): void => {
     expect(component.error()).toBe(
       'Este empleado no tiene una contraseña válida. Un administrador debe asignarle una nueva contraseña.',
     );
+  });
+
+  it('debe devolver el foco al campo de contraseña después de un password incorrecto', async (): Promise<void> => {
+    const empleadosService: EmpleadosService = TestBed.inject(EmpleadosService);
+
+    let resolveAuthentication: (result: AutenticarEmpleadoResult) => void = (): void => {
+      throw new Error('La autenticación pendiente no está preparada.');
+    };
+
+    const pendingAuthentication: Promise<AutenticarEmpleadoResult> =
+      new Promise<AutenticarEmpleadoResult>((resolve): void => {
+        resolveAuthentication = resolve;
+      });
+
+    vi.spyOn(empleadosService, 'authenticate').mockReturnValueOnce(pendingAuthentication);
+
+    const passwordInput: HTMLInputElement | null =
+      fixture.nativeElement.querySelector('input[type="password"]');
+
+    expect(passwordInput).not.toBeNull();
+
+    if (passwordInput === null) {
+      return;
+    }
+
+    passwordInput.blur();
+
+    component.password.set('incorrecta');
+
+    const submitPromise: Promise<void> = component.submit({
+      preventDefault: vi.fn(),
+    } as unknown as Event);
+
+    /*
+     * Mientras la autenticación está pendiente
+     * el input queda realmente deshabilitado.
+     */
+    fixture.detectChanges();
+
+    expect(passwordInput.disabled).toBe(true);
+
+    resolveAuthentication({
+      status: 'invalid_password',
+    });
+
+    await submitPromise;
+
+    /*
+     * El foco solo debe recuperarse después
+     * de volver a renderizar loading = false.
+     */
+    fixture.detectChanges();
+
+    await fixture.whenStable();
+
+    expect(passwordInput.disabled).toBe(false);
+
+    expect(document.activeElement).toBe(passwordInput);
   });
 
   it('debe recargar empleados si el empleado deja de estar disponible', async (): Promise<void> => {
