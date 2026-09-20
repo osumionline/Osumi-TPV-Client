@@ -105,6 +105,16 @@
         color:
             var(--mat-sys-on-surface-variant);
         opacity: 0.55;
+        cursor: grab;
+
+        &:active {
+            cursor: grabbing;
+        }
+
+        &--disabled {
+            opacity: 0.25;
+            cursor: default;
+        }
     }
 
     &__name {
@@ -136,6 +146,32 @@
             margin: 0;
         }
     }
+}
+
+.payment-type-list__item.cdk-drag-preview {
+    box-sizing: border-box;
+    box-shadow:
+        0 8px 20px rgb(0 0 0 / 18%);
+}
+
+.payment-type-list__item.cdk-drag-placeholder {
+    opacity: 0;
+}
+
+.payment-type-list__item.cdk-drag-animating {
+    transition:
+        transform 180ms cubic-bezier(0,
+            0,
+            0.2,
+            1);
+}
+
+.payment-type-list.cdk-drop-list-dragging .payment-type-list__item:not(.cdk-drag-placeholder) {
+    transition:
+        transform 180ms cubic-bezier(0,
+            0,
+            0.2,
+            1);
 }
 
 .payment-type-content {

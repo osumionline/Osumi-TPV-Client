@@ -11,6 +11,7 @@ import FilesService from '@services/application/files.service';
 import TiposPagoService from '@services/tipos-pago/tipos-pago.service';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
+import type { CdkDragDrop } from '@angular/cdk/drag-drop';
 
 describe('ManagementPaymentTypesComponent', (): void => {
   let originalDesktopDescriptor: PropertyDescriptor | undefined;
@@ -123,6 +124,91 @@ describe('ManagementPaymentTypesComponent', (): void => {
     expect(
       component.filteredTiposPago().map((tipoPago: TipoPago): string => tipoPago.nombre),
     ).toEqual(['Bizum']);
+  });
+
+  it('solo permite reordenar cuando no hay búsqueda activa', (): void => {
+    const fixture: ComponentFixture<ManagementPaymentTypesComponent> = TestBed.createComponent(
+      ManagementPaymentTypesComponent,
+    );
+
+    const component: ManagementPaymentTypesComponent = fixture.componentInstance;
+
+    expect(component.canReorderTiposPago()).toBe(true);
+
+    component.updateSearchTerm('visa');
+
+    expect(component.canReorderTiposPago()).toBe(false);
+
+    component.updateSearchTerm('');
+
+    expect(component.canReorderTiposPago()).toBe(true);
+  });
+
+  it('persiste el nuevo orden al completar un drag', async (): Promise<void> => {
+    const fixture: ComponentFixture<ManagementPaymentTypesComponent> = TestBed.createComponent(
+      ManagementPaymentTypesComponent,
+    );
+
+    const component: ManagementPaymentTypesComponent = fixture.componentInstance;
+
+    const reorderSpy = vi.spyOn(tiposPagoService, 'reorder').mockResolvedValueOnce();
+
+    await component.reorderTiposPago(createDropEvent(0, 1));
+
+    expect(reorderSpy).toHaveBeenCalledWith({
+      ids: [3, 2],
+    });
+  });
+
+  it('persiste el nuevo orden al completar un drag', async (): Promise<void> => {
+    const fixture: ComponentFixture<ManagementPaymentTypesComponent> = TestBed.createComponent(
+      ManagementPaymentTypesComponent,
+    );
+
+    const component: ManagementPaymentTypesComponent = fixture.componentInstance;
+
+    const reorderSpy = vi.spyOn(tiposPagoService, 'reorder').mockResolvedValueOnce();
+
+    await component.reorderTiposPago(createDropEvent(0, 1));
+
+    expect(reorderSpy).toHaveBeenCalledWith({
+      ids: [3, 2],
+    });
+  });
+
+  it('ignora un drop mientras existe una búsqueda activa', async (): Promise<void> => {
+    const fixture: ComponentFixture<ManagementPaymentTypesComponent> = TestBed.createComponent(
+      ManagementPaymentTypesComponent,
+    );
+
+    const component: ManagementPaymentTypesComponent = fixture.componentInstance;
+
+    const reorderSpy = vi.spyOn(tiposPagoService, 'reorder');
+
+    component.updateSearchTerm('visa');
+
+    await component.reorderTiposPago(createDropEvent(0, 1));
+
+    expect(reorderSpy).not.toHaveBeenCalled();
+  });
+
+  it('muestra un error si no puede persistir el nuevo orden', async (): Promise<void> => {
+    const fixture: ComponentFixture<ManagementPaymentTypesComponent> = TestBed.createComponent(
+      ManagementPaymentTypesComponent,
+    );
+
+    const component: ManagementPaymentTypesComponent = fixture.componentInstance;
+
+    vi.spyOn(tiposPagoService, 'reorder').mockRejectedValueOnce(new Error('Database error'));
+
+    const alertSpy = vi.spyOn(dialog, 'alert');
+
+    await component.reorderTiposPago(createDropEvent(0, 1));
+
+    expect(alertSpy).toHaveBeenCalledWith({
+      title: 'Error',
+      content: 'Database error',
+    });
   });
 
   it('selecciona un tipo de pago existente', (): void => {
@@ -730,6 +816,16 @@ describe('ManagementPaymentTypesComponent', (): void => {
     expect(discardStagedImageMock).not.toHaveBeenCalled();
   });
 });
+
+function createDropEvent(
+  previousIndex: number,
+  currentIndex: number,
+): CdkDragDrop<readonly TipoPago[]> {
+  return {
+    previousIndex,
+    currentIndex,
+  } as unknown as CdkDragDrop<readonly TipoPago[]>;
+}
 
 function createStagedPaymentTypeImage(stagingId: string, url: string): StagedImageInterface {
   return {

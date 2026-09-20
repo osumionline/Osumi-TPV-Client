@@ -1,4 +1,11 @@
 import {
+  CdkDrag,
+  CdkDragHandle,
+  CdkDropList,
+  moveItemInArray,
+  type CdkDragDrop,
+} from '@angular/cdk/drag-drop';
+import {
   afterNextRender,
   Component,
   computed,
@@ -51,6 +58,9 @@ const EFECTIVO_SLUG: string = 'efectivo';
     MatIcon,
     MatInput,
     MatTabsModule,
+    CdkDrag,
+    CdkDragHandle,
+    CdkDropList,
   ],
 })
 export default class ManagementPaymentTypesComponent {
@@ -76,6 +86,7 @@ export default class ManagementPaymentTypesComponent {
   readonly savingTipoPago: WritableSignal<boolean> = signal<boolean>(false);
   readonly deletingTipoPago: WritableSignal<boolean> = signal<boolean>(false);
   readonly saveSuccessful: WritableSignal<boolean> = signal<boolean>(false);
+  readonly reorderingTipoPago: Signal<boolean> = this.tiposPagoService.reordering;
 
   private saveFeedbackTimeoutId: number | null = null;
 
@@ -96,6 +107,7 @@ export default class ManagementPaymentTypesComponent {
 
   readonly canSaveTipoPago: Signal<boolean> = computed((): boolean => {
     if (
+      this.reorderingTipoPago() ||
       this.deletingTipoPago() ||
       this.savingTipoPago() ||
       this.logoProcessing() ||
@@ -137,6 +149,16 @@ export default class ManagementPaymentTypesComponent {
     );
   });
 
+  readonly canReorderTiposPago: Signal<boolean> = computed(
+    (): boolean =>
+      this.searchTerm().trim() === '' &&
+      this.tiposPagoConfigurables().length > 1 &&
+      !this.reorderingTipoPago() &&
+      !this.deletingTipoPago() &&
+      !this.savingTipoPago() &&
+      !this.logoProcessing(),
+  );
+
   constructor() {
     this.destroyRef.onDestroy((): void => {
       this.destroyed = true;
@@ -162,11 +184,75 @@ export default class ManagementPaymentTypesComponent {
   }
 
   /**
+   * Persiste el nuevo orden resultante
+   * de arrastrar un tipo de pago.
+   */
+  async reorderTiposPago(event: CdkDragDrop<readonly TipoPago[]>): Promise<void> {
+    if (!this.canReorderTiposPago() || event.previousIndex === event.currentIndex) {
+      return;
+    }
+
+    const reordered: TipoPago[] = [...this.tiposPagoConfigurables()];
+
+    moveItemInArray(reordered, event.previousIndex, event.currentIndex);
+
+    const ids: number[] = [];
+
+    for (const tipoPago of reordered) {
+      if (tipoPago.id === null) {
+        this.dialog.alert({
+          title: 'Error',
+          content: 'No se ha podido determinar el identificador de uno de los tipos de pago.',
+        });
+
+        return;
+      }
+
+      ids.push(tipoPago.id);
+    }
+
+    const selectedId: number | null = this.selectedTipoPago()?.id ?? null;
+
+    try {
+      await this.tiposPagoService.reorder({
+        ids,
+      });
+
+      /*
+       * reorder() sustituye el maestro por los
+       * modelos canónicos devueltos por backend.
+       *
+       * Si había una ficha seleccionada, actualizamos
+       * su referencia sin tocar el formulario para
+       * conservar posibles cambios sin guardar.
+       */
+      if (selectedId !== null) {
+        this.selectedTipoPago.set(this.tiposPagoService.findById(selectedId));
+      }
+    } catch (error: unknown) {
+      console.error('Error reordenando los tipos de pago:', error);
+
+      this.dialog.alert({
+        title: 'Error',
+        content: getErrorMessage(
+          error,
+          'No se ha podido guardar el nuevo orden de los tipos de pago.',
+        ),
+      });
+    }
+  }
+
+  /**
    * Selecciona un tipo de pago existente
    * y carga sus datos en el formulario.
    */
   async selectTipoPago(tipoPago: TipoPago): Promise<void> {
-    if (this.deletingTipoPago() || this.savingTipoPago() || this.logoProcessing()) {
+    if (
+      this.reorderingTipoPago() ||
+      this.deletingTipoPago() ||
+      this.savingTipoPago() ||
+      this.logoProcessing()
+    ) {
       return;
     }
 
@@ -190,7 +276,12 @@ export default class ManagementPaymentTypesComponent {
    * tipo de pago.
    */
   async startCreatingTipoPago(): Promise<void> {
-    if (this.deletingTipoPago() || this.savingTipoPago() || this.logoProcessing()) {
+    if (
+      this.reorderingTipoPago() ||
+      this.deletingTipoPago() ||
+      this.savingTipoPago() ||
+      this.logoProcessing()
+    ) {
       return;
     }
 
@@ -217,7 +308,12 @@ export default class ManagementPaymentTypesComponent {
    * En edición restaura los datos persistidos.
    */
   async cancelTipoPagoChanges(): Promise<void> {
-    if (this.deletingTipoPago() || this.savingTipoPago() || this.logoProcessing()) {
+    if (
+      this.reorderingTipoPago() ||
+      this.deletingTipoPago() ||
+      this.savingTipoPago() ||
+      this.logoProcessing()
+    ) {
       return;
     }
 
@@ -250,7 +346,12 @@ export default class ManagementPaymentTypesComponent {
    * que se está creando o editando.
    */
   async saveTipoPago(): Promise<void> {
-    if (this.deletingTipoPago() || this.savingTipoPago() || this.logoProcessing()) {
+    if (
+      this.reorderingTipoPago() ||
+      this.deletingTipoPago() ||
+      this.savingTipoPago() ||
+      this.logoProcessing()
+    ) {
       return;
     }
 
@@ -310,6 +411,7 @@ export default class ManagementPaymentTypesComponent {
    */
   async deleteTipoPago(): Promise<void> {
     if (
+      this.reorderingTipoPago() ||
       this.deletingTipoPago() ||
       this.savingTipoPago() ||
       this.logoProcessing() ||
@@ -405,7 +507,12 @@ export default class ManagementPaymentTypesComponent {
    * el logo del tipo de pago.
    */
   selectLogo(): void {
-    if (this.deletingTipoPago() || this.savingTipoPago() || this.logoProcessing()) {
+    if (
+      this.reorderingTipoPago() ||
+      this.deletingTipoPago() ||
+      this.savingTipoPago() ||
+      this.logoProcessing()
+    ) {
       return;
     }
 
@@ -418,7 +525,12 @@ export default class ManagementPaymentTypesComponent {
    * cualquier staging anterior.
    */
   async onLogoSelected(event: Event): Promise<void> {
-    if (this.deletingTipoPago() || this.savingTipoPago() || this.logoProcessing()) {
+    if (
+      this.reorderingTipoPago() ||
+      this.deletingTipoPago() ||
+      this.savingTipoPago() ||
+      this.logoProcessing()
+    ) {
       return;
     }
 

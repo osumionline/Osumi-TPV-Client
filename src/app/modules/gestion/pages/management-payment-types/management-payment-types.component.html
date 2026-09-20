@@ -40,6 +40,7 @@
                        type="search"
                        autocomplete="off"
                        [value]="searchTerm()"
+                       [disabled]="reorderingTipoPago()"
                        (input)="
                            updateSearchTerm(
                                searchInput.value
@@ -47,24 +48,37 @@
                        ">
             </mat-form-field>
 
-            <div class="payment-type-list">
+            <div class="payment-type-list"
+                 cdkDropList
+                 [cdkDropListData]="filteredTiposPago()"
+                 [cdkDropListDisabled]="!canReorderTiposPago()"
+                 (cdkDropListDropped)="reorderTiposPago($event)">
                 @for (
                 tipoPago of filteredTiposPago();
                 track tipoPago.id
                 ) {
                 <button type="button"
+                        cdkDrag
                         class="payment-type-list__item"
                         [class.payment-type-list__item--selected]="
                             !creatingTipoPago() &&
                             selectedTipoPago()?.id === tipoPago.id
                         "
                         [disabled]="
+                            reorderingTipoPago() ||
                             deletingTipoPago() ||
                             savingTipoPago() ||
                             logoProcessing()
                         "
                         (click)="selectTipoPago(tipoPago)">
-                    <mat-icon class="payment-type-list__handle"
+                    <mat-icon cdkDragHandle
+                              class="payment-type-list__handle"
+                              [class.payment-type-list__handle--disabled]="
+                                  !canReorderTiposPago()
+                              "
+                              [cdkDragHandleDisabled]="
+                                  !canReorderTiposPago()
+                              "
                               aria-hidden="true">
                         drag_indicator
                     </mat-icon>
@@ -99,6 +113,7 @@
                     type="button"
                     class="payment-type-sidebar__create"
                     [disabled]="
+                        reorderingTipoPago() ||
                         deletingTipoPago() ||
                         savingTipoPago() ||
                         logoProcessing()
