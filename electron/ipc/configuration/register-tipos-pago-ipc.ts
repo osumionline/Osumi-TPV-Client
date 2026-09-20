@@ -2,6 +2,10 @@ import type TiposPagoService from '@backend/application/tipos-pago/tipos-pago.se
 import type ActualizarTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/actualizar-tipo-pago-command.interface';
 import type CrearTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/crear-tipo-pago-command.interface';
 import type ReordenarTiposPagoCommand from '@desktop-contracts/configuration/tipos-pago/reordenar-tipos-pago-command.interface';
+import type {
+  TipoPagoEstadisticasConsulta,
+  TipoPagoEstadisticasResultado,
+} from '@desktop-contracts/configuration/tipos-pago/tipo-pago-estadisticas.interface';
 import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 import type { MainWindowProvider } from '@ipc/assert-trusted-sender';
 import { assertTrustedSender } from '@ipc/assert-trusted-sender';
@@ -19,6 +23,19 @@ export default function registerTiposPagoIpc(
       assertTrustedSender(event, getMainWindow);
 
       return tiposPagoService.getAll();
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.tiposPagoGetEstadisticas,
+
+    async (
+      event,
+      consulta: TipoPagoEstadisticasConsulta,
+    ): Promise<TipoPagoEstadisticasResultado> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return tiposPagoService.getEstadisticas(consulta);
     },
   );
 

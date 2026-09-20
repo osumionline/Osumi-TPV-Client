@@ -2,6 +2,10 @@ import { TestBed } from '@angular/core/testing';
 import type ActualizarTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/actualizar-tipo-pago-command.interface';
 import type CrearTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/crear-tipo-pago-command.interface';
 import type ReordenarTiposPagoCommand from '@desktop-contracts/configuration/tipos-pago/reordenar-tipos-pago-command.interface';
+import type {
+  TipoPagoEstadisticasConsulta,
+  TipoPagoEstadisticasResultado,
+} from '@desktop-contracts/configuration/tipos-pago/tipo-pago-estadisticas.interface';
 import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 import type TipoPago from '@model/tipos-pago/tipo-pago.model';
 import TiposPagoService from '@services/tipos-pago/tipos-pago.service';
@@ -21,6 +25,8 @@ let reorderResult: readonly TipoPagoInterface[];
 let getAllResult: readonly TipoPagoInterface[];
 let createResult: TipoPagoInterface;
 let updateResult: TipoPagoInterface;
+let estadisticasCalls: TipoPagoEstadisticasConsulta[];
+let estadisticasResult: TipoPagoEstadisticasResultado;
 
 describe('TiposPagoService', (): void => {
   beforeEach((): void => {
@@ -90,6 +96,30 @@ describe('TiposPagoService', (): void => {
       fisico: false,
     });
 
+    estadisticasCalls = [];
+
+    estadisticasResult = {
+      availableYears: [2025, 2026],
+      points: [
+        {
+          year: 2026,
+          month: 9,
+          day: 1,
+          importeCents: 1_500,
+        },
+        {
+          year: 2026,
+          month: 9,
+          day: 2,
+          importeCents: -500,
+        },
+      ],
+      totalImporteCents: 1_000,
+      operaciones: 2,
+      importeMedioCents: 500,
+      porcentajeTotalBps: 6_667,
+    };
+
     reorderResult = [
       createTipoPagoInterface({
         id: 1,
@@ -132,6 +162,15 @@ describe('TiposPagoService', (): void => {
 
             return Promise.resolve(getAllResult);
           },
+
+          getEstadisticas: (
+            consulta: TipoPagoEstadisticasConsulta,
+          ): Promise<TipoPagoEstadisticasResultado> => {
+            estadisticasCalls.push(consulta);
+
+            return Promise.resolve(estadisticasResult);
+          },
+
           create: (command: CrearTipoPagoCommand): Promise<TipoPagoInterface> => {
             createCalls.push(command);
 
@@ -440,6 +479,50 @@ describe('TiposPagoService', (): void => {
 
     expect(service.loaded()).toBe(false);
     expect(service.tiposPago()).toEqual([]);
+  });
+
+  it('consulta las estadísticas sin modificar el maestro en memoria', async (): Promise<void> => {
+    await service.load();
+
+    const previous: readonly TipoPago[] = service.tiposPago();
+
+    const result: TipoPagoEstadisticasResultado = await service.getEstadisticas({
+      idTipoPago: 2,
+      year: 2026,
+      month: 9,
+    });
+
+    expect(estadisticasCalls).toEqual([
+      {
+        idTipoPago: 2,
+        year: 2026,
+        month: 9,
+      },
+    ]);
+
+    expect(result).toBe(estadisticasResult);
+
+    /*
+     * Consultar estadísticas es una lectura
+     * independiente del maestro global.
+     */
+    expect(service.tiposPago()).toBe(previous);
+
+    expect(service.loaded()).toBe(true);
+  });
+
+  it('propaga los errores de la consulta de estadísticas', async (): Promise<void> => {
+    vi.spyOn(window.osumiDesktop.tiposPago, 'getEstadisticas').mockRejectedValueOnce(
+      new Error('Database error'),
+    );
+
+    await expect(
+      service.getEstadisticas({
+        idTipoPago: 2,
+        year: 2026,
+        month: null,
+      }),
+    ).rejects.toThrow('Database error');
   });
 });
 

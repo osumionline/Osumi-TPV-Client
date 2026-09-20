@@ -3,6 +3,10 @@ import { Service, signal } from '@angular/core';
 import type ActualizarTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/actualizar-tipo-pago-command.interface';
 import type CrearTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/crear-tipo-pago-command.interface';
 import type ReordenarTiposPagoCommand from '@desktop-contracts/configuration/tipos-pago/reordenar-tipos-pago-command.interface';
+import type {
+  TipoPagoEstadisticasConsulta,
+  TipoPagoEstadisticasResultado,
+} from '@desktop-contracts/configuration/tipos-pago/tipo-pago-estadisticas.interface';
 import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 import TipoPago from '@model/tipos-pago/tipo-pago.model';
 
@@ -40,6 +44,14 @@ export default class TiposPagoService {
    */
   reload(): Promise<void> {
     return this.loadData();
+  }
+
+  /**
+   * Recupera las estadísticas históricas
+   * de un tipo de pago sin modificar el maestro.
+   */
+  getEstadisticas(consulta: TipoPagoEstadisticasConsulta): Promise<TipoPagoEstadisticasResultado> {
+    return window.osumiDesktop.tiposPago.getEstadisticas(consulta);
   }
 
   /**
