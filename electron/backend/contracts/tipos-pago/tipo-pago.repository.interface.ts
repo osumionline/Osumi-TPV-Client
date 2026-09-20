@@ -34,6 +34,14 @@ export default interface TipoPagoRepository {
   update(id: number, command: ActualizarTipoPagoRecordCommand): Promise<TipoPagoRecord>;
 
   /**
+   * Persiste el orden completo de los tipos de pago
+   * configurables activos y devuelve el maestro actualizado.
+   *
+   * Efectivo conserva su posición estructural.
+   */
+  reorder(ids: readonly number[]): Promise<readonly TipoPagoRecord[]>;
+
+  /**
    * Da de baja lógicamente un tipo de pago
    * conservando sus referencias históricas.
    */

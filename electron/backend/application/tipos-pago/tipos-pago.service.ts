@@ -8,6 +8,7 @@ import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.
 import type TipoPagoRecord from '@backend/domain/tipos-pago/tipo-pago-record.interface';
 import type ActualizarTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/actualizar-tipo-pago-command.interface';
 import type CrearTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/crear-tipo-pago-command.interface';
+import ReordenarTiposPagoCommand from '@desktop-contracts/configuration/tipos-pago/reordenar-tipos-pago-command.interface';
 import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 
 const EFECTIVO_SLUG: string = 'efectivo';
@@ -149,6 +150,42 @@ export default class TiposPagoService {
   }
 
   /**
+   * Reordena todos los tipos de pago configurables.
+   *
+   * El comando debe contener exactamente una vez
+   * cada tipo configurable activo. Efectivo queda
+   * excluido y conserva su orden estructural.
+   */
+  async reorder(command: ReordenarTiposPagoCommand): Promise<readonly TipoPagoInterface[]> {
+    const ids: readonly number[] = this.normalizeReorderIds(command);
+
+    const current: readonly TipoPagoRecord[] = await this.repository.findAll();
+
+    const configurableIds: ReadonlySet<number> = new Set<number>(
+      current
+        .filter(
+          (tipoPago: TipoPagoRecord): boolean =>
+            tipoPago.slug.toLocaleLowerCase('es-ES') !== EFECTIVO_SLUG,
+        )
+        .map((tipoPago: TipoPagoRecord): number => tipoPago.id),
+    );
+
+    const matchesCurrentMaster: boolean =
+      ids.length === configurableIds.size &&
+      ids.every((id: number): boolean => configurableIds.has(id));
+
+    if (!matchesCurrentMaster) {
+      throw new Error('El orden recibido no coincide con los tipos de pago configurables activos.');
+    }
+
+    const tiposPago: readonly TipoPagoRecord[] = await this.repository.reorder(ids);
+
+    return tiposPago.map((tipoPago: TipoPagoRecord): TipoPagoInterface =>
+      this.toInterface(tipoPago),
+    );
+  }
+
+  /**
    * Da de baja lógicamente un tipo de pago configurable.
    *
    * Efectivo es estructural y no puede eliminarse.
@@ -165,6 +202,28 @@ export default class TiposPagoService {
     this.assertConfigurable(current);
 
     await this.repository.deactivate(validId);
+  }
+
+  /**
+   * Valida y normaliza el comando recibido
+   * para reordenar Tipos de pago.
+   */
+  private normalizeReorderIds(command: ReordenarTiposPagoCommand): readonly number[] {
+    if (typeof command !== 'object' || command === null || !Array.isArray(command.ids)) {
+      throw new Error('El orden de tipos de pago no es válido.');
+    }
+
+    const ids: readonly number[] = [...command.ids];
+
+    if (ids.some((id: number): boolean => !Number.isSafeInteger(id) || id <= 0)) {
+      throw new Error('El orden contiene un identificador de tipo de pago no válido.');
+    }
+
+    if (new Set<number>(ids).size !== ids.length) {
+      throw new Error('El orden de tipos de pago contiene identificadores duplicados.');
+    }
+
+    return ids;
   }
 
   /**

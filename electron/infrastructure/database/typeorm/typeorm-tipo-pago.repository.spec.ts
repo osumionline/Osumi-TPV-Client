@@ -13,9 +13,7 @@ import type { DataSource } from 'typeorm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 let tempDirectory: string | null = null;
-
 let applicationDatabase: TypeOrmApplicationDatabase | null = null;
-
 let repository: TypeOrmTipoPagoRepository | null = null;
 
 describe('TypeOrmTipoPagoRepository', (): void => {
@@ -183,6 +181,124 @@ describe('TypeOrmTipoPagoRepository', (): void => {
         }),
       ),
     ).rejects.toThrow('El logo nuevo no pertenece al almacenamiento de imágenes de Tipos de pago.');
+  });
+
+  it('reordena atómicamente los tipos configurables manteniendo Efectivo en orden cero', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+      INSERT INTO tipo_pago (
+        id,
+        public_id,
+        id_archivo,
+        nombre,
+        slug,
+        afecta_caja,
+        orden,
+        fisico,
+        activo,
+        deleted_at
+      )
+      VALUES (
+        4,
+        'tipo-pago-bizum',
+        NULL,
+        'Bizum',
+        'bizum',
+        0,
+        2,
+        1,
+        1,
+        NULL
+      )
+    `,
+    );
+
+    const tiposPago: readonly TipoPagoRecord[] = await requireRepository().reorder([4, 2]);
+
+    expect(
+      tiposPago.map((tipoPago: TipoPagoRecord) => ({
+        id: tipoPago.id,
+        orden: tipoPago.orden,
+      })),
+    ).toEqual([
+      {
+        id: 1,
+        orden: 0,
+      },
+      {
+        id: 4,
+        orden: 1,
+      },
+      {
+        id: 2,
+        orden: 2,
+      },
+    ]);
+  });
+
+  it('rechaza un reorder que no contenga exactamente todos los tipos configurables activos', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+      INSERT INTO tipo_pago (
+        id,
+        public_id,
+        id_archivo,
+        nombre,
+        slug,
+        afecta_caja,
+        orden,
+        fisico,
+        activo,
+        deleted_at
+      )
+      VALUES (
+        4,
+        'tipo-pago-bizum',
+        NULL,
+        'Bizum',
+        'bizum',
+        0,
+        2,
+        1,
+        1,
+        NULL
+      )
+    `,
+    );
+
+    await expect(requireRepository().reorder([2])).rejects.toThrow(
+      'El orden recibido no coincide con los tipos de pago configurables activos.',
+    );
+
+    await expect(requireRepository().reorder([1, 2])).rejects.toThrow(
+      'El orden recibido no coincide con los tipos de pago configurables activos.',
+    );
+
+    const tiposPago: readonly TipoPagoRecord[] = await requireRepository().findAll();
+
+    expect(
+      tiposPago.map((tipoPago: TipoPagoRecord) => ({
+        id: tipoPago.id,
+        orden: tipoPago.orden,
+      })),
+    ).toEqual([
+      {
+        id: 1,
+        orden: 0,
+      },
+      {
+        id: 2,
+        orden: 1,
+      },
+      {
+        id: 4,
+        orden: 2,
+      },
+    ]);
   });
 
   it('da de baja lógicamente conservando registro y logo', async (): Promise<void> => {

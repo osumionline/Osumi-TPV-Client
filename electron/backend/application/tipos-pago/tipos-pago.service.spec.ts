@@ -10,21 +10,17 @@ import type PreparedImageAsset from '@backend/domain/files/prepared-image-asset.
 import type TipoPagoRecord from '@backend/domain/tipos-pago/tipo-pago-record.interface';
 import type ActualizarTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/actualizar-tipo-pago-command.interface';
 import type CrearTipoPagoCommand from '@desktop-contracts/configuration/tipos-pago/crear-tipo-pago-command.interface';
+import type ReordenarTiposPagoCommand from '@desktop-contracts/configuration/tipos-pago/reordenar-tipos-pago-command.interface';
 import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 let tiposPago: readonly TipoPagoRecord[];
-
 let lastCreateCommand: CrearTipoPagoRecordCommand | null;
-
 let lastUpdateId: number | null;
-
 let lastUpdateCommand: ActualizarTipoPagoRecordCommand | null;
-
 let lastDeactivateId: number | null;
-
+let lastReorderIds: readonly number[] | null;
 let createError: Error | null;
-
 let updateError: Error | null;
 
 class FakeImageAssetPromoter implements ImageAssetPromoter {
@@ -113,15 +109,11 @@ describe('TiposPagoService', (): void => {
     ];
 
     lastCreateCommand = null;
-
     lastUpdateId = null;
-
     lastUpdateCommand = null;
-
     lastDeactivateId = null;
-
+    lastReorderIds = null;
     createError = null;
-
     updateError = null;
   });
 
@@ -321,6 +313,88 @@ describe('TiposPagoService', (): void => {
     expect(lastUpdateCommand).toBeNull();
   });
 
+  it('reordena todos los tipos configurables manteniendo Efectivo fuera del comando', async (): Promise<void> => {
+    tiposPago = [
+      ...tiposPago,
+      createRecord({
+        id: 3,
+        publicId: 'tipo-pago-bizum',
+        nombre: 'Bizum',
+        slug: 'bizum',
+        fotoRelativePath: 'files/payment-types/bizum.webp',
+        afectaCaja: false,
+        orden: 2,
+        fisico: true,
+      }),
+    ];
+
+    const service: TiposPagoService = createService();
+
+    const command: ReordenarTiposPagoCommand = {
+      ids: [3, 2],
+    };
+
+    const result: readonly TipoPagoInterface[] = await service.reorder(command);
+
+    expect(lastReorderIds).toEqual([3, 2]);
+
+    expect(
+      result.map((tipoPago: TipoPagoInterface) => ({
+        slug: tipoPago.slug,
+        orden: tipoPago.orden,
+      })),
+    ).toEqual([
+      {
+        slug: 'efectivo',
+        orden: 0,
+      },
+      {
+        slug: 'bizum',
+        orden: 1,
+      },
+      {
+        slug: 'visa',
+        orden: 2,
+      },
+    ]);
+  });
+
+  it('rechaza órdenes incompletos, duplicados o que incluyan Efectivo', async (): Promise<void> => {
+    tiposPago = [
+      ...tiposPago,
+      createRecord({
+        id: 3,
+        publicId: 'tipo-pago-bizum',
+        nombre: 'Bizum',
+        slug: 'bizum',
+        fotoRelativePath: 'files/payment-types/bizum.webp',
+        orden: 2,
+      }),
+    ];
+
+    const service: TiposPagoService = createService();
+
+    await expect(
+      service.reorder({
+        ids: [2],
+      }),
+    ).rejects.toThrow('El orden recibido no coincide con los tipos de pago configurables activos.');
+
+    await expect(
+      service.reorder({
+        ids: [2, 2],
+      }),
+    ).rejects.toThrow('El orden de tipos de pago contiene identificadores duplicados.');
+
+    await expect(
+      service.reorder({
+        ids: [1, 2],
+      }),
+    ).rejects.toThrow('El orden recibido no coincide con los tipos de pago configurables activos.');
+
+    expect(lastReorderIds).toBeNull();
+  });
+
   it('impide eliminar Efectivo por una llamada directa al backend', async (): Promise<void> => {
     const service: TiposPagoService = createService();
 
@@ -449,6 +523,34 @@ function createService(
         fisico: command.fisico,
         fotoRelativePath: command.nuevoLogo?.relativePath ?? current.fotoRelativePath,
       });
+    },
+
+    reorder: (ids: readonly number[]): Promise<readonly TipoPagoRecord[]> => {
+      lastReorderIds = [...ids];
+
+      const orderById: ReadonlyMap<number, number> = new Map<number, number>(
+        ids.map((id: number, index: number): readonly [number, number] => [id, index + 1]),
+      );
+
+      tiposPago = tiposPago
+        .map((tipoPago: TipoPagoRecord): TipoPagoRecord => {
+          if (tipoPago.slug.toLocaleLowerCase('es-ES') === 'efectivo') {
+            return {
+              ...tipoPago,
+              orden: 0,
+            };
+          }
+
+          return {
+            ...tipoPago,
+            orden: orderById.get(tipoPago.id) ?? tipoPago.orden,
+          };
+        })
+        .sort(
+          (first: TipoPagoRecord, second: TipoPagoRecord): number => first.orden - second.orden,
+        );
+
+      return Promise.resolve(tiposPago);
     },
 
     deactivate: (id: number): Promise<void> => {

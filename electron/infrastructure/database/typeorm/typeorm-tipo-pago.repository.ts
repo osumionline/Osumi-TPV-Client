@@ -10,6 +10,8 @@ import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeo
 import { randomUUID } from 'node:crypto';
 import type { DataSource, QueryRunner } from 'typeorm';
 
+const EFECTIVO_SLUG: string = 'efectivo';
+
 interface TipoPagoDatabaseRow {
   readonly id: number;
   readonly public_id: string;
@@ -297,6 +299,70 @@ export default class TypeOrmTipoPagoRepository implements TipoPagoRepository {
   }
 
   /**
+   * Persiste el orden completo de los tipos de pago
+   * configurables dentro de una única transacción.
+   *
+   * Efectivo permanece siempre fuera del orden editable
+   * y conserva su posición estructural.
+   */
+  async reorder(ids: readonly number[]): Promise<readonly TipoPagoRecord[]> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const timestamp: string = new Date().toISOString();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<readonly TipoPagoRecord[]> => {
+        const currentRows: readonly TipoPagoDatabaseRow[] =
+          await this.findAllActiveRows(queryRunner);
+
+        const configurableRows: readonly TipoPagoDatabaseRow[] = currentRows.filter(
+          (row: TipoPagoDatabaseRow): boolean =>
+            row.slug.toLocaleLowerCase('es-ES') !== EFECTIVO_SLUG,
+        );
+
+        const configurableIds: ReadonlySet<number> = new Set<number>(
+          configurableRows.map((row: TipoPagoDatabaseRow): number => row.id),
+        );
+
+        const uniqueIds: ReadonlySet<number> = new Set<number>(ids);
+
+        const matchesCurrentMaster: boolean =
+          ids.length === configurableRows.length &&
+          uniqueIds.size === ids.length &&
+          ids.every((id: number): boolean => configurableIds.has(id));
+
+        if (!matchesCurrentMaster) {
+          throw new Error(
+            'El orden recibido no coincide con los tipos de pago configurables activos.',
+          );
+        }
+
+        for (let index: number = 0; index < ids.length; index++) {
+          await queryRunner.query(
+            `
+            UPDATE tipo_pago
+            SET
+              orden = ?,
+              updated_at = ?
+            WHERE
+              id = ?
+              AND activo = 1
+              AND deleted_at IS NULL
+          `,
+            [index + 1, timestamp, ids[index]],
+          );
+        }
+
+        const updatedRows: readonly TipoPagoDatabaseRow[] =
+          await this.findAllActiveRows(queryRunner);
+
+        return updatedRows.map((row: TipoPagoDatabaseRow): TipoPagoRecord => this.toRecord(row));
+      },
+    );
+  }
+
+  /**
    * Da de baja lógicamente un tipo de pago
    * sin eliminar su registro ni su logo.
    */
@@ -327,6 +393,44 @@ export default class TypeOrmTipoPagoRepository implements TipoPagoRepository {
         [timestamp, timestamp, id],
       );
     });
+  }
+
+  /**
+   * Recupera el maestro activo dentro de una
+   * transacción respetando su orden persistido.
+   */
+  private async findAllActiveRows(
+    queryRunner: QueryRunner,
+  ): Promise<readonly TipoPagoDatabaseRow[]> {
+    return (await queryRunner.query(
+      `
+      SELECT
+        tp.id,
+        tp.public_id,
+        tp.id_archivo,
+        tp.nombre,
+        tp.slug,
+        tp.afecta_caja,
+        tp.orden,
+        tp.fisico,
+        a.relative_path
+          AS foto_relative_path
+      FROM tipo_pago tp
+
+      LEFT JOIN archivo a
+        ON a.id = tp.id_archivo
+        AND a.deleted_at IS NULL
+
+      WHERE
+        tp.activo = 1
+        AND tp.deleted_at IS NULL
+
+      ORDER BY
+        tp.orden,
+        tp.nombre COLLATE NOCASE,
+        tp.id
+    `,
+    )) as readonly TipoPagoDatabaseRow[];
   }
 
   /**
