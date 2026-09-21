@@ -1,11 +1,21 @@
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CajaAbiertaRecord from '@backend/domain/caja/caja-abierta-record.interface';
+import type SalidaCajaRecord from '@backend/domain/caja/salida-caja-record.interface';
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
 import { getLastInsertId } from '@infrastructure/database/typeorm/sqlite.utils';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
 import { randomUUID } from 'node:crypto';
 import type { DataSource, QueryRunner } from 'typeorm';
+
+interface SalidaCajaDatabaseRow {
+  readonly public_id: string;
+  readonly concepto: string;
+  readonly descripcion: string | null;
+  readonly importe_cents: number;
+  readonly fecha: string;
+  readonly editable: number;
+}
 
 interface CajaAbiertaDatabaseRow {
   readonly id: number;
@@ -129,6 +139,55 @@ export default class TypeOrmCajaRepository implements CajaRepository {
         cause: error,
       });
     }
+  }
+
+  /**
+   * Recupera las salidas activas correspondientes al intervalo indicado.
+   */
+  async findSalidasByPeriod(
+    desde: string,
+    hastaExclusive: string,
+  ): Promise<readonly SalidaCajaRecord[]> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const rows: readonly SalidaCajaDatabaseRow[] = (await dataSource.query(
+      `
+      SELECT
+        mc.public_id,
+        mc.concepto,
+        mc.descripcion,
+        mc.importe_cents,
+        mc.created_at AS fecha,
+        CASE
+          WHEN c.cierre IS NULL THEN 1
+          ELSE 0
+        END AS editable
+      FROM movimiento_caja mc
+
+      INNER JOIN caja c
+        ON c.id = mc.id_caja
+
+      WHERE
+        mc.tipo = 'salida'
+        AND mc.deleted_at IS NULL
+        AND mc.created_at >= ?
+        AND mc.created_at < ?
+
+      ORDER BY
+        mc.created_at DESC,
+        mc.id DESC
+    `,
+      [desde, hastaExclusive],
+    )) as readonly SalidaCajaDatabaseRow[];
+
+    return rows.map((row: SalidaCajaDatabaseRow): SalidaCajaRecord => ({
+      publicId: row.public_id,
+      concepto: row.concepto,
+      descripcion: row.descripcion,
+      importeCents: row.importe_cents,
+      fecha: row.fecha,
+      editable: row.editable === 1,
+    }));
   }
 
   /**

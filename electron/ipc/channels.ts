@@ -128,6 +128,7 @@ const IPC_CHANNELS = {
   filesDiscardStagedImage: 'files:discard-staged-image',
 
   cajaOpen: 'caja:open',
+  cajaGetSalidas: 'caja:get-salidas',
 
   reservasCreate: 'reservas:create',
   reservasGetAll: 'reservas:get-all',
