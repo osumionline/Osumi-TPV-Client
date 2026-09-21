@@ -1,0 +1,79 @@
+<otpv-header selectedOption="caja"
+             [appName]="appName()" />
+
+<main class="cash-register">
+    <section class="cash-register__panel">
+        <header class="cash-register__toolbar">
+            <h1>
+                CAJA
+            </h1>
+        </header>
+
+        <nav class="cash-register__tabs"
+             role="tablist"
+             aria-label="Apartados de Caja">
+            @for (section of sections; track section.id) {
+            <button class="cash-register__tab"
+                    type="button"
+                    role="tab"
+                    [class.cash-register__tab--active]="activeSection() === section.id"
+                    [attr.aria-selected]="activeSection() === section.id"
+                    (click)="selectSection(section.id)">
+                {{ section.label }}
+            </button>
+            }
+        </nav>
+
+        <div class="cash-register__content">
+            @switch (activeSection()) {
+            @case ('history') {
+            <section class="cash-register__placeholder">
+                <h2>
+                    Histórico de ventas
+                </h2>
+
+                <p>
+                    Consulta y gestión del histórico de ventas.
+                </p>
+            </section>
+            }
+
+            @case ('outflows') {
+            <section class="cash-register__placeholder">
+                <h2>
+                    Salidas caja
+                </h2>
+
+                <p>
+                    Gestión de las salidas manuales de efectivo.
+                </p>
+            </section>
+            }
+
+            @case ('closing') {
+            <section class="cash-register__placeholder">
+                <h2>
+                    Cerrar caja
+                </h2>
+
+                <p>
+                    Recuento y cierre de la caja activa.
+                </p>
+            </section>
+            }
+
+            @case ('reports') {
+            <section class="cash-register__placeholder">
+                <h2>
+                    Informes
+                </h2>
+
+                <p>
+                    Este apartado se definirá más adelante.
+                </p>
+            </section>
+            }
+            }
+        </div>
+    </section>
+</main>

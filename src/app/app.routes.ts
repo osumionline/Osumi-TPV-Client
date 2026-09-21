@@ -62,6 +62,11 @@ const routes: Routes = [
     loadComponent: () => import('@modules/almacen/pages/warehouse/warehouse.component'),
   },
   {
+    path: 'caja',
+    canActivate: [readyApplicationGuard],
+    loadComponent: () => import('@modules/caja/pages/cash-register/cash-register.component'),
+  },
+  {
     path: 'gestion',
     canActivate: [readyApplicationGuard],
     loadChildren: () => import('@modules/gestion/gestion.routes').then((module) => module.default),

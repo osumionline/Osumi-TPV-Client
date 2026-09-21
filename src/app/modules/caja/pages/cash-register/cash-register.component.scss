@@ -1,0 +1,102 @@
+:host {
+    display: block;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.cash-register {
+    height: calc(100vh - 56px);
+    min-height: 0;
+    padding: 16px;
+    background-color: var(--bg-color);
+
+    .cash-register__panel {
+        display: flex;
+        height: 100%;
+        min-height: 0;
+        flex-direction: column;
+        background-color: var(--color-white);
+        box-shadow: 0 1px 2px rgb(0 0 0 / 20%);
+    }
+
+    .cash-register__toolbar {
+        display: flex;
+        min-height: 64px;
+        align-items: center;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--separator-color);
+
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 400;
+            line-height: 1.2;
+        }
+    }
+
+    .cash-register__tabs {
+        display: flex;
+        min-height: 44px;
+        align-items: stretch;
+        padding-left: 24px;
+        overflow-x: auto;
+        border-bottom: 1px solid var(--separator-color);
+        background-color: var(--color-white);
+    }
+
+    .cash-register__tab {
+        min-width: max-content;
+        padding: 0 18px;
+        border: 0;
+        border-bottom: 3px solid transparent;
+        background-color: transparent;
+        cursor: pointer;
+        font: inherit;
+        font-size: 13px;
+        opacity: 0.65;
+
+        &:hover {
+            opacity: 1;
+        }
+
+        &.cash-register__tab--active {
+            border-bottom-color: var(--main-color);
+            font-weight: 600;
+            opacity: 1;
+        }
+    }
+
+    .cash-register__content {
+        min-height: 0;
+        flex: 1;
+        overflow: auto;
+    }
+
+    .cash-register__placeholder {
+        display: flex;
+        height: 100%;
+        min-height: 300px;
+        padding: 32px;
+        box-sizing: border-box;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 8px;
+        text-align: center;
+
+        h2,
+        p {
+            margin: 0;
+        }
+
+        h2 {
+            font-size: 22px;
+            font-weight: 500;
+        }
+
+        p {
+            max-width: 520px;
+            color: var(--disabled-color);
+        }
+    }
+}

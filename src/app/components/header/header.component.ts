@@ -63,7 +63,7 @@ export default class HeaderComponent {
       id: 'caja',
       label: 'Caja',
       icon: 'payments',
-      route: null,
+      route: '/caja',
     },
   ];
 
