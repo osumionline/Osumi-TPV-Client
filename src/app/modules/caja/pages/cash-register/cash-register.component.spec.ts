@@ -3,6 +3,7 @@ import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
+import CashOutflowsComponent from '@modules/caja/components/cash-outflows/cash-outflows.component';
 import CashRegisterComponent from '@modules/caja/pages/cash-register/cash-register.component';
 import HistoricalSalesComponent from '@modules/ventas/components/historical-sales/historical-sales.component';
 import { DialogService } from '@osumi/angular-tools';
@@ -16,6 +17,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 class HistoricalSalesStubComponent {
   readonly embedded = input<boolean>(false);
 }
+
+@Component({
+  selector: 'otpv-cash-outflows',
+  template: '',
+})
+class CashOutflowsStubComponent {}
 
 describe('CashRegisterComponent', (): void => {
   let fixture: ComponentFixture<CashRegisterComponent>;
@@ -46,10 +53,10 @@ describe('CashRegisterComponent', (): void => {
     })
       .overrideComponent(CashRegisterComponent, {
         remove: {
-          imports: [HistoricalSalesComponent],
+          imports: [CashOutflowsComponent, HistoricalSalesComponent],
         },
         add: {
-          imports: [HistoricalSalesStubComponent],
+          imports: [CashOutflowsStubComponent, HistoricalSalesStubComponent],
         },
       })
       .compileComponents();
@@ -93,16 +100,18 @@ describe('CashRegisterComponent', (): void => {
     expect(component.activeSection()).toBe('reports');
   });
 
-  it('renderiza el contenido correspondiente a la pestaña seleccionada', (): void => {
+  it('muestra el componente de salidas al seleccionar su pestaña', (): void => {
     component.selectSection('outflows');
     fixture.detectChanges();
 
-    const element: HTMLElement = fixture.nativeElement as HTMLElement;
+    expect(fixture.debugElement.query(By.directive(CashOutflowsStubComponent))).not.toBeNull();
+  });
 
-    expect(element.textContent).toContain('Gestión de las salidas manuales de efectivo.');
-
+  it('mantiene Informes como placeholder', (): void => {
     component.selectSection('reports');
     fixture.detectChanges();
+
+    const element: HTMLElement = fixture.nativeElement as HTMLElement;
 
     expect(element.textContent).toContain('Este apartado se definirá más adelante.');
   });

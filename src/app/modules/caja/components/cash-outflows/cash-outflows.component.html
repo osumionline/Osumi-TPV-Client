@@ -1,0 +1,356 @@
+<section class="cash-outflows">
+    <header class="cash-outflows__filters">
+        <div class="cash-outflows__filter-mode"
+             aria-label="Tipo de búsqueda">
+            <button type="button"
+                    [class.cash-outflows__filter-mode-button--active]="filterMode() === 'fecha'"
+                    [attr.aria-pressed]="filterMode() === 'fecha'"
+                    (click)="selectFilterMode('fecha')">
+                Fecha
+            </button>
+
+            <button type="button"
+                    [class.cash-outflows__filter-mode-button--active]="filterMode() === 'rango'"
+                    [attr.aria-pressed]="filterMode() === 'rango'"
+                    (click)="selectFilterMode('rango')">
+                Rango
+            </button>
+        </div>
+
+        @if (filterMode() === 'fecha') {
+        <div class="cash-outflows__date-filter">
+            <button mat-icon-button
+                    type="button"
+                    aria-label="Día anterior"
+                    matTooltip="Día anterior"
+                    [disabled]="loading()"
+                    (click)="moveFecha(-1)">
+                <mat-icon>
+                    chevron_left
+                </mat-icon>
+            </button>
+
+            <label>
+                <span>
+                    Fecha
+                </span>
+
+                <input type="date"
+                       [value]="fecha()"
+                       [disabled]="loading()"
+                       (change)="onFechaChange($event)">
+            </label>
+
+            <button mat-icon-button
+                    type="button"
+                    aria-label="Día siguiente"
+                    matTooltip="Día siguiente"
+                    [disabled]="loading()"
+                    (click)="moveFecha(1)">
+                <mat-icon>
+                    chevron_right
+                </mat-icon>
+            </button>
+        </div>
+        }
+        @else {
+        <div class="cash-outflows__range-filter">
+            <label>
+                <span>
+                    Desde
+                </span>
+
+                <input type="date"
+                       [value]="desde()"
+                       [disabled]="loading()"
+                       (change)="onDesdeChange($event)">
+            </label>
+
+            <label>
+                <span>
+                    Hasta
+                </span>
+
+                <input type="date"
+                       [value]="hasta()"
+                       [disabled]="loading()"
+                       (change)="onHastaChange($event)">
+            </label>
+
+            <button mat-flat-button
+                    type="button"
+                    [disabled]="loading() || !canSearchRange()"
+                    (click)="searchRange()">
+                Buscar
+            </button>
+        </div>
+        }
+    </header>
+
+    @if (error() !== null) {
+    <div class="cash-outflows__error"
+         role="alert">
+        {{ error() }}
+    </div>
+    }
+
+    <div class="cash-outflows__layout">
+        <aside class="cash-outflows__sidebar">
+            <div class="cash-outflows__list"
+                 aria-label="Salidas de caja">
+                @if (loading()) {
+                <div class="cash-outflows__state">
+                    <mat-icon aria-hidden="true">
+                        hourglass_top
+                    </mat-icon>
+
+                    <span>
+                        Cargando salidas...
+                    </span>
+                </div>
+                }
+                @else {
+                @for (salida of salidas(); track salida.publicId) {
+                <button type="button"
+                        class="cash-outflows__item"
+                        [class.cash-outflows__item--selected]="
+                            selectedSalida()?.publicId === salida.publicId
+                        "
+                        [disabled]="saving() || deleting()"
+                        (click)="selectSalida(salida)">
+                    <span class="cash-outflows__item-main">
+                        <strong>
+                            {{ salida.concepto }}
+                        </strong>
+
+                        <small>
+                            {{ salida.fecha | date:'dd/MM/yyyy HH:mm' }}
+                        </small>
+                    </span>
+
+                    <span class="cash-outflows__item-amount">
+                        {{
+                            salida.importeCents
+                                | centsToEuros
+                                | currency:'EUR':'symbol':'1.2-2'
+                        }}
+
+                        @if (!salida.editable) {
+                        <mat-icon aria-label="Caja cerrada">
+                            lock
+                        </mat-icon>
+                        }
+                    </span>
+                </button>
+                }
+                @empty {
+                <div class="cash-outflows__state">
+                    <mat-icon aria-hidden="true">
+                        payments
+                    </mat-icon>
+
+                    <span>
+                        No hay salidas en el periodo seleccionado.
+                    </span>
+                </div>
+                }
+                }
+            </div>
+
+            <div class="cash-outflows__sidebar-footer">
+                @if (ventasContextService.cajaAbierta() === null) {
+                <p>
+                    No hay una caja abierta. Puedes consultar el histórico,
+                    pero no crear ni modificar salidas.
+                </p>
+                }
+
+                <button mat-flat-button
+                        type="button"
+                        [disabled]="
+                            ventasContextService.cajaAbierta() === null ||
+                            saving() ||
+                            deleting()
+                        "
+                        (click)="startCreatingSalida()">
+                    <mat-icon>
+                        add_circle_outline
+                    </mat-icon>
+
+                    Nueva salida de caja
+                </button>
+            </div>
+        </aside>
+
+        <main class="cash-outflows__editor">
+            @if (hasEditor()) {
+            <form class="cash-outflows__form"
+                  novalidate
+                  (submit)="saveSalida($event)">
+                <header class="cash-outflows__form-header">
+                    @if (creatingSalida()) {
+                    <div>
+                        <span>
+                            Nueva salida
+                        </span>
+
+                        <h2>
+                            Registrar salida de caja
+                        </h2>
+                    </div>
+                    }
+                    @else if (selectedSalida(); as salida) {
+                    <div>
+                        <span>
+                            Salida seleccionada
+                        </span>
+
+                        <h2>
+                            {{ salida.concepto }}
+                        </h2>
+
+                        <small>
+                            {{ salida.fecha | date:'dd/MM/yyyy HH:mm' }}
+                        </small>
+                    </div>
+                    }
+                </header>
+
+                @if (!formEditable() && selectedSalida() !== null) {
+                <div class="cash-outflows__readonly">
+                    <mat-icon aria-hidden="true">
+                        lock
+                    </mat-icon>
+
+                    <span>
+                        Esta salida pertenece a una caja cerrada y es de solo lectura.
+                    </span>
+                </div>
+                }
+
+                <div class="cash-outflows__fields">
+                    <mat-form-field appearance="outline">
+                        <mat-label>
+                            Concepto
+                        </mat-label>
+
+                        <input #conceptoInput
+                               matInput
+                               type="text"
+                               autocomplete="off"
+                               [formField]="salidaCajaForm.concepto">
+
+                        @if (
+                        salidaCajaForm.concepto().touched() &&
+                        salidaCajaForm.concepto().invalid()
+                        ) {
+                        <mat-error>
+                            {{ salidaCajaForm.concepto().errors()[0]?.message }}
+                        </mat-error>
+                        }
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                        <mat-label>
+                            Descripción
+                        </mat-label>
+
+                        <textarea matInput
+                                  rows="5"
+                                  [formField]="salidaCajaForm.descripcion">
+                        </textarea>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline"
+                                    class="cash-outflows__amount">
+                        <mat-label>
+                            Importe
+                        </mat-label>
+
+                        <input matInput
+                               type="number"
+                               step="0.01"
+                               [formField]="salidaCajaForm.importeEuros">
+
+                        <span matTextSuffix>
+                            €
+                        </span>
+
+                        @if (
+                        salidaCajaForm.importeEuros().touched() &&
+                        salidaCajaForm.importeEuros().invalid()
+                        ) {
+                        <mat-error>
+                            {{ salidaCajaForm.importeEuros().errors()[0]?.message }}
+                        </mat-error>
+                        }
+                    </mat-form-field>
+                </div>
+
+                <footer class="cash-outflows__actions">
+                    @if (!creatingSalida() && selectedSalida() !== null) {
+                    <button mat-button
+                            type="button"
+                            class="cash-outflows__delete"
+                            [disabled]="!canDelete()"
+                            (click)="deleteSalida()">
+                        <mat-icon>
+                            delete
+                        </mat-icon>
+
+                        {{ deleting() ? 'Eliminando…' : 'Eliminar' }}
+                    </button>
+                    }
+
+                    <span class="cash-outflows__actions-spacer"></span>
+
+                    @if (saveSuccessful()) {
+                    <span class="cash-outflows__save-feedback"
+                          role="status"
+                          aria-live="polite">
+                        Salida de caja guardada correctamente
+                    </span>
+                    }
+
+                    <button mat-button
+                            type="button"
+                            [disabled]="
+                                saving() ||
+                                deleting() ||
+                                !salidaCajaForm().dirty()
+                            "
+                            (click)="cancelSalidaChanges()">
+                        Cancelar
+                    </button>
+
+                    <button mat-flat-button
+                            type="submit"
+                            [disabled]="!canSave()">
+                        <mat-icon>
+                            save
+                        </mat-icon>
+
+                        {{ saving() ? 'Guardando…' : 'Guardar' }}
+                    </button>
+                </footer>
+            </form>
+            }
+            @else {
+            <div class="cash-outflows__welcome">
+                <mat-icon aria-hidden="true">
+                    point_of_sale
+                </mat-icon>
+
+                <h2>
+                    Elige una salida de caja
+                </h2>
+
+                <p>
+                    Selecciona una salida de la lista para consultar sus datos
+                    o crea una nueva salida sobre la caja activa.
+                </p>
+            </div>
+            }
+        </main>
+    </div>
+</section>
