@@ -1,10 +1,10 @@
-Osumi TPV Client — Documento de continuidad v2.76
+Osumi TPV Client — Documento de continuidad v2.77
 
 Fecha: 21 de septiembre de 2026  
 Proyecto: Osumi TPV Client  
 Repositorio principal: https://github.com/osumionline/Osumi-TPV-Client
 
-Este documento sustituye a docs/osumi-tpv-continuidad-v2.75.md.
+Este documento sustituye a docs/osumi-tpv-continuidad-v2.76.md.
 
 Su objetivo es permitir retomar el desarrollo sin perder decisiones funcionales, arquitectura, convenciones, estado real del código ni el siguiente paso exacto.
 
@@ -160,19 +160,35 @@ Cerrado
 
     ●	Retirada total del antiguo flag empleados ✅ CERRADA
 
+    ●	18 Caja:
+
+    ●	18.1 Shell de Caja ✅
+
+    ●	18.2 Histórico de ventas embebido ✅
+
+    ●	18.3 Lectura de Salidas de caja ✅
+
+    ●	18.4 CRUD de Salidas de caja ✅
+
+    ●	18.4a backend/API/persistencia ✅
+
+    ●	18.4b interfaz completa ✅
+
 En curso / siguiente
 
-    ●	18 Caja 🔨 SIGUIENTE HITO
+    ●	18 Caja 🔨
 
-    ●	análisis funcional terminado;
+    ●	siguiente unidad: 18.5 — Datos calculados del cierre
 
-    ●	TPV antiguo revisado;
+    ●	18.6 UI de cierre \+ recuento ⏳
 
-    ●	esquema actual revisado;
+    ●	18.7 desglose por tipos de pago ⏳
 
-    ●	plan 18.1–18.9 acordado;
+    ●	18.8 cierre transaccional ⏳
 
-    ●	aún no se ha implementado 18.1.
+    ●	18.9 regresión final ⏳
+
+    ●	Informes continúa como placeholder hasta que el usuario defina su comportamiento.
 
 Pendiente posterior
 
@@ -188,39 +204,55 @@ Pendiente posterior
 
 Último commit confirmado en main al generar esta versión:
 
-282417b8b6b0ee2deaeee63111376d07c217d03b
+d5888ac594ec608f9ec0214efaf109b7d717c7d4
 
-Terminada limpieza de campo empleados
+Terminado Caja 18.4b
 
-Commits inmediatamente anteriores:
+Commits inmediatamente anteriores del bloque Caja:
 
-d7a9c1885a8a482d53fdf79f8b5a35945e4de465
+3ddf0f05883df9f866762b7804fca969b6fb9c0f
 
-Ronda de limpieza de antiguo valor empleados
+Terminado Caja 18.4a
 
-6e9f20dd98e32e290db8a41acafcef44ab9ef3d5
+9b588024cafb218fb0ac6805a9db04760dc46d79
 
-Selector de empleado en ventas
+Terminado Caja 18.3
 
-El usuario confirmó:
+be3c07d2526121e7ddc71d82671d8299e1068d13
 
-    ●	tests completos correctos;
+Terminado Caja 18.2
+
+495efcee83e37c3ac64495f6cac1cad963ddb07e
+
+Terminado Caja 18.1
+
+El usuario confirmó para 18.1–18.4:
+
+    ●	batería completa de tests/build/lint correcta;
 
     ●	pruebas funcionales correctas;
 
-    ●	cambios subidos a main;
+    ●	aspecto visual de Salidas de caja aprobado;
 
-    ●	exportador .otpv modificado también para dejar de incluir empleados;
-
-    ●	importación de un .otpv nuevo sin ese campo probada correctamente.
+    ●	cambios subidos a main.
 
 Siguiente paso exacto
 
 El próximo bloque de código es:
 
-18.1 — Shell de Caja
+18.5 — Datos calculados del cierre
 
-No iniciar todavía lógica de salidas, cierres ni informes en 18.1.
+Objetivo único:
+
+    ●	añadir la lectura canónica del cierre de la caja activa;
+
+    ●	calcular en backend saldo inicial, ventas que afectan caja, salidas, saldo teórico y desglose por tipos de pago;
+
+    ●	usar relación directa por id\_caja;
+
+    ●	no implementar todavía el formulario/recuento visual del cierre;
+
+    ●	no cerrar todavía la caja.
 
 5\. Corrección Ventas / Empleados ✅
 
@@ -720,11 +752,31 @@ El apartado Caja se compone de cuatro pestañas:
 
 4\. Informes
 
+La ruta /caja y el shell ya están implementados.
+
+La cabecera principal habilita Caja mediante:
+
+route: '/caja'
+
+CashRegisterComponent mantiene la pestaña activa localmente y sirve como composición de los subapartados.
+
+Estado:
+
+Histórico de ventas ✅ implementado
+
+Salidas caja ✅ implementado
+
+Cerrar caja ⏳ siguiente fase
+
+Informes 📋 placeholder
+
 Informes
 
 No diseñar todavía.
 
-Debe quedar como placeholder hasta que el usuario defina el nuevo comportamiento deseado.
+Debe seguir como placeholder hasta que el usuario defina el nuevo comportamiento deseado.
+
+No inferir informes a partir del TPV antiguo.
 
 14\. 18 Caja — Histórico de ventas
 
@@ -734,41 +786,25 @@ El TPV antiguo reutilizaba el mismo componente de histórico tanto:
 
     ●	como en el modal abierto desde Ventas.
 
-El cliente nuevo debe mantener esa misma idea.
+El cliente nuevo mantiene esa misma idea.
 
-Ya existe:
+Componente:
 
 HistoricalSalesComponent
 
-y ya se usa desde Ventas.
+Implementación terminada
 
-Decisión
+Se añadió el input:
 
-No duplicar:
+embedded: boolean
 
-    ●	consultas;
+con valor por defecto:
 
-    ●	detalle;
-
-    ●	acciones postventa;
-
-    ●	TicketBAI;
-
-    ●	ticket regalo;
-
-    ●	impresión;
-
-    ●	email;
-
-    ●	cambio de cliente;
-
-    ●	cambio de tipo de pago.
-
-Hay que adaptar HistoricalSalesComponent para trabajar en dos modos.
+false
 
 Modal desde Ventas
 
-Mantener:
+Se conserva:
 
     ●	backdrop;
 
@@ -778,21 +814,69 @@ Mantener:
 
     ●	botón cerrar;
 
-    ●	comportamiento actual.
+    ●	pestañas internas del modal;
+
+    ●	comportamiento postventa existente;
+
+    ●	foco inicial del botón de cierre;
+
+    ●	Escape/cierre;
+
+    ●	detalle;
+
+    ●	TicketBAI;
+
+    ●	impresión;
+
+    ●	ticket regalo;
+
+    ●	email;
+
+    ●	cambio de cliente;
+
+    ●	cambio de tipo de pago.
+
+No se duplicó ninguna consulta ni acción.
 
 Embebido en Caja
 
-Ocultar:
+Con:
+
+\<otpv-historical-sales \[embedded\]="true" /\>
+
+se elimina visualmente:
 
     ●	backdrop;
 
-    ●	envoltorio modal;
+    ●	posicionamiento modal;
+
+    ●	cabecera modal;
 
     ●	botón cerrar;
 
-    ●	pestaña interna placeholder “Salidas caja”.
+    ●	pestañas internas.
 
-Mostrar directamente el contenido del histórico como contenido de la pestaña Caja.
+Se muestra directamente el panel de Histórico de ventas.
+
+La antigua pestaña interna placeholder Salidas caja no aparece en modo embebido porque Caja ya tiene su propia pestaña real.
+
+Detalles técnicos consolidados
+
+    ●	En modo embebido close() no emite.
+
+    ●	El foco inicial del botón cerrar solo se aplica en modo modal.
+
+    ●	El wrapper no conserva la clase global .overlay al estar embebido, porque esa clase es position: fixed.
+
+    ●	El layout responsive del modal no se aplica al modo embebido.
+
+    ●	El histórico mantiene sus filtros Fecha/Rango y su comportamiento previo.
+
+    ●	Existen tests que protegen ambos modos.
+
+Estado:
+
+18.2 ✅ CERRADO
 
 15\. 18 Caja — Salidas de caja
 
@@ -810,23 +894,33 @@ Ejemplos:
 
     ●	cualquier gasto que requiera sacar efectivo físicamente.
 
+Componente renderer actual:
+
+CashOutflowsComponent
+
+Servicio renderer:
+
+CajaSalidasService
+
 Filtros
+
+La cabecera quedó alineada visual y funcionalmente con HistoricalSalesComponent.
 
 Dos modos:
 
 Fecha
 
-    ●	selector Fecha;
+    ●	botones Fecha / Rango como selector de modo;
 
-    ●	control de fecha;
+    ●	\<input type="date"\> nativo;
 
-    ●	anterior/siguiente;
+    ●	calendario nativo del sistema;
 
-    ●	carga automática al cambiar día.
+    ●	botones anterior/siguiente;
+
+    ●	carga automática al cambiar de día.
 
 Rango
-
-    ●	selector Rango;
 
     ●	fecha desde;
 
@@ -834,9 +928,11 @@ Rango
 
     ●	botón Buscar.
 
-Validar:
+Validación:
 
 desde \<= hasta
+
+La consulta usa fechas civiles YYYY-MM-DD.
 
 Layout
 
@@ -850,15 +946,23 @@ Listado de salidas:
 
     ●	fecha/hora;
 
-    ●	importe.
+    ●	importe;
+
+    ●	icono de candado cuando la salida pertenece a una caja cerrada.
 
 Debajo:
 
 Nueva salida de caja
 
+Si no existe caja abierta:
+
+    ●	el histórico sigue siendo consultable;
+
+    ●	no se permite crear una salida nueva.
+
 Derecha
 
-Formulario:
+Formulario Signal Forms:
 
     ●	concepto obligatorio;
 
@@ -874,9 +978,91 @@ Acciones:
 
     ●	Guardar.
 
+Las salidas de cajas cerradas se muestran en modo solo lectura.
+
+Flujo de alta
+
+Al crear:
+
+    1\.	se usa la caja abierta actual;
+
+    2\.	backend asigna fecha/hora actual;
+
+    3\.	se persiste;
+
+    4\.	el filtro vuelve al día actual, conservando el modo Fecha/Rango;
+
+    5\.	se refresca el listado;
+
+    6\.	la salida recién creada queda seleccionada;
+
+    7\.	el formulario queda preparado para corregirla o eliminarla;
+
+    8\.	aparece durante 4 segundos:
+
+Salida de caja guardada correctamente
+
+No aparece diálogo modal de éxito al guardar.
+
+Flujo de edición
+
+Al editar:
+
+    ●	se conserva el publicId;
+
+    ●	se conserva la fecha original;
+
+    ●	se actualiza el listado en memoria;
+
+    ●	la salida sigue seleccionada;
+
+    ●	el formulario se resetea al snapshot persistido;
+
+    ●	aparece el mismo feedback inferior durante 4 segundos.
+
+No aparece diálogo modal de éxito.
+
+Flujo de borrado
+
+Al borrar:
+
+    1\.	se pide confirmación;
+
+    2\.	backend realiza baja lógica;
+
+    3\.	se muestra diálogo de éxito;
+
+    4\.	se refresca el filtro actualmente visible;
+
+    5\.	no se selecciona automáticamente ninguna otra salida.
+
+La confirmación y el diálogo de éxito de eliminación sí deben mantenerse.
+
+Cancelar
+
+    ●	en alta, restaura el formulario vacío;
+
+    ●	en edición, restaura los datos persistidos de la salida seleccionada.
+
+Feedback
+
+El patrón de guardado replica el usado en Artículos:
+
+    ●	señal temporal;
+
+    ●	texto verde en el footer;
+
+    ●	duración 4 segundos;
+
+    ●	desaparece al iniciar otra operación.
+
+Estado:
+
+18.4b ✅ CERRADO
+
 16\. Salidas de caja — modelo nuevo
 
-El esquema actual ya contiene:
+El esquema actual utiliza:
 
 movimiento\_caja
 
@@ -906,7 +1092,105 @@ Para este subapartado:
 
 tipo \= 'salida'
 
-No crear una tabla nueva equivalente a pago\_caja.
+No existe ni debe crearse una tabla paralela equivalente a pago\_caja.
+
+Contratos implementados
+
+Lectura:
+
+SalidaCajaConsulta
+
+SalidaCajaInterface
+
+Escritura:
+
+CrearSalidaCajaCommand
+
+ActualizarSalidaCajaCommand
+
+EliminarSalidaCajaCommand
+
+CajaApi expone:
+
+getSalidas()
+
+createSalida()
+
+updateSalida()
+
+deleteSalida()
+
+Persistencia
+
+TypeOrmCajaRepository implementa:
+
+findSalidasByPeriod()
+
+createSalida()
+
+updateSalida()
+
+deleteSalida()
+
+Reglas:
+
+    ●	alta/edición/borrado se ejecutan transaccionalmente;
+
+    ●	alta genera public\_id UUID;
+
+    ●	alta usa new Date().toISOString() como created\_at;
+
+    ●	edición conserva created\_at;
+
+    ●	borrado usa deleted\_at;
+
+    ●	solo se recuperan movimientos activos;
+
+    ●	solo se recuperan tipo \= 'salida';
+
+    ●	orden: fecha descendente \+ id descendente.
+
+Después de cualquier alta/edición/baja se reconstruye:
+
+caja.movimientos\_salida\_cents
+
+mediante la suma real de movimientos activos de esa caja.
+
+No se mantiene mediante deltas acumulativos.
+
+Esto conserva la base coherente antes del cierre, aunque 18.5/18.8 volverán a calcular los valores canónicos al cerrar.
+
+Validación de aplicación
+
+Backend normaliza:
+
+    ●	cajaPublicId;
+
+    ●	publicId;
+
+    ●	concepto.trim();
+
+    ●	descripción vacía → null.
+
+Reglas:
+
+concepto: 1..250 caracteres tras trim
+
+importeCents: entero seguro \> 0
+
+El renderer usa:
+
+eurosToCents()
+
+centsToEuros()
+
+No se implementó una selección de empleado para Salidas:
+
+movimiento\_caja.id\_empleado \= NULL
+
+El esquema lo permite y el usuario no ha definido un flujo de empleado para esta operación.
+
+No inventar uno.
 
 Compatibilidad legacy
 
@@ -920,15 +1204,9 @@ Por tanto el histórico importado está alineado con el modelo nuevo.
 
 17\. Salidas de caja — editabilidad
 
-El TPV antiguo mostraba editable.
+El TPV antiguo impedía modificar salidas pertenecientes a cajas ya cerradas.
 
-La revisión del código confirma que una salida perteneciente a una caja cerrada no podía:
-
-    ●	editarse;
-
-    ●	guardarse;
-
-    ●	eliminarse.
+El cliente nuevo conserva y refuerza esa regla.
 
 Regla definitiva
 
@@ -960,15 +1238,61 @@ Motivo:
 
 Modificarla alteraría retrospectivamente los importes de un cierre ya consolidado.
 
-Mejora del modelo nuevo
+Lectura canónica
 
-No inferir editabilidad por intervalos temporales.
+La query de lectura obtiene:
 
-Usar directamente:
+editable \=
+
+caja.cierre IS NULL
+
+No se infiere editabilidad mediante fechas.
+
+La relación se obtiene directamente de:
 
 movimiento\_caja.id\_caja
 
-y el estado real de esa caja.
+Protección de escritura
+
+Renderer recibe editable, pero no es la barrera de seguridad.
+
+Alta, edición y borrado envían:
+
+cajaPublicId
+
+Backend exige:
+
+    1\.	que esa caja exista y continúe abierta;
+
+    2\.	en edición/borrado, que el movimiento:
+
+    ●	exista;
+
+    ●	sea tipo \= 'salida';
+
+    ●	no esté borrado;
+
+    ●	pertenezca exactamente a esa caja.
+
+Por tanto un estado obsoleto del renderer no permite alterar una caja cerrada ni una salida de otra caja.
+
+Renderer
+
+    ●	sin caja abierta se puede consultar, pero no crear;
+
+    ●	salida cerrada muestra candado;
+
+    ●	formulario cerrado usa estado readonly de Signal Forms;
+
+    ●	Guardar/Eliminar quedan deshabilitados;
+
+    ●	backend sigue validando aunque la UI se manipule.
+
+Estado:
+
+18.3 lectura ✅
+
+18.4 protección CRUD ✅
 
 18\. 18 Caja — Cerrar caja
 
@@ -1360,7 +1684,7 @@ Por tanto 18 debe explotar el esquema existente antes de plantear cambios.
 
 27\. Estado actual del backend de Caja
 
-Ya existe:
+Ya existe y está ampliado:
 
 CajaService
 
@@ -1368,7 +1692,7 @@ TypeOrmCajaRepository
 
 CajaApi
 
-Actualmente implementan apertura de caja.
+Apertura
 
 TypeOrmCajaRepository.open():
 
@@ -1382,7 +1706,103 @@ TypeOrmCajaRepository.open():
 
     ●	crea filas iniciales de caja\_tipo.
 
-Esto se reutilizará y ampliará.
+Salidas — lectura
+
+Actualmente están implementados:
+
+CajaService.findSalidas()
+
+TypeOrmCajaRepository.findSalidasByPeriod()
+
+CajaApi.getSalidas()
+
+Además:
+
+    ●	canal IPC específico;
+
+    ●	handler con assertTrustedSender;
+
+    ●	preload;
+
+    ●	CajaSalidasService en renderer.
+
+La aplicación convierte una fecha civil local a intervalo UTC:
+
+\[desde, hastaExclusive)
+
+y valida fechas reales y rangos no invertidos.
+
+Salidas — CRUD
+
+Implementados:
+
+CajaService.createSalida()
+
+CajaService.updateSalida()
+
+CajaService.deleteSalida()
+
+TypeOrmCajaRepository.createSalida()
+
+TypeOrmCajaRepository.updateSalida()
+
+TypeOrmCajaRepository.deleteSalida()
+
+También existen:
+
+    ●	canales IPC create/update/delete;
+
+    ●	preload;
+
+    ●	métodos correspondientes en CajaApi;
+
+    ●	métodos correspondientes en CajaSalidasService.
+
+Persistencia transaccional:
+
+movimiento\_caja
+
+\+
+
+reconciliación caja.movimientos\_salida\_cents
+
+Protecciones:
+
+    ●	caja obligatoriamente abierta;
+
+    ●	movimiento activo;
+
+    ●	tipo salida;
+
+    ●	pertenencia exacta a la caja indicada.
+
+Renderer
+
+La pestaña Salidas está implementada mediante:
+
+CashOutflowsComponent
+
+Usa:
+
+    ●	Signal Forms;
+
+    ●	VentasContextService para conocer cajaAbierta;
+
+    ●	CajaSalidasService para lectura/CRUD;
+
+    ●	utilidades monetarias existentes.
+
+Estado actual del backend de Caja:
+
+apertura ✅
+
+lectura salidas ✅
+
+CRUD salidas ✅
+
+cálculos de cierre ⏳ siguiente
+
+cierre transaccional ⏳
 
 28\. Apertura y venta
 
@@ -1434,13 +1854,15 @@ No reabrir la migración legacy salvo que 18 revele un caso real no cubierto.
 
 30\. 18 Caja — plan de implementación
 
-18.1 — Shell de Caja
+18.1 — Shell de Caja ✅
 
-Crear:
+Implementado:
 
-    ●	ruta/página de Caja;
+    ●	ruta /caja;
 
-    ●	estructura general;
+    ●	opción Caja habilitada en cabecera;
+
+    ●	CashRegisterComponent;
 
     ●	cuatro pestañas:
 
@@ -1450,33 +1872,49 @@ Crear:
 
     ●	Cerrar caja;
 
-    ●	Informes.
+    ●	Informes;
 
-Informes queda placeholder.
+    ●	Informes como placeholder;
 
-Sin implementar todavía lógica de negocio nueva.
+    ●	tests del shell.
 
-18.2 — Histórico embebido
+Commit:
 
-Adaptar HistoricalSalesComponent para:
+495efcee83e37c3ac64495f6cac1cad963ddb07e
 
-    ●	seguir funcionando como modal desde Ventas;
+Terminado Caja 18.1
 
-    ●	funcionar embebido en Caja;
+18.2 — Histórico embebido ✅
 
-    ●	no duplicar lógica;
+Implementado:
 
-    ●	ocultar UI modal cuando esté embebido;
+    ●	HistoricalSalesComponent funciona como modal y embebido;
 
-    ●	retirar/ocultar la pestaña interna “Salidas caja” en modo Caja.
+    ●	input embedded;
 
-18.3 — Lectura de Salidas
+    ●	modo Ventas preservado;
 
-Añadir:
+    ●	Caja reutiliza el mismo histórico;
+
+    ●	no se duplicó lógica;
+
+    ●	no aparecen overlay/cabecera/pestañas internas en Caja;
+
+    ●	tests de ambos modos.
+
+Commit:
+
+be3c07d2526121e7ddc71d82671d8299e1068d13
+
+Terminado Caja 18.2
+
+18.3 — Lectura de Salidas ✅
+
+Implementado:
 
     ●	contratos;
 
-    ●	domain records;
+    ●	domain record;
 
     ●	repository;
 
@@ -1490,13 +1928,21 @@ Añadir:
 
     ●	consulta por rango;
 
-    ●	flag canónico de editabilidad.
+    ●	fechas civiles locales;
 
-Sin CRUD todavía.
+    ●	flag canónico editable.
 
-18.4 — CRUD de Salidas
+Commit:
 
-Implementar:
+9b588024cafb218fb0ac6805a9db04760dc46d79
+
+Terminado Caja 18.3
+
+18.4 — CRUD de Salidas ✅
+
+18.4a — backend/API/persistencia ✅
+
+Implementado:
 
     ●	alta;
 
@@ -1506,21 +1952,71 @@ Implementar:
 
     ●	fecha automática al crear;
 
-    ●	confirmación de borrado;
+    ●	validación y normalización backend;
 
-    ●	protección backend para cajas cerradas;
+    ●	protección caja abierta;
 
-    ●	formulario;
+    ●	pertenencia exacta de movimiento a caja;
+
+    ●	transacciones;
+
+    ●	reconciliación movimientos\_salida\_cents;
+
+    ●	IPC/preload/API/servicio renderer;
+
+    ●	tests de servicio y repository SQLite.
+
+Commit:
+
+3ddf0f05883df9f866762b7804fca969b6fb9c0f
+
+Terminado Caja 18.4a
+
+18.4b — interfaz completa ✅
+
+Implementado:
+
+    ●	CashOutflowsComponent;
+
+    ●	filtros Fecha/Rango iguales al patrón del Histórico;
+
+    ●	controles de calendario nativos;
+
+    ●	anterior/siguiente;
 
     ●	listado;
 
-    ●	selección;
+    ●	candado de caja cerrada;
 
-    ●	reset/cancelación;
+    ●	formulario Signal Forms;
 
-    ●	foco inicial.
+    ●	alta/edición;
 
-18.5 — Datos calculados del cierre
+    ●	cancelación;
+
+    ●	confirmación y éxito de borrado;
+
+    ●	feedback inferior de guardado durante 4 segundos;
+
+    ●	alta queda seleccionada tras guardarse;
+
+    ●	edición mantiene selección;
+
+    ●	borrado deja el editor sin selección;
+
+    ●	histórico consultable aunque no exista caja abierta;
+
+    ●	crear/editar/borrar bloqueados sin caja abierta o sobre caja cerrada;
+
+    ●	pruebas funcionales y aspecto visual aprobados.
+
+Commit:
+
+d5888ac594ec608f9ec0214efaf109b7d717c7d4
+
+Terminado Caja 18.4b
+
+18.5 — Datos calculados del cierre 🔨 SIGUIENTE
 
 Backend de lectura del cierre activo:
 
@@ -1530,23 +2026,51 @@ Backend de lectura del cierre activo:
 
     ●	salidas;
 
-    ●	saldo teórico;
+    ●	saldo final teórico;
 
     ●	tipos de pago;
 
     ●	operaciones;
 
-    ●	ventas por tipo.
+    ●	ventas/importes por tipo.
 
 Calcular desde:
 
 id\_caja
+
+venta
 
 venta\_pago
 
 tipo\_pago.afecta\_caja
 
 movimiento\_caja
+
+Reglas ya acordadas:
+
+    ●	usar caja exacta, no intervalos de tiempo;
+
+    ●	excluir ventas con deleted\_at IS NOT NULL;
+
+    ●	ventas efectivo \= pagos cuyo tipo tenga afecta\_caja \= true;
+
+    ●	soportar pagos divididos;
+
+    ●	operaciones por tipo \= COUNT(DISTINCT id\_venta);
+
+    ●	tratar devoluciones según importes firmados de venta\_pago;
+
+    ●	datos económicos calculados en backend.
+
+En 18.5 solo lectura/cálculo.
+
+No implementar todavía:
+
+    ●	recuento físico;
+
+    ●	campos de cierre editables;
+
+    ●	persistencia del cierre.
 
 18.6 — UI de cierre \+ recuento
 
@@ -1698,17 +2222,9 @@ ef79cb84820cf2736ef5d0d5d473ec4df51a7549
 
 Terminado Gestión 17.6
 
-fc738cf4ec788b4ae2ee703e2786f6487dd6e641
-
-Actualizo documento de continuidad tras 17.6
-
 fe85e59b1f7049fe3a87655d3a3ed2c6c03b3709
 
 Corrección modal login en Gestión
-
-74156ab04174cec3cb9fc4e3df704d3760b7e02f
-
-Actualizado documento de continuidad tras planes para correcciones y sincronización
 
 6e9f20dd98e32e290db8a41acafcef44ab9ef3d5
 
@@ -1722,9 +2238,35 @@ Ronda de limpieza de antiguo valor empleados
 
 Terminada limpieza de campo empleados
 
-Último main confirmado para esta v2.76:
+fe372fddbd9837d32dff4c4aae811a2848d34e01
 
-282417b8b6b0ee2deaeee63111376d07c217d03b
+Actualizado documento de continuidad tras plan para 18
+
+495efcee83e37c3ac64495f6cac1cad963ddb07e
+
+Terminado Caja 18.1
+
+be3c07d2526121e7ddc71d82671d8299e1068d13
+
+Terminado Caja 18.2
+
+9b588024cafb218fb0ac6805a9db04760dc46d79
+
+Terminado Caja 18.3
+
+3ddf0f05883df9f866762b7804fca969b6fb9c0f
+
+Terminado Caja 18.4a
+
+d5888ac594ec608f9ec0214efaf109b7d717c7d4
+
+Terminado Caja 18.4b
+
+Último main confirmado para esta v2.77:
+
+d5888ac594ec608f9ec0214efaf109b7d717c7d4
+
+No hay cambios locales pendientes conocidos al generar este documento.
 
 34\. Resumen ejecutivo
 
@@ -1772,25 +2314,49 @@ reservas con la misma regla
 
 \- exportador .otpv
 
-🔨 18 Caja — SIGUIENTE
+🔨 18 Caja
 
-18.1 Shell
+✅ 18.1 Shell
 
-18.2 Histórico embebido
+✅ 18.2 Histórico embebido
 
-18.3 Lectura salidas
+✅ 18.3 Lectura salidas
 
-18.4 CRUD salidas
+✅ 18.4 CRUD salidas
 
-18.5 Datos cierre
+      ✅ 18.4a backend/API
 
-18.6 UI/recuento
+      ✅ 18.4b interfaz
 
-18.7 Tipos de pago
+▶️ 18.5 Datos calculados cierre — SIGUIENTE
 
-18.8 Cierre transaccional
+⏳ 18.6 UI/recuento
 
-18.9 Regresión
+⏳ 18.7 Tipos de pago
+
+⏳ 18.8 Cierre transaccional
+
+⏳ 18.9 Regresión
+
+✅ Salidas de caja
+
+\- Fecha / Rango
+
+\- calendario nativo
+
+\- anterior / siguiente
+
+\- alta / edición / baja lógica
+
+\- cajas cerradas solo lectura
+
+\- acumulado de salidas reconciliado
+
+\- feedback inferior al guardar
+
+\- alta queda seleccionada
+
+\- borrado deja sin selección
 
 ⏳ 19 Enforcement global permisos
 
@@ -1802,37 +2368,173 @@ NO INICIAR HASTA TERMINAR LA APLICACIÓN
 
 ⏸ TicketBAI 12C.9
 
+Fuente de verdad al continuar:
+
+main
+
+\+
+
+este documento
+
+\+
+
+conversación actual
+
+Antes de 18.5 revisar de nuevo el main actualizado.
+
 35\. Siguiente paso exacto
 
 El siguiente trabajo de código es:
 
-\> \*\*18.1 — Shell de Caja\*\*
+\> \*\*18.5 — Datos calculados del cierre\*\*
 
-Objetivo único:
+Objetivo de esta unidad:
 
-    ●	crear la página/ruta de Caja;
+Crear la lectura canónica de la caja abierta necesaria para pintar posteriormente el cierre.
 
-    ●	montar la estructura de cuatro pestañas;
+Debe devolver, como mínimo:
 
-    ●	dejar Informes como placeholder;
+saldoInicial
 
-    ●	no implementar todavía histórico embebido;
+ventasEfectivo / ventasQueAfectanCaja
 
-    ●	no implementar todavía Salidas;
+salidasCaja
 
-    ●	no implementar todavía cierre.
+saldoFinalTeorico
 
-Antes de codificar:
+desgloseTiposPago\[\]
 
-    1\.	revisar main recién actualizado;
+Para cada tipo de pago relevante:
 
-    2\.	revisar navegación/rutas actuales;
+tipoPago
 
-    3\.	localizar cómo se integra Caja en el shell principal;
+importeVentas
 
-    4\.	implementar únicamente 18.1;
+operaciones
 
-    5\.	añadir tests de esa unidad;
+Fuentes de datos
+
+Usar:
+
+caja
+
+venta
+
+venta\_pago
+
+tipo\_pago
+
+movimiento\_caja
+
+Asociar operaciones mediante:
+
+venta.id\_caja
+
+No mediante intervalo apertura/cierre.
+
+Reglas económicas ya cerradas
+
+Saldo inicial
+
+caja.importe\_apertura\_cents
+
+Ventas efectivo / efectivo que afecta caja
+
+SUM(venta\_pago.importe\_cents)
+
+WHERE tipo\_pago.afecta\_caja \= true
+
+No limitar al slug efectivo.
+
+Salidas
+
+Suma de:
+
+movimiento\_caja
+
+tipo \= 'salida'
+
+deleted\_at IS NULL
+
+id\_caja \= caja actual
+
+Saldo final teórico
+
+saldoInicial
+
+\+ ventasQueAfectanCaja
+
+\- salidasCaja
+
+Tipos de pago
+
+Para cada tipo usado/definido según el diseño que confirme el código actual:
+
+importe \= SUM(venta\_pago.importe\_cents)
+
+operaciones \= COUNT(DISTINCT venta.id)
+
+La UI inferior excluirá posteriormente el Efectivo estructural, pero 18.5 debe diseñar el contrato de datos de manera coherente con 18.6/18.7.
+
+Ventas anuladas/borradas
+
+Excluir:
+
+venta.deleted\_at IS NOT NULL
+
+Devoluciones
+
+Respetar importes firmados ya persistidos en venta\_pago.
+
+No añadir una segunda regla de compensación sin revisar el comportamiento actual de ventas/devoluciones.
+
+Alcance estricto de 18.5
+
+Sí:
+
+    ●	contratos;
+
+    ●	record(s);
+
+    ●	repository queries;
+
+    ●	application service;
+
+    ●	IPC/preload;
+
+    ●	servicio renderer si es necesario;
+
+    ●	tests de cálculos.
+
+No:
+
+    ●	formulario visual definitivo de Cerrar caja;
+
+    ●	recuento de monedas/billetes;
+
+    ●	retirado;
+
+    ●	entrada editable;
+
+    ●	cierre de caja;
+
+    ●	escritura de caja\_tipo;
+
+    ●	escritura de caja\_recuento.
+
+Eso empieza en 18.6/18.8.
+
+Procedimiento
+
+    1\.	revisar main;
+
+    2\.	revisar cómo quedan actualmente los acumulados de venta en caja y caja\_tipo;
+
+    3\.	decidir si 18.5 lee agregados persistidos o recalcula canónicamente desde venta/pagos; la decisión acordada favorece recalcular;
+
+    4\.	implementar una sola unidad pequeña;
+
+    5\.	tests;
 
     6\.	usuario ejecuta batería completa;
 
@@ -1860,7 +2562,7 @@ Para cualquier módulo heredado:
 
     9\.	se continúa solo después de verde y push.
 
-Estado al cerrar esta v2.76:
+Estado al cerrar esta v2.77:
 
     ●	17.5 Empleados: CERRADO.
 
@@ -1872,7 +2574,19 @@ Estado al cerrar esta v2.76:
 
     ●	Flag empleados: ELIMINADO COMPLETAMENTE.
 
-    ●	18 Caja: ANALIZADO Y PLANIFICADO; siguiente unidad 18.1.
+    ●	18.1 Shell de Caja: CERRADO.
+
+    ●	18.2 Histórico embebido: CERRADO.
+
+    ●	18.3 Lectura de Salidas: CERRADO.
+
+    ●	18.4 CRUD de Salidas: CERRADO.
+
+    ●	18.5 Datos calculados del cierre: SIGUIENTE.
+
+    ●	18.6–18.9 Caja: pendientes posteriores.
+
+    ●	Informes de Caja: placeholder; no diseñar todavía.
 
     ●	19 permisos: pendiente posterior.
 
@@ -1880,4 +2594,10 @@ Estado al cerrar esta v2.76:
 
     ●	TicketBAI 12C.9: pausado.
 
-    ●	Último commit confirmado: 282417b8b6b0ee2deaeee63111376d07c217d03b.
+    ●	Último commit confirmado: d5888ac594ec608f9ec0214efaf109b7d717c7d4.
+
+La siguiente conversación puede comenzar directamente con:
+
+Continuamos con 18.5 — Datos calculados del cierre.
+
+Antes de escribir código, revisar de nuevo main y seguir la regla de una sola unidad pequeña por respuesta.
