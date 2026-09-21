@@ -103,29 +103,41 @@
                 </strong>
             </article>
 
-            <article class="cash-closing__field">
+            <article class="cash-closing__field cash-closing__field--recount">
                 <span>
                     Importe real
                 </span>
 
-                @if (importeRealCents() !== null) {
-                <strong>
-                    {{
-                        (importeRealCents() ?? 0)
-                            | centsToEuros
-                            | currency:'EUR':'symbol':'1.2-2'
-                    }}
-                </strong>
-                }
-                @else {
-                <strong class="cash-closing__pending-value">
-                    Pendiente de recuento
-                </strong>
+                <button type="button"
+                        class="cash-closing__recount-toggle"
+                        [attr.aria-expanded]="recuentoOpen()"
+                        aria-controls="cash-closing-recount"
+                        (click)="toggleRecuento()">
+                    <span>
+                        @if (importeRealCents() !== null) {
+                        <strong>
+                            {{
+                                (importeRealCents() ?? 0)
+                                    | centsToEuros
+                                    | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </strong>
+                        }
+                        @else {
+                        <strong class="cash-closing__pending-value">
+                            Pendiente de recuento
+                        </strong>
+                        }
 
-                <small>
-                    Se calculará con monedas y billetes.
-                </small>
-                }
+                        <small>
+                            Monedas y billetes
+                        </small>
+                    </span>
+
+                    <mat-icon aria-hidden="true">
+                        {{ recuentoOpen() ? 'expand_less' : 'expand_more' }}
+                    </mat-icon>
+                </button>
             </article>
 
             <article class="cash-closing__field cash-closing__field--input">
@@ -212,22 +224,202 @@
             </article>
         </section>
 
-        <div class="cash-closing__recount-info">
-            <mat-icon aria-hidden="true">
-                calculate
-            </mat-icon>
+        @if (recuentoOpen()) {
+        <section id="cash-closing-recount"
+                 class="cash-closing__recount"
+                 aria-label="Recuento de monedas y billetes">
+            <header class="cash-closing__recount-header">
+                <div>
+                    <span>
+                        Recuento físico
+                    </span>
 
-            <div>
+                    <h3>
+                        Monedas y billetes
+                    </h3>
+                </div>
+
+                @if (importeRealCents() !== null) {
                 <strong>
-                    Recuento de efectivo pendiente
+                    Total:
+                    {{
+                        (importeRealCents() ?? 0)
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
                 </strong>
+                }
+            </header>
 
-                <span>
-                    En el siguiente paso, Importe real se obtendrá contando
-                    monedas y billetes.
-                </span>
+            <div class="cash-closing__recount-groups">
+                <section class="cash-closing__recount-group">
+                    <h4>
+                        Monedas
+                    </h4>
+
+                    <div class="cash-closing__denominations">
+                        <mat-form-field appearance="outline"
+                                        subscriptSizing="dynamic">
+                            <mat-label>1 c</mat-label>
+                            <input matInput
+                                   type="number"
+                                   autocomplete="off"
+                                   [formField]="cierreForm.recuento.cent1"
+                                   (focus)="selectCountInput($event)">
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline"
+                                        subscriptSizing="dynamic">
+                            <mat-label>2 c</mat-label>
+                            <input matInput
+                                   type="number"
+                                   autocomplete="off"
+                                   [formField]="cierreForm.recuento.cent2"
+                                   (focus)="selectCountInput($event)">
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline"
+                                        subscriptSizing="dynamic">
+                            <mat-label>5 c</mat-label>
+                            <input matInput
+                                   type="number"
+                                   autocomplete="off"
+                                   [formField]="cierreForm.recuento.cent5"
+                                   (focus)="selectCountInput($event)">
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline"
+                                        subscriptSizing="dynamic">
+                            <mat-label>10 c</mat-label>
+                            <input matInput
+                                   type="number"
+                                   autocomplete="off"
+                                   [formField]="cierreForm.recuento.cent10"
+                                   (focus)="selectCountInput($event)">
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline"
+                                        subscriptSizing="dynamic">
+                            <mat-label>20 c</mat-label>
+                            <input matInput
+                                   type="number"
+                                   autocomplete="off"
+                                   [formField]="cierreForm.recuento.cent20"
+                                   (focus)="selectCountInput($event)">
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline"
+                                        subscriptSizing="dynamic">
+                            <mat-label>50 c</mat-label>
+                            <input matInput
+                                   type="number"
+                                   autocomplete="off"
+                                   [formField]="cierreForm.recuento.cent50"
+                                   (focus)="selectCountInput($event)">
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline"
+                                        subscriptSizing="dynamic">
+                            <mat-label>1 €</mat-label>
+                            <input matInput
+                                   type="number"
+                                   autocomplete="off"
+                                   [formField]="cierreForm.recuento.euro1"
+                                   (focus)="selectCountInput($event)">
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline"
+                                        subscriptSizing="dynamic">
+                            <mat-label>2 €</mat-label>
+                            <input matInput
+                                   type="number"
+                                   autocomplete="off"
+                                   [formField]="cierreForm.recuento.euro2"
+                                   (focus)="selectCountInput($event)">
+                        </mat-form-field>
+                    </div>
+                </section>
+
+                <section class="cash-closing__recount-group">
+                    <h4>
+                        Billetes
+                    </h4>
+
+                    <div class="cash-closing__denominations">
+                        <mat-form-field appearance="outline"
+                                        subscriptSizing="dynamic">
+                            <mat-label>5 €</mat-label>
+                            <input matInput
+                                   type="number"
+                                   autocomplete="off"
+                                   [formField]="cierreForm.recuento.euro5"
+                                   (focus)="selectCountInput($event)">
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline"
+                                        subscriptSizing="dynamic">
+                            <mat-label>10 €</mat-label>
+                            <input matInput
+                                   type="number"
+                                   autocomplete="off"
+                                   [formField]="cierreForm.recuento.euro10"
+                                   (focus)="selectCountInput($event)">
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline"
+                                        subscriptSizing="dynamic">
+                            <mat-label>20 €</mat-label>
+                            <input matInput
+                                   type="number"
+                                   autocomplete="off"
+                                   [formField]="cierreForm.recuento.euro20"
+                                   (focus)="selectCountInput($event)">
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline"
+                                        subscriptSizing="dynamic">
+                            <mat-label>50 €</mat-label>
+                            <input matInput
+                                   type="number"
+                                   autocomplete="off"
+                                   [formField]="cierreForm.recuento.euro50"
+                                   (focus)="selectCountInput($event)">
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline"
+                                        subscriptSizing="dynamic">
+                            <mat-label>100 €</mat-label>
+                            <input matInput
+                                   type="number"
+                                   autocomplete="off"
+                                   [formField]="cierreForm.recuento.euro100"
+                                   (focus)="selectCountInput($event)">
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline"
+                                        subscriptSizing="dynamic">
+                            <mat-label>200 €</mat-label>
+                            <input matInput
+                                   type="number"
+                                   autocomplete="off"
+                                   [formField]="cierreForm.recuento.euro200"
+                                   (focus)="selectCountInput($event)">
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline"
+                                        subscriptSizing="dynamic">
+                            <mat-label>500 €</mat-label>
+                            <input matInput
+                                   type="number"
+                                   autocomplete="off"
+                                   [formField]="cierreForm.recuento.euro500"
+                                   (focus)="selectCountInput($event)">
+                        </mat-form-field>
+                    </div>
+                </section>
             </div>
-        </div>
+        </section>
+        }
     </div>
     }
     @else {
