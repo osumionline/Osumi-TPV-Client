@@ -1,5 +1,9 @@
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
+import {
+  type CajaCierreInterface,
+  CajaCierreConsulta,
+} from '@desktop-contracts/caja/caja-cierre.interface';
 import type {
   ActualizarSalidaCajaCommand,
   CrearSalidaCajaCommand,
@@ -32,4 +36,9 @@ export default interface CajaApi {
    * Elimina lógicamente una salida de la caja activa.
    */
   deleteSalida(command: EliminarSalidaCajaCommand): Promise<void>;
+
+  /**
+   * Obtiene el snapshot económico de una caja abierta.
+   */
+  getCierre(consulta: CajaCierreConsulta): Promise<CajaCierreInterface>;
 }

@@ -1,8 +1,17 @@
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CajaAbiertaRecord from '@backend/domain/caja/caja-abierta-record.interface';
+import type {
+  CajaCierreRecord,
+  CajaCierreTipoPagoRecord,
+} from '@backend/domain/caja/caja-cierre-record.interface';
 import type SalidaCajaRecord from '@backend/domain/caja/salida-caja-record.interface';
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
+import {
+  type CajaCierreInterface,
+  CajaCierreConsulta,
+  CajaCierreTipoPagoInterface,
+} from '@desktop-contracts/caja/caja-cierre.interface';
 import type {
   ActualizarSalidaCajaCommand,
   CrearSalidaCajaCommand,
@@ -48,6 +57,95 @@ export default class CajaService {
       idTerminal: caja.idTerminal,
       apertura: caja.apertura,
       importeAperturaCents: caja.importeAperturaCents,
+    };
+  }
+
+  /**
+   * Obtiene los datos económicos canónicos de una caja abierta
+   * necesarios para preparar su cierre.
+   */
+  async getCierre(consulta: CajaCierreConsulta): Promise<CajaCierreInterface> {
+    if (typeof consulta !== 'object' || consulta === null) {
+      throw new Error('La consulta de cierre de caja no es válida.');
+    }
+
+    const cajaPublicId: string = this.requirePublicId(
+      consulta.cajaPublicId,
+      'La caja indicada no es válida.',
+    );
+
+    const record: CajaCierreRecord | null = await this.cajaRepository.findCierre(cajaPublicId);
+
+    if (record === null) {
+      throw new Error('La caja indicada no está abierta.');
+    }
+
+    const saldoInicialCents: number = this.requireSafeInteger(
+      record.importeAperturaCents,
+      'El saldo inicial de la caja no es válido.',
+    );
+
+    const ventasAfectanCajaCents: number = this.requireSafeInteger(
+      record.ventasAfectanCajaCents,
+      'El importe de ventas que afectan a caja no es válido.',
+    );
+
+    const salidasCajaCents: number = this.requireSafeInteger(
+      record.salidasCajaCents,
+      'El importe de salidas de caja no es válido.',
+    );
+
+    if (salidasCajaCents < 0) {
+      throw new Error('El importe de salidas de caja no puede ser negativo.');
+    }
+
+    const saldoFinalTeoricoCents: number = this.safeAdd(
+      this.safeAdd(
+        saldoInicialCents,
+        ventasAfectanCajaCents,
+        'El saldo final teórico de la caja supera el rango numérico seguro.',
+      ),
+      -salidasCajaCents,
+      'El saldo final teórico de la caja supera el rango numérico seguro.',
+    );
+
+    const tiposPago: readonly CajaCierreTipoPagoInterface[] = record.tiposPago.map(
+      (tipoPago: CajaCierreTipoPagoRecord): CajaCierreTipoPagoInterface => {
+        const operaciones: number = this.requireSafeInteger(
+          tipoPago.operaciones,
+          'El número de operaciones de un tipo de pago no es válido.',
+        );
+
+        if (operaciones < 0) {
+          throw new Error('El número de operaciones de un tipo de pago no puede ser negativo.');
+        }
+
+        return {
+          publicId: tipoPago.publicId,
+          nombre: tipoPago.nombre,
+          slug: tipoPago.slug,
+          afectaCaja: tipoPago.afectaCaja,
+          orden: this.requireSafeInteger(
+            tipoPago.orden,
+            'El orden de un tipo de pago no es válido.',
+          ),
+          operaciones,
+          importeVentasCents: this.requireSafeInteger(
+            tipoPago.importeVentasCents,
+            'El importe de ventas de un tipo de pago no es válido.',
+          ),
+        };
+      },
+    );
+
+    return {
+      cajaPublicId: record.cajaPublicId,
+      apertura: record.apertura,
+      saldoInicialCents,
+      ventasAfectanCajaCents,
+      salidasCajaCents,
+      saldoFinalTeoricoCents,
+      tiposPago,
     };
   }
 
@@ -126,6 +224,25 @@ export default class CajaService {
     };
 
     await this.cajaRepository.deleteSalida(normalizedCommand);
+  }
+
+  /**
+   * Valida un entero procedente de persistencia antes
+   * de utilizarlo en cálculos económicos.
+   */
+  private requireSafeInteger(value: number, message: string): number {
+    if (!Number.isSafeInteger(value)) {
+      throw new RangeError(message);
+    }
+
+    return value;
+  }
+
+  /**
+   * Suma dos enteros protegiendo el rango seguro de JavaScript.
+   */
+  private safeAdd(left: number, right: number, message: string): number {
+    return this.requireSafeInteger(left + right, message);
   }
 
   /**

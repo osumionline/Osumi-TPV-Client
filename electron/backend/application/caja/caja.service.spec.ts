@@ -1,6 +1,7 @@
 import CajaService from '@backend/application/caja/caja.service';
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CajaAbiertaRecord from '@backend/domain/caja/caja-abierta-record.interface';
+import type { CajaCierreRecord } from '@backend/domain/caja/caja-cierre-record.interface';
 import type SalidaCajaRecord from '@backend/domain/caja/salida-caja-record.interface';
 import type {
   ActualizarSalidaCajaCommand,
@@ -158,6 +159,51 @@ describe('CajaService', (): void => {
 
     expect(repository.lastCreateCommand).toBeNull();
   });
+
+  it('calcula el saldo final teórico a partir del snapshot canónico', async (): Promise<void> => {
+    const result = await service.getCierre({
+      cajaPublicId: '  caja-1  ',
+    });
+
+    expect(repository.lastCierrePublicId).toBe('caja-1');
+
+    expect(result).toEqual({
+      cajaPublicId: 'caja-1',
+      apertura: '2026-09-21T08:00:00.000Z',
+      saldoInicialCents: 10_000,
+      ventasAfectanCajaCents: 7_000,
+      salidasCajaCents: 1_500,
+      saldoFinalTeoricoCents: 15_500,
+      tiposPago: repository.cierre?.tiposPago,
+    });
+  });
+
+  it('rechaza el cierre de una caja que ya no está abierta', async (): Promise<void> => {
+    repository.cierre = null;
+
+    await expect(
+      service.getCierre({
+        cajaPublicId: 'caja-cerrada',
+      }),
+    ).rejects.toThrow('La caja indicada no está abierta.');
+  });
+
+  it('protege el cálculo del saldo final frente a desbordamientos', async (): Promise<void> => {
+    repository.cierre = {
+      cajaPublicId: 'caja-1',
+      apertura: '2026-09-21T08:00:00.000Z',
+      importeAperturaCents: Number.MAX_SAFE_INTEGER,
+      ventasAfectanCajaCents: 1,
+      salidasCajaCents: 0,
+      tiposPago: [],
+    };
+
+    await expect(
+      service.getCierre({
+        cajaPublicId: 'caja-1',
+      }),
+    ).rejects.toThrow('El saldo final teórico de la caja supera el rango numérico seguro.');
+  });
 });
 
 class FakeCajaRepository implements CajaRepository {
@@ -176,6 +222,36 @@ class FakeCajaRepository implements CajaRepository {
     importeCents: 1_250,
     fecha: '2026-09-21T10:00:00.000Z',
     editable: true,
+  };
+
+  lastCierrePublicId: string | null = null;
+
+  cierre: CajaCierreRecord | null = {
+    cajaPublicId: 'caja-1',
+    apertura: '2026-09-21T08:00:00.000Z',
+    importeAperturaCents: 10_000,
+    ventasAfectanCajaCents: 7_000,
+    salidasCajaCents: 1_500,
+    tiposPago: [
+      {
+        publicId: 'tipo-efectivo',
+        nombre: 'Efectivo',
+        slug: 'efectivo',
+        afectaCaja: true,
+        orden: 0,
+        operaciones: 2,
+        importeVentasCents: 2_000,
+      },
+      {
+        publicId: 'tipo-tarjeta',
+        nombre: 'Tarjeta',
+        slug: 'tarjeta',
+        afectaCaja: false,
+        orden: 1,
+        operaciones: 1,
+        importeVentasCents: 6_000,
+      },
+    ],
   };
 
   /**
@@ -227,5 +303,14 @@ class FakeCajaRepository implements CajaRepository {
     this.lastDeleteCommand = command;
 
     return Promise.resolve();
+  }
+
+  /**
+   * Devuelve el snapshot económico preparado por el test.
+   */
+  findCierre(cajaPublicId: string): Promise<CajaCierreRecord | null> {
+    this.lastCierrePublicId = cajaPublicId;
+
+    return Promise.resolve(this.cierre);
   }
 }

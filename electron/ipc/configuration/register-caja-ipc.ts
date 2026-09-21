@@ -1,6 +1,10 @@
 import type CajaService from '@backend/application/caja/caja.service';
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
+import {
+  type CajaCierreInterface,
+  CajaCierreConsulta,
+} from '@desktop-contracts/caja/caja-cierre.interface';
 import type {
   ActualizarSalidaCajaCommand,
   CrearSalidaCajaCommand,
@@ -64,6 +68,15 @@ export default function registerCajaIpc(
       assertTrustedSender(event, getMainWindow);
 
       await cajaService.deleteSalida(command);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.cajaGetCierre,
+    async (event, consulta: CajaCierreConsulta): Promise<CajaCierreInterface> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return cajaService.getCierre(consulta);
     },
   );
 }

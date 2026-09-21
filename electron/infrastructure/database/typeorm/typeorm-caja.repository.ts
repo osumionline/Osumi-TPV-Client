@@ -1,5 +1,9 @@
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CajaAbiertaRecord from '@backend/domain/caja/caja-abierta-record.interface';
+import type {
+  CajaCierreRecord,
+  CajaCierreTipoPagoRecord,
+} from '@backend/domain/caja/caja-cierre-record.interface';
 import type SalidaCajaRecord from '@backend/domain/caja/salida-caja-record.interface';
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
 import type {
@@ -12,6 +16,25 @@ import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm
 import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
 import { randomUUID } from 'node:crypto';
 import type { DataSource, QueryRunner } from 'typeorm';
+
+interface CajaCierreDatabaseRow {
+  readonly id: number;
+  readonly public_id: string;
+  readonly apertura: string;
+  readonly importe_apertura_cents: number;
+  readonly ventas_afectan_caja_cents: number;
+  readonly salidas_caja_cents: number;
+}
+
+interface CajaCierreTipoPagoDatabaseRow {
+  readonly public_id: string;
+  readonly nombre: string;
+  readonly slug: string;
+  readonly afecta_caja: number;
+  readonly orden: number;
+  readonly operaciones: number;
+  readonly importe_ventas_cents: number;
+}
 
 interface IdDatabaseRow {
   readonly id: number;
@@ -202,6 +225,155 @@ export default class TypeOrmCajaRepository implements CajaRepository {
       fecha: row.fecha,
       editable: row.editable === 1,
     }));
+  }
+
+  /**
+   * Obtiene una fotografía consistente de los importes necesarios
+   * para cerrar una caja todavía abierta.
+   *
+   * Los importes se recalculan desde ventas, pagos y movimientos;
+   * no se confía en los acumulados persistidos de caja/caja_tipo.
+   */
+  async findCierre(cajaPublicId: string): Promise<CajaCierreRecord | null> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<CajaCierreRecord | null> => {
+        const cajaRows: readonly CajaCierreDatabaseRow[] = (await queryRunner.query(
+          `
+            SELECT
+              c.id,
+              c.public_id,
+              c.apertura,
+              c.importe_apertura_cents,
+
+              COALESCE(
+                (
+                  SELECT
+                    SUM(vp.importe_cents)
+                  FROM venta v
+
+                  INNER JOIN venta_pago vp
+                    ON vp.id_venta = v.id
+
+                  INNER JOIN tipo_pago tp
+                    ON tp.id = vp.id_tipo_pago
+
+                  WHERE
+                    v.id_caja = c.id
+                    AND v.deleted_at IS NULL
+                    AND tp.afecta_caja = 1
+                ),
+                0
+              ) AS ventas_afectan_caja_cents,
+
+              COALESCE(
+                (
+                  SELECT
+                    SUM(mc.importe_cents)
+                  FROM movimiento_caja mc
+                  WHERE
+                    mc.id_caja = c.id
+                    AND mc.tipo = 'salida'
+                    AND mc.deleted_at IS NULL
+                ),
+                0
+              ) AS salidas_caja_cents
+
+            FROM caja c
+
+            WHERE
+              c.public_id = ?
+              AND c.cierre IS NULL
+
+            LIMIT 1
+          `,
+          [cajaPublicId],
+        )) as readonly CajaCierreDatabaseRow[];
+
+        const caja: CajaCierreDatabaseRow | undefined = cajaRows[0];
+
+        if (caja === undefined) {
+          return null;
+        }
+
+        const tipoPagoRows: readonly CajaCierreTipoPagoDatabaseRow[] = (await queryRunner.query(
+          `
+            SELECT
+              tp.public_id,
+              tp.nombre,
+              tp.slug,
+              tp.afecta_caja,
+              tp.orden,
+
+              COUNT(
+                DISTINCT CASE
+                  WHEN vp.id IS NOT NULL
+                    THEN v.id
+                  ELSE NULL
+                END
+              ) AS operaciones,
+
+              COALESCE(
+                SUM(vp.importe_cents),
+                0
+              ) AS importe_ventas_cents
+
+            FROM caja_tipo ct
+
+            INNER JOIN tipo_pago tp
+              ON tp.id = ct.id_tipo_pago
+
+            LEFT JOIN venta v
+              ON v.id_caja = ct.id_caja
+              AND v.deleted_at IS NULL
+
+            LEFT JOIN venta_pago vp
+              ON vp.id_venta = v.id
+              AND vp.id_tipo_pago = ct.id_tipo_pago
+
+            WHERE
+              ct.id_caja = ?
+
+            GROUP BY
+              tp.id,
+              tp.public_id,
+              tp.nombre,
+              tp.slug,
+              tp.afecta_caja,
+              tp.orden
+
+            ORDER BY
+              tp.orden,
+              tp.nombre COLLATE NOCASE,
+              tp.id
+          `,
+          [caja.id],
+        )) as readonly CajaCierreTipoPagoDatabaseRow[];
+
+        const tiposPago: readonly CajaCierreTipoPagoRecord[] = tipoPagoRows.map(
+          (row: CajaCierreTipoPagoDatabaseRow): CajaCierreTipoPagoRecord => ({
+            publicId: row.public_id,
+            nombre: row.nombre,
+            slug: row.slug,
+            afectaCaja: row.afecta_caja === 1,
+            orden: row.orden,
+            operaciones: row.operaciones,
+            importeVentasCents: row.importe_ventas_cents,
+          }),
+        );
+
+        return {
+          cajaPublicId: caja.public_id,
+          apertura: caja.apertura,
+          importeAperturaCents: caja.importe_apertura_cents,
+          ventasAfectanCajaCents: caja.ventas_afectan_caja_cents,
+          salidasCajaCents: caja.salidas_caja_cents,
+          tiposPago,
+        };
+      },
+    );
   }
 
   /**
