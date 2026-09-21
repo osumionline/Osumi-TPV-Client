@@ -27,15 +27,7 @@
         <div class="cash-register__content">
             @switch (activeSection()) {
             @case ('history') {
-            <section class="cash-register__placeholder">
-                <h2>
-                    Histórico de ventas
-                </h2>
-
-                <p>
-                    Consulta y gestión del histórico de ventas.
-                </p>
-            </section>
+            <otpv-historical-sales [embedded]="true" />
             }
 
             @case ('outflows') {

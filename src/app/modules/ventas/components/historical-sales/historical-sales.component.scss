@@ -1,5 +1,18 @@
-.overlay {
-    z-index: 110;
+:host {
+    display: block;
+    height: 100%;
+    min-height: 0;
+}
+
+.historical-sales-host {
+    &:not(.overlay) {
+        height: 100%;
+        min-height: 0;
+    }
+
+    &.overlay {
+        z-index: 110;
+    }
 
     .historical-sales {
         display: flex;
@@ -10,6 +23,15 @@
         padding: 0;
         flex-direction: column;
         overflow: hidden;
+    }
+
+    .historical-sales--embedded {
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        max-height: none;
+        border-radius: 0;
+        box-shadow: none;
     }
 
     .historical-sales__header {
@@ -371,7 +393,7 @@
     }
 
     @media (max-width: 900px) {
-        .historical-sales {
+        .historical-sales:not(.historical-sales--embedded) {
             width: calc(100vw - 24px);
             height: calc(100vh - 24px);
         }

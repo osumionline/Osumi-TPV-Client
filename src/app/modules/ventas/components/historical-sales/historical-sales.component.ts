@@ -4,10 +4,12 @@ import {
   computed,
   ElementRef,
   inject,
+  input,
   output,
   signal,
   viewChild,
   type AfterViewInit,
+  type InputSignal,
   type OnInit,
   type OutputEmitterRef,
   type Signal,
@@ -76,6 +78,7 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
     inject(VentaTicketEmailService);
 
   readonly closeEvent: OutputEmitterRef<void> = output<void>();
+  readonly embedded: InputSignal<boolean> = input<boolean>(false);
 
   readonly activeTab: WritableSignal<HistoricalSalesTab> = signal<HistoricalSalesTab>('ventas');
   readonly filterMode: WritableSignal<HistoricalSalesFilterMode> =
@@ -137,7 +140,11 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
    * Sitúa el foco inicial en un control interactivo del diálogo.
    */
   ngAfterViewInit(): void {
-    this.closeButton()?.nativeElement.focus();
+    if (this.embedded()) {
+      return;
+    }
+
+    this.closeButton()?.nativeElement?.focus();
   }
 
   /**
@@ -564,7 +571,7 @@ export default class HistoricalSalesComponent implements AfterViewInit, OnInit {
    * Solicita cerrar el modal de Histórico.
    */
   close(): void {
-    if (this.postventaSaving()) {
+    if (this.embedded() || this.postventaSaving()) {
       return;
     }
 

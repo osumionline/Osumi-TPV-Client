@@ -1,11 +1,21 @@
-import { signal, type WritableSignal } from '@angular/core';
+import { Component, input, signal, type WritableSignal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import CashRegisterComponent from '@modules/caja/pages/cash-register/cash-register.component';
+import HistoricalSalesComponent from '@modules/ventas/components/historical-sales/historical-sales.component';
 import { DialogService } from '@osumi/angular-tools';
 import AppDataService from '@services/application/app-data.service';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+@Component({
+  selector: 'otpv-historical-sales',
+  template: '',
+})
+class HistoricalSalesStubComponent {
+  readonly embedded = input<boolean>(false);
+}
 
 describe('CashRegisterComponent', (): void => {
   let fixture: ComponentFixture<CashRegisterComponent>;
@@ -33,7 +43,16 @@ describe('CashRegisterComponent', (): void => {
           },
         },
       ],
-    }).compileComponents();
+    })
+      .overrideComponent(CashRegisterComponent, {
+        remove: {
+          imports: [HistoricalSalesComponent],
+        },
+        add: {
+          imports: [HistoricalSalesStubComponent],
+        },
+      })
+      .compileComponents();
 
     fixture = TestBed.createComponent(CashRegisterComponent);
     component = fixture.componentInstance;
@@ -75,16 +94,10 @@ describe('CashRegisterComponent', (): void => {
   });
 
   it('renderiza el contenido correspondiente a la pestaña seleccionada', (): void => {
-    fixture.detectChanges();
-
-    let element: HTMLElement = fixture.nativeElement as HTMLElement;
-
-    expect(element.textContent).toContain('Histórico de ventas');
-
     component.selectSection('outflows');
     fixture.detectChanges();
 
-    element = fixture.nativeElement as HTMLElement;
+    const element: HTMLElement = fixture.nativeElement as HTMLElement;
 
     expect(element.textContent).toContain('Gestión de las salidas manuales de efectivo.');
 
@@ -92,5 +105,20 @@ describe('CashRegisterComponent', (): void => {
     fixture.detectChanges();
 
     expect(element.textContent).toContain('Este apartado se definirá más adelante.');
+  });
+
+  it('muestra el histórico de ventas en modo embebido', (): void => {
+    fixture.detectChanges();
+
+    const historicalSalesDebugElement = fixture.debugElement.query(
+      By.directive(HistoricalSalesStubComponent),
+    );
+
+    expect(historicalSalesDebugElement).not.toBeNull();
+
+    const historicalSales =
+      historicalSalesDebugElement.componentInstance as HistoricalSalesStubComponent;
+
+    expect(historicalSales.embedded()).toBe(true);
   });
 });

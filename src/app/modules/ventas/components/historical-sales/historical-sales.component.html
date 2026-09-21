@@ -1,17 +1,24 @@
-<div class="overlay">
+<div class="historical-sales-host"
+     [class.overlay]="!embedded()">
+    @if (!embedded()) {
     <button class="overlay__backdrop"
             [disabled]="postventaSaving()"
             type="button"
             aria-label="Cerrar histórico"
             (click)="close()">
     </button>
+    }
 
-    <section class="historical-sales overlay__panel"
+    <section class="historical-sales"
+             [class.overlay__panel]="!embedded()"
+             [class.historical-sales--embedded]="embedded()"
              [class.historical-sales--saving]="postventaSaving()"
-             role="dialog"
-             aria-modal="true"
-             aria-labelledby="historical-sales-title"
+             [attr.role]="embedded() ? null : 'dialog'"
+             [attr.aria-modal]="embedded() ? null : 'true'"
+             [attr.aria-labelledby]="embedded() ? null : 'historical-sales-title'"
+             tabindex="-1"
              (keydown.escape)="close()">
+        @if (!embedded()) {
         <header class="historical-sales__header">
             <div>
                 <h2 id="historical-sales-title">
@@ -56,13 +63,15 @@
                 Salidas caja
             </button>
         </nav>
+        }
 
         <div class="historical-sales__content">
-            @if (activeTab() === 'ventas') {
+            @if (embedded() || activeTab() === 'ventas') {
             <section id="historical-sales-panel-ventas"
                      class="historical-sales__panel"
-                     role="tabpanel"
-                     aria-labelledby="historical-sales-tab-ventas">
+                     [attr.role]="embedded() ? 'region' : 'tabpanel'"
+                     [attr.aria-label]="embedded() ? 'Histórico de ventas' : null"
+                     [attr.aria-labelledby]="embedded() ? null : 'historical-sales-tab-ventas'">
                 <div class="historical-sales__filters">
                     <div class="historical-sales__filter-mode"
                          aria-label="Tipo de búsqueda">

@@ -69,7 +69,7 @@
     .cash-register__content {
         min-height: 0;
         flex: 1;
-        overflow: auto;
+        overflow: hidden;
     }
 
     .cash-register__placeholder {
