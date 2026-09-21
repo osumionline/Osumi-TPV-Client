@@ -4,6 +4,11 @@ import type SalidaCajaRecord from '@backend/domain/caja/salida-caja-record.inter
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
 import type {
+  ActualizarSalidaCajaCommand,
+  CrearSalidaCajaCommand,
+  EliminarSalidaCajaCommand,
+} from '@desktop-contracts/caja/salida-caja-command.interface';
+import type {
   SalidaCajaConsulta,
   SalidaCajaInterface,
 } from '@desktop-contracts/caja/salida-caja.interface';
@@ -80,14 +85,126 @@ export default class CajaService {
       period.hastaExclusive,
     );
 
-    return records.map((record: SalidaCajaRecord): SalidaCajaInterface => ({
+    return records.map((record: SalidaCajaRecord): SalidaCajaInterface =>
+      this.toSalidaInterface(record),
+    );
+  }
+
+  /**
+   * Valida y crea una nueva salida en la caja activa.
+   */
+  async createSalida(command: CrearSalidaCajaCommand): Promise<SalidaCajaInterface> {
+    const normalizedCommand: CrearSalidaCajaCommand = {
+      cajaPublicId: this.requirePublicId(command?.cajaPublicId, 'La caja indicada no es válida.'),
+      ...this.normalizeSalidaFields(command),
+    };
+
+    return this.toSalidaInterface(await this.cajaRepository.createSalida(normalizedCommand));
+  }
+
+  /**
+   * Valida y actualiza una salida perteneciente a la caja activa.
+   */
+  async updateSalida(command: ActualizarSalidaCajaCommand): Promise<SalidaCajaInterface> {
+    const normalizedCommand: ActualizarSalidaCajaCommand = {
+      publicId: this.requirePublicId(command?.publicId, 'La salida de caja indicada no es válida.'),
+      cajaPublicId: this.requirePublicId(command?.cajaPublicId, 'La caja indicada no es válida.'),
+      ...this.normalizeSalidaFields(command),
+    };
+
+    return this.toSalidaInterface(await this.cajaRepository.updateSalida(normalizedCommand));
+  }
+
+  /**
+   * Da de baja una salida únicamente si pertenece
+   * a la caja activa indicada.
+   */
+  async deleteSalida(command: EliminarSalidaCajaCommand): Promise<void> {
+    const normalizedCommand: EliminarSalidaCajaCommand = {
+      publicId: this.requirePublicId(command?.publicId, 'La salida de caja indicada no es válida.'),
+      cajaPublicId: this.requirePublicId(command?.cajaPublicId, 'La caja indicada no es válida.'),
+    };
+
+    await this.cajaRepository.deleteSalida(normalizedCommand);
+  }
+
+  /**
+   * Normaliza los campos editables de una salida.
+   */
+  private normalizeSalidaFields(
+    command: CrearSalidaCajaCommand | ActualizarSalidaCajaCommand,
+  ): Pick<CrearSalidaCajaCommand, 'concepto' | 'descripcion' | 'importeCents'> {
+    if (typeof command !== 'object' || command === null) {
+      throw new Error('Los datos de la salida de caja no son válidos.');
+    }
+
+    if (typeof command.concepto !== 'string') {
+      throw new Error('El concepto de la salida de caja no es válido.');
+    }
+
+    const concepto: string = command.concepto.trim();
+
+    if (concepto.length === 0) {
+      throw new Error('El concepto de la salida de caja es obligatorio.');
+    }
+
+    if (concepto.length > 250) {
+      throw new Error('El concepto de la salida de caja no puede superar los 250 caracteres.');
+    }
+
+    if (!Number.isSafeInteger(command.importeCents) || command.importeCents <= 0) {
+      throw new Error('El importe de la salida de caja debe ser mayor que cero.');
+    }
+
+    let descripcion: string | null = null;
+
+    if (command.descripcion !== null) {
+      if (typeof command.descripcion !== 'string') {
+        throw new Error('La descripción de la salida de caja no es válida.');
+      }
+
+      const normalizedDescripcion: string = command.descripcion.trim();
+
+      descripcion = normalizedDescripcion.length === 0 ? null : normalizedDescripcion;
+    }
+
+    return {
+      concepto,
+      descripcion,
+      importeCents: command.importeCents,
+    };
+  }
+
+  /**
+   * Normaliza un identificador público recibido por IPC.
+   */
+  private requirePublicId(value: unknown, message: string): string {
+    if (typeof value !== 'string') {
+      throw new Error(message);
+    }
+
+    const normalizedValue: string = value.trim();
+
+    if (normalizedValue.length === 0) {
+      throw new Error(message);
+    }
+
+    return normalizedValue;
+  }
+
+  /**
+   * Convierte el record interno de una salida
+   * en su contrato público.
+   */
+  private toSalidaInterface(record: SalidaCajaRecord): SalidaCajaInterface {
+    return {
       publicId: record.publicId,
       concepto: record.concepto,
       descripcion: record.descripcion,
       importeCents: record.importeCents,
       fecha: record.fecha,
       editable: record.editable,
-    }));
+    };
   }
 
   /**

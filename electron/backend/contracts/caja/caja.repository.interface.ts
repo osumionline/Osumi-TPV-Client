@@ -1,6 +1,11 @@
 import type CajaAbiertaRecord from '@backend/domain/caja/caja-abierta-record.interface';
 import type SalidaCajaRecord from '@backend/domain/caja/salida-caja-record.interface';
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
+import type {
+  ActualizarSalidaCajaCommand,
+  CrearSalidaCajaCommand,
+  EliminarSalidaCajaCommand,
+} from '@desktop-contracts/caja/salida-caja-command.interface';
 
 export default interface CajaRepository {
   open(command: AbrirCajaCommand): Promise<CajaAbiertaRecord>;
@@ -11,4 +16,19 @@ export default interface CajaRepository {
    * El límite inicial es inclusivo y el final exclusivo.
    */
   findSalidasByPeriod(desde: string, hastaExclusive: string): Promise<readonly SalidaCajaRecord[]>;
+
+  /**
+   * Crea una salida asociada a una caja todavía abierta.
+   */
+  createSalida(command: CrearSalidaCajaCommand): Promise<SalidaCajaRecord>;
+
+  /**
+   * Actualiza una salida perteneciente a la caja abierta indicada.
+   */
+  updateSalida(command: ActualizarSalidaCajaCommand): Promise<SalidaCajaRecord>;
+
+  /**
+   * Da de baja lógicamente una salida perteneciente a la caja abierta indicada.
+   */
+  deleteSalida(command: EliminarSalidaCajaCommand): Promise<void>;
 }

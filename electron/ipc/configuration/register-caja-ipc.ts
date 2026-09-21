@@ -2,6 +2,11 @@ import type CajaService from '@backend/application/caja/caja.service';
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
 import type {
+  ActualizarSalidaCajaCommand,
+  CrearSalidaCajaCommand,
+  EliminarSalidaCajaCommand,
+} from '@desktop-contracts/caja/salida-caja-command.interface';
+import type {
   SalidaCajaConsulta,
   SalidaCajaInterface,
 } from '@desktop-contracts/caja/salida-caja.interface';
@@ -32,6 +37,33 @@ export default function registerCajaIpc(
       assertTrustedSender(event, getMainWindow);
 
       return cajaService.findSalidas(consulta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.cajaCreateSalida,
+    async (event, command: CrearSalidaCajaCommand): Promise<SalidaCajaInterface> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return cajaService.createSalida(command);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.cajaUpdateSalida,
+    async (event, command: ActualizarSalidaCajaCommand): Promise<SalidaCajaInterface> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return cajaService.updateSalida(command);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.cajaDeleteSalida,
+    async (event, command: EliminarSalidaCajaCommand): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await cajaService.deleteSalida(command);
     },
   );
 }

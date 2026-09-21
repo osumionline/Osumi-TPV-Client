@@ -129,6 +129,9 @@ const IPC_CHANNELS = {
 
   cajaOpen: 'caja:open',
   cajaGetSalidas: 'caja:get-salidas',
+  cajaCreateSalida: 'caja:create-salida',
+  cajaUpdateSalida: 'caja:update-salida',
+  cajaDeleteSalida: 'caja:delete-salida',
 
   reservasCreate: 'reservas:create',
   reservasGetAll: 'reservas:get-all',

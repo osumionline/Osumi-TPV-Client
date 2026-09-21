@@ -2,11 +2,25 @@ import type CajaRepository from '@backend/contracts/caja/caja.repository.interfa
 import type CajaAbiertaRecord from '@backend/domain/caja/caja-abierta-record.interface';
 import type SalidaCajaRecord from '@backend/domain/caja/salida-caja-record.interface';
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
+import type {
+  ActualizarSalidaCajaCommand,
+  CrearSalidaCajaCommand,
+  EliminarSalidaCajaCommand,
+} from '@desktop-contracts/caja/salida-caja-command.interface';
 import { getLastInsertId } from '@infrastructure/database/typeorm/sqlite.utils';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import { runDataSourceTransaction } from '@infrastructure/database/typeorm/typeorm-transaction.utils';
 import { randomUUID } from 'node:crypto';
 import type { DataSource, QueryRunner } from 'typeorm';
+
+interface IdDatabaseRow {
+  readonly id: number;
+}
+
+interface SalidaCajaEditableDatabaseRow {
+  readonly id: number;
+  readonly created_at: string;
+}
 
 interface SalidaCajaDatabaseRow {
   readonly public_id: string;
@@ -188,6 +202,235 @@ export default class TypeOrmCajaRepository implements CajaRepository {
       fecha: row.fecha,
       editable: row.editable === 1,
     }));
+  }
+
+  /**
+   * Crea una nueva salida sobre una caja todavía abierta.
+   */
+  async createSalida(command: CrearSalidaCajaCommand): Promise<SalidaCajaRecord> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<SalidaCajaRecord> => {
+        const cajaId: number = await this.requireOpenCajaId(queryRunner, command.cajaPublicId);
+
+        const publicId: string = randomUUID();
+        const now: string = new Date().toISOString();
+
+        await queryRunner.query(
+          `
+          INSERT INTO movimiento_caja (
+            public_id,
+            id_caja,
+            id_empleado,
+            tipo,
+            concepto,
+            importe_cents,
+            descripcion,
+            created_at,
+            updated_at,
+            deleted_at
+          )
+          VALUES (
+            ?,
+            ?,
+            NULL,
+            'salida',
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            NULL
+          )
+        `,
+          [publicId, cajaId, command.concepto, command.importeCents, command.descripcion, now, now],
+        );
+
+        await this.refreshSalidaAggregate(queryRunner, cajaId, now);
+
+        return {
+          publicId,
+          concepto: command.concepto,
+          descripcion: command.descripcion,
+          importeCents: command.importeCents,
+          fecha: now,
+          editable: true,
+        };
+      },
+    );
+  }
+
+  /**
+   * Actualiza una salida únicamente cuando continúa
+   * perteneciendo a la caja abierta indicada.
+   */
+  async updateSalida(command: ActualizarSalidaCajaCommand): Promise<SalidaCajaRecord> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<SalidaCajaRecord> => {
+        const cajaId: number = await this.requireOpenCajaId(queryRunner, command.cajaPublicId);
+
+        const current: SalidaCajaEditableDatabaseRow = await this.requireEditableSalida(
+          queryRunner,
+          command.publicId,
+          cajaId,
+        );
+
+        const now: string = new Date().toISOString();
+
+        await queryRunner.query(
+          `
+          UPDATE movimiento_caja
+          SET
+            concepto = ?,
+            importe_cents = ?,
+            descripcion = ?,
+            updated_at = ?
+          WHERE id = ?
+        `,
+          [command.concepto, command.importeCents, command.descripcion, now, current.id],
+        );
+
+        await this.refreshSalidaAggregate(queryRunner, cajaId, now);
+
+        return {
+          publicId: command.publicId,
+          concepto: command.concepto,
+          descripcion: command.descripcion,
+          importeCents: command.importeCents,
+          fecha: current.created_at,
+          editable: true,
+        };
+      },
+    );
+  }
+
+  /**
+   * Da de baja lógicamente una salida de la caja abierta indicada.
+   */
+  async deleteSalida(command: EliminarSalidaCajaCommand): Promise<void> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    await runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
+      const cajaId: number = await this.requireOpenCajaId(queryRunner, command.cajaPublicId);
+
+      const current: SalidaCajaEditableDatabaseRow = await this.requireEditableSalida(
+        queryRunner,
+        command.publicId,
+        cajaId,
+      );
+
+      const now: string = new Date().toISOString();
+
+      await queryRunner.query(
+        `
+          UPDATE movimiento_caja
+          SET
+            deleted_at = ?,
+            updated_at = ?
+          WHERE id = ?
+        `,
+        [now, now, current.id],
+      );
+
+      await this.refreshSalidaAggregate(queryRunner, cajaId, now);
+    });
+  }
+
+  /**
+   * Resuelve una caja únicamente cuando sigue abierta.
+   */
+  private async requireOpenCajaId(queryRunner: QueryRunner, publicId: string): Promise<number> {
+    const rows: readonly IdDatabaseRow[] = (await queryRunner.query(
+      `
+      SELECT
+        c.id
+      FROM caja c
+      WHERE
+        c.public_id = ?
+        AND c.cierre IS NULL
+      LIMIT 1
+    `,
+      [publicId],
+    )) as readonly IdDatabaseRow[];
+
+    const id: number | undefined = rows[0]?.id;
+
+    if (id === undefined) {
+      throw new Error('La caja indicada no está abierta.');
+    }
+
+    return id;
+  }
+
+  /**
+   * Recupera una salida activa únicamente cuando
+   * pertenece a la caja abierta indicada.
+   */
+  private async requireEditableSalida(
+    queryRunner: QueryRunner,
+    publicId: string,
+    cajaId: number,
+  ): Promise<SalidaCajaEditableDatabaseRow> {
+    const rows: readonly SalidaCajaEditableDatabaseRow[] = (await queryRunner.query(
+      `
+      SELECT
+        mc.id,
+        mc.created_at
+      FROM movimiento_caja mc
+      WHERE
+        mc.public_id = ?
+        AND mc.id_caja = ?
+        AND mc.tipo = 'salida'
+        AND mc.deleted_at IS NULL
+      LIMIT 1
+    `,
+      [publicId, cajaId],
+    )) as readonly SalidaCajaEditableDatabaseRow[];
+
+    const row: SalidaCajaEditableDatabaseRow | undefined = rows[0];
+
+    if (row === undefined) {
+      throw new Error('La salida de caja no pertenece a la caja activa o ya no está disponible.');
+    }
+
+    return row;
+  }
+
+  /**
+   * Reconstruye el acumulado de salidas de una caja
+   * a partir de sus movimientos todavía activos.
+   */
+  private async refreshSalidaAggregate(
+    queryRunner: QueryRunner,
+    cajaId: number,
+    updatedAt: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+      UPDATE caja
+      SET
+        movimientos_salida_cents = (
+          SELECT
+            COALESCE(
+              SUM(mc.importe_cents),
+              0
+            )
+          FROM movimiento_caja mc
+          WHERE
+            mc.id_caja = ?
+            AND mc.tipo = 'salida'
+            AND mc.deleted_at IS NULL
+        ),
+        updated_at = ?
+      WHERE id = ?
+    `,
+      [cajaId, updatedAt, cajaId],
+    );
   }
 
   /**

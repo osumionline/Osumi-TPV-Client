@@ -39,6 +39,11 @@ import type CategoriaInterface from '@desktop-contracts/articulos/categorias/cat
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
 import type {
+  ActualizarSalidaCajaCommand,
+  CrearSalidaCajaCommand,
+  EliminarSalidaCajaCommand,
+} from '@desktop-contracts/caja/salida-caja-command.interface';
+import type {
   SalidaCajaConsulta,
   SalidaCajaInterface,
 } from '@desktop-contracts/caja/salida-caja.interface';
@@ -715,6 +720,15 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
       ipcRenderer.invoke(IPC_CHANNELS.cajaGetSalidas, consulta) as Promise<
         readonly SalidaCajaInterface[]
       >,
+
+    createSalida: (command: CrearSalidaCajaCommand): Promise<SalidaCajaInterface> =>
+      ipcRenderer.invoke(IPC_CHANNELS.cajaCreateSalida, command) as Promise<SalidaCajaInterface>,
+
+    updateSalida: (command: ActualizarSalidaCajaCommand): Promise<SalidaCajaInterface> =>
+      ipcRenderer.invoke(IPC_CHANNELS.cajaUpdateSalida, command) as Promise<SalidaCajaInterface>,
+
+    deleteSalida: (command: EliminarSalidaCajaCommand): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.cajaDeleteSalida, command) as Promise<void>,
   }),
 
   reservas: Object.freeze({
