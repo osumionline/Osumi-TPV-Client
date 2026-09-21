@@ -59,7 +59,6 @@ export default function createSettingsCommand(
 
     opciones: {
       fechaCaducidad: model.opciones.fechaCaducidad,
-      empleados: model.opciones.empleados,
     },
 
     integrations: {

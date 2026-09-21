@@ -68,6 +68,38 @@ describe('JsonAppDataRepository', (): void => {
       bodyTemplate: 'Gracias por comprar en {nombreNegocio}.',
     });
   });
+
+  it('ignora el flag legacy de empleados al cargar app_data', async (): Promise<void> => {
+    const filePath: string = join(requireTempDirectory(), 'app_data.json');
+
+    await writeFile(filePath, JSON.stringify(createLegacyAppData()), 'utf8');
+
+    const repository: JsonAppDataRepository = new JsonAppDataRepository(filePath);
+
+    const appData = await repository.load();
+
+    expect(appData).not.toBeNull();
+    expect(appData).not.toHaveProperty('empleados');
+  });
+
+  it('acepta un app_data actual sin el flag legacy de empleados', async (): Promise<void> => {
+    const filePath: string = join(requireTempDirectory(), 'app_data.json');
+
+    const currentAppData: Record<string, unknown> = {
+      ...createLegacyAppData(),
+    };
+
+    delete currentAppData['empleados'];
+
+    await writeFile(filePath, JSON.stringify(currentAppData), 'utf8');
+
+    const repository: JsonAppDataRepository = new JsonAppDataRepository(filePath);
+
+    const appData = await repository.load();
+
+    expect(appData).not.toBeNull();
+    expect(appData).not.toHaveProperty('empleados');
+  });
 });
 
 /**

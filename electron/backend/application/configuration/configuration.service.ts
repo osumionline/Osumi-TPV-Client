@@ -151,7 +151,6 @@ export default class ConfigurationService {
       marginList: [...command.fiscalidad.marginList],
 
       fechaCad: command.opciones.fechaCaducidad,
-      empleados: command.opciones.empleados,
     };
 
     if (command.integrations === undefined) {

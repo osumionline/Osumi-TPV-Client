@@ -54,6 +54,5 @@ export default function createAppData(command: InstallationCommand, installedAt:
       : null,
 
     fechaCad: command.opciones.fechaCaducidad,
-    empleados: command.opciones.empleados,
   };
 }

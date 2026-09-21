@@ -129,8 +129,7 @@ export function isInstallationCommand(value: unknown): value is InstallationComm
 
   const validTicketBai: boolean = hasBoolean(ticketBai, 'active') && hasString(ticketBai, 'nif');
 
-  const validOptions: boolean =
-    hasBoolean(opciones, 'fechaCaducidad') && hasBoolean(opciones, 'empleados');
+  const validOptions: boolean = hasBoolean(opciones, 'fechaCaducidad');
 
   const validSecrets: boolean =
     hasString(secretos, 'secretApi') &&

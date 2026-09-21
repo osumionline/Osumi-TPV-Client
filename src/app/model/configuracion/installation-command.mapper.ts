@@ -103,7 +103,6 @@ export default function createInstallationCommand(
 
     opciones: {
       fechaCaducidad: model.opciones.fechaCaducidad,
-      empleados: model.opciones.empleados,
     },
 
     secretos: {

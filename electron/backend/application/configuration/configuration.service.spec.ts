@@ -352,7 +352,6 @@ function createAppData(): AppData {
     },
 
     fechaCad: true,
-    empleados: true,
   };
 }
 
@@ -393,7 +392,6 @@ function createCommand(): ConfigurationUpdateCommand {
 
     opciones: {
       fechaCaducidad: true,
-      empleados: true,
     },
 
     integrations: {

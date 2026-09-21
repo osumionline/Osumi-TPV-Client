@@ -167,7 +167,6 @@ export default function createInstallationFormInitialValue(): InstallationFormMo
     opciones: {
       backupApiKey: '',
       fechaCaducidad: false,
-      empleados: false,
     },
   };
 }

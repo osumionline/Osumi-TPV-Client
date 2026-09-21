@@ -66,7 +66,6 @@ export interface SettingsBackupFormModel {
 
 export interface SettingsOptionsFormModel {
   fechaCaducidad: boolean;
-  empleados: boolean;
 }
 
 export interface SettingsFormModel {

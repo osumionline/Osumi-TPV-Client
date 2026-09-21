@@ -811,7 +811,6 @@ function createAppData(): AppData {
     },
 
     fechaCad: false,
-    empleados: true,
   };
 }
 

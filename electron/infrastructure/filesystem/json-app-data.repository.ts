@@ -93,6 +93,15 @@ function isStoredTicketBaiConfig(value: unknown): value is StoredTicketBaiConfig
 }
 
 type StoredAppData = Omit<AppData, 'frasesTicket' | 'ticketEmail' | 'emailSmtp' | 'ticketBai'> & {
+  /*
+   * Campo legacy anterior a la política automática
+   * de selección de empleado.
+   *
+   * Se acepta al leer configuraciones antiguas,
+   * pero nunca vuelve a exponerse ni persistirse.
+   */
+  empleados?: boolean;
+
   readonly frasesTicket?: readonly string[];
   readonly ticketEmail?: TicketEmailConfig;
   readonly emailSmtp?: EmailSmtpConfig | null;
@@ -123,7 +132,7 @@ function isStoredAppData(value: unknown): value is StoredAppData {
     'urlApi',
   ];
 
-  const booleanProperties: readonly string[] = ['ventaOnline', 'fechaCad', 'empleados'];
+  const booleanProperties: readonly string[] = ['ventaOnline', 'fechaCad'];
   const numberProperties: readonly string[] = ['schemaVersion'];
 
   const validStrings: boolean = stringProperties.every(
@@ -133,6 +142,8 @@ function isStoredAppData(value: unknown): value is StoredAppData {
   const validBooleans: boolean = booleanProperties.every(
     (property: string): boolean => typeof data[property] === 'boolean',
   );
+  const validLegacyEmpleados: boolean =
+    data['empleados'] === undefined || typeof data['empleados'] === 'boolean';
 
   const validNumbers: boolean = numberProperties.every(
     (property: string): boolean =>
@@ -158,6 +169,7 @@ function isStoredAppData(value: unknown): value is StoredAppData {
   return (
     validStrings &&
     validBooleans &&
+    validLegacyEmpleados &&
     validNumbers &&
     validTicketPhrases &&
     validTicketEmail &&
@@ -191,29 +203,42 @@ export default class JsonAppDataRepository implements AppDataRepository {
         throw new Error('El archivo app_data.json no tiene una estructura válida.');
       }
 
-      return {
+      /*
+       * Normalizamos también configuraciones anteriores
+       * para que el flag legacy no vuelva a propagarse
+       * mediante spreads posteriores de AppData.
+       */
+      const normalizedParsed: StoredAppData = {
         ...parsed,
+      };
 
-        frasesTicket: parsed.frasesTicket === undefined ? [] : [...parsed.frasesTicket],
+      delete normalizedParsed.empleados;
+
+      return {
+        ...normalizedParsed,
+
+        frasesTicket:
+          normalizedParsed.frasesTicket === undefined ? [] : [...normalizedParsed.frasesTicket],
 
         ticketEmail:
-          parsed.ticketEmail === undefined
+          normalizedParsed.ticketEmail === undefined
             ? {
                 subjectTemplate: DEFAULT_TICKET_EMAIL_SUBJECT_TEMPLATE,
                 bodyTemplate: DEFAULT_TICKET_EMAIL_BODY_TEMPLATE,
               }
             : {
-                subjectTemplate: parsed.ticketEmail.subjectTemplate,
-                bodyTemplate: parsed.ticketEmail.bodyTemplate,
+                subjectTemplate: normalizedParsed.ticketEmail.subjectTemplate,
+                bodyTemplate: normalizedParsed.ticketEmail.bodyTemplate,
               },
 
-        emailSmtp: parsed.emailSmtp ?? null,
+        emailSmtp: normalizedParsed.emailSmtp ?? null,
         ticketBai:
-          parsed.ticketBai === undefined || parsed.ticketBai === null
+          normalizedParsed.ticketBai === undefined || normalizedParsed.ticketBai === null
             ? null
             : {
-                nif: parsed.ticketBai.nif,
-                environment: parsed.ticketBai.environment ?? DEFAULT_TICKET_BAI_ENVIRONMENT,
+                nif: normalizedParsed.ticketBai.nif,
+                environment:
+                  normalizedParsed.ticketBai.environment ?? DEFAULT_TICKET_BAI_ENVIRONMENT,
               },
       };
     } catch (error: unknown) {

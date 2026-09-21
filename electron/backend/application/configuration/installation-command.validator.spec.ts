@@ -150,7 +150,6 @@ function createValidCommand(): InstallationCommand {
 
     opciones: {
       fechaCaducidad: false,
-      empleados: false,
     },
 
     secretos: {

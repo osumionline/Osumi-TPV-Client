@@ -31,7 +31,6 @@ describe('buildReservaTicketDocument', (): void => {
     emailSmtp: null,
     ticketBai: null,
     fechaCad: false,
-    empleados: false,
   };
 
   const reserva: ReservaInterface = {

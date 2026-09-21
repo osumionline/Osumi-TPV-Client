@@ -153,8 +153,7 @@ export function isConfigurationUpdateCommand(value: unknown): value is Configura
     hasNumberArray(fiscalidad, 'reList') &&
     hasNumberArray(fiscalidad, 'marginList');
 
-  const validOptions: boolean =
-    hasBoolean(opciones, 'fechaCaducidad') && hasBoolean(opciones, 'empleados');
+  const validOptions: boolean = hasBoolean(opciones, 'fechaCaducidad');
 
   return (
     validBusiness && validSocial && validTicket && validTicketEmail && validTaxData && validOptions

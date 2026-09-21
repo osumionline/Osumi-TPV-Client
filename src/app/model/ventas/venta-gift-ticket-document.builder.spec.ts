@@ -31,7 +31,6 @@ describe('buildVentaGiftTicketDocument', (): void => {
     emailSmtp: null,
     ticketBai: null,
     fechaCad: false,
-    empleados: false,
   };
 
   it('incluye la información no económica del ticket regalo', (): void => {

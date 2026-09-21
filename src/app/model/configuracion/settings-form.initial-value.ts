@@ -91,7 +91,6 @@ export default function createSettingsFormInitialValue(appData: AppData): Settin
 
     opciones: {
       fechaCaducidad: appData.fechaCad,
-      empleados: appData.empleados,
     },
   };
 }

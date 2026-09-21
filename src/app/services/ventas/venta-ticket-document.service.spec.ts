@@ -382,7 +382,6 @@ function createAppData(): AppData {
     emailSmtp: null,
     ticketBai: null,
     fechaCad: false,
-    empleados: false,
   };
 }
 

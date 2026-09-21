@@ -82,7 +82,6 @@ export interface InstallationTicketBaiFormModel {
 export interface InstallationOptionsFormModel {
   backupApiKey: string;
   fechaCaducidad: boolean;
-  empleados: boolean;
 }
 
 export interface InstallationFormModel {

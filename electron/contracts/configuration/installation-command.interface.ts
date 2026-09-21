@@ -61,7 +61,6 @@ export interface InstallationTicketBaiData {
 
 export interface InstallationOptionsData {
   readonly fechaCaducidad: boolean;
-  readonly empleados: boolean;
 }
 
 export interface InstallationSecretsData {

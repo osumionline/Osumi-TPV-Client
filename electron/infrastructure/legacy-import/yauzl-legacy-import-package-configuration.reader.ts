@@ -202,7 +202,6 @@ export default class YauzlLegacyImportPackageConfigurationReader implements Lega
       emailSmtp: pluginConfiguration.emailSmtp,
       ticketBai: pluginConfiguration.ticketBai,
       fechaCad: this.getBoolean(source, 'fechaCad'),
-      empleados: this.getBoolean(source, 'empleados'),
     };
 
     const secrets: InstallationSecretsData = {

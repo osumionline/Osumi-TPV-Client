@@ -34,5 +34,4 @@ export default interface AppData {
   readonly ticketBai: TicketBaiConfig | null;
 
   readonly fechaCad: boolean;
-  readonly empleados: boolean;
 }

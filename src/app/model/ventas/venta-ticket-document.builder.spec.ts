@@ -31,7 +31,6 @@ describe('buildVentaTicketDocument', (): void => {
     emailSmtp: null,
     ticketBai: null,
     fechaCad: false,
-    empleados: false,
   };
 
   const ticket: VentaTicketInterface = {

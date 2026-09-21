@@ -433,6 +433,5 @@ function createAppData(): AppData {
     ticketBai: null,
 
     fechaCad: false,
-    empleados: true,
   };
 }
