@@ -3,9 +3,7 @@ import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
-import CashOutflowsComponent from '@modules/caja/components/cash-outflows/cash-outflows.component';
 import CashRegisterComponent from '@modules/caja/pages/cash-register/cash-register.component';
-import HistoricalSalesComponent from '@modules/ventas/components/historical-sales/historical-sales.component';
 import { DialogService } from '@osumi/angular-tools';
 import AppDataService from '@services/application/app-data.service';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -23,6 +21,21 @@ class HistoricalSalesStubComponent {
   template: '',
 })
 class CashOutflowsStubComponent {}
+
+@Component({
+  selector: 'otpv-cash-closing',
+  template: '',
+})
+class CashClosingStubComponent {}
+
+@Component({
+  selector: 'otpv-header',
+  template: '',
+})
+class HeaderStubComponent {
+  readonly selectedOption = input<string>('');
+  readonly appName = input<string>('');
+}
 
 describe('CashRegisterComponent', (): void => {
   let fixture: ComponentFixture<CashRegisterComponent>;
@@ -52,11 +65,13 @@ describe('CashRegisterComponent', (): void => {
       ],
     })
       .overrideComponent(CashRegisterComponent, {
-        remove: {
-          imports: [CashOutflowsComponent, HistoricalSalesComponent],
-        },
-        add: {
-          imports: [CashOutflowsStubComponent, HistoricalSalesStubComponent],
+        set: {
+          imports: [
+            HeaderStubComponent,
+            CashClosingStubComponent,
+            CashOutflowsStubComponent,
+            HistoricalSalesStubComponent,
+          ],
         },
       })
       .compileComponents();
@@ -129,5 +144,12 @@ describe('CashRegisterComponent', (): void => {
       historicalSalesDebugElement.componentInstance as HistoricalSalesStubComponent;
 
     expect(historicalSales.embedded()).toBe(true);
+  });
+
+  it('muestra el cierre de caja al seleccionar su pestaña', (): void => {
+    component.selectSection('closing');
+    fixture.detectChanges();
+
+    expect(fixture.debugElement.query(By.directive(CashClosingStubComponent))).not.toBeNull();
   });
 });

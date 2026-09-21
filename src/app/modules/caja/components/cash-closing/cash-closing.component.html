@@ -1,0 +1,248 @@
+<section class="cash-closing">
+    @if (loading()) {
+    <div class="cash-closing__state">
+        <mat-icon aria-hidden="true">
+            hourglass_top
+        </mat-icon>
+
+        <span>
+            Cargando datos de caja...
+        </span>
+    </div>
+    }
+    @else if (error() !== null) {
+    <div class="cash-closing__state cash-closing__state--error"
+         role="alert">
+        <mat-icon aria-hidden="true">
+            error_outline
+        </mat-icon>
+
+        <h2>
+            No se ha podido cargar el cierre
+        </h2>
+
+        <p>
+            {{ error() }}
+        </p>
+    </div>
+    }
+    @else if (cierre(); as cierreCaja) {
+    <div class="cash-closing__content">
+        <header class="cash-closing__header">
+            <div>
+                <span>
+                    Caja abierta
+                </span>
+
+                <h2>
+                    Preparar cierre
+                </h2>
+
+                <small>
+                    Apertura:
+                    {{ cierreCaja.apertura | date:'dd/MM/yyyy HH:mm' }}
+                </small>
+            </div>
+        </header>
+
+        <section class="cash-closing__summary"
+                 aria-label="Resumen del cierre">
+            <article class="cash-closing__field">
+                <span>
+                    Saldo inicial
+                </span>
+
+                <strong>
+                    {{
+                        cierreCaja.saldoInicialCents
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
+                </strong>
+            </article>
+
+            <article class="cash-closing__field">
+                <span>
+                    Ventas efectivo
+                </span>
+
+                <strong>
+                    {{
+                        cierreCaja.ventasAfectanCajaCents
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
+                </strong>
+            </article>
+
+            <article class="cash-closing__field">
+                <span>
+                    Salidas caja
+                </span>
+
+                <strong>
+                    {{
+                        cierreCaja.salidasCajaCents
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
+                </strong>
+            </article>
+
+            <article class="cash-closing__field cash-closing__field--highlight">
+                <span>
+                    Saldo final
+                </span>
+
+                <strong>
+                    {{
+                        cierreCaja.saldoFinalTeoricoCents
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
+                </strong>
+            </article>
+
+            <article class="cash-closing__field">
+                <span>
+                    Importe real
+                </span>
+
+                @if (importeRealCents() !== null) {
+                <strong>
+                    {{
+                        (importeRealCents() ?? 0)
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
+                </strong>
+                }
+                @else {
+                <strong class="cash-closing__pending-value">
+                    Pendiente de recuento
+                </strong>
+
+                <small>
+                    Se calculará con monedas y billetes.
+                </small>
+                }
+            </article>
+
+            <article class="cash-closing__field cash-closing__field--input">
+                <span>
+                    Retirado
+                </span>
+
+                <mat-form-field appearance="outline"
+                                subscriptSizing="dynamic">
+                    <input matInput
+                           type="number"
+                           step="0.01"
+                           [formField]="cierreForm.retiradoEuros">
+
+                    <span matTextSuffix>
+                        €
+                    </span>
+                </mat-form-field>
+            </article>
+
+            <article class="cash-closing__field">
+                <span>
+                    Diferencia
+                </span>
+
+                @if (importeRealCents() !== null) {
+                <strong [class.cash-closing__value--positive]="
+                            (diferenciaCents() ?? 0) > 0
+                        "
+                        [class.cash-closing__value--negative]="
+                            (diferenciaCents() ?? 0) < 0
+                        ">
+                    {{
+                        (diferenciaCents() ?? 0)
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
+                </strong>
+                }
+                @else {
+                <strong class="cash-closing__pending-value">
+                    —
+                </strong>
+                }
+            </article>
+
+            <article class="cash-closing__field cash-closing__field--input">
+                <span>
+                    Entrada
+                </span>
+
+                <mat-form-field appearance="outline"
+                                subscriptSizing="dynamic">
+                    <input matInput
+                           type="number"
+                           step="0.01"
+                           [formField]="cierreForm.entradaEuros">
+
+                    <span matTextSuffix>
+                        €
+                    </span>
+                </mat-form-field>
+            </article>
+
+            <article class="cash-closing__field cash-closing__field--highlight">
+                <span>
+                    Saldo siguiente caja
+                </span>
+
+                @if (importeRealCents() !== null) {
+                <strong>
+                    {{
+                        (saldoSiguienteCents() ?? 0)
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                    }}
+                </strong>
+                }
+                @else {
+                <strong class="cash-closing__pending-value">
+                    —
+                </strong>
+                }
+            </article>
+        </section>
+
+        <div class="cash-closing__recount-info">
+            <mat-icon aria-hidden="true">
+                calculate
+            </mat-icon>
+
+            <div>
+                <strong>
+                    Recuento de efectivo pendiente
+                </strong>
+
+                <span>
+                    En el siguiente paso, Importe real se obtendrá contando
+                    monedas y billetes.
+                </span>
+            </div>
+        </div>
+    </div>
+    }
+    @else {
+    <div class="cash-closing__state">
+        <mat-icon aria-hidden="true">
+            point_of_sale
+        </mat-icon>
+
+        <h2>
+            No hay ninguna caja abierta
+        </h2>
+
+        <p>
+            Debes abrir una caja antes de poder realizar un cierre.
+        </p>
+    </div>
+    }
+</section>

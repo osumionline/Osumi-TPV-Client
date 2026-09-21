@@ -8,6 +8,7 @@ import {
   type WritableSignal,
 } from '@angular/core';
 import HeaderComponent from '@app/components/header/header.component';
+import CashClosingComponent from '@modules/caja/components/cash-closing/cash-closing.component';
 import CashOutflowsComponent from '@modules/caja/components/cash-outflows/cash-outflows.component';
 import HistoricalSalesComponent from '@modules/ventas/components/historical-sales/historical-sales.component';
 import { DialogService } from '@osumi/angular-tools';
@@ -47,7 +48,7 @@ const CASH_REGISTER_SECTIONS: readonly CashRegisterSectionDefinition[] = [
   selector: 'otpv-cash-register',
   templateUrl: './cash-register.component.html',
   styleUrl: './cash-register.component.scss',
-  imports: [CashOutflowsComponent, HeaderComponent, HistoricalSalesComponent],
+  imports: [CashClosingComponent, CashOutflowsComponent, HeaderComponent, HistoricalSalesComponent],
 })
 export default class CashRegisterComponent implements OnInit {
   private readonly dialog: DialogService = inject(DialogService);
