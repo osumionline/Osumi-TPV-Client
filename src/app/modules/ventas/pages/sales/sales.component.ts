@@ -10,7 +10,6 @@ import {
 import { MatButton } from '@angular/material/button';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import HeaderComponent from '@app/components/header/header.component';
-import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type ReservaInterface from '@desktop-contracts/ventas/reservas/reserva.interface';
 import type Cliente from '@model/clientes/cliente.model';
 import type Empleado from '@model/empleados/empleado.model';
@@ -119,14 +118,8 @@ export default class SalesComponent implements OnInit {
       return;
     }
 
-    const appData = this.ventasContextService.appData();
-
-    if (appData === null) {
-      return;
-    }
-
-    if (!appData.empleados || empleados.length === 1) {
-      this.ventasService.crearVenta(empleados[0]);
+    if (empleados.length === 1) {
+      this.ventasService.crearVenta(empleados[0]!);
 
       return;
     }
@@ -262,12 +255,6 @@ export default class SalesComponent implements OnInit {
       return;
     }
 
-    const appData: AppData | null = this.ventasContextService.appData();
-
-    if (appData === null) {
-      return;
-    }
-
     const pending: PendingReservasLoad = {
       cliente,
       reservas,
@@ -279,7 +266,7 @@ export default class SalesComponent implements OnInit {
      */
     this.managingReservas.set(false);
 
-    if (!appData.empleados || empleados.length === 1) {
+    if (empleados.length === 1) {
       this.createVentaDesdeReservas(empleados[0]!, pending);
 
       return;
