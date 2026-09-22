@@ -27,11 +27,6 @@ import VentasContextService from '@services/ventas/ventas-context.service';
 import VentasService from '@services/ventas/ventas.service';
 import { getErrorMessage } from '@utils/error.utils';
 
-interface PendingReservasLoad {
-  readonly cliente: Cliente;
-  readonly reservas: readonly ReservaInterface[];
-}
-
 /**
  * Página principal del módulo de ventas.
  */
@@ -61,15 +56,8 @@ export default class SalesComponent implements OnInit {
   );
 
   readonly initializing: WritableSignal<boolean> = signal<boolean>(true);
-
-  readonly selectingEmployee: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly selectingClient: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly managingReservas: WritableSignal<boolean> = signal<boolean>(false);
-
-  private readonly pendingReservasLoad: WritableSignal<PendingReservasLoad | null> =
-    signal<PendingReservasLoad | null>(null);
 
   readonly appName: Signal<string> = computed((): string => {
     const appData = this.ventasContextService.appData();
@@ -140,44 +128,6 @@ export default class SalesComponent implements OnInit {
    */
   selectVentaEmpleado(ventaIdTemporal: string, empleado: Empleado): void {
     this.ventasService.asignarEmpleado(ventaIdTemporal, empleado);
-  }
-
-  /**
-   * Crea una nueva venta con el empleado seleccionado.
-   */
-  /**
-   * Crea la venta correspondiente con el empleado seleccionado.
-   */
-  selectEmpleado(empleado: Empleado): void {
-    this.selectingEmployee.set(false);
-
-    const pendingReservas: PendingReservasLoad | null = this.pendingReservasLoad();
-
-    if (pendingReservas !== null) {
-      this.pendingReservasLoad.set(null);
-
-      this.createVentaDesdeReservas(empleado, pendingReservas);
-
-      return;
-    }
-
-    this.ventasService.crearVenta(empleado);
-  }
-
-  /**
-   * Cancela la selección de empleado sin crear una nueva venta.
-   */
-  cancelEmployeeSelection(): void {
-    this.selectingEmployee.set(false);
-    this.pendingReservasLoad.set(null);
-
-    const ventaIdTemporal: string | null = this.ventasService.ventaActivaId();
-
-    if (ventaIdTemporal !== null) {
-      this.ventasService.setFocusTarget(ventaIdTemporal, {
-        type: 'localizador',
-      });
-    }
   }
 
   /**
@@ -270,26 +220,12 @@ export default class SalesComponent implements OnInit {
       return;
     }
 
-    const pending: PendingReservasLoad = {
-      cliente,
-      reservas,
-    };
-
     /*
-     * Cerramos el gestor antes de abrir una
-     * nueva pestaña o el selector de empleado.
+     * Cerramos el gestor antes de abrir la nueva pestaña.
      */
     this.managingReservas.set(false);
 
-    if (empleados.length === 1) {
-      this.createVentaDesdeReservas(empleados[0]!, pending);
-
-      return;
-    }
-
-    this.pendingReservasLoad.set(pending);
-
-    this.selectingEmployee.set(true);
+    this.createVentaDesdeReservas(empleados.length === 1 ? empleados[0]! : null, cliente, reservas);
   }
 
   /**
@@ -458,12 +394,18 @@ export default class SalesComponent implements OnInit {
   }
 
   /**
-   * Crea materialmente una pestaña nueva a
-   * partir de las reservas seleccionadas.
+   * Crea una venta a partir de las reservas seleccionadas.
+   *
+   * Con varios empleados la venta se crea sin responsable
+   * y utilizará el selector embebido de la propia pestaña.
    */
-  private createVentaDesdeReservas(empleado: Empleado, pending: PendingReservasLoad): void {
+  private createVentaDesdeReservas(
+    empleado: Empleado | null,
+    cliente: Cliente,
+    reservas: readonly ReservaInterface[],
+  ): void {
     try {
-      this.ventasService.crearVentaDesdeReservas(empleado, pending.cliente, pending.reservas);
+      this.ventasService.crearVentaDesdeReservas(empleado, cliente, reservas);
     } catch (error: unknown) {
       this.dialog.alert({
         title: 'Error',

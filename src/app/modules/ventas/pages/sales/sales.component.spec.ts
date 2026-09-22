@@ -96,43 +96,35 @@ describe('SalesComponent', (): void => {
 
   it('muestra un error si no hay empleados disponibles', (): void => {
     empleados.set([]);
+
     component.nuevaVenta();
 
     expect(crearVentaMock).not.toHaveBeenCalled();
-    expect(component.selectingEmployee()).toBe(false);
+
     expect(alertMock).toHaveBeenCalledWith({
       title: 'Error',
-
       content: 'No existe ningún empleado disponible para crear una venta.',
     });
   });
 
   it('asigna automáticamente el único empleado disponible', (): void => {
     const empleado: Empleado = createEmpleado(1, 'Ana');
+
     empleados.set([empleado]);
+
     component.nuevaVenta();
 
     expect(crearVentaMock).toHaveBeenCalledTimes(1);
     expect(crearVentaMock).toHaveBeenCalledWith(empleado);
-    expect(component.selectingEmployee()).toBe(false);
   });
 
   it('crea una venta pendiente cuando hay más de un empleado', (): void => {
-    const first: Empleado = createEmpleado(1, 'Ana');
-    const second: Empleado = createEmpleado(2, 'Jon');
-
-    empleados.set([first, second]);
+    empleados.set([createEmpleado(1, 'Ana'), createEmpleado(2, 'Jon')]);
 
     component.nuevaVenta();
 
     expect(crearVentaMock).toHaveBeenCalledTimes(1);
     expect(crearVentaMock).toHaveBeenCalledWith();
-
-    /*
-     * La nueva venta normal ya no abre
-     * el selector modal global.
-     */
-    expect(component.selectingEmployee()).toBe(false);
   });
 
   it('asigna posteriormente el empleado a una venta pendiente', (): void => {
@@ -155,30 +147,28 @@ describe('SalesComponent', (): void => {
     await component.loadReservas([reserva]);
 
     expect(component.managingReservas()).toBe(false);
-    expect(component.selectingEmployee()).toBe(false);
+
     expect(crearVentaDesdeReservasMock).toHaveBeenCalledTimes(1);
+
     expect(crearVentaDesdeReservasMock).toHaveBeenCalledWith(empleado, cliente, [reserva]);
   });
 
-  it('solicita empleado antes de cargar reservas cuando hay varios', async (): Promise<void> => {
+  it('crea una venta de reserva pendiente cuando hay varios empleados', async (): Promise<void> => {
     const first: Empleado = createEmpleado(1, 'Ana');
     const second: Empleado = createEmpleado(2, 'Jon');
     const reserva: ReservaInterface = createReserva();
 
     empleados.set([first, second]);
+
     component.managingReservas.set(true);
 
     await component.loadReservas([reserva]);
 
     expect(component.managingReservas()).toBe(false);
-    expect(crearVentaDesdeReservasMock).not.toHaveBeenCalled();
-    expect(component.selectingEmployee()).toBe(true);
 
-    component.selectEmpleado(second);
-
-    expect(component.selectingEmployee()).toBe(false);
     expect(crearVentaDesdeReservasMock).toHaveBeenCalledTimes(1);
-    expect(crearVentaDesdeReservasMock).toHaveBeenCalledWith(second, cliente, [reserva]);
+
+    expect(crearVentaDesdeReservasMock).toHaveBeenCalledWith(null, cliente, [reserva]);
   });
 
   it('no permite iniciar una venta cuando no hay una caja operativa', (): void => {
@@ -189,7 +179,6 @@ describe('SalesComponent', (): void => {
     component.nuevaVenta();
 
     expect(crearVentaMock).not.toHaveBeenCalled();
-    expect(component.selectingEmployee()).toBe(false);
     expect(alertMock).not.toHaveBeenCalled();
   });
 });

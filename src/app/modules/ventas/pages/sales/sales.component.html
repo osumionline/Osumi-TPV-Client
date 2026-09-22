@@ -64,7 +64,6 @@
   @if (ventasService.ventaActiva(); as venta) {
   @if (venta.empleado === null) {
   <otpv-employee-selector [empleados]="empleadosService.empleados()"
-                          [embedded]="true"
                           (selectEvent)="
                                   selectVentaEmpleado(
                                       venta.idTemporal,
@@ -93,12 +92,6 @@
   }
   }
 </main>
-
-@if (selectingEmployee()) {
-<otpv-employee-selector [empleados]="empleadosService.empleados()"
-                        (selectEvent)="selectEmpleado($event)"
-                        (cancelEvent)="cancelEmployeeSelection()" />
-}
 
 @if (selectingClient() && ventasService.ventaActiva(); as venta) {
 <otpv-client-selector [clientes]="clientesService.clientes()"
