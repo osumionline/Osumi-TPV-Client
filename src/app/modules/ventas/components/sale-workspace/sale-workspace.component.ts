@@ -22,7 +22,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { Router } from '@angular/router';
 import { PERCENT_TOTAL } from '@constants/percentage.constants';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
-import permissionIds from '@desktop-contracts/configuration/permissions/permission-ids.constants';
+import permissionKeys from '@desktop-contracts/configuration/permissions/permission-keys.constants';
 import type GuardarVentaResult from '@desktop-contracts/ventas/guardar-venta-result.interface';
 import type ReservaInterface from '@desktop-contracts/ventas/reservas/reserva.interface';
 import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devolucion.interface';
@@ -339,7 +339,7 @@ export default class SaleWorkspaceComponent {
       return false;
     }
 
-    return empleado.admin || empleado.hasPerm(permissionIds.ventas.modificarImportes);
+    return empleado.admin || empleado.hasPerm(permissionKeys.ventas.modificarImportes);
   }
 
   /**
