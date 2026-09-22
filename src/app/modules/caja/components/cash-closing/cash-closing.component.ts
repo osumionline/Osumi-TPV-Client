@@ -9,6 +9,7 @@ import {
   type WritableSignal,
 } from '@angular/core';
 import { FieldTree, form, FormField } from '@angular/forms/signals';
+import { MatButton } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
@@ -17,6 +18,11 @@ import type {
   CajaCierreInterface,
   CajaCierreTipoPagoInterface,
 } from '@desktop-contracts/caja/caja-cierre.interface';
+import type {
+  CerrarCajaCommand,
+  CerrarCajaRecuentoCommand,
+  CerrarCajaTipoPagoCommand,
+} from '@desktop-contracts/caja/cerrar-caja-command.interface';
 import createCajaCierreFormInitialValue from '@model/caja/caja-cierre-form.initial-value';
 import type {
   CajaCierreFormModel,
@@ -25,11 +31,32 @@ import type {
 import cajaCierreFormSchema from '@model/caja/caja-cierre-form.schema';
 import createCajaCierreTipoPagoInitialValue from '@model/caja/caja-cierre-tipo-pago.initial-value';
 import type CajaCierreTipoPagoModel from '@model/caja/caja-cierre-tipo-pago.model';
+import { DialogService } from '@osumi/angular-tools';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import CajaCierreService from '@services/caja/caja-cierre.service';
 import VentasContextService from '@services/ventas/ventas-context.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { eurosToCents } from '@utils/money.utils';
+import { firstValueFrom } from 'rxjs';
+
+const CAJA_RECUENTO_FIELDS: readonly (readonly [keyof CajaCierreRecuentoFormModel, number])[] = [
+  ['cent1', 1],
+  ['cent2', 2],
+  ['cent5', 5],
+  ['cent10', 10],
+  ['cent20', 20],
+  ['cent50', 50],
+
+  ['euro1', 100],
+  ['euro2', 200],
+  ['euro5', 500],
+  ['euro10', 1_000],
+  ['euro20', 2_000],
+  ['euro50', 5_000],
+  ['euro100', 10_000],
+  ['euro200', 20_000],
+  ['euro500', 50_000],
+];
 
 /**
  * Prepara visualmente los datos necesarios para cerrar
@@ -47,13 +74,16 @@ import { eurosToCents } from '@utils/money.utils';
     MatFormFieldModule,
     MatIcon,
     MatInput,
+    MatButton,
   ],
 })
 export default class CashClosingComponent implements OnInit {
   private readonly cajaCierreService: CajaCierreService = inject(CajaCierreService);
   readonly ventasContextService: VentasContextService = inject(VentasContextService);
+  private readonly dialog: DialogService = inject(DialogService);
 
   readonly loading: WritableSignal<boolean> = signal<boolean>(true);
+  readonly closing: WritableSignal<boolean> = signal<boolean>(false);
   readonly error: WritableSignal<string | null> = signal<string | null>(null);
   readonly cierre: WritableSignal<CajaCierreInterface | null> = signal<CajaCierreInterface | null>(
     null,
@@ -168,6 +198,18 @@ export default class CashClosingComponent implements OnInit {
     return realCents + this.entradaCents();
   });
 
+  readonly canClose: Signal<boolean> = computed(
+    (): boolean =>
+      this.cierre() !== null &&
+      !this.loading() &&
+      !this.closing() &&
+      !this.cierreForm().invalid() &&
+      this.importeRealCents() !== null &&
+      this.tiposPago().every(
+        (tipoPago: CajaCierreTipoPagoModel): boolean => tipoPago.importeRealCents !== null,
+      ),
+  );
+
   /**
    * Refresca el contexto operativo y carga el snapshot
    * canónico de la caja abierta.
@@ -199,6 +241,7 @@ export default class CashClosingComponent implements OnInit {
       const cierre: CajaCierreInterface = await this.cajaCierreService.getCierre({
         cajaPublicId: caja.publicId,
       });
+      console.log(cierre);
 
       this.cierre.set(cierre);
       this.tiposPago.set(
@@ -294,6 +337,155 @@ export default class CashClosingComponent implements OnInit {
     }
 
     return tipoPago.importeRealCents - tipoPago.importeVentasCents;
+  }
+
+  /**
+   * Solicita confirmación y cierra definitivamente
+   * la caja actualmente preparada.
+   */
+  async closeCaja(): Promise<void> {
+    if (!this.canClose()) {
+      return;
+    }
+
+    const command: CerrarCajaCommand | null = this.buildCloseCommand();
+
+    if (command === null) {
+      return;
+    }
+
+    const diferenciaCents: number | null = this.diferenciaCents();
+
+    const content: string =
+      diferenciaCents !== null && diferenciaCents < 0
+        ? 'El recuento presenta una diferencia negativa. ¿Estás seguro de querer cerrar definitivamente esta caja?'
+        : '¿Estás seguro de querer cerrar definitivamente esta caja?';
+
+    const confirmed: boolean = await firstValueFrom(
+      this.dialog.confirm({
+        title: 'Cerrar caja',
+        content,
+        warn: true,
+        ok: 'Cerrar caja',
+        cancel: 'Cancelar',
+      }),
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.closing.set(true);
+
+    try {
+      await this.cajaCierreService.close(command);
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido cerrar la caja.'),
+        })
+        .subscribe();
+
+      return;
+    } finally {
+      this.closing.set(false);
+    }
+
+    /*
+     * El cierre ya se ha confirmado en SQLite.
+     *
+     * Limpiamos inmediatamente el contexto en memoria para que,
+     * incluso si la recarga posterior falla, el renderer no siga
+     * creyendo que puede vender sobre la caja ya cerrada.
+     */
+    this.ventasContextService.clear();
+    this.clearAfterClose();
+
+    try {
+      await this.ventasContextService.reload();
+    } catch (error: unknown) {
+      console.error('Error reloading ventas context:', error);
+      await firstValueFrom(
+        this.dialog.alert({
+          title: 'Caja cerrada',
+          content:
+            'La caja se ha cerrado correctamente, pero no se ha podido actualizar el contexto operativo. Será necesario volver a cargarlo antes de continuar.',
+        }),
+      );
+
+      return;
+    }
+
+    await firstValueFrom(
+      this.dialog.alert({
+        title: 'Caja cerrada',
+        content: 'La caja se ha cerrado correctamente.',
+      }),
+    );
+  }
+
+  private buildCloseCommand(): CerrarCajaCommand | null {
+    const cierre: CajaCierreInterface | null = this.cierre();
+
+    if (cierre === null || this.importeRealCents() === null) {
+      return null;
+    }
+
+    const recuento: readonly CerrarCajaRecuentoCommand[] = this.buildRecuentoCommand();
+
+    if (recuento.length === 0) {
+      return null;
+    }
+
+    const tiposPago: CerrarCajaTipoPagoCommand[] = [];
+
+    for (const tipoPago of this.tiposPago()) {
+      if (tipoPago.importeRealCents === null) {
+        return null;
+      }
+
+      tiposPago.push({
+        tipoPagoPublicId: tipoPago.publicId,
+        importeRealCents: tipoPago.importeRealCents,
+      });
+    }
+
+    return {
+      cajaPublicId: cierre.cajaPublicId,
+      retiradoCents: this.retiradoCents(),
+      entradaCents: this.entradaCents(),
+      recuento,
+      tiposPago,
+    };
+  }
+
+  private buildRecuentoCommand(): readonly CerrarCajaRecuentoCommand[] {
+    const recuento: CajaCierreRecuentoFormModel = this.cierreDataModel().recuento;
+
+    const result: CerrarCajaRecuentoCommand[] = [];
+
+    for (const [field, valorCents] of CAJA_RECUENTO_FIELDS) {
+      const cantidad: number | null = recuento[field];
+
+      if (cantidad === null) {
+        continue;
+      }
+
+      result.push({
+        valorCents,
+        cantidad,
+      });
+    }
+
+    return result;
+  }
+
+  private clearAfterClose(): void {
+    this.cierre.set(null);
+    this.tiposPago.set([]);
+    this.recuentoOpen.set(false);
+    this.cierreForm().reset(createCajaCierreFormInitialValue());
   }
 
   /**

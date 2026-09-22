@@ -358,6 +358,12 @@
         }
     }
 
+    .cash-closing__actions {
+        display: flex;
+        padding-top: 8px;
+        justify-content: flex-end;
+    }
+
     @media (max-width: 1000px) {
         .cash-closing__summary {
             grid-template-columns: repeat(2, minmax(200px, 1fr));

@@ -5,8 +5,10 @@ import type { CajaCierreInterface } from '@desktop-contracts/caja/caja-cierre.in
 import createCajaCierreFormInitialValue from '@model/caja/caja-cierre-form.initial-value';
 import type CajaCierreTipoPagoModel from '@model/caja/caja-cierre-tipo-pago.model';
 import CashClosingComponent from '@modules/caja/components/cash-closing/cash-closing.component';
+import { DialogService } from '@osumi/angular-tools';
 import CajaCierreService from '@services/caja/caja-cierre.service';
 import VentasContextService from '@services/ventas/ventas-context.service';
+import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 describe('CashClosingComponent', (): void => {
@@ -16,6 +18,10 @@ describe('CashClosingComponent', (): void => {
   let cajaAbierta: WritableSignal<CajaAbiertaInterface | null>;
   let reloadMock: Mock;
   let getCierreMock: Mock;
+  let closeMock: Mock;
+  let clearMock: Mock;
+  let confirmMock: Mock;
+  let alertMock: Mock;
 
   beforeEach(async (): Promise<void> => {
     cajaAbierta = signal<CajaAbiertaInterface | null>({
@@ -29,21 +35,35 @@ describe('CashClosingComponent', (): void => {
     reloadMock = vi.fn().mockResolvedValue(undefined);
 
     getCierreMock = vi.fn().mockResolvedValue(createCierre());
+    closeMock = vi.fn().mockResolvedValue(undefined);
+    clearMock = vi.fn();
+
+    confirmMock = vi.fn().mockReturnValue(of(true));
+    alertMock = vi.fn().mockReturnValue(of(undefined));
 
     await TestBed.configureTestingModule({
       imports: [CashClosingComponent],
       providers: [
         {
-          provide: CajaCierreService,
-          useValue: {
-            getCierre: getCierreMock,
-          },
-        },
-        {
           provide: VentasContextService,
           useValue: {
             cajaAbierta: cajaAbierta.asReadonly(),
             reload: reloadMock,
+            clear: clearMock,
+          },
+        },
+        {
+          provide: CajaCierreService,
+          useValue: {
+            getCierre: getCierreMock,
+            close: closeMock,
+          },
+        },
+        {
+          provide: DialogService,
+          useValue: {
+            confirm: confirmMock,
+            alert: alertMock,
           },
         },
       ],
@@ -270,6 +290,132 @@ describe('CashClosingComponent', (): void => {
       0,
     );
   });
+
+  it('no permite cerrar hasta realizar el recuento', async (): Promise<void> => {
+    await component.load();
+
+    expect(component.canClose()).toBe(false);
+
+    prepareValidClosing(component);
+
+    expect(component.canClose()).toBe(true);
+  });
+
+  it('construye el cierre con recuento, entrada, retirada y reales por tipo', async (): Promise<void> => {
+    await component.load();
+
+    prepareValidClosing(component);
+
+    await component.closeCaja();
+
+    expect(closeMock).toHaveBeenCalledWith({
+      cajaPublicId: 'caja-1',
+      retiradoCents: 2_000,
+      entradaCents: 1_000,
+
+      recuento: [
+        {
+          valorCents: 1,
+          cantidad: 0,
+        },
+        {
+          valorCents: 500,
+          cantidad: 1,
+        },
+        {
+          valorCents: 2_000,
+          cantidad: 1,
+        },
+        {
+          valorCents: 10_000,
+          cantidad: 1,
+        },
+      ],
+
+      tiposPago: [
+        {
+          tipoPagoPublicId: 'tipo-tarjeta',
+          importeRealCents: 12_500,
+        },
+        {
+          tipoPagoPublicId: 'tipo-vale',
+          importeRealCents: 5_000,
+        },
+        {
+          tipoPagoPublicId: 'tipo-bizum',
+          importeRealCents: 0,
+        },
+        {
+          tipoPagoPublicId: 'tipo-devolucion',
+          importeRealCents: -2_000,
+        },
+      ],
+    });
+  });
+
+  it('no cierra la caja si el usuario cancela la confirmación', async (): Promise<void> => {
+    confirmMock.mockReturnValue(of(false));
+
+    await component.load();
+
+    prepareValidClosing(component);
+
+    await component.closeCaja();
+
+    expect(closeMock).not.toHaveBeenCalled();
+    expect(clearMock).not.toHaveBeenCalled();
+  });
+
+  it('limpia y recarga el contexto después de cerrar correctamente', async (): Promise<void> => {
+    await component.load();
+
+    prepareValidClosing(component);
+
+    /*
+     * Ignoramos la recarga realizada por load().
+     */
+    reloadMock.mockClear();
+
+    await component.closeCaja();
+
+    expect(closeMock).toHaveBeenCalledTimes(1);
+    expect(clearMock).toHaveBeenCalledTimes(1);
+    expect(reloadMock).toHaveBeenCalledTimes(1);
+
+    expect(component.cierre()).toBeNull();
+    expect(component.tiposPago()).toEqual([]);
+    expect(component.recuentoOpen()).toBe(false);
+  });
+
+  it('advierte expresamente cuando el efectivo tiene una diferencia negativa', async (): Promise<void> => {
+    await component.load();
+
+    const initialValue = createCajaCierreFormInitialValue();
+
+    component.cierreForm().reset({
+      ...initialValue,
+
+      recuento: {
+        ...initialValue.recuento,
+
+        /*
+         * Solo 5 €, frente a 155 € teóricos.
+         */
+        euro5: 1,
+      },
+    });
+
+    await component.closeCaja();
+
+    expect(confirmMock).toHaveBeenCalledWith({
+      title: 'Cerrar caja',
+      content:
+        'El recuento presenta una diferencia negativa. ¿Estás seguro de querer cerrar definitivamente esta caja?',
+      warn: true,
+      ok: 'Cerrar caja',
+      cancel: 'Cancelar',
+    });
+  });
 });
 
 /**
@@ -343,4 +489,23 @@ function createInputEvent(value: string): Event {
   return {
     currentTarget: input,
   } as unknown as Event;
+}
+
+function prepareValidClosing(component: CashClosingComponent): void {
+  const initialValue = createCajaCierreFormInitialValue();
+
+  component.cierreForm().reset({
+    ...initialValue,
+
+    retiradoEuros: 20,
+    entradaEuros: 10,
+
+    recuento: {
+      ...initialValue.recuento,
+      cent1: 0,
+      euro5: 1,
+      euro20: 1,
+      euro100: 1,
+    },
+  });
 }

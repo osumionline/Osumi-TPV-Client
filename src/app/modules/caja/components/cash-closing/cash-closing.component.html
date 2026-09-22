@@ -566,6 +566,19 @@
             </div>
         </section>
         }
+        <footer class="cash-closing__actions">
+            <button mat-flat-button
+                    type="button"
+                    [disabled]="!canClose()"
+                    (click)="closeCaja()">
+                @if (closing()) {
+                Cerrando caja...
+                }
+                @else {
+                Cerrar caja
+                }
+            </button>
+        </footer>
     </div>
     }
     @else {
