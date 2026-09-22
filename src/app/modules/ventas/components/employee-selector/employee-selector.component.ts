@@ -13,9 +13,9 @@ import type Empleado from '@model/empleados/empleado.model';
 })
 export default class EmployeeSelectorComponent {
   readonly empleados: InputSignal<readonly Empleado[]> = input.required<readonly Empleado[]>();
+  readonly embedded: InputSignal<boolean> = input<boolean>(false);
 
   readonly selectEvent: OutputEmitterRef<Empleado> = output<Empleado>();
-
   readonly cancelEvent: OutputEmitterRef<void> = output<void>();
 
   /**

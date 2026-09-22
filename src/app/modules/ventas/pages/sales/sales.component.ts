@@ -124,7 +124,22 @@ export default class SalesComponent implements OnInit {
       return;
     }
 
-    this.selectingEmployee.set(true);
+    /*
+     * Con varios empleados la venta se crea inmediatamente,
+     * pero queda pendiente de asignación.
+     *
+     * Esto permite seguir navegando por el resto de la aplicación
+     * sin que la selección de empleado bloquee toda la interfaz.
+     */
+    this.ventasService.crearVenta();
+  }
+
+  /**
+   * Asigna un empleado a una venta que todavía
+   * estaba pendiente de responsable.
+   */
+  selectVentaEmpleado(ventaIdTemporal: string, empleado: Empleado): void {
+    this.ventasService.asignarEmpleado(ventaIdTemporal, empleado);
   }
 
   /**

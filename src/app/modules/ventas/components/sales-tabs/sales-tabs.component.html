@@ -33,16 +33,19 @@
                 type="button"
                 [disabled]="
                     selectedVenta() === null ||
+                    selectedVenta()?.empleado === null ||
                     selectedVenta()?.tieneReservas === true
                 "
                 [matTooltip]="
                     selectedVenta() === null
                         ? 'No hay venta activa'
-                        : selectedVenta()?.tieneReservas
-                            ? 'Cliente fijado por las reservas'
-                            : selectedVenta()?.cliente === null
-                                ? 'Seleccionar cliente'
-                                : 'Cambiar cliente'
+                        : selectedVenta()?.empleado === null
+                            ? 'Selecciona primero un empleado'
+                            : selectedVenta()?.tieneReservas
+                                ? 'Cliente fijado por las reservas'
+                                : selectedVenta()?.cliente === null
+                                    ? 'Seleccionar cliente'
+                                    : 'Cambiar cliente'
                 "
                 (click)="openClient()">
             @if (selectedVenta()?.cliente; as cliente) {

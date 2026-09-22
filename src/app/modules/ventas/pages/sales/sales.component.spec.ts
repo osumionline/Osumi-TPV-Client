@@ -21,6 +21,7 @@ describe('SalesComponent', (): void => {
   let crearVentaDesdeReservasMock: Mock;
   let cliente: Cliente;
   let puedeVender: WritableSignal<boolean>;
+  let asignarEmpleadoMock: Mock;
 
   beforeEach(async (): Promise<void> => {
     empleados = signal<readonly Empleado[]>([]);
@@ -29,6 +30,7 @@ describe('SalesComponent', (): void => {
     crearVentaDesdeReservasMock = vi.fn();
     cliente = createCliente();
     puedeVender = signal<boolean>(true);
+    asignarEmpleadoMock = vi.fn();
 
     await TestBed.configureTestingModule({
       imports: [SalesComponent],
@@ -62,6 +64,7 @@ describe('SalesComponent', (): void => {
             ventaActivaId: (): null => null,
             findById: vi.fn(),
             setFocusTarget: vi.fn(),
+            asignarEmpleado: asignarEmpleadoMock,
           },
         },
         {
@@ -114,21 +117,32 @@ describe('SalesComponent', (): void => {
     expect(component.selectingEmployee()).toBe(false);
   });
 
-  it('abre el selector cuando hay más de un empleado', (): void => {
+  it('crea una venta pendiente cuando hay más de un empleado', (): void => {
     const first: Empleado = createEmpleado(1, 'Ana');
     const second: Empleado = createEmpleado(2, 'Jon');
 
     empleados.set([first, second]);
+
     component.nuevaVenta();
 
-    expect(crearVentaMock).not.toHaveBeenCalled();
-    expect(component.selectingEmployee()).toBe(true);
-
-    component.selectEmpleado(second);
-
-    expect(component.selectingEmployee()).toBe(false);
     expect(crearVentaMock).toHaveBeenCalledTimes(1);
-    expect(crearVentaMock).toHaveBeenCalledWith(second);
+    expect(crearVentaMock).toHaveBeenCalledWith();
+
+    /*
+     * La nueva venta normal ya no abre
+     * el selector modal global.
+     */
+    expect(component.selectingEmployee()).toBe(false);
+  });
+
+  it('asigna posteriormente el empleado a una venta pendiente', (): void => {
+    const empleado: Empleado = createEmpleado(2, 'Jon');
+
+    component.selectVentaEmpleado('venta-pendiente', empleado);
+
+    expect(asignarEmpleadoMock).toHaveBeenCalledTimes(1);
+
+    expect(asignarEmpleadoMock).toHaveBeenCalledWith('venta-pendiente', empleado);
   });
 
   it('carga directamente una reserva cuando solo hay un empleado', async (): Promise<void> => {

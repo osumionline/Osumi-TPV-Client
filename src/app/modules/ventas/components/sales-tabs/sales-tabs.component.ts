@@ -82,7 +82,7 @@ export default class SalesTabsComponent {
   openClient(): void {
     const venta: VentaEnCurso | null = this.selectedVenta();
 
-    if (venta === null || venta.tieneReservas) {
+    if (venta === null || venta.empleado === null || venta.tieneReservas) {
       return;
     }
 

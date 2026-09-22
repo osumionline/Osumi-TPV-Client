@@ -62,10 +62,23 @@
                    (reservationsEvent)="openReservas()" />
 
   @if (ventasService.ventaActiva(); as venta) {
+  @if (venta.empleado === null) {
+  <otpv-employee-selector [empleados]="empleadosService.empleados()"
+                          [embedded]="true"
+                          (selectEvent)="
+                                  selectVentaEmpleado(
+                                      venta.idTemporal,
+                                      $event
+                                  )
+                              " />
+  }
+  @else {
   <otpv-sale-workspace [venta]="venta"
                        (completedEvent)="completeVenta($event)"
                        (cancelEvent)="cancelarVentaActiva()" />
-  } @else {
+  }
+  }
+  @else {
   <section class="sales__state">
     <h2>
       No hay ninguna venta abierta

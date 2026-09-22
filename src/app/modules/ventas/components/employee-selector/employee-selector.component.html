@@ -1,11 +1,20 @@
-<div class="overlay overlay--dimmed">
-    <section class="selector overlay__panel"
-             role="dialog"
-             aria-modal="true"
+<div class="employee-selector"
+     [class.overlay]="!embedded()"
+     [class.overlay--dimmed]="!embedded()"
+     [class.employee-selector--embedded]="embedded()">
+    <section class="selector"
+             [class.overlay__panel]="!embedded()"
+             [class.selector--embedded]="embedded()"
+             [attr.role]="embedded() ? null : 'dialog'"
+             [attr.aria-modal]="embedded() ? null : 'true'"
              aria-labelledby="employee-selector-title">
         <h2 id="employee-selector-title">
             Seleccionar empleado
         </h2>
+
+        <p class="selector__description">
+            Selecciona quién atenderá esta venta.
+        </p>
 
         <div class="selector__employees">
             @for (empleado of empleados(); track empleado.publicId) {
@@ -19,6 +28,7 @@
             }
         </div>
 
+        @if (!embedded()) {
         <div class="selector__actions">
             <button mat-stroked-button
                     type="button"
@@ -26,5 +36,6 @@
                 Cancelar
             </button>
         </div>
+        }
     </section>
 </div>
