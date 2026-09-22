@@ -1,10 +1,10 @@
-# Osumi TPV Client — Documento de continuidad v2.78
+# Osumi TPV Client — Documento de continuidad v2.79
 
-**Fecha:** 21 de septiembre de 2026  
+**Fecha:** 22 de septiembre de 2026  
 **Proyecto:** Osumi TPV Client  
 **Repositorio principal:** `https://github.com/osumionline/Osumi-TPV-Client`
 
-Este documento sustituye a `docs/osumi-tpv-continuidad-v2.77.md`.
+Este documento sustituye a `docs/osumi-tpv-continuidad-v2.78.md`.
 
 Su objetivo es permitir retomar el desarrollo sin perder decisiones funcionales, arquitectura, convenciones, estado real del código ni el siguiente paso exacto.
 
@@ -42,6 +42,30 @@ El desarrollo se realiza de forma incremental y controlada.
 - No crear migraciones antes de la primera versión estable salvo necesidad expresa.
 - `DATABASE_SCHEMA_VERSION = 1`.
 
+## Convención de exports
+
+Regla expresa del usuario:
+
+```text
+1 único símbolo exportado por archivo
+→ usar siempre export default
+
+2 o más símbolos exportados por archivo
+→ usar exports nominales
+→ NO usar ningún export default
+```
+
+Aplica a:
+
+- interfaces;
+- tipos;
+- funciones;
+- clases;
+- constantes;
+- cualquier otro símbolo exportado.
+
+No mezclar `export default` con otros exports cuando un archivo exporta más de un símbolo.
+
 ## Angular
 
 - Angular 22.1.7.
@@ -63,8 +87,6 @@ El desarrollo se realiza de forma incremental y controlada.
 - Renderer/frontend: globals según configuración actual.
 - Aislar hijos pesados en specs del padre cuando el hijo ya tiene tests propios.
 - Caso consolidado: `PaymentTypeStatisticsComponent` se sustituye por stub en el spec de `ManagementPaymentTypesComponent` para no inicializar ECharts/`ResizeObserver` en JSDOM.
-
----
 
 # 2. Repositorios y acceso
 
@@ -94,11 +116,17 @@ La GitHub App `ChatGPT Codex Connector` está instalada también en la cuenta `i
 ## Cerrado
 
 - 16 Compras ✅
-- 17 Gestión ✅ hasta 17.6
+- 17 Gestión:
+  - 17.1 Shell/rutas ✅
+  - 17.2 Auth backend empleados ✅
+  - 17.3 Sesión/permisos ✅
+  - 17.4 Ajustes ✅
+  - 17.5 Empleados ✅
+  - 17.6 Tipos de pago ✅
 - Corrección foco modal Gestión ✅
 - Ventas/Empleados ✅
 - Retirada total del antiguo flag `empleados` ✅
-- 18 Caja:
+- 18 Caja ✅ **CERRADO EN EL ALCANCE ACORDADO**
   - 18.1 Shell ✅
   - 18.2 Histórico embebido ✅
   - 18.3 Lectura de Salidas ✅
@@ -109,68 +137,92 @@ La GitHub App `ChatGPT Codex Connector` está instalada también en la cuenta `i
   - 18.6 UI de cierre + recuento ✅
     - 18.6a pantalla + snapshot ✅
     - 18.6b recuento físico ✅
+  - 18.7 Desglose por tipos de pago ✅
+  - 18.8 Cierre transaccional ✅
+    - 18.8a backend/API/persistencia ✅
+    - 18.8b confirmación + renderer ✅
+  - 18.9 Repaso final de diseño ✅
+  - 18.10 Regresión final ✅
 
-## En curso / siguiente
+`Informes` continúa deliberadamente como placeholder. No bloquea el cierre del hito 18 porque el usuario pidió no diseñarlo todavía.
 
-- 18 Caja 🔨
-  - **18.7 — Desglose por tipos de pago — SIGUIENTE**
-  - 18.8 cierre transaccional ⏳
-  - 18.9 regresión final ⏳
-- `Informes` sigue como placeholder.
+## Siguiente hito
+
+- **19 — Enforcement global de permisos** ⏳
+
+No iniciar su diseño ni implementación hasta que el usuario explique:
+
+- objetivo funcional;
+- comportamiento deseado;
+- comportamiento heredado si resulta relevante.
 
 ## Pendiente posterior
 
-- 19 Enforcement global de permisos ⏳
-- resto de desarrollo funcional ⏳
+- resto de desarrollo funcional de la aplicación ⏳
 - Sincronización Indomable Store ↔ Osumi TPV 📋 **pospuesta hasta terminar la aplicación**
 - TicketBAI 12C.9 ⏸ pendiente de Berein.
 
 # 4. Punto exacto de continuidad
 
-Último commit confirmado en `main`:
+Último commit confirmado en `main` al generar esta versión:
 
 ```text
-212699cf8c41389fc545ade1b18572856e8e3624
-Terminado Caja 18.6
+eda8361e3d5eadc0ca4e230fc8b333685ec6bfe4
+Terminado Caja 18
 ```
 
-Commits recientes del bloque Caja:
+Commits recientes del cierre de Caja:
 
 ```text
-02bb6d4ca3025e2fe62c15f89ea7fc0a2172b63a
-Terminado Caja 18.6a
+c8520d9831fa8773f355909eeab794a36aa88627
+Terminado Caja 18.8
 
-444fefc44fb13b347cc511c8ebe4da5a8de53141
-Terminado Caja 18.5
+c9c20163cf56083b9cfe0b3eb658cb23feb7e4b9
+Limpieza de una traza
 
-eb3b1d4a562ff71215bfbfc2bc19c56a5e69103d
-Actualizado documento de continuidad tras 18.4
+c5434f05c9cb3477c5af677ed8a6489fc91eb2e8
+Terminado 18.8b
 
-d5888ac594ec608f9ec0214efaf109b7d717c7d4
-Terminado Caja 18.4b
+07015b1f13a0651a3ffbcb7dd20124d5d98d8676
+Por corregir 18.8b
+
+6948155e1d99d7acd1b66d01a97e5013c77311ae
+Terminado Caja 18.8a
+
+a1928d90dcf632917aae83b4c47dbfb02c3ca4b8
+Terminado Caja 18.7
 ```
 
-El usuario confirmó para 18.5 y 18.6:
+El usuario confirmó al cerrar el hito:
 
-- batería completa `test/build/test:electron/build:electron/lint` correcta;
-- pruebas funcionales correctas;
-- interfaz de cierre y recuento funcionando;
-- cambios subidos a `main`.
+- `npm test` ✅
+- `npm run build` ✅
+- `npm run test:electron` ✅
+- `npm run build:electron` ✅
+- `npm run lint` ✅
+- pruebas funcionales reales de cierre ✅
+- comparación de cifras con el TPV antiguo ✅
+- rediseño compacto aprobado ✅
+- cierre con datos legacy reales aprobado ✅
+- cambios subidos a `main` ✅
 
 ## Siguiente paso exacto
 
+El siguiente hito técnico es:
+
 ```text
-18.7 — Desglose por tipos de pago
+19 — Enforcement global de permisos
 ```
 
-Objetivo:
+Pero **no comenzar código todavía**.
 
-- usar `CajaCierreInterface.tiposPago`;
-- mostrar tarjetas por tipo excepto `slug = 'efectivo'`;
-- mostrar Ventas siempre;
-- desplegar Operaciones, Importe real y Diferencia;
-- inicializar Importe real con Ventas;
-- no persistir todavía el cierre.
+Primero el usuario debe describir:
+
+- qué debe quedar protegido;
+- cómo quiere que se comporte cada acceso/acción;
+- cómo funcionaba en el TPV antiguo si sirve como referencia.
+
+Mantener la regla general del proyecto de no inventar requisitos funcionales.
 
 # 5. Corrección Ventas / Empleados ✅
 
@@ -583,28 +635,56 @@ El apartado Caja tiene cuatro pestañas:
 4. Informes
 ```
 
-Estado actual:
+Estado final del hito:
 
 ```text
 Histórico de ventas  ✅
 Salidas caja         ✅
-Cerrar caja          🔨 bloque superior + recuento implementados
-Informes             📋 placeholder
+Cerrar caja          ✅
+Informes             📋 placeholder intencionado
 ```
 
-Dentro de `Cerrar caja`:
+`18 Caja` se considera **cerrado en el alcance acordado**.
+
+## Histórico
+
+Reutiliza `HistoricalSalesComponent` en modo embebido.
+
+## Salidas caja
+
+CRUD completo sobre `movimiento_caja tipo='salida'`.
+
+## Cerrar caja
+
+Completo:
 
 ```text
-snapshot económico        ✅
-bloque superior           ✅
-recuento monedas/billetes ✅
-tipos de pago inferiores  ⏳ 18.7
-cierre transaccional      ⏳ 18.8
+snapshot económico          ✅
+bloque superior             ✅
+recuento monedas/billetes   ✅
+tipos de pago inferiores    ✅
+confirmación                ✅
+cierre transaccional        ✅
+contexto post-cierre        ✅
+nueva apertura              ✅
+compatibilidad legacy       ✅
+rediseño compacto           ✅
+regresión final             ✅
 ```
 
 ## Informes
 
-No diseñar todavía. Esperar a que el usuario defina el comportamiento deseado.
+No diseñar todavía.
+
+Debe seguir como placeholder hasta que el usuario defina expresamente:
+
+- qué informes necesita;
+- qué datos deben mostrar;
+- filtros;
+- impresión/exportación;
+- referencia del sistema anterior si procede.
+
+No inferir requisitos a partir del TPV antiguo.
 
 # 14. 18 Caja — Histórico de ventas
 
@@ -1067,9 +1147,17 @@ Estado:
 
 # 18. 18 Caja — Cerrar caja
 
-El cierre es único; no recuperar la antigua separación `Tienda | Web | Totales`.
+El cierre está **terminado y validado funcionalmente**.
 
-Componente actual:
+No recupera la antigua separación:
+
+```text
+Tienda | Web | Totales
+```
+
+El nuevo sistema realiza un único cierre integrado.
+
+Componente renderer:
 
 ```text
 CashClosingComponent
@@ -1081,28 +1169,47 @@ Servicio renderer:
 CajaCierreService
 ```
 
-Contrato:
+Contratos principales:
 
 ```text
 CajaCierreInterface
 CajaCierreTipoPagoInterface
 CajaCierreConsulta
+
+CerrarCajaCommand
+CerrarCajaRecuentoCommand
+CerrarCajaTipoPagoCommand
 ```
 
-Estado:
+Estado definitivo:
 
 ```text
-18.5 ✅ snapshot económico canónico
-18.6 ✅ bloque superior + recuento
-18.7 ⏳ tarjetas por tipos de pago
-18.8 ⏳ persistencia/cierre real
+18.5  ✅ snapshot económico canónico
+18.6  ✅ bloque superior + recuento
+18.7  ✅ tarjetas por tipos de pago
+18.8  ✅ persistencia/cierre real
+18.9  ✅ rediseño compacto
+18.10 ✅ regresión final
 ```
 
-La pantalla ya carga la caja abierta mediante `VentasContextService`, muestra la apertura y todos los importes principales y permite realizar el recuento físico. Todavía no persiste ni cierra la caja.
+La pantalla:
+
+- carga la caja abierta actual;
+- muestra importes económicos canónicos;
+- permite recuento físico;
+- permite revisar importes reales de otros tipos de pago;
+- calcula diferencias;
+- solicita confirmación;
+- ejecuta cierre transaccional;
+- limpia y recarga el contexto;
+- deja el TPV sin caja abierta;
+- no abre automáticamente la siguiente caja.
+
+Una nueva venta solo puede iniciarse después de abrir otra caja.
 
 # 19. Cerrar caja — bloque superior
 
-Mostrar:
+El bloque superior definitivo muestra:
 
 - Saldo inicial
 - Ventas efectivo
@@ -1116,7 +1223,7 @@ Mostrar:
 
 ## Saldo inicial
 
-Es:
+Fuente:
 
 ```text
 caja.importe_apertura_cents
@@ -1124,73 +1231,119 @@ caja.importe_apertura_cents
 
 ## Ventas efectivo
 
-No significa solo el tipo de pago Efectivo.
+No significa únicamente el tipo Efectivo.
 
-Es la suma de pagos de la caja cuyos tipos tengan:
+Es:
+
+```text
+SUM(venta_pago.importe_cents)
+WHERE tipo_pago.afecta_caja = true
+```
+
+dentro de la caja exacta.
+
+Por tanto cualquier tipo con:
 
 ```text
 afectaCaja = true
 ```
 
-La semántica está confirmada por el TPV antiguo.
+incrementa el efectivo teórico.
 
 ## Salidas caja
 
-Suma de movimientos activos:
+Suma canónica de:
 
 ```text
+movimiento_caja
 tipo = 'salida'
+deleted_at IS NULL
+id_caja = caja actual
 ```
-
-pertenecientes a la caja.
 
 ## Saldo final teórico
 
-Fórmula:
-
 ```text
-saldoFinal =
+saldoFinalTeorico =
   saldoInicial
   + ventasQueAfectanCaja
   - salidasCaja
 ```
 
----
+## Diseño final
+
+Tras el repaso 18.9, el bloque se presenta de forma compacta:
+
+- los nueve conceptos caben en una única fila en pantallas amplias;
+- inputs de Retirado/Entrada tienen anchura contenida;
+- tipografía y espaciados se redujeron para priorizar densidad;
+- breakpoints conservan la legibilidad en portátil.
+
+El usuario validó este diseño comparándolo con la densidad del TPV antiguo.
 
 # 20. Importe real y recuento físico
 
-`Importe real` ya se calcula exclusivamente a partir del recuento físico.
+`Importe real` se calcula exclusivamente desde el recuento de efectivo físico.
 
-Al pulsarlo se despliega/contrae el bloque de monedas y billetes.
+No se envía como una cifra independiente al backend.
 
-## Denominaciones implementadas
+## Denominaciones
 
 Monedas:
 
 ```text
-1 c · 2 c · 5 c · 10 c · 20 c · 50 c · 1 € · 2 €
+1 c
+2 c
+5 c
+10 c
+20 c
+50 c
+1 €
+2 €
 ```
 
 Billetes:
 
 ```text
-5 € · 10 € · 20 € · 50 € · 100 € · 200 € · 500 €
+5 €
+10 €
+20 €
+50 €
+100 €
+200 €
+500 €
 ```
 
-Total: **15 denominaciones**.
+Total:
 
-## Modelo
+```text
+15 denominaciones
+```
 
-`CajaCierreFormModel.recuento` contiene una cantidad `number | null` por denominación.
+Existe además una constante compartida de contrato con los valores admitidos en céntimos.
+
+## Modelo renderer
+
+`CajaCierreFormModel.recuento` mantiene una cantidad:
+
+```text
+number | null
+```
+
+por denominación.
 
 Regla importante:
 
 ```text
-todos null    → todavía no se ha realizado el recuento
-algún valor 0 → recuento realizado; el efectivo real puede ser 0 €
+todos null    → todavía no se ha realizado recuento
+algún valor 0 → recuento realizado; el total real puede ser 0 €
 ```
 
-Cada cantidad debe ser un entero seguro `>= 0`.
+Cada cantidad debe ser:
+
+```text
+entero seguro >= 0
+```
 
 `importeRealCents` es un `computed()`:
 
@@ -1198,34 +1351,47 @@ Cada cantidad debe ser un entero seguro `>= 0`.
 SUM(cantidad × valor_centimos)
 ```
 
-Se protegen productos y sumas frente a desbordamientos de `Number.MAX_SAFE_INTEGER`.
+Se protegen multiplicaciones y sumas frente a desbordamientos de `Number.MAX_SAFE_INTEGER`.
 
-## Interacción
+## Persistencia
 
-- `recuentoOpen` controla el desplegable;
-- el total se actualiza de forma reactiva;
-- al enfocar una cantidad se selecciona todo su contenido;
-- el layout separa Monedas y Billetes y es responsive.
+Al cerrar se envían las denominaciones introducidas:
 
-## Persistencia futura
+```text
+valorCents
+cantidad
+```
 
-18.8 mapeará este estado directamente a `caja_recuento`:
+Backend:
+
+1. valida la denominación;
+2. rechaza duplicados;
+3. recalcula él mismo el total real;
+4. persiste `caja_recuento` con:
 
 ```text
 momento = 'cierre'
-valor_centimos = denominación
-cantidad = cantidad introducida
+valor_centimos
+cantidad
 ```
 
-No existe persistencia del recuento todavía.
+El renderer no puede declarar un total físico distinto del recuento enviado.
+
+## Diseño final
+
+18.9 compactó el recuento para su uso real:
+
+- campos estrechos pensados para unidades;
+- monedas y billetes agrupados;
+- varias denominaciones en una misma fila;
+- inputs alineados a la derecha;
+- no se desperdicia ancho de pantalla con controles gigantes.
 
 # 21. Retirado, Diferencia, Entrada y saldo siguiente
 
-Ya están implementados reactivamente en `CashClosingComponent`.
-
 ## Retirado
 
-Campo Signal Forms:
+Campo renderer:
 
 ```text
 retiradoEuros
@@ -1234,10 +1400,10 @@ retiradoEuros
 Conversión:
 
 ```text
-retiradoCents = eurosToCents(retiradoEuros)
+retiradoCents
 ```
 
-Persistencia prevista:
+Persistencia final:
 
 ```text
 caja.importe_retirado_cents
@@ -1245,132 +1411,246 @@ caja.importe_retirado_cents
 
 ## Entrada
 
-Campo:
+Campo renderer:
 
 ```text
 entradaEuros
 ```
 
-Persistencia prevista:
+Persistencia final:
 
 ```text
 caja.movimientos_entrada_cents
 ```
 
-## Diferencia
+## Diferencia de efectivo
 
 ```text
-diferencia = importeReal + retirado - saldoFinalTeorico
+diferencia =
+  importeReal
+  + retirado
+  - saldoFinalTeorico
 ```
 
-Solo existe cuando se ha realizado el recuento. Positiva se muestra verde; negativa, roja.
+Comportamiento visual:
+
+- positiva → verde;
+- negativa → rojo;
+- sin recuento → `—`.
+
+Si la diferencia es negativa, la confirmación de cierre muestra un aviso específico antes de continuar.
 
 ## Saldo siguiente caja
 
 ```text
-saldoSiguiente = importeReal + entrada
+saldoSiguiente =
+  importeReal
+  + entrada
 ```
 
-La apertura existente de la siguiente caja ya usa:
+La siguiente caja hereda exactamente:
 
 ```text
-importe_cierre_real_cents + movimientos_entrada_cents
+cajaAnterior.importe_cierre_real_cents
++
+cajaAnterior.movimientos_entrada_cents
 ```
 
-por lo que la semántica coincide.
+Regresión final verificada:
+
+```text
+125,00 € reales
++ 10,00 € entrada
+= 135,00 € apertura siguiente
+```
+
+No se abre automáticamente la nueva caja al cerrar.
 
 # 22. Cerrar caja — tipos de pago inferiores
 
-Este es el **siguiente bloque: 18.7**.
+18.7 está **cerrado**.
 
-18.5 ya entrega `CajaCierreInterface.tiposPago[]` con:
-
-```text
-publicId
-nombre
-slug
-afectaCaja
-orden
-operaciones
-importeVentasCents
-```
-
-## Inclusión
-
-Excluir únicamente:
+Debajo del efectivo se muestran los tipos de pago asociados a la caja excepto el Efectivo estructural:
 
 ```text
 slug === 'efectivo'
 ```
 
-No excluir por cero operaciones, cero importe, `afectaCaja` o estado activo actual.
+## Cada tarjeta
 
-## Tarjeta cerrada
+Cerrada:
 
 - nombre;
 - Ventas.
 
-## Tarjeta abierta
+Desplegada:
 
-- Ventas;
 - Operaciones;
+- Ventas;
 - Importe real;
 - Diferencia.
+
+## Importe real
 
 Inicialización:
 
 ```text
-importeReal = importeVentas
+importeRealCents = importeVentasCents
 ```
 
-Diferencia:
+El usuario puede modificarlo manualmente.
+
+Puede ser negativo para conservar correctamente devoluciones.
+
+## Diferencia
 
 ```text
-importeReal - importeVentas
+diferencia =
+  importeRealCents
+  - importeVentasCents
 ```
 
-No persistir todavía. La escritura de `caja_tipo.importe_real_cents` pertenece a 18.8.
+## Estado renderer
+
+Se mantiene separado del contrato canónico recibido.
+
+Identidad:
+
+```text
+publicId
+```
+
+Dato enviado al cerrar:
+
+```text
+tipoPagoPublicId
+importeRealCents
+```
+
+## Inclusión
+
+No se excluyen tipos por:
+
+- 0 operaciones;
+- 0 € de ventas;
+- `afectaCaja`;
+- estado activo actual.
+
+Solo se excluye visualmente el Efectivo estructural.
+
+## Diseño final
+
+18.9 cambió las tarjetas a una rejilla compacta con:
+
+```text
+auto-fill + ancho mínimo razonable
+align-items: start
+```
+
+Consecuencias:
+
+- caben varios tipos por fila;
+- expandir una tarjeta no estira visualmente las vecinas;
+- el input de Importe real tiene anchura contenida;
+- se mantiene una alta densidad de información en portátil.
 
 # 23. Tipos de pago y caja
 
-El esquema actual ya contiene `caja_tipo`.
-
-Al abrir una caja se inicializan filas para tipos activos; si durante la caja aparece un tipo nuevo y se utiliza en una venta, el guardado de ventas crea su fila.
-
-18.5 usa `caja_tipo` para determinar qué tipos pertenecen al cierre, pero recalcula sus datos económicos desde `venta` + `venta_pago`:
+El esquema utiliza:
 
 ```text
-importe = SUM(venta_pago.importe_cents)
-operaciones = COUNT(DISTINCT venta.id)
+caja_tipo
 ```
 
-Se excluyen ventas borradas y las devoluciones conservan su signo.
+Al abrir una caja nueva se crean filas para todos los tipos de pago activos.
 
-El contrato incluye también Efectivo; 18.7 excluirá de la UI inferior únicamente:
+Durante una venta nueva, si se utiliza un tipo que todavía no tiene fila, la persistencia de ventas puede materializar su `caja_tipo`.
+
+## Corrección importante descubierta con caja legacy
+
+Se detectó una caja abierta importada desde el TPV antiguo donde:
 
 ```text
-slug = 'efectivo'
+tipo_pago
+→ contenía Efectivo, VISA, VISA(web), Bizum, Paypal, Paypal(web)...
+
+caja_tipo de la caja abierta
+→ contenía solo Efectivo
+
+venta_pago de esa misma caja
+→ sí contenía el resto de tipos realmente utilizados
 ```
 
-No crear una estructura paralela.
+Motivo:
+
+> En el TPV antiguo `caja_tipo` se consolidaba al cerrar. Una caja legacy que seguía abierta podía no tener todavía esas filas.
+
+Regla definitiva para construir los tipos asociados al cierre:
+
+```text
+tipos de la caja =
+  tipos presentes en caja_tipo
+  UNION
+  tipos realmente utilizados por venta_pago
+  en ventas activas de esa caja
+```
+
+Esto conserva simultáneamente:
+
+- tipos asociados con 0 operaciones desde `caja_tipo`;
+- tipos realmente usados aunque falte su fila legacy.
+
+## Al cerrar
+
+Backend ejecuta una reconciliación:
+
+```text
+ensureCajaTipoRowsForUsedPaymentTypes(...)
+```
+
+que materializa en `caja_tipo` los tipos utilizados por ventas activas y todavía ausentes.
+
+Después actualiza canónicamente:
+
+```text
+operaciones
+importe_total_cents
+importe_real_cents
+importe_descuento_cents
+```
+
+No se filtran tipos históricos por `activo` o `deleted_at` si pertenecen realmente a la caja.
 
 # 24. Cierre — origen de cálculos
 
 Regla definitiva:
 
-> Los importes económicos canónicos se recalculan en backend; no se confía en los valores enviados por el renderer.
+> Los importes económicos canónicos se recalculan en backend; nunca se confía en snapshots económicos enviados por el renderer.
 
-## 18.5 implementado
+## Lectura previa
 
-`TypeOrmCajaRepository.findCierre()` obtiene dentro de una transacción de lectura:
+`TypeOrmCajaRepository.findCierre()` trabaja dentro de transacción y recalcula:
 
-- saldo inicial desde `caja`;
-- pagos que afectan caja desde `venta_pago` + `tipo_pago.afecta_caja`;
-- salidas desde `movimiento_caja`;
-- importes por tipo desde `venta_pago`;
-- operaciones por tipo con `COUNT(DISTINCT venta.id)`.
+- saldo inicial;
+- ventas que afectan caja;
+- salidas;
+- tipos asociados;
+- operaciones por tipo;
+- importes por tipo.
 
-No confía como fuente canónica en acumulados como:
+Fuente:
+
+```text
+caja
+venta
+linea_venta
+venta_pago
+tipo_pago
+caja_tipo
+movimiento_caja
+```
+
+No confía en acumulados previos como:
 
 ```text
 caja.movimientos_salida_cents
@@ -1379,11 +1659,70 @@ caja_tipo.operaciones
 caja_tipo.importe_total_cents
 ```
 
-Los tests SQLite verifican esta independencia.
+## Escritura definitiva
 
-## 18.8 pendiente
+`TypeOrmCajaRepository.close()` vuelve a recalcular dentro de **la misma transacción de escritura**:
 
-Al confirmar el cierre, backend deberá recalcular de nuevo dentro de la misma transacción de escritura para evitar cerrar con un snapshot obsoleto.
+- ventas;
+- beneficios;
+- descuentos;
+- pagos que afectan caja;
+- salidas;
+- saldo teórico;
+- operaciones por tipo;
+- importes por tipo.
+
+Renderer aporta solo:
+
+- `cajaPublicId`;
+- retirada;
+- entrada;
+- recuento físico;
+- importes reales de otros tipos de pago.
+
+Backend calcula el importe real de efectivo a partir del recuento.
+
+## Venta legacy de total 0 €
+
+Se descubrió un caso real y frecuente:
+
+```text
+venta.total_cents = 0
+descuento != 0
+num_pagos = 1
+venta_pago.importe_cents = 0
+```
+
+En la base real había 584 ventas de este tipo.
+
+El importador legacy conserva intencionadamente un pago de 0 € para recordar el medio de pago original.
+
+Regla final para repartir descuentos:
+
+```text
+si totalWeight > 0
+→ reparto proporcional normal
+
+si totalWeight = 0 y hay exactamente 1 pago
+→ todo el descuento pertenece a ese único tipo
+
+si totalWeight = 0 y hay varios pagos
+→ error: reparto ambiguo
+```
+
+Esta corrección tiene test de regresión específico.
+
+## Resultado
+
+El cierre funciona correctamente con:
+
+- ventas normales;
+- pagos mixtos;
+- devoluciones;
+- descuentos;
+- ventas 100 % descontadas;
+- tipos legacy ausentes de `caja_tipo`;
+- acumulados previos deliberadamente incorrectos.
 
 # 25. Cierre — relación directa con `id_caja`
 
@@ -1459,22 +1798,46 @@ Por tanto 18 debe explotar el esquema existente antes de plantear cambios.
 
 # 27. Estado actual del backend de Caja
 
-Ya existen `CajaService`, `TypeOrmCajaRepository` y `CajaApi`.
+Backend de Caja completo para el alcance acordado.
+
+Componentes principales:
+
+```text
+CajaService
+TypeOrmCajaRepository
+CajaApi
+```
 
 ## Apertura ✅
 
+`open()`:
+
 - reutiliza caja abierta si existe;
 - crea una nueva si no;
-- calcula saldo inicial desde la caja anterior;
-- inicializa `caja_tipo`.
+- calcula saldo inicial desde la caja cerrada anterior;
+- inicializa `caja_tipo` para tipos activos.
+
+Saldo de nueva apertura:
+
+```text
+importe_cierre_real_cents
++
+movimientos_entrada_cents
+```
 
 ## Salidas ✅
 
-Lectura y CRUD completos, con IPC/preload/renderer, baja lógica, protección de caja cerrada y reconciliación de `movimientos_salida_cents`.
+Lectura + CRUD completos:
 
-## Cierre — lectura canónica ✅
+- query por fecha/rango;
+- alta;
+- edición;
+- baja lógica;
+- caja abierta obligatoria para mutaciones;
+- reconciliación de acumulado;
+- IPC/preload/renderer.
 
-18.5 añadió:
+## Snapshot de cierre ✅
 
 ```text
 CajaService.getCierre()
@@ -1483,7 +1846,7 @@ CajaApi.getCierre()
 CajaCierreService
 ```
 
-El snapshot contiene:
+Datos:
 
 ```text
 saldoInicialCents
@@ -1493,59 +1856,131 @@ saldoFinalTeoricoCents
 tiposPago[]
 ```
 
-Por tipo:
+## Cierre transaccional ✅
+
+Contrato:
 
 ```text
-publicId
-nombre
-slug
-afectaCaja
-orden
-operaciones
-importeVentasCents
+CerrarCajaCommand
+CerrarCajaRecuentoCommand
+CerrarCajaTipoPagoCommand
 ```
 
-Reglas:
+Persistencia:
 
-- `venta.id_caja` como asociación canónica;
-- ventas borradas excluidas;
-- devoluciones firmadas;
-- todos los tipos `afecta_caja = 1` suman al efectivo teórico;
-- operaciones deduplicadas por venta;
-- acumulados previos no son fuente canónica.
+- valida comando;
+- valida denominaciones;
+- recalcula datos canónicos;
+- reconcilia `caja_tipo` legacy;
+- recalcula descuentos/beneficios/ventas;
+- calcula importe real desde recuento;
+- actualiza `caja_tipo`;
+- persiste `caja_recuento`;
+- actualiza `caja`;
+- marca `cierre`;
+- todo dentro de transacción.
 
-## Renderer de cierre ✅ parcial
+## Renderer de cierre ✅
 
-`CashClosingComponent` ya implementa bloque principal y recuento.
+`CashClosingComponent`:
 
-Pendiente:
+- carga snapshot;
+- recuento;
+- tipos de pago;
+- diferencias;
+- validación `canClose`;
+- confirmación;
+- aviso especial por diferencia negativa;
+- llamada a `CajaCierreService.close()`;
+- limpia contexto inmediatamente tras éxito de SQLite;
+- recarga contexto;
+- muestra resultado al usuario.
+
+Estado:
 
 ```text
-18.7 tipos de pago inferiores
-18.8 cierre transaccional
+apertura              ✅
+salidas               ✅
+snapshot cierre       ✅
+recuento              ✅
+tipos pago            ✅
+cierre transaccional  ✅
+post-cierre           ✅
+nueva apertura        ✅
 ```
 
 # 28. Apertura y venta
 
-Regla funcional:
+Regla funcional final:
 
 > Una vez cerrada la caja no se puede hacer una venta hasta volver a abrir una nueva.
 
-El comportamiento de venta debe seguir dependiendo de la existencia de una caja abierta.
-
-El cierre debe dejar:
+Al cerrar:
 
 ```text
 caja.cierre != NULL
 ```
 
-La siguiente venta debe forzar/solicitar nueva apertura según el flujo ya existente.
+`VentasContextRepository` solo devuelve caja abierta cuando:
 
----
+```text
+cierre IS NULL
+```
+
+Renderer:
+
+```text
+VentasContextService.puedeVender()
+```
+
+solo es `true` cuando:
+
+- contexto cargado;
+- terminal existente;
+- caja abierta existente;
+- Efectivo estructural disponible.
+
+Después del cierre:
+
+1. `CajaCierreService.close()` termina;
+2. `VentasContextService.clear()` elimina inmediatamente el contexto obsoleto;
+3. se ejecuta `reload()`;
+4. `cajaAbierta = null`;
+5. `puedeVender = false`.
+
+`SalesComponent.nuevaVenta()` retorna sin crear nada si:
+
+```text
+puedeVender() === false
+```
+
+No se abre una caja automáticamente.
+
+El usuario debe abrir una nueva caja mediante el flujo ya existente.
+
+## Regresión final
+
+18.10 verifica:
+
+```text
+cerrar caja
+→ findCierre() devuelve null
+→ abrir nueva caja
+→ saldo inicial = real anterior + entrada anterior
+→ solo existe una caja abierta
+→ caja_tipo se reinicializa
+```
+
+y también:
+
+```text
+puedeVender = false
+→ nuevaVenta() no crea venta
+```
 
 # 29. Importación legacy de Caja
 
-El importador nuevo ya conserva:
+El importador conserva:
 
 - cajas antiguas;
 - cierres;
@@ -1558,126 +1993,271 @@ El importador nuevo ya conserva:
 - cierre teórico;
 - cierre real.
 
-Transformaciones importantes:
+Transformación:
 
 ```text
 pago_caja
 → movimiento_caja tipo 'salida'
 ```
 
-El efectivo implícito del sistema antiguo se materializa como tipo estructural Efectivo.
+El efectivo implícito antiguo se materializa como tipo estructural Efectivo.
 
-No reabrir la migración legacy salvo que 18 revele un caso real no cubierto.
+## Compatibilidad adicional descubierta durante 18
 
----
+### Caja abierta legacy con `caja_tipo` incompleto
+
+Una caja que permaneció abierta en el sistema antiguo puede tener:
+
+```text
+caja_tipo
+→ solo Efectivo
+```
+
+aunque sus `venta_pago` utilicen otros tipos.
+
+El cierre nuevo no confía exclusivamente en `caja_tipo`.
+
+Usa:
+
+```text
+caja_tipo UNION tipos usados por venta_pago
+```
+
+y materializa filas faltantes al cerrar.
+
+### Ventas legacy de total 0 €
+
+El importador puede conservar:
+
+```text
+venta.total_cents = 0
+venta_pago.importe_cents = 0
+```
+
+con un único pago para preservar el medio de pago original.
+
+Si la venta tiene descuento, todo el descuento se asigna a ese único tipo de pago.
+
+No modificar manualmente bases importadas para estos casos: el backend nuevo los soporta directamente.
+
+No reabrir la migración legacy salvo aparición de otro caso real no cubierto.
 
 # 30. 18 Caja — plan de implementación
 
+El hito 18 está **cerrado**.
+
 ## 18.1 — Shell ✅
-Commit `495efcee83e37c3ac64495f6cac1cad963ddb07e`.
+
+Commit:
+
+```text
+495efcee83e37c3ac64495f6cac1cad963ddb07e
+```
 
 ## 18.2 — Histórico embebido ✅
-Commit `be3c07d2526121e7ddc71d82671d8299e1068d13`.
+
+Commit:
+
+```text
+be3c07d2526121e7ddc71d82671d8299e1068d13
+```
 
 ## 18.3 — Lectura Salidas ✅
-Commit `9b588024cafb218fb0ac6805a9db04760dc46d79`.
+
+Commit:
+
+```text
+9b588024cafb218fb0ac6805a9db04760dc46d79
+```
 
 ## 18.4 — CRUD Salidas ✅
 
-- 18.4a backend/API: `3ddf0f05883df9f866762b7804fca969b6fb9c0f`
-- 18.4b interfaz: `d5888ac594ec608f9ec0214efaf109b7d717c7d4`
+```text
+18.4a backend/API
+3ddf0f05883df9f866762b7804fca969b6fb9c0f
+
+18.4b interfaz
+d5888ac594ec608f9ec0214efaf109b7d717c7d4
+```
 
 ## 18.5 — Datos calculados del cierre ✅
 
-Implementado:
-
-- contrato/record de cierre;
-- `findCierre()`;
-- `getCierre()`;
+- contrato/record;
+- lectura canónica;
 - IPC/preload;
-- `CajaCierreService`;
-- cálculo canónico desde caja/ventas/pagos/movimientos;
-- tipos de pago con operaciones e importes;
-- pruebas SQLite con esquema completo.
+- renderer service;
+- caja exacta por `id_caja`;
+- devoluciones firmadas;
+- tipos con `afectaCaja`;
+- operaciones deduplicadas;
+- acumulados previos ignorados.
 
 Commit:
 
 ```text
 444fefc44fb13b347cc511c8ebe4da5a8de53141
-Terminado Caja 18.5
 ```
 
-## 18.6 — UI de cierre + recuento ✅
+## 18.6 — UI + recuento ✅
 
-### 18.6a — pantalla + snapshot ✅
+### 18.6a
 
-- `CashClosingComponent`;
-- integración en Caja;
-- loading/error/sin caja;
-- 9 conceptos principales;
+- pantalla;
+- snapshot;
+- 9 conceptos;
 - Retirado/Entrada;
-- fórmulas de Diferencia/Saldo siguiente;
-- tests aislados.
+- Diferencia/Saldo siguiente.
 
-Commit `02bb6d4ca3025e2fe62c15f89ea7fc0a2172b63a`.
+Commit:
 
-### 18.6b — recuento físico ✅
+```text
+02bb6d4ca3025e2fe62c15f89ea7fc0a2172b63a
+```
 
-- desplegable desde Importe real;
+### 18.6b
+
 - 15 denominaciones;
-- `number | null` por cantidad;
-- entero no negativo;
-- cálculo reactivo del importe real;
-- distinción “sin contar” / “0 € reales”;
-- actualización de diferencia y saldo siguiente;
-- responsive + tests.
+- `number | null`;
+- validación;
+- importe real reactivo;
+- distinción sin recuento / 0 €.
 
 Commit:
 
 ```text
 212699cf8c41389fc545ade1b18572856e8e3624
-Terminado Caja 18.6
 ```
 
-## 18.7 — Desglose por tipos de pago 🔨 SIGUIENTE
+## 18.7 — Tipos de pago ✅
 
-- tarjetas por tipo salvo Efectivo;
+- tarjetas por tipo;
+- Efectivo excluido del bloque inferior;
 - Ventas;
 - Operaciones;
 - Importe real editable;
 - Diferencia;
-- sin persistencia.
+- negativos soportados;
+- estado renderer separado.
 
-## 18.8 — Cierre transaccional ⏳
+Commit:
 
-- comando y validación;
-- recálculo canónico dentro de transacción;
-- persistir `caja`, `caja_tipo`, `caja_recuento`;
-- entrada/retirada;
-- marcar cierre;
-- actualizar contexto;
-- impedir venta hasta nueva apertura.
+```text
+a1928d90dcf632917aae83b4c47dbfb02c3ca4b8
+Terminado Caja 18.7
+```
 
-## 18.9 — Regresión final ⏳
+## 18.8 — Cierre transaccional ✅
 
-Cubrir caja importada/nueva, salidas, pagos simples/mixtos, `afectaCaja`, devoluciones, recuento, tipos de pago, cierre y nueva apertura.
+### 18.8a — backend/API/persistencia
 
-# 31. 18 Caja — decisiones explícitamente no abiertas todavía
+- contrato de cierre;
+- denominaciones compartidas;
+- validación;
+- recálculo canónico;
+- `caja_recuento`;
+- `caja_tipo`;
+- `caja`;
+- IPC/preload/API;
+- servicio renderer.
 
-No diseñar todavía:
+Commit:
+
+```text
+6948155e1d99d7acd1b66d01a97e5013c77311ae
+Terminado Caja 18.8a
+```
+
+### 18.8b — renderer
+
+- `canClose`;
+- construcción del comando;
+- confirmación;
+- aviso por diferencia negativa;
+- ejecución;
+- `clear()` + `reload()`;
+- estado sin caja abierta tras cierre;
+- mensaje de éxito/error.
+
+Commits relevantes:
+
+```text
+c5434f05c9cb3477c5af677ed8a6489fc91eb2e8
+Terminado 18.8b
+
+c8520d9831fa8773f355909eeab794a36aa88627
+Terminado Caja 18.8
+```
+
+Durante validación real se corrigió además:
+
+- caja legacy con `caja_tipo` incompleto;
+- reconciliación de tipos usados desde `venta_pago`.
+
+## 18.9 — Repaso final de diseño ✅
+
+Objetivo:
+
+Recuperar la densidad de información del TPV antiguo sin copiar literalmente su interfaz.
+
+Resultado aprobado:
+
+- resumen superior compacto;
+- 9 conceptos en una fila en pantalla amplia;
+- recuento con inputs pequeños;
+- monedas/billetes compactos;
+- varias tarjetas de pago por fila;
+- tarjetas independientes al expandirse;
+- input de importe real reducido;
+- menor espaciado vertical;
+- responsive para portátil.
+
+El usuario indicó que el diseño final queda **perfecto**.
+
+## 18.10 — Regresión final ✅
+
+Cubierto:
+
+- caja importada;
+- caja nueva;
+- salidas;
+- pagos simples/mixtos;
+- `afectaCaja`;
+- devoluciones;
+- recuento;
+- tipos de pago;
+- tipos legacy ausentes de `caja_tipo`;
+- ventas legacy de total 0 €;
+- descuentos;
+- cierre;
+- cierre doble rechazado;
+- nueva apertura;
+- saldo heredado;
+- una única caja abierta;
+- bloqueo de nueva venta sin caja.
+
+Commit final del hito:
+
+```text
+eda8361e3d5eadc0ca4e230fc8b333685ec6bfe4
+Terminado Caja 18
+```
+
+# 31. 18 Caja — decisiones que siguen fuera de alcance
+
+Aunque el hito 18 está cerrado, siguen sin diseñarse expresamente:
 
 - Informes;
 - nuevos tipos de informes;
-- impresión de cierre;
+- impresión específica del cierre;
 - exportación específica de cierres;
-- permisos finos específicos de Caja;
+- permisos finos específicos de Caja más allá del futuro hito 19;
 - sincronización con tienda online;
 - cambios de multi-terminal más allá de respetar `id_terminal`;
 - observaciones de cierre si el usuario no las solicita.
 
 No inventar requisitos.
 
----
+`Informes` continúa como placeholder hasta una definición funcional explícita del usuario.
 
 # 32. 18 Caja — referencias visuales aportadas
 
@@ -1685,20 +2265,30 @@ El usuario aportó capturas del TPV antiguo para:
 
 - Histórico de ventas;
 - Salidas caja;
-- Cerrar caja.
+- Cerrar caja;
+- recuento físico;
+- tarjetas/tipos de pago.
 
-Estas capturas sirven como referencia de:
+Sirvieron como referencia de:
 
-- estructura;
 - jerarquía;
+- densidad;
 - distribución;
 - comportamiento general.
 
-No es obligatorio copiar literalmente el diseño visual antiguo.
+Decisión visual final:
 
-El nuevo apartado debe mantener coherencia con la interfaz actual de Osumi TPV Client.
+> El nuevo cliente no copia literalmente el TPV antiguo, pero debe conservar su capacidad para mostrar muchas cifras de forma compacta en un portátil de mostrador.
 
----
+18.9 ajustó específicamente:
+
+- resumen de 9 valores;
+- tamaños de inputs;
+- espaciados;
+- número de tarjetas por fila;
+- comportamiento independiente al expandir tarjetas.
+
+El usuario aprobó el resultado final.
 
 # 33. Commits recientes relevantes
 
@@ -1707,21 +2297,29 @@ ef79cb84820cf2736ef5d0d5d473ec4df51a7549  Terminado Gestión 17.6
 fe85e59b1f7049fe3a87655d3a3ed2c6c03b3709  Corrección modal login Gestión
 6e9f20dd98e32e290db8a41acafcef44ab9ef3d5  Selector empleado Ventas
 282417b8b6b0ee2deaeee63111376d07c217d03b  Terminada limpieza `empleados`
+
 495efcee83e37c3ac64495f6cac1cad963ddb07e  Terminado Caja 18.1
 be3c07d2526121e7ddc71d82671d8299e1068d13  Terminado Caja 18.2
 9b588024cafb218fb0ac6805a9db04760dc46d79  Terminado Caja 18.3
 3ddf0f05883df9f866762b7804fca969b6fb9c0f  Terminado Caja 18.4a
 d5888ac594ec608f9ec0214efaf109b7d717c7d4  Terminado Caja 18.4b
-eb3b1d4a562ff71215bfbfc2bc19c56a5e69103d  Continuidad tras 18.4
 444fefc44fb13b347cc511c8ebe4da5a8de53141  Terminado Caja 18.5
 02bb6d4ca3025e2fe62c15f89ea7fc0a2172b63a  Terminado Caja 18.6a
 212699cf8c41389fc545ade1b18572856e8e3624  Terminado Caja 18.6
+7b77bf5e0b48bd4f788e32567bac22e4f25ccf09  Continuidad tras 18.6
+a1928d90dcf632917aae83b4c47dbfb02c3ca4b8  Terminado Caja 18.7
+6948155e1d99d7acd1b66d01a97e5013c77311ae  Terminado Caja 18.8a
+07015b1f13a0651a3ffbcb7dd20124d5d98d8676  Por corregir 18.8b
+c5434f05c9cb3477c5af677ed8a6489fc91eb2e8  Terminado 18.8b
+c9c20163cf56083b9cfe0b3eb658cb23feb7e4b9  Limpieza de una traza
+c8520d9831fa8773f355909eeab794a36aa88627  Terminado Caja 18.8
+eda8361e3d5eadc0ca4e230fc8b333685ec6bfe4  Terminado Caja 18
 ```
 
-Último `main` confirmado para v2.78:
+Último `main` confirmado para v2.79:
 
 ```text
-212699cf8c41389fc545ade1b18572856e8e3624
+eda8361e3d5eadc0ca4e230fc8b333685ec6bfe4
 ```
 
 No hay cambios locales pendientes conocidos al generar este documento.
@@ -1730,128 +2328,139 @@ No hay cambios locales pendientes conocidos al generar este documento.
 
 ```text
 ✅ 16 Compras
-✅ 17 Gestión hasta 17.6
-✅ Ventas/Empleados + retirada flag `empleados`
 
-🔨 18 Caja
+✅ 17 Gestión
+   ✅ 17.1–17.6
+   ✅ corrección foco login
+   ✅ Ventas/Empleados
+   ✅ eliminado flag `empleados`
+
+✅ 18 Caja — CERRADO
    ✅ 18.1 Shell
    ✅ 18.2 Histórico embebido
    ✅ 18.3 Lectura Salidas
    ✅ 18.4 CRUD Salidas
-   ✅ 18.5 Snapshot/calculados cierre
-   ✅ 18.6 UI principal + recuento
-      ✅ 18.6a pantalla/snapshot
-      ✅ 18.6b 15 denominaciones
-   ▶️ 18.7 Tipos de pago — SIGUIENTE
-   ⏳ 18.8 Cierre transaccional
-   ⏳ 18.9 Regresión final
+   ✅ 18.5 Snapshot canónico cierre
+   ✅ 18.6 UI + recuento
+   ✅ 18.7 Tipos de pago
+   ✅ 18.8 Cierre transaccional
+   ✅ 18.9 Diseño compacto
+   ✅ 18.10 Regresión final
 
-✅ Cerrar caja actualmente
+✅ Cerrar caja
    - saldo inicial
    - ventas afectaCaja
    - salidas
-   - saldo final teórico
+   - saldo teórico
+   - 15 denominaciones
+   - importe real
    - retirado
    - entrada
-   - recuento monedas/billetes
-   - importe real
    - diferencia
    - saldo siguiente
+   - tipos de pago
+   - reales por tipo
+   - confirmación
+   - persistencia
+   - post-cierre
+   - nueva apertura
 
-⏳ 19 permisos
-📋 Sincronización Indomable Store pospuesta
+✅ Compatibilidad real validada
+   - caja legacy con caja_tipo incompleto
+   - tipos recuperados desde venta_pago
+   - ventas de total 0 € con pago legacy de 0 €
+   - descuentos asignados correctamente
+   - devoluciones firmadas
+
+📋 Informes de Caja
+   placeholder intencionado
+
+▶️ 19 Enforcement global de permisos
+   SIGUIENTE HITO
+   NO DISEÑAR hasta explicación funcional del usuario
+
+📋 Sincronización Indomable Store
+   pospuesta hasta terminar la aplicación
+
 ⏸ TicketBAI 12C.9
 ```
 
 Fuente de verdad:
 
 ```text
-main + este documento + conversación actual
+main
++
+este documento
++
+conversación actual
 ```
 
-Antes de 18.7 revisar nuevamente `main`.
+Antes de iniciar 19:
+
+1. escuchar primero la explicación funcional del usuario;
+2. revisar `main`;
+3. contrastar con TPV antiguo si resulta útil;
+4. acordar alcance;
+5. solo entonces proponer plan/código.
 
 # 35. Siguiente paso exacto
 
-> **18.7 — Desglose por tipos de pago**
+El siguiente hito es:
 
-Añadir debajo del bloque principal de `CashClosingComponent` el cierre de medios de pago distintos del Efectivo estructural.
+> **19 — Enforcement global de permisos**
 
-## Fuente
+Todavía **no está funcionalmente definido** en esta conversación.
 
-`CajaCierreInterface.tiposPago[]` ya proporciona:
+No empezar código ni inventar reglas.
 
-```text
-publicId
-nombre
-slug
-afectaCaja
-orden
-operaciones
-importeVentasCents
-```
+## Antes de implementar
 
-## Inclusión
+El usuario debe explicar:
 
-Mostrar todos los asociados a la caja excepto:
+- qué pantallas deben quedar protegidas;
+- qué acciones concretas requieren permiso;
+- qué debe ocurrir cuando falta un permiso;
+- cuándo debe pedirse autenticación de Gestión y cuándo no;
+- si los permisos existentes 18–25 son suficientes;
+- comportamiento del TPV antiguo si sirve como referencia.
 
-```text
-slug === 'efectivo'
-```
+## Contexto ya disponible
 
-No filtrar por importe cero, operaciones cero, `afectaCaja` ni estado activo actual.
-
-## UI
-
-Tarjeta cerrada:
+Existe:
 
 ```text
-[expandir] Nombre
-Ventas: XX,XX €
+GestionSessionService
 ```
 
-Desplegada:
+con sesión temporal de Gestión.
+
+Permisos actuales relevantes:
 
 ```text
-Ventas
-Operaciones
-Importe real
-Diferencia
+18 Ajustes
+19 Tipos de pago
+20 Crear empleados
+21 Modificar datos
+22 Borrar empleados
+23 Modificar permisos
+24 Estadísticas empleados
+25 Copias de seguridad
 ```
 
-## Estado editable
-
-Inicializar:
+Administradores tienen bypass mediante:
 
 ```text
-importeRealCents = importeVentasCents
+hasPerm()
+hasAnyPerm()
 ```
 
-Diferencia:
+El hito 19 debe revisar dónde se aplican realmente estos permisos y extender el enforcement global según lo que defina el usuario.
 
-```text
-importeRealCents - importeVentasCents
-```
+## Regla de inicio
 
-Mantener estado renderer por `publicId`; no mutar el contrato recibido. Dejar preparado el dato para 18.8:
+La próxima conversación o bloque debería comenzar con el usuario describiendo el objetivo de 19.
 
-```text
-tipoPagoPublicId + importeRealCents
-```
-
-## Tests mínimos
-
-- Efectivo no aparece;
-- otro tipo `afectaCaja = true` sí aparece;
-- tipo con 0 operaciones sigue disponible;
-- reales inicializados desde ventas;
-- editar real recalcula diferencia;
-- expandir una tarjeta no afecta a las demás;
-- importes negativos de devoluciones se representan correctamente.
-
-## Fuera de alcance
-
-No implementar todavía `close`, persistencia, confirmación final, actualización de contexto ni navegación post-cierre. Todo eso pertenece a 18.8.
+No asumir que el sistema antiguo debe copiarse literalmente.
 
 # 36. Regla final de dirección
 
@@ -1867,27 +2476,38 @@ Para cualquier módulo heredado:
 8. el usuario valida;
 9. solo se continúa después de verde + push.
 
-Estado al cerrar v2.78:
+Convención de exports obligatoria:
+
+```text
+1 export  → export default
+2+ exports → solo exports nominales, sin default
+```
+
+Estado al cerrar v2.79:
 
 - **17.5 Empleados: CERRADO.**
 - **17.6 Tipos de pago: CERRADO.**
 - **Ventas/Empleados: CERRADO.**
 - **Flag `empleados`: ELIMINADO.**
-- **18.1–18.6 Caja: CERRADOS.**
-- **18.7 Desglose por tipos de pago: SIGUIENTE.**
-- **18.8 Cierre transaccional: pendiente.**
-- **18.9 Regresión final: pendiente.**
-- **Informes de Caja: placeholder.**
-- **19 permisos: pendiente.**
+- **18 Caja: CERRADO EN EL ALCANCE ACORDADO.**
+- **18.1–18.10: CERRADOS.**
+- **Cerrar caja: FUNCIONAL, VALIDADO Y REDISEÑADO.**
+- **Compatibilidad legacy descubierta durante cierre: CUBIERTA.**
+- **Informes de Caja: placeholder intencionado.**
+- **19 permisos: SIGUIENTE HITO, aún sin definición funcional.**
 - **Sincronización Indomable Store: pospuesta.**
 - **TicketBAI 12C.9: pausado.**
-- **Último commit confirmado: `212699cf8c41389fc545ade1b18572856e8e3624`.**
+- **Último commit confirmado: `eda8361e3d5eadc0ca4e230fc8b333685ec6bfe4`.**
 
-La siguiente conversación puede comenzar directamente con:
+La siguiente conversación debe comenzar por definir funcionalmente el hito 19 antes de escribir código.
+
+Antes de cualquier cambio:
 
 ```text
-Continuamos con 18.7 — Desglose por tipos de pago.
+revisar main
++
+respetar este documento
++
+mantener una sola unidad pequeña por respuesta
 ```
-
-Antes de escribir código, revisar de nuevo `main`.
 
