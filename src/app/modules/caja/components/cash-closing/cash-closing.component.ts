@@ -241,7 +241,6 @@ export default class CashClosingComponent implements OnInit {
       const cierre: CajaCierreInterface = await this.cajaCierreService.getCierre({
         cajaPublicId: caja.publicId,
       });
-      console.log(cierre);
 
       this.cierre.set(cierre);
       this.tiposPago.set(
