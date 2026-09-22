@@ -26,6 +26,7 @@ interface ImportedEmployeeRow {
   readonly id: number;
   readonly password_hash: string;
   readonly password_algorithm: 'scrypt' | 'bcrypt_legacy';
+  readonly admin: number;
 }
 
 class FakeLegacyImportDumpReader implements LegacyImportDumpReader {
@@ -103,7 +104,7 @@ describe('LegacyImportMasterDataImporter', (): void => {
     tempDirectory = null;
   });
 
-  it('concede Copias a los empleados legacy activos y conserva los permisos existentes', async (): Promise<void> => {
+  it('conserva únicamente los permisos legacy presentes en el dump', async (): Promise<void> => {
     const inserts: readonly LegacySqlInsert[] = [
       createLegacyEmployeeInsert(1, null),
       createLegacyEmployeeInsert(2, '2026-01-15T10:00:00.000Z'),
@@ -111,8 +112,6 @@ describe('LegacyImportMasterDataImporter', (): void => {
 
       createLegacyPermissionInsert(1, 18),
       createLegacyPermissionInsert(2, 19),
-
-      // Comprueba también que un 25 ya existente no se duplica.
       createLegacyPermissionInsert(3, GESTION_PERMISSIONS.BACKUPS),
     ];
 
@@ -131,11 +130,6 @@ describe('LegacyImportMasterDataImporter', (): void => {
       },
     );
 
-    /*
-     * Solo se cuentan las seis filas que proceden del dump.
-     * El permiso 25 generado para el empleado 1 no se cuenta
-     * como fila importada.
-     */
     expect(result).toEqual({
       importedRows: 6,
       skippedRows: 0,
@@ -149,16 +143,90 @@ describe('LegacyImportMasterDataImporter', (): void => {
         id_permiso: 18,
       },
       {
-        id_empleado: 1,
-        id_permiso: GESTION_PERMISSIONS.BACKUPS,
-      },
-      {
         id_empleado: 2,
         id_permiso: 19,
       },
       {
         id_empleado: 3,
         id_permiso: GESTION_PERMISSIONS.BACKUPS,
+      },
+    ]);
+
+    const employees: readonly ImportedEmployeeRow[] = await readEmployees();
+
+    expect(
+      employees.map(
+        (employee: ImportedEmployeeRow): { readonly id: number; readonly admin: number } => ({
+          id: employee.id,
+          admin: employee.admin,
+        }),
+      ),
+    ).toEqual([
+      {
+        id: 1,
+        admin: 0,
+      },
+      {
+        id: 2,
+        admin: 0,
+      },
+      {
+        id: 3,
+        admin: 0,
+      },
+    ]);
+  });
+
+  it('convierte en administrador al único empleado legacy activo', async (): Promise<void> => {
+    const inserts: readonly LegacySqlInsert[] = [
+      createLegacyEmployeeInsert(1, '2026-01-10T10:00:00.000Z'),
+      createLegacyEmployeeInsert(2, null),
+      createLegacyEmployeeInsert(3, '2026-01-20T10:00:00.000Z'),
+    ];
+
+    const importer: LegacyImportMasterDataImporter = new LegacyImportMasterDataImporter(
+      new FakeLegacyImportDumpReader(inserts),
+      new LegacySqlValueReader(),
+      new LegacyImportPublicIdFactory(),
+      new NodeScryptPasswordHasher(),
+    );
+
+    const result: LegacyImportPhaseResult = await importer.import(
+      requireQueryRunner(),
+      createExecutionCommand(inserts.length),
+      (progress): void => {
+        void progress;
+      },
+    );
+
+    expect(result).toEqual({
+      importedRows: 3,
+      skippedRows: 0,
+      warningCount: 0,
+      defaultedEmployeePasswords: 0,
+    });
+
+    const employees: readonly ImportedEmployeeRow[] = await readEmployees();
+
+    expect(
+      employees.map(
+        (employee: ImportedEmployeeRow): { readonly id: number; readonly admin: number } => ({
+          id: employee.id,
+          admin: employee.admin,
+        }),
+      ),
+    ).toEqual([
+      {
+        id: 1,
+        admin: 0,
+      },
+      {
+        id: 2,
+        admin: 1,
+      },
+      {
+        id: 3,
+        admin: 0,
       },
     ]);
   });
@@ -306,7 +374,8 @@ async function readEmployees(): Promise<readonly ImportedEmployeeRow[]> {
       SELECT
         id,
         password_hash,
-        password_algorithm
+        password_algorithm,
+        admin
       FROM empleado
       ORDER BY id
     `,

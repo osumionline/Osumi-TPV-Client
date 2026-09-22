@@ -5,7 +5,6 @@ import type PasswordHasher from '@backend/contracts/security/password-hasher.int
 import type LegacyImportExecutionCommand from '@backend/domain/legacy-import/legacy-import-execution-command.interface';
 import type LegacyImportPhaseResult from '@backend/domain/legacy-import/legacy-import-phase-result.interface';
 import type LegacySqlInsert from '@backend/domain/legacy-import/legacy-sql-insert.interface';
-import { GESTION_PERMISSIONS } from '@desktop-contracts/configuration/empleados/gestion-permissions.constants';
 import LegacyImportPublicIdFactory from '@infrastructure/legacy-import/legacy-import-public-id.factory';
 import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value.reader';
 import type { QueryRunner } from 'typeorm';
@@ -177,7 +176,7 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
 
       await this.insertEmployees(queryRunner, command, state, counters);
 
-      await this.insertEmployeePermissions(queryRunner, command, state, counters);
+      await this.insertEmployeePermissions(queryRunner, state, counters);
 
       this.reportProgress(
         command,
@@ -446,6 +445,10 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
     state: LegacyMasterDataState,
     counters: MutableImportCounters,
   ): Promise<void> {
+    const activeEmployeeCount: number = state.employees.filter(
+      (employee: LegacyEmployeeRow): boolean => employee.deletedAt === null,
+    ).length;
+
     for (const employee of state.employees) {
       let passwordHash: string;
       let passwordAlgorithm: 'scrypt' | 'bcrypt_legacy';
@@ -464,6 +467,8 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
       }
 
       const color: string = this.normalizeColor(employee.color, counters);
+
+      const admin: number = activeEmployeeCount === 1 && employee.deletedAt === null ? 1 : 0;
 
       await queryRunner.query(
         `
@@ -487,7 +492,7 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
           ?,
           ?,
           ?,
-          0,
+          ?,
           ?,
           ?,
           ?,
@@ -503,6 +508,7 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
           passwordHash,
           passwordAlgorithm,
           color,
+          admin,
 
           employee.deletedAt === null ? 1 : 0,
 
@@ -518,7 +524,6 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
 
   private async insertEmployeePermissions(
     queryRunner: QueryRunner,
-    command: LegacyImportExecutionCommand,
     state: LegacyMasterDataState,
     counters: MutableImportCounters,
   ): Promise<void> {
@@ -552,34 +557,6 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
       insertedKeys.add(key);
 
       counters.importedRows++;
-    }
-
-    /*
-     * En Osumi TPV legacy el acceso a Copias de seguridad
-     * no estaba protegido por un permiso específico.
-     *
-     * Al importar conservamos ese comportamiento concediendo
-     * el nuevo permiso 25 a todos los empleados activos.
-     */
-    for (const employee of state.employees) {
-      if (employee.deletedAt !== null) {
-        continue;
-      }
-
-      const key: string = [employee.id, GESTION_PERMISSIONS.BACKUPS].join(':');
-
-      if (insertedKeys.has(key)) {
-        continue;
-      }
-
-      await this.insertEmployeePermission(
-        queryRunner,
-        employee.id,
-        GESTION_PERMISSIONS.BACKUPS,
-        command.startedAt,
-      );
-
-      insertedKeys.add(key);
     }
   }
 
