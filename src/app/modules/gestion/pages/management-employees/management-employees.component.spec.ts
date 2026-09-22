@@ -3,6 +3,7 @@ import { provideRouter, Router } from '@angular/router';
 import type ActualizarEmpleadoCommand from '@desktop-contracts/configuration/empleados/actualizar-empleado-command.interface';
 import type CrearEmpleadoCommand from '@desktop-contracts/configuration/empleados/crear-empleado-command.interface';
 import type EmpleadoInterface from '@desktop-contracts/configuration/empleados/empleado.interface';
+import permissionKeys from '@desktop-contracts/configuration/permissions/permission-keys.constants';
 import Empleado from '@model/empleados/empleado.model';
 import ManagementEmployeesComponent from '@modules/gestion/pages/management-employees/management-employees.component';
 import { DialogService } from '@osumi/angular-tools';
@@ -28,7 +29,7 @@ describe('ManagementEmployeesComponent', (): void => {
         hasPassword: true,
         color: '#336699',
         admin: false,
-        permisos: [20, 23],
+        permisos: [permissionKeys.gestion.empleados],
       },
       {
         id: 2,
@@ -46,7 +47,7 @@ describe('ManagementEmployeesComponent', (): void => {
         hasPassword: true,
         color: '#228844',
         admin: false,
-        permisos: [21],
+        permisos: [permissionKeys.gestion.ajustes],
       },
     ];
 
@@ -144,7 +145,7 @@ describe('ManagementEmployeesComponent', (): void => {
     expect(fixture.componentInstance.creatingEmpleado()).toBe(false);
   });
 
-  it('permite iniciar un alta con el permiso 20', (): void => {
+  it('permite iniciar un alta con el permiso gestion.empleados', (): void => {
     gestionSessionService.login(1);
 
     const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
@@ -162,7 +163,7 @@ describe('ManagementEmployeesComponent', (): void => {
     expect(component.selectedEmpleado()).toBeNull();
   });
 
-  it('no permite iniciar un alta sin el permiso 20', (): void => {
+  it('no permite iniciar un alta sin el permiso gestion.empleados', (): void => {
     gestionSessionService.login(3);
 
     const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
@@ -372,7 +373,7 @@ describe('ManagementEmployeesComponent', (): void => {
   });
 
   it('actualiza Datos conservando contraseña y permisos cuando la contraseña queda vacía', async (): Promise<void> => {
-    gestionSessionService.login(3);
+    gestionSessionService.login(1);
 
     const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
       ManagementEmployeesComponent,
@@ -421,7 +422,7 @@ describe('ManagementEmployeesComponent', (): void => {
   });
 
   it('envía la nueva contraseña cuando se modifica', async (): Promise<void> => {
-    gestionSessionService.login(3);
+    gestionSessionService.login(1);
 
     const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
       ManagementEmployeesComponent,
@@ -455,15 +456,16 @@ describe('ManagementEmployeesComponent', (): void => {
     );
   });
 
-  it('no permite modificar Datos sin el permiso 21', async (): Promise<void> => {
-    gestionSessionService.login(1);
+  it('no permite modificar Datos sin el permiso gestion.empleados', async (): Promise<void> => {
+    gestionSessionService.login(3);
 
     const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
       ManagementEmployeesComponent,
     );
 
     const component: ManagementEmployeesComponent = fixture.componentInstance;
-    const empleado: Empleado | null = empleadosService.findById(3);
+
+    const empleado: Empleado | null = empleadosService.findById(1);
 
     expect(empleado).not.toBeNull();
 
@@ -490,7 +492,7 @@ describe('ManagementEmployeesComponent', (): void => {
   });
 
   it('restaura los datos originales al cancelar una edición', (): void => {
-    gestionSessionService.login(3);
+    gestionSessionService.login(1);
 
     const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
       ManagementEmployeesComponent,
@@ -545,7 +547,7 @@ describe('ManagementEmployeesComponent', (): void => {
     expect(component.selectedEmpleado()).toBeNull();
   });
 
-  it('permite acceder a Permisos con el permiso 23', (): void => {
+  it('permite acceder a Permisos con el permiso gestion.empleados', (): void => {
     gestionSessionService.login(1);
 
     const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
@@ -555,7 +557,7 @@ describe('ManagementEmployeesComponent', (): void => {
     expect(fixture.componentInstance.canManageEmpleadoPermissions()).toBe(true);
   });
 
-  it('no permite acceder a Permisos sin el permiso 23', (): void => {
+  it('no permite acceder a Permisos sin el permiso gestion.empleados', (): void => {
     gestionSessionService.login(3);
 
     const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
@@ -576,7 +578,7 @@ describe('ManagementEmployeesComponent', (): void => {
   });
 
   it('carga los permisos almacenados del empleado seleccionado', (): void => {
-    gestionSessionService.login(3);
+    gestionSessionService.login(1);
 
     const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
       ManagementEmployeesComponent,
@@ -594,13 +596,13 @@ describe('ManagementEmployeesComponent', (): void => {
 
     component.selectEmpleado(empleado);
 
-    expect(component.hasEmpleadoPermission(20)).toBe(true);
+    expect(component.hasEmpleadoPermission(permissionKeys.gestion.empleados)).toBe(true);
 
-    expect(component.hasEmpleadoPermission(21)).toBe(false);
+    expect(component.hasEmpleadoPermission(permissionKeys.gestion.tiposPago)).toBe(false);
   });
 
   it('muestra todos los permisos seleccionados para un administrador', (): void => {
-    gestionSessionService.login(3);
+    gestionSessionService.login(1);
 
     const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
       ManagementEmployeesComponent,
@@ -618,11 +620,13 @@ describe('ManagementEmployeesComponent', (): void => {
 
     component.selectEmpleado(empleado);
 
-    expect(component.selectedEmpleadoPermisos().length).toBe(25);
-
-    for (let permissionId: number = 1; permissionId <= 25; permissionId++) {
-      expect(component.hasEmpleadoPermission(permissionId)).toBe(true);
-    }
+    expect(component.selectedEmpleadoPermisos()).toEqual([
+      permissionKeys.gestion.ajustes,
+      permissionKeys.gestion.copiasSeguridad,
+      permissionKeys.gestion.empleados,
+      permissionKeys.gestion.tiposPago,
+      permissionKeys.ventas.modificarImportes,
+    ]);
   });
 
   it('inicia un nuevo empleado sin permisos seleccionados', (): void => {
@@ -639,7 +643,7 @@ describe('ManagementEmployeesComponent', (): void => {
     expect(component.selectedEmpleadoPermisos()).toEqual([]);
   });
 
-  it('permite modificar permisos con el permiso 23', (): void => {
+  it('permite modificar permisos con el permiso gestion.empleados', (): void => {
     gestionSessionService.login(1);
 
     const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
@@ -662,103 +666,19 @@ describe('ManagementEmployeesComponent', (): void => {
 
     expect(component.empleadoPermissionsDirty()).toBe(false);
 
-    component.setEmpleadoPermission(20, true);
+    component.setEmpleadoPermission(permissionKeys.gestion.tiposPago, true);
 
-    expect(component.hasEmpleadoPermission(20)).toBe(true);
+    expect(component.hasEmpleadoPermission(permissionKeys.gestion.tiposPago)).toBe(true);
 
     expect(component.empleadoPermissionsDirty()).toBe(true);
 
     expect(component.canSaveEmpleado()).toBe(true);
 
-    component.setEmpleadoPermission(20, false);
+    component.setEmpleadoPermission(permissionKeys.gestion.tiposPago, false);
+
+    expect(component.hasEmpleadoPermission(permissionKeys.gestion.tiposPago)).toBe(false);
 
     expect(component.empleadoPermissionsDirty()).toBe(false);
-  });
-
-  it('modifica permisos sin alterar Datos cuando no dispone del permiso 21', async (): Promise<void> => {
-    gestionSessionService.login(1);
-
-    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
-      ManagementEmployeesComponent,
-    );
-
-    const component: ManagementEmployeesComponent = fixture.componentInstance;
-
-    const empleado: Empleado | null = empleadosService.findById(3);
-
-    expect(empleado).not.toBeNull();
-
-    if (empleado === null) {
-      return;
-    }
-
-    const updatedEmpleado: Empleado = new Empleado();
-
-    updatedEmpleado.id = empleado.id;
-    updatedEmpleado.publicId = empleado.publicId;
-    updatedEmpleado.nombre = empleado.nombre;
-    updatedEmpleado.hasPassword = true;
-    updatedEmpleado.color = empleado.color;
-    updatedEmpleado.admin = false;
-    updatedEmpleado.permisos = [20, 21];
-
-    const updateSpy = vi.spyOn(empleadosService, 'update').mockResolvedValue(updatedEmpleado);
-
-    component.selectEmpleado(empleado);
-
-    expect(component.canUpdateEmpleado()).toBe(false);
-
-    component.setEmpleadoPermission(20, true);
-
-    await component.saveEmpleado();
-
-    expect(updateSpy).toHaveBeenCalledWith(empleado.id, {
-      nombre: 'Iñigo',
-      password: null,
-      color: '#228844',
-      permisos: [20, 21],
-    } satisfies ActualizarEmpleadoCommand);
-  });
-
-  it('conserva los permisos al guardar Datos sin permiso 23', async (): Promise<void> => {
-    gestionSessionService.login(3);
-
-    const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
-      ManagementEmployeesComponent,
-    );
-
-    const component: ManagementEmployeesComponent = fixture.componentInstance;
-
-    const empleado: Empleado | null = empleadosService.findById(1);
-
-    expect(empleado).not.toBeNull();
-
-    if (empleado === null) {
-      return;
-    }
-
-    const updateSpy = vi.spyOn(empleadosService, 'update').mockResolvedValue(empleado);
-
-    component.selectEmpleado(empleado);
-
-    /*
-     * Incluso una modificación programática
-     * de este estado no debe atravesar
-     * la autorización del permiso 23.
-     */
-    component.selectedEmpleadoPermisos.set([1, 2, 3]);
-
-    component.empleadoDataForm.nombre().value.set('Zuriñe nueva');
-
-    await component.saveEmpleado();
-
-    expect(updateSpy).toHaveBeenCalledWith(
-      empleado.id,
-      expect.objectContaining({
-        nombre: 'Zuriñe nueva',
-        permisos: [20, 23],
-      }),
-    );
   });
 
   it('no permite modificar los permisos de un administrador', (): void => {
@@ -782,11 +702,17 @@ describe('ManagementEmployeesComponent', (): void => {
 
     expect(component.canEditEmpleadoPermissions()).toBe(false);
 
-    component.setEmpleadoPermission(1, false);
+    component.setEmpleadoPermission(permissionKeys.gestion.ajustes, false);
 
-    expect(component.selectedEmpleadoPermisos().length).toBe(25);
+    expect(component.selectedEmpleadoPermisos()).toEqual([
+      permissionKeys.gestion.ajustes,
+      permissionKeys.gestion.copiasSeguridad,
+      permissionKeys.gestion.empleados,
+      permissionKeys.gestion.tiposPago,
+      permissionKeys.ventas.modificarImportes,
+    ]);
 
-    expect(component.hasEmpleadoPermission(1)).toBe(true);
+    expect(component.hasEmpleadoPermission(permissionKeys.gestion.ajustes)).toBe(true);
 
     expect(component.empleadoPermissionsDirty()).toBe(false);
   });
@@ -810,13 +736,15 @@ describe('ManagementEmployeesComponent', (): void => {
 
     component.selectEmpleado(empleado);
 
-    component.setEmpleadoPermission(20, true);
+    expect(component.selectedEmpleadoPermisos()).toEqual([permissionKeys.gestion.ajustes]);
+
+    component.setEmpleadoPermission(permissionKeys.gestion.tiposPago, true);
 
     expect(component.empleadoPermissionsDirty()).toBe(true);
 
     component.cancelEmpleadoChanges();
 
-    expect(component.selectedEmpleadoPermisos()).toEqual([21]);
+    expect(component.selectedEmpleadoPermisos()).toEqual([permissionKeys.gestion.ajustes]);
 
     expect(component.empleadoPermissionsDirty()).toBe(false);
   });
@@ -838,7 +766,10 @@ describe('ManagementEmployeesComponent', (): void => {
     createdEmpleado.hasPassword = true;
     createdEmpleado.color = '#112233';
     createdEmpleado.admin = false;
-    createdEmpleado.permisos = [18, 25];
+    createdEmpleado.permisos = [
+      permissionKeys.gestion.ajustes,
+      permissionKeys.gestion.copiasSeguridad,
+    ];
 
     const createSpy = vi.spyOn(empleadosService, 'create').mockResolvedValue(createdEmpleado);
 
@@ -852,9 +783,9 @@ describe('ManagementEmployeesComponent', (): void => {
 
     component.empleadoDataForm.color().value.set('#112233');
 
-    component.setEmpleadoPermission(18, true);
+    component.setEmpleadoPermission(permissionKeys.gestion.copiasSeguridad, true);
 
-    component.setEmpleadoPermission(25, true);
+    component.setEmpleadoPermission(permissionKeys.gestion.ajustes, true);
 
     await component.saveEmpleado();
 
@@ -862,7 +793,7 @@ describe('ManagementEmployeesComponent', (): void => {
       nombre: 'Leire',
       password: 'clave',
       color: '#112233',
-      permisos: [18, 25],
+      permisos: [permissionKeys.gestion.ajustes, permissionKeys.gestion.copiasSeguridad],
     } satisfies CrearEmpleadoCommand);
   });
 
@@ -870,7 +801,7 @@ describe('ManagementEmployeesComponent', (): void => {
     vi.useFakeTimers();
 
     try {
-      gestionSessionService.login(3);
+      gestionSessionService.login(1);
 
       const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
         ManagementEmployeesComponent,
@@ -920,97 +851,153 @@ describe('ManagementEmployeesComponent', (): void => {
 
   it('elimina otro empleado después de confirmarlo', async (): Promise<void> => {
     gestionSessionService.login(2);
+
     const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
       ManagementEmployeesComponent,
     );
+
     const component: ManagementEmployeesComponent = fixture.componentInstance;
+
     const empleado: Empleado | null = empleadosService.findById(1);
+
     expect(empleado).not.toBeNull();
+
     if (empleado === null) {
       return;
     }
+
     vi.spyOn(dialog, 'confirm').mockReturnValue(of(true));
+
     const deactivateSpy = vi.spyOn(empleadosService, 'deactivate');
+
     component.selectEmpleado(empleado);
+
     expect(component.canDeleteEmpleado()).toBe(true);
+
     expect(component.canDeleteSelectedEmpleado()).toBe(true);
+
     await component.deleteEmpleado();
+
     expect(deactivateSpy).toHaveBeenCalledWith(1);
+
     expect(empleadosService.findById(1)).toBeNull();
+
     expect(component.selectedEmpleado()).toBeNull();
   });
 
   it('no elimina el empleado si se cancela la confirmación', async (): Promise<void> => {
     gestionSessionService.login(2);
+
     const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
       ManagementEmployeesComponent,
     );
+
     const component: ManagementEmployeesComponent = fixture.componentInstance;
+
     const empleado: Empleado | null = empleadosService.findById(1);
+
     expect(empleado).not.toBeNull();
+
     if (empleado === null) {
       return;
     }
+
     vi.spyOn(dialog, 'confirm').mockReturnValue(of(false));
+
     const deactivateSpy = vi.spyOn(empleadosService, 'deactivate');
+
     component.selectEmpleado(empleado);
+
     await component.deleteEmpleado();
+
     expect(deactivateSpy).not.toHaveBeenCalled();
+
     expect(component.selectedEmpleado()).toBe(empleado);
+
     expect(empleadosService.findById(1)).toBe(empleado);
   });
 
-  it('no permite eliminar empleados sin el permiso 22', async (): Promise<void> => {
+  it('no permite eliminar empleados sin el permiso gestion.empleados', async (): Promise<void> => {
     gestionSessionService.login(3);
+
     const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
       ManagementEmployeesComponent,
     );
+
     const component: ManagementEmployeesComponent = fixture.componentInstance;
+
     const empleado: Empleado | null = empleadosService.findById(1);
+
     expect(empleado).not.toBeNull();
+
     if (empleado === null) {
       return;
     }
+
     const deactivateSpy = vi.spyOn(empleadosService, 'deactivate');
+
     component.selectEmpleado(empleado);
+
     expect(component.canDeleteEmpleado()).toBe(false);
+
     expect(component.canDeleteSelectedEmpleado()).toBe(false);
+
     await component.deleteEmpleado();
+
     expect(deactivateSpy).not.toHaveBeenCalled();
   });
 
   it('no permite que el empleado autenticado se elimine a sí mismo', async (): Promise<void> => {
     gestionSessionService.login(2);
+
     const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
       ManagementEmployeesComponent,
     );
+
     const component: ManagementEmployeesComponent = fixture.componentInstance;
+
     const empleado: Empleado | null = empleadosService.findById(2);
+
     expect(empleado).not.toBeNull();
+
     if (empleado === null) {
       return;
     }
+
     const deactivateSpy = vi.spyOn(empleadosService, 'deactivate');
+
     component.selectEmpleado(empleado);
+
     expect(component.canDeleteEmpleado()).toBe(true);
+
     expect(component.canDeleteSelectedEmpleado()).toBe(false);
+
     await component.deleteEmpleado();
+
     expect(deactivateSpy).not.toHaveBeenCalled();
+
     expect(component.selectedEmpleado()).toBe(empleado);
   });
 
-  it('vuelve a Gestión si el empleado se quita a sí mismo todos los permisos de Empleados', async (): Promise<void> => {
+  it('vuelve a Gestión si el empleado autenticado se quita a sí mismo gestion.empleados', async (): Promise<void> => {
     gestionSessionService.login(1);
+
     const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
       ManagementEmployeesComponent,
     );
+
     const component: ManagementEmployeesComponent = fixture.componentInstance;
+
     const empleado: Empleado | null = empleadosService.findById(1);
+
     expect(empleado).not.toBeNull();
+
     if (empleado === null) {
       return;
     }
+
     const updatedEmpleado: Empleado = new Empleado();
+
     updatedEmpleado.id = empleado.id;
     updatedEmpleado.publicId = empleado.publicId;
     updatedEmpleado.nombre = empleado.nombre;
@@ -1018,47 +1005,79 @@ describe('ManagementEmployeesComponent', (): void => {
     updatedEmpleado.color = empleado.color;
     updatedEmpleado.admin = false;
     updatedEmpleado.permisos = [];
-    vi.spyOn(empleadosService, 'update').mockResolvedValue(updatedEmpleado);
+
+    const updateSpy = vi.spyOn(empleadosService, 'update').mockResolvedValue(updatedEmpleado);
+
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
     component.selectEmpleado(empleado);
-    component.setEmpleadoPermission(20, false);
-    component.setEmpleadoPermission(23, false);
+
+    component.setEmpleadoPermission(permissionKeys.gestion.empleados, false);
+
     await component.saveEmpleado();
+
+    expect(updateSpy).toHaveBeenCalledWith(
+      empleado.id,
+      expect.objectContaining({
+        permisos: [],
+      }),
+    );
+
     expect(navigateSpy).toHaveBeenCalledWith(['/gestion']);
+
     expect(gestionSessionService.empleadoId()).toBe(1);
+
     expect(component.saveSuccessful()).toBe(false);
   });
 
-  it('permanece en Empleados si al editarse conserva algún permiso 20-24', async (): Promise<void> => {
+  it('permanece en Empleados si al editarse conserva gestion.empleados', async (): Promise<void> => {
     gestionSessionService.login(1);
+
     const fixture: ComponentFixture<ManagementEmployeesComponent> = TestBed.createComponent(
       ManagementEmployeesComponent,
     );
+
     const component: ManagementEmployeesComponent = fixture.componentInstance;
+
     const empleado: Empleado | null = empleadosService.findById(1);
+
     expect(empleado).not.toBeNull();
+
     if (empleado === null) {
       return;
     }
+
     const updatedEmpleado: Empleado = new Empleado();
+
     updatedEmpleado.id = empleado.id;
     updatedEmpleado.publicId = empleado.publicId;
     updatedEmpleado.nombre = empleado.nombre;
     updatedEmpleado.hasPassword = empleado.hasPassword;
     updatedEmpleado.color = empleado.color;
     updatedEmpleado.admin = false;
-    /*
-     * Pierde el 23 pero conserva
-     * el permiso 20.
-     */
-    updatedEmpleado.permisos = [20];
-    vi.spyOn(empleadosService, 'update').mockResolvedValue(updatedEmpleado);
+    updatedEmpleado.permisos = [permissionKeys.gestion.ajustes, permissionKeys.gestion.empleados];
+
+    const updateSpy = vi.spyOn(empleadosService, 'update').mockResolvedValue(updatedEmpleado);
+
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
     component.selectEmpleado(empleado);
-    component.setEmpleadoPermission(23, false);
+
+    component.setEmpleadoPermission(permissionKeys.gestion.ajustes, true);
+
     await component.saveEmpleado();
+
+    expect(updateSpy).toHaveBeenCalledWith(
+      empleado.id,
+      expect.objectContaining({
+        permisos: [permissionKeys.gestion.ajustes, permissionKeys.gestion.empleados],
+      }),
+    );
+
     expect(navigateSpy).not.toHaveBeenCalled();
+
     expect(gestionSessionService.empleadoId()).toBe(1);
+
     /*
      * Limpia también el timeout del
      * feedback generado por el guardado.

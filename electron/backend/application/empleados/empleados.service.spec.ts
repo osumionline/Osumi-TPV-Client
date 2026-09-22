@@ -7,6 +7,8 @@ import type PasswordHasher from '@backend/contracts/security/password-hasher.int
 import type EmpleadoAuthenticationRecord from '@backend/domain/empleados/empleado-authentication-record.interface';
 import type EmpleadoRecord from '@backend/domain/empleados/empleado-record.interface';
 import type EmpleadoInterface from '@desktop-contracts/configuration/empleados/empleado.interface';
+import type PermissionId from '@desktop-contracts/configuration/permissions/permission-id.type';
+import permissionKeys from '@desktop-contracts/configuration/permissions/permission-keys.constants';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 class FakeEmpleadoRepository implements EmpleadoRepository {
@@ -231,7 +233,7 @@ describe('EmpleadosService', (): void => {
         hasPassword: false,
         color: '00FF00',
         admin: false,
-        permisos: [18, 19],
+        permisos: [permissionKeys.gestion.ajustes, permissionKeys.gestion.tiposPago],
       }),
     ];
 
@@ -245,7 +247,7 @@ describe('EmpleadosService', (): void => {
         hasPassword: true,
         color: '#FF0000',
         admin: true,
-        permisos: [18, 20],
+        permisos: [permissionKeys.gestion.ajustes, permissionKeys.gestion.empleados],
       },
       {
         id: 2,
@@ -254,7 +256,7 @@ describe('EmpleadosService', (): void => {
         hasPassword: false,
         color: '#00FF00',
         admin: false,
-        permisos: [18, 19],
+        permisos: [permissionKeys.gestion.ajustes, permissionKeys.gestion.tiposPago],
       },
     ]);
   });
@@ -269,14 +271,18 @@ describe('EmpleadosService', (): void => {
       hasPassword: true,
       color: '12ABEF',
       admin: false,
-      permisos: [18, 20],
+      permisos: [permissionKeys.gestion.ajustes, permissionKeys.gestion.empleados],
     });
 
     const result: EmpleadoInterface = await service.create({
       nombre: '  Ane  ',
       password: 'secreto',
       color: '#12abEF',
-      permisos: [20, 18, 20],
+      permisos: [
+        permissionKeys.gestion.empleados,
+        permissionKeys.gestion.ajustes,
+        permissionKeys.gestion.empleados,
+      ],
     });
 
     expect(passwordHasher.hashRequests).toEqual(['secreto']);
@@ -293,7 +299,7 @@ describe('EmpleadosService', (): void => {
         nombre: 'Ane',
         passwordHash: 'nuevo-hash',
         color: '12ABEF',
-        permisos: [18, 20],
+        permisos: [permissionKeys.gestion.ajustes, permissionKeys.gestion.empleados],
       },
     ]);
 
@@ -304,8 +310,29 @@ describe('EmpleadosService', (): void => {
       hasPassword: true,
       color: '#12ABEF',
       admin: false,
-      permisos: [18, 20],
+      permisos: [permissionKeys.gestion.ajustes, permissionKeys.gestion.empleados],
     });
+  });
+
+  it('rechaza crear un empleado con un permiso desconocido', async (): Promise<void> => {
+    const invalidPermissions = [
+      'gestion.permiso_inexistente',
+    ] as unknown as readonly PermissionId[];
+
+    await expect(
+      service.create({
+        nombre: 'Ane',
+        password: 'secreto',
+        color: '#00FF00',
+        permisos: invalidPermissions,
+      }),
+    ).rejects.toThrow('Los permisos del empleado no son válidos.');
+
+    expect(passwordHasher.hashRequests).toHaveLength(0);
+
+    expect(repository.existsActiveByNameRequests).toHaveLength(0);
+
+    expect(repository.createRequests).toHaveLength(0);
   });
 
   it('rechaza crear un empleado con contraseña vacía', async (): Promise<void> => {
@@ -350,14 +377,18 @@ describe('EmpleadosService', (): void => {
       nombre: 'Nombre nuevo',
       color: 'ABCDEF',
       admin: false,
-      permisos: [18, 21],
+      permisos: [permissionKeys.gestion.ajustes, permissionKeys.gestion.tiposPago],
     });
 
     const result: EmpleadoInterface = await service.update(1, {
       nombre: '  Nombre nuevo  ',
       password: null,
       color: '#abcdef',
-      permisos: [21, 18, 21],
+      permisos: [
+        permissionKeys.gestion.tiposPago,
+        permissionKeys.gestion.ajustes,
+        permissionKeys.gestion.tiposPago,
+      ],
     });
 
     expect(passwordHasher.hashRequests).toHaveLength(0);
@@ -369,7 +400,7 @@ describe('EmpleadosService', (): void => {
           nombre: 'Nombre nuevo',
           passwordHash: null,
           color: 'ABCDEF',
-          permisos: [18, 21],
+          permisos: [permissionKeys.gestion.ajustes, permissionKeys.gestion.tiposPago],
         },
       },
     ]);
@@ -414,7 +445,7 @@ describe('EmpleadosService', (): void => {
       nombre: 'Iñigo',
       password: 'nuevo-secreto',
       color: '#FF0000',
-      permisos: [18],
+      permisos: [permissionKeys.gestion.ajustes],
     });
 
     expect(passwordHasher.hashRequests).toEqual(['nuevo-secreto']);
@@ -673,7 +704,7 @@ function createEmpleadoRecord(overrides: Partial<EmpleadoRecord> = {}): Empleado
     hasPassword: true,
     color: 'FF0000',
     admin: true,
-    permisos: [18, 20],
+    permisos: [permissionKeys.gestion.ajustes, permissionKeys.gestion.empleados],
     ...overrides,
   };
 }

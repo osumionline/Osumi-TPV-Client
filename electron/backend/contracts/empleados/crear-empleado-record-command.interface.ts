@@ -1,3 +1,5 @@
+import type PermissionId from '@desktop-contracts/configuration/permissions/permission-id.type';
+
 export default interface CrearEmpleadoRecordCommand {
   readonly nombre: string;
 
@@ -11,5 +13,5 @@ export default interface CrearEmpleadoRecordCommand {
    */
   readonly color: string;
 
-  readonly permisos: readonly number[];
+  readonly permisos: readonly PermissionId[];
 }

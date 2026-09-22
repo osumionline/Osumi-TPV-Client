@@ -5,6 +5,8 @@ import type PasswordHasher from '@backend/contracts/security/password-hasher.int
 import type LegacyImportExecutionCommand from '@backend/domain/legacy-import/legacy-import-execution-command.interface';
 import type LegacyImportPhaseResult from '@backend/domain/legacy-import/legacy-import-phase-result.interface';
 import type LegacySqlInsert from '@backend/domain/legacy-import/legacy-sql-insert.interface';
+import type PermissionId from '@desktop-contracts/configuration/permissions/permission-id.type';
+import mapLegacyEmployeePermission from '@infrastructure/legacy-import/legacy-import-employee-permission.mapper';
 import LegacyImportPublicIdFactory from '@infrastructure/legacy-import/legacy-import-public-id.factory';
 import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value.reader';
 import type { QueryRunner } from 'typeorm';
@@ -534,13 +536,30 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
     const insertedKeys: Set<string> = new Set<string>();
 
     for (const permission of state.employeePermissions) {
-      const key: string = [permission.employeeId, permission.permissionId].join(':');
+      if (!employeeIds.has(permission.employeeId)) {
+        counters.skippedRows++;
+        counters.warningCount++;
 
-      if (
-        !employeeIds.has(permission.employeeId) ||
-        permission.permissionId <= 0 ||
-        insertedKeys.has(key)
-      ) {
+        continue;
+      }
+
+      const permissionId: PermissionId | null = mapLegacyEmployeePermission(
+        permission.permissionId,
+      );
+
+      /*
+       * Los permisos legacy que ya no existen se
+       * descartan de forma esperada, sin generar warning.
+       */
+      if (permissionId === null) {
+        counters.skippedRows++;
+
+        continue;
+      }
+
+      const key: string = [permission.employeeId, permissionId].join(':');
+
+      if (insertedKeys.has(key)) {
         counters.skippedRows++;
         counters.warningCount++;
 
@@ -550,7 +569,7 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
       await this.insertEmployeePermission(
         queryRunner,
         permission.employeeId,
-        permission.permissionId,
+        permissionId,
         permission.createdAt,
       );
 
@@ -563,14 +582,14 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
   private async insertEmployeePermission(
     queryRunner: QueryRunner,
     employeeId: number,
-    permissionId: number,
+    permissionId: PermissionId,
     createdAt: string,
   ): Promise<void> {
     await queryRunner.query(
       `
       INSERT INTO empleado_permiso (
         id_empleado,
-        id_permiso,
+        permiso,
         created_at
       )
       VALUES (

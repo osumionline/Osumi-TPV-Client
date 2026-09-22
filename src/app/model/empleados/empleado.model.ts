@@ -1,4 +1,5 @@
 import type EmpleadoInterface from '@desktop-contracts/configuration/empleados/empleado.interface';
+import type PermissionId from '@desktop-contracts/configuration/permissions/permission-id.type';
 
 export default class Empleado {
   id: number | null = null;
@@ -7,7 +8,7 @@ export default class Empleado {
   hasPassword: boolean = false;
   color: string = '#000000';
   admin: boolean = false;
-  permisos: number[] = [];
+  permisos: PermissionId[] = [];
 
   get textColor(): string {
     const normalizedColor: string = this.color.replace(/^#/, '');
@@ -17,11 +18,8 @@ export default class Empleado {
     }
 
     const red: number = Number.parseInt(normalizedColor.slice(0, 2), 16);
-
     const green: number = Number.parseInt(normalizedColor.slice(2, 4), 16);
-
     const blue: number = Number.parseInt(normalizedColor.slice(4, 6), 16);
-
     const brightness: number = Math.round((red * 299 + green * 587 + blue * 114) / 1000);
 
     return brightness > 125 ? '#000000' : '#ffffff';
@@ -59,7 +57,7 @@ export default class Empleado {
    * Indica si el empleado dispone de un permiso.
    * Los administradores tienen acceso completo.
    */
-  hasPerm(permiso: number): boolean {
+  hasPerm(permiso: PermissionId): boolean {
     return this.admin || this.permisos.includes(permiso);
   }
 
@@ -67,9 +65,10 @@ export default class Empleado {
    * Indica si el empleado dispone de al menos uno de los permisos indicados.
    * Los administradores tienen acceso completo.
    */
-  hasAnyPerm(permisos: readonly number[]): boolean {
+  hasAnyPerm(permisos: readonly PermissionId[]): boolean {
     return (
-      this.admin || permisos.some((permiso: number): boolean => this.permisos.includes(permiso))
+      this.admin ||
+      permisos.some((permiso: PermissionId): boolean => this.permisos.includes(permiso))
     );
   }
 }

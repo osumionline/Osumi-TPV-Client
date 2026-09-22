@@ -5,11 +5,13 @@ import type LegacyPasswordVerifier from '@backend/contracts/security/legacy-pass
 import type PasswordHasher from '@backend/contracts/security/password-hasher.interface';
 import type EmpleadoAuthenticationRecord from '@backend/domain/empleados/empleado-authentication-record.interface';
 import type EmpleadoRecord from '@backend/domain/empleados/empleado-record.interface';
+import PermissionsService from '@backend/domain/permissions/permission.service';
 import type ActualizarEmpleadoCommand from '@desktop-contracts/configuration/empleados/actualizar-empleado-command.interface';
 import type AutenticarEmpleadoCommand from '@desktop-contracts/configuration/empleados/autenticar-empleado-command.interface';
 import type AutenticarEmpleadoResult from '@desktop-contracts/configuration/empleados/autenticar-empleado-result.type';
 import type CrearEmpleadoCommand from '@desktop-contracts/configuration/empleados/crear-empleado-command.interface';
 import type EmpleadoInterface from '@desktop-contracts/configuration/empleados/empleado.interface';
+import type PermissionId from '@desktop-contracts/configuration/permissions/permission-id.type';
 
 export default class EmpleadosService {
   constructor(
@@ -35,7 +37,7 @@ export default class EmpleadosService {
 
     const color: string = this.normalizeColor(command.color);
 
-    const permisos: readonly number[] = this.normalizePermissions(command.permisos);
+    const permisos: readonly PermissionId[] = this.normalizePermissions(command.permisos);
 
     if (await this.repository.existsActiveByName(nombre, null)) {
       throw new Error('Ya existe un empleado con ese nombre.');
@@ -74,7 +76,7 @@ export default class EmpleadosService {
 
     const color: string = this.normalizeColor(command.color);
 
-    const permisos: readonly number[] = this.normalizePermissions(command.permisos);
+    const permisos: readonly PermissionId[] = this.normalizePermissions(command.permisos);
 
     if (await this.repository.existsActiveByName(nombre, idEmpleado)) {
       throw new Error('Ya existe otro empleado con ese nombre.');
@@ -160,6 +162,10 @@ export default class EmpleadosService {
     };
   }
 
+  private readonly availablePermissionIds: ReadonlySet<PermissionId> = new Set<PermissionId>(
+    new PermissionsService().getAllRoleIds(),
+  );
+
   private validateEmployeeId(idEmpleado: number): void {
     if (!Number.isSafeInteger(idEmpleado) || idEmpleado <= 0) {
       throw new Error('El empleado indicado no es válido.');
@@ -188,15 +194,15 @@ export default class EmpleadosService {
     return color.substring(1).toUpperCase();
   }
 
-  private normalizePermissions(permisos: readonly number[]): readonly number[] {
+  private normalizePermissions(permisos: readonly PermissionId[]): readonly PermissionId[] {
     if (!Array.isArray(permisos)) {
       throw new Error('Los permisos del empleado no son válidos.');
     }
 
-    const normalized: number[] = [];
+    const normalized: PermissionId[] = [];
 
     for (const permiso of permisos) {
-      if (!Number.isSafeInteger(permiso) || permiso < 1 || permiso > 25) {
+      if (!this.availablePermissionIds.has(permiso)) {
         throw new Error('Los permisos del empleado no son válidos.');
       }
 
@@ -205,7 +211,9 @@ export default class EmpleadosService {
       }
     }
 
-    return normalized.sort((first: number, second: number): number => first - second);
+    return normalized.sort((first: PermissionId, second: PermissionId): number =>
+      first.localeCompare(second),
+    );
   }
 
   private async resolveCreatePassword(password: string): Promise<string> {

@@ -251,15 +251,24 @@ const statements: readonly string[] = [
   `
     CREATE TABLE empleado_permiso (
       id_empleado INTEGER NOT NULL,
-      id_permiso INTEGER NOT NULL
-        CHECK (id_permiso > 0),
+
+      permiso TEXT NOT NULL
+        CHECK (
+          permiso IN (
+            'ventas.modificar_importes',
+            'gestion.ajustes',
+            'gestion.tipos_pago',
+            'gestion.empleados',
+            'gestion.copias_seguridad'
+          )
+        ),
 
       created_at TEXT NOT NULL
         DEFAULT (${SQLITE_TIMESTAMP_DEFAULT}),
 
       PRIMARY KEY (
         id_empleado,
-        id_permiso
+        permiso
       ),
 
       CONSTRAINT fk_empleado_permiso_empleado
@@ -277,7 +286,7 @@ const statements: readonly string[] = [
   `
     CREATE INDEX idx_empleado_permiso_permiso
     ON empleado_permiso (
-      id_permiso
+      permiso
     )
   `,
 

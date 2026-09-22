@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import type { ActivatedRouteSnapshot, CanActivateFn, UrlTree } from '@angular/router';
 import { Router } from '@angular/router';
+import type PermissionId from '@desktop-contracts/configuration/permissions/permission-id.type';
 import type Empleado from '@model/empleados/empleado.model';
 import EmpleadosService from '@services/empleados/empleados.service';
 import GestionSessionService from '@services/gestion/gestion-session.service';
@@ -35,8 +36,9 @@ const gestionPermissionGuard: CanActivateFn = (
     return router.parseUrl('/gestion');
   }
 
-  const requiredPermissions: readonly number[] | undefined = route.data['requiredPermissions'] as
-    readonly number[] | undefined;
+  const requiredPermissions: readonly PermissionId[] | undefined = route.data[
+    'requiredPermissions'
+  ] as readonly PermissionId[] | undefined;
 
   if (requiredPermissions === undefined || requiredPermissions.length === 0) {
     return router.parseUrl('/gestion');

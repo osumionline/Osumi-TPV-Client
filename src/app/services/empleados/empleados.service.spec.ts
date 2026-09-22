@@ -4,6 +4,7 @@ import type AutenticarEmpleadoCommand from '@desktop-contracts/configuration/emp
 import type AutenticarEmpleadoResult from '@desktop-contracts/configuration/empleados/autenticar-empleado-result.type';
 import type CrearEmpleadoCommand from '@desktop-contracts/configuration/empleados/crear-empleado-command.interface';
 import type EmpleadoInterface from '@desktop-contracts/configuration/empleados/empleado.interface';
+import permissionKeys from '@desktop-contracts/configuration/permissions/permission-keys.constants';
 import type Empleado from '@model/empleados/empleado.model';
 import EmpleadosService from '@services/empleados/empleados.service';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -50,7 +51,7 @@ describe('EmpleadosService', (): void => {
         nombre: 'Iñigo',
         color: '#FF0000',
         admin: true,
-        permisos: [18, 20],
+        permisos: [permissionKeys.gestion.ajustes, permissionKeys.gestion.empleados],
       }),
 
       createEmpleadoInterface({
@@ -59,7 +60,7 @@ describe('EmpleadosService', (): void => {
         nombre: 'Amaia',
         color: '#FFAA00',
         admin: false,
-        permisos: [20, 21],
+        permisos: [permissionKeys.gestion.empleados, permissionKeys.gestion.tiposPago],
       }),
     ];
 
@@ -73,7 +74,7 @@ describe('EmpleadosService', (): void => {
       nombre: 'Zuriñe',
       color: '#00AA00',
       admin: false,
-      permisos: [20],
+      permisos: [permissionKeys.gestion.empleados],
     });
 
     updateResult = createEmpleadoInterface({
@@ -82,7 +83,7 @@ describe('EmpleadosService', (): void => {
       nombre: 'Aitor',
       color: '#123456',
       admin: true,
-      permisos: [20, 21],
+      permisos: [permissionKeys.gestion.empleados, permissionKeys.gestion.tiposPago],
     });
 
     Object.defineProperty(window, 'osumiDesktop', {
@@ -187,7 +188,7 @@ describe('EmpleadosService', (): void => {
       nombre: 'Zuriñe',
       password: 'secreto',
       color: '#00AA00',
-      permisos: [20],
+      permisos: [permissionKeys.gestion.empleados],
     });
 
     expect(createCalls).toEqual([
@@ -195,7 +196,7 @@ describe('EmpleadosService', (): void => {
         nombre: 'Zuriñe',
         password: 'secreto',
         color: '#00AA00',
-        permisos: [20],
+        permisos: [permissionKeys.gestion.empleados],
       },
     ]);
 
@@ -204,6 +205,8 @@ describe('EmpleadosService', (): void => {
     expect(empleado.id).toBe(3);
 
     expect(empleado.nombre).toBe('Zuriñe');
+
+    expect(empleado.permisos).toEqual([permissionKeys.gestion.empleados]);
 
     expect(service.empleados().map((item: Empleado): string => item.nombre)).toEqual([
       'Amaia',
@@ -219,7 +222,7 @@ describe('EmpleadosService', (): void => {
       nombre: 'Aitor',
       password: null,
       color: '#123456',
-      permisos: [20, 21],
+      permisos: [permissionKeys.gestion.empleados, permissionKeys.gestion.tiposPago],
     });
 
     expect(updateCalls).toEqual([
@@ -230,7 +233,7 @@ describe('EmpleadosService', (): void => {
           nombre: 'Aitor',
           password: null,
           color: '#123456',
-          permisos: [20, 21],
+          permisos: [permissionKeys.gestion.empleados, permissionKeys.gestion.tiposPago],
         },
       },
     ]);
@@ -241,7 +244,10 @@ describe('EmpleadosService', (): void => {
 
     expect(service.findById(1)?.color).toBe('#123456');
 
-    expect(service.findById(1)?.permisos).toEqual([20, 21]);
+    expect(service.findById(1)?.permisos).toEqual([
+      permissionKeys.gestion.empleados,
+      permissionKeys.gestion.tiposPago,
+    ]);
 
     expect(service.empleados().map((item: Empleado): string => item.nombre)).toEqual([
       'Aitor',

@@ -35,6 +35,7 @@ import {
 } from '@constants/gestion-permissions.constants';
 import type ActualizarEmpleadoCommand from '@desktop-contracts/configuration/empleados/actualizar-empleado-command.interface';
 import type CrearEmpleadoCommand from '@desktop-contracts/configuration/empleados/crear-empleado-command.interface';
+import type PermissionId from '@desktop-contracts/configuration/permissions/permission-id.type';
 import createEmpleadoDataFormInitialValue from '@model/empleados/empleado-data-form.initial-value';
 import type { EmpleadoDataFormModel } from '@model/empleados/empleado-data-form.model';
 import empleadoDataFormSchema from '@model/empleados/empleado-data-form.schema';
@@ -87,11 +88,11 @@ export default class ManagementEmployeesComponent {
   private saveFeedbackTimeoutId: number | null = null;
   private nombreFocusPending: boolean = false;
 
-  readonly selectedEmpleadoPermisos: WritableSignal<readonly number[]> = signal<readonly number[]>(
-    [],
-  );
-  private readonly initialEmpleadoPermisos: WritableSignal<readonly number[]> = signal<
-    readonly number[]
+  readonly selectedEmpleadoPermisos: WritableSignal<readonly PermissionId[]> = signal<
+    readonly PermissionId[]
+  >([]);
+  private readonly initialEmpleadoPermisos: WritableSignal<readonly PermissionId[]> = signal<
+    readonly PermissionId[]
   >([]);
   readonly empleadoPermissionGroups: readonly EmpleadoPermissionGroup[] =
     EMPLEADO_PERMISSION_GROUPS;
@@ -110,15 +111,15 @@ export default class ManagementEmployeesComponent {
   });
 
   readonly canCreateEmpleado: Signal<boolean> = computed(
-    (): boolean => this.gestionEmpleado()?.hasPerm(GESTION_PERMISSIONS.EMPLOYEES_CREATE) ?? false,
+    (): boolean => this.gestionEmpleado()?.hasPerm(GESTION_PERMISSIONS.EMPLOYEES) ?? false,
   );
 
   readonly canUpdateEmpleado: Signal<boolean> = computed(
-    (): boolean => this.gestionEmpleado()?.hasPerm(GESTION_PERMISSIONS.EMPLOYEES_UPDATE) ?? false,
+    (): boolean => this.gestionEmpleado()?.hasPerm(GESTION_PERMISSIONS.EMPLOYEES) ?? false,
   );
 
   readonly canDeleteEmpleado: Signal<boolean> = computed(
-    (): boolean => this.gestionEmpleado()?.hasPerm(GESTION_PERMISSIONS.EMPLOYEES_DELETE) ?? false,
+    (): boolean => this.gestionEmpleado()?.hasPerm(GESTION_PERMISSIONS.EMPLOYEES) ?? false,
   );
 
   readonly canDeleteSelectedEmpleado: Signal<boolean> = computed((): boolean => {
@@ -137,8 +138,7 @@ export default class ManagementEmployeesComponent {
   });
 
   readonly canManageEmpleadoPermissions: Signal<boolean> = computed(
-    (): boolean =>
-      this.gestionEmpleado()?.hasPerm(GESTION_PERMISSIONS.EMPLOYEES_PERMISSIONS) ?? false,
+    (): boolean => this.gestionEmpleado()?.hasPerm(GESTION_PERMISSIONS.EMPLOYEES) ?? false,
   );
 
   readonly canEditEmpleadoPermissions: Signal<boolean> = computed((): boolean => {
@@ -156,16 +156,16 @@ export default class ManagementEmployeesComponent {
   });
 
   readonly empleadoPermissionsDirty: Signal<boolean> = computed((): boolean => {
-    const current: readonly number[] = this.selectedEmpleadoPermisos();
+    const current: readonly PermissionId[] = this.selectedEmpleadoPermisos();
 
-    const initial: readonly number[] = this.initialEmpleadoPermisos();
+    const initial: readonly PermissionId[] = this.initialEmpleadoPermisos();
 
     if (current.length !== initial.length) {
       return true;
     }
 
     return current.some(
-      (permissionId: number, index: number): boolean => permissionId !== initial[index],
+      (permissionId: PermissionId, index: number): boolean => permissionId !== initial[index],
     );
   });
 
@@ -416,7 +416,7 @@ export default class ManagementEmployeesComponent {
    * Indica si el permiso está seleccionado
    * para el empleado mostrado actualmente.
    */
-  hasEmpleadoPermission(permissionId: number): boolean {
+  hasEmpleadoPermission(permissionId: PermissionId): boolean {
     return this.selectedEmpleadoPermisos().includes(permissionId);
   }
 
@@ -424,17 +424,17 @@ export default class ManagementEmployeesComponent {
    * Marca o desmarca un permiso del empleado
    * cuando el usuario puede modificar permisos.
    */
-  setEmpleadoPermission(permissionId: number, checked: boolean): void {
+  setEmpleadoPermission(permissionId: PermissionId, checked: boolean): void {
     if (!this.canEditEmpleadoPermissions()) {
       return;
     }
 
-    const current: readonly number[] = this.selectedEmpleadoPermisos();
+    const current: readonly PermissionId[] = this.selectedEmpleadoPermisos();
 
-    const next: readonly number[] = checked
+    const next: readonly PermissionId[] = checked
       ? [...current, permissionId]
       : current.filter(
-          (currentPermissionId: number): boolean => currentPermissionId !== permissionId,
+          (currentPermissionId: PermissionId): boolean => currentPermissionId !== permissionId,
         );
 
     this.selectedEmpleadoPermisos.set(this.normalizeEmpleadoPermissions(next));
@@ -545,7 +545,7 @@ export default class ManagementEmployeesComponent {
     const canUpdatePermissions: boolean = this.canEditEmpleadoPermissions();
     const command: ActualizarEmpleadoCommand = {
       /*
-       * Sin permiso 21 conservamos
+       * Sin permiso gestion.empleados conservamos
        * exactamente los datos actuales.
        */
       nombre: canUpdateData ? data.nombre.trim() : empleado.nombre,
@@ -553,7 +553,7 @@ export default class ManagementEmployeesComponent {
       color: canUpdateData ? data.color : empleado.color,
 
       /*
-       * Sin permiso 23 conservamos
+       * Sin permiso gestion.empleados conservamos
        * exactamente los permisos actuales.
        */
       permisos: canUpdatePermissions
@@ -565,27 +565,27 @@ export default class ManagementEmployeesComponent {
   }
 
   private resetEmpleadoPermissions(empleado: Empleado | null): void {
-    let permisos: readonly number[] = [];
+    let permisos: readonly PermissionId[] = [];
 
     if (empleado?.admin) {
       permisos = EMPLEADO_PERMISSION_GROUPS.flatMap(
-        (group: EmpleadoPermissionGroup): readonly number[] =>
-          group.permissions.map((permission): number => permission.id),
+        (group: EmpleadoPermissionGroup): readonly PermissionId[] =>
+          group.permissions.map((permission): PermissionId => permission.id),
       );
     } else if (empleado !== null) {
       permisos = empleado.permisos;
     }
 
-    const normalized: readonly number[] = this.normalizeEmpleadoPermissions(permisos);
+    const normalized: readonly PermissionId[] = this.normalizeEmpleadoPermissions(permisos);
 
     this.selectedEmpleadoPermisos.set(normalized);
 
     this.initialEmpleadoPermisos.set([...normalized]);
   }
 
-  private normalizeEmpleadoPermissions(permisos: readonly number[]): readonly number[] {
-    return [...new Set<number>(permisos)].sort(
-      (first: number, second: number): number => first - second,
+  private normalizeEmpleadoPermissions(permisos: readonly PermissionId[]): readonly PermissionId[] {
+    return [...new Set<PermissionId>(permisos)].sort(
+      (first: PermissionId, second: PermissionId): number => first.localeCompare(second),
     );
   }
 

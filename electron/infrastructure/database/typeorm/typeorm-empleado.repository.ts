@@ -3,6 +3,7 @@ import type CrearEmpleadoRecordCommand from '@backend/contracts/empleados/crear-
 import type EmpleadoRepository from '@backend/contracts/empleados/empleado.repository.interface';
 import type EmpleadoAuthenticationRecord from '@backend/domain/empleados/empleado-authentication-record.interface';
 import type EmpleadoRecord from '@backend/domain/empleados/empleado-record.interface';
+import type PermissionId from '@desktop-contracts/configuration/permissions/permission-id.type';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import DISABLED_LEGACY_PASSWORD_HASH from '@infrastructure/security/disabled-legacy-password-hash.constant';
 import { randomUUID } from 'node:crypto';
@@ -26,7 +27,7 @@ interface EmpleadoDatabaseRow {
 
 interface EmpleadoPermisoDatabaseRow {
   readonly id_empleado: number;
-  readonly id_permiso: number;
+  readonly permiso: PermissionId;
 }
 
 interface EmpleadoIdRow {
@@ -55,7 +56,8 @@ export default class TypeOrmEmpleadoRepository implements EmpleadoRepository {
 
     const permisos: readonly EmpleadoPermisoDatabaseRow[] = await this.readPermisos(dataSource);
 
-    const permisosByEmpleado: ReadonlyMap<number, readonly number[]> = this.groupPermisos(permisos);
+    const permisosByEmpleado: ReadonlyMap<number, readonly PermissionId[]> =
+      this.groupPermisos(permisos);
 
     return empleados.map((empleado: EmpleadoDatabaseRow): EmpleadoRecord => ({
       id: empleado.id,
@@ -411,29 +413,29 @@ export default class TypeOrmEmpleadoRepository implements EmpleadoRepository {
   private async replacePermissions(
     queryRunner: QueryRunner,
     idEmpleado: number,
-    permisos: readonly number[],
+    permisos: readonly PermissionId[],
   ): Promise<void> {
     await queryRunner.query(
       `
-        DELETE FROM empleado_permiso
-        WHERE id_empleado = ?
-      `,
+      DELETE FROM empleado_permiso
+      WHERE id_empleado = ?
+    `,
       [idEmpleado],
     );
 
     const createdAt: string = new Date().toISOString();
 
-    for (const idPermiso of permisos) {
+    for (const permiso of permisos) {
       await queryRunner.query(
         `
-          INSERT INTO empleado_permiso (
-            id_empleado,
-            id_permiso,
-            created_at
-          )
-          VALUES (?, ?, ?)
-        `,
-        [idEmpleado, idPermiso, createdAt],
+        INSERT INTO empleado_permiso (
+          id_empleado,
+          permiso,
+          created_at
+        )
+        VALUES (?, ?, ?)
+      `,
+        [idEmpleado, permiso, createdAt],
       );
     }
   }
@@ -471,30 +473,30 @@ export default class TypeOrmEmpleadoRepository implements EmpleadoRepository {
   ): Promise<readonly EmpleadoPermisoDatabaseRow[]> {
     return (await dataSource.query(
       `
-        SELECT
-          ep.id_empleado,
-          ep.id_permiso
-        FROM empleado_permiso ep
-        INNER JOIN empleado e
-          ON e.id = ep.id_empleado
-          AND e.activo = 1
-          AND e.deleted_at IS NULL
-        ORDER BY
-          ep.id_empleado,
-          ep.id_permiso
-      `,
+      SELECT
+        ep.id_empleado,
+        ep.permiso
+      FROM empleado_permiso ep
+      INNER JOIN empleado e
+        ON e.id = ep.id_empleado
+        AND e.activo = 1
+        AND e.deleted_at IS NULL
+      ORDER BY
+        ep.id_empleado,
+        ep.permiso
+    `,
     )) as readonly EmpleadoPermisoDatabaseRow[];
   }
 
   private groupPermisos(
     rows: readonly EmpleadoPermisoDatabaseRow[],
-  ): ReadonlyMap<number, readonly number[]> {
-    const result: Map<number, number[]> = new Map<number, number[]>();
+  ): ReadonlyMap<number, readonly PermissionId[]> {
+    const result: Map<number, PermissionId[]> = new Map<number, PermissionId[]>();
 
     for (const row of rows) {
-      const current: number[] = result.get(row.id_empleado) ?? [];
+      const current: PermissionId[] = result.get(row.id_empleado) ?? [];
 
-      current.push(row.id_permiso);
+      current.push(row.permiso);
 
       result.set(row.id_empleado, current);
     }

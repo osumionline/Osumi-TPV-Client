@@ -8,6 +8,7 @@ import {
   GESTION_EMPLOYEES_PERMISSIONS,
   GESTION_PERMISSIONS,
 } from '@constants/gestion-permissions.constants';
+import type PermissionId from '@desktop-contracts/configuration/permissions/permission-id.type';
 import type Empleado from '@model/empleados/empleado.model';
 import ManagementPasswordDialogComponent from '@modules/gestion/components/management-password-dialog/management-password-dialog.component';
 import EmpleadosService from '@services/empleados/empleados.service';
@@ -19,7 +20,7 @@ interface ManagementModuleItem {
   readonly description: string;
   readonly icon: string;
   readonly route: string;
-  readonly requiredPermissions: readonly number[];
+  readonly requiredPermissions: readonly PermissionId[];
 }
 
 /**

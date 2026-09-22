@@ -3,7 +3,8 @@ import type LegacyImportSqlInsertListener from '@backend/contracts/legacy-import
 import type LegacyImportExecutionCommand from '@backend/domain/legacy-import/legacy-import-execution-command.interface';
 import type LegacyImportPhaseResult from '@backend/domain/legacy-import/legacy-import-phase-result.interface';
 import type LegacySqlInsert from '@backend/domain/legacy-import/legacy-sql-insert.interface';
-import { GESTION_PERMISSIONS } from '@desktop-contracts/configuration/empleados/gestion-permissions.constants';
+import type PermissionId from '@desktop-contracts/configuration/permissions/permission-id.type';
+import permissionKeys from '@desktop-contracts/configuration/permissions/permission-keys.constants';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
@@ -19,7 +20,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 interface ImportedEmployeePermissionRow {
   readonly id_empleado: number;
-  readonly id_permiso: number;
+  readonly permiso: PermissionId;
 }
 
 interface ImportedEmployeeRow {
@@ -104,15 +105,17 @@ describe('LegacyImportMasterDataImporter', (): void => {
     tempDirectory = null;
   });
 
-  it('conserva únicamente los permisos legacy presentes en el dump', async (): Promise<void> => {
+  it('convierte los permisos legacy existentes a sus identificadores actuales', async (): Promise<void> => {
     const inserts: readonly LegacySqlInsert[] = [
       createLegacyEmployeeInsert(1, null),
       createLegacyEmployeeInsert(2, '2026-01-15T10:00:00.000Z'),
       createLegacyEmployeeInsert(3, null),
 
+      createLegacyPermissionInsert(1, 1),
       createLegacyPermissionInsert(1, 18),
       createLegacyPermissionInsert(2, 19),
-      createLegacyPermissionInsert(3, GESTION_PERMISSIONS.BACKUPS),
+      createLegacyPermissionInsert(3, 20),
+      createLegacyPermissionInsert(3, 25),
     ];
 
     const importer: LegacyImportMasterDataImporter = new LegacyImportMasterDataImporter(
@@ -124,14 +127,14 @@ describe('LegacyImportMasterDataImporter', (): void => {
 
     const result: LegacyImportPhaseResult = await importer.import(
       requireQueryRunner(),
-      createExecutionCommand(inserts.length),
+      createExecutionCommand(inserts),
       (progress): void => {
         void progress;
       },
     );
 
     expect(result).toEqual({
-      importedRows: 6,
+      importedRows: 8,
       skippedRows: 0,
       warningCount: 0,
       defaultedEmployeePasswords: 0,
@@ -140,15 +143,23 @@ describe('LegacyImportMasterDataImporter', (): void => {
     expect(await readEmployeePermissions()).toEqual([
       {
         id_empleado: 1,
-        id_permiso: 18,
+        permiso: permissionKeys.gestion.ajustes,
+      },
+      {
+        id_empleado: 1,
+        permiso: permissionKeys.ventas.modificarImportes,
       },
       {
         id_empleado: 2,
-        id_permiso: 19,
+        permiso: permissionKeys.gestion.tiposPago,
       },
       {
         id_empleado: 3,
-        id_permiso: GESTION_PERMISSIONS.BACKUPS,
+        permiso: permissionKeys.gestion.copiasSeguridad,
+      },
+      {
+        id_empleado: 3,
+        permiso: permissionKeys.gestion.empleados,
       },
     ]);
 
@@ -177,6 +188,45 @@ describe('LegacyImportMasterDataImporter', (): void => {
     ]);
   });
 
+  it('descarta los permisos legacy que ya no existen', async (): Promise<void> => {
+    const inserts: readonly LegacySqlInsert[] = [
+      createLegacyEmployeeInsert(1, null),
+      createLegacyEmployeeInsert(2, null),
+      createLegacyEmployeeInsert(3, null),
+
+      createLegacyPermissionInsert(1, 2),
+      createLegacyPermissionInsert(1, 17),
+      createLegacyPermissionInsert(2, 21),
+      createLegacyPermissionInsert(2, 22),
+      createLegacyPermissionInsert(3, 23),
+      createLegacyPermissionInsert(3, 24),
+    ];
+
+    const importer: LegacyImportMasterDataImporter = new LegacyImportMasterDataImporter(
+      new FakeLegacyImportDumpReader(inserts),
+      new LegacySqlValueReader(),
+      new LegacyImportPublicIdFactory(),
+      new NodeScryptPasswordHasher(),
+    );
+
+    const result: LegacyImportPhaseResult = await importer.import(
+      requireQueryRunner(),
+      createExecutionCommand(inserts),
+      (progress): void => {
+        void progress;
+      },
+    );
+
+    expect(result).toEqual({
+      importedRows: 3,
+      skippedRows: 6,
+      warningCount: 0,
+      defaultedEmployeePasswords: 0,
+    });
+
+    expect(await readEmployeePermissions()).toEqual([]);
+  });
+
   it('convierte en administrador al único empleado legacy activo', async (): Promise<void> => {
     const inserts: readonly LegacySqlInsert[] = [
       createLegacyEmployeeInsert(1, '2026-01-10T10:00:00.000Z'),
@@ -193,7 +243,7 @@ describe('LegacyImportMasterDataImporter', (): void => {
 
     const result: LegacyImportPhaseResult = await importer.import(
       requireQueryRunner(),
-      createExecutionCommand(inserts.length),
+      createExecutionCommand(inserts),
       (progress): void => {
         void progress;
       },
@@ -251,7 +301,7 @@ describe('LegacyImportMasterDataImporter', (): void => {
 
     const result: LegacyImportPhaseResult = await importer.import(
       requireQueryRunner(),
-      createExecutionCommand(inserts.length),
+      createExecutionCommand(inserts),
       (progress): void => {
         void progress;
       },
@@ -310,7 +360,24 @@ function createLegacyPermissionInsert(employeeId: number, permissionId: number):
   };
 }
 
-function createExecutionCommand(sourceRows: number): LegacyImportExecutionCommand {
+function createExecutionCommand(inserts: readonly LegacySqlInsert[]): LegacyImportExecutionCommand {
+  const expectedTableRows: Record<string, number> = {
+    empleado: 0,
+    empleado_rol: 0,
+    tipo_pago: 0,
+    categoria: 0,
+    marca: 0,
+    proveedor: 0,
+    comercial: 0,
+    proveedor_marca: 0,
+  };
+
+  for (const insert of inserts) {
+    if (insert.tableName in expectedTableRows) {
+      expectedTableRows[insert.tableName]++;
+    }
+  }
+
   return {
     selectionId: 'legacy-master-data-test',
     packagePath: '/tmp/legacy-master-data-test.otpv',
@@ -318,19 +385,10 @@ function createExecutionCommand(sourceRows: number): LegacyImportExecutionComman
     sourceVersion: 'legacy',
     sourceSchemaVersion: 'legacy',
     sourceHash: 'a'.repeat(64),
-    sourceRows,
+    sourceRows: inserts.length,
     initialSaleNumber: 0,
     initialInvoiceNumber: 0,
-    expectedTableRows: {
-      empleado: 3,
-      empleado_rol: 3,
-      tipo_pago: 0,
-      categoria: 0,
-      marca: 0,
-      proveedor: 0,
-      comercial: 0,
-      proveedor_marca: 0,
-    },
+    expectedTableRows,
     fileInventory: [],
     reviewDecisions: [],
     warningCount: 0,
@@ -359,11 +417,11 @@ async function readEmployeePermissions(): Promise<readonly ImportedEmployeePermi
     `
       SELECT
         id_empleado,
-        id_permiso
+        permiso
       FROM empleado_permiso
       ORDER BY
         id_empleado,
-        id_permiso
+        permiso
     `,
   )) as readonly ImportedEmployeePermissionRow[];
 }

@@ -1,6 +1,7 @@
 import { signal, type WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { form, type FieldTree } from '@angular/forms/signals';
+import permissionKeys from '@desktop-contracts/configuration/permissions/permission-keys.constants';
 import createEmpleadoDataFormInitialValue from '@model/empleados/empleado-data-form.initial-value';
 import type { EmpleadoDataFormModel } from '@model/empleados/empleado-data-form.model';
 import empleadoDataFormSchema from '@model/empleados/empleado-data-form.schema';
@@ -139,7 +140,7 @@ function createEmpleado(): Empleado {
   empleado.hasPassword = true;
   empleado.color = '#336699';
   empleado.admin = false;
-  empleado.permisos = [20, 21];
+  empleado.permisos = [permissionKeys.gestion.ajustes, permissionKeys.gestion.empleados];
 
   return empleado;
 }

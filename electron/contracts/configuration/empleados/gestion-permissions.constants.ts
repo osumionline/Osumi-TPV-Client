@@ -1,18 +1,13 @@
+import type PermissionId from '@desktop-contracts/configuration/permissions/permission-id.type';
+import permissionKeys from '@desktop-contracts/configuration/permissions/permission-keys.constants';
+
 export const GESTION_PERMISSIONS = {
-  SETTINGS: 18,
-  PAYMENT_TYPES: 19,
-  EMPLOYEES_CREATE: 20,
-  EMPLOYEES_UPDATE: 21,
-  EMPLOYEES_DELETE: 22,
-  EMPLOYEES_PERMISSIONS: 23,
-  EMPLOYEES_STATISTICS: 24,
-  BACKUPS: 25,
+  SETTINGS: permissionKeys.gestion.ajustes,
+  PAYMENT_TYPES: permissionKeys.gestion.tiposPago,
+  EMPLOYEES: permissionKeys.gestion.empleados,
+  BACKUPS: permissionKeys.gestion.copiasSeguridad,
 } as const;
 
-export const GESTION_EMPLOYEES_PERMISSIONS: readonly number[] = [
-  GESTION_PERMISSIONS.EMPLOYEES_CREATE,
-  GESTION_PERMISSIONS.EMPLOYEES_UPDATE,
-  GESTION_PERMISSIONS.EMPLOYEES_DELETE,
-  GESTION_PERMISSIONS.EMPLOYEES_PERMISSIONS,
-  GESTION_PERMISSIONS.EMPLOYEES_STATISTICS,
+export const GESTION_EMPLOYEES_PERMISSIONS: readonly PermissionId[] = [
+  GESTION_PERMISSIONS.EMPLOYEES,
 ];

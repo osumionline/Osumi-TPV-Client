@@ -1,4 +1,6 @@
 import type EmpleadoAuthenticationRecord from '@backend/domain/empleados/empleado-authentication-record.interface';
+import type EmpleadoRecord from '@backend/domain/empleados/empleado-record.interface';
+import permissionKeys from '@desktop-contracts/configuration/permissions/permission-keys.constants';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
@@ -9,6 +11,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DataSource } from 'typeorm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+interface PersistedPermissionRow {
+  readonly id_empleado: number;
+  readonly permiso: string;
+  readonly storage_type: string;
+}
 
 let tempDirectory: string | null = null;
 let applicationDatabase: TypeOrmApplicationDatabase | null = null;
@@ -45,6 +53,105 @@ describe('TypeOrmEmpleadoRepository', (): void => {
     repository = null;
     applicationDatabase = null;
     tempDirectory = null;
+  });
+
+  it('persiste y recupera los permisos mediante sus identificadores string', async (): Promise<void> => {
+    const result: EmpleadoRecord = await requireRepository().create({
+      nombre: 'Empleado con permisos',
+      passwordHash: 'scrypt-hash',
+      color: '336699',
+      permisos: [permissionKeys.ventas.modificarImportes, permissionKeys.gestion.empleados],
+    });
+
+    expect(result.nombre).toBe('Empleado con permisos');
+
+    expect(result.admin).toBe(false);
+
+    expect(result.permisos).toEqual([
+      permissionKeys.gestion.empleados,
+      permissionKeys.ventas.modificarImportes,
+    ]);
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const rows: readonly PersistedPermissionRow[] = (await dataSource.query(
+      `
+        SELECT
+          id_empleado,
+          permiso,
+          typeof(permiso) AS storage_type
+        FROM empleado_permiso
+        WHERE id_empleado = ?
+        ORDER BY permiso
+      `,
+      [result.id],
+    )) as readonly PersistedPermissionRow[];
+
+    expect(rows).toEqual([
+      {
+        id_empleado: result.id,
+        permiso: permissionKeys.gestion.empleados,
+        storage_type: 'text',
+      },
+      {
+        id_empleado: result.id,
+        permiso: permissionKeys.ventas.modificarImportes,
+        storage_type: 'text',
+      },
+    ]);
+  });
+
+  it('sustituye completamente los permisos al actualizar un empleado', async (): Promise<void> => {
+    const created: EmpleadoRecord = await requireRepository().create({
+      nombre: 'Empleado',
+      passwordHash: 'scrypt-hash',
+      color: '336699',
+      permisos: [permissionKeys.gestion.ajustes, permissionKeys.gestion.tiposPago],
+    });
+
+    const updated: EmpleadoRecord = await requireRepository().update(created.id, {
+      nombre: 'Empleado actualizado',
+      passwordHash: null,
+      color: '445566',
+      permisos: [permissionKeys.gestion.empleados, permissionKeys.gestion.copiasSeguridad],
+    });
+
+    expect(updated.nombre).toBe('Empleado actualizado');
+
+    expect(updated.color).toBe('445566');
+
+    expect(updated.permisos).toEqual([
+      permissionKeys.gestion.copiasSeguridad,
+      permissionKeys.gestion.empleados,
+    ]);
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const rows: readonly PersistedPermissionRow[] = (await dataSource.query(
+      `
+        SELECT
+          id_empleado,
+          permiso,
+          typeof(permiso) AS storage_type
+        FROM empleado_permiso
+        WHERE id_empleado = ?
+        ORDER BY permiso
+      `,
+      [created.id],
+    )) as readonly PersistedPermissionRow[];
+
+    expect(rows).toEqual([
+      {
+        id_empleado: created.id,
+        permiso: permissionKeys.gestion.copiasSeguridad,
+        storage_type: 'text',
+      },
+      {
+        id_empleado: created.id,
+        permiso: permissionKeys.gestion.empleados,
+        storage_type: 'text',
+      },
+    ]);
   });
 
   it('obtiene las credenciales scrypt de un empleado activo', async (): Promise<void> => {
