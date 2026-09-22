@@ -200,6 +200,128 @@
         }
     }
 
+    .cash-closing__payment-types {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .cash-closing__payment-types-header {
+        span {
+            color: var(--disabled-color);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        h3 {
+            margin: 3px 0 0;
+            font-size: 18px;
+            font-weight: 500;
+        }
+    }
+
+    .cash-closing__payment-types-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(280px, 1fr));
+        gap: 12px;
+    }
+
+    .cash-closing__payment-type {
+        overflow: hidden;
+        border: 1px solid var(--separator-color);
+        border-radius: 6px;
+        background-color: var(--color-white);
+    }
+
+    .cash-closing__payment-type-header {
+        display: flex;
+        width: 100%;
+        min-height: 72px;
+        padding: 14px 16px;
+        box-sizing: border-box;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border: 0;
+        background-color: transparent;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+
+        &:hover {
+            background-color: var(--color-very-light-grey);
+        }
+    }
+
+    .cash-closing__payment-type-title {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 8px;
+
+        mat-icon {
+            flex: 0 0 auto;
+            color: var(--disabled-color);
+        }
+
+        strong {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    }
+
+    .cash-closing__payment-type-sales {
+        display: flex;
+        flex: 0 0 auto;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 2px;
+
+        small {
+            color: var(--disabled-color);
+        }
+
+        strong {
+            font-size: 1.05rem;
+        }
+    }
+
+    .cash-closing__payment-type-content {
+        display: grid;
+        padding: 16px;
+        grid-template-columns: repeat(2, minmax(140px, 1fr));
+        gap: 16px;
+        border-top: 1px solid var(--separator-color);
+        background-color: var(--color-very-light-grey);
+    }
+
+    .cash-closing__payment-type-value,
+    .cash-closing__payment-type-input {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: 6px;
+
+        >span {
+            color: var(--disabled-color);
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        >strong {
+            font-size: 1.05rem;
+            font-weight: 500;
+        }
+    }
+
+    .cash-closing__payment-type-input {
+        mat-form-field {
+            width: 100%;
+        }
+    }
+
     .cash-closing__state {
         display: flex;
         height: 100%;
@@ -248,6 +370,10 @@
         .cash-closing__denominations {
             grid-template-columns: repeat(4, minmax(90px, 1fr));
         }
+
+        .cash-closing__payment-types-grid {
+            grid-template-columns: 1fr;
+        }
     }
 
     @media (max-width: 650px) {
@@ -266,6 +392,10 @@
         .cash-closing__recount-header {
             align-items: flex-start;
             flex-direction: column;
+        }
+
+        .cash-closing__payment-type-content {
+            grid-template-columns: 1fr;
         }
     }
 }

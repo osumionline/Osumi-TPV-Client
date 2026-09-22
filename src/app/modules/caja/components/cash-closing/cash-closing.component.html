@@ -420,6 +420,152 @@
             </div>
         </section>
         }
+        @if (tiposPago().length > 0) {
+        <section class="cash-closing__payment-types"
+                 aria-label="Tipos de pago">
+            <header class="cash-closing__payment-types-header">
+                <span>
+                    Otros tipos de pago
+                </span>
+
+                <h3>
+                    Revisión de importes
+                </h3>
+            </header>
+
+            <div class="cash-closing__payment-types-grid">
+                @for (tipoPago of tiposPago(); track tipoPago.publicId) {
+                <article class="cash-closing__payment-type">
+                    <button type="button"
+                            class="cash-closing__payment-type-header"
+                            [attr.aria-expanded]="tipoPago.expanded"
+                            (click)="toggleTipoPago(tipoPago.publicId)">
+                        <span class="cash-closing__payment-type-title">
+                            <mat-icon aria-hidden="true">
+                                {{
+                                    tipoPago.expanded
+                                        ? 'expand_less'
+                                        : 'expand_more'
+                                }}
+                            </mat-icon>
+
+                            <strong>
+                                {{ tipoPago.nombre }}
+                            </strong>
+                        </span>
+
+                        <span class="cash-closing__payment-type-sales">
+                            <small>
+                                Ventas
+                            </small>
+
+                            <strong>
+                                {{
+                                    tipoPago.importeVentasCents
+                                        | centsToEuros
+                                        | currency:'EUR':'symbol':'1.2-2'
+                                }}
+                            </strong>
+                        </span>
+                    </button>
+
+                    @if (tipoPago.expanded) {
+                    <div class="cash-closing__payment-type-content">
+                        <div class="cash-closing__payment-type-value">
+                            <span>
+                                Operaciones
+                            </span>
+
+                            <strong>
+                                {{ tipoPago.operaciones }}
+                            </strong>
+                        </div>
+
+                        <div class="cash-closing__payment-type-value">
+                            <span>
+                                Ventas
+                            </span>
+
+                            <strong>
+                                {{
+                                    tipoPago.importeVentasCents
+                                        | centsToEuros
+                                        | currency:'EUR':'symbol':'1.2-2'
+                                }}
+                            </strong>
+                        </div>
+
+                        <div class="cash-closing__payment-type-input">
+                            <span>
+                                Importe real
+                            </span>
+
+                            <mat-form-field appearance="outline"
+                                            subscriptSizing="dynamic">
+                                <input matInput
+                                       type="number"
+                                       step="0.01"
+                                       [value]="
+                                           tipoPago.importeRealCents === null
+                                               ? ''
+                                               : (tipoPago.importeRealCents | centsToEuros)
+                                       "
+                                       (focus)="selectCountInput($event)"
+                                       (input)="
+                                           updateTipoPagoImporteReal(
+                                               tipoPago.publicId,
+                                               $event
+                                           )
+                                       ">
+
+                                <span matTextSuffix>
+                                    €
+                                </span>
+                            </mat-form-field>
+                        </div>
+
+                        <div class="cash-closing__payment-type-value">
+                            <span>
+                                Diferencia
+                            </span>
+
+                            @if (
+                            getTipoPagoDiferenciaCents(tipoPago);
+                            as diferencia
+                            ) {
+                            <strong [class.cash-closing__value--positive]="diferencia > 0"
+                                    [class.cash-closing__value--negative]="diferencia < 0">
+                                {{
+                                    diferencia
+                                        | centsToEuros
+                                        | currency:'EUR':'symbol':'1.2-2'
+                                }}
+                            </strong>
+                            }
+                            @else if (
+                            getTipoPagoDiferenciaCents(tipoPago) === 0
+                            ) {
+                            <strong>
+                                {{
+                                    0
+                                        | centsToEuros
+                                        | currency:'EUR':'symbol':'1.2-2'
+                                }}
+                            </strong>
+                            }
+                            @else {
+                            <strong class="cash-closing__pending-value">
+                                —
+                            </strong>
+                            }
+                        </div>
+                    </div>
+                    }
+                </article>
+                }
+            </div>
+        </section>
+        }
     </div>
     }
     @else {

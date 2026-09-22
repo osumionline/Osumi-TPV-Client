@@ -13,13 +13,18 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
-import type { CajaCierreInterface } from '@desktop-contracts/caja/caja-cierre.interface';
+import type {
+  CajaCierreInterface,
+  CajaCierreTipoPagoInterface,
+} from '@desktop-contracts/caja/caja-cierre.interface';
 import createCajaCierreFormInitialValue from '@model/caja/caja-cierre-form.initial-value';
 import type {
   CajaCierreFormModel,
   CajaCierreRecuentoFormModel,
 } from '@model/caja/caja-cierre-form.model';
 import cajaCierreFormSchema from '@model/caja/caja-cierre-form.schema';
+import createCajaCierreTipoPagoInitialValue from '@model/caja/caja-cierre-tipo-pago.initial-value';
+import type CajaCierreTipoPagoModel from '@model/caja/caja-cierre-tipo-pago.model';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
 import CajaCierreService from '@services/caja/caja-cierre.service';
 import VentasContextService from '@services/ventas/ventas-context.service';
@@ -54,6 +59,9 @@ export default class CashClosingComponent implements OnInit {
     null,
   );
   readonly recuentoOpen: WritableSignal<boolean> = signal<boolean>(false);
+  readonly tiposPago: WritableSignal<readonly CajaCierreTipoPagoModel[]> = signal<
+    readonly CajaCierreTipoPagoModel[]
+  >([]);
   readonly cierreDataModel: WritableSignal<CajaCierreFormModel> = signal<CajaCierreFormModel>(
     createCajaCierreFormInitialValue(),
   );
@@ -176,6 +184,7 @@ export default class CashClosingComponent implements OnInit {
     this.error.set(null);
     this.cierre.set(null);
     this.recuentoOpen.set(false);
+    this.tiposPago.set([]);
     this.cierreForm().reset(createCajaCierreFormInitialValue());
 
     try {
@@ -192,6 +201,13 @@ export default class CashClosingComponent implements OnInit {
       });
 
       this.cierre.set(cierre);
+      this.tiposPago.set(
+        cierre.tiposPago
+          .filter((tipoPago: CajaCierreTipoPagoInterface): boolean => tipoPago.slug !== 'efectivo')
+          .map((tipoPago: CajaCierreTipoPagoInterface): CajaCierreTipoPagoModel =>
+            createCajaCierreTipoPagoInitialValue(tipoPago),
+          ),
+      );
     } catch (error: unknown) {
       this.error.set(
         getErrorMessage(error, 'No se han podido recuperar los datos del cierre de caja.'),
@@ -216,6 +232,68 @@ export default class CashClosingComponent implements OnInit {
     const input: HTMLInputElement = event.currentTarget as HTMLInputElement;
 
     input.select();
+  }
+
+  /**
+   * Despliega o contrae un único tipo de pago.
+   */
+  toggleTipoPago(publicId: string): void {
+    this.tiposPago.update(
+      (tiposPago: readonly CajaCierreTipoPagoModel[]): readonly CajaCierreTipoPagoModel[] =>
+        tiposPago.map((tipoPago: CajaCierreTipoPagoModel): CajaCierreTipoPagoModel =>
+          tipoPago.publicId === publicId
+            ? {
+                ...tipoPago,
+                expanded: !tipoPago.expanded,
+              }
+            : tipoPago,
+        ),
+    );
+  }
+
+  /**
+   * Actualiza el importe real introducido para un tipo de pago.
+   */
+  updateTipoPagoImporteReal(publicId: string, event: Event): void {
+    const input: HTMLInputElement = event.currentTarget as HTMLInputElement;
+
+    let importeRealCents: number | null = null;
+
+    if (input.value.trim() !== '') {
+      const importeEuros: number = input.valueAsNumber;
+
+      if (Number.isFinite(importeEuros)) {
+        try {
+          importeRealCents = eurosToCents(importeEuros);
+        } catch {
+          importeRealCents = null;
+        }
+      }
+    }
+
+    this.tiposPago.update(
+      (tiposPago: readonly CajaCierreTipoPagoModel[]): readonly CajaCierreTipoPagoModel[] =>
+        tiposPago.map((tipoPago: CajaCierreTipoPagoModel): CajaCierreTipoPagoModel =>
+          tipoPago.publicId === publicId
+            ? {
+                ...tipoPago,
+                importeRealCents,
+              }
+            : tipoPago,
+        ),
+    );
+  }
+
+  /**
+   * Calcula la diferencia entre el importe real introducido
+   * y las ventas canónicas del tipo de pago.
+   */
+  getTipoPagoDiferenciaCents(tipoPago: CajaCierreTipoPagoModel): number | null {
+    if (tipoPago.importeRealCents === null) {
+      return null;
+    }
+
+    return tipoPago.importeRealCents - tipoPago.importeVentasCents;
   }
 
   /**
