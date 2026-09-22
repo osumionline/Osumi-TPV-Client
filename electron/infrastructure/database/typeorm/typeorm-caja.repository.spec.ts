@@ -9,6 +9,31 @@ import { join } from 'node:path';
 import type { DataSource } from 'typeorm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+interface CajaCerradaRow {
+  readonly cierre: string | null;
+  readonly ventas_cents: number;
+  readonly beneficios_cents: number;
+  readonly descuentos_cents: number;
+  readonly movimientos_entrada_cents: number;
+  readonly movimientos_salida_cents: number;
+  readonly importe_cierre_teorico_cents: number;
+  readonly importe_cierre_real_cents: number;
+  readonly importe_retirado_cents: number;
+}
+
+interface CajaTipoCerradoRow {
+  readonly slug: string;
+  readonly operaciones: number;
+  readonly importe_total_cents: number;
+  readonly importe_real_cents: number | null;
+  readonly importe_descuento_cents: number;
+}
+
+interface CajaRecuentoRow {
+  readonly valor_centimos: number;
+  readonly cantidad: number;
+}
+
 interface CajaAggregateRow {
   readonly movimientos_salida_cents: number;
 }
@@ -460,6 +485,315 @@ describe('TypeOrmCajaRepository salidas', (): void => {
 
   it('no devuelve datos de cierre para una caja ya cerrada', async (): Promise<void> => {
     await expect(requireRepository().findCierre('caja-cerrada')).resolves.toBeNull();
+  });
+
+  it('cierra la caja consolidando de nuevo sus valores canónicos', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(`
+    UPDATE caja
+    SET
+      importe_apertura_cents = 10000,
+      ventas_cents = 99999,
+      beneficios_cents = 99999,
+      descuentos_cents = 99999,
+      movimientos_salida_cents = 99999,
+      importe_cierre_teorico_cents = 99999
+    WHERE id = 2
+  `);
+
+    await dataSource.query(`
+    INSERT INTO empleado (
+      id,
+      public_id,
+      nombre,
+      password_hash,
+      password_algorithm,
+      color
+    )
+    VALUES (
+      1,
+      'empleado-1',
+      'Empleado',
+      'hash',
+      'scrypt',
+      '000000'
+    )
+  `);
+
+    await dataSource.query(`
+    INSERT INTO tipo_pago (
+      id,
+      public_id,
+      nombre,
+      slug,
+      afecta_caja,
+      orden,
+      fisico
+    )
+    VALUES
+      (
+        1,
+        'tipo-efectivo',
+        'Efectivo',
+        'efectivo',
+        1,
+        0,
+        1
+      ),
+      (
+        2,
+        'tipo-tarjeta',
+        'Tarjeta',
+        'tarjeta',
+        0,
+        1,
+        1
+      )
+  `);
+
+    await dataSource.query(`
+    INSERT INTO caja_tipo (
+      id_caja,
+      id_tipo_pago,
+      operaciones,
+      importe_total_cents,
+      importe_real_cents,
+      importe_descuento_cents
+    )
+    VALUES
+      (2, 1, 99, 99999, 99999, 99999),
+      (2, 2, 99, 99999, 99999, 99999)
+  `);
+
+    await dataSource.query(`
+    INSERT INTO venta (
+      id,
+      public_id,
+      id_caja,
+      id_empleado,
+      numero,
+      total_cents
+    )
+    VALUES (
+      1,
+      'venta-1',
+      2,
+      1,
+      1,
+      9000
+    )
+  `);
+
+    await dataSource.query(`
+    INSERT INTO linea_venta (
+      public_id,
+      id_venta,
+      nombre_articulo,
+      puc_micros,
+      pvp_micros,
+      importe_micros,
+      descuento_bps,
+      importe_descuento_micros,
+      unidades
+    )
+    VALUES (
+      'linea-1',
+      1,
+      'Artículo',
+      60000000,
+      100000000,
+      90000000,
+      1000,
+      10000000,
+      1
+    )
+  `);
+
+    await dataSource.query(`
+    INSERT INTO venta_pago (
+      public_id,
+      id_venta,
+      id_tipo_pago,
+      orden,
+      importe_cents
+    )
+    VALUES
+      ('pago-efectivo', 1, 1, 0, 4500),
+      ('pago-tarjeta', 1, 2, 1, 4500)
+  `);
+
+    await dataSource.query(`
+    INSERT INTO movimiento_caja (
+      public_id,
+      id_caja,
+      tipo,
+      concepto,
+      importe_cents
+    )
+    VALUES (
+      'salida-1',
+      2,
+      'salida',
+      'Material',
+      1500
+    )
+  `);
+
+    await requireRepository().close({
+      cajaPublicId: 'caja-abierta',
+
+      retiradoCents: 2_000,
+      entradaCents: 1_000,
+
+      recuento: [
+        {
+          valorCents: 10_000,
+          cantidad: 1,
+        },
+        {
+          valorCents: 2_000,
+          cantidad: 1,
+        },
+        {
+          valorCents: 500,
+          cantidad: 1,
+        },
+      ],
+
+      tiposPago: [
+        {
+          tipoPagoPublicId: 'tipo-tarjeta',
+          importeRealCents: 4_600,
+        },
+      ],
+    });
+
+    const cajaRows = (await dataSource.query(`
+    SELECT
+      cierre,
+      ventas_cents,
+      beneficios_cents,
+      descuentos_cents,
+      movimientos_entrada_cents,
+      movimientos_salida_cents,
+      importe_cierre_teorico_cents,
+      importe_cierre_real_cents,
+      importe_retirado_cents
+    FROM caja
+    WHERE id = 2
+  `)) as readonly CajaCerradaRow[];
+
+    expect(cajaRows[0]).toEqual({
+      cierre: expect.any(String),
+
+      ventas_cents: 9_000,
+
+      /*
+       * Venta 90 €
+       * Coste 60 €
+       */
+      beneficios_cents: 3_000,
+
+      descuentos_cents: 1_000,
+
+      movimientos_entrada_cents: 1_000,
+      movimientos_salida_cents: 1_500,
+
+      /*
+       * 10000 inicial
+       * + 4500 afecta caja
+       * - 1500 salida
+       */
+      importe_cierre_teorico_cents: 13_000,
+
+      /*
+       * 100 € + 20 € + 5 €
+       */
+      importe_cierre_real_cents: 12_500,
+
+      importe_retirado_cents: 2_000,
+    });
+
+    const tiposRows = (await dataSource.query(`
+    SELECT
+      tp.slug,
+      ct.operaciones,
+      ct.importe_total_cents,
+      ct.importe_real_cents,
+      ct.importe_descuento_cents
+    FROM caja_tipo ct
+
+    INNER JOIN tipo_pago tp
+      ON tp.id = ct.id_tipo_pago
+
+    WHERE ct.id_caja = 2
+
+    ORDER BY tp.orden
+  `)) as readonly CajaTipoCerradoRow[];
+
+    expect(tiposRows).toEqual([
+      {
+        slug: 'efectivo',
+        operaciones: 1,
+        importe_total_cents: 4_500,
+        importe_real_cents: null,
+        importe_descuento_cents: 500,
+      },
+      {
+        slug: 'tarjeta',
+        operaciones: 1,
+        importe_total_cents: 4_500,
+        importe_real_cents: 4_600,
+        importe_descuento_cents: 500,
+      },
+    ]);
+
+    const recuentoRows = (await dataSource.query(`
+    SELECT
+      valor_centimos,
+      cantidad
+    FROM caja_recuento
+    WHERE
+      id_caja = 2
+      AND momento = 'cierre'
+    ORDER BY valor_centimos
+  `)) as readonly CajaRecuentoRow[];
+
+    expect(recuentoRows).toEqual([
+      {
+        valor_centimos: 500,
+        cantidad: 1,
+      },
+      {
+        valor_centimos: 2_000,
+        cantidad: 1,
+      },
+      {
+        valor_centimos: 10_000,
+        cantidad: 1,
+      },
+    ]);
+
+    await expect(
+      requireRepository().close({
+        cajaPublicId: 'caja-abierta',
+        retiradoCents: 0,
+        entradaCents: 0,
+        recuento: [
+          {
+            valorCents: 100,
+            cantidad: 0,
+          },
+        ],
+        tiposPago: [
+          {
+            tipoPagoPublicId: 'tipo-tarjeta',
+            importeRealCents: 4_500,
+          },
+        ],
+      }),
+    ).rejects.toThrow('La caja indicada no está abierta.');
   });
 });
 

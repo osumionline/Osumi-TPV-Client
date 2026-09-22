@@ -4,6 +4,7 @@ import {
   type CajaCierreInterface,
   CajaCierreConsulta,
 } from '@desktop-contracts/caja/caja-cierre.interface';
+import type { CerrarCajaCommand } from '@desktop-contracts/caja/cerrar-caja-command.interface';
 import type {
   ActualizarSalidaCajaCommand,
   CrearSalidaCajaCommand,
@@ -41,4 +42,9 @@ export default interface CajaApi {
    * Obtiene el snapshot económico de una caja abierta.
    */
   getCierre(consulta: CajaCierreConsulta): Promise<CajaCierreInterface>;
+
+  /**
+   * Cierra definitivamente una caja abierta.
+   */
+  close(command: CerrarCajaCommand): Promise<void>;
 }

@@ -12,6 +12,12 @@ import {
   CajaCierreConsulta,
   CajaCierreTipoPagoInterface,
 } from '@desktop-contracts/caja/caja-cierre.interface';
+import CAJA_RECUENTO_DENOMINACIONES_CENTS from '@desktop-contracts/caja/caja-recuento.constants';
+import type {
+  CerrarCajaCommand,
+  CerrarCajaRecuentoCommand,
+  CerrarCajaTipoPagoCommand,
+} from '@desktop-contracts/caja/cerrar-caja-command.interface';
 import type {
   ActualizarSalidaCajaCommand,
   CrearSalidaCajaCommand,
@@ -150,6 +156,103 @@ export default class CajaService {
   }
 
   /**
+   * Valida y solicita el cierre definitivo de una caja.
+   *
+   * Los valores económicos calculados de la caja no se reciben
+   * desde el renderer: persistencia los recalculará dentro de
+   * la propia transacción de cierre.
+   */
+  async close(command: CerrarCajaCommand): Promise<void> {
+    if (typeof command !== 'object' || command === null) {
+      throw new Error('Los datos del cierre de caja no son válidos.');
+    }
+
+    const cajaPublicId: string = this.requirePublicId(
+      command.cajaPublicId,
+      'La caja indicada no es válida.',
+    );
+
+    const retiradoCents: number = this.requireNonNegativeSafeInteger(
+      command.retiradoCents,
+      'El importe retirado no es válido.',
+    );
+
+    const entradaCents: number = this.requireNonNegativeSafeInteger(
+      command.entradaCents,
+      'El importe de entrada no es válido.',
+    );
+
+    if (!Array.isArray(command.recuento) || command.recuento.length === 0) {
+      throw new Error('Es obligatorio realizar el recuento de efectivo antes de cerrar la caja.');
+    }
+
+    const denominaciones: Set<number> = new Set<number>();
+
+    const recuento: readonly CerrarCajaRecuentoCommand[] = command.recuento.map(
+      (item: CerrarCajaRecuentoCommand): CerrarCajaRecuentoCommand => {
+        if (
+          !Number.isSafeInteger(item?.valorCents) ||
+          !CAJA_RECUENTO_DENOMINACIONES_CENTS.includes(item.valorCents)
+        ) {
+          throw new Error('Una denominación del recuento de caja no es válida.');
+        }
+
+        if (denominaciones.has(item.valorCents)) {
+          throw new Error('El recuento de caja contiene una denominación duplicada.');
+        }
+
+        denominaciones.add(item.valorCents);
+
+        return {
+          valorCents: item.valorCents,
+          cantidad: this.requireNonNegativeSafeInteger(
+            item.cantidad,
+            'Una cantidad del recuento de caja no es válida.',
+          ),
+        };
+      },
+    );
+
+    if (!Array.isArray(command.tiposPago)) {
+      throw new Error('Los tipos de pago del cierre no son válidos.');
+    }
+
+    const tiposPagoPublicIds: Set<string> = new Set<string>();
+
+    const tiposPago: readonly CerrarCajaTipoPagoCommand[] = command.tiposPago.map(
+      (tipoPago: CerrarCajaTipoPagoCommand): CerrarCajaTipoPagoCommand => {
+        const tipoPagoPublicId: string = this.requirePublicId(
+          tipoPago?.tipoPagoPublicId,
+          'Uno de los tipos de pago del cierre no es válido.',
+        );
+
+        if (tiposPagoPublicIds.has(tipoPagoPublicId)) {
+          throw new Error('El cierre contiene un tipo de pago duplicado.');
+        }
+
+        tiposPagoPublicIds.add(tipoPagoPublicId);
+
+        if (!Number.isSafeInteger(tipoPago.importeRealCents)) {
+          throw new Error('El importe real de uno de los tipos de pago no es válido.');
+        }
+
+        return {
+          tipoPagoPublicId,
+          importeRealCents: tipoPago.importeRealCents,
+        };
+      },
+    );
+
+    await this.cajaRepository.close({
+      cajaPublicId,
+      retiradoCents,
+      entradaCents,
+      recuento,
+      tiposPago,
+    });
+  }
+
+  /**
    * Recupera las salidas correspondientes a un periodo civil local.
    */
   async findSalidas(consulta: SalidaCajaConsulta): Promise<readonly SalidaCajaInterface[]> {
@@ -224,6 +327,19 @@ export default class CajaService {
     };
 
     await this.cajaRepository.deleteSalida(normalizedCommand);
+  }
+
+  /**
+   * Valida un entero económico que no pueda ser negativo.
+   */
+  private requireNonNegativeSafeInteger(value: number, message: string): number {
+    const result: number = this.requireSafeInteger(value, message);
+
+    if (result < 0) {
+      throw new Error(message);
+    }
+
+    return result;
   }
 
   /**

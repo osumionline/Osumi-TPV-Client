@@ -6,6 +6,11 @@ import type {
 } from '@backend/domain/caja/caja-cierre-record.interface';
 import type SalidaCajaRecord from '@backend/domain/caja/salida-caja-record.interface';
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
+import CAJA_RECUENTO_DENOMINACIONES_CENTS from '@desktop-contracts/caja/caja-recuento.constants';
+import type {
+  CerrarCajaCommand,
+  CerrarCajaRecuentoCommand,
+} from '@desktop-contracts/caja/cerrar-caja-command.interface';
 import type {
   ActualizarSalidaCajaCommand,
   CrearSalidaCajaCommand,
@@ -69,6 +74,40 @@ interface CajaAnteriorDatabaseRow {
 
 interface TerminalIdDatabaseRow {
   readonly id: number;
+}
+
+interface CajaVentaDatabaseRow {
+  readonly id: number;
+  readonly total_cents: number;
+}
+
+interface CajaVentaLineaDatabaseRow {
+  readonly id_venta: number;
+  readonly puc_micros: number;
+  readonly pvp_micros: number;
+  readonly importe_micros: number;
+  readonly descuento_bps: number;
+  readonly importe_descuento_micros: number;
+  readonly unidades: number;
+}
+
+interface CajaVentaPagoDatabaseRow {
+  readonly id_venta: number;
+  readonly id_tipo_pago: number;
+  readonly importe_cents: number;
+}
+
+interface CajaTipoIdentityDatabaseRow {
+  readonly id_tipo_pago: number;
+  readonly public_id: string;
+  readonly slug: string;
+}
+
+interface CajaCanonicalTotals {
+  readonly ventasCents: number;
+  readonly beneficiosCents: number;
+  readonly descuentosCents: number;
+  readonly descuentosTipoCents: ReadonlyMap<number, number>;
 }
 
 /**
@@ -228,152 +267,219 @@ export default class TypeOrmCajaRepository implements CajaRepository {
   }
 
   /**
-   * Obtiene una fotografía consistente de los importes necesarios
-   * para cerrar una caja todavía abierta.
-   *
-   * Los importes se recalculan desde ventas, pagos y movimientos;
-   * no se confía en los acumulados persistidos de caja/caja_tipo.
+   * Obtiene el snapshot económico canónico de una caja abierta.
    */
   async findCierre(cajaPublicId: string): Promise<CajaCierreRecord | null> {
     const dataSource: DataSource = await this.applicationDatabase.connect();
 
     return runDataSourceTransaction(
       dataSource,
-      async (queryRunner: QueryRunner): Promise<CajaCierreRecord | null> => {
-        const cajaRows: readonly CajaCierreDatabaseRow[] = (await queryRunner.query(
-          `
+      (queryRunner: QueryRunner): Promise<CajaCierreRecord | null> =>
+        this.findCierreWithQueryRunner(queryRunner, cajaPublicId),
+    );
+  }
+
+  /**
+   * Consolida y cierra una caja utilizando una única transacción.
+   *
+   * Los totales económicos se recalculan desde ventas, líneas,
+   * pagos y movimientos reales. El renderer únicamente aporta
+   * recuento, retirada, entrada e importes reales por tipo.
+   */
+  async close(command: CerrarCajaCommand): Promise<void> {
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    await runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
+      const cierre: CajaCierreRecord | null = await this.findCierreWithQueryRunner(
+        queryRunner,
+        command.cajaPublicId,
+      );
+
+      if (cierre === null) {
+        throw new Error('La caja indicada no está abierta.');
+      }
+
+      const cajaId: number = await this.requireOpenCajaId(queryRunner, command.cajaPublicId);
+
+      const canonicalTotals: CajaCanonicalTotals = await this.calculateCanonicalTotals(
+        queryRunner,
+        cajaId,
+      );
+
+      const importeRealCents: number = this.calculateRecuentoTotal(command.recuento);
+
+      const saldoFinalTeoricoCents: number = this.safeSubtract(
+        this.safeAdd(
+          cierre.importeAperturaCents,
+          cierre.ventasAfectanCajaCents,
+          'El saldo final teórico de la caja supera el rango numérico seguro.',
+        ),
+        cierre.salidasCajaCents,
+        'El saldo final teórico de la caja supera el rango numérico seguro.',
+      );
+
+      const tiposPagoRows: readonly CajaTipoIdentityDatabaseRow[] = (await queryRunner.query(
+        `
             SELECT
-              c.id,
-              c.public_id,
-              c.apertura,
-              c.importe_apertura_cents,
-
-              COALESCE(
-                (
-                  SELECT
-                    SUM(vp.importe_cents)
-                  FROM venta v
-
-                  INNER JOIN venta_pago vp
-                    ON vp.id_venta = v.id
-
-                  INNER JOIN tipo_pago tp
-                    ON tp.id = vp.id_tipo_pago
-
-                  WHERE
-                    v.id_caja = c.id
-                    AND v.deleted_at IS NULL
-                    AND tp.afecta_caja = 1
-                ),
-                0
-              ) AS ventas_afectan_caja_cents,
-
-              COALESCE(
-                (
-                  SELECT
-                    SUM(mc.importe_cents)
-                  FROM movimiento_caja mc
-                  WHERE
-                    mc.id_caja = c.id
-                    AND mc.tipo = 'salida'
-                    AND mc.deleted_at IS NULL
-                ),
-                0
-              ) AS salidas_caja_cents
-
-            FROM caja c
-
-            WHERE
-              c.public_id = ?
-              AND c.cierre IS NULL
-
-            LIMIT 1
-          `,
-          [cajaPublicId],
-        )) as readonly CajaCierreDatabaseRow[];
-
-        const caja: CajaCierreDatabaseRow | undefined = cajaRows[0];
-
-        if (caja === undefined) {
-          return null;
-        }
-
-        const tipoPagoRows: readonly CajaCierreTipoPagoDatabaseRow[] = (await queryRunner.query(
-          `
-            SELECT
+              ct.id_tipo_pago,
               tp.public_id,
-              tp.nombre,
-              tp.slug,
-              tp.afecta_caja,
-              tp.orden,
-
-              COUNT(
-                DISTINCT CASE
-                  WHEN vp.id IS NOT NULL
-                    THEN v.id
-                  ELSE NULL
-                END
-              ) AS operaciones,
-
-              COALESCE(
-                SUM(vp.importe_cents),
-                0
-              ) AS importe_ventas_cents
-
+              tp.slug
             FROM caja_tipo ct
 
             INNER JOIN tipo_pago tp
               ON tp.id = ct.id_tipo_pago
 
-            LEFT JOIN venta v
-              ON v.id_caja = ct.id_caja
-              AND v.deleted_at IS NULL
-
-            LEFT JOIN venta_pago vp
-              ON vp.id_venta = v.id
-              AND vp.id_tipo_pago = ct.id_tipo_pago
-
-            WHERE
-              ct.id_caja = ?
-
-            GROUP BY
-              tp.id,
-              tp.public_id,
-              tp.nombre,
-              tp.slug,
-              tp.afecta_caja,
-              tp.orden
+            WHERE ct.id_caja = ?
 
             ORDER BY
               tp.orden,
               tp.nombre COLLATE NOCASE,
               tp.id
           `,
-          [caja.id],
-        )) as readonly CajaCierreTipoPagoDatabaseRow[];
+        [cajaId],
+      )) as readonly CajaTipoIdentityDatabaseRow[];
 
-        const tiposPago: readonly CajaCierreTipoPagoRecord[] = tipoPagoRows.map(
-          (row: CajaCierreTipoPagoDatabaseRow): CajaCierreTipoPagoRecord => ({
-            publicId: row.public_id,
-            nombre: row.nombre,
-            slug: row.slug,
-            afectaCaja: row.afecta_caja === 1,
-            orden: row.orden,
-            operaciones: row.operaciones,
-            importeVentasCents: row.importe_ventas_cents,
-          }),
+      const realesPorTipo: Map<string, number> = new Map<string, number>();
+
+      for (const tipoPago of command.tiposPago) {
+        if (realesPorTipo.has(tipoPago.tipoPagoPublicId)) {
+          throw new Error('El cierre contiene un tipo de pago duplicado.');
+        }
+
+        realesPorTipo.set(tipoPago.tipoPagoPublicId, tipoPago.importeRealCents);
+      }
+
+      const tiposPagoEditables: readonly CajaTipoIdentityDatabaseRow[] = tiposPagoRows.filter(
+        (tipoPago: CajaTipoIdentityDatabaseRow): boolean => tipoPago.slug !== 'efectivo',
+      );
+
+      if (
+        realesPorTipo.size !== tiposPagoEditables.length ||
+        tiposPagoEditables.some(
+          (tipoPago: CajaTipoIdentityDatabaseRow): boolean =>
+            !realesPorTipo.has(tipoPago.public_id),
+        )
+      ) {
+        throw new Error('Los tipos de pago del cierre ya no coinciden con la caja actual.');
+      }
+
+      const cierreTiposPagoByPublicId: ReadonlyMap<string, CajaCierreTipoPagoRecord> = new Map(
+        cierre.tiposPago.map(
+          (tipoPago: CajaCierreTipoPagoRecord): readonly [string, CajaCierreTipoPagoRecord] => [
+            tipoPago.publicId,
+            tipoPago,
+          ],
+        ),
+      );
+
+      const now: string = new Date().toISOString();
+
+      for (const tipoPago of tiposPagoRows) {
+        const cierreTipo: CajaCierreTipoPagoRecord | undefined = cierreTiposPagoByPublicId.get(
+          tipoPago.public_id,
         );
 
-        return {
-          cajaPublicId: caja.public_id,
-          apertura: caja.apertura,
-          importeAperturaCents: caja.importe_apertura_cents,
-          ventasAfectanCajaCents: caja.ventas_afectan_caja_cents,
-          salidasCajaCents: caja.salidas_caja_cents,
-          tiposPago,
-        };
-      },
-    );
+        if (cierreTipo === undefined) {
+          throw new Error('No se ha podido reconstruir uno de los tipos de pago de la caja.');
+        }
+
+        const importeRealTipoCents: number | null =
+          tipoPago.slug === 'efectivo' ? null : (realesPorTipo.get(tipoPago.public_id) ?? null);
+
+        if (tipoPago.slug !== 'efectivo' && importeRealTipoCents === null) {
+          throw new Error('Falta el importe real de uno de los tipos de pago.');
+        }
+
+        await queryRunner.query(
+          `
+            UPDATE caja_tipo
+            SET
+              operaciones = ?,
+              importe_total_cents = ?,
+              importe_real_cents = ?,
+              importe_descuento_cents = ?,
+              updated_at = ?
+            WHERE
+              id_caja = ?
+              AND id_tipo_pago = ?
+          `,
+          [
+            cierreTipo.operaciones,
+            cierreTipo.importeVentasCents,
+            importeRealTipoCents,
+            canonicalTotals.descuentosTipoCents.get(tipoPago.id_tipo_pago) ?? 0,
+            now,
+            cajaId,
+            tipoPago.id_tipo_pago,
+          ],
+        );
+      }
+
+      await queryRunner.query(
+        `
+          DELETE FROM caja_recuento
+          WHERE
+            id_caja = ?
+            AND momento = 'cierre'
+        `,
+        [cajaId],
+      );
+
+      for (const item of command.recuento) {
+        await queryRunner.query(
+          `
+            INSERT INTO caja_recuento (
+              id_caja,
+              momento,
+              valor_centimos,
+              cantidad,
+              created_at
+            )
+            VALUES (
+              ?,
+              'cierre',
+              ?,
+              ?,
+              ?
+            )
+          `,
+          [cajaId, item.valorCents, item.cantidad, now],
+        );
+      }
+
+      await queryRunner.query(
+        `
+          UPDATE caja
+          SET
+            cierre = ?,
+            ventas_cents = ?,
+            beneficios_cents = ?,
+            descuentos_cents = ?,
+            movimientos_entrada_cents = ?,
+            movimientos_salida_cents = ?,
+            importe_cierre_teorico_cents = ?,
+            importe_cierre_real_cents = ?,
+            importe_retirado_cents = ?,
+            updated_at = ?
+          WHERE
+            id = ?
+            AND cierre IS NULL
+        `,
+        [
+          now,
+          canonicalTotals.ventasCents,
+          canonicalTotals.beneficiosCents,
+          canonicalTotals.descuentosCents,
+          command.entradaCents,
+          cierre.salidasCajaCents,
+          saldoFinalTeoricoCents,
+          importeRealCents,
+          command.retiradoCents,
+          now,
+          cajaId,
+        ],
+      );
+    });
   }
 
   /**
@@ -511,6 +617,543 @@ export default class TypeOrmCajaRepository implements CajaRepository {
 
       await this.refreshSalidaAggregate(queryRunner, cajaId, now);
     });
+  }
+
+  /**
+   * Recalcula los acumulados económicos de una caja
+   * desde las ventas y líneas realmente persistidas.
+   */
+  private async calculateCanonicalTotals(
+    queryRunner: QueryRunner,
+    cajaId: number,
+  ): Promise<CajaCanonicalTotals> {
+    const ventas: readonly CajaVentaDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT
+          v.id,
+          v.total_cents
+        FROM venta v
+        WHERE
+          v.id_caja = ?
+          AND v.deleted_at IS NULL
+        ORDER BY v.id
+      `,
+      [cajaId],
+    )) as readonly CajaVentaDatabaseRow[];
+
+    const lineas: readonly CajaVentaLineaDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT
+          lv.id_venta,
+          lv.puc_micros,
+          lv.pvp_micros,
+          lv.importe_micros,
+          lv.descuento_bps,
+          lv.importe_descuento_micros,
+          lv.unidades
+        FROM linea_venta lv
+
+        INNER JOIN venta v
+          ON v.id = lv.id_venta
+
+        WHERE
+          v.id_caja = ?
+          AND v.deleted_at IS NULL
+
+        ORDER BY
+          lv.id_venta,
+          lv.id
+      `,
+      [cajaId],
+    )) as readonly CajaVentaLineaDatabaseRow[];
+
+    const pagos: readonly CajaVentaPagoDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT
+          vp.id_venta,
+          vp.id_tipo_pago,
+          vp.importe_cents
+        FROM venta_pago vp
+
+        INNER JOIN venta v
+          ON v.id = vp.id_venta
+
+        WHERE
+          v.id_caja = ?
+          AND v.deleted_at IS NULL
+
+        ORDER BY
+          vp.id_venta,
+          vp.orden,
+          vp.id
+      `,
+      [cajaId],
+    )) as readonly CajaVentaPagoDatabaseRow[];
+
+    const lineasPorVenta: Map<number, CajaVentaLineaDatabaseRow[]> = new Map<
+      number,
+      CajaVentaLineaDatabaseRow[]
+    >();
+
+    for (const linea of lineas) {
+      const current: CajaVentaLineaDatabaseRow[] = lineasPorVenta.get(linea.id_venta) ?? [];
+
+      current.push(linea);
+      lineasPorVenta.set(linea.id_venta, current);
+    }
+
+    const pagosPorVenta: Map<number, CajaVentaPagoDatabaseRow[]> = new Map<
+      number,
+      CajaVentaPagoDatabaseRow[]
+    >();
+
+    for (const pago of pagos) {
+      const current: CajaVentaPagoDatabaseRow[] = pagosPorVenta.get(pago.id_venta) ?? [];
+
+      current.push(pago);
+      pagosPorVenta.set(pago.id_venta, current);
+    }
+
+    let ventasCents: number = 0;
+    let beneficiosCents: number = 0;
+    let descuentosCents: number = 0;
+
+    const descuentosTipoCents: Map<number, number> = new Map<number, number>();
+
+    for (const venta of ventas) {
+      ventasCents = this.safeAdd(
+        ventasCents,
+        venta.total_cents,
+        'El total de ventas de la caja supera el rango numérico seguro.',
+      );
+
+      let beneficioMicros: number = 0;
+      let descuentoMicros: number = 0;
+
+      for (const linea of lineasPorVenta.get(venta.id) ?? []) {
+        const costeMicros: number = this.safeMultiply(
+          linea.puc_micros,
+          linea.unidades,
+          'El coste de una línea de venta supera el rango numérico seguro.',
+        );
+
+        beneficioMicros = this.safeAdd(
+          beneficioMicros,
+          this.safeSubtract(
+            linea.importe_micros,
+            costeMicros,
+            'El beneficio de una línea de venta supera el rango numérico seguro.',
+          ),
+          'El beneficio de una venta supera el rango numérico seguro.',
+        );
+
+        descuentoMicros = this.safeAdd(
+          descuentoMicros,
+          this.calculateLineaDescuentoMicros(linea),
+          'El descuento de una venta supera el rango numérico seguro.',
+        );
+      }
+
+      const beneficioVentaCents: number = this.microsToCents(beneficioMicros);
+
+      const descuentoVentaCents: number = this.microsToCents(descuentoMicros);
+
+      beneficiosCents = this.safeAdd(
+        beneficiosCents,
+        beneficioVentaCents,
+        'El beneficio de la caja supera el rango numérico seguro.',
+      );
+
+      descuentosCents = this.safeAdd(
+        descuentosCents,
+        descuentoVentaCents,
+        'El descuento de la caja supera el rango numérico seguro.',
+      );
+
+      const pagosVenta: readonly CajaVentaPagoDatabaseRow[] = pagosPorVenta.get(venta.id) ?? [];
+
+      const descuentosPagos: readonly number[] = this.allocateDiscountByPayments(
+        descuentoVentaCents,
+        pagosVenta,
+      );
+
+      for (let index: number = 0; index < pagosVenta.length; index += 1) {
+        const pago: CajaVentaPagoDatabaseRow | undefined = pagosVenta[index];
+
+        const descuentoPago: number | undefined = descuentosPagos[index];
+
+        if (pago === undefined || descuentoPago === undefined) {
+          throw new Error('No se ha podido reconstruir el descuento de uno de los pagos.');
+        }
+
+        descuentosTipoCents.set(
+          pago.id_tipo_pago,
+          this.safeAdd(
+            descuentosTipoCents.get(pago.id_tipo_pago) ?? 0,
+            descuentoPago,
+            'El descuento de un tipo de pago supera el rango numérico seguro.',
+          ),
+        );
+      }
+    }
+
+    return {
+      ventasCents,
+      beneficiosCents,
+      descuentosCents,
+      descuentosTipoCents,
+    };
+  }
+
+  private calculateLineaDescuentoMicros(linea: CajaVentaLineaDatabaseRow): number {
+    if (linea.importe_descuento_micros !== 0) {
+      return linea.unidades < 0 ? -linea.importe_descuento_micros : linea.importe_descuento_micros;
+    }
+
+    if (linea.descuento_bps === 0) {
+      return 0;
+    }
+
+    const importeBaseMicros: number = this.safeMultiply(
+      linea.pvp_micros,
+      linea.unidades,
+      'El importe base de una línea supera el rango numérico seguro.',
+    );
+
+    const descuentoMicros: number = this.safeSubtract(
+      importeBaseMicros,
+      linea.importe_micros,
+      'El descuento porcentual de una línea supera el rango numérico seguro.',
+    );
+
+    if (linea.unidades > 0 && descuentoMicros < 0) {
+      throw new Error(
+        'El descuento porcentual de una línea positiva no puede aumentar su importe.',
+      );
+    }
+
+    if (linea.unidades < 0 && descuentoMicros > 0) {
+      throw new Error('El descuento porcentual de una devolución no tiene un signo válido.');
+    }
+
+    return descuentoMicros;
+  }
+
+  private allocateDiscountByPayments(
+    descuentoTotalCents: number,
+    pagos: readonly CajaVentaPagoDatabaseRow[],
+  ): readonly number[] {
+    if (pagos.length === 0) {
+      return [];
+    }
+
+    if (descuentoTotalCents === 0) {
+      return pagos.map((): number => 0);
+    }
+
+    let totalWeight: number = 0;
+
+    for (const pago of pagos) {
+      totalWeight = this.safeAdd(
+        totalWeight,
+        Math.abs(pago.importe_cents),
+        'El reparto del descuento supera el rango numérico seguro.',
+      );
+    }
+
+    if (totalWeight === 0) {
+      throw new Error('No se puede repartir el descuento entre pagos sin importe.');
+    }
+
+    const sign: number = descuentoTotalCents < 0 ? -1 : 1;
+
+    const totalAbs: number = Math.abs(descuentoTotalCents);
+
+    let allocatedCents: number = 0;
+
+    return pagos.map((pago: CajaVentaPagoDatabaseRow, index: number): number => {
+      if (index === pagos.length - 1) {
+        return this.safeSubtract(
+          descuentoTotalCents,
+          allocatedCents,
+          'El reparto final del descuento supera el rango numérico seguro.',
+        );
+      }
+
+      const allocationAbsCents: number = this.roundProportionalInteger(
+        totalAbs,
+        Math.abs(pago.importe_cents),
+        totalWeight,
+      );
+
+      const allocationCents: number = sign * allocationAbsCents;
+
+      allocatedCents = this.safeAdd(
+        allocatedCents,
+        allocationCents,
+        'El reparto del descuento supera el rango numérico seguro.',
+      );
+
+      return allocationCents;
+    });
+  }
+
+  private calculateRecuentoTotal(recuento: readonly CerrarCajaRecuentoCommand[]): number {
+    if (recuento.length === 0) {
+      throw new Error('Es obligatorio realizar el recuento de efectivo antes de cerrar la caja.');
+    }
+
+    const denominaciones: Set<number> = new Set<number>();
+
+    let totalCents: number = 0;
+
+    for (const item of recuento) {
+      if (
+        !Number.isSafeInteger(item.valorCents) ||
+        !CAJA_RECUENTO_DENOMINACIONES_CENTS.includes(item.valorCents) ||
+        denominaciones.has(item.valorCents)
+      ) {
+        throw new Error('El recuento de efectivo no es válido.');
+      }
+
+      denominaciones.add(item.valorCents);
+
+      if (!Number.isSafeInteger(item.cantidad) || item.cantidad < 0) {
+        throw new Error('El recuento de efectivo no es válido.');
+      }
+
+      totalCents = this.safeAdd(
+        totalCents,
+        this.safeMultiply(
+          item.valorCents,
+          item.cantidad,
+          'El recuento de efectivo supera el rango numérico seguro.',
+        ),
+        'El recuento de efectivo supera el rango numérico seguro.',
+      );
+    }
+
+    return totalCents;
+  }
+
+  private microsToCents(micros: number): number {
+    if (!Number.isSafeInteger(micros)) {
+      throw new Error('Un importe en microeuros no es válido.');
+    }
+
+    const sign: number = micros < 0 ? -1 : 1;
+
+    const cents: number = sign * Math.round(Math.abs(micros) / 10_000);
+
+    if (!Number.isSafeInteger(cents)) {
+      throw new Error('La conversión a céntimos supera el rango numérico seguro.');
+    }
+
+    return cents;
+  }
+
+  private roundProportionalInteger(total: number, part: number, whole: number): number {
+    if (
+      !Number.isSafeInteger(total) ||
+      !Number.isSafeInteger(part) ||
+      !Number.isSafeInteger(whole) ||
+      total < 0 ||
+      part < 0 ||
+      whole <= 0
+    ) {
+      throw new Error('No se puede calcular un reparto proporcional con valores no válidos.');
+    }
+
+    const totalBigInt: bigint = BigInt(total);
+    const partBigInt: bigint = BigInt(part);
+    const wholeBigInt: bigint = BigInt(whole);
+
+    const numerator: bigint = totalBigInt * partBigInt;
+
+    const rounded: bigint = (numerator + wholeBigInt / 2n) / wholeBigInt;
+
+    const result: number = Number(rounded);
+
+    if (!Number.isSafeInteger(result)) {
+      throw new Error('El reparto proporcional supera el rango numérico seguro.');
+    }
+
+    return result;
+  }
+
+  private safeAdd(left: number, right: number, message: string): number {
+    const result: number = left + right;
+
+    if (!Number.isSafeInteger(result)) {
+      throw new Error(message);
+    }
+
+    return result;
+  }
+
+  private safeSubtract(left: number, right: number, message: string): number {
+    const result: number = left - right;
+
+    if (!Number.isSafeInteger(result)) {
+      throw new Error(message);
+    }
+
+    return result;
+  }
+
+  private safeMultiply(left: number, right: number, message: string): number {
+    const result: number = left * right;
+
+    if (!Number.isSafeInteger(result)) {
+      throw new Error(message);
+    }
+
+    return result;
+  }
+
+  /**
+   * Obtiene el snapshot canónico utilizando una transacción ya abierta.
+   *
+   * Se comparte entre la lectura previa y el cierre definitivo para
+   * garantizar que ambas operaciones utilicen exactamente las mismas
+   * reglas económicas.
+   */
+  private async findCierreWithQueryRunner(
+    queryRunner: QueryRunner,
+    cajaPublicId: string,
+  ): Promise<CajaCierreRecord | null> {
+    const cajaRows: readonly CajaCierreDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT
+          c.id,
+          c.public_id,
+          c.apertura,
+          c.importe_apertura_cents,
+
+          COALESCE(
+            (
+              SELECT
+                SUM(vp.importe_cents)
+              FROM venta v
+
+              INNER JOIN venta_pago vp
+                ON vp.id_venta = v.id
+
+              INNER JOIN tipo_pago tp
+                ON tp.id = vp.id_tipo_pago
+
+              WHERE
+                v.id_caja = c.id
+                AND v.deleted_at IS NULL
+                AND tp.afecta_caja = 1
+            ),
+            0
+          ) AS ventas_afectan_caja_cents,
+
+          COALESCE(
+            (
+              SELECT
+                SUM(mc.importe_cents)
+              FROM movimiento_caja mc
+              WHERE
+                mc.id_caja = c.id
+                AND mc.tipo = 'salida'
+                AND mc.deleted_at IS NULL
+            ),
+            0
+          ) AS salidas_caja_cents
+
+        FROM caja c
+
+        WHERE
+          c.public_id = ?
+          AND c.cierre IS NULL
+
+        LIMIT 1
+      `,
+      [cajaPublicId],
+    )) as readonly CajaCierreDatabaseRow[];
+
+    const caja: CajaCierreDatabaseRow | undefined = cajaRows[0];
+
+    if (caja === undefined) {
+      return null;
+    }
+
+    const tipoPagoRows: readonly CajaCierreTipoPagoDatabaseRow[] = (await queryRunner.query(
+      `
+        SELECT
+          tp.public_id,
+          tp.nombre,
+          tp.slug,
+          tp.afecta_caja,
+          tp.orden,
+
+          COUNT(
+            DISTINCT CASE
+              WHEN vp.id IS NOT NULL
+                THEN v.id
+              ELSE NULL
+            END
+          ) AS operaciones,
+
+          COALESCE(
+            SUM(vp.importe_cents),
+            0
+          ) AS importe_ventas_cents
+
+        FROM caja_tipo ct
+
+        INNER JOIN tipo_pago tp
+          ON tp.id = ct.id_tipo_pago
+
+        LEFT JOIN venta v
+          ON v.id_caja = ct.id_caja
+          AND v.deleted_at IS NULL
+
+        LEFT JOIN venta_pago vp
+          ON vp.id_venta = v.id
+          AND vp.id_tipo_pago = ct.id_tipo_pago
+
+        WHERE
+          ct.id_caja = ?
+
+        GROUP BY
+          tp.id,
+          tp.public_id,
+          tp.nombre,
+          tp.slug,
+          tp.afecta_caja,
+          tp.orden
+
+        ORDER BY
+          tp.orden,
+          tp.nombre COLLATE NOCASE,
+          tp.id
+      `,
+      [caja.id],
+    )) as readonly CajaCierreTipoPagoDatabaseRow[];
+
+    const tiposPago: readonly CajaCierreTipoPagoRecord[] = tipoPagoRows.map(
+      (row: CajaCierreTipoPagoDatabaseRow): CajaCierreTipoPagoRecord => ({
+        publicId: row.public_id,
+        nombre: row.nombre,
+        slug: row.slug,
+        afectaCaja: row.afecta_caja === 1,
+        orden: row.orden,
+        operaciones: row.operaciones,
+        importeVentasCents: row.importe_ventas_cents,
+      }),
+    );
+
+    return {
+      cajaPublicId: caja.public_id,
+      apertura: caja.apertura,
+      importeAperturaCents: caja.importe_apertura_cents,
+      ventasAfectanCajaCents: caja.ventas_afectan_caja_cents,
+      salidasCajaCents: caja.salidas_caja_cents,
+      tiposPago,
+    };
   }
 
   /**

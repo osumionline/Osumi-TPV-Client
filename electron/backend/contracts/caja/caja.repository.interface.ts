@@ -2,6 +2,7 @@ import type CajaAbiertaRecord from '@backend/domain/caja/caja-abierta-record.int
 import type { CajaCierreRecord } from '@backend/domain/caja/caja-cierre-record.interface';
 import type SalidaCajaRecord from '@backend/domain/caja/salida-caja-record.interface';
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
+import type { CerrarCajaCommand } from '@desktop-contracts/caja/cerrar-caja-command.interface';
 import type {
   ActualizarSalidaCajaCommand,
   CrearSalidaCajaCommand,
@@ -37,4 +38,9 @@ export default interface CajaRepository {
    * Obtiene el snapshot económico canónico de una caja todavía abierta.
    */
   findCierre(cajaPublicId: string): Promise<CajaCierreRecord | null>;
+
+  /**
+   * Consolida y cierra transaccionalmente una caja todavía abierta.
+   */
+  close(command: CerrarCajaCommand): Promise<void>;
 }

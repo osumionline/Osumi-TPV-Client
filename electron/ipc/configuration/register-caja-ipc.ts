@@ -5,6 +5,7 @@ import {
   type CajaCierreInterface,
   CajaCierreConsulta,
 } from '@desktop-contracts/caja/caja-cierre.interface';
+import type { CerrarCajaCommand } from '@desktop-contracts/caja/cerrar-caja-command.interface';
 import type {
   ActualizarSalidaCajaCommand,
   CrearSalidaCajaCommand,
@@ -77,6 +78,15 @@ export default function registerCajaIpc(
       assertTrustedSender(event, getMainWindow);
 
       return cajaService.getCierre(consulta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.cajaClose,
+    async (event, command: CerrarCajaCommand): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await cajaService.close(command);
     },
   );
 }

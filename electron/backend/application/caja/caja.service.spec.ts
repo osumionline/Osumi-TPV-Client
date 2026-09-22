@@ -3,6 +3,7 @@ import type CajaRepository from '@backend/contracts/caja/caja.repository.interfa
 import type CajaAbiertaRecord from '@backend/domain/caja/caja-abierta-record.interface';
 import type { CajaCierreRecord } from '@backend/domain/caja/caja-cierre-record.interface';
 import type SalidaCajaRecord from '@backend/domain/caja/salida-caja-record.interface';
+import type { CerrarCajaCommand } from '@desktop-contracts/caja/cerrar-caja-command.interface';
 import type {
   ActualizarSalidaCajaCommand,
   CrearSalidaCajaCommand,
@@ -204,6 +205,102 @@ describe('CajaService', (): void => {
       }),
     ).rejects.toThrow('El saldo final teórico de la caja supera el rango numérico seguro.');
   });
+
+  it('normaliza y valida los datos introducidos para cerrar una caja', async (): Promise<void> => {
+    await service.close({
+      cajaPublicId: '  caja-1  ',
+      retiradoCents: 2_000,
+      entradaCents: 1_000,
+      recuento: [
+        {
+          valorCents: 10_000,
+          cantidad: 1,
+        },
+        {
+          valorCents: 500,
+          cantidad: 2,
+        },
+      ],
+      tiposPago: [
+        {
+          tipoPagoPublicId: '  tipo-tarjeta  ',
+          importeRealCents: -500,
+        },
+      ],
+    });
+
+    expect(repository.lastCloseCommand).toEqual({
+      cajaPublicId: 'caja-1',
+      retiradoCents: 2_000,
+      entradaCents: 1_000,
+      recuento: [
+        {
+          valorCents: 10_000,
+          cantidad: 1,
+        },
+        {
+          valorCents: 500,
+          cantidad: 2,
+        },
+      ],
+      tiposPago: [
+        {
+          tipoPagoPublicId: 'tipo-tarjeta',
+          importeRealCents: -500,
+        },
+      ],
+    });
+  });
+
+  it('impide cerrar sin haber realizado un recuento', async (): Promise<void> => {
+    await expect(
+      service.close({
+        cajaPublicId: 'caja-1',
+        retiradoCents: 0,
+        entradaCents: 0,
+        recuento: [],
+        tiposPago: [],
+      }),
+    ).rejects.toThrow('Es obligatorio realizar el recuento de efectivo antes de cerrar la caja.');
+
+    expect(repository.lastCloseCommand).toBeNull();
+  });
+
+  it('rechaza denominaciones duplicadas o no admitidas', async (): Promise<void> => {
+    await expect(
+      service.close({
+        cajaPublicId: 'caja-1',
+        retiradoCents: 0,
+        entradaCents: 0,
+        recuento: [
+          {
+            valorCents: 100,
+            cantidad: 1,
+          },
+          {
+            valorCents: 100,
+            cantidad: 2,
+          },
+        ],
+        tiposPago: [],
+      }),
+    ).rejects.toThrow('El recuento de caja contiene una denominación duplicada.');
+
+    await expect(
+      service.close({
+        cajaPublicId: 'caja-1',
+        retiradoCents: 0,
+        entradaCents: 0,
+        recuento: [
+          {
+            valorCents: 3,
+            cantidad: 1,
+          },
+        ],
+        tiposPago: [],
+      }),
+    ).rejects.toThrow('Una denominación del recuento de caja no es válida.');
+  });
 });
 
 class FakeCajaRepository implements CajaRepository {
@@ -253,6 +350,17 @@ class FakeCajaRepository implements CajaRepository {
       },
     ],
   };
+
+  lastCloseCommand: CerrarCajaCommand | null = null;
+
+  /**
+   * Registra el comando de cierre recibido.
+   */
+  close(command: CerrarCajaCommand): Promise<void> {
+    this.lastCloseCommand = command;
+
+    return Promise.resolve();
+  }
 
   /**
    * Implementación mínima requerida por el contrato de Caja.
