@@ -299,9 +299,15 @@ describe('TypeOrmCajaRepository salidas', (): void => {
         importe_total_cents
       )
       VALUES
+        /*
+        * Efectivo ya asociado.
+        */
         (2, 1, 99, 99999),
-        (2, 2, 99, 99999),
-        (2, 3, 99, 99999),
+
+        /*
+        * Bizum está asociado a la caja aunque no tenga
+        * ninguna operación.
+        */
         (2, 4, 99, 99999)
     `,
     );
@@ -562,8 +568,14 @@ describe('TypeOrmCajaRepository salidas', (): void => {
       importe_descuento_cents
     )
     VALUES
-      (2, 1, 99, 99999, 99999, 99999),
-      (2, 2, 99, 99999, 99999, 99999)
+      /*
+      * Reproducimos una caja legacy abierta:
+      * solo existe la fila estructural de Efectivo.
+      *
+      * Tarjeta será descubierta desde venta_pago y
+      * materializada al cerrar.
+      */
+      (2, 1, 99, 99999, 99999, 99999)
   `);
 
     await dataSource.query(`

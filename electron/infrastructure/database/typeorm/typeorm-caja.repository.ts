@@ -318,6 +318,10 @@ export default class TypeOrmCajaRepository implements CajaRepository {
         'El saldo final teórico de la caja supera el rango numérico seguro.',
       );
 
+      const now: string = new Date().toISOString();
+
+      await this.ensureCajaTipoRowsForUsedPaymentTypes(queryRunner, cajaId, now);
+
       const tiposPagoRows: readonly CajaTipoIdentityDatabaseRow[] = (await queryRunner.query(
         `
             SELECT
@@ -371,8 +375,6 @@ export default class TypeOrmCajaRepository implements CajaRepository {
           ],
         ),
       );
-
-      const now: string = new Date().toISOString();
 
       for (const tipoPago of tiposPagoRows) {
         const cierreTipo: CajaCierreTipoPagoRecord | undefined = cierreTiposPagoByPublicId.get(
@@ -1082,56 +1084,86 @@ export default class TypeOrmCajaRepository implements CajaRepository {
 
     const tipoPagoRows: readonly CajaCierreTipoPagoDatabaseRow[] = (await queryRunner.query(
       `
-        SELECT
-          tp.public_id,
-          tp.nombre,
-          tp.slug,
-          tp.afecta_caja,
-          tp.orden,
+    WITH tipos_caja AS (
+      /*
+       * Tipos que ya estaban asociados explícitamente
+       * a la caja.
+       */
+      SELECT
+        ct.id_tipo_pago
+      FROM caja_tipo ct
+      WHERE
+        ct.id_caja = ?
 
-          COUNT(
-            DISTINCT CASE
-              WHEN vp.id IS NOT NULL
-                THEN v.id
-              ELSE NULL
-            END
-          ) AS operaciones,
+      UNION
 
-          COALESCE(
-            SUM(vp.importe_cents),
-            0
-          ) AS importe_ventas_cents
+      /*
+       * Tipos que realmente se han utilizado en ventas
+       * activas de la caja.
+       *
+       * Este segundo origen es necesario especialmente
+       * para cajas legacy abiertas, ya que el TPV antiguo
+       * solo generaba caja_tipo al cerrar la caja.
+       */
+      SELECT
+        vp.id_tipo_pago
+      FROM venta v
 
-        FROM caja_tipo ct
+      INNER JOIN venta_pago vp
+        ON vp.id_venta = v.id
 
-        INNER JOIN tipo_pago tp
-          ON tp.id = ct.id_tipo_pago
+      WHERE
+        v.id_caja = ?
+        AND v.deleted_at IS NULL
+    )
 
-        LEFT JOIN venta v
-          ON v.id_caja = ct.id_caja
-          AND v.deleted_at IS NULL
+    SELECT
+      tp.public_id,
+      tp.nombre,
+      tp.slug,
+      tp.afecta_caja,
+      tp.orden,
 
-        LEFT JOIN venta_pago vp
-          ON vp.id_venta = v.id
-          AND vp.id_tipo_pago = ct.id_tipo_pago
+      COUNT(
+        DISTINCT CASE
+          WHEN vp.id IS NOT NULL
+            THEN v.id
+          ELSE NULL
+        END
+      ) AS operaciones,
 
-        WHERE
-          ct.id_caja = ?
+      COALESCE(
+        SUM(vp.importe_cents),
+        0
+      ) AS importe_ventas_cents
 
-        GROUP BY
-          tp.id,
-          tp.public_id,
-          tp.nombre,
-          tp.slug,
-          tp.afecta_caja,
-          tp.orden
+    FROM tipos_caja tc
 
-        ORDER BY
-          tp.orden,
-          tp.nombre COLLATE NOCASE,
-          tp.id
-      `,
-      [caja.id],
+    INNER JOIN tipo_pago tp
+      ON tp.id = tc.id_tipo_pago
+
+    LEFT JOIN venta v
+      ON v.id_caja = ?
+      AND v.deleted_at IS NULL
+
+    LEFT JOIN venta_pago vp
+      ON vp.id_venta = v.id
+      AND vp.id_tipo_pago = tc.id_tipo_pago
+
+    GROUP BY
+      tp.id,
+      tp.public_id,
+      tp.nombre,
+      tp.slug,
+      tp.afecta_caja,
+      tp.orden
+
+    ORDER BY
+      tp.orden,
+      tp.nombre COLLATE NOCASE,
+      tp.id
+  `,
+      [caja.id, caja.id, caja.id],
     )) as readonly CajaCierreTipoPagoDatabaseRow[];
 
     const tiposPago: readonly CajaCierreTipoPagoRecord[] = tipoPagoRows.map(
@@ -1154,6 +1186,66 @@ export default class TypeOrmCajaRepository implements CajaRepository {
       salidasCajaCents: caja.salidas_caja_cents,
       tiposPago,
     };
+  }
+
+  /**
+   * Materializa en caja_tipo cualquier tipo de pago que
+   * haya sido utilizado realmente por una venta activa
+   * de la caja y todavía no tenga su fila asociada.
+   *
+   * Es especialmente necesario para cajas abiertas
+   * importadas desde el TPV legacy.
+   */
+  private async ensureCajaTipoRowsForUsedPaymentTypes(
+    queryRunner: QueryRunner,
+    cajaId: number,
+    timestamp: string,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+      INSERT INTO caja_tipo (
+        id_caja,
+        id_tipo_pago,
+        operaciones,
+        importe_total_cents,
+        importe_real_cents,
+        importe_descuento_cents,
+        created_at,
+        updated_at
+      )
+
+      SELECT
+        ?,
+        tipos_usados.id_tipo_pago,
+        0,
+        0,
+        NULL,
+        0,
+        ?,
+        ?
+
+      FROM (
+        SELECT DISTINCT
+          vp.id_tipo_pago
+        FROM venta v
+
+        INNER JOIN venta_pago vp
+          ON vp.id_venta = v.id
+
+        WHERE
+          v.id_caja = ?
+          AND v.deleted_at IS NULL
+      ) tipos_usados
+
+      LEFT JOIN caja_tipo ct
+        ON ct.id_caja = ?
+        AND ct.id_tipo_pago = tipos_usados.id_tipo_pago
+
+      WHERE
+        ct.id_tipo_pago IS NULL
+    `,
+      [cajaId, timestamp, timestamp, cajaId, cajaId],
+    );
   }
 
   /**
