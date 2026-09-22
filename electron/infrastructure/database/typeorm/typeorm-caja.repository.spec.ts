@@ -9,6 +9,10 @@ import { join } from 'node:path';
 import type { DataSource } from 'typeorm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+interface CountRow {
+  readonly total: number;
+}
+
 interface CajaDescuentoRow {
   readonly descuentos_cents: number;
 }
@@ -985,6 +989,52 @@ describe('TypeOrmCajaRepository salidas', (): void => {
         ],
       }),
     ).rejects.toThrow('La caja indicada no está abierta.');
+
+    /*
+     * Una caja cerrada deja de aparecer inmediatamente
+     * como candidata a cierre.
+     */
+    await expect(requireRepository().findCierre('caja-abierta')).resolves.toBeNull();
+
+    /*
+     * Al abrir la siguiente caja se hereda únicamente
+     * el efectivo que realmente queda disponible:
+     *
+     * 125,00 € reales + 10,00 € de entrada = 135,00 €.
+     */
+    const nuevaCaja = await requireRepository().open({
+      terminalPublicId: 'terminal-1',
+    });
+
+    expect(nuevaCaja.publicId).not.toBe('caja-abierta');
+    expect(nuevaCaja.idTerminal).toBe(1);
+    expect(nuevaCaja.importeAperturaCents).toBe(13_500);
+
+    const cajasAbiertas = (await dataSource.query(`
+  SELECT COUNT(*) AS total
+  FROM caja
+  WHERE
+    id_terminal = 1
+    AND cierre IS NULL
+`)) as readonly CountRow[];
+
+    expect(cajasAbiertas[0]?.total).toBe(1);
+
+    /*
+     * La nueva caja inicializa de nuevo todos los tipos
+     * de pago activos, incluso aunque la caja legacy
+     * anterior no tuviese todas sus filas caja_tipo.
+     */
+    const tiposNuevaCaja = (await dataSource.query(
+      `
+    SELECT COUNT(*) AS total
+    FROM caja_tipo
+    WHERE id_caja = ?
+  `,
+      [nuevaCaja.id],
+    )) as readonly CountRow[];
+
+    expect(tiposNuevaCaja[0]?.total).toBe(2);
   });
 });
 

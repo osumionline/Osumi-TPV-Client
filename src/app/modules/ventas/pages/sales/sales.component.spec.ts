@@ -20,6 +20,7 @@ describe('SalesComponent', (): void => {
   let crearVentaMock: Mock;
   let crearVentaDesdeReservasMock: Mock;
   let cliente: Cliente;
+  let puedeVender: WritableSignal<boolean>;
 
   beforeEach(async (): Promise<void> => {
     empleados = signal<readonly Empleado[]>([]);
@@ -27,6 +28,7 @@ describe('SalesComponent', (): void => {
     crearVentaMock = vi.fn();
     crearVentaDesdeReservasMock = vi.fn();
     cliente = createCliente();
+    puedeVender = signal<boolean>(true);
 
     await TestBed.configureTestingModule({
       imports: [SalesComponent],
@@ -48,7 +50,7 @@ describe('SalesComponent', (): void => {
         {
           provide: VentasContextService,
           useValue: {
-            puedeVender: (): boolean => true,
+            puedeVender: puedeVender.asReadonly(),
             appData: (): null => null,
           },
         },
@@ -163,6 +165,18 @@ describe('SalesComponent', (): void => {
     expect(component.selectingEmployee()).toBe(false);
     expect(crearVentaDesdeReservasMock).toHaveBeenCalledTimes(1);
     expect(crearVentaDesdeReservasMock).toHaveBeenCalledWith(second, cliente, [reserva]);
+  });
+
+  it('no permite iniciar una venta cuando no hay una caja operativa', (): void => {
+    puedeVender.set(false);
+
+    empleados.set([createEmpleado(1, 'Ana')]);
+
+    component.nuevaVenta();
+
+    expect(crearVentaMock).not.toHaveBeenCalled();
+    expect(component.selectingEmployee()).toBe(false);
+    expect(alertMock).not.toHaveBeenCalled();
   });
 });
 
