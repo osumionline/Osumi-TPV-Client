@@ -12,10 +12,10 @@
     .cash-closing__content {
         display: flex;
         min-height: 100%;
-        padding: 24px;
         box-sizing: border-box;
         flex-direction: column;
-        gap: 24px;
+        padding: 16px 20px;
+        gap: 16px;
     }
 
     .cash-closing__header {
@@ -35,43 +35,54 @@
         }
 
         h2 {
-            margin: 4px 0;
-            font-size: 22px;
+            margin: 2px 0;
+            font-size: 20px;
             font-weight: 500;
         }
     }
 
     .cash-closing__summary {
         display: grid;
-        grid-template-columns: repeat(3, minmax(200px, 1fr));
-        gap: 12px;
+        grid-template-columns: repeat(9, minmax(0, 1fr));
+        gap: 6px;
     }
 
     .cash-closing__field {
         display: flex;
-        min-height: 112px;
-        padding: 16px;
+        min-width: 0;
+        min-height: 82px;
+        padding: 10px 12px;
         box-sizing: border-box;
         flex-direction: column;
         justify-content: center;
-        gap: 8px;
+        gap: 5px;
         border: 1px solid var(--separator-color);
-        border-radius: 6px;
+        border-radius: 5px;
         background-color: var(--color-white);
 
         >span {
+            overflow: hidden;
             color: var(--disabled-color);
-            font-size: 0.82rem;
+            font-size: 0.76rem;
             font-weight: 500;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         >strong {
-            font-size: 1.35rem;
-            font-weight: 500;
+            overflow: hidden;
+            font-size: 1.05rem;
+            font-weight: 600;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         >small {
+            overflow: hidden;
             color: var(--disabled-color);
+            font-size: 0.72rem;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         &.cash-closing__field--highlight {
@@ -79,10 +90,11 @@
         }
 
         &.cash-closing__field--input {
-            justify-content: flex-start;
+            justify-content: center;
 
             mat-form-field {
                 width: 100%;
+                max-width: 125px;
             }
         }
     }
@@ -112,7 +124,7 @@
         padding: 0;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
+        gap: 5px;
         border: 0;
         background-color: transparent;
         color: inherit;
@@ -128,30 +140,34 @@
         }
 
         strong {
-            font-size: 1.35rem;
+            font-size: 1.05rem;
             font-weight: 500;
         }
 
         small {
+            font-size: 0.7rem;
             color: var(--disabled-color);
         }
 
         mat-icon {
             flex: 0 0 auto;
             color: var(--disabled-color);
+            width: 20px;
+            height: 20px;
+            font-size: 20px;
         }
     }
 
     .cash-closing__recount {
-        padding: 20px;
+        padding: 12px 16px 14px;
         border: 1px solid var(--separator-color);
-        border-radius: 6px;
+        border-radius: 5px;
         background-color: var(--color-very-light-grey);
     }
 
     .cash-closing__recount-header {
         display: flex;
-        margin-bottom: 20px;
+        margin-bottom: 12px;
         align-items: flex-end;
         justify-content: space-between;
         gap: 16px;
@@ -163,8 +179,8 @@
         }
 
         h3 {
-            margin: 3px 0 0;
-            font-size: 18px;
+            margin: 2px 0 0;
+            font-size: 16px;
             font-weight: 500;
         }
 
@@ -177,53 +193,68 @@
     .cash-closing__recount-groups {
         display: grid;
         grid-template-columns: minmax(0, 8fr) minmax(0, 7fr);
-        gap: 24px;
+        gap: 20px;
     }
 
     .cash-closing__recount-group {
         min-width: 0;
 
         h4 {
-            margin: 0 0 12px;
-            font-size: 14px;
+            margin: 0 0 8px;
+            font-size: 13px;
             font-weight: 600;
         }
     }
 
     .cash-closing__denominations {
         display: grid;
-        grid-template-columns: repeat(4, minmax(90px, 1fr));
-        gap: 10px;
+        gap: 6px;
+        justify-content: start;
 
         mat-form-field {
-            min-width: 0;
+            width: 76px;
+            min-width: 76px;
+        }
+
+        input {
+            text-align: right;
+        }
+
+        &.cash-closing__denominations--coins {
+            grid-template-columns: repeat(8, 76px);
+        }
+
+        &.cash-closing__denominations--notes {
+            grid-template-columns: repeat(7, 76px);
         }
     }
 
     .cash-closing__payment-types {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 10px;
     }
 
     .cash-closing__payment-types-header {
         span {
             color: var(--disabled-color);
-            font-size: 0.8rem;
+            font-size: 0.72rem;
             text-transform: uppercase;
         }
 
         h3 {
-            margin: 3px 0 0;
-            font-size: 18px;
+            margin: 2px 0 0;
+            font-size: 16px;
             font-weight: 500;
         }
     }
 
     .cash-closing__payment-types-grid {
         display: grid;
-        grid-template-columns: repeat(2, minmax(280px, 1fr));
-        gap: 12px;
+        grid-template-columns: repeat(auto-fill,
+                minmax(235px, 1fr));
+        align-items: start;
+        gap: 8px;
     }
 
     .cash-closing__payment-type {
@@ -236,12 +267,12 @@
     .cash-closing__payment-type-header {
         display: flex;
         width: 100%;
-        min-height: 72px;
-        padding: 14px 16px;
+        min-height: 54px;
+        padding: 8px 10px;
         box-sizing: border-box;
         align-items: center;
         justify-content: space-between;
-        gap: 16px;
+        gap: 8px;
         border: 0;
         background-color: transparent;
         color: inherit;
@@ -258,15 +289,19 @@
         display: flex;
         min-width: 0;
         align-items: center;
-        gap: 8px;
+        gap: 4px;
 
         mat-icon {
+            width: 18px;
+            height: 18px;
             flex: 0 0 auto;
             color: var(--disabled-color);
+            font-size: 18px;
         }
 
         strong {
             overflow: hidden;
+            font-size: 0.95rem;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
@@ -277,22 +312,24 @@
         flex: 0 0 auto;
         flex-direction: column;
         align-items: flex-end;
-        gap: 2px;
+        gap: 0;
 
         small {
+            font-size: 0.7rem;
             color: var(--disabled-color);
         }
 
         strong {
-            font-size: 1.05rem;
+            font-size: 0.92rem;
         }
     }
 
     .cash-closing__payment-type-content {
         display: grid;
-        padding: 16px;
-        grid-template-columns: repeat(2, minmax(140px, 1fr));
-        gap: 16px;
+        padding: 10px;
+        grid-template-columns: repeat(2, minmax(90px, 1fr));
+        align-items: start;
+        gap: 10px;
         border-top: 1px solid var(--separator-color);
         background-color: var(--color-very-light-grey);
     }
@@ -302,23 +339,28 @@
         display: flex;
         min-width: 0;
         flex-direction: column;
-        gap: 6px;
+        gap: 3px;
 
         >span {
             color: var(--disabled-color);
-            font-size: 0.8rem;
+            font-size: 0.72rem;
             font-weight: 500;
         }
 
         >strong {
-            font-size: 1.05rem;
+            font-size: 0.9rem;
             font-weight: 500;
         }
     }
 
     .cash-closing__payment-type-input {
         mat-form-field {
-            width: 100%;
+            width: 130px;
+            max-width: 100%;
+        }
+
+        input {
+            text-align: right;
         }
     }
 
@@ -364,9 +406,9 @@
         justify-content: flex-end;
     }
 
-    @media (max-width: 1000px) {
+    @media (max-width: 1200px) {
         .cash-closing__summary {
-            grid-template-columns: repeat(2, minmax(200px, 1fr));
+            grid-template-columns: repeat(5, minmax(0, 1fr));
         }
 
         .cash-closing__recount-groups {
@@ -374,25 +416,31 @@
         }
 
         .cash-closing__denominations {
-            grid-template-columns: repeat(4, minmax(90px, 1fr));
-        }
+            &.cash-closing__denominations--coins {
+                grid-template-columns: repeat(8, 76px);
+            }
 
-        .cash-closing__payment-types-grid {
-            grid-template-columns: 1fr;
+            &.cash-closing__denominations--notes {
+                grid-template-columns: repeat(7, 76px);
+            }
         }
     }
 
-    @media (max-width: 650px) {
+    @media (max-width: 700px) {
         .cash-closing__content {
-            padding: 16px;
+            padding: 12px;
         }
 
         .cash-closing__summary {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
         .cash-closing__denominations {
-            grid-template-columns: repeat(2, minmax(90px, 1fr));
+
+            &.cash-closing__denominations--coins,
+            &.cash-closing__denominations--notes {
+                grid-template-columns: repeat(4, 76px);
+            }
         }
 
         .cash-closing__recount-header {
@@ -401,7 +449,7 @@
         }
 
         .cash-closing__payment-type-content {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, minmax(90px, 1fr));
         }
     }
 }

@@ -864,7 +864,21 @@ export default class TypeOrmCajaRepository implements CajaRepository {
     }
 
     if (totalWeight === 0) {
-      throw new Error('No se puede repartir el descuento entre pagos sin importe.');
+      /*
+       * Las ventas legacy de total cero conservan un único
+       * venta_pago también de importe cero para recordar el
+       * medio de pago original.
+       *
+       * Aunque no exista peso económico con el que realizar
+       * un reparto proporcional, con un solo pago no existe
+       * ninguna ambigüedad: todo el descuento pertenece a
+       * ese tipo de pago.
+       */
+      if (pagos.length === 1) {
+        return [descuentoTotalCents];
+      }
+
+      throw new Error('No se puede repartir el descuento entre varios pagos sin importe.');
     }
 
     const sign: number = descuentoTotalCents < 0 ? -1 : 1;

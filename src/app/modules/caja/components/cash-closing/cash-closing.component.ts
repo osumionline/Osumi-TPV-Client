@@ -403,8 +403,7 @@ export default class CashClosingComponent implements OnInit {
 
     try {
       await this.ventasContextService.reload();
-    } catch (error: unknown) {
-      console.error('Error reloading ventas context:', error);
+    } catch {
       await firstValueFrom(
         this.dialog.alert({
           title: 'Caja cerrada',
