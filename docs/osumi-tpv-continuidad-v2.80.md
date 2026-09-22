@@ -1,10 +1,10 @@
-# Osumi TPV Client — Documento de continuidad v2.79
+# Osumi TPV Client — Documento de continuidad v2.80
 
 **Fecha:** 22 de septiembre de 2026  
 **Proyecto:** Osumi TPV Client  
 **Repositorio principal:** `https://github.com/osumionline/Osumi-TPV-Client`
 
-Este documento sustituye a `docs/osumi-tpv-continuidad-v2.78.md`.
+Este documento sustituye a `docs/osumi-tpv-continuidad-v2.79.md`.
 
 Su objetivo es permitir retomar el desarrollo sin perder decisiones funcionales, arquitectura, convenciones, estado real del código ni el siguiente paso exacto.
 
@@ -124,37 +124,41 @@ La GitHub App `ChatGPT Codex Connector` está instalada también en la cuenta `i
   - 17.5 Empleados ✅
   - 17.6 Tipos de pago ✅
 - Corrección foco modal Gestión ✅
-- Ventas/Empleados ✅
+- Ventas/Empleados inicial ✅
 - Retirada total del antiguo flag `empleados` ✅
 - 18 Caja ✅ **CERRADO EN EL ALCANCE ACORDADO**
-  - 18.1 Shell ✅
-  - 18.2 Histórico embebido ✅
-  - 18.3 Lectura de Salidas ✅
-  - 18.4 CRUD de Salidas ✅
-    - 18.4a backend/API ✅
-    - 18.4b interfaz ✅
-  - 18.5 Datos calculados del cierre ✅
-  - 18.6 UI de cierre + recuento ✅
-    - 18.6a pantalla + snapshot ✅
-    - 18.6b recuento físico ✅
-  - 18.7 Desglose por tipos de pago ✅
-  - 18.8 Cierre transaccional ✅
-    - 18.8a backend/API/persistencia ✅
-    - 18.8b confirmación + renderer ✅
-  - 18.9 Repaso final de diseño ✅
-  - 18.10 Regresión final ✅
+  - 18.1–18.10 ✅
+- B3 — Selector de empleado integrado en la venta ✅
+  - B3.1 nueva venta normal ✅
+  - B3.2 reservas + limpieza del selector modal ✅
 
 `Informes` continúa deliberadamente como placeholder. No bloquea el cierre del hito 18 porque el usuario pidió no diseñarlo todavía.
 
 ## Siguiente hito
 
-- **19 — Enforcement global de permisos** ⏳
+- **19 — Simplificación y aplicación definitiva de permisos** 🔨
 
-No iniciar su diseño ni implementación hasta que el usuario explique:
+La definición funcional ya está cerrada.
 
-- objetivo funcional;
-- comportamiento deseado;
-- comportamiento heredado si resulta relevante.
+Plan:
+
+```text
+19.1 — Nuevo catálogo con IDs string
+       + schema
+       + contratos/modelos
+       + importador legacy
+
+19.2 — Ventas
+       ventas.modificar_importes
+
+19.3 — Gestión
+       gestion.ajustes
+       gestion.tipos_pago
+       gestion.empleados
+       gestion.copias_seguridad
+
+19.4 — Regresión final
+```
 
 ## Pendiente posterior
 
@@ -167,85 +171,166 @@ No iniciar su diseño ni implementación hasta que el usuario explique:
 Último commit confirmado en `main` al generar esta versión:
 
 ```text
+f8d8498b463735f2d2503bd6f8ded62fa65a21e8
+Terminado B3.2
+```
+
+Commits inmediatamente anteriores relevantes:
+
+```text
+5959aa8c1f4519c99ccdb7915245d928a6d1b940
+Terminado B3.1
+
+e8e8ec8ccf7e7a2fd705b90bd086880e1770caad
+Actualizado documento de continuidad tras Cerrar caja y actualizaciones de librerías
+
 eda8361e3d5eadc0ca4e230fc8b333685ec6bfe4
 Terminado Caja 18
 ```
 
-Commits recientes del cierre de Caja:
+El usuario confirmó para B3:
 
-```text
-c8520d9831fa8773f355909eeab794a36aa88627
-Terminado Caja 18.8
-
-c9c20163cf56083b9cfe0b3eb658cb23feb7e4b9
-Limpieza de una traza
-
-c5434f05c9cb3477c5af677ed8a6489fc91eb2e8
-Terminado 18.8b
-
-07015b1f13a0651a3ffbcb7dd20124d5d98d8676
-Por corregir 18.8b
-
-6948155e1d99d7acd1b66d01a97e5013c77311ae
-Terminado Caja 18.8a
-
-a1928d90dcf632917aae83b4c47dbfb02c3ca4b8
-Terminado Caja 18.7
-```
-
-El usuario confirmó al cerrar el hito:
-
-- `npm test` ✅
-- `npm run build` ✅
-- `npm run test:electron` ✅
-- `npm run build:electron` ✅
-- `npm run lint` ✅
-- pruebas funcionales reales de cierre ✅
-- comparación de cifras con el TPV antiguo ✅
-- rediseño compacto aprobado ✅
-- cierre con datos legacy reales aprobado ✅
-- cambios subidos a `main` ✅
+- batería completa de tests/build/lint correcta;
+- pruebas funcionales correctas;
+- nueva venta con varios empleados funcionando;
+- reservas con varios empleados funcionando;
+- selector integrado visualmente aprobado;
+- cambios subidos a `main`.
 
 ## Siguiente paso exacto
 
-El siguiente hito técnico es:
+El siguiente bloque es:
 
 ```text
-19 — Enforcement global de permisos
+19.1 — Nuevo catálogo de permisos con IDs string
 ```
 
-Pero **no comenzar código todavía**.
+Alcance de 19.1:
 
-Primero el usuario debe describir:
+- sustituir los identificadores numéricos por claves `string`;
+- simplificar el catálogo a cinco permisos;
+- actualizar schema SQLite;
+- actualizar contratos/modelos/repositories/services afectados;
+- adaptar Gestión > Empleados;
+- adaptar importador legacy;
+- conservar bypass de administrador;
+- tests de regresión.
 
-- qué debe quedar protegido;
-- cómo quiere que se comporte cada acceso/acción;
-- cómo funcionaba en el TPV antiguo si sirve como referencia.
+No aplicar todavía los permisos funcionalmente en Ventas o Gestión; eso queda para 19.2 y 19.3.
 
-Mantener la regla general del proyecto de no inventar requisitos funcionales.
-
-# 5. Corrección Ventas / Empleados ✅
+# 5. Ventas / Empleados — estado definitivo ✅
 
 La antigua configuración `empleados` ha desaparecido por completo.
 
-## Regla definitiva
+## Regla funcional final
 
 ```text
-0 empleados  → error / no se puede iniciar venta
-1 empleado   → asignación automática
-2 o más      → selector de empleado
+0 empleados
+→ error / no se puede iniciar venta
+
+1 empleado
+→ la venta se crea directamente con ese empleado
+
+2 o más empleados
+→ la venta se crea inmediatamente con empleado = null
+→ la pestaña aparece blanca con texto negro
+→ el selector de empleado se muestra dentro del contenido de esa venta
 ```
 
-Se aplica a:
+La selección de empleado **ya no es un modal global** y no bloquea la navegación por la aplicación.
 
-- nueva venta;
-- venta procedente de reservas.
+El usuario puede dejar una venta pendiente de empleado y navegar a:
 
-`EmployeeSelectorComponent` se reutiliza para el caso de más de un empleado.
+- Caja;
+- Almacén;
+- Artículos;
+- Compras;
+- Clientes;
+- Gestión;
+- cualquier otro apartado disponible.
 
-## Limpieza realizada
+## Pestaña pendiente
 
-El flag se eliminó de:
+`SalesTabsComponent` ya utiliza:
+
+```text
+empleado == null
+→ background #ffffff
+→ text #000000
+```
+
+Al seleccionar un empleado:
+
+```text
+VentasService.asignarEmpleado(...)
+```
+
+actualiza la venta y la pestaña adopta automáticamente:
+
+- color del empleado;
+- color de texto del empleado.
+
+## Contenido de la venta
+
+Mientras:
+
+```text
+venta.empleado === null
+```
+
+se muestra:
+
+```text
+EmployeeSelectorComponent
+```
+
+embebido dentro de la propia venta.
+
+Cuando el empleado deja de ser `null` se muestra:
+
+```text
+SaleWorkspaceComponent
+```
+
+## Reservas
+
+B3.2 unificó también el flujo de reservas.
+
+Regla:
+
+```text
+1 empleado
+→ crearVentaDesdeReservas(empleado, ...)
+
+2+ empleados
+→ crearVentaDesdeReservas(null, ...)
+→ pestaña pendiente
+→ selector embebido
+```
+
+Ya no existen para este flujo:
+
+```text
+selectingEmployee
+pendingReservasLoad
+selector global modal
+```
+
+`EmployeeSelectorComponent` quedó como componente exclusivamente embebido.
+
+## Cliente
+
+Mientras una venta no tiene empleado asignado:
+
+```text
+venta.empleado === null
+```
+
+la acción de Cliente permanece deshabilitada.
+
+## Limpieza histórica
+
+El antiguo flag `empleados` fue eliminado de:
 
 - `AppData`;
 - instalación;
@@ -260,15 +345,13 @@ El flag se eliminó de:
 - exportador `.otpv`;
 - compatibilidad temporal de `JsonAppDataRepository`.
 
-No debe quedar rastro funcional del antiguo campo.
-
-No crear compatibilidad legacy futura para este flag: no existe una versión en producción que la requiera.
-
----
+No crear compatibilidad legacy futura para este flag.
 
 # 6. Gestión y permisos
 
-`GestionSessionService` mantiene sesión temporal de Gestión.
+## Estado actual
+
+`GestionSessionService` mantiene una sesión temporal de Gestión:
 
 - `empleadoId`
 - `authenticatedAt`
@@ -277,22 +360,186 @@ No crear compatibilidad legacy futura para este flag: no existe una versión en 
 
 No se renueva por actividad.
 
-Permisos relevantes:
+Los administradores tienen bypass mediante las comprobaciones de permisos existentes.
 
-- 18 Ajustes
-- 19 Tipos de pago
-- 20 Crear empleados
-- 21 Modificar datos
-- 22 Borrar empleados
-- 23 Modificar permisos
-- 24 Estadísticas empleados
-- 25 Copias de seguridad
+Actualmente los permisos siguen almacenados como identificadores numéricos hasta implementar 19.1:
 
-Administradores tienen bypass mediante `hasPerm()` / `hasAnyPerm()`.
+```text
+empleado_permiso.id_permiso INTEGER
+EmpleadoRecord.permisos: readonly number[]
+```
 
-El enforcement global fino sigue reservado para el hito 19.
+Esto debe cambiar en el siguiente bloque.
 
----
+## Decisión funcional definitiva para el hito 19
+
+Se abandona la idea de aplicar permisos a multitud de apartados operativos.
+
+Motivo:
+
+> En un comercio prima la rapidez. Introducir identificaciones adicionales en Marcas, Proveedores, Artículos, Clientes, Compras, Caja, etc. generaría demasiada fricción y probablemente llevaría a conceder todos los permisos o compartir una cuenta administradora.
+
+Los permisos quedarán restringidos a dos ámbitos donde ya existe una identidad natural:
+
+```text
+Ventas
+→ usa el empleado ya asignado a la venta
+
+Gestión
+→ usa el empleado autenticado en GestionSessionService
+```
+
+El resto de la aplicación no tendrá enforcement de permisos.
+
+## Nuevo catálogo definitivo
+
+### Ventas
+
+```text
+ventas.modificar_importes
+```
+
+Nombre visible:
+
+```text
+Modificar importes, descuentos o descuentos directos.
+```
+
+Semántica:
+
+Permite modificar el importe directo de un artículo en una venta y aplicar descuentos directos.
+
+No requiere ninguna identificación adicional porque la venta ya tiene un empleado asignado.
+
+### Gestión
+
+```text
+gestion.ajustes
+gestion.tipos_pago
+gestion.empleados
+gestion.copias_seguridad
+```
+
+Semántica:
+
+```text
+gestion.ajustes
+→ modificar ajustes generales de la aplicación
+
+gestion.tipos_pago
+→ modificar tipos de pago
+
+gestion.empleados
+→ acceder y gestionar empleados como una capacidad única
+
+gestion.copias_seguridad
+→ acceder y gestionar copias de seguridad
+```
+
+Gestión continúa requiriendo autenticación como hasta ahora.
+
+## Administradores
+
+Regla:
+
+```text
+admin = true
+→ acceso completo / bypass de permisos
+```
+
+No es necesario asignar explícitamente las cinco claves a un administrador.
+
+## IDs string
+
+Decisión cerrada:
+
+> Los nuevos permisos utilizarán claves `string` estables en lugar de IDs numéricos.
+
+Claves definitivas:
+
+```text
+ventas.modificar_importes
+gestion.ajustes
+gestion.tipos_pago
+gestion.empleados
+gestion.copias_seguridad
+```
+
+Ventajas buscadas:
+
+- significado visible directamente en código y SQLite;
+- no depender de numeraciones;
+- poder añadir/eliminar permisos sin renumerar;
+- evitar huecos históricos;
+- contratos más expresivos.
+
+Previsión para 19.1:
+
+```text
+EmpleadoPermissionDefinition.id
+number → string
+
+EmpleadoRecord.permisos
+readonly number[] → readonly string[]
+
+empleado_permiso
+id_permiso INTEGER → permiso TEXT
+```
+
+No crear migración de versión: el proyecto sigue antes de la primera versión estable y `DATABASE_SCHEMA_VERSION = 1`.
+
+## Importación legacy
+
+Mapeo definitivo acordado:
+
+```text
+1  → ventas.modificar_importes
+18 → gestion.ajustes
+19 → gestion.tipos_pago
+20 → gestion.empleados
+25 → gestion.copias_seguridad
+```
+
+Cualquier otro permiso antiguo se descarta:
+
+```text
+2–17
+21–24
+cualquier otro ID no reconocido
+→ no se importa
+```
+
+Decisión especialmente importante:
+
+```text
+20
+```
+
+deja de significar únicamente “crear empleados” y se utiliza como origen legacy para conceder la nueva capacidad global:
+
+```text
+gestion.empleados
+```
+
+Los antiguos permisos:
+
+```text
+21 modificar empleado
+22 borrar empleado
+23 modificar permisos
+24 estadísticas empleado
+```
+
+no conceden nada en el nuevo modelo.
+
+## Plan de implementación
+
+```text
+19.1 — catálogo string + schema + contratos + importador
+19.2 — Ventas: ventas.modificar_importes
+19.3 — Gestión: cuatro permisos
+19.4 — regresión final
+```
 
 # 7. Tipos de pago — estado definitivo
 
@@ -377,9 +624,11 @@ Decisión del usuario:
 Por tanto:
 
 ```text
-18 Caja
+18 Caja ✅
 ↓
-19 permisos
+B3 selector empleado integrado ✅
+↓
+19 simplificación/aplicación de permisos
 ↓
 resto de desarrollo funcional
 ↓
@@ -391,8 +640,6 @@ sincronización Indomable Store ↔ Osumi TPV
 No iniciar ningún bloque S1–S10 mientras la aplicación principal siga en desarrollo.
 
 La planificación existente se conserva para retomarla después.
-
----
 
 # 10. Sincronización futura — arquitectura acordada
 
@@ -2306,20 +2553,22 @@ d5888ac594ec608f9ec0214efaf109b7d717c7d4  Terminado Caja 18.4b
 444fefc44fb13b347cc511c8ebe4da5a8de53141  Terminado Caja 18.5
 02bb6d4ca3025e2fe62c15f89ea7fc0a2172b63a  Terminado Caja 18.6a
 212699cf8c41389fc545ade1b18572856e8e3624  Terminado Caja 18.6
-7b77bf5e0b48bd4f788e32567bac22e4f25ccf09  Continuidad tras 18.6
 a1928d90dcf632917aae83b4c47dbfb02c3ca4b8  Terminado Caja 18.7
 6948155e1d99d7acd1b66d01a97e5013c77311ae  Terminado Caja 18.8a
-07015b1f13a0651a3ffbcb7dd20124d5d98d8676  Por corregir 18.8b
 c5434f05c9cb3477c5af677ed8a6489fc91eb2e8  Terminado 18.8b
-c9c20163cf56083b9cfe0b3eb658cb23feb7e4b9  Limpieza de una traza
 c8520d9831fa8773f355909eeab794a36aa88627  Terminado Caja 18.8
 eda8361e3d5eadc0ca4e230fc8b333685ec6bfe4  Terminado Caja 18
+
+e8e8ec8ccf7e7a2fd705b90bd086880e1770caad  Continuidad tras Caja + librerías
+5959aa8c1f4519c99ccdb7915245d928a6d1b940  Terminado B3.1
+f8d8498b463735f2d2503bd6f8ded62fa65a21e8  Terminado B3.2
 ```
 
-Último `main` confirmado para v2.79:
+Último `main` confirmado para v2.80:
 
 ```text
-eda8361e3d5eadc0ca4e230fc8b333685ec6bfe4
+f8d8498b463735f2d2503bd6f8ded62fa65a21e8
+Terminado B3.2
 ```
 
 No hay cambios locales pendientes conocidos al generar este documento.
@@ -2332,52 +2581,49 @@ No hay cambios locales pendientes conocidos al generar este documento.
 ✅ 17 Gestión
    ✅ 17.1–17.6
    ✅ corrección foco login
-   ✅ Ventas/Empleados
    ✅ eliminado flag `empleados`
 
 ✅ 18 Caja — CERRADO
-   ✅ 18.1 Shell
-   ✅ 18.2 Histórico embebido
-   ✅ 18.3 Lectura Salidas
-   ✅ 18.4 CRUD Salidas
-   ✅ 18.5 Snapshot canónico cierre
-   ✅ 18.6 UI + recuento
-   ✅ 18.7 Tipos de pago
-   ✅ 18.8 Cierre transaccional
-   ✅ 18.9 Diseño compacto
-   ✅ 18.10 Regresión final
+   ✅ 18.1–18.10
+   ✅ cierre transaccional
+   ✅ compatibilidad legacy
+   ✅ diseño compacto
+   ✅ regresión final
 
-✅ Cerrar caja
-   - saldo inicial
-   - ventas afectaCaja
-   - salidas
-   - saldo teórico
-   - 15 denominaciones
-   - importe real
-   - retirado
-   - entrada
-   - diferencia
-   - saldo siguiente
-   - tipos de pago
-   - reales por tipo
-   - confirmación
-   - persistencia
-   - post-cierre
-   - nueva apertura
+✅ B3 Selector empleado integrado
+   ✅ nueva venta normal
+   ✅ reservas
+   ✅ empleado pendiente por venta
+   ✅ pestaña blanca mientras empleado = null
+   ✅ selector dentro del contenido
+   ✅ sin modal global bloqueante
+   ✅ navegación libre por la aplicación
 
-✅ Compatibilidad real validada
-   - caja legacy con caja_tipo incompleto
-   - tipos recuperados desde venta_pago
-   - ventas de total 0 € con pago legacy de 0 €
-   - descuentos asignados correctamente
-   - devoluciones firmadas
+🔨 19 Simplificación y aplicación definitiva de permisos
+
+   Catálogo acordado:
+   - ventas.modificar_importes
+   - gestion.ajustes
+   - gestion.tipos_pago
+   - gestion.empleados
+   - gestion.copias_seguridad
+
+   Legacy:
+   1  → ventas.modificar_importes
+   18 → gestion.ajustes
+   19 → gestion.tipos_pago
+   20 → gestion.empleados
+   25 → gestion.copias_seguridad
+   resto → descartar
+
+   Plan:
+   ▶️ 19.1 IDs string + schema/contratos/importador
+   ⏳ 19.2 Ventas
+   ⏳ 19.3 Gestión
+   ⏳ 19.4 Regresión
 
 📋 Informes de Caja
    placeholder intencionado
-
-▶️ 19 Enforcement global de permisos
-   SIGUIENTE HITO
-   NO DISEÑAR hasta explicación funcional del usuario
 
 📋 Sincronización Indomable Store
    pospuesta hasta terminar la aplicación
@@ -2395,72 +2641,148 @@ este documento
 conversación actual
 ```
 
-Antes de iniciar 19:
+Antes de 19.1:
 
-1. escuchar primero la explicación funcional del usuario;
-2. revisar `main`;
-3. contrastar con TPV antiguo si resulta útil;
-4. acordar alcance;
-5. solo entonces proponer plan/código.
+1. revisar de nuevo `main`;
+2. localizar todos los usos actuales de permisos numéricos;
+3. modificar una sola unidad pequeña;
+4. tests completos;
+5. no avanzar hasta verde + push.
 
 # 35. Siguiente paso exacto
 
-El siguiente hito es:
+El siguiente trabajo de código es:
 
-> **19 — Enforcement global de permisos**
+> **19.1 — Nuevo catálogo de permisos con IDs string**
 
-Todavía **no está funcionalmente definido** en esta conversación.
+La definición funcional ya está cerrada.
 
-No empezar código ni inventar reglas.
-
-## Antes de implementar
-
-El usuario debe explicar:
-
-- qué pantallas deben quedar protegidas;
-- qué acciones concretas requieren permiso;
-- qué debe ocurrir cuando falta un permiso;
-- cuándo debe pedirse autenticación de Gestión y cuándo no;
-- si los permisos existentes 18–25 son suficientes;
-- comportamiento del TPV antiguo si sirve como referencia.
-
-## Contexto ya disponible
-
-Existe:
+## Catálogo objetivo
 
 ```text
-GestionSessionService
+ventas.modificar_importes
+
+gestion.ajustes
+gestion.tipos_pago
+gestion.empleados
+gestion.copias_seguridad
 ```
 
-con sesión temporal de Gestión.
+No crear otros permisos.
 
-Permisos actuales relevantes:
+## Política general
 
 ```text
-18 Ajustes
-19 Tipos de pago
-20 Crear empleados
-21 Modificar datos
-22 Borrar empleados
-23 Modificar permisos
-24 Estadísticas empleados
-25 Copias de seguridad
+Ventas
+→ utiliza el empleado ya asignado a la venta
+→ no pide una identificación adicional
+
+Gestión
+→ login obligatorio como hasta ahora
+→ permisos sobre el empleado autenticado
+
+Admin
+→ bypass completo
+
+Resto de la aplicación
+→ sin permisos
 ```
 
-Administradores tienen bypass mediante:
+No introducir autenticación ni permisos en:
+
+- Marcas;
+- Proveedores;
+- Artículos;
+- Clientes;
+- Compras;
+- Caja;
+- navegación general.
+
+## Cambios técnicos de 19.1
+
+Revisar primero todos los usos actuales de:
 
 ```text
-hasPerm()
-hasAnyPerm()
+id_permiso
+readonly number[]
+EmpleadoPermissionDefinition.id
+permissionIds
+hasPerm
+hasAnyPerm
 ```
 
-El hito 19 debe revisar dónde se aplican realmente estos permisos y extender el enforcement global según lo que defina el usuario.
+Objetivo:
 
-## Regla de inicio
+```text
+number
+→ string
+```
 
-La próxima conversación o bloque debería comenzar con el usuario describiendo el objetivo de 19.
+Esquema previsto:
 
-No asumir que el sistema antiguo debe copiarse literalmente.
+```text
+empleado_permiso.permiso TEXT
+```
+
+en sustitución del actual:
+
+```text
+empleado_permiso.id_permiso INTEGER
+```
+
+Actualizar:
+
+- catálogo renderer;
+- constantes compartidas;
+- contratos;
+- records;
+- domain;
+- repository;
+- application services;
+- IPC/preload si sus tipos lo requieren;
+- formularios de empleados;
+- tests;
+- importador legacy.
+
+No aplicar todavía la autorización funcional de 19.2/19.3 dentro de este bloque.
+
+## Mapeo legacy obligatorio
+
+```text
+1  → ventas.modificar_importes
+18 → gestion.ajustes
+19 → gestion.tipos_pago
+20 → gestion.empleados
+25 → gestion.copias_seguridad
+```
+
+Todo permiso antiguo fuera de esa lista:
+
+```text
+→ descartar
+```
+
+No intentar inferir equivalencias para 21–24.
+
+## Sin migración
+
+Seguimos antes de la primera versión estable:
+
+```text
+DATABASE_SCHEMA_VERSION = 1
+```
+
+Modificar el schema base y el importador; no crear migración.
+
+## Procedimiento
+
+1. revisar `main`;
+2. inventariar referencias a permisos numéricos;
+3. diseñar el contrato string mínimo;
+4. implementar solo 19.1;
+5. tests;
+6. usuario ejecuta batería completa;
+7. esperar verde + push antes de 19.2.
 
 # 36. Regla final de dirección
 
@@ -2479,34 +2801,70 @@ Para cualquier módulo heredado:
 Convención de exports obligatoria:
 
 ```text
-1 export  → export default
+1 export   → export default
 2+ exports → solo exports nominales, sin default
 ```
 
-Estado al cerrar v2.79:
+Estado al cerrar v2.80:
 
-- **17.5 Empleados: CERRADO.**
-- **17.6 Tipos de pago: CERRADO.**
-- **Ventas/Empleados: CERRADO.**
+- **17 Gestión: CERRADO en su alcance funcional previo.**
 - **Flag `empleados`: ELIMINADO.**
 - **18 Caja: CERRADO EN EL ALCANCE ACORDADO.**
-- **18.1–18.10: CERRADOS.**
-- **Cerrar caja: FUNCIONAL, VALIDADO Y REDISEÑADO.**
-- **Compatibilidad legacy descubierta durante cierre: CUBIERTA.**
+- **B3 selector de empleado integrado: CERRADO.**
+- **Nueva venta con 2+ empleados: venta pendiente, no modal.**
+- **Reservas con 2+ empleados: venta pendiente, no modal.**
+- **19 permisos: DEFINICIÓN FUNCIONAL CERRADA.**
+- **19.1 IDs string + infraestructura: SIGUIENTE.**
+- **19.2 Ventas: pendiente.**
+- **19.3 Gestión: pendiente.**
+- **19.4 regresión: pendiente.**
 - **Informes de Caja: placeholder intencionado.**
-- **19 permisos: SIGUIENTE HITO, aún sin definición funcional.**
 - **Sincronización Indomable Store: pospuesta.**
 - **TicketBAI 12C.9: pausado.**
-- **Último commit confirmado: `eda8361e3d5eadc0ca4e230fc8b333685ec6bfe4`.**
+- **Último commit confirmado: `f8d8498b463735f2d2503bd6f8ded62fa65a21e8`.**
 
-La siguiente conversación debe comenzar por definir funcionalmente el hito 19 antes de escribir código.
+Reglas funcionales de permisos ya fijadas:
 
-Antes de cualquier cambio:
+```text
+Ventas
+→ ventas.modificar_importes
+
+Gestión
+→ gestion.ajustes
+→ gestion.tipos_pago
+→ gestion.empleados
+→ gestion.copias_seguridad
+
+Admin
+→ bypass
+
+Resto
+→ sin permisos
+```
+
+Mapeo legacy:
+
+```text
+1  → ventas.modificar_importes
+18 → gestion.ajustes
+19 → gestion.tipos_pago
+20 → gestion.empleados
+25 → gestion.copias_seguridad
+resto → descartar
+```
+
+La siguiente conversación puede comenzar directamente con:
+
+```text
+Continuamos con 19.1 — permisos con IDs string.
+```
+
+Antes de escribir código:
 
 ```text
 revisar main
 +
-respetar este documento
+inventariar usos numéricos actuales
 +
 mantener una sola unidad pequeña por respuesta
 ```
