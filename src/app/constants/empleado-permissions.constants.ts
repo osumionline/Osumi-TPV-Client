@@ -20,9 +20,9 @@ export const EMPLEADO_PERMISSION_GROUPS = [
     permissions: [
       {
         id: permissionKeys.ventas.modificarImportes,
-        name: 'Modificar importes, descuentos o descuentos directos.',
+        name: 'Modificar importes y descuentos.',
         description:
-          'Indica si un empleado puede modificar el importe directo de un artículo en una venta o si puede aplicar descuentos directos.',
+          'Permite al empleado modificar importes manuales y descuentos de una venta, incluidos los descuentos porcentuales, directos y la retirada de descuentos promocionales.',
       },
     ],
   },

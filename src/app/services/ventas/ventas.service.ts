@@ -674,6 +674,10 @@ export default class VentasService {
     this.nextVentaNumber = 1;
   }
 
+  /**
+   * Comprueba que el empleado asignado a la venta
+   * puede modificar importes o descuentos.
+   */
   private requireCanModifyAmounts(ventaIdTemporal: string): void {
     const venta: VentaEnCurso = this.requireVenta(ventaIdTemporal);
     const empleado: Empleado | null = venta.empleado;
