@@ -1,8 +1,5 @@
 import type { Routes } from '@angular/router';
-import {
-  GESTION_EMPLOYEES_PERMISSIONS,
-  GESTION_PERMISSIONS,
-} from '@constants/gestion-permissions.constants';
+import { GESTION_PERMISSIONS } from '@constants/gestion-permissions.constants';
 import gestionPermissionGuard from '@guards/gestion-permission.guard';
 
 const routes: Routes = [
@@ -29,7 +26,7 @@ const routes: Routes = [
         loadComponent: () =>
           import('@modules/gestion/pages/management-employees/management-employees.component'),
         data: {
-          requiredPermissions: GESTION_EMPLOYEES_PERMISSIONS,
+          requiredPermissions: [GESTION_PERMISSIONS.EMPLOYEES],
           title: 'Empleados',
           icon: 'badge',
           description: 'Aquí podrás gestionar los empleados de la tienda.',

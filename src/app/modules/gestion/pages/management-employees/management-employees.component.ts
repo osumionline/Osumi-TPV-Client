@@ -29,10 +29,7 @@ import {
   EMPLEADO_PERMISSION_GROUPS,
   type EmpleadoPermissionGroup,
 } from '@constants/empleado-permissions.constants';
-import {
-  GESTION_EMPLOYEES_PERMISSIONS,
-  GESTION_PERMISSIONS,
-} from '@constants/gestion-permissions.constants';
+import { GESTION_PERMISSIONS } from '@constants/gestion-permissions.constants';
 import type ActualizarEmpleadoCommand from '@desktop-contracts/configuration/empleados/actualizar-empleado-command.interface';
 import type CrearEmpleadoCommand from '@desktop-contracts/configuration/empleados/crear-empleado-command.interface';
 import type PermissionId from '@desktop-contracts/configuration/permissions/permission-id.type';
@@ -394,7 +391,7 @@ export default class ManagementEmployeesComponent {
         !wasCreatingEmpleado &&
         empleado.id !== null &&
         empleado.id === gestionEmpleadoId &&
-        !empleado.hasAnyPerm(GESTION_EMPLOYEES_PERMISSIONS)
+        !empleado.hasPerm(GESTION_PERMISSIONS.EMPLOYEES)
       ) {
         await this.router.navigate(['/gestion']);
         return;

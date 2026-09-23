@@ -4,10 +4,7 @@ import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatTooltip } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
-import {
-  GESTION_EMPLOYEES_PERMISSIONS,
-  GESTION_PERMISSIONS,
-} from '@constants/gestion-permissions.constants';
+import { GESTION_PERMISSIONS } from '@constants/gestion-permissions.constants';
 import type PermissionId from '@desktop-contracts/configuration/permissions/permission-id.type';
 import type Empleado from '@model/empleados/empleado.model';
 import ManagementPasswordDialogComponent from '@modules/gestion/components/management-password-dialog/management-password-dialog.component';
@@ -68,7 +65,7 @@ export default class ManagementHomeComponent {
       description: 'Empleados, contraseñas y permisos.',
       icon: 'badge',
       route: '/gestion/empleados',
-      requiredPermissions: GESTION_EMPLOYEES_PERMISSIONS,
+      requiredPermissions: [GESTION_PERMISSIONS.EMPLOYEES],
     },
     {
       id: 'payment-types',
