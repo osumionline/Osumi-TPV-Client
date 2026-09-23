@@ -9,6 +9,8 @@ import InventarioService from '@backend/application/almacen/inventario/inventari
 import ApplicationStateService from '@backend/application/application/application-state.service';
 import ArticulosService from '@backend/application/articulos/articulos.service';
 import CajaService from '@backend/application/caja/caja.service';
+import InformePeriodoResolver from '@backend/application/caja/informes/informe-periodo.resolver';
+import InformeSimpleService from '@backend/application/caja/informes/informe-simple.service';
 import CategoriasService from '@backend/application/categorias/categorias.service';
 import ClienteFacturaDocumentosService from '@backend/application/clientes/cliente-factura-documentos.service';
 import ClienteFacturaEmailService from '@backend/application/clientes/cliente-factura-email.service';
@@ -50,6 +52,7 @@ import type InventarioPrintWindow from '@backend/contracts/almacen/inventario/in
 import type InventarioRepository from '@backend/contracts/almacen/inventario/inventario.repository.interface';
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
+import type InformeSimpleRepository from '@backend/contracts/caja/informes/informe-simple.repository.interface';
 import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';
 import type ClienteFacturaDocumentosRepository from '@backend/contracts/clientes/cliente-factura-documentos.repository.interface';
 import type ClienteFacturaPdfStorage from '@backend/contracts/clientes/cliente-factura-pdf-storage.interface';
@@ -100,6 +103,7 @@ import DatabaseSchemaService from '@infrastructure/database/schema/database-sche
 import TypeOrmCaducidadesRepository from '@infrastructure/database/typeorm/almacen/caducidades/typeorm-caducidades.repository';
 import TypeOrmImprentaRepository from '@infrastructure/database/typeorm/almacen/imprenta/typeorm-imprenta.repository';
 import TypeOrmInventarioRepository from '@infrastructure/database/typeorm/almacen/inventario/typeorm-inventario.repository';
+import TypeOrmInformeSimpleRepository from '@infrastructure/database/typeorm/caja/informes/typeorm-informe-simple.repository';
 import TypeOrmPedidosRepository from '@infrastructure/database/typeorm/compras/pedidos/typeorm-pedidos.repository';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import TypeOrmArticulosRepository from '@infrastructure/database/typeorm/typeorm-articulos.repository';
@@ -468,6 +472,17 @@ export default function createApplicationComposition(
   const cajaRepository: CajaRepository = new TypeOrmCajaRepository(operationalDatabase);
   const cajaService: CajaService = new CajaService(cajaRepository);
 
+  const informePeriodoResolver: InformePeriodoResolver = new InformePeriodoResolver();
+
+  const informeSimpleRepository: InformeSimpleRepository = new TypeOrmInformeSimpleRepository(
+    operationalDatabase,
+  );
+
+  const informeSimpleService: InformeSimpleService = new InformeSimpleService(
+    informeSimpleRepository,
+    informePeriodoResolver,
+  );
+
   const ventasArticulosRepository: VentasArticulosRepository = new TypeOrmVentasArticulosRepository(
     operationalDatabase,
   );
@@ -693,7 +708,7 @@ export default function createApplicationComposition(
     clienteFacturaPdfService,
   );
   registerCategoriasIpc(getMainWindow, categoriasService);
-  registerCajaIpc(getMainWindow, cajaService);
+  registerCajaIpc(getMainWindow, cajaService, informeSimpleService);
   registerReservasIpc(getMainWindow, reservasService);
 
   registerVentasIpc(

@@ -134,6 +134,7 @@ const IPC_CHANNELS = {
   cajaDeleteSalida: 'caja:delete-salida',
   cajaGetCierre: 'caja:get-cierre',
   cajaClose: 'caja:close',
+  cajaGetInformeSimple: 'caja:get-informe-simple',
 
   reservasCreate: 'reservas:create',
   reservasGetAll: 'reservas:get-all',

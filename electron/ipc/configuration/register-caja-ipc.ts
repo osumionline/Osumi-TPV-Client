@@ -1,4 +1,5 @@
 import type CajaService from '@backend/application/caja/caja.service';
+import type InformeSimpleService from '@backend/application/caja/informes/informe-simple.service';
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
 import {
@@ -6,6 +7,10 @@ import {
   CajaCierreConsulta,
 } from '@desktop-contracts/caja/caja-cierre.interface';
 import type { CerrarCajaCommand } from '@desktop-contracts/caja/cerrar-caja-command.interface';
+import type {
+  InformeSimpleConsulta,
+  InformeSimpleResultado,
+} from '@desktop-contracts/caja/informes/informe-simple.interface';
 import type {
   ActualizarSalidaCajaCommand,
   CrearSalidaCajaCommand,
@@ -26,6 +31,7 @@ import { ipcMain } from 'electron';
 export default function registerCajaIpc(
   getMainWindow: MainWindowProvider,
   cajaService: CajaService,
+  informeSimpleService: InformeSimpleService,
 ): void {
   ipcMain.handle(
     IPC_CHANNELS.cajaOpen,
@@ -87,6 +93,15 @@ export default function registerCajaIpc(
       assertTrustedSender(event, getMainWindow);
 
       await cajaService.close(command);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.cajaGetInformeSimple,
+    async (event, consulta: InformeSimpleConsulta): Promise<InformeSimpleResultado> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return informeSimpleService.getInforme(consulta);
     },
   );
 }
