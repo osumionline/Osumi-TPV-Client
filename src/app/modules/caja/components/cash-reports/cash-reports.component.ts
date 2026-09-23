@@ -128,13 +128,21 @@ export default class CashReportsComponent implements OnInit {
   readonly showCategory: Signal<boolean> = computed(
     (): boolean => this.selectedType() === 'ventas',
   );
-  readonly canGenerate: Signal<boolean> = computed(
-    (): boolean => !this.loading() && this.selectedType() !== 'ventas',
-  );
+  readonly canGenerate: Signal<boolean> = computed((): boolean => {
+    if (this.loading()) {
+      return false;
+    }
+
+    if (this.selectedType() !== 'ventas') {
+      return true;
+    }
+
+    return this.selectedCategoryId() !== null;
+  });
 
   /**
    * Precarga el árbol de categorías utilizado
-   * por el futuro Informe de Ventas.
+   * por el Informe de Ventas.
    */
   ngOnInit(): void {
     void this.loadCategorias();
@@ -201,8 +209,20 @@ export default class CashReportsComponent implements OnInit {
           await this.informesService.openDetallado(consulta);
           break;
 
-        case 'ventas':
-          return;
+        case 'ventas': {
+          const idCategoria: number | null = this.selectedCategoryId();
+
+          if (idCategoria === null) {
+            return;
+          }
+
+          await this.informesService.openVentas({
+            ...consulta,
+            idCategoria,
+          });
+
+          break;
+        }
       }
     } catch (error: unknown) {
       this.error.set(getErrorMessage(error, 'No se ha podido abrir el informe.'));

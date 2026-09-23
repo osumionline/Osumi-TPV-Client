@@ -1,7 +1,6 @@
 import { signal, type WritableSignal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
-import type InformeTipo from '@desktop-contracts/caja/informes/informe-tipo.type';
-import type Categoria from '@model/categorias/categoria.model';
+import Categoria from '@model/categorias/categoria.model';
 import CashReportsComponent from '@modules/caja/components/cash-reports/cash-reports.component';
 import CategoriasService from '@services/articulos/categorias.service';
 import CajaInformesService from '@services/caja/caja-informes.service';
@@ -9,18 +8,19 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 describe('CashReportsComponent', (): void => {
   let fixture: ComponentFixture<CashReportsComponent>;
-
   let component: CashReportsComponent;
 
   let openSimpleMock: Mock;
   let openDetalladoMock: Mock;
   let loadCategoriasMock: Mock;
+  let openVentasMock: Mock;
 
   let categoriasPlain: WritableSignal<readonly Categoria[]>;
 
   beforeEach(async (): Promise<void> => {
     openSimpleMock = vi.fn().mockResolvedValue(undefined);
     openDetalladoMock = vi.fn().mockResolvedValue(undefined);
+    openVentasMock = vi.fn().mockResolvedValue(undefined);
     loadCategoriasMock = vi.fn().mockResolvedValue(undefined);
 
     categoriasPlain = signal<readonly Categoria[]>([]);
@@ -34,6 +34,7 @@ describe('CashReportsComponent', (): void => {
           useValue: {
             openSimple: openSimpleMock,
             openDetallado: openDetalladoMock,
+            openVentas: openVentasMock,
           },
         },
         {
@@ -79,7 +80,7 @@ describe('CashReportsComponent', (): void => {
     ]);
   });
 
-  it('permite generar Simple y Detallado pero no Ventas', (): void => {
+  it('permite generar Ventas cuando existe una categoría seleccionada', (): void => {
     expect(component.canGenerate()).toBe(true);
 
     component.setType('detallado');
@@ -87,6 +88,14 @@ describe('CashReportsComponent', (): void => {
     expect(component.canGenerate()).toBe(true);
 
     component.setType('ventas');
+
+    expect(component.canGenerate()).toBe(false);
+
+    component.setCategoryId(12);
+
+    expect(component.canGenerate()).toBe(true);
+
+    component.setCategoryId(null);
 
     expect(component.canGenerate()).toBe(false);
   });
@@ -140,16 +149,68 @@ describe('CashReportsComponent', (): void => {
     expect(component.error()).toBeNull();
   });
 
-  it('no genera el Informe de Ventas todavía no implementado', async (): Promise<void> => {
-    const type: InformeTipo = 'ventas';
+  it('abre el Informe de Ventas con periodo y categoría actuales', async (): Promise<void> => {
+    component.setType('ventas');
 
-    component.setType(type);
+    component.setYear(2025);
+
+    component.setMonth('todos');
+
+    component.setCategoryId(37);
 
     await component.generate();
+
+    expect(openVentasMock).toHaveBeenCalledWith({
+      year: 2025,
+      month: 'todos',
+      idCategoria: 37,
+    });
 
     expect(openSimpleMock).not.toHaveBeenCalled();
 
     expect(openDetalladoMock).not.toHaveBeenCalled();
+
+    expect(component.loading()).toBe(false);
+
+    expect(component.error()).toBeNull();
+  });
+
+  it('no genera Ventas sin una categoría seleccionada', async (): Promise<void> => {
+    component.setType('ventas');
+
+    component.setCategoryId(null);
+
+    await component.generate();
+
+    expect(openVentasMock).not.toHaveBeenCalled();
+
+    expect(openSimpleMock).not.toHaveBeenCalled();
+
+    expect(openDetalladoMock).not.toHaveBeenCalled();
+
+    expect(component.loading()).toBe(false);
+  });
+
+  it('selecciona automáticamente la primera categoría disponible', async (): Promise<void> => {
+    const categoria: Categoria = new Categoria().fromInterface({
+      id: 15,
+      publicId: 'categoria-15',
+      idPadre: null,
+      nombre: 'Primera categoría',
+      orden: 1,
+    });
+
+    categoria.profundidad = 1;
+
+    categoriasPlain.set([categoria]);
+
+    fixture.detectChanges();
+
+    await fixture.whenStable();
+
+    expect(loadCategoriasMock).toHaveBeenCalled();
+
+    expect(component.selectedCategoryId()).toBe(15);
   });
 
   it('limpia un error anterior al cambiar filtros', (): void => {
