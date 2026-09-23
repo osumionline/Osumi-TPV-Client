@@ -5,6 +5,7 @@ const FACTURA_PREVIEW_WINDOW: string = 'factura-preview';
 const INVENTARIO_PRINT_WINDOW: string = 'inventario-print';
 const CADUCIDAD_REPORT_WINDOW: string = 'caducidad-report';
 const IMPRENTA_PRINT_WINDOW: string = 'imprenta-print';
+const CAJA_INFORME_PRINT_WINDOW: string = 'caja-informe-print';
 
 /**
  * Arranca únicamente la aplicación correspondiente
@@ -59,6 +60,18 @@ async function bootstrap(): Promise<void> {
       ]);
 
     await bootstrapApplication(ImprentaPrintComponent, imprentaPrintConfig);
+
+    return;
+  }
+
+  if (windowType === CAJA_INFORME_PRINT_WINDOW) {
+    const [{ default: CashReportPrintComponent }, { default: cajaInformePrintConfig }] =
+      await Promise.all([
+        import('@modules/caja/pages/cash-report-print/cash-report-print.component'),
+        import('@app/caja-informe-print.config'),
+      ]);
+
+    await bootstrapApplication(CashReportPrintComponent, cajaInformePrintConfig);
 
     return;
   }

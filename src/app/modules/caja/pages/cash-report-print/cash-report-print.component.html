@@ -1,0 +1,71 @@
+@if (loading()) {
+<section class="cash-report-print-state">
+    Cargando informe…
+</section>
+}
+@else if (loadError() !== null) {
+<section class="cash-report-print-state cash-report-print-state--error">
+    <span>
+        {{ loadError() }}
+    </span>
+
+    <button type="button"
+            (click)="retry()">
+        Reintentar
+    </button>
+</section>
+}
+@else if (documento(); as currentDocument) {
+<div class="cash-report-print">
+    <header class="cash-report-print__actions">
+        <div>
+            <strong>
+                {{ getReportLabel(currentDocument) }}
+            </strong>
+
+            <span>
+                {{ getPeriodLabel(currentDocument) }}
+            </span>
+        </div>
+
+        <button type="button"
+                [disabled]="processing()"
+                (click)="print()">
+            {{
+                processing()
+                    ? 'IMPRIMIENDO…'
+                    : 'IMPRIMIR'
+            }}
+        </button>
+    </header>
+
+    @if (operationError() !== null) {
+    <div class="cash-report-print__operation-error">
+        {{ operationError() }}
+    </div>
+    }
+
+    <main class="cash-report-print-document">
+        <header class="cash-report-print-document__header">
+            <h1>
+                {{ getReportLabel(currentDocument) }}
+            </h1>
+
+            <span>
+                {{ getPeriodLabel(currentDocument) }}
+            </span>
+        </header>
+
+        @if (simpleDocumento(); as simpleDocument) {
+        <otpv-simple-report [result]="simpleDocument.resultado"
+                            [year]="simpleDocument.consulta.year"
+                            [month]="simpleDocument.consulta.month" />
+        }
+        @else {
+        <section class="cash-report-print__unsupported">
+            Este tipo de informe todavía no está disponible.
+        </section>
+        }
+    </main>
+</div>
+}

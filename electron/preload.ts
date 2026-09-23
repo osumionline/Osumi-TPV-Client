@@ -750,6 +750,9 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         IPC_CHANNELS.cajaGetInformeSimple,
         consulta,
       ) as Promise<InformeSimpleResultado>,
+
+    openInformeSimple: (consulta: InformeSimpleConsulta): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.cajaOpenInformeSimple, consulta) as Promise<void>,
   }),
 
   reservas: Object.freeze({

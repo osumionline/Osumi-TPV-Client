@@ -9,6 +9,7 @@ import InventarioService from '@backend/application/almacen/inventario/inventari
 import ApplicationStateService from '@backend/application/application/application-state.service';
 import ArticulosService from '@backend/application/articulos/articulos.service';
 import CajaService from '@backend/application/caja/caja.service';
+import CajaInformePrintService from '@backend/application/caja/informes/caja-informe-print.service';
 import InformePeriodoResolver from '@backend/application/caja/informes/informe-periodo.resolver';
 import InformeSimpleService from '@backend/application/caja/informes/informe-simple.service';
 import CategoriasService from '@backend/application/categorias/categorias.service';
@@ -52,6 +53,7 @@ import type InventarioPrintWindow from '@backend/contracts/almacen/inventario/in
 import type InventarioRepository from '@backend/contracts/almacen/inventario/inventario.repository.interface';
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
+import type CajaInformePrintWindow from '@backend/contracts/caja/informes/caja-informe-print-window.interface';
 import type InformeSimpleRepository from '@backend/contracts/caja/informes/informe-simple.repository.interface';
 import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';
 import type ClienteFacturaDocumentosRepository from '@backend/contracts/clientes/cliente-factura-documentos.repository.interface';
@@ -130,6 +132,7 @@ import ElectronCaducidadReportWindow from '@infrastructure/electron/almacen/elec
 import ElectronImprentaPrintWindow from '@infrastructure/electron/almacen/electron-imprenta-print-window';
 import ElectronInventarioCsvFileSaver from '@infrastructure/electron/almacen/electron-inventario-csv-file-saver';
 import ElectronInventarioPrintWindow from '@infrastructure/electron/almacen/electron-inventario-print-window';
+import ElectronCajaInformePrintWindow from '@infrastructure/electron/caja/electron-caja-informe-print-window';
 import ElectronPedidoArchivoDialog from '@infrastructure/electron/compras/electron-pedido-archivo-dialog';
 import ElectronA4DocumentRenderer from '@infrastructure/electron/electron-a4-document.renderer';
 import ElectronAssetUrlBuilder from '@infrastructure/electron/electron-asset-url.builder';
@@ -167,6 +170,7 @@ import registerImprentaPrintIpc from '@ipc/almacen/register-imprenta-print-ipc';
 import registerInventarioPrintIpc from '@ipc/almacen/register-inventario-print-ipc';
 import registerArticulosIpc from '@ipc/articulos/register-articulos-ipc';
 import registerCategoriasIpc from '@ipc/articulos/register-categorias-ipc';
+import registerCajaInformePrintIpc from '@ipc/caja/register-caja-informe-print-ipc';
 import registerClienteFacturaPreviewIpc from '@ipc/clientes/register-cliente-factura-preview-ipc';
 import registerClientesIpc from '@ipc/clientes/register-clientes-ipc';
 import registerComprasIpc from '@ipc/compras/register-compras-ipc';
@@ -483,6 +487,15 @@ export default function createApplicationComposition(
     informePeriodoResolver,
   );
 
+  const cajaInformePrintWindow: CajaInformePrintWindow = new ElectronCajaInformePrintWindow(
+    getMainWindow,
+  );
+
+  const cajaInformePrintService: CajaInformePrintService = new CajaInformePrintService(
+    informeSimpleService,
+    cajaInformePrintWindow,
+  );
+
   const ventasArticulosRepository: VentasArticulosRepository = new TypeOrmVentasArticulosRepository(
     operationalDatabase,
   );
@@ -708,7 +721,8 @@ export default function createApplicationComposition(
     clienteFacturaPdfService,
   );
   registerCategoriasIpc(getMainWindow, categoriasService);
-  registerCajaIpc(getMainWindow, cajaService, informeSimpleService);
+  registerCajaIpc(getMainWindow, cajaService, informeSimpleService, cajaInformePrintService);
+  registerCajaInformePrintIpc(cajaInformePrintWindow);
   registerReservasIpc(getMainWindow, reservasService);
 
   registerVentasIpc(

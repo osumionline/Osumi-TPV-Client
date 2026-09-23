@@ -11,6 +11,7 @@ const buildOptions = {
     'caducidad-report-preload': 'electron/preloads/caducidad-report-preload.ts',
     'imprenta-print-preload': 'electron/preloads/imprenta-print-preload.ts',
     'legacy-import-worker': 'electron/workers/legacy-import-worker.ts',
+    'caja-informe-print-preload': 'electron/preloads/caja-informe-print-preload.ts',
   },
 
   bundle: true,

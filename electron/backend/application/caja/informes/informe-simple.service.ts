@@ -1,4 +1,5 @@
 import InformePeriodoResolver from '@backend/application/caja/informes/informe-periodo.resolver';
+import type InformeSimpleProvider from '@backend/contracts/caja/informes/informe-simple-provider.interface';
 import type InformeSimpleRepository from '@backend/contracts/caja/informes/informe-simple.repository.interface';
 import type { InformePeriodosResueltos } from '@backend/domain/caja/informes/informe-periodo-resuelto.interface';
 import type {
@@ -39,7 +40,7 @@ interface LocalDateParts {
  * Construye el Informe Simple de Caja a partir
  * de ventas y pagos históricos persistidos.
  */
-export default class InformeSimpleService {
+export default class InformeSimpleService implements InformeSimpleProvider {
   constructor(
     private readonly repository: InformeSimpleRepository,
     private readonly periodoResolver: InformePeriodoResolver,

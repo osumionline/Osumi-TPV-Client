@@ -1,4 +1,5 @@
 import type CajaService from '@backend/application/caja/caja.service';
+import type CajaInformePrintService from '@backend/application/caja/informes/caja-informe-print.service';
 import type InformeSimpleService from '@backend/application/caja/informes/informe-simple.service';
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
@@ -32,6 +33,7 @@ export default function registerCajaIpc(
   getMainWindow: MainWindowProvider,
   cajaService: CajaService,
   informeSimpleService: InformeSimpleService,
+  cajaInformePrintService: CajaInformePrintService,
 ): void {
   ipcMain.handle(
     IPC_CHANNELS.cajaOpen,
@@ -102,6 +104,15 @@ export default function registerCajaIpc(
       assertTrustedSender(event, getMainWindow);
 
       return informeSimpleService.getInforme(consulta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.cajaOpenInformeSimple,
+    async (event, consulta: InformeSimpleConsulta): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await cajaInformePrintService.openSimple(consulta);
     },
   );
 }

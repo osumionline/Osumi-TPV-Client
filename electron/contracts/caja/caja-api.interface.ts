@@ -56,4 +56,10 @@ export default interface CajaApi {
    * Genera el Informe Simple del periodo indicado.
    */
   getInformeSimple(consulta: InformeSimpleConsulta): Promise<InformeSimpleResultado>;
+
+  /**
+   * Genera el Informe Simple y abre
+   * su ventana independiente de impresión.
+   */
+  openInformeSimple(consulta: InformeSimpleConsulta): Promise<void>;
 }
