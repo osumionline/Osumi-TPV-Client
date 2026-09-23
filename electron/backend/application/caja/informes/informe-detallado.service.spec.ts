@@ -132,8 +132,8 @@ describe('InformeDetalladoService', (): void => {
       totalVentasPvpMicros: 0,
       totalBeneficioMicros: 0,
       margenBps: 0,
-      margenAnteriorBps: 0,
-      diferenciaMargenBps: 0,
+      margenAnteriorBps: null,
+      diferenciaMargenBps: null,
       porcentajeVentasBps: 0,
     });
 
@@ -144,6 +144,19 @@ describe('InformeDetalladoService', (): void => {
 
       margenBps: 4182,
     });
+  });
+
+  it('no inventa comparación de margen para una marca sin base anterior', async (): Promise<void> => {
+    const result: InformeDetalladoResultado = await requireService().getInforme({
+      year: 2026,
+      month: 9,
+    });
+
+    const gamma: InformeDetalladoMarca = requireMarca(result, 'marca-gamma');
+
+    expect(gamma.margenAnteriorBps).toBeNull();
+
+    expect(gamma.diferenciaMargenBps).toBeNull();
   });
 
   it('calcula Top artículos, penetración por tickets y margen anterior', async (): Promise<void> => {

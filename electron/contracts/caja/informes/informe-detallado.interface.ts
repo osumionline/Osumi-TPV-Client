@@ -16,7 +16,7 @@ export interface InformeDetalladoVentas {
   readonly margenBps: number;
 
   /**
-   * Margen global ponderado del periodo anterior.
+   * Margen del periodo anterior.
    *
    * Es null cuando no existe una base económica
    * comparable útil.
@@ -24,8 +24,7 @@ export interface InformeDetalladoVentas {
   readonly margenAnteriorBps: number | null;
 
   /**
-   * Diferencia entre ambos márgenes expresada
-   * en puntos básicos / puntos porcentuales.
+   * Diferencia de margen respecto al periodo anterior.
    *
    * Es null cuando no existe comparación útil.
    */
@@ -40,8 +39,20 @@ export interface InformeDetalladoMarca {
   readonly totalBeneficioMicros: number;
 
   readonly margenBps: number;
-  readonly margenAnteriorBps: number;
-  readonly diferenciaMargenBps: number;
+  /**
+   * Margen del periodo anterior.
+   *
+   * Es null cuando no existe una base económica
+   * comparable útil.
+   */
+  readonly margenAnteriorBps: number | null;
+
+  /**
+   * Diferencia de margen respecto al periodo anterior.
+   *
+   * Es null cuando no existe comparación útil.
+   */
+  readonly diferenciaMargenBps: number | null;
 
   /**
    * Peso de la facturación PVP de la marca

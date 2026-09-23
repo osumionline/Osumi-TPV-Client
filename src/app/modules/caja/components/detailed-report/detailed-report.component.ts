@@ -3,16 +3,8 @@ import { Component, input, type InputSignal } from '@angular/core';
 import type { InformeDetalladoResultado } from '@desktop-contracts/caja/informes/informe-detallado.interface';
 import BpsToPercentPipe from '@pipes/bps-to-percent.pipe';
 import MicrosToEurosPipe from '@pipes/micros-to-euros.pipe';
+import { formatDecimal, formatInteger } from '@utils/format.utils';
 import { bpsToPercent } from '@utils/percentage.utils';
-
-const INTEGER_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
-  maximumFractionDigits: 0,
-});
-
-const PERCENTAGE_POINT_FORMATTER: Intl.NumberFormat = new Intl.NumberFormat('es-ES', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
 
 /**
  * Presenta el resultado del Informe Detallado
@@ -45,8 +37,7 @@ export default class DetailedReportComponent {
    * signo positivo cuando corresponda.
    */
   formatIntegerDifference(difference: number): string {
-    const formatted: string = INTEGER_FORMATTER.format(difference);
-
+    const formatted: string = formatInteger(difference);
     return difference > 0 ? `+${formatted}` : formatted;
   }
 
@@ -60,8 +51,7 @@ export default class DetailedReportComponent {
     }
 
     const value: number = bpsToPercent(differenceBps);
-
-    const formatted: string = PERCENTAGE_POINT_FORMATTER.format(value);
+    const formatted: string = formatDecimal(value);
 
     return value > 0 ? `+${formatted} p.p.` : `${formatted} p.p.`;
   }

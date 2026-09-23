@@ -133,10 +133,13 @@ export default class InformeDetalladoService implements InformeDetalladoProvider
       marca.totalVentasPvpMicros,
     );
 
-    const margenAnteriorBps: number = this.calculateMarginBps(
-      marca.totalBeneficioAnteriorMicros,
-      marca.totalVentasPvpAnteriorMicros,
-    );
+    const margenAnteriorBps: number | null =
+      marca.totalVentasPvpAnteriorMicros === 0
+        ? null
+        : this.calculateMarginBps(
+            marca.totalBeneficioAnteriorMicros,
+            marca.totalVentasPvpAnteriorMicros,
+          );
 
     return {
       marcaPublicId: marca.marcaPublicId,
@@ -145,7 +148,7 @@ export default class InformeDetalladoService implements InformeDetalladoProvider
       totalBeneficioMicros: marca.totalBeneficioMicros,
       margenBps,
       margenAnteriorBps,
-      diferenciaMargenBps: margenBps - margenAnteriorBps,
+      diferenciaMargenBps: margenAnteriorBps === null ? null : margenBps - margenAnteriorBps,
       porcentajeVentasBps: this.calculatePercentageBps(
         marca.totalVentasPvpMicros,
         totalVentasMarcasMicros,

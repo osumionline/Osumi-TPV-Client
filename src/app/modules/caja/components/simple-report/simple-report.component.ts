@@ -1,6 +1,5 @@
 import { CurrencyPipe } from '@angular/common';
 import { Component, input, type InputSignal } from '@angular/core';
-import type { InformeMes } from '@desktop-contracts/caja/informes/informe-periodo.interface';
 import type {
   InformeSimpleImporteTipoPago,
   InformeSimpleItem,
@@ -8,10 +7,7 @@ import type {
   InformeSimpleTicket,
 } from '@desktop-contracts/caja/informes/informe-simple.interface';
 import CentsToEurosPipe from '@pipes/cents-to-euros.pipe';
-
-const MONTH_FORMATTER: Intl.DateTimeFormat = new Intl.DateTimeFormat('es-ES', {
-  month: 'long',
-});
+import { formatMonthName } from '@utils/date.utils';
 
 const WEEKDAY_FORMATTER: Intl.DateTimeFormat = new Intl.DateTimeFormat('es-ES', {
   weekday: 'long',
@@ -30,31 +26,12 @@ const WEEKDAY_FORMATTER: Intl.DateTimeFormat = new Intl.DateTimeFormat('es-ES', 
 export default class SimpleReportComponent {
   readonly result: InputSignal<InformeSimpleResultado> = input.required<InformeSimpleResultado>();
 
-  readonly year: InputSignal<number> = input.required<number>();
-
-  readonly month: InputSignal<InformeMes> = input.required<InformeMes>();
-
-  /**
-   * Devuelve el título legible del periodo.
-   */
-  getTitle(): string {
-    if (this.month() === 'todos') {
-      return String(this.year());
-    }
-
-    const date: Date = this.createLocalDate(this.year(), this.month() as number, 1);
-
-    return `${this.capitalize(MONTH_FORMATTER.format(date))} de ${this.year()}`;
-  }
-
   /**
    * Devuelve la etiqueta temporal de una fila.
    */
   getRowLabel(item: InformeSimpleItem): string {
     if (item.day === null) {
-      const date: Date = this.createLocalDate(item.year, item.month, 1);
-
-      return this.capitalize(MONTH_FORMATTER.format(date));
+      return formatMonthName(item.month);
     }
 
     const date: Date = this.createLocalDate(item.year, item.month, item.day);

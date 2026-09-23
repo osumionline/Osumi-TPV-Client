@@ -155,8 +155,14 @@
 
                         <td class="percentage">
                             <span class="trend"
-                                  [class.trend--up]="marca.diferenciaMargenBps > 0"
-                                  [class.trend--down]="marca.diferenciaMargenBps < 0">
+                                  [class.trend--up]="
+                                    marca.diferenciaMargenBps !== null
+                                    && marca.diferenciaMargenBps! > 0
+                                  "
+                                  [class.trend--down]="
+                                    marca.diferenciaMargenBps !== null
+                                    && marca.diferenciaMargenBps! < 0
+                                  ">
                                 {{
                                     getTrendSymbol(
                                         marca.diferenciaMargenBps

@@ -23,26 +23,18 @@ describe('SimpleReportComponent', (): void => {
 
     fixture = TestBed.createComponent(SimpleReportComponent);
     component = fixture.componentInstance;
-
     fixture.componentRef.setInput('result', createResult());
-
-    fixture.componentRef.setInput('year', 2026);
-
-    fixture.componentRef.setInput('month', 9);
-
     fixture.detectChanges();
   });
 
-  it('muestra el periodo mensual en el título', (): void => {
-    expect(component.getTitle()).toBe('Septiembre de 2026');
-  });
+  it('muestra el nombre canónico del mes en las filas anuales', (): void => {
+    const item: InformeSimpleItem = {
+      ...createResult().items[0],
+      month: 9,
+      day: null,
+    };
 
-  it('muestra únicamente el año cuando el periodo es Todos', (): void => {
-    fixture.componentRef.setInput('month', 'todos');
-
-    fixture.detectChanges();
-
-    expect(component.getTitle()).toBe('2026');
+    expect(component.getRowLabel(item)).toBe('Septiembre');
   });
 
   it('mantiene el formato de rango de tickets del legacy', (): void => {

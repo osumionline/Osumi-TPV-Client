@@ -57,9 +57,7 @@
         </header>
 
         @if (simpleDocumento(); as simpleDocument) {
-        <otpv-simple-report [result]="simpleDocument.resultado"
-                            [year]="simpleDocument.consulta.year"
-                            [month]="simpleDocument.consulta.month" />
+        <otpv-simple-report [result]="simpleDocument.resultado" />
         }
         @else if (detalladoDocumento(); as detailedDocument) {
         <otpv-detailed-report [result]="detailedDocument.resultado" />

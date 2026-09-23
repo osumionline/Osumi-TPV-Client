@@ -10,6 +10,7 @@ import {
 import { MatButton } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
+import { MONTH_OPTIONS, type MonthOption } from '@constants/date.constants';
 import type { InformeMes } from '@desktop-contracts/caja/informes/informe-periodo.interface';
 import type InformeTipo from '@desktop-contracts/caja/informes/informe-tipo.type';
 import type Categoria from '@model/categorias/categoria.model';
@@ -42,61 +43,6 @@ const REPORT_TYPES: readonly InformeTipoOption[] = [
   },
 ];
 
-const REPORT_MONTHS: readonly InformeMesOption[] = [
-  {
-    value: 'todos',
-    label: 'Todos',
-  },
-  {
-    value: 1,
-    label: 'Enero',
-  },
-  {
-    value: 2,
-    label: 'Febrero',
-  },
-  {
-    value: 3,
-    label: 'Marzo',
-  },
-  {
-    value: 4,
-    label: 'Abril',
-  },
-  {
-    value: 5,
-    label: 'Mayo',
-  },
-  {
-    value: 6,
-    label: 'Junio',
-  },
-  {
-    value: 7,
-    label: 'Julio',
-  },
-  {
-    value: 8,
-    label: 'Agosto',
-  },
-  {
-    value: 9,
-    label: 'Septiembre',
-  },
-  {
-    value: 10,
-    label: 'Octubre',
-  },
-  {
-    value: 11,
-    label: 'Noviembre',
-  },
-  {
-    value: 12,
-    label: 'Diciembre',
-  },
-];
-
 /**
  * Gestiona los filtros y la apertura
  * de los informes disponibles en Caja.
@@ -112,7 +58,17 @@ export default class CashReportsComponent implements OnInit {
   readonly categoriasService: CategoriasService = inject(CategoriasService);
 
   readonly tipos: readonly InformeTipoOption[] = REPORT_TYPES;
-  readonly meses: readonly InformeMesOption[] = REPORT_MONTHS;
+  readonly meses: readonly InformeMesOption[] = [
+    {
+      value: 'todos',
+      label: 'Todos',
+    },
+    ...MONTH_OPTIONS.map((month: MonthOption): InformeMesOption => ({
+      value: month.value as InformeMes,
+
+      label: month.label,
+    })),
+  ];
 
   readonly selectedType: WritableSignal<InformeTipo> = signal<InformeTipo>('simple');
   readonly selectedMonth: WritableSignal<InformeMes> = signal<InformeMes>(
