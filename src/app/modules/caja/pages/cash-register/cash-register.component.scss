@@ -71,32 +71,4 @@
         flex: 1;
         overflow: hidden;
     }
-
-    .cash-register__placeholder {
-        display: flex;
-        height: 100%;
-        min-height: 300px;
-        padding: 32px;
-        box-sizing: border-box;
-        align-items: center;
-        justify-content: center;
-        flex-direction: column;
-        gap: 8px;
-        text-align: center;
-
-        h2,
-        p {
-            margin: 0;
-        }
-
-        h2 {
-            font-size: 22px;
-            font-weight: 500;
-        }
-
-        p {
-            max-width: 520px;
-            color: var(--disabled-color);
-        }
-    }
 }

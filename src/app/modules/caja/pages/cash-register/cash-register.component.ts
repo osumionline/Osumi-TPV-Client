@@ -10,6 +10,7 @@ import {
 import HeaderComponent from '@app/components/header/header.component';
 import CashClosingComponent from '@modules/caja/components/cash-closing/cash-closing.component';
 import CashOutflowsComponent from '@modules/caja/components/cash-outflows/cash-outflows.component';
+import CashReportsComponent from '@modules/caja/components/cash-reports/cash-reports.component';
 import HistoricalSalesComponent from '@modules/ventas/components/historical-sales/historical-sales.component';
 import { DialogService } from '@osumi/angular-tools';
 import AppDataService from '@services/application/app-data.service';
@@ -48,7 +49,13 @@ const CASH_REGISTER_SECTIONS: readonly CashRegisterSectionDefinition[] = [
   selector: 'otpv-cash-register',
   templateUrl: './cash-register.component.html',
   styleUrl: './cash-register.component.scss',
-  imports: [CashClosingComponent, CashOutflowsComponent, HeaderComponent, HistoricalSalesComponent],
+  imports: [
+    CashClosingComponent,
+    CashOutflowsComponent,
+    CashReportsComponent,
+    HeaderComponent,
+    HistoricalSalesComponent,
+  ],
 })
 export default class CashRegisterComponent implements OnInit {
   private readonly dialog: DialogService = inject(DialogService);

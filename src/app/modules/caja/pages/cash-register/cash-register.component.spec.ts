@@ -37,6 +37,12 @@ class HeaderStubComponent {
   readonly appName = input<string>('');
 }
 
+@Component({
+  selector: 'otpv-cash-reports',
+  template: '',
+})
+class CashReportsStubComponent {}
+
 describe('CashRegisterComponent', (): void => {
   let fixture: ComponentFixture<CashRegisterComponent>;
   let component: CashRegisterComponent;
@@ -71,6 +77,7 @@ describe('CashRegisterComponent', (): void => {
             CashClosingStubComponent,
             CashOutflowsStubComponent,
             HistoricalSalesStubComponent,
+            CashReportsStubComponent,
           ],
         },
       })
@@ -122,13 +129,11 @@ describe('CashRegisterComponent', (): void => {
     expect(fixture.debugElement.query(By.directive(CashOutflowsStubComponent))).not.toBeNull();
   });
 
-  it('mantiene Informes como placeholder', (): void => {
+  it('muestra Informes al seleccionar su pestaña', (): void => {
     component.selectSection('reports');
     fixture.detectChanges();
 
-    const element: HTMLElement = fixture.nativeElement as HTMLElement;
-
-    expect(element.textContent).toContain('Este apartado se definirá más adelante.');
+    expect(fixture.debugElement.query(By.directive(CashReportsStubComponent))).not.toBeNull();
   });
 
   it('muestra el histórico de ventas en modo embebido', (): void => {

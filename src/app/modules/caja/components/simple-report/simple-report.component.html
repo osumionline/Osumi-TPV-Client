@@ -1,0 +1,153 @@
+<section class="simple-report">
+    <header class="simple-report__header">
+        <h3>
+            {{ getTitle() }}
+        </h3>
+    </header>
+
+    <div class="simple-report__table-wrapper">
+        <table class="simple-report__table">
+            <thead>
+                <tr>
+                    <th>
+                        Fecha
+                    </th>
+
+                    <th class="center">
+                        Tickets
+                    </th>
+
+                    @for (
+                    tipoPago of result().tiposPago;
+                    track tipoPago.publicId
+                    ) {
+                    <th class="money">
+                        {{ tipoPago.nombre }}
+                    </th>
+                    }
+
+                    <th class="money">
+                        Total
+                    </th>
+
+                    <th class="money">
+                        Suma
+                    </th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @for (
+                item of result().items;
+                track item.month + '-' + item.day
+                ) {
+                <tr>
+                    <td>
+                        {{ getRowLabel(item) }}
+                    </td>
+
+                    <td class="center">
+                        {{
+                            getTicketRange(
+                                item.primerTicket,
+                                item.ultimoTicket
+                            )
+                        }}
+                    </td>
+
+                    @for (
+                    tipoPago of result().tiposPago;
+                    track tipoPago.publicId
+                    ) {
+                    <td class="money">
+                        @if (item.numeroVentas === 0) {
+                        ------
+                        }
+                        @else {
+                        {{
+                            getTipoPagoImporte(
+                                item.importesTipoPago,
+                                tipoPago.publicId
+                            )
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                        }}
+                        }
+                    </td>
+                    }
+
+                    <td class="money">
+                        @if (item.numeroVentas === 0) {
+                        ------
+                        }
+                        @else {
+                        {{
+                            item.totalCents
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                        }}
+                        }
+                    </td>
+
+                    <td class="money">
+                        {{
+                            item.sumaCents
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                        }}
+                    </td>
+                </tr>
+                }
+            </tbody>
+
+            <tfoot>
+                <tr>
+                    <th>
+                        TOTAL
+                    </th>
+
+                    <th class="center">
+                        {{
+                            getTicketRange(
+                                result().totales.primerTicket,
+                                result().totales.ultimoTicket
+                            )
+                        }}
+                    </th>
+
+                    @for (
+                    tipoPago of result().tiposPago;
+                    track tipoPago.publicId
+                    ) {
+                    <th class="money">
+                        {{
+                            getTipoPagoImporte(
+                                result().totales.importesTipoPago,
+                                tipoPago.publicId
+                            )
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                        }}
+                    </th>
+                    }
+
+                    <th class="money">
+                        {{
+                            result().totales.totalCents
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                        }}
+                    </th>
+
+                    <th class="money">
+                        {{
+                            result().totales.sumaCents
+                            | centsToEuros
+                            | currency:'EUR':'symbol':'1.2-2'
+                        }}
+                    </th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</section>

@@ -1,0 +1,120 @@
+<section class="cash-reports">
+    <header class="cash-reports__header">
+        <div>
+            <span>
+                Caja
+            </span>
+
+            <h2>
+                Informes
+            </h2>
+
+            <p>
+                Selecciona el tipo de informe y el periodo que quieres consultar.
+            </p>
+        </div>
+    </header>
+
+    <div class="cash-reports__filters">
+        <mat-form-field appearance="outline">
+            <mat-label>
+                Tipo
+            </mat-label>
+
+            <mat-select [value]="selectedType()"
+                        (selectionChange)="setType($event.value)">
+                @for (tipo of tipos; track tipo.value) {
+                <mat-option [value]="tipo.value">
+                    {{ tipo.label }}
+                </mat-option>
+                }
+            </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+            <mat-label>
+                Mes
+            </mat-label>
+
+            <mat-select [value]="selectedMonth()"
+                        (selectionChange)="setMonth($event.value)">
+                @for (month of meses; track month.value) {
+                <mat-option [value]="month.value">
+                    {{ month.label }}
+                </mat-option>
+                }
+            </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+            <mat-label>
+                Año
+            </mat-label>
+
+            <mat-select [value]="selectedYear()"
+                        (selectionChange)="setYear($event.value)">
+                @for (year of years; track year) {
+                <mat-option [value]="year">
+                    {{ year }}
+                </mat-option>
+                }
+            </mat-select>
+        </mat-form-field>
+
+        @if (showCategory()) {
+        <mat-form-field appearance="outline"
+                        class="cash-reports__category">
+            <mat-label>
+                Categoría
+            </mat-label>
+
+            <mat-select [value]="selectedCategoryId()"
+                        (selectionChange)="setCategoryId($event.value)">
+                @for (
+                categoria of categoriasService.categoriasPlain();
+                track categoria.id
+                ) {
+                <mat-option [value]="categoria.id">
+                    {{ getCategoryLabel(categoria) }}
+                </mat-option>
+                }
+            </mat-select>
+        </mat-form-field>
+        }
+
+        <button mat-flat-button
+                type="button"
+                class="cash-reports__generate"
+                [disabled]="!canGenerate()"
+                (click)="generate()">
+            {{
+                loading()
+                    ? 'Generando...'
+                    : 'Generar'
+            }}
+        </button>
+    </div>
+
+    @if (selectedType() !== 'simple') {
+    <div class="cash-reports__pending">
+        {{
+            selectedType() === 'detallado'
+                ? 'El informe Detallado se incorporará en el siguiente bloque.'
+                : 'El informe de Ventas se incorporará después del Detallado.'
+        }}
+    </div>
+    }
+
+    @if (error() !== null) {
+    <div class="cash-reports__error"
+         role="alert">
+        {{ error() }}
+    </div>
+    }
+
+    @if (simpleResult(); as result) {
+    <otpv-simple-report [result]="result"
+                        [year]="selectedYear()"
+                        [month]="selectedMonth()" />
+    }
+</section>

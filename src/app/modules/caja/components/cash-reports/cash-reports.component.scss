@@ -1,0 +1,91 @@
+:host {
+    display: block;
+    height: 100%;
+    min-height: 0;
+}
+
+.cash-reports {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    box-sizing: border-box;
+    flex-direction: column;
+    overflow-y: auto;
+
+    .cash-reports__header {
+        padding: 16px 20px 8px;
+
+        span {
+            color: var(--disabled-color);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+
+        h2 {
+            margin: 2px 0 4px;
+            font-size: 20px;
+            font-weight: 500;
+        }
+
+        p {
+            margin: 0;
+            color: var(--disabled-color);
+            font-size: 0.85rem;
+        }
+    }
+
+    .cash-reports__filters {
+        display: flex;
+        padding: 8px 20px 16px;
+        align-items: flex-start;
+        gap: 10px;
+        border-bottom: 1px solid var(--separator-color);
+
+        mat-form-field {
+            width: 180px;
+        }
+
+        .cash-reports__category {
+            width: 280px;
+        }
+    }
+
+    .cash-reports__generate {
+        min-width: 110px;
+        margin-top: 8px;
+    }
+
+    .cash-reports__pending,
+    .cash-reports__error {
+        margin: 16px 20px 0;
+        padding: 12px 16px;
+        border-radius: 5px;
+    }
+
+    .cash-reports__pending {
+        border: 1px solid var(--separator-color);
+        background-color: var(--color-very-light-grey);
+        color: var(--disabled-color);
+    }
+
+    .cash-reports__error {
+        border: 1px solid var(--color-red);
+        color: var(--color-red);
+    }
+
+    otpv-simple-report {
+        display: block;
+        flex: 1 0 auto;
+    }
+
+    @media (max-width: 900px) {
+        .cash-reports__filters {
+            flex-wrap: wrap;
+
+            mat-form-field,
+            .cash-reports__category {
+                width: min(100%, 220px);
+            }
+        }
+    }
+}
