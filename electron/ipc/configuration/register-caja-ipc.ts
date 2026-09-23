@@ -7,6 +7,7 @@ import {
   CajaCierreConsulta,
 } from '@desktop-contracts/caja/caja-cierre.interface';
 import type { CerrarCajaCommand } from '@desktop-contracts/caja/cerrar-caja-command.interface';
+import type { InformeDetalladoConsulta } from '@desktop-contracts/caja/informes/informe-detallado.interface';
 import type { InformeSimpleConsulta } from '@desktop-contracts/caja/informes/informe-simple.interface';
 import type {
   ActualizarSalidaCajaCommand,
@@ -99,6 +100,16 @@ export default function registerCajaIpc(
       assertTrustedSender(event, getMainWindow);
 
       await cajaInformePrintService.openSimple(consulta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.cajaOpenInformeDetallado,
+
+    async (event, consulta: InformeDetalladoConsulta): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await cajaInformePrintService.openDetallado(consulta);
     },
   );
 }

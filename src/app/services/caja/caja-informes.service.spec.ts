@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import type { InformeDetalladoConsulta } from '@desktop-contracts/caja/informes/informe-detallado.interface';
 import type { InformeSimpleConsulta } from '@desktop-contracts/caja/informes/informe-simple.interface';
 import CajaInformesService from '@services/caja/caja-informes.service';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -7,13 +8,16 @@ let service: CajaInformesService;
 
 let originalDesktopDescriptor: PropertyDescriptor | undefined;
 
-let consultas: InformeSimpleConsulta[];
+let consultasSimple: InformeSimpleConsulta[];
+
+let consultasDetallado: InformeDetalladoConsulta[];
 
 describe('CajaInformesService', (): void => {
   beforeEach((): void => {
     originalDesktopDescriptor = Object.getOwnPropertyDescriptor(window, 'osumiDesktop');
 
-    consultas = [];
+    consultasSimple = [];
+    consultasDetallado = [];
 
     Object.defineProperty(window, 'osumiDesktop', {
       configurable: true,
@@ -21,7 +25,13 @@ describe('CajaInformesService', (): void => {
       value: {
         caja: {
           openInformeSimple: (consulta: InformeSimpleConsulta): Promise<void> => {
-            consultas.push(consulta);
+            consultasSimple.push(consulta);
+
+            return Promise.resolve();
+          },
+
+          openInformeDetallado: (consulta: InformeDetalladoConsulta): Promise<void> => {
+            consultasDetallado.push(consulta);
 
             return Promise.resolve();
           },
@@ -54,7 +64,7 @@ describe('CajaInformesService', (): void => {
       }),
     ).resolves.toBeUndefined();
 
-    expect(consultas).toEqual([
+    expect(consultasSimple).toEqual([
       {
         year: 2026,
         month: 9,
@@ -68,7 +78,37 @@ describe('CajaInformesService', (): void => {
       month: 'todos',
     });
 
-    expect(consultas).toEqual([
+    expect(consultasSimple).toEqual([
+      {
+        year: 2026,
+        month: 'todos',
+      },
+    ]);
+  });
+
+  it('abre el Informe Detallado mensual mediante Electron', async (): Promise<void> => {
+    await expect(
+      service.openDetallado({
+        year: 2026,
+        month: 9,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(consultasDetallado).toEqual([
+      {
+        year: 2026,
+        month: 9,
+      },
+    ]);
+  });
+
+  it('permite abrir el Informe Detallado anual', async (): Promise<void> => {
+    await service.openDetallado({
+      year: 2026,
+      month: 'todos',
+    });
+
+    expect(consultasDetallado).toEqual([
       {
         year: 2026,
         month: 'todos',

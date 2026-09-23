@@ -5,6 +5,7 @@ import {
   CajaCierreConsulta,
 } from '@desktop-contracts/caja/caja-cierre.interface';
 import type { CerrarCajaCommand } from '@desktop-contracts/caja/cerrar-caja-command.interface';
+import type { InformeDetalladoConsulta } from '@desktop-contracts/caja/informes/informe-detallado.interface';
 import type { InformeSimpleConsulta } from '@desktop-contracts/caja/informes/informe-simple.interface';
 import type {
   ActualizarSalidaCajaCommand,
@@ -54,4 +55,10 @@ export default interface CajaApi {
    * su ventana independiente de impresión.
    */
   openInformeSimple(consulta: InformeSimpleConsulta): Promise<void>;
+
+  /**
+   * Genera el Informe Detallado y abre
+   * su ventana independiente de impresión.
+   */
+  openInformeDetallado(consulta: InformeDetalladoConsulta): Promise<void>;
 }

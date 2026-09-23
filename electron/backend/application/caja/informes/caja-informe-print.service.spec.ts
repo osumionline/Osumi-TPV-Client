@@ -1,7 +1,12 @@
 import CajaInformePrintService from '@backend/application/caja/informes/caja-informe-print.service';
 import type CajaInformePrintWindow from '@backend/contracts/caja/informes/caja-informe-print-window.interface';
+import type InformeDetalladoProvider from '@backend/contracts/caja/informes/informe-detallado-provider.interface';
 import type InformeSimpleProvider from '@backend/contracts/caja/informes/informe-simple-provider.interface';
 import type { CajaInformePrintDocumento } from '@desktop-contracts/caja/informes/caja-informe-print.interface';
+import type {
+  InformeDetalladoConsulta,
+  InformeDetalladoResultado,
+} from '@desktop-contracts/caja/informes/informe-detallado.interface';
 import type {
   InformeSimpleConsulta,
   InformeSimpleResultado,
@@ -51,6 +56,45 @@ class FakeInformeSimpleProvider implements InformeSimpleProvider {
   }
 }
 
+class FakeInformeDetalladoProvider implements InformeDetalladoProvider {
+  lastConsulta: InformeDetalladoConsulta | null = null;
+
+  readonly resultado: InformeDetalladoResultado = {
+    ventas: {
+      numeroVentas: 3,
+      numeroVentasAnterior: 2,
+      diferenciaNumeroVentas: 1,
+      margenBps: 3500,
+      margenAnteriorBps: 3200,
+      diferenciaMargenBps: 300,
+    },
+
+    marcas: [],
+    marcasTotales: {
+      totalVentasPvpMicros: 0,
+      totalBeneficioMicros: 0,
+      margenBps: 0,
+    },
+
+    articulos: [],
+    articulosTotales: {
+      totalUnidadesVendidas: 0,
+      totalVentasPvpMicros: 0,
+      totalBeneficioMicros: 0,
+    },
+  };
+
+  /**
+   * Conserva la consulta y devuelve
+   * el resultado configurado por el test.
+   */
+  getInforme(consulta: InformeDetalladoConsulta): Promise<InformeDetalladoResultado> {
+    this.lastConsulta = consulta;
+
+    return Promise.resolve(this.resultado);
+  }
+}
+
 class FakeCajaInformePrintWindow implements CajaInformePrintWindow {
   lastDocumento: CajaInformePrintDocumento | null = null;
 
@@ -84,18 +128,24 @@ class FakeCajaInformePrintWindow implements CajaInformePrintWindow {
 
 describe('CajaInformePrintService', (): void => {
   it('genera el Informe Simple antes de abrir la ventana', async (): Promise<void> => {
-    const provider: FakeInformeSimpleProvider = new FakeInformeSimpleProvider();
+    const simpleProvider: FakeInformeSimpleProvider = new FakeInformeSimpleProvider();
+
+    const detalladoProvider: FakeInformeDetalladoProvider = new FakeInformeDetalladoProvider();
 
     const printWindow: FakeCajaInformePrintWindow = new FakeCajaInformePrintWindow();
 
-    const service: CajaInformePrintService = new CajaInformePrintService(provider, printWindow);
+    const service: CajaInformePrintService = new CajaInformePrintService(
+      simpleProvider,
+      detalladoProvider,
+      printWindow,
+    );
 
     await service.openSimple({
       year: 2026,
       month: 9,
     });
 
-    expect(provider.lastConsulta).toEqual({
+    expect(simpleProvider.lastConsulta).toEqual({
       year: 2026,
       month: 9,
     });
@@ -108,16 +158,22 @@ describe('CajaInformePrintService', (): void => {
         month: 9,
       },
 
-      resultado: provider.resultado,
+      resultado: simpleProvider.resultado,
     });
   });
 
-  it('permite materializar un informe anual', async (): Promise<void> => {
-    const provider: FakeInformeSimpleProvider = new FakeInformeSimpleProvider();
+  it('permite materializar un Informe Simple anual', async (): Promise<void> => {
+    const simpleProvider: FakeInformeSimpleProvider = new FakeInformeSimpleProvider();
+
+    const detalladoProvider: FakeInformeDetalladoProvider = new FakeInformeDetalladoProvider();
 
     const printWindow: FakeCajaInformePrintWindow = new FakeCajaInformePrintWindow();
 
-    const service: CajaInformePrintService = new CajaInformePrintService(provider, printWindow);
+    const service: CajaInformePrintService = new CajaInformePrintService(
+      simpleProvider,
+      detalladoProvider,
+      printWindow,
+    );
 
     await service.openSimple({
       year: 2025,
@@ -126,6 +182,69 @@ describe('CajaInformePrintService', (): void => {
 
     expect(printWindow.lastDocumento).toMatchObject({
       tipo: 'simple',
+
+      consulta: {
+        year: 2025,
+        month: 'todos',
+      },
+    });
+  });
+
+  it('genera el Informe Detallado antes de abrir la ventana', async (): Promise<void> => {
+    const simpleProvider: FakeInformeSimpleProvider = new FakeInformeSimpleProvider();
+
+    const detalladoProvider: FakeInformeDetalladoProvider = new FakeInformeDetalladoProvider();
+
+    const printWindow: FakeCajaInformePrintWindow = new FakeCajaInformePrintWindow();
+
+    const service: CajaInformePrintService = new CajaInformePrintService(
+      simpleProvider,
+      detalladoProvider,
+      printWindow,
+    );
+
+    await service.openDetallado({
+      year: 2026,
+      month: 9,
+    });
+
+    expect(detalladoProvider.lastConsulta).toEqual({
+      year: 2026,
+      month: 9,
+    });
+
+    expect(printWindow.lastDocumento).toEqual({
+      tipo: 'detallado',
+
+      consulta: {
+        year: 2026,
+        month: 9,
+      },
+
+      resultado: detalladoProvider.resultado,
+    });
+  });
+
+  it('permite materializar un Informe Detallado anual', async (): Promise<void> => {
+    const simpleProvider: FakeInformeSimpleProvider = new FakeInformeSimpleProvider();
+
+    const detalladoProvider: FakeInformeDetalladoProvider = new FakeInformeDetalladoProvider();
+
+    const printWindow: FakeCajaInformePrintWindow = new FakeCajaInformePrintWindow();
+
+    const service: CajaInformePrintService = new CajaInformePrintService(
+      simpleProvider,
+      detalladoProvider,
+      printWindow,
+    );
+
+    await service.openDetallado({
+      year: 2025,
+      month: 'todos',
+    });
+
+    expect(printWindow.lastDocumento).toMatchObject({
+      tipo: 'detallado',
 
       consulta: {
         year: 2025,

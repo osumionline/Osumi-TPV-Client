@@ -10,6 +10,7 @@ import ApplicationStateService from '@backend/application/application/applicatio
 import ArticulosService from '@backend/application/articulos/articulos.service';
 import CajaService from '@backend/application/caja/caja.service';
 import CajaInformePrintService from '@backend/application/caja/informes/caja-informe-print.service';
+import InformeDetalladoService from '@backend/application/caja/informes/informe-detallado.service';
 import InformePeriodoResolver from '@backend/application/caja/informes/informe-periodo.resolver';
 import InformeSimpleService from '@backend/application/caja/informes/informe-simple.service';
 import CategoriasService from '@backend/application/categorias/categorias.service';
@@ -54,6 +55,7 @@ import type InventarioRepository from '@backend/contracts/almacen/inventario/inv
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CajaInformePrintWindow from '@backend/contracts/caja/informes/caja-informe-print-window.interface';
+import type InformeDetalladoRepository from '@backend/contracts/caja/informes/informe-detallado.repository.interface';
 import type InformeSimpleRepository from '@backend/contracts/caja/informes/informe-simple.repository.interface';
 import type CategoriaRepository from '@backend/contracts/categorias/categoria.repository.interface';
 import type ClienteFacturaDocumentosRepository from '@backend/contracts/clientes/cliente-factura-documentos.repository.interface';
@@ -105,6 +107,7 @@ import DatabaseSchemaService from '@infrastructure/database/schema/database-sche
 import TypeOrmCaducidadesRepository from '@infrastructure/database/typeorm/almacen/caducidades/typeorm-caducidades.repository';
 import TypeOrmImprentaRepository from '@infrastructure/database/typeorm/almacen/imprenta/typeorm-imprenta.repository';
 import TypeOrmInventarioRepository from '@infrastructure/database/typeorm/almacen/inventario/typeorm-inventario.repository';
+import TypeOrmInformeDetalladoRepository from '@infrastructure/database/typeorm/caja/informes/typeorm-informe-detallado.repository';
 import TypeOrmInformeSimpleRepository from '@infrastructure/database/typeorm/caja/informes/typeorm-informe-simple.repository';
 import TypeOrmPedidosRepository from '@infrastructure/database/typeorm/compras/pedidos/typeorm-pedidos.repository';
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
@@ -487,12 +490,21 @@ export default function createApplicationComposition(
     informePeriodoResolver,
   );
 
+  const informeDetalladoRepository: InformeDetalladoRepository =
+    new TypeOrmInformeDetalladoRepository(operationalDatabase);
+
+  const informeDetalladoService: InformeDetalladoService = new InformeDetalladoService(
+    informeDetalladoRepository,
+    informePeriodoResolver,
+  );
+
   const cajaInformePrintWindow: CajaInformePrintWindow = new ElectronCajaInformePrintWindow(
     getMainWindow,
   );
 
   const cajaInformePrintService: CajaInformePrintService = new CajaInformePrintService(
     informeSimpleService,
+    informeDetalladoService,
     cajaInformePrintWindow,
   );
 
