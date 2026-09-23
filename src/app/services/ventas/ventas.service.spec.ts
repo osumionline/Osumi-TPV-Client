@@ -1,5 +1,7 @@
+import permissionKeys from '@desktop-contracts/configuration/permissions/permission-keys.constants';
 import type ReservaInterface from '@desktop-contracts/ventas/reservas/reserva.interface';
 import Cliente from '@model/clientes/cliente.model';
+import Empleado from '@model/empleados/empleado.model';
 import ArticuloVenta from '@model/ventas/articulo-venta.model';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
 import type VentaLineaEnCurso from '@model/ventas/venta-linea-en-curso.model';
@@ -77,6 +79,60 @@ const createCliente = (publicId: string, descuento: number): Cliente => {
   return cliente;
 };
 
+/**
+ * Crea un empleado autorizado para modificar
+ * importes y descuentos de una venta.
+ */
+function createEmpleadoConPermisoModificarImportes(): Empleado {
+  const empleado: Empleado = new Empleado();
+
+  empleado.id = 1;
+  empleado.publicId = 'empleado-1';
+  empleado.nombre = 'Empleado ventas';
+  empleado.hasPassword = true;
+  empleado.color = '#336699';
+  empleado.admin = false;
+  empleado.permisos = [permissionKeys.ventas.modificarImportes];
+
+  return empleado;
+}
+
+/**
+ * Crea un empleado sin autorización para modificar
+ * importes o descuentos de una venta.
+ */
+function createEmpleadoSinPermisoModificarImportes(): Empleado {
+  const empleado: Empleado = new Empleado();
+
+  empleado.id = 2;
+  empleado.publicId = 'empleado-2';
+  empleado.nombre = 'Empleado sin permiso';
+  empleado.hasPassword = true;
+  empleado.color = '#663399';
+  empleado.admin = false;
+  empleado.permisos = [];
+
+  return empleado;
+}
+
+/**
+ * Crea un empleado administrador sin permisos
+ * explícitos asignados.
+ */
+function createEmpleadoAdministrador(): Empleado {
+  const empleado: Empleado = new Empleado();
+
+  empleado.id = 3;
+  empleado.publicId = 'empleado-3';
+  empleado.nombre = 'Administrador';
+  empleado.hasPassword = true;
+  empleado.color = '#993366';
+  empleado.admin = true;
+  empleado.permisos = [];
+
+  return empleado;
+}
+
 describe('VentasService', (): void => {
   it('incrementa la cantidad cuando se añade de nuevo el mismo artículo', (): void => {
     const service: VentasService = new VentasService();
@@ -91,9 +147,77 @@ describe('VentasService', (): void => {
     expect(venta.totalCents).toBe(2_000);
   });
 
+  it('rechaza las modificaciones económicas si la venta no tiene empleado asignado', (): void => {
+    const service: VentasService = new VentasService();
+
+    const venta: VentaEnCurso = service.crearVenta();
+
+    service.agregarArticulos(venta.idTemporal, [createArticulo('articulo-1')]);
+
+    const linea: VentaLineaEnCurso = venta.lineas[0]!;
+
+    const operations: readonly (() => void)[] = [
+      (): void => service.establecerImporteManual(venta.idTemporal, linea.idTemporal, 5_000_000),
+      (): void => service.quitarImporteManual(venta.idTemporal, linea.idTemporal),
+      (): void => service.quitarDescuentoPromocional(venta.idTemporal, linea.idTemporal),
+      (): void => service.establecerDescuentoPorcentaje(venta.idTemporal, linea.idTemporal, 1_000),
+      (): void => service.quitarDescuentoPorcentajeManual(venta.idTemporal, linea.idTemporal),
+      (): void => service.establecerDescuentoDirecto(venta.idTemporal, linea.idTemporal, 1_000_000),
+      (): void => service.quitarDescuentoDirecto(venta.idTemporal, linea.idTemporal),
+    ];
+
+    for (const operation of operations) {
+      expect(operation).toThrow(
+        'El empleado asignado a la venta no puede modificar importes o descuentos.',
+      );
+    }
+  });
+
+  it('rechaza las modificaciones económicas si el empleado no tiene ventas.modificar_importes', (): void => {
+    const service: VentasService = new VentasService();
+
+    const venta: VentaEnCurso = service.crearVenta(createEmpleadoSinPermisoModificarImportes());
+
+    service.agregarArticulos(venta.idTemporal, [createArticulo('articulo-1')]);
+
+    const linea: VentaLineaEnCurso = venta.lineas[0]!;
+
+    const operations: readonly (() => void)[] = [
+      (): void => service.establecerImporteManual(venta.idTemporal, linea.idTemporal, 5_000_000),
+      (): void => service.quitarImporteManual(venta.idTemporal, linea.idTemporal),
+      (): void => service.quitarDescuentoPromocional(venta.idTemporal, linea.idTemporal),
+      (): void => service.establecerDescuentoPorcentaje(venta.idTemporal, linea.idTemporal, 1_000),
+      (): void => service.quitarDescuentoPorcentajeManual(venta.idTemporal, linea.idTemporal),
+      (): void => service.establecerDescuentoDirecto(venta.idTemporal, linea.idTemporal, 1_000_000),
+      (): void => service.quitarDescuentoDirecto(venta.idTemporal, linea.idTemporal),
+    ];
+
+    for (const operation of operations) {
+      expect(operation).toThrow(
+        'El empleado asignado a la venta no puede modificar importes o descuentos.',
+      );
+    }
+  });
+
+  it('permite modificar importes a un administrador sin permisos explícitos', (): void => {
+    const service: VentasService = new VentasService();
+
+    const venta: VentaEnCurso = service.crearVenta(createEmpleadoAdministrador());
+
+    service.agregarArticulos(venta.idTemporal, [createArticulo('articulo-1')]);
+
+    const linea: VentaLineaEnCurso = venta.lineas[0]!;
+
+    expect((): void =>
+      service.establecerDescuentoPorcentaje(venta.idTemporal, linea.idTemporal, 1_000),
+    ).not.toThrow();
+
+    expect(linea.descuentoManualBps).toBe(1_000);
+  });
+
   it('actualiza el total de la venta al operar sobre sus líneas', (): void => {
     const service: VentasService = new VentasService();
-    const venta: VentaEnCurso = service.crearVenta();
+    const venta: VentaEnCurso = service.crearVenta(createEmpleadoConPermisoModificarImportes());
 
     service.agregarArticulos(venta.idTemporal, [
       createArticulo('articulo-1', 1_000),
@@ -124,7 +248,7 @@ describe('VentasService', (): void => {
 
   it('redondea el total después de sumar los importes de las líneas en microeuros', (): void => {
     const service: VentasService = new VentasService();
-    const venta: VentaEnCurso = service.crearVenta();
+    const venta: VentaEnCurso = service.crearVenta(createEmpleadoConPermisoModificarImportes());
 
     service.agregarArticulos(venta.idTemporal, [
       createArticulo('articulo-1', 1),
@@ -239,7 +363,7 @@ describe('VentasService', (): void => {
 
   it('cambia y elimina el descuento del cliente sin destruir un override manual', (): void => {
     const service: VentasService = new VentasService();
-    const venta: VentaEnCurso = service.crearVenta();
+    const venta: VentaEnCurso = service.crearVenta(createEmpleadoConPermisoModificarImportes());
 
     service.agregarArticulos(venta.idTemporal, [createArticulo('articulo-1', 1_000)]);
 

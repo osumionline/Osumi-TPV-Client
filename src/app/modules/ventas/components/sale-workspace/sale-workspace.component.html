@@ -164,7 +164,7 @@
             </div>
 
             <div class="col-importe">
-                @if (isEditing(linea.idTemporal, 'importe')) {
+                @if (isEditing(linea.idTemporal, 'importe') && canModifyAmounts()) {
                 <input #editableInput
                        class="sale__inline-input"
                        type="number"
@@ -269,7 +269,7 @@
                     }
                 </div>
                 }
-                @else if (isEditing(linea.idTemporal, 'descuento-importe')) {
+                @else if (isEditing(linea.idTemporal, 'descuento-importe') && canModifyAmounts()) {
                 <div class="sale__inline-editor">
                     <input #editableInput
                            class="sale__inline-input"
@@ -315,7 +315,7 @@
                     }
                 </div>
                 }
-                @else if (isEditing(linea.idTemporal, 'descuento-porcentaje')) {
+                @else if (isEditing(linea.idTemporal, 'descuento-porcentaje') && canModifyAmounts()) {
                 <div class="sale__inline-editor">
                     <input #editableInput
                            class="sale__inline-input"
@@ -337,6 +337,7 @@
                 <div class="sale__editable-cell">
                     <button class="sale__editable-value"
                             type="button"
+                            [disabled]="!canModifyAmounts()"
                             [matTooltip]="
                                 linea.tieneDescuentoManual
                                     ? 'Descuento porcentual manual'
@@ -349,6 +350,7 @@
                     </button>
 
                     @if (linea.tieneDescuentoManual) {
+                    @if (canModifyAmounts()) {
                     <button class="sale__inline-action"
                             type="button"
                             [matTooltip]="
@@ -364,6 +366,7 @@
                             (click)="clearDescuentoPorcentajeManual(linea, $event)">
                         <mat-icon>restart_alt</mat-icon>
                     </button>
+                    }
                     }
                     @else if (linea.descuentoClienteBps > 0) {
                     <mat-icon class="sale__discount-origin"

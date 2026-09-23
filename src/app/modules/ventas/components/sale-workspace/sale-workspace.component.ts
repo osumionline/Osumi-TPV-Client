@@ -330,7 +330,8 @@ export default class SaleWorkspaceComponent {
   }
 
   /**
-   * Indica si el empleado actual puede modificar importes económicos directos.
+   * Indica si el empleado asignado a la venta
+   * puede modificar importes o descuentos.
    */
   canModifyAmounts(): boolean {
     const empleado = this.venta().empleado;
@@ -339,7 +340,7 @@ export default class SaleWorkspaceComponent {
       return false;
     }
 
-    return empleado.admin || empleado.hasPerm(permissionKeys.ventas.modificarImportes);
+    return empleado.hasPerm(permissionKeys.ventas.modificarImportes);
   }
 
   /**
@@ -385,8 +386,13 @@ export default class SaleWorkspaceComponent {
       return;
     }
 
-    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+    if (!this.canModifyAmounts()) {
+      this.focusLocalizador();
 
+      return;
+    }
+
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
     const inputValue: number = inputElement.valueAsNumber;
 
     if (Number.isNaN(inputValue) || inputValue < 0) {
@@ -441,6 +447,10 @@ export default class SaleWorkspaceComponent {
    * Inicia la edición del descuento porcentual de una línea.
    */
   editDescuentoPorcentaje(linea: VentaLineaEnCurso): void {
+    if (!this.canModifyAmounts()) {
+      return;
+    }
+
     if (linea.regalo) {
       this.showLineEditBlocked(
         'La línea está marcada como regalo y no se puede modificar su descuento.',
@@ -488,10 +498,14 @@ export default class SaleWorkspaceComponent {
       return;
     }
 
+    if (!this.canModifyAmounts()) {
+      this.focusLocalizador();
+
+      return;
+    }
+
     const inputElement: HTMLInputElement = event.target as HTMLInputElement;
-
     const inputValue: number = inputElement.valueAsNumber;
-
     const porcentaje: number = Number.isNaN(inputValue) ? 0 : inputValue;
 
     if (porcentaje < 0 || porcentaje > PERCENT_TOTAL) {
@@ -538,6 +552,10 @@ export default class SaleWorkspaceComponent {
    */
   clearDescuentoPorcentajeManual(linea: VentaLineaEnCurso, event: MouseEvent): void {
     event.stopPropagation();
+
+    if (!this.canModifyAmounts()) {
+      return;
+    }
 
     this.ventasService.quitarDescuentoPorcentajeManual(this.venta().idTemporal, linea.idTemporal);
 
@@ -591,8 +609,13 @@ export default class SaleWorkspaceComponent {
       return;
     }
 
-    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
+    if (!this.canModifyAmounts()) {
+      this.focusLocalizador();
 
+      return;
+    }
+
+    const inputElement: HTMLInputElement = event.target as HTMLInputElement;
     const inputValue: number = inputElement.valueAsNumber;
 
     if (Number.isNaN(inputValue) || inputValue <= 0) {

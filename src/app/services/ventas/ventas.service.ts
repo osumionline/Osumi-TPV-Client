@@ -1,5 +1,6 @@
 import type { Signal, WritableSignal } from '@angular/core';
 import { computed, Service, signal } from '@angular/core';
+import permissionKeys from '@desktop-contracts/configuration/permissions/permission-keys.constants';
 import type ReservaInterface from '@desktop-contracts/ventas/reservas/reserva.interface';
 import type VentaDevolucionInterface from '@desktop-contracts/ventas/venta-devolucion.interface';
 import type Cliente from '@model/clientes/cliente.model';
@@ -461,6 +462,8 @@ export default class VentasService {
     lineaIdTemporal: string,
     importeManualMicros: number,
   ): void {
+    this.requireCanModifyAmounts(ventaIdTemporal);
+
     const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
 
     linea.setImporteManualMicros(importeManualMicros);
@@ -471,6 +474,8 @@ export default class VentasService {
    * Elimina el importe manual de una línea.
    */
   quitarImporteManual(ventaIdTemporal: string, lineaIdTemporal: string): void {
+    this.requireCanModifyAmounts(ventaIdTemporal);
+
     const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
 
     linea.clearImporteManual();
@@ -481,6 +486,8 @@ export default class VentasService {
    * Elimina el descuento promocional con el que un artículo entró en la venta.
    */
   quitarDescuentoPromocional(ventaIdTemporal: string, lineaIdTemporal: string): void {
+    this.requireCanModifyAmounts(ventaIdTemporal);
+
     const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
 
     linea.clearDescuentoPromocional();
@@ -495,6 +502,8 @@ export default class VentasService {
     lineaIdTemporal: string,
     descuentoBps: number,
   ): void {
+    this.requireCanModifyAmounts(ventaIdTemporal);
+
     const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
 
     linea.setDescuentoManualBps(descuentoBps);
@@ -505,10 +514,11 @@ export default class VentasService {
    * Elimina el descuento porcentual manual y recupera el descuento del cliente.
    */
   quitarDescuentoPorcentajeManual(ventaIdTemporal: string, lineaIdTemporal: string): void {
+    this.requireCanModifyAmounts(ventaIdTemporal);
+
     const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
 
     linea.clearDescuentoManual();
-
     this.notifyVentasChanged();
   }
 
@@ -520,6 +530,8 @@ export default class VentasService {
     lineaIdTemporal: string,
     descuentoDirectoMicros: number,
   ): void {
+    this.requireCanModifyAmounts(ventaIdTemporal);
+
     const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
 
     linea.setDescuentoDirectoMicros(descuentoDirectoMicros);
@@ -530,6 +542,8 @@ export default class VentasService {
    * Elimina el descuento directo de una línea.
    */
   quitarDescuentoDirecto(ventaIdTemporal: string, lineaIdTemporal: string): void {
+    this.requireCanModifyAmounts(ventaIdTemporal);
+
     const linea: VentaLineaEnCurso = this.requireLinea(ventaIdTemporal, lineaIdTemporal);
 
     linea.clearDescuentoDirecto();
@@ -658,6 +672,15 @@ export default class VentasService {
     this.ventaActivaIdSignal.set(null);
     this.workspacesSignal.set(new Map<string, VentaWorkspaceState>());
     this.nextVentaNumber = 1;
+  }
+
+  private requireCanModifyAmounts(ventaIdTemporal: string): void {
+    const venta: VentaEnCurso = this.requireVenta(ventaIdTemporal);
+    const empleado: Empleado | null = venta.empleado;
+
+    if (empleado === null || !empleado.hasPerm(permissionKeys.ventas.modificarImportes)) {
+      throw new Error('El empleado asignado a la venta no puede modificar importes o descuentos.');
+    }
   }
 
   /**
