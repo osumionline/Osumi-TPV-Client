@@ -139,6 +139,7 @@ const IPC_CHANNELS = {
 
   cajaInformePrintGetDocumento: 'caja-informe-print:get-documento',
   cajaInformePrintPrint: 'caja-informe-print:print',
+  cajaOpenInformeVentas: 'caja:open-informe-ventas',
 
   reservasCreate: 'reservas:create',
   reservasGetAll: 'reservas:get-all',

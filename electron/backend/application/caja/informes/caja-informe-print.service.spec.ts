@@ -2,6 +2,7 @@ import CajaInformePrintService from '@backend/application/caja/informes/caja-inf
 import type CajaInformePrintWindow from '@backend/contracts/caja/informes/caja-informe-print-window.interface';
 import type InformeDetalladoProvider from '@backend/contracts/caja/informes/informe-detallado-provider.interface';
 import type InformeSimpleProvider from '@backend/contracts/caja/informes/informe-simple-provider.interface';
+import type InformeVentasProvider from '@backend/contracts/caja/informes/informe-ventas-provider.interface';
 import type { CajaInformePrintDocumento } from '@desktop-contracts/caja/informes/caja-informe-print.interface';
 import type {
   InformeDetalladoConsulta,
@@ -11,6 +12,10 @@ import type {
   InformeSimpleConsulta,
   InformeSimpleResultado,
 } from '@desktop-contracts/caja/informes/informe-simple.interface';
+import type {
+  InformeVentasConsulta,
+  InformeVentasResultado,
+} from '@desktop-contracts/caja/informes/informe-ventas.interface';
 import { describe, expect, it } from 'vitest';
 
 class FakeInformeSimpleProvider implements InformeSimpleProvider {
@@ -95,6 +100,38 @@ class FakeInformeDetalladoProvider implements InformeDetalladoProvider {
   }
 }
 
+class FakeInformeVentasProvider implements InformeVentasProvider {
+  lastConsulta: InformeVentasConsulta | null = null;
+
+  readonly resultado: InformeVentasResultado = {
+    categoria: {
+      idCategoria: 10,
+      categoriaPublicId: 'categoria-10',
+      nombre: 'Categoría',
+
+      importeMicros: 1_000_000,
+      unidades: 1,
+      ventasPvpMicros: 1_000_000,
+      beneficioMicros: 400_000,
+      margenBps: 4000,
+
+      articulos: [],
+      marcas: [],
+      subcategorias: [],
+    },
+  };
+
+  /**
+   * Conserva la consulta y devuelve
+   * el resultado configurado por el test.
+   */
+  getInforme(consulta: InformeVentasConsulta): Promise<InformeVentasResultado> {
+    this.lastConsulta = consulta;
+
+    return Promise.resolve(this.resultado);
+  }
+}
+
 class FakeCajaInformePrintWindow implements CajaInformePrintWindow {
   lastDocumento: CajaInformePrintDocumento | null = null;
 
@@ -129,14 +166,14 @@ class FakeCajaInformePrintWindow implements CajaInformePrintWindow {
 describe('CajaInformePrintService', (): void => {
   it('genera el Informe Simple antes de abrir la ventana', async (): Promise<void> => {
     const simpleProvider: FakeInformeSimpleProvider = new FakeInformeSimpleProvider();
-
     const detalladoProvider: FakeInformeDetalladoProvider = new FakeInformeDetalladoProvider();
-
     const printWindow: FakeCajaInformePrintWindow = new FakeCajaInformePrintWindow();
+    const ventasProvider: FakeInformeVentasProvider = new FakeInformeVentasProvider();
 
     const service: CajaInformePrintService = new CajaInformePrintService(
       simpleProvider,
       detalladoProvider,
+      ventasProvider,
       printWindow,
     );
 
@@ -164,14 +201,14 @@ describe('CajaInformePrintService', (): void => {
 
   it('permite materializar un Informe Simple anual', async (): Promise<void> => {
     const simpleProvider: FakeInformeSimpleProvider = new FakeInformeSimpleProvider();
-
     const detalladoProvider: FakeInformeDetalladoProvider = new FakeInformeDetalladoProvider();
-
     const printWindow: FakeCajaInformePrintWindow = new FakeCajaInformePrintWindow();
+    const ventasProvider: FakeInformeVentasProvider = new FakeInformeVentasProvider();
 
     const service: CajaInformePrintService = new CajaInformePrintService(
       simpleProvider,
       detalladoProvider,
+      ventasProvider,
       printWindow,
     );
 
@@ -192,14 +229,14 @@ describe('CajaInformePrintService', (): void => {
 
   it('genera el Informe Detallado antes de abrir la ventana', async (): Promise<void> => {
     const simpleProvider: FakeInformeSimpleProvider = new FakeInformeSimpleProvider();
-
     const detalladoProvider: FakeInformeDetalladoProvider = new FakeInformeDetalladoProvider();
-
     const printWindow: FakeCajaInformePrintWindow = new FakeCajaInformePrintWindow();
+    const ventasProvider: FakeInformeVentasProvider = new FakeInformeVentasProvider();
 
     const service: CajaInformePrintService = new CajaInformePrintService(
       simpleProvider,
       detalladoProvider,
+      ventasProvider,
       printWindow,
     );
 
@@ -227,14 +264,14 @@ describe('CajaInformePrintService', (): void => {
 
   it('permite materializar un Informe Detallado anual', async (): Promise<void> => {
     const simpleProvider: FakeInformeSimpleProvider = new FakeInformeSimpleProvider();
-
     const detalladoProvider: FakeInformeDetalladoProvider = new FakeInformeDetalladoProvider();
-
     const printWindow: FakeCajaInformePrintWindow = new FakeCajaInformePrintWindow();
+    const ventasProvider: FakeInformeVentasProvider = new FakeInformeVentasProvider();
 
     const service: CajaInformePrintService = new CajaInformePrintService(
       simpleProvider,
       detalladoProvider,
+      ventasProvider,
       printWindow,
     );
 
@@ -249,6 +286,80 @@ describe('CajaInformePrintService', (): void => {
       consulta: {
         year: 2025,
         month: 'todos',
+      },
+    });
+  });
+
+  it('genera el Informe de Ventas antes de abrir la ventana', async (): Promise<void> => {
+    const simpleProvider: FakeInformeSimpleProvider = new FakeInformeSimpleProvider();
+
+    const detalladoProvider: FakeInformeDetalladoProvider = new FakeInformeDetalladoProvider();
+
+    const ventasProvider: FakeInformeVentasProvider = new FakeInformeVentasProvider();
+
+    const printWindow: FakeCajaInformePrintWindow = new FakeCajaInformePrintWindow();
+
+    const service: CajaInformePrintService = new CajaInformePrintService(
+      simpleProvider,
+      detalladoProvider,
+      ventasProvider,
+      printWindow,
+    );
+
+    await service.openVentas({
+      year: 2026,
+      month: 9,
+      idCategoria: 10,
+    });
+
+    expect(ventasProvider.lastConsulta).toEqual({
+      year: 2026,
+      month: 9,
+      idCategoria: 10,
+    });
+
+    expect(printWindow.lastDocumento).toEqual({
+      tipo: 'ventas',
+
+      consulta: {
+        year: 2026,
+        month: 9,
+        idCategoria: 10,
+      },
+
+      resultado: ventasProvider.resultado,
+    });
+  });
+
+  it('permite materializar un Informe de Ventas anual', async (): Promise<void> => {
+    const simpleProvider: FakeInformeSimpleProvider = new FakeInformeSimpleProvider();
+
+    const detalladoProvider: FakeInformeDetalladoProvider = new FakeInformeDetalladoProvider();
+
+    const ventasProvider: FakeInformeVentasProvider = new FakeInformeVentasProvider();
+
+    const printWindow: FakeCajaInformePrintWindow = new FakeCajaInformePrintWindow();
+
+    const service: CajaInformePrintService = new CajaInformePrintService(
+      simpleProvider,
+      detalladoProvider,
+      ventasProvider,
+      printWindow,
+    );
+
+    await service.openVentas({
+      year: 2025,
+      month: 'todos',
+      idCategoria: 25,
+    });
+
+    expect(printWindow.lastDocumento).toMatchObject({
+      tipo: 'ventas',
+
+      consulta: {
+        year: 2025,
+        month: 'todos',
+        idCategoria: 25,
       },
     });
   });

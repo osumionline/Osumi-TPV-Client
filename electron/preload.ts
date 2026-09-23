@@ -45,6 +45,7 @@ import {
 import type { CerrarCajaCommand } from '@desktop-contracts/caja/cerrar-caja-command.interface';
 import type { InformeDetalladoConsulta } from '@desktop-contracts/caja/informes/informe-detallado.interface';
 import type { InformeSimpleConsulta } from '@desktop-contracts/caja/informes/informe-simple.interface';
+import type { InformeVentasConsulta } from '@desktop-contracts/caja/informes/informe-ventas.interface';
 import type {
   ActualizarSalidaCajaCommand,
   CrearSalidaCajaCommand,
@@ -748,6 +749,9 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
 
     openInformeDetallado: (consulta: InformeDetalladoConsulta): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.cajaOpenInformeDetallado, consulta) as Promise<void>,
+
+    openInformeVentas: (consulta: InformeVentasConsulta): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.cajaOpenInformeVentas, consulta) as Promise<void>,
   }),
 
   reservas: Object.freeze({

@@ -9,6 +9,7 @@ import {
 import type { CerrarCajaCommand } from '@desktop-contracts/caja/cerrar-caja-command.interface';
 import type { InformeDetalladoConsulta } from '@desktop-contracts/caja/informes/informe-detallado.interface';
 import type { InformeSimpleConsulta } from '@desktop-contracts/caja/informes/informe-simple.interface';
+import type { InformeVentasConsulta } from '@desktop-contracts/caja/informes/informe-ventas.interface';
 import type {
   ActualizarSalidaCajaCommand,
   CrearSalidaCajaCommand,
@@ -110,6 +111,16 @@ export default function registerCajaIpc(
       assertTrustedSender(event, getMainWindow);
 
       await cajaInformePrintService.openDetallado(consulta);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.cajaOpenInformeVentas,
+
+    async (event, consulta: InformeVentasConsulta): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await cajaInformePrintService.openVentas(consulta);
     },
   );
 }

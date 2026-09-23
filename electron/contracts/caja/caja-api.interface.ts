@@ -7,6 +7,7 @@ import {
 import type { CerrarCajaCommand } from '@desktop-contracts/caja/cerrar-caja-command.interface';
 import type { InformeDetalladoConsulta } from '@desktop-contracts/caja/informes/informe-detallado.interface';
 import type { InformeSimpleConsulta } from '@desktop-contracts/caja/informes/informe-simple.interface';
+import type { InformeVentasConsulta } from '@desktop-contracts/caja/informes/informe-ventas.interface';
 import type {
   ActualizarSalidaCajaCommand,
   CrearSalidaCajaCommand,
@@ -61,4 +62,10 @@ export default interface CajaApi {
    * su ventana independiente de impresión.
    */
   openInformeDetallado(consulta: InformeDetalladoConsulta): Promise<void>;
+
+  /**
+   * Genera el Informe de Ventas y abre
+   * su ventana independiente de impresión.
+   */
+  openInformeVentas(consulta: InformeVentasConsulta): Promise<void>;
 }
