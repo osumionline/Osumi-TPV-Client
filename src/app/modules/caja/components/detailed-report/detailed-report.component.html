@@ -1,0 +1,375 @@
+<section class="detailed-report">
+    <section class="detailed-report__section">
+        <h2>
+            Ventas
+        </h2>
+
+        <div class="detailed-report__table-wrapper detailed-report__table-wrapper--summary">
+            <table class="detailed-report__table detailed-report__table--summary">
+                <thead>
+                    <tr>
+                        <th>
+                            Ventas
+                        </th>
+
+                        <th>
+                            Beneficio medio
+                        </th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <tr>
+                        <td>
+                            <div class="detailed-report__summary-value">
+                                {{
+                                    result().ventas.numeroVentas
+                                    | number:'1.0-0'
+                                }}
+                            </div>
+
+                            <div class="trend"
+                                 [class.trend--up]="result().ventas.diferenciaNumeroVentas > 0"
+                                 [class.trend--down]="result().ventas.diferenciaNumeroVentas < 0">
+                                {{
+                                    getTrendSymbol(
+                                        result().ventas.diferenciaNumeroVentas
+                                    )
+                                }}
+
+                                {{
+                                    formatIntegerDifference(
+                                        result().ventas.diferenciaNumeroVentas
+                                    )
+                                }}
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="detailed-report__summary-value">
+                                {{
+                                    result().ventas.margenBps
+                                    | bpsToPercent
+                                    | number:'1.2-2'
+                                }}
+                                %
+                            </div>
+
+                            <div class="trend"
+                                 [class.trend--up]="
+                                    result().ventas.diferenciaMargenBps !== null
+                                    && result().ventas.diferenciaMargenBps! > 0
+                                 "
+                                 [class.trend--down]="
+                                    result().ventas.diferenciaMargenBps !== null
+                                    && result().ventas.diferenciaMargenBps! < 0
+                                 ">
+                                {{
+                                    getTrendSymbol(
+                                        result().ventas.diferenciaMargenBps
+                                    )
+                                }}
+
+                                {{
+                                    formatMarginDifference(
+                                        result().ventas.diferenciaMargenBps
+                                    )
+                                }}
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="detailed-report__section">
+        <h2>
+            Marcas
+        </h2>
+
+        <div class="detailed-report__table-wrapper">
+            <table class="detailed-report__table">
+                <thead>
+                    <tr>
+                        <th>
+                            Marca
+                        </th>
+
+                        <th class="money">
+                            Total ventas PVP
+                        </th>
+
+                        <th class="money">
+                            Total beneficio
+                        </th>
+
+                        <th class="percentage">
+                            % margen beneficio
+                        </th>
+
+                        <th class="percentage">
+                            Incremento
+                        </th>
+
+                        <th class="percentage">
+                            % ventas
+                        </th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @for (
+                    marca of result().marcas;
+                    track marca.marcaPublicId
+                    ) {
+                    <tr>
+                        <td>
+                            {{ marca.nombre }}
+                        </td>
+
+                        <td class="money">
+                            {{
+                                marca.totalVentasPvpMicros
+                                | microsToEuros
+                                | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </td>
+
+                        <td class="money">
+                            {{
+                                marca.totalBeneficioMicros
+                                | microsToEuros
+                                | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </td>
+
+                        <td class="percentage">
+                            {{
+                                marca.margenBps
+                                | bpsToPercent
+                                | number:'1.2-2'
+                            }}
+                            %
+                        </td>
+
+                        <td class="percentage">
+                            <span class="trend"
+                                  [class.trend--up]="marca.diferenciaMargenBps > 0"
+                                  [class.trend--down]="marca.diferenciaMargenBps < 0">
+                                {{
+                                    getTrendSymbol(
+                                        marca.diferenciaMargenBps
+                                    )
+                                }}
+
+                                {{
+                                    formatMarginDifference(
+                                        marca.diferenciaMargenBps
+                                    )
+                                }}
+                            </span>
+                        </td>
+
+                        <td class="percentage">
+                            {{
+                                marca.porcentajeVentasBps
+                                | bpsToPercent
+                                | number:'1.2-2'
+                            }}
+                            %
+                        </td>
+                    </tr>
+                    }
+                </tbody>
+
+                <tfoot>
+                    <tr>
+                        <th>
+                            TOTAL
+                        </th>
+
+                        <th class="money">
+                            {{
+                                result().marcasTotales.totalVentasPvpMicros
+                                | microsToEuros
+                                | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </th>
+
+                        <th class="money">
+                            {{
+                                result().marcasTotales.totalBeneficioMicros
+                                | microsToEuros
+                                | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </th>
+
+                        <th class="percentage">
+                            {{
+                                result().marcasTotales.margenBps
+                                | bpsToPercent
+                                | number:'1.2-2'
+                            }}
+                            %
+                        </th>
+
+                        <th></th>
+                        <th></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </section>
+
+    <section class="detailed-report__section">
+        <h2>
+            Artículos
+        </h2>
+
+        <div class="detailed-report__table-wrapper">
+            <table class="detailed-report__table">
+                <thead>
+                    <tr>
+                        <th>
+                            Marca
+                        </th>
+
+                        <th>
+                            Nombre
+                        </th>
+
+                        <th class="center">
+                            Total unidades vendidas
+                        </th>
+
+                        <th class="money">
+                            Total ventas PVP
+                        </th>
+
+                        <th class="money">
+                            Total beneficio
+                        </th>
+
+                        <th class="percentage">
+                            Incremento
+                        </th>
+
+                        <th class="percentage">
+                            % ventas
+                        </th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @for (
+                    articulo of result().articulos;
+                    track $index
+                    ) {
+                    <tr>
+                        <td>
+                            {{ articulo.marca }}
+                        </td>
+
+                        <td>
+                            {{ articulo.nombre }}
+                        </td>
+
+                        <td class="center">
+                            {{
+                                articulo.totalUnidadesVendidas
+                                | number:'1.0-0'
+                            }}
+                        </td>
+
+                        <td class="money">
+                            {{
+                                articulo.totalVentasPvpMicros
+                                | microsToEuros
+                                | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </td>
+
+                        <td class="money">
+                            {{
+                                articulo.totalBeneficioMicros
+                                | microsToEuros
+                                | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </td>
+
+                        <td class="percentage">
+                            <span class="trend"
+                                  [class.trend--up]="
+                                    articulo.diferenciaMargenBps !== null
+                                    && articulo.diferenciaMargenBps! > 0
+                                  "
+                                  [class.trend--down]="
+                                    articulo.diferenciaMargenBps !== null
+                                    && articulo.diferenciaMargenBps! < 0
+                                  ">
+                                {{
+                                    getTrendSymbol(
+                                        articulo.diferenciaMargenBps
+                                    )
+                                }}
+
+                                {{
+                                    formatMarginDifference(
+                                        articulo.diferenciaMargenBps
+                                    )
+                                }}
+                            </span>
+                        </td>
+
+                        <td class="percentage">
+                            {{
+                                articulo.porcentajeVentasBps
+                                | bpsToPercent
+                                | number:'1.2-2'
+                            }}
+                            %
+                        </td>
+                    </tr>
+                    }
+                </tbody>
+
+                <tfoot>
+                    <tr>
+                        <th>
+                            TOTAL
+                        </th>
+
+                        <th></th>
+
+                        <th class="center">
+                            {{
+                                result().articulosTotales.totalUnidadesVendidas
+                                | number:'1.0-0'
+                            }}
+                        </th>
+
+                        <th class="money">
+                            {{
+                                result().articulosTotales.totalVentasPvpMicros
+                                | microsToEuros
+                                | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </th>
+
+                        <th class="money">
+                            {{
+                                result().articulosTotales.totalBeneficioMicros
+                                | microsToEuros
+                                | currency:'EUR':'symbol':'1.2-2'
+                            }}
+                        </th>
+
+                        <th></th>
+                        <th></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </section>
+</section>

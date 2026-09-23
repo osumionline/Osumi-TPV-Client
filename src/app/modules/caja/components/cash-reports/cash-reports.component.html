@@ -95,13 +95,9 @@
         </button>
     </div>
 
-    @if (selectedType() !== 'simple') {
+    @if (selectedType() === 'ventas') {
     <div class="cash-reports__pending">
-        {{
-            selectedType() === 'detallado'
-                ? 'El informe Detallado se incorporará en el siguiente bloque.'
-                : 'El informe de Ventas se incorporará después del Detallado.'
-        }}
+        El informe de Ventas se incorporará en el siguiente bloque.
     </div>
     }
 

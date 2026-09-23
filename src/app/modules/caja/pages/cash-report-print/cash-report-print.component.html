@@ -61,6 +61,9 @@
                             [year]="simpleDocument.consulta.year"
                             [month]="simpleDocument.consulta.month" />
         }
+        @else if (detalladoDocumento(); as detailedDocument) {
+        <otpv-detailed-report [result]="detailedDocument.resultado" />
+        }
         @else {
         <section class="cash-report-print__unsupported">
             Este tipo de informe todavía no está disponible.

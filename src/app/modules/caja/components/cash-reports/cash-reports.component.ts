@@ -109,25 +109,18 @@ const REPORT_MONTHS: readonly InformeMesOption[] = [
 })
 export default class CashReportsComponent implements OnInit {
   private readonly informesService: CajaInformesService = inject(CajaInformesService);
-
   readonly categoriasService: CategoriasService = inject(CategoriasService);
 
   readonly tipos: readonly InformeTipoOption[] = REPORT_TYPES;
-
   readonly meses: readonly InformeMesOption[] = REPORT_MONTHS;
 
   readonly selectedType: WritableSignal<InformeTipo> = signal<InformeTipo>('simple');
-
   readonly selectedMonth: WritableSignal<InformeMes> = signal<InformeMes>(
     (new Date().getMonth() + 1) as InformeMes,
   );
-
   readonly selectedYear: WritableSignal<number> = signal<number>(new Date().getFullYear());
-
   readonly selectedCategoryId: WritableSignal<number | null> = signal<number | null>(null);
-
   readonly loading: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly error: WritableSignal<string | null> = signal<string | null>(null);
 
   readonly years: readonly number[] = this.createYears();
@@ -135,9 +128,8 @@ export default class CashReportsComponent implements OnInit {
   readonly showCategory: Signal<boolean> = computed(
     (): boolean => this.selectedType() === 'ventas',
   );
-
   readonly canGenerate: Signal<boolean> = computed(
-    (): boolean => !this.loading() && this.selectedType() === 'simple',
+    (): boolean => !this.loading() && this.selectedType() !== 'ventas',
   );
 
   /**
@@ -195,10 +187,23 @@ export default class CashReportsComponent implements OnInit {
     this.error.set(null);
 
     try {
-      await this.informesService.openSimple({
+      const consulta = {
         year: this.selectedYear(),
         month: this.selectedMonth(),
-      });
+      };
+
+      switch (this.selectedType()) {
+        case 'simple':
+          await this.informesService.openSimple(consulta);
+          break;
+
+        case 'detallado':
+          await this.informesService.openDetallado(consulta);
+          break;
+
+        case 'ventas':
+          return;
+      }
     } catch (error: unknown) {
       this.error.set(getErrorMessage(error, 'No se ha podido abrir el informe.'));
     } finally {

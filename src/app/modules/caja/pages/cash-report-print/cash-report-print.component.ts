@@ -7,9 +7,11 @@ import {
   type WritableSignal,
 } from '@angular/core';
 import type {
+  CajaInformeDetalladoPrintDocumento,
   CajaInformePrintDocumento,
   CajaInformeSimplePrintDocumento,
 } from '@desktop-contracts/caja/informes/caja-informe-print.interface';
+import DetailedReportComponent from '@modules/caja/components/detailed-report/detailed-report.component';
 import SimpleReportComponent from '@modules/caja/components/simple-report/simple-report.component';
 import { formatMonthName } from '@utils/date.utils';
 import { getErrorMessage } from '@utils/error.utils';
@@ -22,18 +24,15 @@ import { getErrorMessage } from '@utils/error.utils';
   selector: 'otpv-root',
   templateUrl: './cash-report-print.component.html',
   styleUrl: './cash-report-print.component.scss',
-  imports: [SimpleReportComponent],
+  imports: [SimpleReportComponent, DetailedReportComponent],
 })
 export default class CashReportPrintComponent implements OnInit {
   readonly documento: WritableSignal<CajaInformePrintDocumento | null> =
     signal<CajaInformePrintDocumento | null>(null);
 
   readonly loading: WritableSignal<boolean> = signal<boolean>(true);
-
   readonly loadError: WritableSignal<string | null> = signal<string | null>(null);
-
   readonly processing: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly operationError: WritableSignal<string | null> = signal<string | null>(null);
 
   readonly simpleDocumento: Signal<CajaInformeSimplePrintDocumento | null> = computed(
@@ -41,6 +40,14 @@ export default class CashReportPrintComponent implements OnInit {
       const documento: CajaInformePrintDocumento | null = this.documento();
 
       return documento?.tipo === 'simple' ? documento : null;
+    },
+  );
+
+  readonly detalladoDocumento: Signal<CajaInformeDetalladoPrintDocumento | null> = computed(
+    (): CajaInformeDetalladoPrintDocumento | null => {
+      const documento: CajaInformePrintDocumento | null = this.documento();
+
+      return documento?.tipo === 'detallado' ? documento : null;
     },
   );
 

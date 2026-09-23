@@ -13,13 +13,14 @@ describe('CashReportsComponent', (): void => {
   let component: CashReportsComponent;
 
   let openSimpleMock: Mock;
+  let openDetalladoMock: Mock;
   let loadCategoriasMock: Mock;
 
   let categoriasPlain: WritableSignal<readonly Categoria[]>;
 
   beforeEach(async (): Promise<void> => {
     openSimpleMock = vi.fn().mockResolvedValue(undefined);
-
+    openDetalladoMock = vi.fn().mockResolvedValue(undefined);
     loadCategoriasMock = vi.fn().mockResolvedValue(undefined);
 
     categoriasPlain = signal<readonly Categoria[]>([]);
@@ -30,14 +31,13 @@ describe('CashReportsComponent', (): void => {
       providers: [
         {
           provide: CajaInformesService,
-
           useValue: {
             openSimple: openSimpleMock,
+            openDetallado: openDetalladoMock,
           },
         },
         {
           provide: CategoriasService,
-
           useValue: {
             load: loadCategoriasMock,
             categoriasPlain: categoriasPlain.asReadonly(),
@@ -79,12 +79,12 @@ describe('CashReportsComponent', (): void => {
     ]);
   });
 
-  it('solo permite generar Simple en esta fase', (): void => {
+  it('permite generar Simple y Detallado pero no Ventas', (): void => {
     expect(component.canGenerate()).toBe(true);
 
     component.setType('detallado');
 
-    expect(component.canGenerate()).toBe(false);
+    expect(component.canGenerate()).toBe(true);
 
     component.setType('ventas');
 
@@ -119,14 +119,37 @@ describe('CashReportsComponent', (): void => {
     expect(component.error()).toBeNull();
   });
 
-  it('no genera un tipo todavía no implementado', async (): Promise<void> => {
-    const type: InformeTipo = 'detallado';
+  it('abre el Informe Detallado con los filtros actuales', async (): Promise<void> => {
+    component.setType('detallado');
+
+    component.setYear(2025);
+
+    component.setMonth('todos');
+
+    await component.generate();
+
+    expect(openDetalladoMock).toHaveBeenCalledWith({
+      year: 2025,
+      month: 'todos',
+    });
+
+    expect(openSimpleMock).not.toHaveBeenCalled();
+
+    expect(component.loading()).toBe(false);
+
+    expect(component.error()).toBeNull();
+  });
+
+  it('no genera el Informe de Ventas todavía no implementado', async (): Promise<void> => {
+    const type: InformeTipo = 'ventas';
 
     component.setType(type);
 
     await component.generate();
 
     expect(openSimpleMock).not.toHaveBeenCalled();
+
+    expect(openDetalladoMock).not.toHaveBeenCalled();
   });
 
   it('limpia un error anterior al cambiar filtros', (): void => {
