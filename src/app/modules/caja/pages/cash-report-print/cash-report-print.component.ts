@@ -10,8 +10,10 @@ import type {
   CajaInformeDetalladoPrintDocumento,
   CajaInformePrintDocumento,
   CajaInformeSimplePrintDocumento,
+  CajaInformeVentasPrintDocumento,
 } from '@desktop-contracts/caja/informes/caja-informe-print.interface';
 import DetailedReportComponent from '@modules/caja/components/detailed-report/detailed-report.component';
+import SalesReportComponent from '@modules/caja/components/sales-report/sales-report.component';
 import SimpleReportComponent from '@modules/caja/components/simple-report/simple-report.component';
 import { formatMonthName } from '@utils/date.utils';
 import { getErrorMessage } from '@utils/error.utils';
@@ -24,7 +26,7 @@ import { getErrorMessage } from '@utils/error.utils';
   selector: 'otpv-root',
   templateUrl: './cash-report-print.component.html',
   styleUrl: './cash-report-print.component.scss',
-  imports: [SimpleReportComponent, DetailedReportComponent],
+  imports: [SimpleReportComponent, DetailedReportComponent, SalesReportComponent],
 })
 export default class CashReportPrintComponent implements OnInit {
   readonly documento: WritableSignal<CajaInformePrintDocumento | null> =
@@ -48,6 +50,14 @@ export default class CashReportPrintComponent implements OnInit {
       const documento: CajaInformePrintDocumento | null = this.documento();
 
       return documento?.tipo === 'detallado' ? documento : null;
+    },
+  );
+
+  readonly ventasDocumento: Signal<CajaInformeVentasPrintDocumento | null> = computed(
+    (): CajaInformeVentasPrintDocumento | null => {
+      const documento: CajaInformePrintDocumento | null = this.documento();
+
+      return documento?.tipo === 'ventas' ? documento : null;
     },
   );
 

@@ -1,0 +1,156 @@
+<section class="sales-report-category">
+    <div class="sales-report-row sales-report-row--category"
+         role="row">
+        <div class="sales-report-row__concept"
+             role="cell"
+             [style.padding-left.px]="depth() * 18 + 6">
+            <button type="button"
+                    class="sales-report-row__toggle"
+                    [class.sales-report-row__toggle--hidden]="!hasChildren()"
+                    [attr.aria-expanded]="expanded()"
+                    (click)="toggle()">
+                {{
+                    expanded()
+                        ? '▾'
+                        : '▸'
+                }}
+            </button>
+
+            <strong>
+                {{ categoria().nombre }}
+            </strong>
+        </div>
+
+        <div class="numeric"
+             role="cell">
+            {{
+                categoria().margenBps
+                | bpsToPercent
+                | number:'1.2-2'
+            }}
+            %
+        </div>
+
+        <div class="numeric"
+             role="cell">
+            {{
+                categoria().unidades
+                | number:'1.0-0'
+            }}
+        </div>
+
+        <div class="numeric"
+             role="cell">
+            {{
+                categoria().importeMicros
+                | microsToEuros
+                | currency:'EUR':'symbol':'1.2-2'
+            }}
+        </div>
+    </div>
+
+    <div class="sales-report-category__children"
+         [class.sales-report-category__children--collapsed]="!expanded()">
+        @if (groupByBrand()) {
+        @for (
+        marca of categoria().marcas;
+        track $index
+        ) {
+        <div class="sales-report-row sales-report-row--item"
+             role="row">
+            <div class="sales-report-row__concept"
+                 role="cell"
+                 [style.padding-left.px]="(depth() + 1) * 18 + 30">
+                <span class="sales-report-row__brand">
+                    {{ marca.nombre }}
+                </span>
+            </div>
+
+            <div class="numeric"
+                 role="cell">
+                {{
+                    marca.margenBps
+                    | bpsToPercent
+                    | number:'1.2-2'
+                }}
+                %
+            </div>
+
+            <div class="numeric"
+                 role="cell">
+                {{
+                    marca.unidades
+                    | number:'1.0-0'
+                }}
+            </div>
+
+            <div class="numeric"
+                 role="cell">
+                {{
+                    marca.importeMicros
+                    | microsToEuros
+                    | currency:'EUR':'symbol':'1.2-2'
+                }}
+            </div>
+        </div>
+        }
+        }
+        @else {
+        @for (
+        articulo of categoria().articulos;
+        track $index
+        ) {
+        <div class="sales-report-row sales-report-row--item"
+             role="row">
+            <div class="sales-report-row__concept"
+                 role="cell"
+                 [style.padding-left.px]="(depth() + 1) * 18 + 30">
+                <span class="sales-report-row__brand">
+                    {{ articulo.marca }}
+                </span>
+
+                <span>
+                    {{ articulo.nombre }}
+                </span>
+            </div>
+
+            <div class="numeric"
+                 role="cell">
+                {{
+                    articulo.margenBps
+                    | bpsToPercent
+                    | number:'1.2-2'
+                }}
+                %
+            </div>
+
+            <div class="numeric"
+                 role="cell">
+                {{
+                    articulo.unidades
+                    | number:'1.0-0'
+                }}
+            </div>
+
+            <div class="numeric"
+                 role="cell">
+                {{
+                    articulo.importeMicros
+                    | microsToEuros
+                    | currency:'EUR':'symbol':'1.2-2'
+                }}
+            </div>
+        </div>
+        }
+        }
+
+        @for (
+        subcategoria of categoria().subcategorias;
+        track subcategoria.idCategoria
+        ) {
+        <otpv-sales-report-category [categoria]="subcategoria"
+                                    [groupByBrand]="groupByBrand()"
+                                    [depth]="depth() + 1" />
+        }
+    </div>
+</section>

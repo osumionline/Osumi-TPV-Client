@@ -1,0 +1,114 @@
+:host {
+    display: block;
+}
+
+.sales-report-category {
+    display: block;
+}
+
+.sales-report-row {
+    display: grid;
+    min-width: 760px;
+    grid-template-columns:
+        var(--sales-report-columns);
+    border-bottom: 1px solid var(--table-data-border);
+
+    >div {
+        min-height: 36px;
+        padding: 5px 10px;
+        box-sizing: border-box;
+        align-content: center;
+        font-size: 0.82rem;
+    }
+}
+
+.sales-report-row--category {
+    background-color: var(--color-very-light-grey);
+
+    strong {
+        font-weight: 600;
+    }
+}
+
+.sales-report-row--item {
+    background-color: var(--color-white);
+}
+
+.sales-report-row__concept {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.sales-report-row__toggle {
+    display: inline-flex;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    flex: 0 0 24px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 50%;
+    background-color: transparent;
+    color: inherit;
+    font-size: 15px;
+    cursor: pointer;
+
+    &:hover {
+        background-color: var(--separator-color);
+    }
+}
+
+.sales-report-row__toggle--hidden {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.sales-report-row__brand {
+    font-weight: 500;
+
+    &::after {
+        content: "·";
+        margin-left: 7px;
+        font-weight: 400;
+        opacity: 0.5;
+    }
+
+    &:last-child::after {
+        display: none;
+    }
+}
+
+.numeric {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.sales-report-category__children--collapsed {
+    display: none;
+}
+
+@media print {
+
+    .sales-report-category__children,
+    .sales-report-category__children--collapsed {
+        display: block !important;
+    }
+
+    .sales-report-row {
+        min-width: 0;
+        break-inside: avoid;
+
+        >div {
+            min-height: auto;
+            padding-top: 3px;
+            padding-bottom: 3px;
+            font-size: 8pt;
+        }
+    }
+
+    .sales-report-row__toggle {
+        display: none !important;
+    }
+}

@@ -1,0 +1,53 @@
+<section class="sales-report">
+    <div class="sales-report__controls">
+        <label>
+            <input #groupByBrandInput
+                   type="checkbox"
+                   [checked]="groupByBrand()"
+                   (change)="setGroupByBrand(groupByBrandInput.checked)">
+
+            <span>
+                Agrupar por marca
+            </span>
+        </label>
+    </div>
+
+    @if (result().categoria; as categoria) {
+    <div class="sales-report__table"
+         role="table">
+        <div class="sales-report__header"
+             role="row">
+            <div role="columnheader">
+                Concepto
+            </div>
+
+            <div class="numeric"
+                 role="columnheader">
+                Margen
+            </div>
+
+            <div class="numeric"
+                 role="columnheader">
+                Unidades
+            </div>
+
+            <div class="numeric"
+                 role="columnheader">
+                Importe
+            </div>
+        </div>
+
+        <div class="sales-report__body"
+             role="rowgroup">
+            <otpv-sales-report-category [categoria]="categoria"
+                                        [groupByBrand]="groupByBrand()"
+                                        [depth]="0" />
+        </div>
+    </div>
+    }
+    @else {
+    <div class="sales-report__empty">
+        No hay ventas para la categoría y periodo seleccionados.
+    </div>
+    }
+</section>

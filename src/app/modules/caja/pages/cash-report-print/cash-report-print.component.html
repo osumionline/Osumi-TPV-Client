@@ -64,6 +64,9 @@
         @else if (detalladoDocumento(); as detailedDocument) {
         <otpv-detailed-report [result]="detailedDocument.resultado" />
         }
+        @else if (ventasDocumento(); as salesDocument) {
+        <otpv-sales-report [result]="salesDocument.resultado" />
+        }
         @else {
         <section class="cash-report-print__unsupported">
             Este tipo de informe todavía no está disponible.
