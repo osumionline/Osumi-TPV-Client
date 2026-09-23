@@ -134,7 +134,6 @@ const IPC_CHANNELS = {
   cajaDeleteSalida: 'caja:delete-salida',
   cajaGetCierre: 'caja:get-cierre',
   cajaClose: 'caja:close',
-  cajaGetInformeSimple: 'caja:get-informe-simple',
   cajaOpenInformeSimple: 'caja:open-informe-simple',
 
   cajaInformePrintGetDocumento: 'caja-informe-print:get-documento',

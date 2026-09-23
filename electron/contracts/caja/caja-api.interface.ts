@@ -5,10 +5,7 @@ import {
   CajaCierreConsulta,
 } from '@desktop-contracts/caja/caja-cierre.interface';
 import type { CerrarCajaCommand } from '@desktop-contracts/caja/cerrar-caja-command.interface';
-import type {
-  InformeSimpleConsulta,
-  InformeSimpleResultado,
-} from '@desktop-contracts/caja/informes/informe-simple.interface';
+import type { InformeSimpleConsulta } from '@desktop-contracts/caja/informes/informe-simple.interface';
 import type {
   ActualizarSalidaCajaCommand,
   CrearSalidaCajaCommand,
@@ -51,11 +48,6 @@ export default interface CajaApi {
    * Cierra definitivamente una caja abierta.
    */
   close(command: CerrarCajaCommand): Promise<void>;
-
-  /**
-   * Genera el Informe Simple del periodo indicado.
-   */
-  getInformeSimple(consulta: InformeSimpleConsulta): Promise<InformeSimpleResultado>;
 
   /**
    * Genera el Informe Simple y abre

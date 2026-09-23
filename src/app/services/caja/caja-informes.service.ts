@@ -1,8 +1,5 @@
 import { Service } from '@angular/core';
-import type {
-  InformeSimpleConsulta,
-  InformeSimpleResultado,
-} from '@desktop-contracts/caja/informes/informe-simple.interface';
+import type { InformeSimpleConsulta } from '@desktop-contracts/caja/informes/informe-simple.interface';
 
 /**
  * Expone al renderer los informes disponibles
@@ -11,9 +8,10 @@ import type {
 @Service()
 export default class CajaInformesService {
   /**
-   * Obtiene el Informe Simple del periodo seleccionado.
+   * Genera el Informe Simple y abre
+   * su ventana independiente de impresión.
    */
-  async getSimple(consulta: InformeSimpleConsulta): Promise<InformeSimpleResultado> {
-    return window.osumiDesktop.caja.getInformeSimple(consulta);
+  async openSimple(consulta: InformeSimpleConsulta): Promise<void> {
+    await window.osumiDesktop.caja.openInformeSimple(consulta);
   }
 }

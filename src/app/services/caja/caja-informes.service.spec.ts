@@ -1,8 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import type {
-  InformeSimpleConsulta,
-  InformeSimpleResultado,
-} from '@desktop-contracts/caja/informes/informe-simple.interface';
+import type { InformeSimpleConsulta } from '@desktop-contracts/caja/informes/informe-simple.interface';
 import CajaInformesService from '@services/caja/caja-informes.service';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -12,48 +9,21 @@ let originalDesktopDescriptor: PropertyDescriptor | undefined;
 
 let consultas: InformeSimpleConsulta[];
 
-let result: InformeSimpleResultado;
-
 describe('CajaInformesService', (): void => {
   beforeEach((): void => {
     originalDesktopDescriptor = Object.getOwnPropertyDescriptor(window, 'osumiDesktop');
 
     consultas = [];
 
-    result = {
-      granularidad: 'dia',
-      tiposPago: [
-        {
-          publicId: 'tipo-pago-efectivo',
-          nombre: 'Efectivo',
-          slug: 'efectivo',
-          orden: 0,
-        },
-      ],
-      items: [],
-      totales: {
-        numeroVentas: 0,
-        primerTicket: null,
-        ultimoTicket: null,
-        importesTipoPago: [
-          {
-            tipoPagoPublicId: 'tipo-pago-efectivo',
-            importeCents: 0,
-          },
-        ],
-        totalCents: 0,
-        sumaCents: 0,
-      },
-    };
-
     Object.defineProperty(window, 'osumiDesktop', {
       configurable: true,
+
       value: {
         caja: {
-          getInformeSimple: (consulta: InformeSimpleConsulta): Promise<InformeSimpleResultado> => {
+          openInformeSimple: (consulta: InformeSimpleConsulta): Promise<void> => {
             consultas.push(consulta);
 
-            return Promise.resolve(result);
+            return Promise.resolve();
           },
         },
       },
@@ -76,13 +46,13 @@ describe('CajaInformesService', (): void => {
     Reflect.deleteProperty(window, 'osumiDesktop');
   });
 
-  it('delega el Informe Simple en la API de Electron', async (): Promise<void> => {
+  it('abre el Informe Simple mensual mediante Electron', async (): Promise<void> => {
     await expect(
-      service.getSimple({
+      service.openSimple({
         year: 2026,
         month: 9,
       }),
-    ).resolves.toBe(result);
+    ).resolves.toBeUndefined();
 
     expect(consultas).toEqual([
       {
@@ -92,8 +62,8 @@ describe('CajaInformesService', (): void => {
     ]);
   });
 
-  it('permite solicitar el año completo', async (): Promise<void> => {
-    await service.getSimple({
+  it('permite abrir el Informe Simple anual', async (): Promise<void> => {
+    await service.openSimple({
       year: 2026,
       month: 'todos',
     });

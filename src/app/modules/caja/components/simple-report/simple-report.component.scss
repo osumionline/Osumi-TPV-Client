@@ -3,18 +3,7 @@
 }
 
 .simple-report {
-    padding: 16px 20px 24px;
-
-    .simple-report__header {
-        margin-bottom: 12px;
-
-        h3 {
-            margin: 0;
-            font-size: 18px;
-            font-weight: 500;
-            text-align: center;
-        }
-    }
+    padding: 0;
 
     .simple-report__table-wrapper {
         width: 100%;
@@ -28,6 +17,7 @@
         min-width: 760px;
         border-collapse: collapse;
         background-color: var(--color-white);
+        margin: 0;
 
         th,
         td {

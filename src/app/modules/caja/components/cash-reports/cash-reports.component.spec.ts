@@ -1,6 +1,5 @@
 import { signal, type WritableSignal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
-import type { InformeSimpleResultado } from '@desktop-contracts/caja/informes/informe-simple.interface';
 import type InformeTipo from '@desktop-contracts/caja/informes/informe-tipo.type';
 import type Categoria from '@model/categorias/categoria.model';
 import CashReportsComponent from '@modules/caja/components/cash-reports/cash-reports.component';
@@ -10,15 +9,16 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 describe('CashReportsComponent', (): void => {
   let fixture: ComponentFixture<CashReportsComponent>;
+
   let component: CashReportsComponent;
 
-  let getSimpleMock: Mock;
+  let openSimpleMock: Mock;
   let loadCategoriasMock: Mock;
 
   let categoriasPlain: WritableSignal<readonly Categoria[]>;
 
   beforeEach(async (): Promise<void> => {
-    getSimpleMock = vi.fn().mockResolvedValue(createSimpleResult());
+    openSimpleMock = vi.fn().mockResolvedValue(undefined);
 
     loadCategoriasMock = vi.fn().mockResolvedValue(undefined);
 
@@ -26,15 +26,18 @@ describe('CashReportsComponent', (): void => {
 
     await TestBed.configureTestingModule({
       imports: [CashReportsComponent],
+
       providers: [
         {
           provide: CajaInformesService,
+
           useValue: {
-            getSimple: getSimpleMock,
+            openSimple: openSimpleMock,
           },
         },
         {
           provide: CategoriasService,
+
           useValue: {
             load: loadCategoriasMock,
             categoriasPlain: categoriasPlain.asReadonly(),
@@ -50,6 +53,7 @@ describe('CashReportsComponent', (): void => {
       .compileComponents();
 
     fixture = TestBed.createComponent(CashReportsComponent);
+
     component = fixture.componentInstance;
   });
 
@@ -57,7 +61,9 @@ describe('CashReportsComponent', (): void => {
     const now: Date = new Date();
 
     expect(component.selectedType()).toBe('simple');
+
     expect(component.selectedMonth()).toBe(now.getMonth() + 1);
+
     expect(component.selectedYear()).toBe(now.getFullYear());
   });
 
@@ -97,20 +103,19 @@ describe('CashReportsComponent', (): void => {
     expect(component.showCategory()).toBe(false);
   });
 
-  it('genera el Informe Simple con los filtros actuales', async (): Promise<void> => {
+  it('abre el Informe Simple con los filtros actuales', async (): Promise<void> => {
     component.setYear(2025);
     component.setMonth('todos');
 
     await component.generate();
 
-    expect(getSimpleMock).toHaveBeenCalledWith({
+    expect(openSimpleMock).toHaveBeenCalledWith({
       year: 2025,
       month: 'todos',
     });
 
-    expect(component.simpleResult()).toEqual(createSimpleResult());
-
     expect(component.loading()).toBe(false);
+
     expect(component.error()).toBeNull();
   });
 
@@ -121,36 +126,14 @@ describe('CashReportsComponent', (): void => {
 
     await component.generate();
 
-    expect(getSimpleMock).not.toHaveBeenCalled();
+    expect(openSimpleMock).not.toHaveBeenCalled();
   });
 
-  it('descarta el resultado al cambiar los filtros', async (): Promise<void> => {
-    await component.generate();
-
-    expect(component.simpleResult()).not.toBeNull();
+  it('limpia un error anterior al cambiar filtros', (): void => {
+    component.error.set('Error anterior');
 
     component.setMonth(1);
 
-    expect(component.simpleResult()).toBeNull();
+    expect(component.error()).toBeNull();
   });
 });
-
-/**
- * Construye un resultado mínimo válido
- * para los tests de Informes.
- */
-function createSimpleResult(): InformeSimpleResultado {
-  return {
-    granularidad: 'dia',
-    tiposPago: [],
-    items: [],
-    totales: {
-      numeroVentas: 0,
-      primerTicket: null,
-      ultimoTicket: null,
-      importesTipoPago: [],
-      totalCents: 0,
-      sumaCents: 0,
-    },
-  };
-}

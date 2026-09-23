@@ -73,11 +73,6 @@
         color: var(--color-red);
     }
 
-    otpv-simple-report {
-        display: block;
-        flex: 1 0 auto;
-    }
-
     @media (max-width: 900px) {
         .cash-reports__filters {
             flex-wrap: wrap;

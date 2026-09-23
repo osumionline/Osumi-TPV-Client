@@ -11,10 +11,8 @@ import { MatButton } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import type { InformeMes } from '@desktop-contracts/caja/informes/informe-periodo.interface';
-import type { InformeSimpleResultado } from '@desktop-contracts/caja/informes/informe-simple.interface';
 import type InformeTipo from '@desktop-contracts/caja/informes/informe-tipo.type';
 import type Categoria from '@model/categorias/categoria.model';
-import SimpleReportComponent from '@modules/caja/components/simple-report/simple-report.component';
 import CategoriasService from '@services/articulos/categorias.service';
 import CajaInformesService from '@services/caja/caja-informes.service';
 import { getErrorMessage } from '@utils/error.utils';
@@ -100,14 +98,14 @@ const REPORT_MONTHS: readonly InformeMesOption[] = [
 ];
 
 /**
- * Gestiona los filtros y la generación
+ * Gestiona los filtros y la apertura
  * de los informes disponibles en Caja.
  */
 @Component({
   selector: 'otpv-cash-reports',
   templateUrl: './cash-reports.component.html',
   styleUrl: './cash-reports.component.scss',
-  imports: [MatButton, MatFormFieldModule, MatSelectModule, SimpleReportComponent],
+  imports: [MatButton, MatFormFieldModule, MatSelectModule],
 })
 export default class CashReportsComponent implements OnInit {
   private readonly informesService: CajaInformesService = inject(CajaInformesService);
@@ -115,6 +113,7 @@ export default class CashReportsComponent implements OnInit {
   readonly categoriasService: CategoriasService = inject(CategoriasService);
 
   readonly tipos: readonly InformeTipoOption[] = REPORT_TYPES;
+
   readonly meses: readonly InformeMesOption[] = REPORT_MONTHS;
 
   readonly selectedType: WritableSignal<InformeTipo> = signal<InformeTipo>('simple');
@@ -130,9 +129,6 @@ export default class CashReportsComponent implements OnInit {
   readonly loading: WritableSignal<boolean> = signal<boolean>(false);
 
   readonly error: WritableSignal<string | null> = signal<string | null>(null);
-
-  readonly simpleResult: WritableSignal<InformeSimpleResultado | null> =
-    signal<InformeSimpleResultado | null>(null);
 
   readonly years: readonly number[] = this.createYears();
 
@@ -153,30 +149,27 @@ export default class CashReportsComponent implements OnInit {
   }
 
   /**
-   * Cambia el tipo de informe seleccionado
-   * y descarta cualquier resultado anterior.
+   * Cambia el tipo de informe seleccionado.
    */
   setType(type: InformeTipo): void {
     this.selectedType.set(type);
-    this.clearResult();
+    this.error.set(null);
   }
 
   /**
-   * Cambia el mes seleccionado
-   * y descarta cualquier resultado anterior.
+   * Cambia el mes seleccionado.
    */
   setMonth(month: InformeMes): void {
     this.selectedMonth.set(month);
-    this.clearResult();
+    this.error.set(null);
   }
 
   /**
-   * Cambia el año seleccionado
-   * y descarta cualquier resultado anterior.
+   * Cambia el año seleccionado.
    */
   setYear(year: number): void {
     this.selectedYear.set(year);
-    this.clearResult();
+    this.error.set(null);
   }
 
   /**
@@ -185,12 +178,13 @@ export default class CashReportsComponent implements OnInit {
    */
   setCategoryId(idCategoria: number | null): void {
     this.selectedCategoryId.set(idCategoria);
-    this.clearResult();
+
+    this.error.set(null);
   }
 
   /**
-   * Genera el informe correspondiente
-   * a los filtros actualmente seleccionados.
+   * Genera el informe seleccionado
+   * y abre su ventana independiente.
    */
   async generate(): Promise<void> {
     if (!this.canGenerate()) {
@@ -199,17 +193,14 @@ export default class CashReportsComponent implements OnInit {
 
     this.loading.set(true);
     this.error.set(null);
-    this.simpleResult.set(null);
 
     try {
-      const result: InformeSimpleResultado = await this.informesService.getSimple({
+      await this.informesService.openSimple({
         year: this.selectedYear(),
         month: this.selectedMonth(),
       });
-
-      this.simpleResult.set(result);
     } catch (error: unknown) {
-      this.error.set(getErrorMessage(error, 'No se ha podido generar el informe.'));
+      this.error.set(getErrorMessage(error, 'No se ha podido abrir el informe.'));
     } finally {
       this.loading.set(false);
     }
@@ -237,6 +228,7 @@ export default class CashReportsComponent implements OnInit {
       {
         length: 5,
       },
+
       (_: unknown, index: number): number => currentYear - index,
     );
   }
@@ -261,14 +253,5 @@ export default class CashReportsComponent implements OnInit {
     } catch (error: unknown) {
       console.error('Error cargando las categorías para Informes:', error);
     }
-  }
-
-  /**
-   * Descarta el resultado mostrado y cualquier
-   * error perteneciente a filtros anteriores.
-   */
-  private clearResult(): void {
-    this.simpleResult.set(null);
-    this.error.set(null);
   }
 }

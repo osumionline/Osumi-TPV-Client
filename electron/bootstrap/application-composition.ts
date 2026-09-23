@@ -721,7 +721,7 @@ export default function createApplicationComposition(
     clienteFacturaPdfService,
   );
   registerCategoriasIpc(getMainWindow, categoriasService);
-  registerCajaIpc(getMainWindow, cajaService, informeSimpleService, cajaInformePrintService);
+  registerCajaIpc(getMainWindow, cajaService, cajaInformePrintService);
   registerCajaInformePrintIpc(cajaInformePrintWindow);
   registerReservasIpc(getMainWindow, reservasService);
 
