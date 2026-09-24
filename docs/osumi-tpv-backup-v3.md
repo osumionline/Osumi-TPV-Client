@@ -632,11 +632,27 @@ La restauración debe realizar conceptualmente:
 14. validar SQLite
 15. validar app_data.json
 16. validar secrets/secrets.json
-17. preparar staging
-18. restaurar recursos en staging
-19. SecretStorage.save()
-20. promoción final
+17. materializar database/app_data/logo/secrets/files en restore-work
+18. reconstruir secretos operativos mediante SecretStorage.save()
+19. preparar staging canónico, con app_data.json como último marcador
+20. eliminar restore-work
+21. promoción final
 ```
+
+El staging canónico de una restauración v3 debe quedar compuesto por:
+
+```text
+staging/osumi-tpv.sqlite
+staging/files/**
+staging/logo.webp
+staging/secrets.json
+staging/app_data.json
+```
+
+secrets.json es siempre un nuevo fichero generado mediante
+Electron safeStorage en la máquina destino.
+
+app_data.json debe materializarse el último.
 
 Ningún recurso definitivo se sustituye antes de terminar las
 validaciones necesarias.

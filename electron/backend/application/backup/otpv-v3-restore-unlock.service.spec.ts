@@ -11,6 +11,7 @@ import type { OtpvV3Manifest } from '@backend/contracts/backup/otpv-v3-manifest.
 import type OtpvV3PayloadInspector from '@backend/contracts/backup/otpv-v3-payload-inspector.interface';
 import type OtpvV3RequiredContentExtractor from '@backend/contracts/backup/otpv-v3-required-content-extractor.interface';
 import type OtpvV3RequiredContentValidator from '@backend/contracts/backup/otpv-v3-required-content-validator.interface';
+import type OtpvV3RestoreStagingPreparer from '@backend/contracts/backup/otpv-v3-restore-staging-preparer.interface';
 import type OtpvV3RestoreWorkspace from '@backend/contracts/backup/otpv-v3-restore-workspace.interface';
 import type OtpvPackageInspection from '@backend/domain/backup/otpv-package-inspection.type';
 import type OtpvV3PayloadInspection from '@backend/domain/backup/otpv-v3-payload-inspection.interface';
@@ -38,6 +39,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
     const requiredContentExtractor = new TestRequiredContentExtractor();
     const requiredContentValidator = new TestRequiredContentValidator();
     const filesExtractor = new TestFilesExtractor();
+    const restoreStagingPreparer = new TestRestoreStagingPreparer();
     const workspace = new TestWorkspace();
 
     const service = new OtpvV3RestoreUnlockService(
@@ -52,6 +54,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       requiredContentExtractor,
       requiredContentValidator,
       filesExtractor,
+      restoreStagingPreparer,
       workspace,
     );
 
@@ -86,6 +89,9 @@ describe('OtpvV3RestoreUnlockService', (): void => {
     expect(filesExtractor.payloadFile).toBe(workspace.decryptedPayloadFile);
     expect(filesExtractor.destinationDirectory).toBe(workspace.filesDirectory);
     expect(workspace.removeDecryptedPayloadCalls).toBe(1);
+    expect(restoreStagingPreparer.calls).toBe(1);
+    expect(restoreStagingPreparer.workspace).toBe(workspace);
+    expect(restoreStagingPreparer.backupApiKey).toBe(BACKUP_KEY);
   });
 
   it('rechaza una selección caducada', async (): Promise<void> => {
@@ -101,6 +107,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRequiredContentExtractor(),
       new TestRequiredContentValidator(),
       new TestFilesExtractor(),
+      new TestRestoreStagingPreparer(),
       new TestWorkspace(),
     );
 
@@ -142,6 +149,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRequiredContentExtractor(),
       new TestRequiredContentValidator(),
       new TestFilesExtractor(),
+      new TestRestoreStagingPreparer(),
       workspace,
     );
 
@@ -190,6 +198,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRequiredContentExtractor(),
       new TestRequiredContentValidator(),
       new TestFilesExtractor(),
+      new TestRestoreStagingPreparer(),
       workspace,
     );
 
@@ -231,6 +240,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRequiredContentExtractor(),
       new TestRequiredContentValidator(),
       new TestFilesExtractor(),
+      new TestRestoreStagingPreparer(),
       workspace,
     );
 
@@ -276,6 +286,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRequiredContentExtractor(),
       contentValidator,
       new TestFilesExtractor(),
+      new TestRestoreStagingPreparer(),
       workspace,
     );
 
@@ -319,6 +330,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRequiredContentExtractor(),
       new TestRequiredContentValidator(),
       filesExtractor,
+      new TestRestoreStagingPreparer(),
       workspace,
     );
 
@@ -332,6 +344,99 @@ describe('OtpvV3RestoreUnlockService', (): void => {
     expect(workspace.clearCalls).toBe(1);
 
     expect(workspace.removeDecryptedPayloadCalls).toBe(0);
+  });
+
+  it('limpia un workspace anterior cuando la TPV Backup key está vacía', async (): Promise<void> => {
+    const manifest: OtpvV3Manifest = createManifest();
+
+    const store = new InMemoryOtpvV3RestoreSelectionStore();
+
+    const selectionId: string = store.save({
+      packagePath: 'C:\\backup.otpv',
+      manifest,
+    });
+
+    const workspace = new TestWorkspace();
+
+    const crypto = new TestCrypto();
+
+    const service = new OtpvV3RestoreUnlockService(
+      store,
+      new TestPackageInspector({
+        formatVersion: OTPV_V3_FORMAT_VERSION,
+        manifest,
+      }),
+      new TestPayloadExtractor(),
+      crypto,
+      new TestPayloadInspector(),
+      new TestRequiredContentExtractor(),
+      new TestRequiredContentValidator(),
+      new TestFilesExtractor(),
+      new TestRestoreStagingPreparer(),
+      workspace,
+    );
+
+    await expect(
+      service.unlock({
+        selectionId,
+        backupApiKey: '',
+      }),
+    ).rejects.toThrow('La TPV Backup key no es correcta o el archivo está dañado.');
+
+    expect(workspace.resetCalls).toBe(1);
+
+    expect(workspace.clearCalls).toBe(1);
+
+    expect(crypto.command).toBeNull();
+  });
+
+  it('limpia el workspace si falla la preparación del staging', async (): Promise<void> => {
+    const manifest: OtpvV3Manifest = createManifest();
+
+    const store = new InMemoryOtpvV3RestoreSelectionStore();
+
+    const selectionId: string = store.save({
+      packagePath: 'C:\\backup.otpv',
+      manifest,
+    });
+
+    const workspace = new TestWorkspace();
+
+    const restoreStagingPreparer = new TestRestoreStagingPreparer();
+
+    restoreStagingPreparer.preparationError = new Error('No se ha podido preparar el staging.');
+
+    const service = new OtpvV3RestoreUnlockService(
+      store,
+      new TestPackageInspector({
+        formatVersion: OTPV_V3_FORMAT_VERSION,
+        manifest,
+      }),
+      new TestPayloadExtractor(),
+      new TestCrypto(),
+      new TestPayloadInspector(),
+      new TestRequiredContentExtractor(),
+      new TestRequiredContentValidator(),
+      new TestFilesExtractor(),
+      restoreStagingPreparer,
+      workspace,
+    );
+
+    await expect(
+      service.unlock({
+        selectionId,
+        backupApiKey: BACKUP_KEY,
+      }),
+    ).rejects.toThrow('No se ha podido preparar el staging.');
+
+    expect(restoreStagingPreparer.calls).toBe(1);
+
+    /*
+     * El preparador real ya limpia por sí mismo;
+     * además el servicio vuelve a aplicar su
+     * protección general de error.
+     */
+    expect(workspace.clearCalls).toBe(1);
   });
 });
 
@@ -575,6 +680,32 @@ class TestFilesExtractor implements OtpvV3FilesExtractor {
 
     if (this.extractionError !== null) {
       return Promise.reject(this.extractionError);
+    }
+
+    return Promise.resolve();
+  }
+}
+
+/**
+ * Preparador de staging controlado
+ * para los tests de orquestación.
+ */
+class TestRestoreStagingPreparer implements OtpvV3RestoreStagingPreparer {
+  calls: number = 0;
+  workspace: OtpvV3RestoreWorkspace | null = null;
+  backupApiKey: string | null = null;
+  preparationError: Error | null = null;
+
+  /**
+   * Registra la preparación solicitada.
+   */
+  prepare(workspace: OtpvV3RestoreWorkspace, backupApiKey: string): Promise<void> {
+    this.calls += 1;
+    this.workspace = workspace;
+    this.backupApiKey = backupApiKey;
+
+    if (this.preparationError !== null) {
+      return Promise.reject(this.preparationError);
     }
 
     return Promise.resolve();

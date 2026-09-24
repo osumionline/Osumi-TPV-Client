@@ -6,6 +6,7 @@ import type OtpvV3PayloadInspector from '@backend/contracts/backup/otpv-v3-paylo
 import type OtpvV3RequiredContentExtractor from '@backend/contracts/backup/otpv-v3-required-content-extractor.interface';
 import type OtpvV3RequiredContentValidator from '@backend/contracts/backup/otpv-v3-required-content-validator.interface';
 import type OtpvV3RestoreSelectionStore from '@backend/contracts/backup/otpv-v3-restore-selection-store.interface';
+import type OtpvV3RestoreStagingPreparer from '@backend/contracts/backup/otpv-v3-restore-staging-preparer.interface';
 import type OtpvV3RestoreWorkspace from '@backend/contracts/backup/otpv-v3-restore-workspace.interface';
 import type OtpvPackageInspection from '@backend/domain/backup/otpv-package-inspection.type';
 import type OtpvV3RestoreSelection from '@backend/domain/backup/otpv-v3-restore-selection.interface';
@@ -31,6 +32,7 @@ export default class OtpvV3RestoreUnlockService {
     private readonly requiredContentExtractor: OtpvV3RequiredContentExtractor,
     private readonly requiredContentValidator: OtpvV3RequiredContentValidator,
     private readonly filesExtractor: OtpvV3FilesExtractor,
+    private readonly restoreStagingPreparer: OtpvV3RestoreStagingPreparer,
     private readonly workspace: OtpvV3RestoreWorkspace,
   ) {}
 
@@ -49,13 +51,12 @@ export default class OtpvV3RestoreUnlockService {
       );
     }
 
-    if (command.backupApiKey.length === 0) {
-      throw this.createOpenError();
-    }
-
     await this.workspace.reset();
 
     try {
+      if (command.backupApiKey.length === 0) {
+        throw this.createOpenError();
+      }
       await this.assertPackageHasNotChanged(selection);
 
       await this.payloadExtractor.extract(
@@ -92,6 +93,8 @@ export default class OtpvV3RestoreUnlockService {
       await this.workspace.removeEncryptedPayload();
 
       await this.workspace.removeDecryptedPayload();
+
+      await this.restoreStagingPreparer.prepare(this.workspace, command.backupApiKey);
 
       return {
         status: 'unlocked',

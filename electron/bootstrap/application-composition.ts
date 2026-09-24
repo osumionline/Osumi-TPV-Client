@@ -111,6 +111,7 @@ import type VentasTicketBaiRepository from '@backend/contracts/ventas/ventas-tic
 import type VentasTicketsRepository from '@backend/contracts/ventas/ventas-tickets.repository.interface';
 import DefaultLegacyImportReviewDecisionValidator from '@backend/domain/legacy-import/default-legacy-import-review-decision.validator';
 import FileOtpvV3RequiredContentValidator from '@infrastructure/backup/file-otpv-v3-required-content.validator';
+import FileOtpvV3RestoreStagingPreparer from '@infrastructure/backup/file-otpv-v3-restore-staging.preparer';
 import FileOtpvV3RestoreWorkspace from '@infrastructure/backup/file-otpv-v3-restore-workspace';
 import InMemoryOtpvV3RestoreSelectionStore from '@infrastructure/backup/in-memory-otpv-v3-restore-selection.store';
 import NodeOtpvV3Crypto from '@infrastructure/backup/node-otpv-v3-crypto';
@@ -758,6 +759,9 @@ export default function createApplicationComposition(
       otpvV3RestoreWorkspace,
     );
 
+  const otpvV3RestoreStagingPreparer: FileOtpvV3RestoreStagingPreparer =
+    new FileOtpvV3RestoreStagingPreparer(applicationPaths, stagingSecretStorage);
+
   const otpvV3RestoreUnlockService: OtpvV3RestoreUnlockService = new OtpvV3RestoreUnlockService(
     otpvV3RestoreSelectionStore,
     otpvPackageInspector,
@@ -767,6 +771,7 @@ export default function createApplicationComposition(
     otpvV3RequiredContentExtractor,
     otpvV3RequiredContentValidator,
     otpvV3FilesExtractor,
+    otpvV3RestoreStagingPreparer,
     otpvV3RestoreWorkspace,
   );
 
