@@ -26,7 +26,9 @@ export const OTPV_V3_SECRETS_ENTRY = 'secrets/secrets.json' as const;
 
 export const OTPV_V3_FILES_PREFIX = 'files/' as const;
 
-export const OTPV_V3_KDF_LENGTH_BYTES: number = 32;
+export const OTPV_V3_PORTABLE_SECRETS_SCHEMA_VERSION = 1 as const;
+
+export const OTPV_V3_KDF_LENGTH_BYTES = 32 as const;
 
 export const OTPV_V3_SALT_LENGTH_BYTES: number = 32;
 
