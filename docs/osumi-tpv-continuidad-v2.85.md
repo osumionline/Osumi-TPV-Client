@@ -1,10 +1,10 @@
-# Osumi TPV Client — Documento de continuidad v2.84
+# Osumi TPV Client — Documento de continuidad v2.85
 
-**Fecha:** 24 de septiembre de 2026  
+**Fecha:** 25 de septiembre de 2026  
 **Proyecto:** Osumi TPV Client  
 **Repositorio principal:** `https://github.com/osumionline/Osumi-TPV-Client`
 
-Este documento actualiza y sustituye como referencia de continuidad a `docs/osumi-tpv-continuidad-v2.83.md`.
+Este documento actualiza y sustituye como referencia de continuidad a `docs/osumi-tpv-continuidad-v2.84.md`.
 
 La fuente de verdad para continuar es:
 
@@ -88,6 +88,10 @@ npm run lint
 
 No continuar con errores.
 
+Regla expresa del usuario:
+
+> No proponer comandos individuales para validar mini-cambios. Cuando haya que validar un bloque, indicar únicamente la batería completa anterior.
+
 Cuando proceda, añadir prueba funcional real además de tests automáticos.
 
 ---
@@ -118,7 +122,7 @@ Incluye métodos públicos, privados, protegidos y métodos declarados en interf
 Referencia actual:
 
 ```text
-Angular 22.1.x
+Angular 22.2.x
 ```
 
 Convenciones:
@@ -207,29 +211,49 @@ https://github.com/igorosabel/indomable-frontend
 ▶️ Hito 21 — TPV Backup
    ✅ 21.1 Especificación `.otpv` v3
    ✅ 21.2 Exportador nativo del Client
-   ⏳ 21.3 Restauración nativa
+   ✅ 21.3 Restauración nativa v3
    ⏳ 21.4 Nueva app TPV Backup
    ⏳ 21.5 API almacenamiento remoto
    ⏳ 21.6 Integración Client ↔ Backup
    ⏳ 21.7 Seguridad/integridad/retención
-   ⏳ 21.8 Regresión recuperación
+   ⏳ 21.8 Regresión recuperación global
 
 ⏳ Hito 22 — Sincronización tienda online
 ⏸ TicketBAI 12C.9 — pendiente de Berein
 ```
 
-Último commit de `main` verificado el 24 de septiembre de 2026:
+Último commit de `main` verificado al crear este documento:
 
 ```text
-b80e1f7e11f9f917933de37696c0986508fb3d98
-Terminado Backup 21.2
+72503f69ebae7eed3ce2d5de6c4245880db88852
+Terminado Backup 21.3j
 ```
 
-Ese commit ya contiene las dos correcciones de tests tras el cambio de HKDF a scrypt. El usuario confirmó después que toda la batería de tests pasó, creó otro `.otpv` desde la aplicación y comprobó el manifest actualizado. Ha dado 21.2 por cerrado.
+Después de ese commit el usuario:
 
-Antes de continuar con código en otro chat, volver a consultar `main`: el usuario va a subir allí este documento de continuidad.
+- aplicó una corrección visual localizada en el campo de TPV Backup key para que la zona de `mat-error` tenga fondo transparente;
+- pasó correctamente la batería completa de tests;
+- realizó una restauración funcional real desde una copia `.otpv` v3 en una instalación limpia;
+- confirmó que la restauración terminó sin problemas;
+- dio **21.3 por cerrado**.
 
----
+Esos últimos cambios/validaciones todavía no aparecen en el `main` remoto verificado arriba. El usuario va a subir este documento y los cambios locales correspondientes antes de continuar.
+
+Tras la confirmación del push:
+
+> Volver a revisar `main` antes de tocar código.
+
+El siguiente trabajo no es 21.4 todavía. Primero hay un bloque de mantenimiento acordado y deliberadamente aplazado hasta terminar 21.3:
+
+```text
+Vitest 4 → 5
+```
+
+Después de cerrar esa actualización, continuar con:
+
+```text
+21.4 — Nueva app TPV Backup
+```
 
 # 5. Empleados — regla definitiva
 
@@ -773,25 +797,34 @@ better-sqlite3
 WAL habilitado
 ```
 
-Por tanto:
+Regla cerrada:
 
 > No copiar `osumi-tpv.sqlite` directamente mientras la aplicación está funcionando.
 
-21.2 debe generar un:
+21.2 genera un:
 
 ```text
 snapshot SQLite consistente
 ```
 
-El `.otpv` debe contener una SQLite autocontenida.
-
-No usar como estrategia:
+El `.otpv` contiene una SQLite autocontenida e independiente de:
 
 ```text
-copiar .sqlite + -wal + -shm
+-wal
+-shm
 ```
 
----
+La restauración v3 valida la SQLite extraída mediante una conexión `better-sqlite3`/TypeORM de **solo lectura**, sin activar WAL sobre el artefacto que va a restaurarse.
+
+La validación real incluye identidad, versión de esquema, tablas, metadatos, `integrity_check` y `foreign_key_check` mediante `DatabaseSchemaService`.
+
+`DATABASE_SCHEMA_VERSION` sigue siendo:
+
+```text
+1
+```
+
+No se ha introducido ninguna migración durante 21.3.
 
 # 14. Secretos actuales
 
@@ -967,7 +1000,7 @@ SecretStorage.load()
 ↓
 backupApiKey
 ↓
-backup automático
+backup automático/local
 ```
 
 Máquina nueva:
@@ -982,20 +1015,32 @@ El usuario proporciona:
 TPV Backup key
 ```
 
-Proceso:
+Flujo v3 implementado y validado:
 
-1. leer metadatos del paquete;
-2. derivar KEK;
-3. recuperar DEK;
-4. autenticar y descifrar payload;
-5. validar contenido;
-6. preparar staging;
-7. restaurar SQLite, app_data, logo y `files/**`;
-8. guardar secretos mediante `SecretStorage.save()`;
-9. `safeStorage` los cifra para el equipo nuevo;
-10. promoción final segura.
+1. seleccionar `.otpv`;
+2. detectar `formatVersion` y separar v2/v3;
+3. validar contenedor exterior y manifest;
+4. comprobar que el paquete no ha cambiado desde la selección;
+5. obtener externamente TPV Backup key;
+6. derivar KEK con scrypt;
+7. autenticar/recuperar DEK;
+8. autenticar y descifrar `payload.enc`;
+9. validar ZIP interior, límites, rutas, duplicados y symlinks;
+10. extraer y validar SQLite, `app_data.json`, logo y secretos portables;
+11. materializar `files/**`;
+12. reconstruir `InstallationSecretsData` combinando secretos portables + TPV Backup key externa;
+13. generar un nuevo `secrets.json` mediante `SecretStorage.save()` y `safeStorage` de la máquina destino;
+14. preparar staging canónico;
+15. vincular el staging a `selectionId + backupId`;
+16. verificar que no exista una instalación ya configurada;
+17. resetear la impresora local a `ticketPrinterDeviceName = null`;
+18. promover database/files/logo/secrets/app_data, con `app_data.json` el último;
+19. invalidar selección/estado preparado;
+20. recargar el renderer sobre la instalación restaurada.
 
----
+La restauración nativa v3 está diseñada para una **instalación limpia**. El backend impide promover una copia sobre una instalación ya configurada.
+
+La prueba funcional real A → `.otpv` → B fue completada con éxito por el usuario al cerrar 21.3.
 
 # 21. Nueva generación `.otpv`
 
@@ -1070,23 +1115,63 @@ keyWrap (AES-256-GCM, iv, authTag, wrappedDek)
 payload (payload.enc, ZIP, AES-256-GCM, iv, authTag)
 ```
 
-`authenticatedData` son los bytes JSON canónicos, codificados en Base64, de los metadatos críticos en el orden formalizado. La restauración debe usarlos como AAD y comprobar su coherencia con el manifest.
+`authenticatedData` son los bytes JSON canónicos, codificados en Base64, de los metadatos críticos en el orden formalizado. La restauración usa esos bytes como AAD y además parsea/compara su contenido con el manifest.
 
-No se exponen en el manifest datos del negocio ni secretos. Los límites, rutas permitidas, validación y compatibilidad constan en la especificación v3. El ejemplo JSON de esa especificación muestra `kdf` y `keyWrap` consecutivos sin una coma entre ambos: es una errata documental; el contrato tipado y el código generan objetos JSON válidos. Puede corregirse al abordar 21.3.
+No se exponen en el manifest datos del negocio ni secretos.
 
----
+El contenedor exterior debe tener exactamente:
+
+```text
+manifest.json
+payload.enc
+```
+
+Los límites, rutas permitidas, validación, compatibilidad y secuencia de restauración constan en `docs/osumi-tpv-backup-v3.md`, que debe seguir tratándose como especificación autoritativa del formato.
 
 # 24. Integridad
 
-El legacy usa `checksums.json` y SHA-256. V3 no requiere `checksums.json`: AES-256-GCM autentica tanto el wrapped DEK como el payload. El AAD vincula los metadatos críticos. Una autenticación fallida invalida la copia.
+El legacy usa `checksums.json` y SHA-256.
 
-El ZIP interior, sus rutas, límites y documentos obligatorios se validarán **antes** de promover datos restaurados. Seguir los requisitos exactos de `docs/osumi-tpv-backup-v3.md`.
+V3 no requiere `checksums.json`:
 
----
+```text
+AES-256-GCM
+```
+
+autentica tanto el wrapped DEK como el payload. El AAD vincula los metadatos críticos.
+
+Una autenticación fallida invalida completamente la copia.
+
+Mensaje funcional genérico para clave incorrecta/corrupción:
+
+```text
+No se puede abrir la copia de seguridad. La TPV Backup key no es correcta o el archivo está dañado.
+```
+
+La restauración valida antes de la promoción:
+
+- tamaño exterior;
+- estructura exacta del ZIP exterior;
+- manifest y metadatos autenticados;
+- parámetros criptográficos;
+- ZIP interior;
+- límites por entrada y acumulados mientras se leen streams reales;
+- rutas seguras;
+- duplicados;
+- symlinks;
+- raíces permitidas;
+- recursos obligatorios;
+- SQLite real;
+- `app_data.json`;
+- secretos portables;
+- WebP del logo;
+- `files/**`.
+
+Ningún recurso definitivo se promociona antes de completar estas comprobaciones.
 
 # 25. Staging y restauración
 
-El Client ya dispone de staging:
+El Client dispone del staging canónico:
 
 ```text
 staging/
@@ -1097,7 +1182,7 @@ staging/
 └── files/
 ```
 
-La instalación actual promociona en orden:
+La promoción usa el orden:
 
 ```text
 database
@@ -1109,21 +1194,61 @@ app_data
 
 `app_data.json` se mueve el último como marcador de instalación completa.
 
-Hito 21.3 debe reutilizar la misma filosofía:
+La restauración v3 implementa además un workspace previo:
 
 ```text
+staging/restore-work/
+├── required/
+│   ├── database/osumi-tpv.sqlite
+│   ├── config/app_data.json
+│   ├── assets/logo.webp
+│   └── secrets/secrets.json   ← portable
+└── files/**
+```
+
+Secuencia real:
+
+```text
+descifrar
+↓
 validar completamente
 ↓
-preparar staging
+materializar restore-work
+↓
+reconstruir secrets.json local mediante safeStorage
+↓
+preparar staging canónico
+↓
+eliminar restore-work / payloads temporales
+↓
+comprobar selectionId + backupId
 ↓
 promover
 ↓
-marcador final
+app_data como marcador final
+```
+
+El estado preparado está ligado explícitamente a:
+
+```text
+selectionId + backupId
+```
+
+Seleccionar otro paquete invalida y limpia cualquier staging v3 previamente preparado.
+
+Ante error de promoción se utiliza `InstallationFinalizer.recover()`; el arranque de Electron también ejecuta `recover()` antes de construir el grafo de dependencias.
+
+`printing_settings.json` no se restaura. Antes de la promoción se deja:
+
+```json
+{
+  "schemaVersion": 1,
+  "ticketPrinterDeviceName": null
+}
 ```
 
 No escribir directamente sobre la instalación definitiva durante la validación.
 
----
 # 26. TPV Backup nuevo — principios
 
 La app OFW8 antigua se reconstruirá.
@@ -1158,44 +1283,242 @@ sirve como referencia, pero la política definitiva debe cerrarse durante Hito 2
 
 ## ✅ 21.1 — Especificación `.otpv` v3
 
-Contrato documentado en `docs/osumi-tpv-backup-v3.md`: contenedor exterior con `manifest.json` y `payload.enc`, ZIP interior, metadatos autenticados, scrypt, DEK/KEK y AES-256-GCM, snapshot SQLite, secretos portables sin `backupApiKey`, entradas permitidas, límites, seguridad de rutas y compatibilidad. Es la referencia para el importador.
+Contrato documentado en `docs/osumi-tpv-backup-v3.md`: contenedor exterior con `manifest.json` y `payload.enc`, ZIP interior, metadatos autenticados, scrypt, DEK/KEK y AES-256-GCM, snapshot SQLite, secretos portables sin `backupApiKey`, entradas permitidas, límites, seguridad de rutas y compatibilidad.
 
 ## ✅ 21.2 — Exportador nativo del Client
 
-Implementados snapshot SQLite consistente, inventario portable (incluye `assets/files/**`), serialización de secretos lógicos sin la clave maestra, ZIP interior, cifrado streaming con DEK aleatoria, KEK mediante `scrypt`, manifest, ZIP exterior y limpieza de temporales.
+Implementados snapshot SQLite consistente, inventario portable completo de `assets/files/**`, secretos lógicos sin la clave maestra, ZIP interior, cifrado streaming, DEK aleatoria, KEK mediante scrypt, manifest, ZIP exterior y limpieza de temporales.
 
-Evolución final:
+La creación funcional de `.otpv` desde la aplicación fue probada y aceptada por el usuario.
+
+## ✅ 21.3 — Restauración nativa v3 — CERRADO
+
+Desarrollo realizado por bloques incrementales:
 
 ```text
-21.2f: corrección de rutas temporales y creación funcional en Windows
-21.2g: se excluye backupApiKey del payload; HKDF → scrypt
-b80e1f7: corregidas las dos expectativas de test que aún usaban HKDF
+21.3a ✅ Detección/inspección inicial v2-v3
+21.3b ✅ Stores y routing común de selección
+21.3c ✅ Selección real Electron + IPC/preload
+21.3d ✅ Extracción payload.enc + AES-GCM + workspace
+21.3e ✅ Validación estricta del ZIP interior
+21.3f ✅ Extracción/validación semántica de recursos obligatorios
+21.3g ✅ Materialización de files/** + limpieza de payloads
+21.3h ✅ Reconstrucción de secretos safeStorage + staging canónico
+21.3i ✅ Promoción final segura + estado preparado + recovery
+21.3j ✅ UI Angular de restauración desde /instalacion
+21.3k ✅ Regresión funcional real A → .otpv → B
 ```
 
-Validación comunicada por el usuario: `npm test`, `npm run build`, `npm run test:electron`, `npm run build:electron` y `npm run lint` correctos; nueva creación funcional de `.otpv` desde la aplicación y manifest comprobado con la nueva suite. **21.2 aceptado y cerrado por el usuario.**
+### 21.3a
 
-Los `.otpv` de desarrollo generados antes de 21.2g usan el contrato anterior; no deben tomarse como v3 definitivo.
+Se introdujo inspección común del paquete y clasificación explícita:
 
-## ⏳ 21.3 — Restauración nativa
+```text
+v2 → legacy-import
+v3 → native-restore
+```
 
-- detectar `formatVersion = 3` y conservar el flujo v2 legacy;
-- obtener TPV Backup key de forma externa cuando haga falta;
-- validar contenedor exterior y manifest;
-- derivar KEK, autenticar DEK y payload;
-- validar ZIP interior, límites y rutas, documentos, configuración y SQLite;
-- preparar staging, reconstruir los secretos con la clave aportada;
-- promoción final segura y recuperación ante fallos;
-- tests de integridad, compatibilidad y restauración real en otra instalación.
+Nunca reinterpretar silenciosamente un formato como otro.
 
-Dividir en bloques coherentes y verificables tras leer el código existente. No asumir que el importador v2 es apto para v3.
+### 21.3b–c
+
+Se añadieron stores/servicios de selección y ruta Electron común. La información sensible del manifest, rutas físicas y datos criptográficos no se exponen al renderer.
+
+### 21.3d
+
+Se implementaron:
+
+- extracción segura de `payload.enc`;
+- validación de que el `.otpv` no cambió tras seleccionarlo;
+- derivación scrypt;
+- unwrap de DEK;
+- descifrado AES-256-GCM;
+- workspace temporal de restore;
+- limpieza integral ante error.
+
+La TPV Backup key se usa exactamente como se introduce, sin `trim` ni normalización.
+
+### 21.3e
+
+El ZIP interior se inspecciona con yauzl y lectura real de streams. Se comprueban:
+
+```text
+máximo 50.000 entradas
+máximo 2 GiB por entrada
+máximo 16 GiB total
+rutas <= 1.024 caracteres
+sin cifrado ZIP
+sin duplicados
+sin symlinks
+sin path traversal
+raíces permitidas
+recursos obligatorios
+```
+
+### 21.3f
+
+Se materializan y validan semánticamente:
+
+```text
+database/osumi-tpv.sqlite
+config/app_data.json
+assets/logo.webp
+secrets/secrets.json
+```
+
+Detalles importantes:
+
+- SQLite validada en modo read-only, sin activar WAL sobre la copia;
+- `DatabaseSchemaService.validate()` sobre SQLite real;
+- `app_data.json` validado mediante el repositorio real;
+- secretos portables con contrato exacto y sin `backupApiKey`;
+- logo realmente WebP, estático y dentro de límites;
+- Sharp recibe el logo como Buffer para evitar locks `EBUSY` en Windows.
+
+Límites semánticos actuales:
+
+```text
+app_data.json       16 MiB
+secrets.json         1 MiB
+logo.webp            5 MiB
+logo dimensiones     4096 × 4096
+```
+
+### 21.3g
+
+Se materializa toda la jerarquía segura `files/**` conservando rutas relativas. Una vez materializado el contenido portable completo se eliminan `payload.enc` y `payload.zip`.
+
+### 21.3h
+
+Los secretos portables se combinan con la TPV Backup key externa:
+
+```text
+secretApi        ← payload
+backupApiKey     ← input externo exacto
+emailSmtpPass    ← payload
+ticketBaiToken   ← payload
+```
+
+Después se genera un nuevo `staging/secrets.json` mediante Electron `safeStorage` de la máquina destino.
+
+El staging canónico queda:
+
+```text
+staging/osumi-tpv.sqlite
+staging/files/**
+staging/logo.webp
+staging/secrets.json
+staging/app_data.json
+```
+
+`app_data.json` se prepara el último.
+
+### 21.3i
+
+Se introdujo estado de restore preparado ligado a:
+
+```text
+selectionId + backupId
+```
+
+La finalización:
+
+- rechaza staging de otra selección;
+- rechaza restaurar sobre instalación ya configurada;
+- resetea impresora local;
+- usa `InstallationFinalizer.finalize()`;
+- usa `recover()` ante promoción fallida;
+- invalida selección/estado tras éxito.
+
+### 21.3j
+
+`/instalacion` tiene tres modos:
+
+```text
+Configurar una nueva instalación
+Importar Osumi TPV anterior
+Restaurar copia de seguridad
+```
+
+El restore nativo permite:
+
+```text
+seleccionar .otpv
+↓
+mostrar metadatos v3
+↓
+introducir TPV Backup key
+↓
+validar y preparar
+↓
+activar restauración
+↓
+Entrar en Osumi TPV
+```
+
+Si se selecciona un v2 desde el flujo nativo, la UI indica que debe usarse `Importar Osumi TPV anterior`.
+
+La TPV Backup key usa Signal Forms y se elimina del estado del renderer después de preparar correctamente el staging.
+
+### 21.3k — regresión final local
+
+El usuario realizó una prueba funcional real:
+
+```text
+instalación A
+↓
+crear backup .otpv v3
+↓
+instalación B limpia
+↓
+seleccionar backup
+↓
+introducir TPV Backup key
+↓
+validar/preparar
+↓
+activar
+↓
+instalación restaurada correctamente
+```
+
+Resultado comunicado:
+
+> Restauración completada sin ningún problema.
+
+Con esa prueba, **21.3 queda oficialmente cerrado**.
+
+También se corrigió visualmente el `mat-form-field` de la TPV Backup key para que la zona inferior reservada a `mat-error` sea transparente y no destaque en blanco sobre el fondo de la pantalla.
+
+## 🔧 Mantenimiento inmediato — Vitest 4 → 5
+
+Este bloque fue aplazado expresamente hasta terminar 21.3.
+
+Estado actual antes de actualizar:
+
+```text
+vitest ^4.1.11
+Angular ^22.2.0
+```
+
+Debe tratarse como mantenimiento aislado, sin mezclar funcionalidad de Backup:
+
+- revisar `package.json` y `package-lock.json`;
+- revisar `electron/vitest.config.mts` y compatibilidad Vite/Vitest;
+- actualizar Vitest 4 → 5;
+- corregir únicamente incompatibilidades derivadas de la actualización;
+- pasar tests Angular + Electron y la batería completa;
+- no introducir cambios funcionales de Hito 21.
+
+Tras cerrar este mantenimiento:
 
 ## ⏳ 21.4 — Nueva app TPV Backup
 
-Reconstrucción moderna.
+Reconstrucción moderna de la aplicación de custodia de backups. Antes de diseñarla, volver a estudiar el repositorio legacy `osumionline/Backup-TPV` y el estado actual del ecosistema.
 
 ## ⏳ 21.5 — API remota
 
-Endpoints versionados.
+Endpoints versionados para autenticación, upload, listado, descarga y borrado.
 
 ## ⏳ 21.6 — Integración Client ↔ Backup
 
@@ -1209,73 +1532,92 @@ estado última copia
 
 ## ⏳ 21.7 — Seguridad / integridad / retención
 
-- autenticación derivada;
+- autenticación derivada independiente de la KEK;
 - rate limiting;
 - límites;
 - auditoría;
 - retención;
 - errores.
 
-## ⏳ 21.8 — Regresión
+## ⏳ 21.8 — Regresión global de recuperación
 
-Prueba principal:
+La prueba A → B de 21.3 ya valida el round-trip local del `.otpv` v3.
+
+21.8 será la regresión del sistema completo una vez existan app remota + API + integración:
 
 ```text
-instalación A
+Client A
 ↓
-backup .otpv
+backup v3
 ↓
-máquina limpia B
+TPV Backup remoto
+↓
+descarga
+↓
+Client B limpio
 ↓
 restauración
 ↓
-instalación B funcionalmente equivalente
+B funcionalmente equivalente
 ```
-
----
 
 # 28. Riesgos Hito 21
 
 ## SQLite + WAL
 
-Riesgo:
+Riesgo original:
 
 ```text
 copia inconsistente
 ```
 
-Mitigación:
+Mitigación ya implementada:
 
 ```text
-backup API/snapshot SQLite adecuado
+snapshot SQLite consistente
++
+validación read-only al restaurar
 ```
 
 ## Secretos en temporales
 
-Objetivo:
+Reglas vigentes:
 
-> Evitar materializar secretos en claro en disco.
-
-Si fuera imprescindible:
-
-- permisos restrictivos;
-- temporales no predecibles;
-- limpieza en `finally`;
-- ningún secreto en logs.
+- `backupApiKey` nunca se incluye en el payload;
+- secretos portables solo existen dentro del payload cifrado y en `restore-work` durante la restauración;
+- buffers sensibles se ponen a cero cuando procede;
+- `restore-work` se limpia tras preparar staging;
+- secretos finales se regeneran con `safeStorage` del equipo destino;
+- no registrar secretos en logs.
 
 ## ZIP / contenedor malicioso
 
-Al importar:
+Mitigaciones implementadas en restore v3:
 
-- limitar número de entradas;
-- limitar tamaño por entrada;
-- limitar tamaño descomprimido total;
-- rechazar `../`;
-- rechazar rutas absolutas;
-- rechazar drive letters;
-- no seguir symlinks inesperados.
+- límites de entradas/tamaños;
+- validación de streams reales;
+- rechazo de `../`;
+- rechazo de rutas absolutas;
+- rechazo de drive letters;
+- rechazo de backslashes/rutas no canónicas;
+- rechazo de symlinks;
+- rechazo de duplicados;
+- raíces permitidas explícitas;
+- requeridos explícitos.
 
-El importador legacy ya contiene defensas de path traversal que sirven de referencia.
+## Staging cruzado entre selecciones
+
+Riesgo detectado durante 21.3:
+
+> preparar una copia A, seleccionar B y promocionar accidentalmente el staging de A.
+
+Mitigación implementada:
+
+```text
+prepared restore = selectionId + backupId
+```
+
+Una nueva selección invalida y limpia el staging preparado anterior.
 
 ## Pérdida de Backup key
 
@@ -1287,9 +1629,20 @@ backupApiKey
 
 las copias v3 cifradas son irrecuperables.
 
-La UX futura debe advertirlo claramente.
+La UX futura del servicio remoto debe advertirlo claramente.
 
----
+## Servicio remoto
+
+Riesgos todavía pendientes para 21.4–21.7:
+
+- diseño de credencial de autenticación remota separada de la KEK;
+- límites de subida/descarga;
+- rate limiting;
+- retención;
+- auditoría;
+- borrado;
+- recuperación de errores de red;
+- garantías de que el servidor nunca necesita `backupApiKey` en claro.
 
 # 29. Hito 22 — Sincronización tienda online
 
@@ -1389,33 +1742,67 @@ No intercalarlo dentro de Hito 21 salvo novedad externa.
 
 # 31. Siguiente paso exacto
 
-El usuario va a añadir esta continuidad a `main`. **Esperar su confirmación del push** antes de empezar el siguiente bloque de desarrollo. Después:
+El usuario va a subir esta continuidad a `main` junto con los últimos cambios locales del cierre de 21.3.
 
-1. revisar el nuevo `main` y `docs/osumi-tpv-backup-v3.md`;
-2. inspeccionar el importador de paquetes legacy v2, el flujo de instalación/staging, `SecretStorage`, los validadores y servicios del exportador v3;
-3. definir y proponer la primera unidad pequeña y verificable de **21.3 — restauración nativa v3**;
-4. mantener el enrutamiento v2/v3 explícito y la clave maestra externa al `.otpv`;
-5. seguir la batería de validación y una prueba funcional de restauración cuando ya exista el flujo completo.
+**Esperar su confirmación del push antes de continuar.**
 
-No iniciar 21.4 ni el servicio remoto hasta que corresponda en el plan.
+Después:
 
----
+1. volver a revisar el nuevo `main`;
+2. confirmar que el cierre de 21.3 y la corrección visual del restore están presentes;
+3. iniciar el bloque aislado de mantenimiento **Vitest 4 → 5**;
+4. antes de proponer cambios, revisar exactamente:
+   - `package.json`;
+   - `package-lock.json`;
+   - `electron/vitest.config.mts`;
+   - scripts de tests Angular/Electron;
+   - cualquier dependencia Vite/Vitest relevante;
+5. no mezclar la actualización de Vitest con funcionalidad de Backup;
+6. ejecutar únicamente la batería completa de validación acordada;
+7. una vez cerrado Vitest 5, revisar de nuevo `main` y comenzar planificación/implementación de **21.4 — nueva app TPV Backup**.
 
-# 32. Estado al cerrar v2.84
+No iniciar 21.5/21.6 antes de cerrar el diseño y alcance de 21.4.
+
+No reabrir 21.3 salvo regresión real demostrada.
+
+# 32. Estado al cerrar v2.85
 
 ```text
 Hito 20: CERRADO.
 Hito 21.1: especificación v3 CERRADA.
 Hito 21.2: exportador nativo CERRADO y probado funcionalmente.
-Hito 21.3: siguiente bloque; aún no implementado.
+Hito 21.3: restauración nativa v3 CERRADA y probada A → B.
+Mantenimiento Vitest 4 → 5: SIGUIENTE.
+Hito 21.4: pendiente tras mantenimiento Vitest.
+Hito 21.5–21.8: pendientes.
 Hito 22: pendiente tras Hito 21.
 TicketBAI 12C.9: pausado hasta respuesta/actualización de Berein.
+```
+
+Último `main` remoto verificado al redactar este documento:
+
+```text
+72503f69ebae7eed3ce2d5de6c4245880db88852
+Terminado Backup 21.3j
+```
+
+Después de ese commit, pero antes de subir v2.85:
+
+```text
+corrección visual TPV Backup key            ✅
+batería completa de tests                   ✅
+regresión funcional A → .otpv → B          ✅
+21.3 cerrado por el usuario                 ✅
 ```
 
 La siguiente conversación puede empezar con:
 
 ```text
-He subido osumi-tpv-continuidad-v2.84.md a main.
-Revisa el último commit y empecemos 21.3 — restauración nativa v3
-con el primer bloque pequeño y verificable.
+He subido osumi-tpv-continuidad-v2.85.md y los últimos cambios a main.
+Revisa el último commit y empecemos el bloque aislado de mantenimiento
+Vitest 4 → 5. No mezcles esta actualización con funcionalidad de Backup.
 ```
+
+---
+
+**Fin del documento de continuidad v2.85.**
