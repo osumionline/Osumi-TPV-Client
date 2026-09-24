@@ -10,9 +10,9 @@
         </h1>
 
         <p class="setup-choice__description">
-            Puedes configurar una instalación vacía
-            o recuperar toda la información de una
-            instalación anterior de Osumi TPV.
+            Puedes configurar una instalación vacía,
+            importar una instalación anterior o restaurar
+            una copia de seguridad creada por Osumi TPV Client.
         </p>
     </section>
 
@@ -69,6 +69,31 @@
                 →
             </span>
         </button>
+
+        <button type="button"
+                class="setup-option"
+                (click)="selectNativeRestore()">
+            <span class="setup-option__icon"
+                  aria-hidden="true">
+                ↻
+            </span>
+
+            <span class="setup-option__content">
+                <strong>
+                    Restaurar copia de seguridad
+                </strong>
+
+                <span>
+                    Recupera una copia .otpv nativa creada
+                    previamente por Osumi TPV Client.
+                </span>
+            </span>
+
+            <span class="setup-option__arrow"
+                  aria-hidden="true">
+                →
+            </span>
+        </button>
     </section>
 </main>
 }
@@ -90,6 +115,10 @@
 
     @case ('legacy-import') {
     <otpv-legacy-import />
+    }
+
+    @case ('native-restore') {
+    <otpv-native-restore />
     }
     }
 </section>

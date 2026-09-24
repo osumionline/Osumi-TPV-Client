@@ -1,0 +1,335 @@
+<main class="native-restore">
+    @if (installedResult(); as result) {
+    <section class="restore-completed"
+             aria-live="polite">
+        <mat-icon aria-hidden="true">
+            task_alt
+        </mat-icon>
+
+        <div>
+            <p class="native-restore__eyebrow">
+                Restauración completada
+            </p>
+
+            <h1>
+                La copia de seguridad ya está activa
+            </h1>
+
+            <p>
+                La base de datos, la configuración,
+                los archivos y los secretos se han
+                restaurado correctamente.
+            </p>
+
+            <p>
+                La impresora de tickets no se ha
+                restaurado porque es una configuración
+                local de este equipo.
+            </p>
+
+            <small>
+                Backup ID: {{ result.backupId }}
+            </small>
+
+            <button type="button"
+                    matButton="filled"
+                    (click)="finishRestore()">
+                <mat-icon>
+                    login
+                </mat-icon>
+
+                Entrar en Osumi TPV
+            </button>
+        </div>
+    </section>
+    }
+    @else {
+    <header class="native-restore__header">
+        <p class="native-restore__eyebrow">
+            Restauración
+        </p>
+
+        <h1>
+            Restaurar una copia de seguridad
+        </h1>
+
+        <p>
+            Selecciona una copia nativa .otpv creada
+            por Osumi TPV Client. Antes de activar la
+            instalación se comprobarán el cifrado,
+            la estructura y todo su contenido.
+        </p>
+    </header>
+
+    <section class="restore-information">
+        <mat-icon aria-hidden="true">
+            verified_user
+        </mat-icon>
+
+        <div>
+            <h2>
+                Restauración completa
+            </h2>
+
+            <p>
+                Se recuperarán la base de datos,
+                configuración, logo, archivos y secretos
+                incluidos en la copia.
+            </p>
+
+            <p>
+                Necesitarás la misma TPV Backup key
+                utilizada para crearla.
+            </p>
+        </div>
+    </section>
+
+    <section class="restore-selection">
+        @if (selectedPackage(); as selectedPackage) {
+        <mat-card appearance="outlined"
+                  class="selected-package">
+            <mat-card-header>
+                <mat-icon mat-card-avatar
+                          aria-hidden="true">
+                    inventory_2
+                </mat-icon>
+
+                <mat-card-title>
+                    {{ selectedPackage.fileName }}
+                </mat-card-title>
+
+                <mat-card-subtitle>
+                    Copia nativa .otpv v3
+                </mat-card-subtitle>
+            </mat-card-header>
+
+            <mat-card-content>
+                <dl class="selected-package__details">
+                    <div>
+                        <dt>
+                            Creada
+                        </dt>
+
+                        <dd>
+                            {{ formatDate(selectedPackage.createdAt) }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>
+                            Versión del Client
+                        </dt>
+
+                        <dd>
+                            {{ selectedPackage.applicationVersion }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>
+                            Esquema de base de datos
+                        </dt>
+
+                        <dd>
+                            {{ selectedPackage.databaseSchemaVersion }}
+                        </dd>
+                    </div>
+
+                    <div>
+                        <dt>
+                            Backup ID
+                        </dt>
+
+                        <dd class="selected-package__backup-id">
+                            {{ selectedPackage.backupId }}
+                        </dd>
+                    </div>
+                </dl>
+            </mat-card-content>
+
+            @if (unlockResult() === null) {
+            <mat-card-actions align="end">
+                <button type="button"
+                        matButton
+                        [disabled]="unlocking()"
+                        (click)="clearSelection()">
+                    <mat-icon>
+                        close
+                    </mat-icon>
+
+                    Quitar
+                </button>
+            </mat-card-actions>
+            }
+        </mat-card>
+        }
+        @else {
+        <button type="button"
+                matButton="filled"
+                [disabled]="selecting()"
+                (click)="selectPackage()">
+            <mat-icon>
+                {{ selecting() ? 'hourglass_top' : 'folder_open' }}
+            </mat-icon>
+
+            {{
+                selecting()
+                    ? 'Seleccionando…'
+                    : 'Seleccionar copia .otpv'
+            }}
+        </button>
+        }
+
+        @if (selectionError(); as errorMessage) {
+        <p class="restore-error"
+           role="alert">
+            {{ errorMessage }}
+        </p>
+        }
+    </section>
+
+    @if (
+    selectedPackage() !== null &&
+    unlockResult() === null
+    ) {
+    <section class="restore-key">
+        <header>
+            <h2>
+                TPV Backup key
+            </h2>
+
+            <p>
+                Introduce exactamente la clave utilizada
+                para crear la copia. No se modifican
+                espacios ni ningún otro carácter.
+            </p>
+        </header>
+
+        <mat-form-field>
+            <mat-label>
+                TPV Backup key
+            </mat-label>
+
+            <input matInput
+                   autocomplete="off"
+                   [type]="backupApiKeyVisible() ? 'text' : 'password'"
+                   [formField]="restoreForm.backupApiKey">
+
+            <button mat-icon-button
+                    matSuffix
+                    type="button"
+                    [attr.aria-label]="
+                        backupApiKeyVisible()
+                            ? 'Ocultar TPV Backup key'
+                            : 'Mostrar TPV Backup key'
+                    "
+                    (click)="toggleBackupApiKeyVisibility()">
+                <mat-icon>
+                    {{
+                        backupApiKeyVisible()
+                            ? 'visibility_off'
+                            : 'visibility'
+                    }}
+                </mat-icon>
+            </button>
+
+            @if (
+            keyValidationRequested() &&
+            restoreForm.backupApiKey().invalid()
+            ) {
+            <mat-error>
+                {{
+                    restoreForm.backupApiKey()
+                        .errors()[0]?.message
+                }}
+            </mat-error>
+            }
+        </mat-form-field>
+
+        <button type="button"
+                matButton="filled"
+                [disabled]="unlocking()"
+                (click)="unlockRestore()">
+            <mat-icon>
+                {{ unlocking() ? 'hourglass_top' : 'lock_open' }}
+            </mat-icon>
+
+            {{
+                unlocking()
+                    ? 'Validando copia…'
+                    : 'Validar y preparar restauración'
+            }}
+        </button>
+
+        @if (unlockError(); as errorMessage) {
+        <p class="restore-error"
+           role="alert">
+            {{ errorMessage }}
+        </p>
+        }
+    </section>
+    }
+
+    @if (unlockResult(); as unlocked) {
+    <section class="restore-ready"
+             aria-live="polite">
+        <mat-icon aria-hidden="true">
+            verified
+        </mat-icon>
+
+        <div>
+            <h2>
+                Copia validada y preparada
+            </h2>
+
+            <p>
+                El cifrado, la base de datos,
+                la configuración y los archivos han
+                superado todas las comprobaciones.
+            </p>
+
+            <p>
+                Al activar la restauración se convertirá
+                este staging validado en la instalación
+                definitiva.
+            </p>
+
+            <p class="restore-ready__warning">
+                La configuración local de la impresora
+                quedará sin asignar y deberá elegirse
+                posteriormente desde Gestión → Ajustes.
+            </p>
+
+            <small>
+                Backup ID: {{ unlocked.backupId }}
+            </small>
+
+            <button type="button"
+                    matButton="filled"
+                    [disabled]="finalizing()"
+                    (click)="finalizeRestore()">
+                <mat-icon>
+                    {{
+                        finalizing()
+                            ? 'hourglass_top'
+                            : 'restore'
+                    }}
+                </mat-icon>
+
+                {{
+                    finalizing()
+                        ? 'Activando restauración…'
+                        : 'Activar copia restaurada'
+                }}
+            </button>
+        </div>
+    </section>
+    }
+    @if (finalizeError(); as errorMessage) {
+    <p class="restore-error"
+       role="alert">
+        {{ errorMessage }}
+    </p>
+    }
+    }
+</main>
