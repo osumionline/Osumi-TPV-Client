@@ -13,6 +13,7 @@ export default class FileOtpvV3RestoreWorkspace implements OtpvV3RestoreWorkspac
   readonly appDataFile: string;
   readonly logoFile: string;
   readonly portableSecretsFile: string;
+  readonly filesDirectory: string;
 
   /**
    * Crea el workspace dentro del directorio indicado.
@@ -24,6 +25,7 @@ export default class FileOtpvV3RestoreWorkspace implements OtpvV3RestoreWorkspac
     this.appDataFile = join(this.workDirectory, 'required', 'config', 'app_data.json');
     this.logoFile = join(this.workDirectory, 'required', 'assets', 'logo.webp');
     this.portableSecretsFile = join(this.workDirectory, 'required', 'secrets', 'secrets.json');
+    this.filesDirectory = join(this.workDirectory, 'files');
   }
 
   /**
@@ -54,6 +56,16 @@ export default class FileOtpvV3RestoreWorkspace implements OtpvV3RestoreWorkspac
   async clear(): Promise<void> {
     await rm(this.workDirectory, {
       recursive: true,
+      force: true,
+    });
+  }
+
+  /**
+   * Elimina el ZIP interior en claro una vez
+   * que todos sus recursos han sido materializados.
+   */
+  async removeDecryptedPayload(): Promise<void> {
+    await rm(this.decryptedPayloadFile, {
       force: true,
     });
   }

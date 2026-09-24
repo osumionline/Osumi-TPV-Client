@@ -226,6 +226,7 @@ class TestRestoreWorkspace implements OtpvV3RestoreWorkspace {
   readonly logoFile: string = 'C:\\staging\\restore-work\\required\\assets\\logo.webp';
   readonly portableSecretsFile: string =
     'C:\\staging\\restore-work\\required\\secrets\\secrets.json';
+  readonly filesDirectory: string = 'C:\\staging\\restore-work\\files';
 
   /**
    * No necesita preparación real en estos tests.
@@ -245,6 +246,13 @@ class TestRestoreWorkspace implements OtpvV3RestoreWorkspace {
    * No existe workspace real que limpiar.
    */
   clear(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  /**
+   * No existe payload descifrado real que eliminar.
+   */
+  removeDecryptedPayload(): Promise<void> {
     return Promise.resolve();
   }
 }

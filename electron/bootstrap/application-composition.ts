@@ -116,6 +116,7 @@ import InMemoryOtpvV3RestoreSelectionStore from '@infrastructure/backup/in-memor
 import NodeOtpvV3Crypto from '@infrastructure/backup/node-otpv-v3-crypto';
 import YauzlOtpvPackageInspector from '@infrastructure/backup/yauzl-otpv-package.inspector';
 import YauzlOtpvV3EncryptedPayloadExtractor from '@infrastructure/backup/yauzl-otpv-v3-encrypted-payload.extractor';
+import YauzlOtpvV3FilesExtractor from '@infrastructure/backup/yauzl-otpv-v3-files.extractor';
 import YauzlOtpvV3PayloadInspector from '@infrastructure/backup/yauzl-otpv-v3-payload.inspector';
 import YauzlOtpvV3RequiredContentExtractor from '@infrastructure/backup/yauzl-otpv-v3-required-content.extractor';
 import YazlOtpvV3PackageBuilder from '@infrastructure/backup/yazl-otpv-v3-package.builder';
@@ -748,6 +749,8 @@ export default function createApplicationComposition(
 
   const otpvV3PayloadInspector: YauzlOtpvV3PayloadInspector = new YauzlOtpvV3PayloadInspector();
 
+  const otpvV3FilesExtractor: YauzlOtpvV3FilesExtractor = new YauzlOtpvV3FilesExtractor();
+
   const backupRestoreSelectionService: BackupRestoreSelectionService =
     new BackupRestoreSelectionService(
       otpvPackageDialog,
@@ -763,6 +766,7 @@ export default function createApplicationComposition(
     otpvV3PayloadInspector,
     otpvV3RequiredContentExtractor,
     otpvV3RequiredContentValidator,
+    otpvV3FilesExtractor,
     otpvV3RestoreWorkspace,
   );
 

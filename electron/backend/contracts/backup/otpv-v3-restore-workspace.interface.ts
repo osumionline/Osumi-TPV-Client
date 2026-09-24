@@ -3,6 +3,7 @@ import type OtpvV3RequiredContentPaths from '@backend/contracts/backup/otpv-v3-r
 export default interface OtpvV3RestoreWorkspace extends OtpvV3RequiredContentPaths {
   readonly encryptedPayloadFile: string;
   readonly decryptedPayloadFile: string;
+  readonly filesDirectory: string;
 
   /**
    * Reinicia el espacio temporal utilizado
@@ -15,6 +16,12 @@ export default interface OtpvV3RestoreWorkspace extends OtpvV3RequiredContentPat
    * es necesario tras el descifrado.
    */
   removeEncryptedPayload(): Promise<void>;
+
+  /**
+   * Elimina el ZIP interior en claro una vez
+   * materializado todo su contenido portable.
+   */
+  removeDecryptedPayload(): Promise<void>;
 
   /**
    * Elimina por completo el espacio temporal

@@ -6,6 +6,7 @@ import type {
   OtpvV3EncryptionResult,
 } from '@backend/contracts/backup/otpv-v3-crypto.interface';
 import type OtpvV3EncryptedPayloadExtractor from '@backend/contracts/backup/otpv-v3-encrypted-payload-extractor.interface';
+import type OtpvV3FilesExtractor from '@backend/contracts/backup/otpv-v3-files-extractor.interface';
 import type { OtpvV3Manifest } from '@backend/contracts/backup/otpv-v3-manifest.interface';
 import type OtpvV3PayloadInspector from '@backend/contracts/backup/otpv-v3-payload-inspector.interface';
 import type OtpvV3RequiredContentExtractor from '@backend/contracts/backup/otpv-v3-required-content-extractor.interface';
@@ -36,6 +37,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
     const payloadInspector = new TestPayloadInspector();
     const requiredContentExtractor = new TestRequiredContentExtractor();
     const requiredContentValidator = new TestRequiredContentValidator();
+    const filesExtractor = new TestFilesExtractor();
     const workspace = new TestWorkspace();
 
     const service = new OtpvV3RestoreUnlockService(
@@ -49,6 +51,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       payloadInspector,
       requiredContentExtractor,
       requiredContentValidator,
+      filesExtractor,
       workspace,
     );
 
@@ -72,7 +75,6 @@ describe('OtpvV3RestoreUnlockService', (): void => {
     );
     expect(crypto.command?.sourceFile).toBe(workspace.encryptedPayloadFile);
     expect(crypto.command?.destinationFile).toBe(workspace.decryptedPayloadFile);
-
     expect(workspace.resetCalls).toBe(1);
     expect(workspace.removeEncryptedPayloadCalls).toBe(1);
     expect(workspace.clearCalls).toBe(0);
@@ -80,6 +82,10 @@ describe('OtpvV3RestoreUnlockService', (): void => {
     expect(payloadInspector.payloadFile).toBe(workspace.decryptedPayloadFile);
     expect(requiredContentExtractor.calls).toBe(1);
     expect(requiredContentValidator.calls).toBe(1);
+    expect(filesExtractor.calls).toBe(1);
+    expect(filesExtractor.payloadFile).toBe(workspace.decryptedPayloadFile);
+    expect(filesExtractor.destinationDirectory).toBe(workspace.filesDirectory);
+    expect(workspace.removeDecryptedPayloadCalls).toBe(1);
   });
 
   it('rechaza una selección caducada', async (): Promise<void> => {
@@ -94,6 +100,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestPayloadInspector(),
       new TestRequiredContentExtractor(),
       new TestRequiredContentValidator(),
+      new TestFilesExtractor(),
       new TestWorkspace(),
     );
 
@@ -134,6 +141,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestPayloadInspector(),
       new TestRequiredContentExtractor(),
       new TestRequiredContentValidator(),
+      new TestFilesExtractor(),
       workspace,
     );
 
@@ -181,6 +189,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestPayloadInspector(),
       new TestRequiredContentExtractor(),
       new TestRequiredContentValidator(),
+      new TestFilesExtractor(),
       workspace,
     );
 
@@ -221,6 +230,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       payloadInspector,
       new TestRequiredContentExtractor(),
       new TestRequiredContentValidator(),
+      new TestFilesExtractor(),
       workspace,
     );
 
@@ -265,6 +275,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestPayloadInspector(),
       new TestRequiredContentExtractor(),
       contentValidator,
+      new TestFilesExtractor(),
       workspace,
     );
 
@@ -278,6 +289,49 @@ describe('OtpvV3RestoreUnlockService', (): void => {
     expect(contentValidator.calls).toBe(1);
     expect(workspace.clearCalls).toBe(1);
     expect(workspace.removeEncryptedPayloadCalls).toBe(0);
+  });
+
+  it('limpia el workspace si falla la extracción de files/**', async (): Promise<void> => {
+    const manifest: OtpvV3Manifest = createManifest();
+
+    const store = new InMemoryOtpvV3RestoreSelectionStore();
+
+    const selectionId: string = store.save({
+      packagePath: 'C:\\backup.otpv',
+      manifest,
+    });
+
+    const workspace = new TestWorkspace();
+
+    const filesExtractor = new TestFilesExtractor();
+
+    filesExtractor.extractionError = new Error('No se han podido restaurar files/**.');
+
+    const service = new OtpvV3RestoreUnlockService(
+      store,
+      new TestPackageInspector({
+        formatVersion: OTPV_V3_FORMAT_VERSION,
+        manifest,
+      }),
+      new TestPayloadExtractor(),
+      new TestCrypto(),
+      new TestPayloadInspector(),
+      new TestRequiredContentExtractor(),
+      new TestRequiredContentValidator(),
+      filesExtractor,
+      workspace,
+    );
+
+    await expect(
+      service.unlock({
+        selectionId,
+        backupApiKey: BACKUP_KEY,
+      }),
+    ).rejects.toThrow('No se han podido restaurar files/**.');
+
+    expect(workspace.clearCalls).toBe(1);
+
+    expect(workspace.removeDecryptedPayloadCalls).toBe(0);
   });
 });
 
@@ -361,7 +415,9 @@ class TestWorkspace implements OtpvV3RestoreWorkspace {
   readonly logoFile: string = 'C:\\staging\\restore-work\\required\\assets\\logo.webp';
   readonly portableSecretsFile: string =
     'C:\\staging\\restore-work\\required\\secrets\\secrets.json';
+  readonly filesDirectory: string = 'C:\\staging\\restore-work\\files';
 
+  removeDecryptedPayloadCalls: number = 0;
   resetCalls: number = 0;
   removeEncryptedPayloadCalls: number = 0;
   clearCalls: number = 0;
@@ -385,6 +441,13 @@ class TestWorkspace implements OtpvV3RestoreWorkspace {
    */
   async clear(): Promise<void> {
     this.clearCalls += 1;
+  }
+
+  /**
+   * Registra la eliminación del ZIP interior.
+   */
+  async removeDecryptedPayload(): Promise<void> {
+    this.removeDecryptedPayloadCalls += 1;
   }
 }
 
@@ -486,6 +549,32 @@ class TestRequiredContentValidator implements OtpvV3RequiredContentValidator {
 
     if (this.validationError !== null) {
       return Promise.reject(this.validationError);
+    }
+
+    return Promise.resolve();
+  }
+}
+
+/**
+ * Extractor controlado de files/**
+ * para los tests de orquestación.
+ */
+class TestFilesExtractor implements OtpvV3FilesExtractor {
+  calls: number = 0;
+  payloadFile: string | null = null;
+  destinationDirectory: string | null = null;
+  extractionError: Error | null = null;
+
+  /**
+   * Registra la extracción solicitada.
+   */
+  extract(payloadFile: string, destinationDirectory: string): Promise<void> {
+    this.calls += 1;
+    this.payloadFile = payloadFile;
+    this.destinationDirectory = destinationDirectory;
+
+    if (this.extractionError !== null) {
+      return Promise.reject(this.extractionError);
     }
 
     return Promise.resolve();
