@@ -1,10 +1,10 @@
-# Osumi TPV Client — Documento de continuidad v2.83
+# Osumi TPV Client — Documento de continuidad v2.84
 
-**Fecha:** 23 de septiembre de 2026  
+**Fecha:** 24 de septiembre de 2026  
 **Proyecto:** Osumi TPV Client  
 **Repositorio principal:** `https://github.com/osumionline/Osumi-TPV-Client`
 
-Este documento actualiza y sustituye como referencia de continuidad a `docs/osumi-tpv-continuidad-v2.82.md`.
+Este documento actualiza y sustituye como referencia de continuidad a `docs/osumi-tpv-continuidad-v2.83.md`.
 
 La fuente de verdad para continuar es:
 
@@ -205,9 +205,9 @@ https://github.com/igorosabel/indomable-frontend
 ✅ Hito 20 — Caja > Informes
 
 ▶️ Hito 21 — TPV Backup
-   ▶️ 21.1 Especificación `.otpv` v3
-   ⏳ 21.2 Exportador Client
-   ⏳ 21.3 Restauración
+   ✅ 21.1 Especificación `.otpv` v3
+   ✅ 21.2 Exportador nativo del Client
+   ⏳ 21.3 Restauración nativa
    ⏳ 21.4 Nueva app TPV Backup
    ⏳ 21.5 API almacenamiento remoto
    ⏳ 21.6 Integración Client ↔ Backup
@@ -218,12 +218,16 @@ https://github.com/igorosabel/indomable-frontend
 ⏸ TicketBAI 12C.9 — pendiente de Berein
 ```
 
-Último commit confirmado:
+Último commit de `main` verificado el 24 de septiembre de 2026:
 
 ```text
-3e18c389ce4c684c231dc42847e0245281c8a618
-Terminado Informes 20.8
+b80e1f7e11f9f917933de37696c0986508fb3d98
+Terminado Backup 21.2
 ```
+
+Ese commit ya contiene las dos correcciones de tests tras el cambio de HKDF a scrypt. El usuario confirmó después que toda la batería de tests pasó, creó otro `.otpv` desde la aplicación y comprobó el manifest actualizado. Ha dado 21.2 por cerrado.
+
+Antes de continuar con código en otro chat, volver a consultar `main`: el usuario va a subir allí este documento de continuidad.
 
 ---
 
@@ -862,34 +866,24 @@ El nuevo TPV Backup tampoco debe almacenar ni recibir el secreto maestro en clar
 
 ---
 
-# 16. Derivación criptográfica
+# 16. Derivación criptográfica — contrato vigente
 
-Dirección acordada:
+El formato v3 usa `scrypt` para derivar la KEK desde los bytes UTF-8 exactos de `backupApiKey`, sin normalización ni recortes. HKDF se descartó para la KEK porque la clave puede ser introducida manualmente y no se garantiza su entropía.
 
-```text
-backupApiKey
-+
-salt aleatorio por backup
-+
-separación de dominio
-↓
-HKDF-SHA-256
-```
-
-Se debe derivar material distinto para funciones distintas.
-
-Ejemplo:
+Parámetros fijos, validados en el manifest:
 
 ```text
-backupApiKey
-├── HKDF(info = "osumi-tpv-backup-encryption-v3")
-│   └── material de cifrado
-│
-└── HKDF(info = "osumi-tpv-backup-authentication-v1")
-    └── credencial remota
+salt aleatorio por backup = 32 bytes
+cost = 32768
+blockSize = 8
+parallelization = 3
+length = 32 bytes
+cryptoSuite = otpv3-scrypt-aes-256-gcm
 ```
 
-Los strings exactos se fijarán formalmente en 21.1.
+El KDF de la futura autenticación remota es una responsabilidad separada que se concretará en los bloques del servicio remoto; no reutilizar la KEK para autenticación.
+
+La especificación autoritativa del formato es `docs/osumi-tpv-backup-v3.md`.
 
 ---
 
@@ -1033,90 +1027,60 @@ y enrutar al flujo correspondiente.
 
 ---
 
-# 22. Contenido lógico previsto de `.otpv` v3
+# 22. Contenido lógico de `.otpv` v3
 
-El contenedor debe representar:
-
-```text
-metadatos públicos mínimos
-+
-envelope criptográfico
-+
-payload cifrado
-```
-
-Payload lógico:
+El contenedor exterior ZIP lleva **exactamente** dos ficheros regulares:
 
 ```text
-database/
-└── osumi-tpv.sqlite
-
-config/
-└── app_data.json
-
-assets/
-└── logo.webp
-
-files/
-└── copia completa de assets/files/**
-
-secrets/
-└── representación portable de InstallationSecretsData
+manifest.json
+payload.enc
 ```
 
-Los secretos:
+`payload.enc` cifra íntegramente un ZIP interior con:
 
 ```text
-siempre dentro del payload cifrado
+database/osumi-tpv.sqlite
+config/app_data.json
+assets/logo.webp
+secrets/secrets.json
+files/**
 ```
+
+`files/**` copia toda la jerarquía de `assets/files/**` sin lista rígida de subdirectorios. El snapshot SQLite debe ser consistente e independiente de `-wal` y `-shm`. Se excluyen `logs/`, `backups/`, `staging/` y `printing_settings.json`.
+
+`secrets/secrets.json` contiene los secretos portables con `schemaVersion`, `secretApi`, `emailSmtpPass` y `ticketBaiToken`. **Nunca contiene `backupApiKey`**. La clave se suministra externamente al restaurar y después se combina con los secretos portables para guardarlos mediante `SecretStorage.save()` en la máquina destino.
 
 ---
 
-# 23. Manifest v3 — pendiente de cerrar formalmente
+# 23. Manifest v3 — contrato cerrado
 
-21.1 debe fijar exactamente el contrato.
+`docs/osumi-tpv-backup-v3.md` y los contratos y validadores del repositorio fijan el esquema exacto. Entre sus campos están:
 
-Como mínimo deberá contener los datos necesarios para:
+```text
+formatVersion = 3
+application = Osumi TPV Client
+applicationVersion
+databaseSchemaVersion
+backupId (UUID v4)
+createdAt (UTC ISO 8601)
+cryptoSuite = otpv3-scrypt-aes-256-gcm
+authenticatedData
+kdf (scrypt, salt y parámetros fijos)
+keyWrap (AES-256-GCM, iv, authTag, wrappedDek)
+payload (payload.enc, ZIP, AES-256-GCM, iv, authTag)
+```
 
-- identificar `formatVersion`;
-- identificar aplicación;
-- versión de aplicación;
-- fecha de creación;
-- versión de esquema SQLite;
-- KDF;
-- salt;
-- algoritmo de cifrado;
-- nonce(s);
-- wrapped DEK;
-- compatibilidad;
-- parámetros criptográficos necesarios para abrir la copia.
+`authenticatedData` son los bytes JSON canónicos, codificados en Base64, de los metadatos críticos en el orden formalizado. La restauración debe usarlos como AAD y comprobar su coherencia con el manifest.
 
-Evitar exponer en claro si no es imprescindible:
-
-- nombre del negocio;
-- CIF;
-- email;
-- secretos;
-- datos personales;
-- contenido funcional.
+No se exponen en el manifest datos del negocio ni secretos. Los límites, rutas permitidas, validación y compatibilidad constan en la especificación v3. El ejemplo JSON de esa especificación muestra `kdf` y `keyWrap` consecutivos sin una coma entre ambos: es una errata documental; el contrato tipado y el código generan objetos JSON válidos. Puede corregirse al abordar 21.3.
 
 ---
 
 # 24. Integridad
 
-El legacy usa:
+El legacy usa `checksums.json` y SHA-256. V3 no requiere `checksums.json`: AES-256-GCM autentica tanto el wrapped DEK como el payload. El AAD vincula los metadatos críticos. Una autenticación fallida invalida la copia.
 
-```text
-checksums.json
-SHA-256
-```
-
-En v3:
-
-- AES-GCM ya autentica el contenido cifrado;
-- puede existir un hash adicional por operatividad;
-- el contrato debe definir qué entra como AAD;
-- no añadir mecanismos redundantes sin propósito claro.
+El ZIP interior, sus rutas, límites y documentos obligatorios se validarán **antes** de promover datos restaurados. Seguir los requisitos exactos de `docs/osumi-tpv-backup-v3.md`.
 
 ---
 
@@ -1192,77 +1156,38 @@ sirve como referencia, pero la política definitiva debe cerrarse durante Hito 2
 
 # 27. Plan actualizado Hito 21
 
-## ▶️ 21.1 — Especificación `.otpv` v3
+## ✅ 21.1 — Especificación `.otpv` v3
 
-Decisiones ya tomadas:
+Contrato documentado en `docs/osumi-tpv-backup-v3.md`: contenedor exterior con `manifest.json` y `payload.enc`, ZIP interior, metadatos autenticados, scrypt, DEK/KEK y AES-256-GCM, snapshot SQLite, secretos portables sin `backupApiKey`, entradas permitidas, límites, seguridad de rutas y compatibilidad. Es la referencia para el importador.
 
-```text
-✅ formato nativo separado del legacy
-✅ formatVersion 3 como nueva generación
-✅ snapshot SQLite consistente
-✅ app_data incluido
-✅ logo incluido
-✅ files/** completo
-✅ secretos portables
-✅ logs excluidos
-✅ backups excluidos
-✅ staging excluido
-✅ printing_settings excluido
-✅ backupApiKey = secreto maestro
-✅ backupApiKey nunca dentro del paquete
-✅ HKDF-SHA-256
-✅ separación de dominio
-✅ DEK aleatoria por backup
-✅ KEK derivada
-✅ AES-256-GCM
-✅ servidor sin backupApiKey
-✅ autenticación remota con material derivado separado
-✅ re-cifrado de secretos con safeStorage al restaurar
-```
+## ✅ 21.2 — Exportador nativo del Client
 
-Pendiente de cerrar en 21.1:
+Implementados snapshot SQLite consistente, inventario portable (incluye `assets/files/**`), serialización de secretos lógicos sin la clave maestra, ZIP interior, cifrado streaming con DEK aleatoria, KEK mediante `scrypt`, manifest, ZIP exterior y limpieza de temporales.
+
+Evolución final:
 
 ```text
-manifest.json exacto
-layout físico exacto
-AAD exacto
-wrapped DEK exacto
-strings/versiones HKDF
-límites de tamaño
-límites de entradas
-límites de expansión
-protección anti-zip-bomb
-protección anti-path-traversal
-reglas de compatibilidad
-códigos/errores de validación
-hashes adicionales si proceden
+21.2f: corrección de rutas temporales y creación funcional en Windows
+21.2g: se excluye backupApiKey del payload; HKDF → scrypt
+b80e1f7: corregidas las dos expectativas de test que aún usaban HKDF
 ```
 
-## ⏳ 21.2 — Exportador nativo
+Validación comunicada por el usuario: `npm test`, `npm run build`, `npm run test:electron`, `npm run build:electron` y `npm run lint` correctos; nueva creación funcional de `.otpv` desde la aplicación y manifest comprobado con la nueva suite. **21.2 aceptado y cerrado por el usuario.**
 
-- snapshot SQLite;
-- inventario portable;
-- secretos lógicos;
-- DEK;
-- KEK;
-- cifrado;
-- manifest;
-- `.otpv`;
-- validación post-generación;
-- tests;
-- limpieza segura de temporales.
+Los `.otpv` de desarrollo generados antes de 21.2g usan el contrato anterior; no deben tomarse como v3 definitivo.
 
-## ⏳ 21.3 — Restauración
+## ⏳ 21.3 — Restauración nativa
 
-- detectar v3;
-- solicitar Backup key cuando proceda;
-- derivar claves;
-- descifrar;
-- validar;
-- staging;
-- reconstruir secretos;
-- promoción;
-- recuperación ante fallo.
+- detectar `formatVersion = 3` y conservar el flujo v2 legacy;
+- obtener TPV Backup key de forma externa cuando haga falta;
+- validar contenedor exterior y manifest;
+- derivar KEK, autenticar DEK y payload;
+- validar ZIP interior, límites y rutas, documentos, configuración y SQLite;
+- preparar staging, reconstruir los secretos con la clave aportada;
+- promoción final segura y recuperación ante fallos;
+- tests de integridad, compatibilidad y restauración real en otra instalación.
+
+Dividir en bloques coherentes y verificables tras leer el código existente. No asumir que el importador v2 es apto para v3.
 
 ## ⏳ 21.4 — Nueva app TPV Backup
 
@@ -1464,68 +1389,33 @@ No intercalarlo dentro de Hito 21 salvo novedad externa.
 
 # 31. Siguiente paso exacto
 
-El siguiente trabajo es:
+El usuario va a añadir esta continuidad a `main`. **Esperar su confirmación del push** antes de empezar el siguiente bloque de desarrollo. Después:
 
-```text
-Hito 21.1 — cerrar formalmente el contrato `.otpv` v3
-```
+1. revisar el nuevo `main` y `docs/osumi-tpv-backup-v3.md`;
+2. inspeccionar el importador de paquetes legacy v2, el flujo de instalación/staging, `SecretStorage`, los validadores y servicios del exportador v3;
+3. definir y proponer la primera unidad pequeña y verificable de **21.3 — restauración nativa v3**;
+4. mantener el enrutamiento v2/v3 explícito y la clave maestra externa al `.otpv`;
+5. seguir la batería de validación y una prueba funcional de restauración cuando ya exista el flujo completo.
 
-No empezar todavía por el exportador.
-
-Orden recomendado:
-
-1. revisar `main`;
-2. fijar `manifest.json`;
-3. fijar layout físico;
-4. fijar envelope criptográfico;
-5. fijar salt/nonce/wrapped DEK/AAD;
-6. fijar versiones y contextos HKDF;
-7. fijar compatibilidad;
-8. fijar límites de tamaño y entradas;
-9. fijar defensas anti-zip-bomb/path-traversal;
-10. fijar errores de validación;
-11. documentar contrato;
-12. solo entonces comenzar 21.2.
+No iniciar 21.4 ni el servicio remoto hasta que corresponda en el plan.
 
 ---
 
-# 32. Estado al cerrar v2.83
+# 32. Estado al cerrar v2.84
 
 ```text
-Hito 20:
-COMPLETAMENTE CERRADO.
-
-Simple:
-funcional, probado e imprimible.
-
-Detallado:
-funcional, probado e imprimible.
-
-Ventas:
-funcional, probado e imprimible.
-
-Regresión:
-cerrada.
-
-Hito 21:
-iniciado a nivel de diseño.
-
-Decisiones estructurales de backup:
-cerradas.
-
-Siguiente:
-formalizar contrato exacto `.otpv` v3.
-
-Hito 22:
-pendiente tras Hito 21.
-
-TicketBAI 12C.9:
-pausado.
+Hito 20: CERRADO.
+Hito 21.1: especificación v3 CERRADA.
+Hito 21.2: exportador nativo CERRADO y probado funcionalmente.
+Hito 21.3: siguiente bloque; aún no implementado.
+Hito 22: pendiente tras Hito 21.
+TicketBAI 12C.9: pausado hasta respuesta/actualización de Berein.
 ```
 
-La siguiente conversación puede comenzar directamente con:
+La siguiente conversación puede empezar con:
 
 ```text
-Continuamos con Hito 21.1:
-vamos a cerrar el contrato exacto del `.otpv` v3.
+He subido osumi-tpv-continuidad-v2.84.md a main.
+Revisa el último commit y empecemos 21.3 — restauración nativa v3
+con el primer bloque pequeño y verificable.
 ```
