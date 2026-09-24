@@ -2,6 +2,7 @@ import type AlmacenApi from '@desktop-contracts/almacen/almacen-api.interface';
 import type ApplicationApi from '@desktop-contracts/application/application-api.interface';
 import type ArticulosApi from '@desktop-contracts/articulos/articulos-api.interface';
 import type CategoriasApi from '@desktop-contracts/articulos/categorias/categorias-api.interface';
+import type BackupApi from '@desktop-contracts/backup/backup-api.interface';
 import type CajaApi from '@desktop-contracts/caja/caja-api.interface';
 import type ClientesApi from '@desktop-contracts/clientes/clientes-api.interface';
 import type ComprasApi from '@desktop-contracts/compras/compras-api.interface';
@@ -23,6 +24,7 @@ export default interface OsumiDesktopApi {
   readonly almacen: AlmacenApi;
   readonly compras: ComprasApi;
   readonly system: SystemApi;
+  readonly backup: BackupApi;
   readonly legacyImport: LegacyImportApi;
   readonly configuration: ConfigurationApi;
   readonly files: FilesApi;

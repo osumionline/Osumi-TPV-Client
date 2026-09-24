@@ -36,6 +36,7 @@ import type {
 import type { ArticuloSaveInterface } from '@desktop-contracts/articulos/articulo-save.interface';
 import type { ArticuloInterface } from '@desktop-contracts/articulos/articulo.interface';
 import type CategoriaInterface from '@desktop-contracts/articulos/categorias/categoria.interface';
+import type BackupCreateResult from '@desktop-contracts/backup/backup-create-result.interface';
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
 import {
@@ -174,6 +175,11 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
   system: Object.freeze({
     getAppInfo: (): Promise<AppInfo> =>
       ipcRenderer.invoke(IPC_CHANNELS.systemGetAppInfo) as Promise<AppInfo>,
+  }),
+
+  backup: Object.freeze({
+    createLocal: (): Promise<BackupCreateResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.backupCreateLocal) as Promise<BackupCreateResult>,
   }),
 
   almacen: Object.freeze({

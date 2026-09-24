@@ -8,6 +8,7 @@ import InventarioPrintService from '@backend/application/almacen/inventario/inve
 import InventarioService from '@backend/application/almacen/inventario/inventario.service';
 import ApplicationStateService from '@backend/application/application/application-state.service';
 import ArticulosService from '@backend/application/articulos/articulos.service';
+import BackupService from '@backend/application/backup/backup.service';
 import CajaService from '@backend/application/caja/caja.service';
 import CajaInformePrintService from '@backend/application/caja/informes/caja-informe-print.service';
 import InformeDetalladoService from '@backend/application/caja/informes/informe-detallado.service';
@@ -54,6 +55,10 @@ import type InventarioCsvFileSaver from '@backend/contracts/almacen/inventario/i
 import type InventarioPrintWindow from '@backend/contracts/almacen/inventario/inventario-print-window.interface';
 import type InventarioRepository from '@backend/contracts/almacen/inventario/inventario.repository.interface';
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
+import type DatabaseSnapshot from '@backend/contracts/backup/database-snapshot.interface';
+import type { OtpvV3Crypto } from '@backend/contracts/backup/otpv-v3-crypto.interface';
+import type { OtpvV3PackageBuilder } from '@backend/contracts/backup/otpv-v3-package-builder.interface';
+import type { OtpvV3PayloadBuilder } from '@backend/contracts/backup/otpv-v3-payload-builder.interface';
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
 import type CajaInformePrintWindow from '@backend/contracts/caja/informes/caja-informe-print-window.interface';
 import type InformeDetalladoRepository from '@backend/contracts/caja/informes/informe-detallado.repository.interface';
@@ -102,6 +107,10 @@ import type VentasPostventaRepository from '@backend/contracts/ventas/ventas-pos
 import type VentasTicketBaiRepository from '@backend/contracts/ventas/ventas-ticket-bai.repository.interface';
 import type VentasTicketsRepository from '@backend/contracts/ventas/ventas-tickets.repository.interface';
 import DefaultLegacyImportReviewDecisionValidator from '@backend/domain/legacy-import/default-legacy-import-review-decision.validator';
+import NodeOtpvV3Crypto from '@infrastructure/backup/node-otpv-v3-crypto';
+import YazlOtpvV3PackageBuilder from '@infrastructure/backup/yazl-otpv-v3-package.builder';
+import YazlOtpvV3PayloadBuilder from '@infrastructure/backup/yazl-otpv-v3-payload.builder';
+import BetterSqlite3DatabaseSnapshot from '@infrastructure/database/better-sqlite3/better-sqlite3-database-snapshot';
 import NewInstallationDataService from '@infrastructure/database/initial-data/new-installation-data.service';
 import completeDatabaseSchema from '@infrastructure/database/schema/complete-database-schema';
 import completeDatabaseSchemaTables from '@infrastructure/database/schema/complete-database-schema.tables';
@@ -176,6 +185,7 @@ import registerImprentaPrintIpc from '@ipc/almacen/register-imprenta-print-ipc';
 import registerInventarioPrintIpc from '@ipc/almacen/register-inventario-print-ipc';
 import registerArticulosIpc from '@ipc/articulos/register-articulos-ipc';
 import registerCategoriasIpc from '@ipc/articulos/register-categorias-ipc';
+import registerBackupIpc from '@ipc/backup/register-backup-ipc';
 import registerCajaInformePrintIpc from '@ipc/caja/register-caja-informe-print-ipc';
 import registerClienteFacturaPreviewIpc from '@ipc/clientes/register-cliente-factura-preview-ipc';
 import registerClientesIpc from '@ipc/clientes/register-clientes-ipc';
@@ -227,6 +237,34 @@ export default function createApplicationComposition(
     appDataRepository,
     operationalSecretStorage,
     operationalLogoStorage,
+  );
+
+  /*
+   * Copias de seguridad.
+   */
+  const databaseSnapshot: DatabaseSnapshot = new BetterSqlite3DatabaseSnapshot(
+    applicationPaths.databaseFile,
+  );
+
+  const backupCrypto: OtpvV3Crypto = new NodeOtpvV3Crypto();
+
+  const backupPayloadBuilder: OtpvV3PayloadBuilder = new YazlOtpvV3PayloadBuilder(
+    applicationPaths,
+    databaseSnapshot,
+    appDataRepository,
+    operationalSecretStorage,
+    backupCrypto,
+  );
+
+  const backupPackageBuilder: OtpvV3PackageBuilder = new YazlOtpvV3PackageBuilder(
+    applicationVersion,
+    backupPayloadBuilder,
+  );
+
+  const backupService: BackupService = new BackupService(
+    applicationPaths.backupsDirectory,
+    operationalSecretStorage,
+    backupPackageBuilder,
   );
 
   /*
@@ -709,6 +747,7 @@ export default function createApplicationComposition(
    * Canales IPC.
    */
   registerApplicationIpc(applicationStateService);
+  registerBackupIpc(getMainWindow, backupService);
   registerAlmacenIpc(
     getMainWindow,
     inventarioService,
