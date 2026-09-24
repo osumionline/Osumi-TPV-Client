@@ -2,6 +2,7 @@ import type {
   OtpvV3Crypto,
   OtpvV3DecryptFileCommand,
   OtpvV3EncryptFileCommand,
+  OtpvV3EncryptStreamCommand,
   OtpvV3EncryptionResult,
 } from '@backend/contracts/backup/otpv-v3-crypto.interface';
 import type {
@@ -27,6 +28,7 @@ import { createCipheriv, createDecipheriv, hkdfSync, randomBytes, randomUUID } f
 import { createReadStream, createWriteStream } from 'node:fs';
 import { access, mkdir, rename, rm } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
+import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 interface WrappedDekResult {
@@ -43,10 +45,27 @@ export default class NodeOtpvV3Crypto implements OtpvV3Crypto {
    * Genera el material criptográfico de una copia
    * y cifra el ZIP interior mediante streaming.
    */
+  /**
+   * Cifra un fichero que contiene el ZIP interior
+   * reutilizando la implementación streaming.
+   */
   async encryptFile(command: OtpvV3EncryptFileCommand): Promise<OtpvV3EncryptionResult> {
-    this.assertBackupApiKey(command.backupApiKey);
-
     this.assertDifferentPaths(command.sourceFile, command.destinationFile);
+
+    return this.encryptStream({
+      backupApiKey: command.backupApiKey,
+      authenticatedData: command.authenticatedData,
+      sourceStream: createReadStream(command.sourceFile),
+      destinationFile: command.destinationFile,
+    });
+  }
+
+  /**
+   * Genera el material criptográfico de una copia
+   * y cifra el ZIP interior recibido como stream.
+   */
+  async encryptStream(command: OtpvV3EncryptStreamCommand): Promise<OtpvV3EncryptionResult> {
+    this.assertBackupApiKey(command.backupApiKey);
 
     await this.assertDestinationDoesNotExist(command.destinationFile);
 
@@ -69,8 +88,8 @@ export default class NodeOtpvV3Crypto implements OtpvV3Crypto {
     try {
       const wrappedDek: WrappedDekResult = this.wrapDek(kek, dek, keyWrapIv, keyWrapAad);
 
-      const payloadAuthTag: Buffer = await this.encryptPayloadFile(
-        command.sourceFile,
+      const payloadAuthTag: Buffer = await this.encryptPayloadStream(
+        command.sourceStream,
         command.destinationFile,
         dek,
         payloadIv,
@@ -257,11 +276,11 @@ export default class NodeOtpvV3Crypto implements OtpvV3Crypto {
   }
 
   /**
-   * Cifra el fichero del ZIP interior mediante streaming
+   * Cifra el stream del ZIP interior
    * y devuelve su authentication tag.
    */
-  private async encryptPayloadFile(
-    sourceFile: string,
+  private async encryptPayloadStream(
+    sourceStream: Readable,
     destinationFile: string,
     dek: Buffer,
     iv: Buffer,
@@ -277,7 +296,7 @@ export default class NodeOtpvV3Crypto implements OtpvV3Crypto {
 
     try {
       await pipeline(
-        createReadStream(sourceFile),
+        sourceStream,
         cipher,
         createWriteStream(temporaryFile, {
           flags: 'wx',

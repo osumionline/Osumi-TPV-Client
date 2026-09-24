@@ -3,11 +3,19 @@ import type {
   OtpvV3KeyWrap,
   OtpvV3PayloadEncryption,
 } from '@backend/contracts/backup/otpv-v3-manifest.interface';
+import type { Readable } from 'node:stream';
 
 export interface OtpvV3EncryptFileCommand {
   readonly backupApiKey: string;
   readonly authenticatedData: Buffer;
   readonly sourceFile: string;
+  readonly destinationFile: string;
+}
+
+export interface OtpvV3EncryptStreamCommand {
+  readonly backupApiKey: string;
+  readonly authenticatedData: Buffer;
+  readonly sourceStream: Readable;
   readonly destinationFile: string;
 }
 
@@ -33,6 +41,12 @@ export interface OtpvV3Crypto {
    * que contiene el ZIP interior del backup.
    */
   encryptFile(command: OtpvV3EncryptFileCommand): Promise<OtpvV3EncryptionResult>;
+
+  /**
+   * Cifra mediante `.otpv` v3 un stream
+   * que contiene el ZIP interior del backup.
+   */
+  encryptStream(command: OtpvV3EncryptStreamCommand): Promise<OtpvV3EncryptionResult>;
 
   /**
    * Descifra y autentica un payload `.otpv` v3
