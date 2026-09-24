@@ -6,6 +6,14 @@ import type {
   OtpvV3PackageBuildResult,
 } from '@backend/contracts/backup/otpv-v3-package-builder.interface';
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
+import {
+  OTPV_V3_CRYPTO_SUITE,
+  OTPV_V3_KDF_ALGORITHM,
+  OTPV_V3_KDF_LENGTH_BYTES,
+  OTPV_V3_SCRYPT_BLOCK_SIZE,
+  OTPV_V3_SCRYPT_COST,
+  OTPV_V3_SCRYPT_PARALLELIZATION,
+} from '@backend/domain/backup/otpv-v3.constants';
 import type { InstallationSecretsData } from '@desktop-contracts/configuration/installation-command.interface';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -135,13 +143,15 @@ function createManifest(): OtpvV3Manifest {
     databaseSchemaVersion: 1,
     backupId: '123e4567-e89b-42d3-a456-426614174000',
     createdAt: '2026-09-24T08:00:00.000Z',
-    cryptoSuite: 'otpv3-hkdf-sha256-aes-256-gcm',
+    cryptoSuite: OTPV_V3_CRYPTO_SUITE,
     authenticatedData: 'e30=',
     kdf: {
-      algorithm: 'hkdf-sha256',
+      algorithm: OTPV_V3_KDF_ALGORITHM,
       salt: Buffer.alloc(32, 1).toString('base64'),
-      info: 'osumi-tpv-backup:v3:kek',
-      length: 32,
+      cost: OTPV_V3_SCRYPT_COST,
+      blockSize: OTPV_V3_SCRYPT_BLOCK_SIZE,
+      parallelization: OTPV_V3_SCRYPT_PARALLELIZATION,
+      length: OTPV_V3_KDF_LENGTH_BYTES,
     },
     keyWrap: {
       algorithm: 'aes-256-gcm',

@@ -185,7 +185,7 @@ describe('OTPV v3 contract validator', (): void => {
         '"applicationVersion":"0.0.0",',
         `"databaseSchemaVersion":${DATABASE_SCHEMA_VERSION},`,
         '"createdAt":"2026-09-24T06:00:00.000Z",',
-        '"cryptoSuite":"otpv3-hkdf-sha256-aes-256-gcm"}',
+        '"cryptoSuite":"otpv3-scrypt-aes-256-gcm"}',
       ].join(''),
     );
   });
