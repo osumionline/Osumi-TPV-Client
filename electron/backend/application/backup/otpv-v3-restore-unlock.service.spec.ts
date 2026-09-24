@@ -8,6 +8,8 @@ import type {
 import type OtpvV3EncryptedPayloadExtractor from '@backend/contracts/backup/otpv-v3-encrypted-payload-extractor.interface';
 import type { OtpvV3Manifest } from '@backend/contracts/backup/otpv-v3-manifest.interface';
 import type OtpvV3PayloadInspector from '@backend/contracts/backup/otpv-v3-payload-inspector.interface';
+import type OtpvV3RequiredContentExtractor from '@backend/contracts/backup/otpv-v3-required-content-extractor.interface';
+import type OtpvV3RequiredContentValidator from '@backend/contracts/backup/otpv-v3-required-content-validator.interface';
 import type OtpvV3RestoreWorkspace from '@backend/contracts/backup/otpv-v3-restore-workspace.interface';
 import type OtpvPackageInspection from '@backend/domain/backup/otpv-package-inspection.type';
 import type OtpvV3PayloadInspection from '@backend/domain/backup/otpv-v3-payload-inspection.interface';
@@ -32,6 +34,8 @@ describe('OtpvV3RestoreUnlockService', (): void => {
     const extractor = new TestPayloadExtractor();
     const crypto = new TestCrypto();
     const payloadInspector = new TestPayloadInspector();
+    const requiredContentExtractor = new TestRequiredContentExtractor();
+    const requiredContentValidator = new TestRequiredContentValidator();
     const workspace = new TestWorkspace();
 
     const service = new OtpvV3RestoreUnlockService(
@@ -43,6 +47,8 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       extractor,
       crypto,
       payloadInspector,
+      requiredContentExtractor,
+      requiredContentValidator,
       workspace,
     );
 
@@ -72,6 +78,8 @@ describe('OtpvV3RestoreUnlockService', (): void => {
     expect(workspace.clearCalls).toBe(0);
     expect(payloadInspector.calls).toBe(1);
     expect(payloadInspector.payloadFile).toBe(workspace.decryptedPayloadFile);
+    expect(requiredContentExtractor.calls).toBe(1);
+    expect(requiredContentValidator.calls).toBe(1);
   });
 
   it('rechaza una selección caducada', async (): Promise<void> => {
@@ -84,6 +92,8 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestPayloadExtractor(),
       new TestCrypto(),
       new TestPayloadInspector(),
+      new TestRequiredContentExtractor(),
+      new TestRequiredContentValidator(),
       new TestWorkspace(),
     );
 
@@ -122,6 +132,8 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       extractor,
       new TestCrypto(),
       new TestPayloadInspector(),
+      new TestRequiredContentExtractor(),
+      new TestRequiredContentValidator(),
       workspace,
     );
 
@@ -167,6 +179,8 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestPayloadExtractor(),
       crypto,
       new TestPayloadInspector(),
+      new TestRequiredContentExtractor(),
+      new TestRequiredContentValidator(),
       workspace,
     );
 
@@ -205,6 +219,8 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestPayloadExtractor(),
       new TestCrypto(),
       payloadInspector,
+      new TestRequiredContentExtractor(),
+      new TestRequiredContentValidator(),
       workspace,
     );
 
@@ -216,6 +232,50 @@ describe('OtpvV3RestoreUnlockService', (): void => {
     ).rejects.toThrow('El payload contiene una ruta insegura.');
 
     expect(payloadInspector.calls).toBe(1);
+    expect(workspace.clearCalls).toBe(1);
+    expect(workspace.removeEncryptedPayloadCalls).toBe(0);
+  });
+
+  it('limpia el workspace si un recurso obligatorio no es válido', async (): Promise<void> => {
+    const manifest: OtpvV3Manifest = createManifest();
+
+    const store = new InMemoryOtpvV3RestoreSelectionStore();
+
+    const selectionId: string = store.save({
+      packagePath: 'C:\\backup.otpv',
+      manifest,
+    });
+
+    const workspace = new TestWorkspace();
+
+    const contentValidator = new TestRequiredContentValidator();
+
+    contentValidator.validationError = new Error(
+      'La base de datos incluida en la copia no es válida.',
+    );
+
+    const service = new OtpvV3RestoreUnlockService(
+      store,
+      new TestPackageInspector({
+        formatVersion: OTPV_V3_FORMAT_VERSION,
+        manifest,
+      }),
+      new TestPayloadExtractor(),
+      new TestCrypto(),
+      new TestPayloadInspector(),
+      new TestRequiredContentExtractor(),
+      contentValidator,
+      workspace,
+    );
+
+    await expect(
+      service.unlock({
+        selectionId,
+        backupApiKey: BACKUP_KEY,
+      }),
+    ).rejects.toThrow('La base de datos incluida en la copia no es válida.');
+
+    expect(contentValidator.calls).toBe(1);
     expect(workspace.clearCalls).toBe(1);
     expect(workspace.removeEncryptedPayloadCalls).toBe(0);
   });
@@ -295,8 +355,12 @@ class TestCrypto implements OtpvV3Crypto {
  */
 class TestWorkspace implements OtpvV3RestoreWorkspace {
   readonly encryptedPayloadFile: string = 'C:\\staging\\restore-work\\payload.enc';
-
   readonly decryptedPayloadFile: string = 'C:\\staging\\restore-work\\payload.zip';
+  readonly databaseFile: string = 'C:\\staging\\restore-work\\required\\database\\osumi-tpv.sqlite';
+  readonly appDataFile: string = 'C:\\staging\\restore-work\\required\\config\\app_data.json';
+  readonly logoFile: string = 'C:\\staging\\restore-work\\required\\assets\\logo.webp';
+  readonly portableSecretsFile: string =
+    'C:\\staging\\restore-work\\required\\secrets\\secrets.json';
 
   resetCalls: number = 0;
   removeEncryptedPayloadCalls: number = 0;
@@ -388,5 +452,42 @@ class TestPayloadInspector implements OtpvV3PayloadInspector {
       regularFileCount: 0,
       totalUncompressedSize: 0,
     };
+  }
+}
+
+/**
+ * Extractor controlado de recursos obligatorios.
+ */
+class TestRequiredContentExtractor implements OtpvV3RequiredContentExtractor {
+  calls: number = 0;
+
+  /**
+   * Registra la extracción solicitada.
+   */
+  extract(): Promise<void> {
+    this.calls += 1;
+
+    return Promise.resolve();
+  }
+}
+
+/**
+ * Validador controlado de recursos obligatorios.
+ */
+class TestRequiredContentValidator implements OtpvV3RequiredContentValidator {
+  calls: number = 0;
+  validationError: Error | null = null;
+
+  /**
+   * Simula la validación semántica.
+   */
+  validate(): Promise<void> {
+    this.calls += 1;
+
+    if (this.validationError !== null) {
+      return Promise.reject(this.validationError);
+    }
+
+    return Promise.resolve();
   }
 }

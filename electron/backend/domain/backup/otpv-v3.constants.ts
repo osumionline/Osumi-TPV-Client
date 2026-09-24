@@ -35,6 +35,10 @@ export const OTPV_V3_MAX_PAYLOAD_ENTRY_COUNT: number = 50_000;
 export const OTPV_V3_MAX_SINGLE_ENTRY_SIZE_BYTES: number = 2 * 1024 * 1024 * 1024;
 export const OTPV_V3_MAX_TOTAL_UNCOMPRESSED_SIZE_BYTES: number = 16 * 1024 * 1024 * 1024;
 export const OTPV_V3_MAX_ENTRY_PATH_LENGTH: number = 1024;
+export const OTPV_V3_MAX_APP_DATA_SIZE_BYTES: number = 16 * 1024 * 1024;
+export const OTPV_V3_MAX_PORTABLE_SECRETS_SIZE_BYTES: number = 1024 * 1024;
+export const OTPV_V3_MAX_LOGO_SIZE_BYTES: number = 5 * 1024 * 1024;
+export const OTPV_V3_MAX_LOGO_DIMENSION: number = 4096;
 
 export const OTPV_V3_ALLOWED_PAYLOAD_ROOTS: readonly string[] = [
   'database/',

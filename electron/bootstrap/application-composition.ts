@@ -110,12 +110,14 @@ import type VentasPostventaRepository from '@backend/contracts/ventas/ventas-pos
 import type VentasTicketBaiRepository from '@backend/contracts/ventas/ventas-ticket-bai.repository.interface';
 import type VentasTicketsRepository from '@backend/contracts/ventas/ventas-tickets.repository.interface';
 import DefaultLegacyImportReviewDecisionValidator from '@backend/domain/legacy-import/default-legacy-import-review-decision.validator';
+import FileOtpvV3RequiredContentValidator from '@infrastructure/backup/file-otpv-v3-required-content.validator';
 import FileOtpvV3RestoreWorkspace from '@infrastructure/backup/file-otpv-v3-restore-workspace';
 import InMemoryOtpvV3RestoreSelectionStore from '@infrastructure/backup/in-memory-otpv-v3-restore-selection.store';
 import NodeOtpvV3Crypto from '@infrastructure/backup/node-otpv-v3-crypto';
 import YauzlOtpvPackageInspector from '@infrastructure/backup/yauzl-otpv-package.inspector';
 import YauzlOtpvV3EncryptedPayloadExtractor from '@infrastructure/backup/yauzl-otpv-v3-encrypted-payload.extractor';
 import YauzlOtpvV3PayloadInspector from '@infrastructure/backup/yauzl-otpv-v3-payload.inspector';
+import YauzlOtpvV3RequiredContentExtractor from '@infrastructure/backup/yauzl-otpv-v3-required-content.extractor';
 import YazlOtpvV3PackageBuilder from '@infrastructure/backup/yazl-otpv-v3-package.builder';
 import YazlOtpvV3PayloadBuilder from '@infrastructure/backup/yazl-otpv-v3-payload.builder';
 import BetterSqlite3DatabaseSnapshot from '@infrastructure/database/better-sqlite3/better-sqlite3-database-snapshot';
@@ -321,6 +323,12 @@ export default function createApplicationComposition(
   );
 
   const newInstallationDataService: NewInstallationDataService = new NewInstallationDataService();
+
+  const otpvV3RequiredContentExtractor: YauzlOtpvV3RequiredContentExtractor =
+    new YauzlOtpvV3RequiredContentExtractor();
+
+  const otpvV3RequiredContentValidator: FileOtpvV3RequiredContentValidator =
+    new FileOtpvV3RequiredContentValidator(dataSourceFactory, databaseSchemaService);
 
   /*
    * Estado de la aplicación.
@@ -753,6 +761,8 @@ export default function createApplicationComposition(
     otpvV3EncryptedPayloadExtractor,
     backupCrypto,
     otpvV3PayloadInspector,
+    otpvV3RequiredContentExtractor,
+    otpvV3RequiredContentValidator,
     otpvV3RestoreWorkspace,
   );
 

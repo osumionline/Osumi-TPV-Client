@@ -542,6 +542,22 @@ Longitud máxima de una ruta ZIP:
 1.024 caracteres
 ```
 
+Límites semánticos de recursos obligatorios:
+
+```text
+config/app_data.json:
+16 MiB
+
+secrets/secrets.json:
+1 MiB
+
+assets/logo.webp:
+5 MiB
+
+Dimensión máxima del logo:
+4096 × 4096 píxeles
+```
+
 Los límites deben comprobarse tanto usando los metadatos ZIP
 como mientras se leen realmente los streams.
 

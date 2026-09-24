@@ -221,6 +221,11 @@ function createV3Manifest(): OtpvV3Manifest {
 class TestRestoreWorkspace implements OtpvV3RestoreWorkspace {
   readonly encryptedPayloadFile: string = 'payload.enc';
   readonly decryptedPayloadFile: string = 'payload.zip';
+  readonly databaseFile: string = 'C:\\staging\\restore-work\\required\\database\\osumi-tpv.sqlite';
+  readonly appDataFile: string = 'C:\\staging\\restore-work\\required\\config\\app_data.json';
+  readonly logoFile: string = 'C:\\staging\\restore-work\\required\\assets\\logo.webp';
+  readonly portableSecretsFile: string =
+    'C:\\staging\\restore-work\\required\\secrets\\secrets.json';
 
   /**
    * No necesita preparación real en estos tests.

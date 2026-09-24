@@ -9,6 +9,10 @@ import { join } from 'node:path';
 export default class FileOtpvV3RestoreWorkspace implements OtpvV3RestoreWorkspace {
   readonly encryptedPayloadFile: string;
   readonly decryptedPayloadFile: string;
+  readonly databaseFile: string;
+  readonly appDataFile: string;
+  readonly logoFile: string;
+  readonly portableSecretsFile: string;
 
   /**
    * Crea el workspace dentro del directorio indicado.
@@ -16,6 +20,10 @@ export default class FileOtpvV3RestoreWorkspace implements OtpvV3RestoreWorkspac
   constructor(private readonly workDirectory: string) {
     this.encryptedPayloadFile = join(this.workDirectory, 'payload.enc');
     this.decryptedPayloadFile = join(this.workDirectory, 'payload.zip');
+    this.databaseFile = join(this.workDirectory, 'required', 'database', 'osumi-tpv.sqlite');
+    this.appDataFile = join(this.workDirectory, 'required', 'config', 'app_data.json');
+    this.logoFile = join(this.workDirectory, 'required', 'assets', 'logo.webp');
+    this.portableSecretsFile = join(this.workDirectory, 'required', 'secrets', 'secrets.json');
   }
 
   /**

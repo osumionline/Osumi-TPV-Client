@@ -1,4 +1,6 @@
-export default interface OtpvV3RestoreWorkspace {
+import type OtpvV3RequiredContentPaths from '@backend/contracts/backup/otpv-v3-required-content-paths.interface';
+
+export default interface OtpvV3RestoreWorkspace extends OtpvV3RequiredContentPaths {
   readonly encryptedPayloadFile: string;
   readonly decryptedPayloadFile: string;
 
