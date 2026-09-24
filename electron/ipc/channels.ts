@@ -2,6 +2,7 @@ const IPC_CHANNELS = {
   systemGetAppInfo: 'system:get-app-info',
 
   backupCreateLocal: 'backup:create-local',
+  backupSelectRestorePackage: 'backup:select-restore-package',
 
   legacyImportSelectPackage: 'legacy-import:select-package',
   legacyImportAnalyzePackage: 'legacy-import:analyze-package',

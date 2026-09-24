@@ -8,7 +8,9 @@ import InventarioPrintService from '@backend/application/almacen/inventario/inve
 import InventarioService from '@backend/application/almacen/inventario/inventario.service';
 import ApplicationStateService from '@backend/application/application/application-state.service';
 import ArticulosService from '@backend/application/articulos/articulos.service';
+import BackupRestoreSelectionService from '@backend/application/backup/backup-restore-selection.service';
 import BackupService from '@backend/application/backup/backup.service';
+import OtpvPackageSelectionService from '@backend/application/backup/otpv-package-selection.service';
 import CajaService from '@backend/application/caja/caja.service';
 import CajaInformePrintService from '@backend/application/caja/informes/caja-informe-print.service';
 import InformeDetalladoService from '@backend/application/caja/informes/informe-detallado.service';
@@ -107,7 +109,9 @@ import type VentasPostventaRepository from '@backend/contracts/ventas/ventas-pos
 import type VentasTicketBaiRepository from '@backend/contracts/ventas/ventas-ticket-bai.repository.interface';
 import type VentasTicketsRepository from '@backend/contracts/ventas/ventas-tickets.repository.interface';
 import DefaultLegacyImportReviewDecisionValidator from '@backend/domain/legacy-import/default-legacy-import-review-decision.validator';
+import InMemoryOtpvV3RestoreSelectionStore from '@infrastructure/backup/in-memory-otpv-v3-restore-selection.store';
 import NodeOtpvV3Crypto from '@infrastructure/backup/node-otpv-v3-crypto';
+import YauzlOtpvPackageInspector from '@infrastructure/backup/yauzl-otpv-package.inspector';
 import YazlOtpvV3PackageBuilder from '@infrastructure/backup/yazl-otpv-v3-package.builder';
 import YazlOtpvV3PayloadBuilder from '@infrastructure/backup/yazl-otpv-v3-payload.builder';
 import BetterSqlite3DatabaseSnapshot from '@infrastructure/database/better-sqlite3/better-sqlite3-database-snapshot';
@@ -155,6 +159,7 @@ import ElectronClienteFacturaPreviewWindow from '@infrastructure/electron/electr
 import ElectronHtmlDocumentRenderer from '@infrastructure/electron/electron-html-document.renderer';
 import ElectronLegacyImportDialog from '@infrastructure/electron/electron-legacy-import-dialog';
 import ElectronLogoStorage from '@infrastructure/electron/electron-logo.storage';
+import ElectronOtpvPackageDialog from '@infrastructure/electron/electron-otpv-package-dialog';
 import ElectronPdfPrintDialog from '@infrastructure/electron/electron-pdf-print-dialog';
 import ElectronPrinterProvider from '@infrastructure/electron/electron-printer.provider';
 import { ElectronRuntimeInfoProvider } from '@infrastructure/electron/electron-runtime-info.provider';
@@ -702,6 +707,30 @@ export default function createApplicationComposition(
   );
 
   /*
+   * Selección común de paquetes `.otpv`.
+   *
+   * Comparte el store legacy existente para que
+   * un v2 quede listo para continuar por el flujo
+   * de importación ya implementado.
+   */
+  const otpvPackageInspector: YauzlOtpvPackageInspector = new YauzlOtpvPackageInspector();
+
+  const otpvV3RestoreSelectionStore: InMemoryOtpvV3RestoreSelectionStore =
+    new InMemoryOtpvV3RestoreSelectionStore();
+
+  const otpvPackageSelectionService: OtpvPackageSelectionService = new OtpvPackageSelectionService(
+    otpvPackageInspector,
+    legacyImportPackageInspector,
+    legacyImportSelectionStore,
+    otpvV3RestoreSelectionStore,
+  );
+
+  const otpvPackageDialog: ElectronOtpvPackageDialog = new ElectronOtpvPackageDialog(getMainWindow);
+
+  const backupRestoreSelectionService: BackupRestoreSelectionService =
+    new BackupRestoreSelectionService(otpvPackageDialog, otpvPackageSelectionService);
+
+  /*
    * Creación de una nueva instalación.
    */
   const installationDatabase: InstallationDatabase = new TypeOrmInstallationDatabase(
@@ -747,7 +776,7 @@ export default function createApplicationComposition(
    * Canales IPC.
    */
   registerApplicationIpc(applicationStateService);
-  registerBackupIpc(getMainWindow, backupService);
+  registerBackupIpc(getMainWindow, backupService, backupRestoreSelectionService);
   registerAlmacenIpc(
     getMainWindow,
     inventarioService,

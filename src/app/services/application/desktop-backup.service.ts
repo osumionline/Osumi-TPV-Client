@@ -1,5 +1,6 @@
 import { Service } from '@angular/core';
 import type BackupCreateResult from '@desktop-contracts/backup/backup-create-result.interface';
+import type BackupRestorePackageSelectionResult from '@desktop-contracts/backup/backup-restore-package-selection-result.type';
 
 @Service()
 export default class DesktopBackupService {
@@ -8,5 +9,12 @@ export default class DesktopBackupService {
    */
   createLocal(): Promise<BackupCreateResult> {
     return window.osumiDesktop.backup.createLocal();
+  }
+
+  /**
+   * Selecciona un `.otpv` para recuperación.
+   */
+  selectRestorePackage(): Promise<BackupRestorePackageSelectionResult> {
+    return window.osumiDesktop.backup.selectRestorePackage();
   }
 }
