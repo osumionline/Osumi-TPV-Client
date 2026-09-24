@@ -238,6 +238,18 @@ mat-form-field {
   }
 }
 
+/*
+ * Mantiene blanco el control Material pero deja transparente
+ * la zona inferior reservada para hints y errores.
+ */
+mat-form-field.otpv-mat-field--transparent-subscript {
+  background-color: transparent;
+
+  .mat-mdc-text-field-wrapper {
+    background-color: var(--color-white);
+  }
+}
+
 .stats-box {
   margin-top: 16px;
 

@@ -1,6 +1,6 @@
 import { Component, inject, signal, type WritableSignal } from '@angular/core';
 import { FieldTree, FormField, form } from '@angular/forms/signals';
-import { MatButton } from '@angular/material/button';
+import { MatButton, MatIconButton } from '@angular/material/button';
 import {
   MatCard,
   MatCardActions,
@@ -36,6 +36,7 @@ type NativeRestoreSelection = Extract<
   imports: [
     FormField,
     MatButton,
+    MatIconButton,
     MatCard,
     MatCardActions,
     MatCardContent,
