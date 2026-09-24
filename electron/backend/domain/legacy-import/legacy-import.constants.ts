@@ -1,4 +1,4 @@
-export const LEGACY_IMPORT_SUPPORTED_FORMAT_VERSION: number = 2;
+export const LEGACY_IMPORT_SUPPORTED_FORMAT_VERSION = 2 as const;
 
 export const LEGACY_IMPORT_SUPPORTED_SCHEMA_VERSION: string = 'legacy-2026-07';
 

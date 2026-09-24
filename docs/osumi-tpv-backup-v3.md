@@ -82,7 +82,7 @@ Estructura exacta prevista:
     "blockSize": 8,
     "parallelization": 3,
     "length": 32
-  }
+  },
   "keyWrap": {
     "algorithm": "aes-256-gcm",
     "iv": "...",
