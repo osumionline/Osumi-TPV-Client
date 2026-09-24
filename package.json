@@ -15,7 +15,7 @@
     "test": "ng test --watch=false",
     "test:watch": "ng test",
     "test:electron": "set npm_config_allow_scripts=&& node scripts/test-electron.mjs",
-    "test:electron:vitest": "vitest run --config electron/vitest.config.ts",
+    "test:electron:vitest": "vitest run --config electron/vitest.config.mts",
     "lint": "ng lint",
     "rebuild:native": "electron-rebuild -f -w better-sqlite3",
     "postinstall": "npm run rebuild:native"
