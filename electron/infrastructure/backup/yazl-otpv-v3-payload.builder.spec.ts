@@ -1,3 +1,4 @@
+import type DatabaseSnapshot from '@backend/contracts/backup/database-snapshot.interface';
 import type { OtpvV3EncryptionResult } from '@backend/contracts/backup/otpv-v3-crypto.interface';
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
@@ -10,7 +11,7 @@ import JsonAppDataRepository from '@infrastructure/filesystem/json-app-data.repo
 import Database from 'better-sqlite3';
 import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Entry, ZipFile } from 'yauzl';
@@ -132,24 +133,20 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
 
   it('genera un payload cifrado con todo el estado portable de la instalación', async (): Promise<void> => {
     const currentPaths: ApplicationPaths = requirePaths();
-
     const appDataRepository: JsonAppDataRepository = new JsonAppDataRepository(
       currentPaths.appDataFile,
     );
-
     const secretStorage: TestSecretStorage = new TestSecretStorage(createSecrets());
-
     const crypto: NodeOtpvV3Crypto = new NodeOtpvV3Crypto();
+    const databaseSnapshot: RecordingDatabaseSnapshot = new RecordingDatabaseSnapshot(
+      new BetterSqlite3DatabaseSnapshot(currentPaths.databaseFile),
+    );
 
     const builder: YazlOtpvV3PayloadBuilder = new YazlOtpvV3PayloadBuilder(
       currentPaths,
-
-      new BetterSqlite3DatabaseSnapshot(currentPaths.databaseFile),
-
+      databaseSnapshot,
       appDataRepository,
-
       secretStorage,
-
       crypto,
     );
 
@@ -160,6 +157,16 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
       authenticatedData: AUTHENTICATED_DATA,
       destinationFile: payloadFile,
     });
+
+    expect(databaseSnapshot.destinationFile).not.toBeNull();
+
+    const snapshotTemporaryName: string = basename(databaseSnapshot.destinationFile ?? '');
+
+    expect(snapshotTemporaryName).toMatch(
+      /^\.snapshot-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.sqlite$/i,
+    );
+
+    expect(snapshotTemporaryName).not.toContain('payload.enc');
 
     const backupDirectoryEntries: string[] = await readdir(currentPaths.backupsDirectory);
 
@@ -561,4 +568,24 @@ function requireTempDirectory(): string {
   }
 
   return tempDirectory;
+}
+
+class RecordingDatabaseSnapshot implements DatabaseSnapshot {
+  destinationFile: string | null = null;
+
+  /**
+   * Crea el wrapper alrededor del proveedor
+   * real de snapshots.
+   */
+  constructor(private readonly delegate: DatabaseSnapshot) {}
+
+  /**
+   * Registra el destino solicitado y delega
+   * la creación real del snapshot.
+   */
+  async create(destinationFile: string): Promise<void> {
+    this.destinationFile = destinationFile;
+
+    await this.delegate.create(destinationFile);
+  }
 }

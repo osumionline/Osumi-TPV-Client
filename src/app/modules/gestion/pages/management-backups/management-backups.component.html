@@ -1,0 +1,78 @@
+<section class="management-backups">
+    <header class="management-backups__header">
+        <div>
+            <span class="management-backups__eyebrow">
+                Gestión
+            </span>
+
+            <h1>
+                Copias de seguridad
+            </h1>
+
+            <p>
+                Crea una copia completa y cifrada de la instalación actual de Osumi TPV.
+            </p>
+        </div>
+
+        <a mat-stroked-button
+           routerLink="/gestion">
+            <mat-icon>arrow_back</mat-icon>
+            Volver a Gestión
+        </a>
+    </header>
+
+    <section class="management-backups__card">
+        <div class="management-backups__icon">
+            <mat-icon>backup</mat-icon>
+        </div>
+
+        <div class="management-backups__content">
+            <h2>
+                Nueva copia local
+            </h2>
+
+            <p>
+                La copia incluye la base de datos, la configuración, el logo,
+                los archivos asociados y los secretos portables de la instalación.
+            </p>
+
+            <p>
+                El archivo se cifra utilizando la TPV Backup key configurada
+                en Ajustes.
+            </p>
+        </div>
+
+        <button mat-flat-button
+                type="button"
+                [disabled]="creating()"
+                (click)="createBackup()">
+            <mat-icon>
+                {{ creating() ? 'hourglass_top' : 'save' }}
+            </mat-icon>
+
+            {{ creating() ? 'Creando copia...' : 'Crear copia de seguridad' }}
+        </button>
+    </section>
+
+    @if (lastBackup(); as backup) {
+    <section class="management-backups__result">
+        <div class="management-backups__result-icon">
+            <mat-icon>check_circle</mat-icon>
+        </div>
+
+        <div>
+            <strong>
+                Última copia creada
+            </strong>
+
+            <span>
+                {{ backup.fileName }}
+            </span>
+
+            <small>
+                {{ formatDate(backup.createdAt) }} · {{ formatSize(backup.sizeBytes) }}
+            </small>
+        </div>
+    </section>
+    }
+</section>

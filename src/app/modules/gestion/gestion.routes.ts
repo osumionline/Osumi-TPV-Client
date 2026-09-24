@@ -48,7 +48,7 @@ const routes: Routes = [
         path: 'copias-seguridad',
         canActivate: [gestionPermissionGuard],
         loadComponent: () =>
-          import('@modules/gestion/pages/management-placeholder/management-placeholder.component'),
+          import('@modules/gestion/pages/management-backups/management-backups.component'),
         data: {
           requiredPermissions: [GESTION_PERMISSIONS.BACKUPS],
           title: 'Copias de seguridad',

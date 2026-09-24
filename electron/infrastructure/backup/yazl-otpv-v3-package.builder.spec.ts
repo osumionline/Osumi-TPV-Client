@@ -21,7 +21,7 @@ import { DATABASE_SCHEMA_VERSION } from '@backend/domain/database/database-schem
 import YazlOtpvV3PackageBuilder from '@infrastructure/backup/yazl-otpv-v3-package.builder';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Entry, ZipFile } from 'yauzl';
@@ -80,6 +80,15 @@ describe('YazlOtpvV3PackageBuilder', (): void => {
 
     expect(payloadBuilder.authenticatedData).not.toBeNull();
     expect(payloadBuilder.authenticatedData?.toString('base64')).toBe(manifest.authenticatedData);
+    expect(payloadBuilder.destinationFile).not.toBeNull();
+
+    const payloadTemporaryName: string = basename(payloadBuilder.destinationFile ?? '');
+
+    expect(payloadTemporaryName).toMatch(
+      /^\.payload-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.enc$/i,
+    );
+
+    expect(payloadTemporaryName).not.toContain('backup.otpv');
 
     expect(await readdir(requireTempDirectory())).toEqual(['backup.otpv']);
   });
@@ -134,6 +143,7 @@ interface TestZipEntry {
  */
 class TestPayloadBuilder implements OtpvV3PayloadBuilder {
   authenticatedData: Buffer | null = null;
+  destinationFile: string | null = null;
 
   /**
    * Genera un payload cifrado de prueba
@@ -141,6 +151,7 @@ class TestPayloadBuilder implements OtpvV3PayloadBuilder {
    */
   async create(command: OtpvV3BuildPayloadCommand): Promise<OtpvV3EncryptionResult> {
     this.authenticatedData = Buffer.from(command.authenticatedData);
+    this.destinationFile = command.destinationFile;
 
     await writeFile(command.destinationFile, PAYLOAD_CONTENT);
 

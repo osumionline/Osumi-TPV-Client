@@ -28,7 +28,7 @@ import { randomUUID } from 'node:crypto';
 import type { Stats } from 'node:fs';
 import { createWriteStream } from 'node:fs';
 import { access, mkdir, rename, rm, stat } from 'node:fs/promises';
-import { basename, dirname, join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { ZipFile } from 'yazl';
 
@@ -72,15 +72,8 @@ export default class YazlOtpvV3PackageBuilder implements OtpvV3PackageBuilder {
 
     const authenticatedData: Buffer = serializeOtpvV3AuthenticatedMetadata(metadata);
 
-    const payloadFile: string = join(
-      destinationDirectory,
-      `.${basename(command.destinationFile)}.${backupId}.payload.enc`,
-    );
-
-    const temporaryPackageFile: string = join(
-      destinationDirectory,
-      `.${basename(command.destinationFile)}.${backupId}.tmp`,
-    );
+    const payloadFile: string = join(destinationDirectory, `.payload-${backupId}.enc`);
+    const temporaryPackageFile: string = join(destinationDirectory, `.package-${backupId}.tmp`);
 
     try {
       const encryption: OtpvV3EncryptionResult = await this.payloadBuilder.create({

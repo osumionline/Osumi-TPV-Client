@@ -26,7 +26,7 @@ import type { InstallationSecretsData } from '@desktop-contracts/configuration/i
 import { randomUUID } from 'node:crypto';
 import type { Dirent, Stats } from 'node:fs';
 import { access, lstat, mkdir, readdir, rm } from 'node:fs/promises';
-import { basename, dirname, join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { Readable } from 'node:stream';
 import { ZipFile } from 'yazl';
 
@@ -77,10 +77,7 @@ export default class YazlOtpvV3PayloadBuilder implements OtpvV3PayloadBuilder {
       recursive: true,
     });
 
-    const snapshotFile: string = join(
-      destinationDirectory,
-      ['.', basename(command.destinationFile), '.', randomUUID(), '.snapshot.sqlite'].join(''),
-    );
+    const snapshotFile: string = join(destinationDirectory, `.snapshot-${randomUUID()}.sqlite`);
 
     let portableSecretsBuffer: Buffer | null = null;
 

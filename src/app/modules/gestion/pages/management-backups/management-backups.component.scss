@@ -1,0 +1,126 @@
+:host {
+    display: block;
+}
+
+.management-backups {
+    padding: 32px;
+
+    .management-backups__header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 32px;
+
+        h1 {
+            margin: 4px 0 8px;
+            font-size: 1.75rem;
+            font-weight: 500;
+        }
+
+        p {
+            margin: 0;
+            opacity: 0.7;
+        }
+    }
+
+    .management-backups__eyebrow {
+        color: var(--main-color);
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .management-backups__card {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 24px;
+        padding: 24px;
+        background: var(--mat-sys-surface-container-low, #f7f7f7);
+        border-radius: 16px;
+    }
+
+    .management-backups__icon {
+        display: grid;
+        width: 64px;
+        height: 64px;
+        place-items: center;
+        color: var(--main-color);
+        background: color-mix(in srgb, var(--main-color) 10%, transparent);
+        border-radius: 16px;
+
+        mat-icon {
+            width: 34px;
+            height: 34px;
+            font-size: 34px;
+        }
+    }
+
+    .management-backups__content {
+        h2 {
+            margin: 0 0 8px;
+            font-size: 1.2rem;
+            font-weight: 500;
+        }
+
+        p {
+            margin: 4px 0;
+            line-height: 1.5;
+            opacity: 0.75;
+        }
+    }
+
+    .management-backups__result {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-top: 24px;
+        padding: 18px 20px;
+        background: var(--mat-sys-surface-container-low, #f7f7f7);
+        border-radius: 12px;
+
+        .management-backups__result-icon {
+            display: grid;
+            place-items: center;
+        }
+
+        mat-icon {
+            color: var(--mat-sys-primary, var(--main-color));
+        }
+
+        div:last-child {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            min-width: 0;
+        }
+
+        span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        small {
+            opacity: 0.65;
+        }
+    }
+
+    @media (max-width: 800px) {
+        padding: 20px;
+
+        .management-backups__header {
+            flex-direction: column;
+        }
+
+        .management-backups__card {
+            grid-template-columns: auto 1fr;
+
+            button {
+                grid-column: 1 / -1;
+                justify-self: start;
+            }
+        }
+    }
+}

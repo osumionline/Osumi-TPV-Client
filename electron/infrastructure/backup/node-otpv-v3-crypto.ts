@@ -27,7 +27,7 @@ import {
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes, randomUUID } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { access, mkdir, rename, rm } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
@@ -437,7 +437,7 @@ export default class NodeOtpvV3Crypto implements OtpvV3Crypto {
       recursive: true,
     });
 
-    return join(directory, ['.', basename(destinationFile), '.', randomUUID(), '.tmp'].join(''));
+    return join(directory, `.crypto-${randomUUID()}.tmp`);
   }
 
   /**

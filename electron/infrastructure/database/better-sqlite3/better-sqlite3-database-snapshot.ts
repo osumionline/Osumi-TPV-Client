@@ -2,7 +2,7 @@ import type DatabaseSnapshot from '@backend/contracts/backup/database-snapshot.i
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { access, mkdir, rename, rm, stat } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 /**
  * Crea snapshots consistentes utilizando
@@ -30,10 +30,7 @@ export default class BetterSqlite3DatabaseSnapshot implements DatabaseSnapshot {
       recursive: true,
     });
 
-    const temporaryFile: string = join(
-      destinationDirectory,
-      ['.', basename(destinationFile), '.', randomUUID(), '.tmp'].join(''),
-    );
+    const temporaryFile: string = join(destinationDirectory, `.sqlite-backup-${randomUUID()}.tmp`);
 
     let sourceDatabase: Database.Database | null = null;
 
