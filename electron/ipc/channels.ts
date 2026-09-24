@@ -3,6 +3,7 @@ const IPC_CHANNELS = {
 
   backupCreateLocal: 'backup:create-local',
   backupSelectRestorePackage: 'backup:select-restore-package',
+  backupUnlockRestorePackage: 'backup:unlock-restore-package',
 
   legacyImportSelectPackage: 'legacy-import:select-package',
   legacyImportAnalyzePackage: 'legacy-import:analyze-package',

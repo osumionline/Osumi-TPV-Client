@@ -11,6 +11,7 @@ import ArticulosService from '@backend/application/articulos/articulos.service';
 import BackupRestoreSelectionService from '@backend/application/backup/backup-restore-selection.service';
 import BackupService from '@backend/application/backup/backup.service';
 import OtpvPackageSelectionService from '@backend/application/backup/otpv-package-selection.service';
+import OtpvV3RestoreUnlockService from '@backend/application/backup/otpv-v3-restore-unlock.service';
 import CajaService from '@backend/application/caja/caja.service';
 import CajaInformePrintService from '@backend/application/caja/informes/caja-informe-print.service';
 import InformeDetalladoService from '@backend/application/caja/informes/informe-detallado.service';
@@ -109,9 +110,11 @@ import type VentasPostventaRepository from '@backend/contracts/ventas/ventas-pos
 import type VentasTicketBaiRepository from '@backend/contracts/ventas/ventas-ticket-bai.repository.interface';
 import type VentasTicketsRepository from '@backend/contracts/ventas/ventas-tickets.repository.interface';
 import DefaultLegacyImportReviewDecisionValidator from '@backend/domain/legacy-import/default-legacy-import-review-decision.validator';
+import FileOtpvV3RestoreWorkspace from '@infrastructure/backup/file-otpv-v3-restore-workspace';
 import InMemoryOtpvV3RestoreSelectionStore from '@infrastructure/backup/in-memory-otpv-v3-restore-selection.store';
 import NodeOtpvV3Crypto from '@infrastructure/backup/node-otpv-v3-crypto';
 import YauzlOtpvPackageInspector from '@infrastructure/backup/yauzl-otpv-package.inspector';
+import YauzlOtpvV3EncryptedPayloadExtractor from '@infrastructure/backup/yauzl-otpv-v3-encrypted-payload.extractor';
 import YazlOtpvV3PackageBuilder from '@infrastructure/backup/yazl-otpv-v3-package.builder';
 import YazlOtpvV3PayloadBuilder from '@infrastructure/backup/yazl-otpv-v3-payload.builder';
 import BetterSqlite3DatabaseSnapshot from '@infrastructure/database/better-sqlite3/better-sqlite3-database-snapshot';
@@ -727,8 +730,27 @@ export default function createApplicationComposition(
 
   const otpvPackageDialog: ElectronOtpvPackageDialog = new ElectronOtpvPackageDialog(getMainWindow);
 
+  const otpvV3RestoreWorkspace: FileOtpvV3RestoreWorkspace = new FileOtpvV3RestoreWorkspace(
+    join(applicationPaths.stagingDirectory, 'restore-work'),
+  );
+
+  const otpvV3EncryptedPayloadExtractor: YauzlOtpvV3EncryptedPayloadExtractor =
+    new YauzlOtpvV3EncryptedPayloadExtractor();
+
   const backupRestoreSelectionService: BackupRestoreSelectionService =
-    new BackupRestoreSelectionService(otpvPackageDialog, otpvPackageSelectionService);
+    new BackupRestoreSelectionService(
+      otpvPackageDialog,
+      otpvPackageSelectionService,
+      otpvV3RestoreWorkspace,
+    );
+
+  const otpvV3RestoreUnlockService: OtpvV3RestoreUnlockService = new OtpvV3RestoreUnlockService(
+    otpvV3RestoreSelectionStore,
+    otpvPackageInspector,
+    otpvV3EncryptedPayloadExtractor,
+    backupCrypto,
+    otpvV3RestoreWorkspace,
+  );
 
   /*
    * Creación de una nueva instalación.
@@ -776,7 +798,12 @@ export default function createApplicationComposition(
    * Canales IPC.
    */
   registerApplicationIpc(applicationStateService);
-  registerBackupIpc(getMainWindow, backupService, backupRestoreSelectionService);
+  registerBackupIpc(
+    getMainWindow,
+    backupService,
+    backupRestoreSelectionService,
+    otpvV3RestoreUnlockService,
+  );
   registerAlmacenIpc(
     getMainWindow,
     inventarioService,

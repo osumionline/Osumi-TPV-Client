@@ -1,7 +1,10 @@
 import type BackupRestoreSelectionService from '@backend/application/backup/backup-restore-selection.service';
 import type BackupService from '@backend/application/backup/backup.service';
+import type OtpvV3RestoreUnlockService from '@backend/application/backup/otpv-v3-restore-unlock.service';
 import type BackupCreateResult from '@desktop-contracts/backup/backup-create-result.interface';
 import type BackupRestorePackageSelectionResult from '@desktop-contracts/backup/backup-restore-package-selection-result.type';
+import type BackupRestoreUnlockCommand from '@desktop-contracts/backup/backup-restore-unlock-command.interface';
+import type BackupRestoreUnlockResult from '@desktop-contracts/backup/backup-restore-unlock-result.interface';
 import { assertTrustedSender, type MainWindowProvider } from '@ipc/assert-trusted-sender';
 import IPC_CHANNELS from '@ipc/channels';
 import { ipcMain } from 'electron';
@@ -13,6 +16,7 @@ export default function registerBackupIpc(
   getMainWindow: MainWindowProvider,
   backupService: BackupService,
   backupRestoreSelectionService: BackupRestoreSelectionService,
+  restoreUnlockService: OtpvV3RestoreUnlockService,
 ): void {
   ipcMain.handle(IPC_CHANNELS.backupCreateLocal, async (event): Promise<BackupCreateResult> => {
     assertTrustedSender(event, getMainWindow);
@@ -26,6 +30,15 @@ export default function registerBackupIpc(
       assertTrustedSender(event, getMainWindow);
 
       return backupRestoreSelectionService.selectPackage();
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.backupUnlockRestorePackage,
+    async (event, command: BackupRestoreUnlockCommand): Promise<BackupRestoreUnlockResult> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return restoreUnlockService.unlock(command);
     },
   );
 }

@@ -1,5 +1,6 @@
 import type OtpvPackageSelectionService from '@backend/application/backup/otpv-package-selection.service';
 import type OtpvPackageDialog from '@backend/contracts/backup/otpv-package-dialog.interface';
+import type OtpvV3RestoreWorkspace from '@backend/contracts/backup/otpv-v3-restore-workspace.interface';
 import type OtpvPackageSelectionResult from '@backend/domain/backup/otpv-package-selection-result.type';
 import type BackupRestorePackageSelectionResult from '@desktop-contracts/backup/backup-restore-package-selection-result.type';
 import { basename } from 'node:path';
@@ -15,6 +16,7 @@ export default class BackupRestoreSelectionService {
   constructor(
     private readonly dialog: OtpvPackageDialog,
     private readonly packageSelectionService: OtpvPackageSelectionService,
+    private readonly restoreWorkspace: OtpvV3RestoreWorkspace,
   ) {}
 
   /**
@@ -29,6 +31,8 @@ export default class BackupRestoreSelectionService {
         status: 'cancelled',
       };
     }
+
+    await this.restoreWorkspace.clear();
 
     try {
       const selection: OtpvPackageSelectionResult =

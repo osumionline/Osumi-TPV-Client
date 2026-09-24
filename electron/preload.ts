@@ -38,6 +38,8 @@ import type { ArticuloInterface } from '@desktop-contracts/articulos/articulo.in
 import type CategoriaInterface from '@desktop-contracts/articulos/categorias/categoria.interface';
 import type BackupCreateResult from '@desktop-contracts/backup/backup-create-result.interface';
 import type BackupRestorePackageSelectionResult from '@desktop-contracts/backup/backup-restore-package-selection-result.type';
+import type BackupRestoreUnlockCommand from '@desktop-contracts/backup/backup-restore-unlock-command.interface';
+import type BackupRestoreUnlockResult from '@desktop-contracts/backup/backup-restore-unlock-result.interface';
 import type AbrirCajaCommand from '@desktop-contracts/caja/abrir-caja-command.interface';
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
 import {
@@ -186,6 +188,14 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
       ipcRenderer.invoke(
         IPC_CHANNELS.backupSelectRestorePackage,
       ) as Promise<BackupRestorePackageSelectionResult>,
+
+    unlockRestorePackage: (
+      command: BackupRestoreUnlockCommand,
+    ): Promise<BackupRestoreUnlockResult> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.backupUnlockRestorePackage,
+        command,
+      ) as Promise<BackupRestoreUnlockResult>,
   }),
 
   almacen: Object.freeze({

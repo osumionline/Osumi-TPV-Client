@@ -3,6 +3,7 @@ import OtpvPackageSelectionService from '@backend/application/backup/otpv-packag
 import type OtpvPackageDialog from '@backend/contracts/backup/otpv-package-dialog.interface';
 import type OtpvPackageInspector from '@backend/contracts/backup/otpv-package-inspector.interface';
 import type { OtpvV3Manifest } from '@backend/contracts/backup/otpv-v3-manifest.interface';
+import type OtpvV3RestoreWorkspace from '@backend/contracts/backup/otpv-v3-restore-workspace.interface';
 import type LegacyImportPackageInspector from '@backend/contracts/legacy-import/legacy-import-package-inspector.interface';
 import type OtpvPackageInspection from '@backend/domain/backup/otpv-package-inspection.type';
 import { OTPV_V3_FORMAT_VERSION } from '@backend/domain/backup/otpv-v3.constants';
@@ -100,7 +101,11 @@ function createService(
     new InMemoryOtpvV3RestoreSelectionStore(),
   );
 
-  return new BackupRestoreSelectionService(dialog, packageSelectionService);
+  return new BackupRestoreSelectionService(
+    dialog,
+    packageSelectionService,
+    new TestRestoreWorkspace(),
+  );
 }
 
 /**
@@ -207,4 +212,34 @@ function createV3Manifest(): OtpvV3Manifest {
       authTag: 'private-fixture',
     },
   };
+}
+
+/**
+ * Workspace neutro utilizado por los tests
+ * de selección de paquetes.
+ */
+class TestRestoreWorkspace implements OtpvV3RestoreWorkspace {
+  readonly encryptedPayloadFile: string = 'payload.enc';
+  readonly decryptedPayloadFile: string = 'payload.zip';
+
+  /**
+   * No necesita preparación real en estos tests.
+   */
+  reset(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  /**
+   * No existe payload cifrado real que eliminar.
+   */
+  removeEncryptedPayload(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  /**
+   * No existe workspace real que limpiar.
+   */
+  clear(): Promise<void> {
+    return Promise.resolve();
+  }
 }
