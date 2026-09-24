@@ -115,6 +115,7 @@ import InMemoryOtpvV3RestoreSelectionStore from '@infrastructure/backup/in-memor
 import NodeOtpvV3Crypto from '@infrastructure/backup/node-otpv-v3-crypto';
 import YauzlOtpvPackageInspector from '@infrastructure/backup/yauzl-otpv-package.inspector';
 import YauzlOtpvV3EncryptedPayloadExtractor from '@infrastructure/backup/yauzl-otpv-v3-encrypted-payload.extractor';
+import YauzlOtpvV3PayloadInspector from '@infrastructure/backup/yauzl-otpv-v3-payload.inspector';
 import YazlOtpvV3PackageBuilder from '@infrastructure/backup/yazl-otpv-v3-package.builder';
 import YazlOtpvV3PayloadBuilder from '@infrastructure/backup/yazl-otpv-v3-payload.builder';
 import BetterSqlite3DatabaseSnapshot from '@infrastructure/database/better-sqlite3/better-sqlite3-database-snapshot';
@@ -737,6 +738,8 @@ export default function createApplicationComposition(
   const otpvV3EncryptedPayloadExtractor: YauzlOtpvV3EncryptedPayloadExtractor =
     new YauzlOtpvV3EncryptedPayloadExtractor();
 
+  const otpvV3PayloadInspector: YauzlOtpvV3PayloadInspector = new YauzlOtpvV3PayloadInspector();
+
   const backupRestoreSelectionService: BackupRestoreSelectionService =
     new BackupRestoreSelectionService(
       otpvPackageDialog,
@@ -749,6 +752,7 @@ export default function createApplicationComposition(
     otpvPackageInspector,
     otpvV3EncryptedPayloadExtractor,
     backupCrypto,
+    otpvV3PayloadInspector,
     otpvV3RestoreWorkspace,
   );
 

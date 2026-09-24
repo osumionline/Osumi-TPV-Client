@@ -1,6 +1,7 @@
 import type OtpvPackageInspector from '@backend/contracts/backup/otpv-package-inspector.interface';
 import type { OtpvV3Crypto } from '@backend/contracts/backup/otpv-v3-crypto.interface';
 import type OtpvV3EncryptedPayloadExtractor from '@backend/contracts/backup/otpv-v3-encrypted-payload-extractor.interface';
+import type OtpvV3PayloadInspector from '@backend/contracts/backup/otpv-v3-payload-inspector.interface';
 import type OtpvV3RestoreSelectionStore from '@backend/contracts/backup/otpv-v3-restore-selection-store.interface';
 import type OtpvV3RestoreWorkspace from '@backend/contracts/backup/otpv-v3-restore-workspace.interface';
 import type OtpvPackageInspection from '@backend/domain/backup/otpv-package-inspection.type';
@@ -23,6 +24,7 @@ export default class OtpvV3RestoreUnlockService {
     private readonly packageInspector: OtpvPackageInspector,
     private readonly payloadExtractor: OtpvV3EncryptedPayloadExtractor,
     private readonly crypto: OtpvV3Crypto,
+    private readonly payloadInspector: OtpvV3PayloadInspector,
     private readonly workspace: OtpvV3RestoreWorkspace,
   ) {}
 
@@ -66,6 +68,8 @@ export default class OtpvV3RestoreUnlockService {
         sourceFile: this.workspace.encryptedPayloadFile,
         destinationFile: this.workspace.decryptedPayloadFile,
       });
+
+      await this.payloadInspector.inspect(this.workspace.decryptedPayloadFile);
 
       await this.workspace.removeEncryptedPayload();
 

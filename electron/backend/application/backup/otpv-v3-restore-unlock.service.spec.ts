@@ -7,8 +7,10 @@ import type {
 } from '@backend/contracts/backup/otpv-v3-crypto.interface';
 import type OtpvV3EncryptedPayloadExtractor from '@backend/contracts/backup/otpv-v3-encrypted-payload-extractor.interface';
 import type { OtpvV3Manifest } from '@backend/contracts/backup/otpv-v3-manifest.interface';
+import type OtpvV3PayloadInspector from '@backend/contracts/backup/otpv-v3-payload-inspector.interface';
 import type OtpvV3RestoreWorkspace from '@backend/contracts/backup/otpv-v3-restore-workspace.interface';
 import type OtpvPackageInspection from '@backend/domain/backup/otpv-package-inspection.type';
+import type OtpvV3PayloadInspection from '@backend/domain/backup/otpv-v3-payload-inspection.interface';
 import { OTPV_V3_FORMAT_VERSION } from '@backend/domain/backup/otpv-v3.constants';
 import { DATABASE_SCHEMA_VERSION } from '@backend/domain/database/database-schema.constants';
 import type BackupRestoreUnlockResult from '@desktop-contracts/backup/backup-restore-unlock-result.interface';
@@ -29,6 +31,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
 
     const extractor = new TestPayloadExtractor();
     const crypto = new TestCrypto();
+    const payloadInspector = new TestPayloadInspector();
     const workspace = new TestWorkspace();
 
     const service = new OtpvV3RestoreUnlockService(
@@ -39,6 +42,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       }),
       extractor,
       crypto,
+      payloadInspector,
       workspace,
     );
 
@@ -66,6 +70,8 @@ describe('OtpvV3RestoreUnlockService', (): void => {
     expect(workspace.resetCalls).toBe(1);
     expect(workspace.removeEncryptedPayloadCalls).toBe(1);
     expect(workspace.clearCalls).toBe(0);
+    expect(payloadInspector.calls).toBe(1);
+    expect(payloadInspector.payloadFile).toBe(workspace.decryptedPayloadFile);
   });
 
   it('rechaza una selección caducada', async (): Promise<void> => {
@@ -77,6 +83,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       }),
       new TestPayloadExtractor(),
       new TestCrypto(),
+      new TestPayloadInspector(),
       new TestWorkspace(),
     );
 
@@ -114,6 +121,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       }),
       extractor,
       new TestCrypto(),
+      new TestPayloadInspector(),
       workspace,
     );
 
@@ -158,6 +166,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       }),
       new TestPayloadExtractor(),
       crypto,
+      new TestPayloadInspector(),
       workspace,
     );
 
@@ -168,6 +177,45 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       }),
     ).rejects.toThrow('La TPV Backup key no es correcta o el archivo está dañado.');
 
+    expect(workspace.clearCalls).toBe(1);
+    expect(workspace.removeEncryptedPayloadCalls).toBe(0);
+  });
+
+  it('limpia el workspace si el ZIP interior no es válido', async (): Promise<void> => {
+    const manifest: OtpvV3Manifest = createManifest();
+
+    const store = new InMemoryOtpvV3RestoreSelectionStore();
+
+    const selectionId: string = store.save({
+      packagePath: 'C:\\backup.otpv',
+      manifest,
+    });
+
+    const workspace = new TestWorkspace();
+    const payloadInspector = new TestPayloadInspector();
+
+    payloadInspector.inspectionError = new Error('El payload contiene una ruta insegura.');
+
+    const service = new OtpvV3RestoreUnlockService(
+      store,
+      new TestPackageInspector({
+        formatVersion: OTPV_V3_FORMAT_VERSION,
+        manifest,
+      }),
+      new TestPayloadExtractor(),
+      new TestCrypto(),
+      payloadInspector,
+      workspace,
+    );
+
+    await expect(
+      service.unlock({
+        selectionId,
+        backupApiKey: BACKUP_KEY,
+      }),
+    ).rejects.toThrow('El payload contiene una ruta insegura.');
+
+    expect(payloadInspector.calls).toBe(1);
     expect(workspace.clearCalls).toBe(1);
     expect(workspace.removeEncryptedPayloadCalls).toBe(0);
   });
@@ -312,4 +360,33 @@ function createManifest(): OtpvV3Manifest {
       authTag: 'fixture',
     },
   };
+}
+
+/**
+ * Inspector del ZIP interior utilizado
+ * para verificar la orquestación.
+ */
+class TestPayloadInspector implements OtpvV3PayloadInspector {
+  calls: number = 0;
+  payloadFile: string | null = null;
+  inspectionError: Error | null = null;
+
+  /**
+   * Registra el payload recibido y simula
+   * una inspección correcta o fallida.
+   */
+  async inspect(payloadFile: string): Promise<OtpvV3PayloadInspection> {
+    this.calls += 1;
+    this.payloadFile = payloadFile;
+
+    if (this.inspectionError !== null) {
+      throw this.inspectionError;
+    }
+
+    return {
+      entries: [],
+      regularFileCount: 0,
+      totalUncompressedSize: 0,
+    };
+  }
 }
