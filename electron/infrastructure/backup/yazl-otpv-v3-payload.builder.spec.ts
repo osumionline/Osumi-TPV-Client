@@ -212,10 +212,10 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
     expect(portableSecrets).toEqual({
       schemaVersion: 1,
       secretApi: 'secret-api',
-      backupApiKey: BACKUP_API_KEY,
       emailSmtpPass: 'smtp-password',
       ticketBaiToken: null,
     });
+    expect(portableSecrets).not.toHaveProperty('backupApiKey');
 
     expect(entries.has('config/printing_settings.json')).toBe(false);
 

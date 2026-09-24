@@ -1,5 +1,6 @@
-import type { InstallationSecretsData } from '@desktop-contracts/configuration/installation-command.interface';
-
-export default interface OtpvV3PortableSecrets extends InstallationSecretsData {
+export default interface OtpvV3PortableSecrets {
   readonly schemaVersion: 1;
+  readonly secretApi: string;
+  readonly emailSmtpPass: string | null;
+  readonly ticketBaiToken: string | null;
 }

@@ -5,18 +5,20 @@ export interface OtpvV3AuthenticatedMetadata {
   readonly applicationVersion: string;
   readonly databaseSchemaVersion: number;
   readonly createdAt: string;
-  readonly cryptoSuite: 'otpv3-hkdf-sha256-aes-256-gcm';
+  readonly cryptoSuite: 'otpv3-scrypt-aes-256-gcm';
 }
 
 export interface OtpvV3Kdf {
-  readonly algorithm: 'hkdf-sha256';
+  readonly algorithm: 'scrypt';
 
   /**
-   * Salt aleatorio de 32 bytes
-   * codificado en Base64.
+   * Salt aleatorio de 32 bytes codificado en Base64.
    */
   readonly salt: string;
-  readonly info: 'osumi-tpv-backup:v3:kek';
+
+  readonly cost: 32768;
+  readonly blockSize: 8;
+  readonly parallelization: 3;
   readonly length: 32;
 }
 
@@ -76,7 +78,7 @@ export interface OtpvV3Manifest {
    * Fecha ISO 8601 UTC.
    */
   readonly createdAt: string;
-  readonly cryptoSuite: 'otpv3-hkdf-sha256-aes-256-gcm';
+  readonly cryptoSuite: 'otpv3-scrypt-aes-256-gcm';
 
   /**
    * Bytes UTF-8 exactos del JSON compacto

@@ -73,14 +73,16 @@ Estructura exacta prevista:
   "databaseSchemaVersion": 1,
   "backupId": "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx",
   "createdAt": "2026-09-23T21:00:00.000Z",
-  "cryptoSuite": "otpv3-hkdf-sha256-aes-256-gcm",
+  "cryptoSuite": "otpv3-scrypt-aes-256-gcm",
   "authenticatedData": "...",
   "kdf": {
-    "algorithm": "hkdf-sha256",
+    "algorithm": "scrypt",
     "salt": "...",
-    "info": "osumi-tpv-backup:v3:kek",
+    "cost": 32768,
+    "blockSize": 8,
+    "parallelization": 3,
     "length": 32
-  },
+  }
   "keyWrap": {
     "algorithm": "aes-256-gcm",
     "iv": "...",
@@ -108,7 +110,15 @@ Los metadatos críticos se serializan como JSON UTF-8 compacto,
 sin espacios y en este orden exacto:
 
 ```json
-{"formatVersion":3,"backupId":"...","application":"Osumi TPV Client","applicationVersion":"...","databaseSchemaVersion":1,"createdAt":"...","cryptoSuite":"otpv3-hkdf-sha256-aes-256-gcm"}
+{
+  "formatVersion": 3,
+  "backupId": "...",
+  "application": "Osumi TPV Client",
+  "applicationVersion": "...",
+  "databaseSchemaVersion": 1,
+  "createdAt": "...",
+  "cryptoSuite": "otpv3-scrypt-aes-256-gcm"
+}
 ```
 
 Los bytes UTF-8 exactos de ese JSON se almacenan en:
@@ -152,31 +162,30 @@ Se trata como material secreto opaco.
 
 ## 7. Derivación de KEK
 
+`backupApiKey` puede proceder de una credencial externa o ser introducida
+manualmente por el usuario. El formato no presupone que tenga entropía
+criptográfica suficiente para utilizarla directamente como material de clave.
+
 Para cada backup se generan 32 bytes aleatorios criptográficamente
-seguros:
+seguros como `salt`.
+
+Se deriva una KEK de 32 bytes mediante `scrypt` con estos parámetros:
 
 ```text
-salt
-```
-
-Se deriva una KEK de 32 bytes mediante:
-
-```text
-HKDF-SHA-256
-```
-
-Parámetros:
-
-```text
-IKM
+password
 → bytes UTF-8 exactos de backupApiKey
 
 salt
 → 32 bytes aleatorios
 
-info
-→ bytes UTF-8 de:
-  osumi-tpv-backup:v3:kek
+cost
+→ 32768
+
+blockSize
+→ 8
+
+parallelization
+→ 3
 
 length
 → 32 bytes
@@ -184,11 +193,13 @@ length
 
 Resultado:
 
-```text
+```
 KEK de 256 bits
 ```
 
-No se normaliza, recorta ni modifica `backupApiKey` antes de utilizarlo.
+No se normaliza, recorta ni modifica backupApiKey antes de utilizarla.
+Los parámetros forman parte del manifest y deben validarse exactamente
+antes de iniciar la restauración.
 
 ---
 
@@ -322,11 +333,27 @@ Estructura:
 {
   "schemaVersion": 1,
   "secretApi": "...",
-  "backupApiKey": "...",
   "emailSmtpPass": null,
   "ticketBaiToken": null
 }
 ```
+
+`backupApiKey` no pertenece a este documento y nunca debe incluirse
+dentro del `.otpv`.
+
+Durante una restauración, la TPV Backup key se obtiene externamente.
+Tras validar y descifrar el backup, los secretos persistidos se reconstruyen
+combinando esa clave con los secretos portables:
+
+```text
+secretApi        ← payload
+backupApiKey     ← clave suministrada externamente
+emailSmtpPass    ← payload
+ticketBaiToken   ← payload
+```
+
+El resultado completo se guarda mediante SecretStorage.save(),
+generando un nuevo safeStorage propio de la máquina destino.
 
 Los valores representan los secretos lógicos obtenidos mediante:
 
@@ -678,9 +705,11 @@ Nunca reinterpretar silenciosamente un campo v3 con una semántica nueva.
 ```text
 backupApiKey
       │
-      │ HKDF-SHA-256
+      │ scrypt
       │ salt aleatorio 32 B
-      │ info = osumi-tpv-backup:v3:kek
+      │ cost = 32768
+      │ blockSize = 8
+      │ parallelization = 3
       ▼
      KEK 32 B
       │

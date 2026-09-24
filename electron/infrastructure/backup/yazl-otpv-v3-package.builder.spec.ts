@@ -11,11 +11,13 @@ import {
   OTPV_V3_ENCRYPTION_ALGORITHM,
   OTPV_V3_FORMAT_VERSION,
   OTPV_V3_KDF_ALGORITHM,
-  OTPV_V3_KDF_INFO,
   OTPV_V3_KDF_LENGTH_BYTES,
   OTPV_V3_MANIFEST_ENTRY,
   OTPV_V3_PAYLOAD_ENTRY,
   OTPV_V3_PAYLOAD_FORMAT,
+  OTPV_V3_SCRYPT_BLOCK_SIZE,
+  OTPV_V3_SCRYPT_COST,
+  OTPV_V3_SCRYPT_PARALLELIZATION,
 } from '@backend/domain/backup/otpv-v3.constants';
 import { DATABASE_SCHEMA_VERSION } from '@backend/domain/database/database-schema.constants';
 import YazlOtpvV3PackageBuilder from '@infrastructure/backup/yazl-otpv-v3-package.builder';
@@ -184,7 +186,9 @@ function createEncryptionResult(): OtpvV3EncryptionResult {
     kdf: {
       algorithm: OTPV_V3_KDF_ALGORITHM,
       salt: Buffer.alloc(32, 1).toString('base64'),
-      info: OTPV_V3_KDF_INFO,
+      cost: OTPV_V3_SCRYPT_COST,
+      blockSize: OTPV_V3_SCRYPT_BLOCK_SIZE,
+      parallelization: OTPV_V3_SCRYPT_PARALLELIZATION,
       length: OTPV_V3_KDF_LENGTH_BYTES,
     },
     keyWrap: {

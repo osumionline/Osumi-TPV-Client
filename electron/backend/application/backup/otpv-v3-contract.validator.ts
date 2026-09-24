@@ -16,12 +16,14 @@ import {
   OTPV_V3_GCM_AUTH_TAG_LENGTH_BYTES,
   OTPV_V3_GCM_IV_LENGTH_BYTES,
   OTPV_V3_KDF_ALGORITHM,
-  OTPV_V3_KDF_INFO,
   OTPV_V3_KDF_LENGTH_BYTES,
   OTPV_V3_PAYLOAD_ENTRY,
   OTPV_V3_PAYLOAD_FORMAT,
   OTPV_V3_PORTABLE_SECRETS_SCHEMA_VERSION,
   OTPV_V3_SALT_LENGTH_BYTES,
+  OTPV_V3_SCRYPT_BLOCK_SIZE,
+  OTPV_V3_SCRYPT_COST,
+  OTPV_V3_SCRYPT_PARALLELIZATION,
 } from '@backend/domain/backup/otpv-v3.constants';
 import { DATABASE_SCHEMA_VERSION } from '@backend/domain/database/database-schema.constants';
 import { TextDecoder } from 'node:util';
@@ -169,7 +171,7 @@ export function validateOtpvV3PortableSecrets(value: unknown): OtpvV3PortableSec
 
   assertExactKeys(
     value,
-    ['schemaVersion', 'secretApi', 'backupApiKey', 'emailSmtpPass', 'ticketBaiToken'],
+    ['schemaVersion', 'secretApi', 'emailSmtpPass', 'ticketBaiToken'],
     'secrets/secrets.json',
   );
 
@@ -181,12 +183,6 @@ export function validateOtpvV3PortableSecrets(value: unknown): OtpvV3PortableSec
   );
 
   const secretApi: string = requireString(value, 'secretApi', 'secrets/secrets.json');
-
-  const backupApiKey: string = requireString(value, 'backupApiKey', 'secrets/secrets.json');
-
-  if (backupApiKey.length === 0) {
-    throw new Error('La TPV Backup key no puede estar vacía.');
-  }
 
   const emailSmtpPass: string | null = requireNullableString(
     value,
@@ -203,18 +199,21 @@ export function validateOtpvV3PortableSecrets(value: unknown): OtpvV3PortableSec
   return {
     schemaVersion,
     secretApi,
-    backupApiKey,
     emailSmtpPass,
     ticketBaiToken,
   };
 }
 
 /**
- * Valida la configuración HKDF declarada
+ * Valida la configuración scrypt declarada
  * por el manifest.
  */
 function validateKdf(value: Record<string, unknown>): OtpvV3Kdf {
-  assertExactKeys(value, ['algorithm', 'salt', 'info', 'length'], 'manifest.json.kdf');
+  assertExactKeys(
+    value,
+    ['algorithm', 'salt', 'cost', 'blockSize', 'parallelization', 'length'],
+    'manifest.json.kdf',
+  );
 
   const algorithm: typeof OTPV_V3_KDF_ALGORITHM = requireLiteral(
     value,
@@ -225,10 +224,24 @@ function validateKdf(value: Record<string, unknown>): OtpvV3Kdf {
 
   const salt: string = requireBase64(value, 'salt', OTPV_V3_SALT_LENGTH_BYTES, 'manifest.json.kdf');
 
-  const info: typeof OTPV_V3_KDF_INFO = requireLiteral(
+  const cost: typeof OTPV_V3_SCRYPT_COST = requireLiteral(
     value,
-    'info',
-    OTPV_V3_KDF_INFO,
+    'cost',
+    OTPV_V3_SCRYPT_COST,
+    'manifest.json.kdf',
+  );
+
+  const blockSize: typeof OTPV_V3_SCRYPT_BLOCK_SIZE = requireLiteral(
+    value,
+    'blockSize',
+    OTPV_V3_SCRYPT_BLOCK_SIZE,
+    'manifest.json.kdf',
+  );
+
+  const parallelization: typeof OTPV_V3_SCRYPT_PARALLELIZATION = requireLiteral(
+    value,
+    'parallelization',
+    OTPV_V3_SCRYPT_PARALLELIZATION,
     'manifest.json.kdf',
   );
 
@@ -239,12 +252,7 @@ function validateKdf(value: Record<string, unknown>): OtpvV3Kdf {
     'manifest.json.kdf',
   );
 
-  return {
-    algorithm,
-    salt,
-    info,
-    length,
-  };
+  return { algorithm, salt, cost, blockSize, parallelization, length };
 }
 
 /**

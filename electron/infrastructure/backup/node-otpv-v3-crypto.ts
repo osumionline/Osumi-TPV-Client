@@ -16,7 +16,10 @@ import {
   OTPV_V3_GCM_AUTH_TAG_LENGTH_BYTES,
   OTPV_V3_GCM_IV_LENGTH_BYTES,
   OTPV_V3_KDF_ALGORITHM,
-  OTPV_V3_KDF_INFO,
+  OTPV_V3_SCRYPT_BLOCK_SIZE,
+  OTPV_V3_SCRYPT_COST,
+  OTPV_V3_SCRYPT_MAXMEM_BYTES,
+  OTPV_V3_SCRYPT_PARALLELIZATION,
   OTPV_V3_KDF_LENGTH_BYTES,
   OTPV_V3_KEY_WRAP_AAD_PREFIX,
   OTPV_V3_PAYLOAD_AAD_PREFIX,
@@ -24,7 +27,7 @@ import {
   OTPV_V3_PAYLOAD_FORMAT,
   OTPV_V3_SALT_LENGTH_BYTES,
 } from '@backend/domain/backup/otpv-v3.constants';
-import { createCipheriv, createDecipheriv, hkdfSync, randomBytes, randomUUID } from 'node:crypto';
+import { createCipheriv, createDecipheriv, randomBytes, randomUUID, scrypt } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { access, mkdir, rename, rm } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
@@ -70,8 +73,8 @@ export default class NodeOtpvV3Crypto implements OtpvV3Crypto {
     await this.assertDestinationDoesNotExist(command.destinationFile);
 
     const salt: Buffer = randomBytes(OTPV_V3_SALT_LENGTH_BYTES);
+    const kek: Buffer = await this.deriveKek(command.backupApiKey, salt);
     const dek: Buffer = randomBytes(OTPV_V3_DEK_LENGTH_BYTES);
-    const kek: Buffer = this.deriveKek(command.backupApiKey, salt);
     const keyWrapIv: Buffer = randomBytes(OTPV_V3_GCM_IV_LENGTH_BYTES);
     const payloadIv: Buffer = this.generateDistinctIv(keyWrapIv);
 
@@ -99,7 +102,9 @@ export default class NodeOtpvV3Crypto implements OtpvV3Crypto {
       const kdf: OtpvV3Kdf = {
         algorithm: OTPV_V3_KDF_ALGORITHM,
         salt: salt.toString('base64'),
-        info: OTPV_V3_KDF_INFO,
+        cost: OTPV_V3_SCRYPT_COST,
+        blockSize: OTPV_V3_SCRYPT_BLOCK_SIZE,
+        parallelization: OTPV_V3_SCRYPT_PARALLELIZATION,
         length: OTPV_V3_KDF_LENGTH_BYTES,
       };
 
@@ -172,7 +177,7 @@ export default class NodeOtpvV3Crypto implements OtpvV3Crypto {
       'payload.authTag',
     );
 
-    const kek: Buffer = this.deriveKek(command.backupApiKey, salt);
+    const kek: Buffer = await this.deriveKek(command.backupApiKey, salt);
 
     let dek: Buffer | null = null;
 
@@ -215,18 +220,32 @@ export default class NodeOtpvV3Crypto implements OtpvV3Crypto {
   }
 
   /**
-   * Deriva la KEK mediante HKDF-SHA-256
-   * usando exactamente los bytes UTF-8 de backupApiKey.
+   * Deriva la KEK mediante scrypt utilizando
+   * exactamente los bytes UTF-8 de backupApiKey.
    */
-  private deriveKek(backupApiKey: string, salt: Buffer): Buffer {
-    return Buffer.from(
-      hkdfSync(
-        'sha256',
-        Buffer.from(backupApiKey, 'utf8'),
-        salt,
-        Buffer.from(OTPV_V3_KDF_INFO, 'utf8'),
-        OTPV_V3_KDF_LENGTH_BYTES,
-      ),
+  private deriveKek(backupApiKey: string, salt: Buffer): Promise<Buffer> {
+    return new Promise<Buffer>(
+      (resolve: (value: Buffer) => void, reject: (reason?: unknown) => void): void => {
+        scrypt(
+          Buffer.from(backupApiKey, 'utf8'),
+          salt,
+          OTPV_V3_KDF_LENGTH_BYTES,
+          {
+            cost: OTPV_V3_SCRYPT_COST,
+            blockSize: OTPV_V3_SCRYPT_BLOCK_SIZE,
+            parallelization: OTPV_V3_SCRYPT_PARALLELIZATION,
+            maxmem: OTPV_V3_SCRYPT_MAXMEM_BYTES,
+          },
+          (error: Error | null, derivedKey: Buffer): void => {
+            if (error !== null) {
+              reject(error);
+              return;
+            }
+
+            resolve(Buffer.from(derivedKey));
+          },
+        );
+      },
     );
   }
 

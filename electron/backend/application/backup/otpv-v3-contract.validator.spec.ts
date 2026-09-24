@@ -14,10 +14,12 @@ import {
   OTPV_V3_ENCRYPTION_ALGORITHM,
   OTPV_V3_FORMAT_VERSION,
   OTPV_V3_KDF_ALGORITHM,
-  OTPV_V3_KDF_INFO,
   OTPV_V3_KDF_LENGTH_BYTES,
   OTPV_V3_PAYLOAD_ENTRY,
   OTPV_V3_PAYLOAD_FORMAT,
+  OTPV_V3_SCRYPT_BLOCK_SIZE,
+  OTPV_V3_SCRYPT_COST,
+  OTPV_V3_SCRYPT_PARALLELIZATION,
 } from '@backend/domain/backup/otpv-v3.constants';
 import { DATABASE_SCHEMA_VERSION } from '@backend/domain/database/database-schema.constants';
 import { describe, expect, it } from 'vitest';
@@ -134,32 +136,32 @@ describe('OTPV v3 contract validator', (): void => {
     expect((): void => assertOtpvV3ManifestCompatible(manifest)).toThrow('versión de esquema');
   });
 
-  it('valida los secretos portables y exige TPV Backup key', (): void => {
+  it('valida los secretos portables sin incluir la TPV Backup key', (): void => {
     expect(
       validateOtpvV3PortableSecrets({
         schemaVersion: 1,
         secretApi: '',
-        backupApiKey: 'backup-secret',
         emailSmtpPass: null,
         ticketBaiToken: null,
       }),
     ).toEqual({
       schemaVersion: 1,
       secretApi: '',
-      backupApiKey: 'backup-secret',
       emailSmtpPass: null,
       ticketBaiToken: null,
     });
+  });
 
+  it('rechaza una TPV Backup key incluida dentro de los secretos portables', (): void => {
     expect((): void => {
       validateOtpvV3PortableSecrets({
         schemaVersion: 1,
         secretApi: '',
-        backupApiKey: '',
+        backupApiKey: 'no-debe-viajar-en-el-backup',
         emailSmtpPass: null,
         ticketBaiToken: null,
       });
-    }).toThrow('TPV Backup key no puede estar vacía');
+    }).toThrow('secrets/secrets.json no tiene la estructura exacta esperada.');
   });
 
   it('serializa los metadatos en el orden canónico establecido', (): void => {
@@ -212,17 +214,17 @@ function createValidManifest(
     kdf: {
       algorithm: OTPV_V3_KDF_ALGORITHM,
       salt: Buffer.alloc(32, 1).toString('base64'),
-      info: OTPV_V3_KDF_INFO,
+      cost: OTPV_V3_SCRYPT_COST,
+      blockSize: OTPV_V3_SCRYPT_BLOCK_SIZE,
+      parallelization: OTPV_V3_SCRYPT_PARALLELIZATION,
       length: OTPV_V3_KDF_LENGTH_BYTES,
     },
-
     keyWrap: {
       algorithm: OTPV_V3_ENCRYPTION_ALGORITHM,
       iv: Buffer.alloc(12, 2).toString('base64'),
       authTag: Buffer.alloc(16, 3).toString('base64'),
       wrappedDek: Buffer.alloc(32, 4).toString('base64'),
     },
-
     payload: {
       entry: OTPV_V3_PAYLOAD_ENTRY,
       format: OTPV_V3_PAYLOAD_FORMAT,

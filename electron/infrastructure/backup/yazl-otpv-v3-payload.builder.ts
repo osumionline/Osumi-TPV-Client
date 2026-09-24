@@ -180,7 +180,6 @@ export default class YazlOtpvV3PayloadBuilder implements OtpvV3PayloadBuilder {
     const portableSecrets: OtpvV3PortableSecrets = {
       schemaVersion: OTPV_V3_PORTABLE_SECRETS_SCHEMA_VERSION,
       secretApi: secrets.secretApi,
-      backupApiKey: secrets.backupApiKey,
       emailSmtpPass: secrets.emailSmtpPass,
       ticketBaiToken: secrets.ticketBaiToken,
     };

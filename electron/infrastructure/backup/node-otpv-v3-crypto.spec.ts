@@ -6,8 +6,12 @@ import {
   OTPV_V3_DEK_LENGTH_BYTES,
   OTPV_V3_GCM_AUTH_TAG_LENGTH_BYTES,
   OTPV_V3_GCM_IV_LENGTH_BYTES,
+  OTPV_V3_KDF_ALGORITHM,
   OTPV_V3_KDF_LENGTH_BYTES,
   OTPV_V3_SALT_LENGTH_BYTES,
+  OTPV_V3_SCRYPT_BLOCK_SIZE,
+  OTPV_V3_SCRYPT_COST,
+  OTPV_V3_SCRYPT_PARALLELIZATION,
 } from '@backend/domain/backup/otpv-v3.constants';
 import NodeOtpvV3Crypto from '@infrastructure/backup/node-otpv-v3-crypto';
 import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -80,6 +84,10 @@ describe('NodeOtpvV3Crypto', (): void => {
     });
 
     expect(Buffer.from(result.kdf.salt, 'base64')).toHaveLength(OTPV_V3_SALT_LENGTH_BYTES);
+    expect(result.kdf.algorithm).toBe(OTPV_V3_KDF_ALGORITHM);
+    expect(result.kdf.cost).toBe(OTPV_V3_SCRYPT_COST);
+    expect(result.kdf.blockSize).toBe(OTPV_V3_SCRYPT_BLOCK_SIZE);
+    expect(result.kdf.parallelization).toBe(OTPV_V3_SCRYPT_PARALLELIZATION);
     expect(result.kdf.length).toBe(OTPV_V3_KDF_LENGTH_BYTES);
     expect(Buffer.from(result.keyWrap.iv, 'base64')).toHaveLength(OTPV_V3_GCM_IV_LENGTH_BYTES);
     expect(Buffer.from(result.keyWrap.authTag, 'base64')).toHaveLength(
