@@ -22,6 +22,14 @@ export default class FileOtpvV3RestoreStagingPreparer implements OtpvV3RestoreSt
   ) {}
 
   /**
+   * Elimina cualquier staging canónico
+   * preparado por una restauración anterior.
+   */
+  async clear(): Promise<void> {
+    await this.cleanCanonicalStaging();
+  }
+
+  /**
    * Reconstruye los secretos locales y mueve
    * los recursos portables al staging canónico.
    */

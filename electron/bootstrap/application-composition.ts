@@ -11,6 +11,7 @@ import ArticulosService from '@backend/application/articulos/articulos.service';
 import BackupRestoreSelectionService from '@backend/application/backup/backup-restore-selection.service';
 import BackupService from '@backend/application/backup/backup.service';
 import OtpvPackageSelectionService from '@backend/application/backup/otpv-package-selection.service';
+import OtpvV3RestoreFinalizeService from '@backend/application/backup/otpv-v3-restore-finalize.service';
 import OtpvV3RestoreUnlockService from '@backend/application/backup/otpv-v3-restore-unlock.service';
 import CajaService from '@backend/application/caja/caja.service';
 import CajaInformePrintService from '@backend/application/caja/informes/caja-informe-print.service';
@@ -113,6 +114,7 @@ import DefaultLegacyImportReviewDecisionValidator from '@backend/domain/legacy-i
 import FileOtpvV3RequiredContentValidator from '@infrastructure/backup/file-otpv-v3-required-content.validator';
 import FileOtpvV3RestoreStagingPreparer from '@infrastructure/backup/file-otpv-v3-restore-staging.preparer';
 import FileOtpvV3RestoreWorkspace from '@infrastructure/backup/file-otpv-v3-restore-workspace';
+import InMemoryOtpvV3PreparedRestoreStore from '@infrastructure/backup/in-memory-otpv-v3-prepared-restore.store';
 import InMemoryOtpvV3RestoreSelectionStore from '@infrastructure/backup/in-memory-otpv-v3-restore-selection.store';
 import NodeOtpvV3Crypto from '@infrastructure/backup/node-otpv-v3-crypto';
 import YauzlOtpvPackageInspector from '@infrastructure/backup/yauzl-otpv-package.inspector';
@@ -250,6 +252,10 @@ export default function createApplicationComposition(
     appDataRepository,
     operationalSecretStorage,
     operationalLogoStorage,
+  );
+
+  const printingSettingsRepository: PrintingSettingsRepository = new JsonPrintingSettingsRepository(
+    applicationPaths.printingSettingsFile,
   );
 
   /*
@@ -732,6 +738,9 @@ export default function createApplicationComposition(
   const otpvV3RestoreSelectionStore: InMemoryOtpvV3RestoreSelectionStore =
     new InMemoryOtpvV3RestoreSelectionStore();
 
+  const otpvV3PreparedRestoreStore: InMemoryOtpvV3PreparedRestoreStore =
+    new InMemoryOtpvV3PreparedRestoreStore();
+
   const otpvPackageSelectionService: OtpvPackageSelectionService = new OtpvPackageSelectionService(
     otpvPackageInspector,
     legacyImportPackageInspector,
@@ -752,15 +761,17 @@ export default function createApplicationComposition(
 
   const otpvV3FilesExtractor: YauzlOtpvV3FilesExtractor = new YauzlOtpvV3FilesExtractor();
 
+  const otpvV3RestoreStagingPreparer: FileOtpvV3RestoreStagingPreparer =
+    new FileOtpvV3RestoreStagingPreparer(applicationPaths, stagingSecretStorage);
+
   const backupRestoreSelectionService: BackupRestoreSelectionService =
     new BackupRestoreSelectionService(
       otpvPackageDialog,
       otpvPackageSelectionService,
       otpvV3RestoreWorkspace,
+      otpvV3RestoreStagingPreparer,
+      otpvV3PreparedRestoreStore,
     );
-
-  const otpvV3RestoreStagingPreparer: FileOtpvV3RestoreStagingPreparer =
-    new FileOtpvV3RestoreStagingPreparer(applicationPaths, stagingSecretStorage);
 
   const otpvV3RestoreUnlockService: OtpvV3RestoreUnlockService = new OtpvV3RestoreUnlockService(
     otpvV3RestoreSelectionStore,
@@ -772,8 +783,18 @@ export default function createApplicationComposition(
     otpvV3RequiredContentValidator,
     otpvV3FilesExtractor,
     otpvV3RestoreStagingPreparer,
+    otpvV3PreparedRestoreStore,
     otpvV3RestoreWorkspace,
   );
+
+  const otpvV3RestoreFinalizeService: OtpvV3RestoreFinalizeService =
+    new OtpvV3RestoreFinalizeService(
+      otpvV3RestoreSelectionStore,
+      otpvV3PreparedRestoreStore,
+      appDataRepository,
+      printingSettingsRepository,
+      installationFinalizer,
+    );
 
   /*
    * Creación de una nueva instalación.
@@ -803,10 +824,6 @@ export default function createApplicationComposition(
   /*
    * Impresión y configuración local del terminal.
    */
-  const printingSettingsRepository: PrintingSettingsRepository = new JsonPrintingSettingsRepository(
-    applicationPaths.printingSettingsFile,
-  );
-
   const printerProvider: PrinterProvider = new ElectronPrinterProvider(getMainWindow);
 
   const htmlDocumentRenderer: HtmlDocumentRenderer = new ElectronHtmlDocumentRenderer();
@@ -826,6 +843,7 @@ export default function createApplicationComposition(
     backupService,
     backupRestoreSelectionService,
     otpvV3RestoreUnlockService,
+    otpvV3RestoreFinalizeService,
   );
   registerAlmacenIpc(
     getMainWindow,

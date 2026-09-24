@@ -3,6 +3,7 @@ import OtpvPackageSelectionService from '@backend/application/backup/otpv-packag
 import type OtpvPackageDialog from '@backend/contracts/backup/otpv-package-dialog.interface';
 import type OtpvPackageInspector from '@backend/contracts/backup/otpv-package-inspector.interface';
 import type { OtpvV3Manifest } from '@backend/contracts/backup/otpv-v3-manifest.interface';
+import type OtpvV3RestoreStagingPreparer from '@backend/contracts/backup/otpv-v3-restore-staging-preparer.interface';
 import type OtpvV3RestoreWorkspace from '@backend/contracts/backup/otpv-v3-restore-workspace.interface';
 import type LegacyImportPackageInspector from '@backend/contracts/legacy-import/legacy-import-package-inspector.interface';
 import type OtpvPackageInspection from '@backend/domain/backup/otpv-package-inspection.type';
@@ -11,6 +12,7 @@ import { DATABASE_SCHEMA_VERSION } from '@backend/domain/database/database-schem
 import type LegacyImportPackageInspection from '@backend/domain/legacy-import/legacy-import-package-inspection.interface';
 import { LEGACY_IMPORT_SUPPORTED_FORMAT_VERSION } from '@backend/domain/legacy-import/legacy-import.constants';
 import type BackupRestorePackageSelectionResult from '@desktop-contracts/backup/backup-restore-package-selection-result.type';
+import InMemoryOtpvV3PreparedRestoreStore from '@infrastructure/backup/in-memory-otpv-v3-prepared-restore.store';
 import InMemoryOtpvV3RestoreSelectionStore from '@infrastructure/backup/in-memory-otpv-v3-restore-selection.store';
 import InMemoryLegacyImportSelectionStore from '@infrastructure/legacy-import/in-memory-legacy-import-selection.store';
 import { describe, expect, it } from 'vitest';
@@ -105,6 +107,8 @@ function createService(
     dialog,
     packageSelectionService,
     new TestRestoreWorkspace(),
+    new TestRestoreStagingPreparer(),
+    new InMemoryOtpvV3PreparedRestoreStore(),
   );
 }
 
@@ -253,6 +257,26 @@ class TestRestoreWorkspace implements OtpvV3RestoreWorkspace {
    * No existe payload descifrado real que eliminar.
    */
   removeDecryptedPayload(): Promise<void> {
+    return Promise.resolve();
+  }
+}
+
+/**
+ * Preparador neutro utilizado durante
+ * la selección de paquetes.
+ */
+class TestRestoreStagingPreparer implements OtpvV3RestoreStagingPreparer {
+  /**
+   * No se prepara staging en estos tests.
+   */
+  prepare(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  /**
+   * Simula la limpieza del staging anterior.
+   */
+  clear(): Promise<void> {
     return Promise.resolve();
   }
 }

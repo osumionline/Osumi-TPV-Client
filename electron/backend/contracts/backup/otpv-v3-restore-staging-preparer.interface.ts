@@ -6,4 +6,10 @@ export default interface OtpvV3RestoreStagingPreparer {
    * en el staging canónico listo para promoción.
    */
   prepare(workspace: OtpvV3RestoreWorkspace, backupApiKey: string): Promise<void>;
+
+  /**
+   * Elimina cualquier staging canónico
+   * perteneciente a una restauración v3 preparada.
+   */
+  clear(): Promise<void>;
 }

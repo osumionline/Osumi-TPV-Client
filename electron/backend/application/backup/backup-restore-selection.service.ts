@@ -1,5 +1,7 @@
 import type OtpvPackageSelectionService from '@backend/application/backup/otpv-package-selection.service';
 import type OtpvPackageDialog from '@backend/contracts/backup/otpv-package-dialog.interface';
+import type OtpvV3PreparedRestoreStore from '@backend/contracts/backup/otpv-v3-prepared-restore-store.interface';
+import type OtpvV3RestoreStagingPreparer from '@backend/contracts/backup/otpv-v3-restore-staging-preparer.interface';
 import type OtpvV3RestoreWorkspace from '@backend/contracts/backup/otpv-v3-restore-workspace.interface';
 import type OtpvPackageSelectionResult from '@backend/domain/backup/otpv-package-selection-result.type';
 import type BackupRestorePackageSelectionResult from '@desktop-contracts/backup/backup-restore-package-selection-result.type';
@@ -17,6 +19,8 @@ export default class BackupRestoreSelectionService {
     private readonly dialog: OtpvPackageDialog,
     private readonly packageSelectionService: OtpvPackageSelectionService,
     private readonly restoreWorkspace: OtpvV3RestoreWorkspace,
+    private readonly restoreStagingPreparer: OtpvV3RestoreStagingPreparer,
+    private readonly preparedRestoreStore: OtpvV3PreparedRestoreStore,
   ) {}
 
   /**
@@ -32,7 +36,9 @@ export default class BackupRestoreSelectionService {
       };
     }
 
-    await this.restoreWorkspace.clear();
+    this.preparedRestoreStore.clear();
+
+    await Promise.all([this.restoreWorkspace.clear(), this.restoreStagingPreparer.clear()]);
 
     try {
       const selection: OtpvPackageSelectionResult =

@@ -636,8 +636,21 @@ La restauración debe realizar conceptualmente:
 18. reconstruir secretos operativos mediante SecretStorage.save()
 19. preparar staging canónico, con app_data.json como último marcador
 20. eliminar restore-work
-21. promoción final
+21. comprobar que el staging preparado pertenece al selectionId actual
+22. comprobar que no existe una instalación activa
+23. resetear printing_settings.json a configuración local sin impresora
+24. promover database/files/logo/secrets/app_data, con app_data el último
+25. invalidar selección y estado preparado
 ```
+
+Una restauración v3 nunca puede promover un staging preparado
+para otro selectionId o backupId.
+
+Seleccionar un nuevo paquete invalida y elimina cualquier staging
+v3 preparado anteriormente.
+
+printing_settings.json no se restaura desde el backup.
+La instalación restaurada comienza con ticketPrinterDeviceName = null.
 
 El staging canónico de una restauración v3 debe quedar compuesto por:
 

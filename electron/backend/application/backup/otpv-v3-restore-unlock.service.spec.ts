@@ -18,6 +18,7 @@ import type OtpvV3PayloadInspection from '@backend/domain/backup/otpv-v3-payload
 import { OTPV_V3_FORMAT_VERSION } from '@backend/domain/backup/otpv-v3.constants';
 import { DATABASE_SCHEMA_VERSION } from '@backend/domain/database/database-schema.constants';
 import type BackupRestoreUnlockResult from '@desktop-contracts/backup/backup-restore-unlock-result.interface';
+import InMemoryOtpvV3PreparedRestoreStore from '@infrastructure/backup/in-memory-otpv-v3-prepared-restore.store';
 import InMemoryOtpvV3RestoreSelectionStore from '@infrastructure/backup/in-memory-otpv-v3-restore-selection.store';
 import { describe, expect, it } from 'vitest';
 
@@ -40,6 +41,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
     const requiredContentValidator = new TestRequiredContentValidator();
     const filesExtractor = new TestFilesExtractor();
     const restoreStagingPreparer = new TestRestoreStagingPreparer();
+    const preparedRestoreStore = new InMemoryOtpvV3PreparedRestoreStore();
     const workspace = new TestWorkspace();
 
     const service = new OtpvV3RestoreUnlockService(
@@ -55,6 +57,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       requiredContentValidator,
       filesExtractor,
       restoreStagingPreparer,
+      preparedRestoreStore,
       workspace,
     );
 
@@ -92,6 +95,10 @@ describe('OtpvV3RestoreUnlockService', (): void => {
     expect(restoreStagingPreparer.calls).toBe(1);
     expect(restoreStagingPreparer.workspace).toBe(workspace);
     expect(restoreStagingPreparer.backupApiKey).toBe(BACKUP_KEY);
+    expect(preparedRestoreStore.resolve()).toEqual({
+      selectionId,
+      backupId: manifest.backupId,
+    });
   });
 
   it('rechaza una selección caducada', async (): Promise<void> => {
@@ -108,6 +115,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRequiredContentValidator(),
       new TestFilesExtractor(),
       new TestRestoreStagingPreparer(),
+      new InMemoryOtpvV3PreparedRestoreStore(),
       new TestWorkspace(),
     );
 
@@ -150,6 +158,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRequiredContentValidator(),
       new TestFilesExtractor(),
       new TestRestoreStagingPreparer(),
+      new InMemoryOtpvV3PreparedRestoreStore(),
       workspace,
     );
 
@@ -199,6 +208,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRequiredContentValidator(),
       new TestFilesExtractor(),
       new TestRestoreStagingPreparer(),
+      new InMemoryOtpvV3PreparedRestoreStore(),
       workspace,
     );
 
@@ -241,6 +251,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRequiredContentValidator(),
       new TestFilesExtractor(),
       new TestRestoreStagingPreparer(),
+      new InMemoryOtpvV3PreparedRestoreStore(),
       workspace,
     );
 
@@ -287,6 +298,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       contentValidator,
       new TestFilesExtractor(),
       new TestRestoreStagingPreparer(),
+      new InMemoryOtpvV3PreparedRestoreStore(),
       workspace,
     );
 
@@ -331,6 +343,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRequiredContentValidator(),
       filesExtractor,
       new TestRestoreStagingPreparer(),
+      new InMemoryOtpvV3PreparedRestoreStore(),
       workspace,
     );
 
@@ -373,6 +386,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRequiredContentValidator(),
       new TestFilesExtractor(),
       new TestRestoreStagingPreparer(),
+      new InMemoryOtpvV3PreparedRestoreStore(),
       workspace,
     );
 
@@ -419,6 +433,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRequiredContentValidator(),
       new TestFilesExtractor(),
       restoreStagingPreparer,
+      new InMemoryOtpvV3PreparedRestoreStore(),
       workspace,
     );
 
@@ -695,6 +710,16 @@ class TestRestoreStagingPreparer implements OtpvV3RestoreStagingPreparer {
   workspace: OtpvV3RestoreWorkspace | null = null;
   backupApiKey: string | null = null;
   preparationError: Error | null = null;
+  clearCalls: number = 0;
+
+  /**
+   * Registra la limpieza del staging canónico.
+   */
+  clear(): Promise<void> {
+    this.clearCalls += 1;
+
+    return Promise.resolve();
+  }
 
   /**
    * Registra la preparación solicitada.

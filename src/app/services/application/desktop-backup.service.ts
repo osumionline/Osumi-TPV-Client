@@ -1,5 +1,6 @@
 import { Service } from '@angular/core';
 import type BackupCreateResult from '@desktop-contracts/backup/backup-create-result.interface';
+import type BackupRestoreFinalizeResult from '@desktop-contracts/backup/backup-restore-finalize-result.interface';
 import type BackupRestorePackageSelectionResult from '@desktop-contracts/backup/backup-restore-package-selection-result.type';
 import type BackupRestoreUnlockCommand from '@desktop-contracts/backup/backup-restore-unlock-command.interface';
 import type BackupRestoreUnlockResult from '@desktop-contracts/backup/backup-restore-unlock-result.interface';
@@ -25,5 +26,12 @@ export default class DesktopBackupService {
    */
   unlockRestorePackage(command: BackupRestoreUnlockCommand): Promise<BackupRestoreUnlockResult> {
     return window.osumiDesktop.backup.unlockRestorePackage(command);
+  }
+
+  /**
+   * Activa una restauración v3 ya preparada.
+   */
+  finalizeRestorePackage(selectionId: string): Promise<BackupRestoreFinalizeResult> {
+    return window.osumiDesktop.backup.finalizeRestorePackage(selectionId);
   }
 }

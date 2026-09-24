@@ -3,6 +3,7 @@ import type { OtpvV3Crypto } from '@backend/contracts/backup/otpv-v3-crypto.inte
 import type OtpvV3EncryptedPayloadExtractor from '@backend/contracts/backup/otpv-v3-encrypted-payload-extractor.interface';
 import type OtpvV3FilesExtractor from '@backend/contracts/backup/otpv-v3-files-extractor.interface';
 import type OtpvV3PayloadInspector from '@backend/contracts/backup/otpv-v3-payload-inspector.interface';
+import type OtpvV3PreparedRestoreStore from '@backend/contracts/backup/otpv-v3-prepared-restore-store.interface';
 import type OtpvV3RequiredContentExtractor from '@backend/contracts/backup/otpv-v3-required-content-extractor.interface';
 import type OtpvV3RequiredContentValidator from '@backend/contracts/backup/otpv-v3-required-content-validator.interface';
 import type OtpvV3RestoreSelectionStore from '@backend/contracts/backup/otpv-v3-restore-selection-store.interface';
@@ -33,6 +34,7 @@ export default class OtpvV3RestoreUnlockService {
     private readonly requiredContentValidator: OtpvV3RequiredContentValidator,
     private readonly filesExtractor: OtpvV3FilesExtractor,
     private readonly restoreStagingPreparer: OtpvV3RestoreStagingPreparer,
+    private readonly preparedRestoreStore: OtpvV3PreparedRestoreStore,
     private readonly workspace: OtpvV3RestoreWorkspace,
   ) {}
 
@@ -51,9 +53,12 @@ export default class OtpvV3RestoreUnlockService {
       );
     }
 
-    await this.workspace.reset();
+    this.preparedRestoreStore.clear();
 
     try {
+      await this.restoreStagingPreparer.clear();
+
+      await this.workspace.reset();
       if (command.backupApiKey.length === 0) {
         throw this.createOpenError();
       }
@@ -96,13 +101,20 @@ export default class OtpvV3RestoreUnlockService {
 
       await this.restoreStagingPreparer.prepare(this.workspace, command.backupApiKey);
 
+      this.preparedRestoreStore.save({
+        selectionId: command.selectionId,
+        backupId: selection.manifest.backupId,
+      });
+
       return {
         status: 'unlocked',
         selectionId: command.selectionId,
         backupId: selection.manifest.backupId,
       };
     } catch (error: unknown) {
-      await this.clearWorkspaceSafely();
+      this.preparedRestoreStore.clear();
+
+      await this.clearRestoreArtifactsSafely();
 
       throw error;
     }
@@ -140,7 +152,15 @@ export default class OtpvV3RestoreUnlockService {
   }
 
   /**
-   * Limpia el workspace sin ocultar
+   * Limpia tanto restore-work como el staging
+   * canónico sin ocultar el fallo principal.
+   */
+  private async clearRestoreArtifactsSafely(): Promise<void> {
+    await Promise.all([this.clearWorkspaceSafely(), this.clearStagingSafely()]);
+  }
+
+  /**
+   * Limpia restore-work sin ocultar
    * el fallo principal.
    */
   private async clearWorkspaceSafely(): Promise<void> {
@@ -148,6 +168,18 @@ export default class OtpvV3RestoreUnlockService {
       await this.workspace.clear();
     } catch (error: unknown) {
       console.error('No se ha podido limpiar el workspace de restauración:', error);
+    }
+  }
+
+  /**
+   * Limpia el staging v3 sin ocultar
+   * el fallo principal.
+   */
+  private async clearStagingSafely(): Promise<void> {
+    try {
+      await this.restoreStagingPreparer.clear();
+    } catch (error: unknown) {
+      console.error('No se ha podido limpiar el staging de restauración:', error);
     }
   }
 }
