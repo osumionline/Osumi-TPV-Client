@@ -19,7 +19,7 @@ import { MatRadioModule } from '@angular/material/radio';
 import { MatSelectModule } from '@angular/material/select';
 import { MatToolbar } from '@angular/material/toolbar';
 import { Router } from '@angular/router';
-import { BackupRemoteCredentials } from '@desktop-contracts/backup/backup-remote.interface';
+import type { BackupRemoteCredentials } from '@desktop-contracts/backup/backup-remote.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type {
   InstallationResult,

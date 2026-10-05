@@ -4,7 +4,7 @@ import type {
   BackupRemoteSession,
 } from '@backend/contracts/backup/backup-remote-client.interface';
 import type BackupRemoteCredentialStorage from '@backend/contracts/backup/backup-remote-credential-storage.interface';
-import {
+import type {
   BackupRemoteBackup,
   BackupRemoteConnection,
   BackupRemoteCredentials,

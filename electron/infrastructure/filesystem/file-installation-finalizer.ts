@@ -58,7 +58,10 @@ export default class FileInstallationFinalizer implements InstallationFinalizer 
      * recurso en las carpetas finales corresponde a
      * una instalación interrumpida.
      */
-    await this.cleanPartialFinalInstallation();
+    await Promise.all([
+      this.cleanPartialFinalInstallation(),
+      this.cleanInterruptedRemoteCredentials(),
+    ]);
 
     await this.resetStaging();
   }
@@ -139,6 +142,26 @@ export default class FileInstallationFinalizer implements InstallationFinalizer 
         }),
       ),
     );
+  }
+
+  /**
+   * Elimina credenciales remotas que hayan podido
+   * quedar de una instalación o restauración interrumpida.
+   *
+   * Solo debe utilizarse durante recover(), cuando
+   * app_data.json confirma que no existe una instalación
+   * completa.
+   */
+  private async cleanInterruptedRemoteCredentials(): Promise<void> {
+    await Promise.all([
+      rm(this.paths.backupRemoteCredentialsFile, {
+        force: true,
+      }),
+
+      rm(`${this.paths.backupRemoteCredentialsFile}.tmp`, {
+        force: true,
+      }),
+    ]);
   }
 
   private async resetStaging(): Promise<void> {
