@@ -24,6 +24,13 @@ export interface BackupRemoteSession {
   readonly canUpload: boolean;
 }
 
+export interface BackupRemoteConnection {
+  readonly expiresAt: number;
+  readonly installation: BackupRemoteInstallation;
+  readonly subscription: BackupRemoteSubscription;
+  readonly canUpload: boolean;
+}
+
 export interface BackupRemoteBackup {
   readonly publicId: string;
   readonly backupId: string;

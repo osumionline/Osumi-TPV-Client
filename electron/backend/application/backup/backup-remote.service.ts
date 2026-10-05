@@ -1,0 +1,189 @@
+import { BackupRemoteClientError } from '@backend/contracts/backup/backup-remote-client.error';
+import type {
+  BackupRemoteBackup,
+  BackupRemoteClient,
+  BackupRemoteConnection,
+  BackupRemoteCredentials,
+  BackupRemoteSession,
+} from '@backend/contracts/backup/backup-remote-client.interface';
+import type BackupRemoteCredentialStorage from '@backend/contracts/backup/backup-remote-credential-storage.interface';
+
+/**
+ * Gestiona la conexión de la instalación
+ * con el servicio remoto de TPV Backup.
+ */
+export default class BackupRemoteService {
+  private static readonly SESSION_EXPIRY_SKEW_SECONDS = 30;
+  private session: BackupRemoteSession | null = null;
+
+  /**
+   * Crea el servicio remoto de copias.
+   *
+   * now permite controlar el reloj exclusivamente
+   * desde tests sin alterar la lógica productiva.
+   */
+  constructor(
+    private readonly client: BackupRemoteClient,
+    private readonly credentialStorage: BackupRemoteCredentialStorage,
+    private readonly now: () => number = (): number => Math.floor(Date.now() / 1000),
+  ) {}
+
+  /**
+   * Valida unas nuevas credenciales contra TPV Backup
+   * y solo las persiste después de autenticar correctamente.
+   */
+  async configure(credentials: BackupRemoteCredentials): Promise<BackupRemoteConnection> {
+    const normalizedCredentials: BackupRemoteCredentials = this.normalizeCredentials(credentials);
+    const session: BackupRemoteSession = await this.client.authenticate(normalizedCredentials);
+
+    await this.credentialStorage.save(normalizedCredentials);
+
+    this.session = session;
+
+    return this.createConnection(session);
+  }
+
+  /**
+   * Obtiene el estado remoto actual.
+   *
+   * Si existen credenciales persistidas pero todavía
+   * no hay sesión, realiza la autenticación necesaria.
+   */
+  async getConnection(): Promise<BackupRemoteConnection | null> {
+    const credentials: BackupRemoteCredentials | null = await this.credentialStorage.load();
+
+    if (credentials === null) {
+      this.session = null;
+
+      return null;
+    }
+
+    const session: BackupRemoteSession = await this.ensureSession(credentials);
+
+    return this.createConnection(session);
+  }
+
+  /**
+   * Obtiene el listado de copias remotas
+   * pertenecientes a esta instalación.
+   */
+  async list(): Promise<readonly BackupRemoteBackup[]> {
+    const credentials: BackupRemoteCredentials = await this.loadRequiredCredentials();
+
+    const session: BackupRemoteSession = await this.ensureSession(credentials);
+
+    try {
+      return await this.client.list(session.token);
+    } catch (error: unknown) {
+      if (!this.isRejectedSession(error)) {
+        throw error;
+      }
+
+      /*
+       * El servidor valida credencial, instalación y suscripción
+       * en cada petición. Por tanto un JWT todavía no caducado
+       * puede dejar de ser válido administrativamente.
+       *
+       * Eliminamos únicamente la sesión en memoria y realizamos
+       * una nueva autenticación con la credencial persistida.
+       */
+      this.session = null;
+
+      const refreshedSession: BackupRemoteSession = await this.ensureSession(credentials);
+
+      return this.client.list(refreshedSession.token);
+    }
+  }
+
+  /**
+   * Elimina la configuración remota local.
+   *
+   * El JWT en memoria solo se descarta después
+   * de eliminar correctamente la credencial persistida.
+   */
+  async removeConfiguration(): Promise<void> {
+    await this.credentialStorage.delete();
+
+    this.session = null;
+  }
+
+  /**
+   * Recupera las credenciales persistidas
+   * o rechaza la operación si no están configuradas.
+   */
+  private async loadRequiredCredentials(): Promise<BackupRemoteCredentials> {
+    const credentials: BackupRemoteCredentials | null = await this.credentialStorage.load();
+
+    if (credentials === null) {
+      throw new Error('La instalación no tiene configuradas las credenciales de TPV Backup.');
+    }
+
+    return credentials;
+  }
+
+  /**
+   * Obtiene una sesión utilizable, reutilizando
+   * la actual o autenticando de nuevo cuando sea necesario.
+   */
+  private async ensureSession(credentials: BackupRemoteCredentials): Promise<BackupRemoteSession> {
+    if (this.session !== null && this.isSessionUsable(this.session)) {
+      return this.session;
+    }
+
+    const session: BackupRemoteSession = await this.client.authenticate(credentials);
+
+    this.session = session;
+
+    return session;
+  }
+
+  /**
+   * Determina si la sesión todavía dispone
+   * de margen suficiente antes de su expiración.
+   */
+  private isSessionUsable(session: BackupRemoteSession): boolean {
+    return session.expiresAt > this.now() + BackupRemoteService.SESSION_EXPIRY_SKEW_SECONDS;
+  }
+
+  /**
+   * Identifica un rechazo del middleware remoto
+   * que puede resolverse renovando la sesión.
+   */
+  private isRejectedSession(error: unknown): boolean {
+    return error instanceof BackupRemoteClientError && error.kind === 'forbidden';
+  }
+
+  /**
+   * Normaliza las credenciales introducidas
+   * sin alterar en ningún caso el secreto.
+   */
+  private normalizeCredentials(credentials: BackupRemoteCredentials): BackupRemoteCredentials {
+    const keyId: string = credentials.keyId.trim();
+
+    if (keyId === '' || credentials.secret === '') {
+      throw new Error('Las credenciales de TPV Backup no pueden estar vacías.');
+    }
+
+    return {
+      keyId,
+      secret: credentials.secret,
+    };
+  }
+
+  /**
+   * Elimina el token de la representación
+   * que puede abandonar este servicio.
+   */
+  private createConnection(session: BackupRemoteSession): BackupRemoteConnection {
+    return {
+      expiresAt: session.expiresAt,
+      installation: {
+        ...session.installation,
+      },
+      subscription: {
+        ...session.subscription,
+      },
+      canUpload: session.canUpload,
+    };
+  }
+}
