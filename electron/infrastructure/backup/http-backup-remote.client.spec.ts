@@ -1,8 +1,6 @@
 import { BackupRemoteClientError } from '@backend/contracts/backup/backup-remote-client.error';
-import type {
-  BackupRemoteBackup,
-  BackupRemoteSession,
-} from '@backend/contracts/backup/backup-remote-client.interface';
+import type { BackupRemoteSession } from '@backend/contracts/backup/backup-remote-client.interface';
+import { BackupRemoteBackup } from '@desktop-contracts/backup/backup-remote.interface';
 import HttpBackupRemoteClient from '@infrastructure/backup/http-backup-remote.client';
 import { describe, expect, it } from 'vitest';
 

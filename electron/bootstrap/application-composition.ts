@@ -8,6 +8,7 @@ import InventarioPrintService from '@backend/application/almacen/inventario/inve
 import InventarioService from '@backend/application/almacen/inventario/inventario.service';
 import ApplicationStateService from '@backend/application/application/application-state.service';
 import ArticulosService from '@backend/application/articulos/articulos.service';
+import BackupRemoteService from '@backend/application/backup/backup-remote.service';
 import BackupRestoreSelectionService from '@backend/application/backup/backup-restore-selection.service';
 import BackupService from '@backend/application/backup/backup.service';
 import OtpvPackageSelectionService from '@backend/application/backup/otpv-package-selection.service';
@@ -59,6 +60,8 @@ import type InventarioCsvFileSaver from '@backend/contracts/almacen/inventario/i
 import type InventarioPrintWindow from '@backend/contracts/almacen/inventario/inventario-print-window.interface';
 import type InventarioRepository from '@backend/contracts/almacen/inventario/inventario.repository.interface';
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
+import type { BackupRemoteClient } from '@backend/contracts/backup/backup-remote-client.interface';
+import type BackupRemoteCredentialStorage from '@backend/contracts/backup/backup-remote-credential-storage.interface';
 import type DatabaseSnapshot from '@backend/contracts/backup/database-snapshot.interface';
 import type { OtpvV3Crypto } from '@backend/contracts/backup/otpv-v3-crypto.interface';
 import type { OtpvV3PackageBuilder } from '@backend/contracts/backup/otpv-v3-package-builder.interface';
@@ -114,6 +117,7 @@ import DefaultLegacyImportReviewDecisionValidator from '@backend/domain/legacy-i
 import FileOtpvV3RequiredContentValidator from '@infrastructure/backup/file-otpv-v3-required-content.validator';
 import FileOtpvV3RestoreStagingPreparer from '@infrastructure/backup/file-otpv-v3-restore-staging.preparer';
 import FileOtpvV3RestoreWorkspace from '@infrastructure/backup/file-otpv-v3-restore-workspace';
+import HttpBackupRemoteClient from '@infrastructure/backup/http-backup-remote.client';
 import InMemoryOtpvV3PreparedRestoreStore from '@infrastructure/backup/in-memory-otpv-v3-prepared-restore.store';
 import InMemoryOtpvV3RestoreSelectionStore from '@infrastructure/backup/in-memory-otpv-v3-restore-selection.store';
 import NodeOtpvV3Crypto from '@infrastructure/backup/node-otpv-v3-crypto';
@@ -173,6 +177,7 @@ import ElectronOtpvPackageDialog from '@infrastructure/electron/electron-otpv-pa
 import ElectronPdfPrintDialog from '@infrastructure/electron/electron-pdf-print-dialog';
 import ElectronPrinterProvider from '@infrastructure/electron/electron-printer.provider';
 import { ElectronRuntimeInfoProvider } from '@infrastructure/electron/electron-runtime-info.provider';
+import ElectronSafeStorageBackupRemoteCredentialStorage from '@infrastructure/electron/electron-safe-storage-backup-remote-credential-storage';
 import ElectronSafeStorageSecretStorage from '@infrastructure/electron/electron-safe-storage-secret-storage';
 import { getMainWindow } from '@infrastructure/electron/main-window';
 import NodemailerEmailSender from '@infrastructure/email/nodemailer-email.sender';
@@ -284,6 +289,20 @@ export default function createApplicationComposition(
     applicationPaths.backupsDirectory,
     operationalSecretStorage,
     backupPackageBuilder,
+  );
+
+  const backupRemoteCredentialStorage: BackupRemoteCredentialStorage =
+    new ElectronSafeStorageBackupRemoteCredentialStorage(
+      applicationPaths.backupRemoteCredentialsFile,
+    );
+
+  const backupRemoteClient: BackupRemoteClient = new HttpBackupRemoteClient(
+    'https://apitpvbackup.osumi.dev/api/v1',
+  );
+
+  const backupRemoteService: BackupRemoteService = new BackupRemoteService(
+    backupRemoteClient,
+    backupRemoteCredentialStorage,
   );
 
   /*
@@ -841,6 +860,7 @@ export default function createApplicationComposition(
   registerBackupIpc(
     getMainWindow,
     backupService,
+    backupRemoteService,
     backupRestoreSelectionService,
     otpvV3RestoreUnlockService,
     otpvV3RestoreFinalizeService,

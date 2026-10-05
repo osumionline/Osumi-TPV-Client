@@ -1,12 +1,14 @@
 import { BackupRemoteClientError } from '@backend/contracts/backup/backup-remote-client.error';
 import type {
-  BackupRemoteBackup,
   BackupRemoteClient,
-  BackupRemoteConnection,
-  BackupRemoteCredentials,
   BackupRemoteSession,
 } from '@backend/contracts/backup/backup-remote-client.interface';
 import type BackupRemoteCredentialStorage from '@backend/contracts/backup/backup-remote-credential-storage.interface';
+import {
+  BackupRemoteBackup,
+  BackupRemoteConnection,
+  BackupRemoteCredentials,
+} from '@desktop-contracts/backup/backup-remote.interface';
 
 /**
  * Gestiona la conexión de la instalación
@@ -32,8 +34,8 @@ export default class BackupRemoteService {
    * Valida unas nuevas credenciales contra TPV Backup
    * y solo las persiste después de autenticar correctamente.
    */
-  async configure(credentials: BackupRemoteCredentials): Promise<BackupRemoteConnection> {
-    const normalizedCredentials: BackupRemoteCredentials = this.normalizeCredentials(credentials);
+  async configure(value: unknown): Promise<BackupRemoteConnection> {
+    const normalizedCredentials: BackupRemoteCredentials = this.normalizeCredentials(value);
     const session: BackupRemoteSession = await this.client.authenticate(normalizedCredentials);
 
     await this.credentialStorage.save(normalizedCredentials);
@@ -154,19 +156,31 @@ export default class BackupRemoteService {
   }
 
   /**
-   * Normaliza las credenciales introducidas
+   * Valida y normaliza las credenciales introducidas
    * sin alterar en ningún caso el secreto.
    */
-  private normalizeCredentials(credentials: BackupRemoteCredentials): BackupRemoteCredentials {
-    const keyId: string = credentials.keyId.trim();
+  private normalizeCredentials(value: unknown): BackupRemoteCredentials {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      throw new Error('Las credenciales de TPV Backup no son válidas.');
+    }
 
-    if (keyId === '' || credentials.secret === '') {
+    const data: Record<string, unknown> = value as Record<string, unknown>;
+    const rawKeyId: unknown = data['keyId'];
+    const secret: unknown = data['secret'];
+
+    if (typeof rawKeyId !== 'string' || typeof secret !== 'string') {
+      throw new Error('Las credenciales de TPV Backup no son válidas.');
+    }
+
+    const keyId: string = rawKeyId.trim();
+
+    if (keyId === '' || secret === '') {
       throw new Error('Las credenciales de TPV Backup no pueden estar vacías.');
     }
 
     return {
       keyId,
-      secret: credentials.secret,
+      secret,
     };
   }
 

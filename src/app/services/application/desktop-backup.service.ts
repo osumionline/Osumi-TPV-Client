@@ -1,5 +1,10 @@
 import { Service } from '@angular/core';
 import type BackupCreateResult from '@desktop-contracts/backup/backup-create-result.interface';
+import type {
+  BackupRemoteBackup,
+  BackupRemoteConnection,
+  BackupRemoteCredentials,
+} from '@desktop-contracts/backup/backup-remote.interface';
 import type BackupRestoreFinalizeResult from '@desktop-contracts/backup/backup-restore-finalize-result.interface';
 import type BackupRestorePackageSelectionResult from '@desktop-contracts/backup/backup-restore-package-selection-result.type';
 import type BackupRestoreUnlockCommand from '@desktop-contracts/backup/backup-restore-unlock-command.interface';
@@ -33,5 +38,34 @@ export default class DesktopBackupService {
    */
   finalizeRestorePackage(selectionId: string): Promise<BackupRestoreFinalizeResult> {
     return window.osumiDesktop.backup.finalizeRestorePackage(selectionId);
+  }
+
+  /**
+   * Configura las credenciales remotas de TPV Backup.
+   */
+  configureRemote(credentials: BackupRemoteCredentials): Promise<BackupRemoteConnection> {
+    return window.osumiDesktop.backup.configureRemote(credentials);
+  }
+
+  /**
+   * Obtiene el estado de la conexión remota actual.
+   */
+  getRemoteConnection(): Promise<BackupRemoteConnection | null> {
+    return window.osumiDesktop.backup.getRemoteConnection();
+  }
+
+  /**
+   * Elimina la configuración local de TPV Backup.
+   */
+  removeRemoteConfiguration(): Promise<void> {
+    return window.osumiDesktop.backup.removeRemoteConfiguration();
+  }
+
+  /**
+   * Obtiene el listado de copias almacenadas
+   * en TPV Backup.
+   */
+  getRemoteBackups(): Promise<readonly BackupRemoteBackup[]> {
+    return window.osumiDesktop.backup.getRemoteBackups();
   }
 }

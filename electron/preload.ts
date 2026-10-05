@@ -37,6 +37,11 @@ import type { ArticuloSaveInterface } from '@desktop-contracts/articulos/articul
 import type { ArticuloInterface } from '@desktop-contracts/articulos/articulo.interface';
 import type CategoriaInterface from '@desktop-contracts/articulos/categorias/categoria.interface';
 import type BackupCreateResult from '@desktop-contracts/backup/backup-create-result.interface';
+import type {
+  BackupRemoteBackup,
+  BackupRemoteConnection,
+  BackupRemoteCredentials,
+} from '@desktop-contracts/backup/backup-remote.interface';
 import type BackupRestoreFinalizeResult from '@desktop-contracts/backup/backup-restore-finalize-result.interface';
 import type BackupRestorePackageSelectionResult from '@desktop-contracts/backup/backup-restore-package-selection-result.type';
 import type BackupRestoreUnlockCommand from '@desktop-contracts/backup/backup-restore-unlock-command.interface';
@@ -184,6 +189,25 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
   backup: Object.freeze({
     createLocal: (): Promise<BackupCreateResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.backupCreateLocal) as Promise<BackupCreateResult>,
+
+    configureRemote: (credentials: BackupRemoteCredentials): Promise<BackupRemoteConnection> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.backupRemoteConfigure,
+        credentials,
+      ) as Promise<BackupRemoteConnection>,
+
+    getRemoteConnection: (): Promise<BackupRemoteConnection | null> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.backupRemoteGetConnection,
+      ) as Promise<BackupRemoteConnection | null>,
+
+    removeRemoteConfiguration: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.backupRemoteRemoveConfiguration) as Promise<void>,
+
+    getRemoteBackups: (): Promise<readonly BackupRemoteBackup[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.backupRemoteGetBackups) as Promise<
+        readonly BackupRemoteBackup[]
+      >,
 
     selectRestorePackage: (): Promise<BackupRestorePackageSelectionResult> =>
       ipcRenderer.invoke(

@@ -1,13 +1,15 @@
 import BackupRemoteService from '@backend/application/backup/backup-remote.service';
 import { BackupRemoteClientError } from '@backend/contracts/backup/backup-remote-client.error';
 import type {
-  BackupRemoteBackup,
   BackupRemoteClient,
-  BackupRemoteConnection,
-  BackupRemoteCredentials,
   BackupRemoteSession,
 } from '@backend/contracts/backup/backup-remote-client.interface';
 import type BackupRemoteCredentialStorage from '@backend/contracts/backup/backup-remote-credential-storage.interface';
+import {
+  BackupRemoteBackup,
+  BackupRemoteConnection,
+  BackupRemoteCredentials,
+} from '@desktop-contracts/backup/backup-remote.interface';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 const NOW = 1_800_000_000;
@@ -56,6 +58,18 @@ describe('BackupRemoteService', (): void => {
     });
 
     expect('token' in result).toBe(false);
+  });
+
+  it('rechaza una estructura de credenciales inválida antes de contactar con el API', async (): Promise<void> => {
+    await expect(
+      service.configure({
+        keyId: '',
+        secret: 123,
+      }),
+    ).rejects.toThrow('Las credenciales de TPV Backup no son válidas.');
+
+    expect(client.authenticateCalls).toHaveLength(0);
+    expect(credentialStorage.saveCalls).toBe(0);
   });
 
   it('no reemplaza las credenciales si la autenticación falla', async (): Promise<void> => {

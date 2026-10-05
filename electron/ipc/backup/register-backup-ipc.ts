@@ -1,8 +1,13 @@
+import type BackupRemoteService from '@backend/application/backup/backup-remote.service';
 import type BackupRestoreSelectionService from '@backend/application/backup/backup-restore-selection.service';
 import type BackupService from '@backend/application/backup/backup.service';
 import type OtpvV3RestoreFinalizeService from '@backend/application/backup/otpv-v3-restore-finalize.service';
 import type OtpvV3RestoreUnlockService from '@backend/application/backup/otpv-v3-restore-unlock.service';
 import type BackupCreateResult from '@desktop-contracts/backup/backup-create-result.interface';
+import type {
+  BackupRemoteBackup,
+  BackupRemoteConnection,
+} from '@desktop-contracts/backup/backup-remote.interface';
 import type BackupRestoreFinalizeResult from '@desktop-contracts/backup/backup-restore-finalize-result.interface';
 import type BackupRestorePackageSelectionResult from '@desktop-contracts/backup/backup-restore-package-selection-result.type';
 import type BackupRestoreUnlockCommand from '@desktop-contracts/backup/backup-restore-unlock-command.interface';
@@ -17,6 +22,7 @@ import { ipcMain } from 'electron';
 export default function registerBackupIpc(
   getMainWindow: MainWindowProvider,
   backupService: BackupService,
+  backupRemoteService: BackupRemoteService,
   backupRestoreSelectionService: BackupRestoreSelectionService,
   restoreUnlockService: OtpvV3RestoreUnlockService,
   restoreFinalizeService: OtpvV3RestoreFinalizeService,
@@ -26,6 +32,39 @@ export default function registerBackupIpc(
 
     return backupService.createLocal();
   });
+
+  ipcMain.handle(
+    IPC_CHANNELS.backupRemoteConfigure,
+    async (event, credentials: unknown): Promise<BackupRemoteConnection> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return backupRemoteService.configure(credentials);
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.backupRemoteGetConnection,
+    async (event): Promise<BackupRemoteConnection | null> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return backupRemoteService.getConnection();
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.backupRemoteRemoveConfiguration, async (event): Promise<void> => {
+    assertTrustedSender(event, getMainWindow);
+
+    await backupRemoteService.removeConfiguration();
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.backupRemoteGetBackups,
+    async (event): Promise<readonly BackupRemoteBackup[]> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return backupRemoteService.list();
+    },
+  );
 
   ipcMain.handle(
     IPC_CHANNELS.backupSelectRestorePackage,

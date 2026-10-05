@@ -1,5 +1,5 @@
-import type { BackupRemoteCredentials } from '@backend/contracts/backup/backup-remote-client.interface';
 import type BackupRemoteCredentialStorage from '@backend/contracts/backup/backup-remote-credential-storage.interface';
+import { BackupRemoteCredentials } from '@desktop-contracts/backup/backup-remote.interface';
 import { safeStorage } from 'electron';
 import { readFile, rename, rm, writeFile } from 'node:fs/promises';
 

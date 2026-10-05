@@ -1,4 +1,4 @@
-import type { BackupRemoteCredentials } from '@backend/contracts/backup/backup-remote-client.interface';
+import { BackupRemoteCredentials } from '@desktop-contracts/backup/backup-remote.interface';
 
 export default interface BackupRemoteCredentialStorage {
   /**

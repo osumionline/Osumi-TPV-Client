@@ -1,4 +1,4 @@
-import type { BackupRemoteCredentials } from '@backend/contracts/backup/backup-remote-client.interface';
+import { BackupRemoteCredentials } from '@desktop-contracts/backup/backup-remote.interface';
 import ElectronSafeStorageBackupRemoteCredentialStorage from '@infrastructure/electron/electron-safe-storage-backup-remote-credential-storage';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

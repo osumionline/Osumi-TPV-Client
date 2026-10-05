@@ -3,12 +3,14 @@ import {
   type BackupRemoteClientErrorKind,
 } from '@backend/contracts/backup/backup-remote-client.error';
 import {
-  BackupRemoteBackup,
-  BackupRemoteCredentials,
   BackupRemoteSession,
-  BackupRemoteSubscriptionStatus,
   type BackupRemoteClient,
 } from '@backend/contracts/backup/backup-remote-client.interface';
+import {
+  BackupRemoteBackup,
+  BackupRemoteCredentials,
+  BackupRemoteSubscriptionStatus,
+} from '@desktop-contracts/backup/backup-remote.interface';
 
 interface JsonResponse {
   readonly response: Response;
