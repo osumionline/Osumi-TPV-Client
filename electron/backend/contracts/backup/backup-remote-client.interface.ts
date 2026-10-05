@@ -14,6 +14,11 @@ export interface BackupRemoteSession {
   readonly canUpload: boolean;
 }
 
+export interface BackupRemoteDownloadTransferResult {
+  readonly sizeBytes: number;
+  readonly sha256: string;
+}
+
 export interface BackupRemoteClient {
   /**
    * Autentica una instalación mediante su credencial
@@ -34,4 +39,14 @@ export interface BackupRemoteClient {
    * todo su contenido en memoria.
    */
   upload(token: string, filePath: string, fileName: string): Promise<BackupRemoteUploadResult>;
+
+  /**
+   * Descarga una copia remota directamente a disco
+   * sin materializar todo su contenido en memoria.
+   */
+  download(
+    token: string,
+    publicId: string,
+    destinationFile: string,
+  ): Promise<BackupRemoteDownloadTransferResult>;
 }

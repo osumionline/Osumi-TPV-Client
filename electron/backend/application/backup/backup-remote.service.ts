@@ -1,6 +1,7 @@
 import { BackupRemoteClientError } from '@backend/contracts/backup/backup-remote-client.error';
 import type {
   BackupRemoteClient,
+  BackupRemoteDownloadTransferResult,
   BackupRemoteSession,
 } from '@backend/contracts/backup/backup-remote-client.interface';
 import type BackupRemoteCredentialStorage from '@backend/contracts/backup/backup-remote-credential-storage.interface';
@@ -125,6 +126,35 @@ export default class BackupRemoteService {
       this.assertUploadAllowed(refreshedSession);
 
       return this.client.upload(refreshedSession.token, filePath, fileName);
+    }
+  }
+
+  /**
+   * Descarga una copia remota directamente
+   * al fichero indicado por la capa de aplicación.
+   *
+   * Las suscripciones caducadas pueden descargar.
+   */
+  async download(
+    publicId: string,
+    destinationFile: string,
+  ): Promise<BackupRemoteDownloadTransferResult> {
+    const credentials: BackupRemoteCredentials = await this.loadRequiredCredentials();
+
+    const session: BackupRemoteSession = await this.ensureSession(credentials);
+
+    try {
+      return await this.client.download(session.token, publicId, destinationFile);
+    } catch (error: unknown) {
+      if (!this.isRejectedSession(error)) {
+        throw error;
+      }
+
+      this.session = null;
+
+      const refreshedSession: BackupRemoteSession = await this.ensureSession(credentials);
+
+      return this.client.download(refreshedSession.token, publicId, destinationFile);
     }
   }
 

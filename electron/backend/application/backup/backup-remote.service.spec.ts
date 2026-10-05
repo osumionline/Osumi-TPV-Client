@@ -2,6 +2,7 @@ import BackupRemoteService from '@backend/application/backup/backup-remote.servi
 import { BackupRemoteClientError } from '@backend/contracts/backup/backup-remote-client.error';
 import type {
   BackupRemoteClient,
+  BackupRemoteDownloadTransferResult,
   BackupRemoteSession,
 } from '@backend/contracts/backup/backup-remote-client.interface';
 import type BackupRemoteCredentialStorage from '@backend/contracts/backup/backup-remote-credential-storage.interface';
@@ -78,7 +79,6 @@ describe('BackupRemoteService', (): void => {
       keyId: 'current-key-id',
       secret: 'current-secret',
     };
-
     client.authenticateError = new BackupRemoteClientError(
       'unauthorized',
       'Invalid installation credentials.',
@@ -96,7 +96,6 @@ describe('BackupRemoteService', (): void => {
       keyId: 'current-key-id',
       secret: 'current-secret',
     });
-
     expect(credentialStorage.saveCalls).toBe(0);
   });
 
@@ -179,7 +178,6 @@ describe('BackupRemoteService', (): void => {
     );
 
     expect(result).toEqual(client.uploadResult);
-
     expect(client.uploadCalls).toEqual([
       {
         token: 'test-token',
@@ -222,7 +220,6 @@ describe('BackupRemoteService', (): void => {
 
     client.sessions = [
       createSession(NOW + 3600, 'first-token'),
-
       createSession(NOW + 3600, 'second-token'),
     ];
 
@@ -255,6 +252,66 @@ describe('BackupRemoteService', (): void => {
 
     await expect(service.getConnection()).resolves.toBeNull();
   });
+
+  it('descarga una copia incluso con una suscripción caducada', async (): Promise<void> => {
+    credentialStorage.value = {
+      keyId: 'remote-key-id',
+      secret: 'remote-secret',
+    };
+
+    client.sessions = [
+      {
+        ...createSession(NOW + 3600, 'expired-token'),
+
+        subscription: {
+          publicId: 'subscription-public-id',
+          name: 'Indomables',
+          status: 'expired',
+        },
+
+        canUpload: false,
+      },
+    ];
+
+    const result: BackupRemoteDownloadTransferResult = await service.download(
+      'backup-public-id',
+      'C:\\backups\\backup.otpv',
+    );
+
+    expect(result).toEqual(client.downloadResult);
+
+    expect(client.downloadCalls).toEqual([
+      {
+        token: 'expired-token',
+        publicId: 'backup-public-id',
+        destinationFile: 'C:\\backups\\backup.otpv',
+      },
+    ]);
+  });
+
+  it('renueva una vez el JWT si el servidor rechaza la sesión durante la descarga', async (): Promise<void> => {
+    credentialStorage.value = {
+      keyId: 'remote-key-id',
+      secret: 'remote-secret',
+    };
+
+    client.sessions = [
+      createSession(NOW + 3600, 'first-token'),
+
+      createSession(NOW + 3600, 'second-token'),
+    ];
+
+    client.rejectDownloadTokenOnce = 'first-token';
+
+    await service.download('backup-public-id', 'C:\\backups\\backup.otpv');
+
+    expect(client.authenticateCalls).toHaveLength(2);
+
+    expect(client.downloadCalls.map((call): string => call.token)).toEqual([
+      'first-token',
+      'second-token',
+    ]);
+  });
 });
 
 /**
@@ -273,7 +330,6 @@ function createSession(expiresAt: number, token: string): BackupRemoteSession {
       name: 'Indomables',
       status: 'active',
     },
-
     canUpload: true,
   };
 }
@@ -301,7 +357,6 @@ class TestBackupRemoteClient implements BackupRemoteClient {
   ];
 
   sessions: BackupRemoteSession[] = [createSession(NOW + 3600, 'test-token')];
-
   authenticateError: Error | null = null;
   rejectTokenOnce: string | null = null;
 
@@ -321,6 +376,19 @@ class TestBackupRemoteClient implements BackupRemoteClient {
   };
 
   rejectUploadTokenOnce: string | null = null;
+
+  readonly downloadCalls: {
+    readonly token: string;
+    readonly publicId: string;
+    readonly destinationFile: string;
+  }[] = [];
+
+  readonly downloadResult: BackupRemoteDownloadTransferResult = {
+    sizeBytes: 4096,
+    sha256: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+  };
+
+  rejectDownloadTokenOnce: string | null = null;
 
   /**
    * Simula la autenticación remota.
@@ -392,6 +460,31 @@ class TestBackupRemoteClient implements BackupRemoteClient {
       ...this.uploadResult,
     };
   }
+
+  /**
+   * Simula la descarga de una copia remota.
+   */
+  async download(
+    token: string,
+    publicId: string,
+    destinationFile: string,
+  ): Promise<BackupRemoteDownloadTransferResult> {
+    this.downloadCalls.push({
+      token,
+      publicId,
+      destinationFile,
+    });
+
+    if (this.rejectDownloadTokenOnce !== null && this.rejectDownloadTokenOnce === token) {
+      this.rejectDownloadTokenOnce = null;
+
+      throw new BackupRemoteClientError('forbidden', 'Invalid installation access token.', 403);
+    }
+
+    return {
+      ...this.downloadResult,
+    };
+  }
 }
 
 /**
@@ -426,7 +519,6 @@ class TestBackupRemoteCredentialStorage implements BackupRemoteCredentialStorage
    */
   async save(credentials: BackupRemoteCredentials): Promise<void> {
     this.saveCalls++;
-
     this.value = {
       ...credentials,
     };
@@ -437,7 +529,6 @@ class TestBackupRemoteCredentialStorage implements BackupRemoteCredentialStorage
    */
   async delete(): Promise<void> {
     this.deleteCalls++;
-
     this.value = null;
   }
 }

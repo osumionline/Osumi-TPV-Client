@@ -4,15 +4,20 @@ import {
 } from '@backend/contracts/backup/backup-remote-client.error';
 import type {
   BackupRemoteClient,
+  BackupRemoteDownloadTransferResult,
   BackupRemoteSession,
 } from '@backend/contracts/backup/backup-remote-client.interface';
+import { OTPV_V3_MAX_PACKAGE_SIZE_BYTES } from '@backend/domain/backup/otpv-v3.constants';
 import type {
   BackupRemoteBackup,
   BackupRemoteCredentials,
   BackupRemoteSubscriptionStatus,
   BackupRemoteUploadResult,
 } from '@desktop-contracts/backup/backup-remote.interface';
+import { createHash } from 'node:crypto';
 import { openAsBlob } from 'node:fs';
+import { mkdir, open, rm, type FileHandle } from 'node:fs/promises';
+import { dirname } from 'node:path';
 
 interface JsonResponse {
   readonly response: Response;
@@ -173,14 +178,182 @@ export default class HttpBackupRemoteClient implements BackupRemoteClient {
   }
 
   /**
-   * Ejecuta una petición JSON y normaliza
-   * los errores HTTP, de red y de respuesta.
+   * Descarga una copia remota directamente a disco
+   * calculando su SHA-256 durante la transferencia.
    */
-  private async requestJson(url: string, init: RequestInit): Promise<JsonResponse> {
-    let response: Response;
+  async download(
+    token: string,
+    publicId: string,
+    destinationFile: string,
+  ): Promise<BackupRemoteDownloadTransferResult> {
+    const normalizedPublicId: string = publicId.trim();
+
+    if (normalizedPublicId === '') {
+      throw new BackupRemoteClientError(
+        'unexpected',
+        'El identificador de la copia remota no es válido.',
+      );
+    }
+
+    const response: Response = await this.request(
+      `${this.baseUrl}/backups/${encodeURIComponent(normalizedPublicId)}/download`,
+      {
+        method: 'GET',
+
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      let payload: unknown = null;
+
+      try {
+        payload = await response.json();
+      } catch {
+        /*
+         * Si el servidor no devuelve JSON para el error,
+         * utilizamos el mensaje normalizado por status.
+         */
+      }
+
+      throw this.createHttpError(response.status, payload);
+    }
+
+    const expectedSize: number = this.getDownloadContentLength(response);
+
+    if (response.body === null) {
+      throw new BackupRemoteClientError(
+        'invalid-response',
+        'TPV Backup ha devuelto una descarga sin contenido.',
+        response.status,
+      );
+    }
+
+    await mkdir(dirname(destinationFile), {
+      recursive: true,
+    });
+
+    let fileHandle: FileHandle | null = null;
+    let completed: boolean = false;
 
     try {
-      response = await this.fetchImplementation(url, init);
+      fileHandle = await open(destinationFile, 'wx', 0o600);
+
+      const hash = createHash('sha256');
+      const reader = response.body.getReader();
+
+      let sizeBytes: number = 0;
+
+      try {
+        while (true) {
+          const chunk = await reader.read();
+
+          if (chunk.done) {
+            break;
+          }
+
+          if (chunk.value.byteLength === 0) {
+            continue;
+          }
+
+          sizeBytes += chunk.value.byteLength;
+
+          if (sizeBytes > OTPV_V3_MAX_PACKAGE_SIZE_BYTES) {
+            throw new BackupRemoteClientError(
+              'too-large',
+              'La copia descargada supera el tamaño máximo permitido.',
+              response.status,
+            );
+          }
+
+          if (sizeBytes > expectedSize) {
+            throw new BackupRemoteClientError(
+              'temporary',
+              'La descarga recibida no coincide con el tamaño anunciado por TPV Backup.',
+              response.status,
+            );
+          }
+
+          hash.update(chunk.value);
+
+          await this.writeDownloadChunk(fileHandle, chunk.value);
+        }
+      } catch (error: unknown) {
+        try {
+          await reader.cancel();
+        } catch {
+          /*
+           * No ocultamos el error original
+           * si la cancelación del stream también falla.
+           */
+        }
+
+        throw error;
+      } finally {
+        reader.releaseLock();
+      }
+
+      if (sizeBytes !== expectedSize) {
+        throw new BackupRemoteClientError(
+          'temporary',
+          'La descarga de TPV Backup ha quedado incompleta.',
+          response.status,
+        );
+      }
+
+      const result: BackupRemoteDownloadTransferResult = {
+        sizeBytes,
+        sha256: hash.digest('hex'),
+      };
+
+      await fileHandle.close();
+
+      fileHandle = null;
+      completed = true;
+
+      return result;
+    } catch (error: unknown) {
+      if (error instanceof BackupRemoteClientError) {
+        throw error;
+      }
+
+      throw new BackupRemoteClientError(
+        'unexpected',
+        'No se ha podido guardar la copia descargada desde TPV Backup.',
+        response.status,
+        error instanceof Error
+          ? {
+              cause: error,
+            }
+          : undefined,
+      );
+    } finally {
+      if (fileHandle !== null) {
+        try {
+          await fileHandle.close();
+        } catch (error: unknown) {
+          console.error(
+            'No se ha podido cerrar el fichero parcial descargado desde TPV Backup:',
+            error,
+          );
+        }
+      }
+
+      if (!completed) {
+        await this.removeDownloadSafely(destinationFile);
+      }
+    }
+  }
+
+  /**
+   * Ejecuta una petición HTTP normalizando
+   * exclusivamente los errores de transporte.
+   */
+  private async request(url: string, init: RequestInit): Promise<Response> {
+    try {
+      return await this.fetchImplementation(url, init);
     } catch (error: unknown) {
       throw new BackupRemoteClientError(
         'temporary',
@@ -193,6 +366,14 @@ export default class HttpBackupRemoteClient implements BackupRemoteClient {
           : undefined,
       );
     }
+  }
+
+  /**
+   * Ejecuta una petición JSON y normaliza
+   * los errores HTTP, de red y de respuesta.
+   */
+  private async requestJson(url: string, init: RequestInit): Promise<JsonResponse> {
+    const response: Response = await this.request(url, init);
 
     let payload: unknown;
 
@@ -333,6 +514,74 @@ export default class HttpBackupRemoteClient implements BackupRemoteClient {
     }
 
     return normalized;
+  }
+
+  /**
+   * Obtiene y valida el tamaño anunciado
+   * para una descarga remota.
+   */
+  private getDownloadContentLength(response: Response): number {
+    const rawValue: string | null = response.headers.get('Content-Length');
+
+    if (rawValue === null || !/^\d+$/.test(rawValue)) {
+      throw new BackupRemoteClientError(
+        'invalid-response',
+        'TPV Backup no ha indicado un tamaño válido para la descarga.',
+        response.status,
+      );
+    }
+
+    const sizeBytes: number = Number(rawValue);
+
+    if (!Number.isSafeInteger(sizeBytes) || sizeBytes <= 0) {
+      throw new BackupRemoteClientError(
+        'invalid-response',
+        'TPV Backup ha indicado un tamaño de descarga no válido.',
+        response.status,
+      );
+    }
+
+    if (sizeBytes > OTPV_V3_MAX_PACKAGE_SIZE_BYTES) {
+      throw new BackupRemoteClientError(
+        'too-large',
+        'La copia remota supera el tamaño máximo permitido.',
+        response.status,
+      );
+    }
+
+    return sizeBytes;
+  }
+
+  /**
+   * Escribe completamente un chunk recibido
+   * aunque el filesystem realice escrituras parciales.
+   */
+  private async writeDownloadChunk(fileHandle: FileHandle, chunk: Uint8Array): Promise<void> {
+    let offset: number = 0;
+
+    while (offset < chunk.byteLength) {
+      const result = await fileHandle.write(chunk, offset, chunk.byteLength - offset);
+
+      if (result.bytesWritten <= 0) {
+        throw new Error('No se han podido escribir los datos descargados.');
+      }
+
+      offset += result.bytesWritten;
+    }
+  }
+
+  /**
+   * Elimina un fichero parcial de descarga
+   * sin ocultar el error original.
+   */
+  private async removeDownloadSafely(filePath: string): Promise<void> {
+    try {
+      await rm(filePath, {
+        force: true,
+      });
+    } catch (error: unknown) {
+      console.error('No se ha podido eliminar una descarga parcial de TPV Backup:', error);
+    }
   }
 
   /**
