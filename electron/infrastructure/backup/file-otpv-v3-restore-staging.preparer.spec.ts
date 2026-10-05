@@ -211,23 +211,15 @@ function createApplicationPaths(): ApplicationPaths {
     secretsDirectory,
     stagingDirectory,
     stagingFilesDirectory,
-
     appDataFile: join(configDirectory, 'app_data.json'),
-
     printingSettingsFile: join(configDirectory, 'printing_settings.json'),
-
     logoFile: join(assetsDirectory, 'logo.webp'),
-
     databaseFile: join(databaseDirectory, 'osumi-tpv.sqlite'),
-
     secretsFile: join(secretsDirectory, 'secrets.json'),
-
+    backupRemoteCredentialsFile: join(secretsDirectory, 'backup_remote_credentials.json'),
     stagingAppDataFile: join(stagingDirectory, 'app_data.json'),
-
     stagingLogoFile: join(stagingDirectory, 'logo.webp'),
-
     stagingSecretsFile: join(stagingDirectory, 'secrets.json'),
-
     stagingDatabaseFile: join(stagingDirectory, 'osumi-tpv.sqlite'),
   };
 }

@@ -15,6 +15,7 @@ export default interface ApplicationPaths {
   readonly logoFile: string;
   readonly databaseFile: string;
   readonly secretsFile: string;
+  readonly backupRemoteCredentialsFile: string;
 
   readonly stagingAppDataFile: string;
   readonly stagingLogoFile: string;
