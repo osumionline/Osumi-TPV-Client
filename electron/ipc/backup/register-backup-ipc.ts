@@ -1,3 +1,4 @@
+import type BackupRemoteCreateService from '@backend/application/backup/backup-remote-create.service';
 import type BackupRemoteService from '@backend/application/backup/backup-remote.service';
 import type BackupRestoreSelectionService from '@backend/application/backup/backup-restore-selection.service';
 import type BackupService from '@backend/application/backup/backup.service';
@@ -7,6 +8,7 @@ import type BackupCreateResult from '@desktop-contracts/backup/backup-create-res
 import type {
   BackupRemoteBackup,
   BackupRemoteConnection,
+  BackupRemoteUploadResult,
 } from '@desktop-contracts/backup/backup-remote.interface';
 import type BackupRestoreFinalizeResult from '@desktop-contracts/backup/backup-restore-finalize-result.interface';
 import type BackupRestorePackageSelectionResult from '@desktop-contracts/backup/backup-restore-package-selection-result.type';
@@ -23,6 +25,7 @@ export default function registerBackupIpc(
   getMainWindow: MainWindowProvider,
   backupService: BackupService,
   backupRemoteService: BackupRemoteService,
+  backupRemoteCreateService: BackupRemoteCreateService,
   backupRestoreSelectionService: BackupRestoreSelectionService,
   restoreUnlockService: OtpvV3RestoreUnlockService,
   restoreFinalizeService: OtpvV3RestoreFinalizeService,
@@ -63,6 +66,15 @@ export default function registerBackupIpc(
       assertTrustedSender(event, getMainWindow);
 
       return backupRemoteService.list();
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.backupRemoteCreate,
+    async (event): Promise<BackupRemoteUploadResult> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return backupRemoteCreateService.create();
     },
   );
 

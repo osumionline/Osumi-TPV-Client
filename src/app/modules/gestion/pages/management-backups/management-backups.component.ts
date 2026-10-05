@@ -16,6 +16,7 @@ import type BackupCreateResult from '@desktop-contracts/backup/backup-create-res
 import type {
   BackupRemoteBackup,
   BackupRemoteConnection,
+  BackupRemoteUploadResult,
 } from '@desktop-contracts/backup/backup-remote.interface';
 import { DialogService } from '@osumi/angular-tools';
 import DesktopBackupService from '@services/application/desktop-backup.service';
@@ -44,6 +45,7 @@ export default class ManagementBackupsComponent implements OnInit {
   >([]);
   readonly remoteError: WritableSignal<string | null> = signal<string | null>(null);
   readonly editingRemoteConfiguration: WritableSignal<boolean> = signal<boolean>(false);
+  readonly remoteCreating: WritableSignal<boolean> = signal<boolean>(false);
   readonly remoteKeyId: WritableSignal<string> = signal<string>('');
   readonly remoteSecret: WritableSignal<string> = signal<string>('');
 
@@ -63,7 +65,7 @@ export default class ManagementBackupsComponent implements OnInit {
    * Crea una copia local completa de Osumi TPV.
    */
   async createBackup(): Promise<void> {
-    if (this.creating()) {
+    if (this.creating() || this.remoteCreating()) {
       return;
     }
 
@@ -88,6 +90,48 @@ export default class ManagementBackupsComponent implements OnInit {
     } finally {
       this.creating.set(false);
     }
+  }
+
+  /**
+   * Crea una copia temporal y la almacena
+   * directamente en TPV Backup.
+   */
+  async createRemoteBackup(): Promise<void> {
+    if (this.remoteCreating() || this.creating()) {
+      return;
+    }
+
+    const connection: BackupRemoteConnection | null = this.remoteConnection();
+
+    if (connection === null || !connection.canUpload) {
+      return;
+    }
+
+    this.remoteCreating.set(true);
+    this.remoteError.set(null);
+
+    try {
+      const result: BackupRemoteUploadResult = await this.backupService.createRemote();
+
+      this.dialog.alert({
+        title: 'Copia remota creada',
+        content:
+          `La copia de seguridad "${result.originalFilename}" ` +
+          'se ha almacenado correctamente en TPV Backup.',
+      });
+    } catch (error: unknown) {
+      console.error('Error creando la copia remota:', error);
+
+      this.remoteError.set(getErrorMessage(error, 'No se ha podido crear la copia remota.'));
+
+      return;
+    } finally {
+      this.remoteCreating.set(false);
+    }
+
+    await this.reloadRemoteBackups(
+      'La copia se ha subido correctamente, pero no se ha podido actualizar el listado.',
+    );
   }
 
   /**
@@ -180,7 +224,9 @@ export default class ManagementBackupsComponent implements OnInit {
       this.remoteSaving.set(false);
     }
 
-    await this.reloadRemoteBackups();
+    await this.reloadRemoteBackups(
+      'La conexión se ha configurado, pero no se han podido cargar las copias remotas.',
+    );
   }
 
   /**
@@ -289,18 +335,13 @@ export default class ManagementBackupsComponent implements OnInit {
    * Recarga el listado tras una operación local
    * conservando una conexión ya establecida.
    */
-  private async reloadRemoteBackups(): Promise<void> {
+  private async reloadRemoteBackups(errorMessage: string): Promise<void> {
     try {
       await this.loadRemoteBackups();
     } catch (error: unknown) {
       console.error('Error cargando las copias remotas:', error);
 
-      this.remoteError.set(
-        getErrorMessage(
-          error,
-          'La conexión se ha configurado, pero no se han podido cargar las copias remotas.',
-        ),
-      );
+      this.remoteError.set(getErrorMessage(error, errorMessage));
     }
   }
 }

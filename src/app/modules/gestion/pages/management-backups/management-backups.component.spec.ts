@@ -6,6 +6,7 @@ import type {
   BackupRemoteBackup,
   BackupRemoteConnection,
   BackupRemoteCredentials,
+  BackupRemoteUploadResult,
 } from '@desktop-contracts/backup/backup-remote.interface';
 import ManagementBackupsComponent from '@modules/gestion/pages/management-backups/management-backups.component';
 import { DialogService } from '@osumi/angular-tools';
@@ -14,6 +15,7 @@ import DesktopBackupService from '@services/application/desktop-backup.service';
 class TestDesktopBackupService {
   readonly createCalls = signal<number>(0);
   readonly configureCalls: BackupRemoteCredentials[] = [];
+  remoteCreateCalls = 0;
 
   remoteConnection: BackupRemoteConnection | null = createRemoteConnection();
   remoteBackups: readonly BackupRemoteBackup[] = [createRemoteBackup()];
@@ -69,6 +71,22 @@ class TestDesktopBackupService {
    */
   async getRemoteBackups(): Promise<readonly BackupRemoteBackup[]> {
     return this.remoteBackups;
+  }
+
+  /**
+   * Simula la creación de una copia remota.
+   */
+  async createRemote(): Promise<BackupRemoteUploadResult> {
+    this.remoteCreateCalls++;
+
+    return {
+      publicId: 'new-backup-public-id',
+      backupId: '123e4567-e89b-42d3-a456-426614174001',
+      createdAtClient: '2026-10-05 20:30:00',
+      originalFilename: 'remote-backup.otpv',
+      sizeBytes: 2_097_152,
+      sha256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    };
   }
 }
 
@@ -197,6 +215,32 @@ describe('ManagementBackupsComponent', (): void => {
     expect(component.formatSize(512)).toBe('512 B');
     expect(component.formatSize(1536)).toBe('1.5 KB');
     expect(component.formatSize(1_048_576)).toBe('1.0 MB');
+  });
+
+  it('crea una copia remota y actualiza el listado', async (): Promise<void> => {
+    component.remoteConnection.set(createRemoteConnection());
+
+    await component.createRemoteBackup();
+
+    expect(backupService.remoteCreateCalls).toBe(1);
+    expect(component.remoteCreating()).toBe(false);
+    expect(component.remoteBackups()).toEqual([createRemoteBackup()]);
+    expect(dialogService.alerts).toHaveLength(1);
+  });
+
+  it('no crea una copia remota cuando la suscripción no permite subir', async (): Promise<void> => {
+    component.remoteConnection.set({
+      ...createRemoteConnection(),
+      subscription: {
+        ...createRemoteConnection().subscription,
+        status: 'expired',
+      },
+      canUpload: false,
+    });
+
+    await component.createRemoteBackup();
+
+    expect(backupService.remoteCreateCalls).toBe(0);
   });
 });
 

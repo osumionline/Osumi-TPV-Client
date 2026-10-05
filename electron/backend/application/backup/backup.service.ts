@@ -1,3 +1,4 @@
+import type BackupCreatedFile from '@backend/contracts/backup/backup-created-file.interface';
 import type {
   OtpvV3PackageBuilder,
   OtpvV3PackageBuildResult,
@@ -12,6 +13,8 @@ import { basename, join } from 'node:path';
  * Crea el servicio de copias locales.
  */
 export default class BackupService {
+  private creating: boolean = false;
+
   constructor(
     private readonly backupsDirectory: string,
     private readonly secretStorage: SecretStorage,
@@ -23,20 +26,49 @@ export default class BackupService {
    * del directorio local de backups.
    */
   async createLocal(): Promise<BackupCreateResult> {
-    const backupApiKey: string = await this.loadBackupApiKey();
-    const destinationFile: string = join(this.backupsDirectory, this.createFileName());
-
-    const result: OtpvV3PackageBuildResult = await this.packageBuilder.create({
-      backupApiKey,
-      destinationFile,
-    });
+    const backup: BackupCreatedFile = await this.createFile(this.backupsDirectory);
 
     return {
-      backupId: result.manifest.backupId,
-      createdAt: result.manifest.createdAt,
-      fileName: basename(result.destinationFile),
-      sizeBytes: result.sizeBytes,
+      backupId: backup.backupId,
+      createdAt: backup.createdAt,
+      fileName: backup.fileName,
+      sizeBytes: backup.sizeBytes,
     };
+  }
+
+  /**
+   * Crea una copia `.otpv` en un directorio interno
+   * indicado por la capa de aplicación.
+   *
+   * La ruta completa nunca debe exponerse al Renderer.
+   */
+  async createFile(destinationDirectory: string): Promise<BackupCreatedFile> {
+    if (this.creating) {
+      throw new Error('Ya se está creando una copia de seguridad.');
+    }
+
+    this.creating = true;
+
+    try {
+      const backupApiKey: string = await this.loadBackupApiKey();
+
+      const destinationFile: string = join(destinationDirectory, this.createFileName());
+
+      const result: OtpvV3PackageBuildResult = await this.packageBuilder.create({
+        backupApiKey,
+        destinationFile,
+      });
+
+      return {
+        backupId: result.manifest.backupId,
+        createdAt: result.manifest.createdAt,
+        fileName: basename(result.destinationFile),
+        filePath: result.destinationFile,
+        sizeBytes: result.sizeBytes,
+      };
+    } finally {
+      this.creating = false;
+    }
   }
 
   /**

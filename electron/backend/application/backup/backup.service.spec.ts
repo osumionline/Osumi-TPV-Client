@@ -77,6 +77,18 @@ describe('BackupService', (): void => {
 
     expect(packageBuilder.command).toBeNull();
   });
+
+  it('puede generar una copia en un directorio interno sin exponerlo al resultado público', async (): Promise<void> => {
+    const result = await service.createFile('/temporary');
+
+    expect(
+      packageBuilder.command?.destinationFile.startsWith(join('/temporary', 'osumi-tpv-backup-')),
+    ).toBe(true);
+
+    expect(result.filePath).toBe(packageBuilder.command?.destinationFile);
+
+    expect(result.fileName).toBe(packageBuilder.command?.destinationFile.split(/[\\/]/).pop());
+  });
 });
 
 class MemorySecretStorage implements SecretStorage {

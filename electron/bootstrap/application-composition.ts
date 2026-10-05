@@ -224,6 +224,7 @@ import { registerSystemIpc } from '@ipc/register-system-ipc';
 import registerReservasIpc from '@ipc/ventas/register-reservas-ipc';
 import registerVentasIpc from '@ipc/ventas/register-ventas-ipc';
 import { join } from 'node:path';
+import BackupRemoteCreateService from '@backend/application/backup/backup-remote-create.service';
 
 /**
  * Construye el grafo de dependencias de la aplicación,
@@ -304,6 +305,12 @@ export default function createApplicationComposition(
   const backupRemoteService: BackupRemoteService = new BackupRemoteService(
     backupRemoteClient,
     backupRemoteCredentialStorage,
+  );
+
+  const backupRemoteCreateService: BackupRemoteCreateService = new BackupRemoteCreateService(
+    join(applicationPaths.stagingDirectory, 'remote-upload'),
+    backupService,
+    backupRemoteService,
   );
 
   /*
@@ -863,6 +870,7 @@ export default function createApplicationComposition(
     getMainWindow,
     backupService,
     backupRemoteService,
+    backupRemoteCreateService,
     backupRestoreSelectionService,
     otpvV3RestoreUnlockService,
     otpvV3RestoreFinalizeService,

@@ -44,7 +44,7 @@
 
         <button mat-flat-button
                 type="button"
-                [disabled]="creating()"
+                [disabled]="creating() || remoteCreating()"
                 (click)="createBackup()">
             <mat-icon>
                 {{ creating() ? 'hourglass_top' : 'save' }}
@@ -95,6 +95,27 @@
 
             @if (remoteConnection(); as connection) {
             <div class="management-backups__remote-actions">
+                <button mat-flat-button
+                        type="button"
+                        [disabled]="
+                          !connection.canUpload ||
+                          remoteCreating() ||
+                          creating() ||
+                          remoteLoading() ||
+                          remoteSaving() ||
+                          remoteRemoving() ||
+                          editingRemoteConfiguration()
+                        "
+                        (click)="createRemoteBackup()">
+                    <mat-icon>cloud_upload</mat-icon>
+
+                    {{
+                        remoteCreating()
+                            ? 'Creando y subiendo...'
+                            : 'Nueva copia remota'
+                    }}
+                </button>
+
                 <button mat-stroked-button
                         type="button"
                         [disabled]="remoteLoading()"
@@ -106,6 +127,7 @@
 
                 <button mat-stroked-button
                         type="button"
+                        [disabled]="remoteCreating() || remoteRemoving()"
                         (click)="startRemoteConfiguration()">
                     <mat-icon>key</mat-icon>
                     Cambiar credenciales
@@ -113,7 +135,7 @@
 
                 <button mat-stroked-button
                         type="button"
-                        [disabled]="remoteRemoving()"
+                        [disabled]="remoteRemoving() || remoteCreating()"
                         (click)="removeRemoteConfiguration()">
                     <mat-icon>link_off</mat-icon>
 
