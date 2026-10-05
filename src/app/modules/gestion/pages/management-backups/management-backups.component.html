@@ -10,7 +10,7 @@
             </h1>
 
             <p>
-                Crea una copia completa y cifrada de la instalación actual de Osumi TPV.
+                Crea copias cifradas de la instalación y consulta las almacenadas en TPV Backup.
             </p>
         </div>
 
@@ -75,4 +75,284 @@
         </div>
     </section>
     }
+
+    <section class="management-backups__remote">
+        <header class="management-backups__remote-header">
+            <div>
+                <span class="management-backups__eyebrow">
+                    TPV Backup
+                </span>
+
+                <h2>
+                    Copias remotas
+                </h2>
+
+                <p>
+                    Las credenciales de TPV Backup son independientes
+                    de la TPV Backup key utilizada para cifrar los archivos.
+                </p>
+            </div>
+
+            @if (remoteConnection(); as connection) {
+            <div class="management-backups__remote-actions">
+                <button mat-stroked-button
+                        type="button"
+                        [disabled]="remoteLoading()"
+                        (click)="refreshRemote()">
+                    <mat-icon>refresh</mat-icon>
+
+                    {{ remoteLoading() ? 'Actualizando...' : 'Actualizar' }}
+                </button>
+
+                <button mat-stroked-button
+                        type="button"
+                        (click)="startRemoteConfiguration()">
+                    <mat-icon>key</mat-icon>
+                    Cambiar credenciales
+                </button>
+
+                <button mat-stroked-button
+                        type="button"
+                        [disabled]="remoteRemoving()"
+                        (click)="removeRemoteConfiguration()">
+                    <mat-icon>link_off</mat-icon>
+
+                    {{ remoteRemoving() ? 'Desconectando...' : 'Desconectar' }}
+                </button>
+            </div>
+            }
+        </header>
+
+        @if (remoteError(); as error) {
+        <div class="management-backups__remote-error"
+             role="alert">
+            <mat-icon>error_outline</mat-icon>
+
+            <span>
+                {{ error }}
+            </span>
+        </div>
+        }
+
+        @if (remoteLoading() && remoteConnection() === null) {
+        <div class="management-backups__remote-loading"
+             aria-live="polite">
+            <mat-icon>hourglass_top</mat-icon>
+            Comprobando conexión con TPV Backup...
+        </div>
+        }
+
+        @if (remoteConnection(); as connection) {
+        <section class="management-backups__connection">
+            <div class="management-backups__connection-main">
+                <div class="management-backups__connection-icon">
+                    <mat-icon>cloud_done</mat-icon>
+                </div>
+
+                <div>
+                    <strong>
+                        {{ connection.installation.name }}
+                    </strong>
+
+                    <span>
+                        {{ connection.subscription.name }}
+                    </span>
+                </div>
+            </div>
+
+            <span class="management-backups__status"
+                  [class.management-backups__status--expired]="connection.subscription.status === 'expired'">
+                {{ connection.subscription.status === 'active' ? 'Activa' : 'Caducada' }}
+            </span>
+        </section>
+
+        @if (connection.subscription.status === 'expired') {
+        <div class="management-backups__remote-warning">
+            <mat-icon>warning_amber</mat-icon>
+
+            <span>
+                La suscripción está caducada. Puedes consultar y recuperar
+                las copias existentes, pero no crear nuevas copias remotas.
+            </span>
+        </div>
+        }
+
+        @if (editingRemoteConfiguration()) {
+        <section class="management-backups__configuration">
+            <h3>
+                Cambiar credenciales
+            </h3>
+
+            <p>
+                Las credenciales actuales se conservarán si las nuevas
+                no pueden validarse correctamente.
+            </p>
+
+            <div class="management-backups__configuration-fields">
+                <mat-form-field appearance="outline">
+                    <mat-label>Key ID</mat-label>
+
+                    <input matInput
+                           #remoteKeyIdInput
+                           autocomplete="off"
+                           [value]="remoteKeyId()"
+                           (input)="remoteKeyId.set(remoteKeyIdInput.value)">
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                    <mat-label>Secret</mat-label>
+
+                    <input matInput
+                           #remoteSecretInput
+                           type="password"
+                           autocomplete="off"
+                           [value]="remoteSecret()"
+                           (input)="remoteSecret.set(remoteSecretInput.value)">
+                </mat-form-field>
+            </div>
+
+            <div class="management-backups__configuration-actions">
+                <button mat-flat-button
+                        type="button"
+                        [disabled]="!canConfigureRemote()"
+                        (click)="configureRemote()">
+                    <mat-icon>link</mat-icon>
+
+                    {{ remoteSaving() ? 'Validando...' : 'Guardar credenciales' }}
+                </button>
+
+                <button mat-stroked-button
+                        type="button"
+                        [disabled]="remoteSaving()"
+                        (click)="cancelRemoteConfiguration()">
+                    Cancelar
+                </button>
+            </div>
+        </section>
+        }
+
+        <section class="management-backups__remote-list">
+            <h3>
+                Copias almacenadas
+            </h3>
+
+            @if (remoteBackups().length === 0) {
+            <div class="management-backups__empty">
+                <mat-icon>cloud_queue</mat-icon>
+
+                <span>
+                    No hay copias remotas almacenadas.
+                </span>
+            </div>
+            }
+            @else {
+            <div class="management-backups__table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th scope="col">
+                                Fecha
+                            </th>
+
+                            <th scope="col">
+                                Archivo
+                            </th>
+
+                            <th scope="col">
+                                Versión
+                            </th>
+
+                            <th scope="col"
+                                class="management-backups__numeric">
+                                Tamaño
+                            </th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @for (backup of remoteBackups(); track backup.publicId) {
+                        <tr>
+                            <td>
+                                {{ formatRemoteDate(backup.createdAtClient) }}
+                            </td>
+
+                            <td>
+                                <div class="management-backups__filename">
+                                    <strong>
+                                        {{ backup.originalFilename }}
+                                    </strong>
+
+                                    <small>
+                                        {{ backup.backupId }}
+                                    </small>
+                                </div>
+                            </td>
+
+                            <td>
+                                {{ backup.applicationVersion }}
+                            </td>
+
+                            <td class="management-backups__numeric">
+                                {{ formatSize(backup.sizeBytes) }}
+                            </td>
+                        </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            }
+        </section>
+        }
+        @else if (!remoteLoading()) {
+        <section class="management-backups__configuration">
+            <div class="management-backups__configuration-intro">
+                <mat-icon>cloud_off</mat-icon>
+
+                <div>
+                    <h3>
+                        TPV Backup no está configurado
+                    </h3>
+
+                    <p>
+                        Introduce las credenciales asignadas a esta instalación.
+                        El secret se almacenará cifrado en el equipo y no se incluirá
+                        en las copias .otpv.
+                    </p>
+                </div>
+            </div>
+
+            <div class="management-backups__configuration-fields">
+                <mat-form-field appearance="outline">
+                    <mat-label>Key ID</mat-label>
+
+                    <input matInput
+                           #remoteKeyIdInput
+                           autocomplete="off"
+                           [value]="remoteKeyId()"
+                           (input)="remoteKeyId.set(remoteKeyIdInput.value)">
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                    <mat-label>Secret</mat-label>
+
+                    <input matInput
+                           #remoteSecretInput
+                           type="password"
+                           autocomplete="off"
+                           [value]="remoteSecret()"
+                           (input)="remoteSecret.set(remoteSecretInput.value)">
+                </mat-form-field>
+            </div>
+
+            <button mat-flat-button
+                    type="button"
+                    [disabled]="!canConfigureRemote()"
+                    (click)="configureRemote()">
+                <mat-icon>link</mat-icon>
+
+                {{ remoteSaving() ? 'Validando...' : 'Conectar con TPV Backup' }}
+            </button>
+        </section>
+        }
+    </section>
 </section>
