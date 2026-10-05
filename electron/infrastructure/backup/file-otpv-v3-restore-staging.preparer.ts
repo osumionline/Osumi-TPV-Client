@@ -4,6 +4,7 @@ import type OtpvV3RestoreStagingPreparer from '@backend/contracts/backup/otpv-v3
 import type OtpvV3RestoreWorkspace from '@backend/contracts/backup/otpv-v3-restore-workspace.interface';
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
+import type { BackupRemoteCredentials } from '@desktop-contracts/backup/backup-remote.interface';
 import type { InstallationSecretsData } from '@desktop-contracts/configuration/installation-command.interface';
 import { mkdir, readFile, rename, rm } from 'node:fs/promises';
 
@@ -33,7 +34,10 @@ export default class FileOtpvV3RestoreStagingPreparer implements OtpvV3RestoreSt
    * Reconstruye los secretos locales y mueve
    * los recursos portables al staging canónico.
    */
-  async prepare(workspace: OtpvV3RestoreWorkspace, backupApiKey: string): Promise<void> {
+  async prepare(
+    workspace: OtpvV3RestoreWorkspace,
+    backupApiKey: string,
+  ): Promise<BackupRemoteCredentials | null> {
     try {
       if (backupApiKey.length === 0) {
         throw new Error('La TPV Backup key no puede estar vacía al preparar la restauración.');
@@ -90,6 +94,13 @@ export default class FileOtpvV3RestoreStagingPreparer implements OtpvV3RestoreSt
        * ni ningún resto de restore-work.
        */
       await workspace.clear();
+
+      return portableSecrets.backupRemoteCredentials === null
+        ? null
+        : {
+            keyId: portableSecrets.backupRemoteCredentials.keyId,
+            secret: portableSecrets.backupRemoteCredentials.secret,
+          };
     } catch (error: unknown) {
       await this.cleanAfterError(workspace);
 

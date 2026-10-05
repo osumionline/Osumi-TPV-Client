@@ -8,4 +8,5 @@ export default interface LegacyImportStartResult {
   readonly skippedRows: number;
   readonly warningCount: number;
   readonly defaultedEmployeePasswords: number;
+  readonly requiresBackupRemoteCredentials: boolean;
 }

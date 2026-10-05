@@ -793,17 +793,70 @@
       </mat-radio-group>
 
       <p>
+        <strong>TPV Backup</strong>
+      </p>
+
+      <p>
         Si tienes una suscripción con TPV Backup,
-        introduce la clave API para realizar las copias de
-        seguridad.
+        introduce los datos asignados a esta instalación.
+        La TPV Backup key cifra las copias, mientras que
+        el Key ID y el Secret permiten acceder al servicio remoto.
       </p>
 
       <div class="row">
-        <mat-form-field class="three">
-          <mat-label>Backup API key</mat-label>
+        <mat-form-field class="three otpv-mat-field--transparent-subscript">
+          <mat-label>TPV Backup key</mat-label>
+
           <input matInput
-                 placeholder="Backup API key"
+                 placeholder="TPV Backup key"
+                 autocomplete="off"
                  [formField]="installationForm.opciones.backupApiKey">
+
+          @if (
+          installationForm.opciones.backupApiKey().touched() &&
+          installationForm.opciones.backupApiKey().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.opciones.backupApiKey().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field class="three otpv-mat-field--transparent-subscript">
+          <mat-label>Key ID</mat-label>
+
+          <input matInput
+                 placeholder="Key ID"
+                 autocomplete="off"
+                 [formField]="installationForm.backupRemote.keyId">
+
+          @if (
+          installationForm.backupRemote.keyId().touched() &&
+          installationForm.backupRemote.keyId().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.backupRemote.keyId().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field class="three otpv-mat-field--transparent-subscript">
+          <mat-label>Secret</mat-label>
+
+          <input matInput
+                 type="password"
+                 placeholder="Secret"
+                 autocomplete="off"
+                 [formField]="installationForm.backupRemote.secret">
+
+          @if (
+          installationForm.backupRemote.secret().touched() &&
+          installationForm.backupRemote.secret().invalid()
+          ) {
+          <mat-error>
+            {{ installationForm.backupRemote.secret().errors()[0]?.message }}
+          </mat-error>
+          }
         </mat-form-field>
       </div>
 

@@ -1,16 +1,23 @@
 import OtpvV3RestoreFinalizeService from '@backend/application/backup/otpv-v3-restore-finalize.service';
+import type BackupRemoteCredentialStorage from '@backend/contracts/backup/backup-remote-credential-storage.interface';
 import type { OtpvV3Manifest } from '@backend/contracts/backup/otpv-v3-manifest.interface';
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
 import type InstallationFinalizer from '@backend/contracts/configuration/installation-finalizer.interface';
 import type PrintingSettingsRepository from '@backend/contracts/printing/printing-settings.repository.interface';
 import { OTPV_V3_FORMAT_VERSION } from '@backend/domain/backup/otpv-v3.constants';
 import { DATABASE_SCHEMA_VERSION } from '@backend/domain/database/database-schema.constants';
+import type { BackupRemoteCredentials } from '@desktop-contracts/backup/backup-remote.interface';
 import type BackupRestoreFinalizeResult from '@desktop-contracts/backup/backup-restore-finalize-result.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type PrintingSettings from '@desktop-contracts/configuration/printing/printing-settings.interface';
 import InMemoryOtpvV3PreparedRestoreStore from '@infrastructure/backup/in-memory-otpv-v3-prepared-restore.store';
 import InMemoryOtpvV3RestoreSelectionStore from '@infrastructure/backup/in-memory-otpv-v3-restore-selection.store';
 import { describe, expect, it } from 'vitest';
+
+const REMOTE_CREDENTIALS: BackupRemoteCredentials = {
+  keyId: 'remote-key-id',
+  secret: 'remote-secret',
+};
 
 describe('OtpvV3RestoreFinalizeService', (): void => {
   it('promueve la restauración preparada e invalida su estado', async (): Promise<void> => {
@@ -28,6 +35,7 @@ describe('OtpvV3RestoreFinalizeService', (): void => {
     preparedStore.save({
       selectionId,
       backupId: manifest.backupId,
+      backupRemoteCredentials: REMOTE_CREDENTIALS,
     });
 
     const appDataRepository = new TestAppDataRepository();
@@ -36,15 +44,22 @@ describe('OtpvV3RestoreFinalizeService', (): void => {
 
     const finalizer = new TestInstallationFinalizer();
 
+    const backupRemoteCredentialStorage = new TestBackupRemoteCredentialStorage();
+
     const service = new OtpvV3RestoreFinalizeService(
       selectionStore,
       preparedStore,
       appDataRepository,
       printingSettingsRepository,
+      backupRemoteCredentialStorage,
       finalizer,
     );
 
     const result: BackupRestoreFinalizeResult = await service.finalize(selectionId);
+
+    expect(backupRemoteCredentialStorage.value).toEqual(REMOTE_CREDENTIALS);
+    expect(backupRemoteCredentialStorage.saveCalls).toBe(1);
+    expect(backupRemoteCredentialStorage.deleteCalls).toBe(0);
 
     expect(result).toEqual({
       status: 'installed',
@@ -77,11 +92,14 @@ describe('OtpvV3RestoreFinalizeService', (): void => {
 
     const finalizer = new TestInstallationFinalizer();
 
+    const backupRemoteCredentialStorage = new TestBackupRemoteCredentialStorage();
+
     const service = new OtpvV3RestoreFinalizeService(
       selectionStore,
       new InMemoryOtpvV3PreparedRestoreStore(),
       new TestAppDataRepository(),
       new TestPrintingSettingsRepository(),
+      backupRemoteCredentialStorage,
       finalizer,
     );
 
@@ -107,15 +125,19 @@ describe('OtpvV3RestoreFinalizeService', (): void => {
     preparedStore.save({
       selectionId: 'otra-seleccion',
       backupId: manifest.backupId,
+      backupRemoteCredentials: REMOTE_CREDENTIALS,
     });
 
     const finalizer = new TestInstallationFinalizer();
+
+    const backupRemoteCredentialStorage = new TestBackupRemoteCredentialStorage();
 
     const service = new OtpvV3RestoreFinalizeService(
       selectionStore,
       preparedStore,
       new TestAppDataRepository(),
       new TestPrintingSettingsRepository(),
+      backupRemoteCredentialStorage,
       finalizer,
     );
 
@@ -141,6 +163,7 @@ describe('OtpvV3RestoreFinalizeService', (): void => {
     preparedStore.save({
       selectionId,
       backupId: manifest.backupId,
+      backupRemoteCredentials: REMOTE_CREDENTIALS,
     });
 
     const appDataRepository = new TestAppDataRepository();
@@ -151,11 +174,14 @@ describe('OtpvV3RestoreFinalizeService', (): void => {
 
     const printingSettingsRepository = new TestPrintingSettingsRepository();
 
+    const backupRemoteCredentialStorage = new TestBackupRemoteCredentialStorage();
+
     const service = new OtpvV3RestoreFinalizeService(
       selectionStore,
       preparedStore,
       appDataRepository,
       printingSettingsRepository,
+      backupRemoteCredentialStorage,
       finalizer,
     );
 
@@ -180,23 +206,31 @@ describe('OtpvV3RestoreFinalizeService', (): void => {
     preparedStore.save({
       selectionId,
       backupId: manifest.backupId,
+      backupRemoteCredentials: REMOTE_CREDENTIALS,
     });
 
     const finalizer = new TestInstallationFinalizer();
 
     finalizer.finalizeError = new Error('Falló una promoción.');
 
+    const backupRemoteCredentialStorage = new TestBackupRemoteCredentialStorage();
+
     const service = new OtpvV3RestoreFinalizeService(
       selectionStore,
       preparedStore,
       new TestAppDataRepository(),
       new TestPrintingSettingsRepository(),
+      backupRemoteCredentialStorage,
       finalizer,
     );
 
     await expect(service.finalize(selectionId)).rejects.toThrow(
       'No se ha podido completar la restauración',
     );
+
+    expect(backupRemoteCredentialStorage.saveCalls).toBe(1);
+    expect(backupRemoteCredentialStorage.deleteCalls).toBe(1);
+    expect(backupRemoteCredentialStorage.value).toBeNull();
 
     expect(finalizer.finalizeCalls).toBe(1);
     expect(finalizer.recoverCalls).toBe(1);
@@ -339,5 +373,54 @@ class TestInstallationFinalizer implements InstallationFinalizer {
     }
 
     return Promise.resolve();
+  }
+}
+
+/**
+ * Storage remoto controlado utilizado
+ * durante los tests de restauración.
+ */
+class TestBackupRemoteCredentialStorage implements BackupRemoteCredentialStorage {
+  value: BackupRemoteCredentials | null = null;
+
+  saveCalls: number = 0;
+  deleteCalls: number = 0;
+
+  /**
+   * Indica si existen credenciales almacenadas.
+   */
+  async exists(): Promise<boolean> {
+    return this.value !== null;
+  }
+
+  /**
+   * Recupera las credenciales almacenadas.
+   */
+  async load(): Promise<BackupRemoteCredentials | null> {
+    return this.value === null
+      ? null
+      : {
+          ...this.value,
+        };
+  }
+
+  /**
+   * Guarda las credenciales restauradas.
+   */
+  async save(credentials: BackupRemoteCredentials): Promise<void> {
+    this.saveCalls++;
+
+    this.value = {
+      ...credentials,
+    };
+  }
+
+  /**
+   * Elimina las credenciales almacenadas.
+   */
+  async delete(): Promise<void> {
+    this.deleteCalls++;
+
+    this.value = null;
   }
 }

@@ -19,6 +19,7 @@ import { MatRadioModule } from '@angular/material/radio';
 import { MatSelectModule } from '@angular/material/select';
 import { MatToolbar } from '@angular/material/toolbar';
 import { Router } from '@angular/router';
+import { BackupRemoteCredentials } from '@desktop-contracts/backup/backup-remote.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type {
   InstallationResult,
@@ -32,8 +33,10 @@ import installationFormSchema from '@model/configuracion/installation-form.schem
 import InstallationStep from '@model/configuracion/installation-step.type';
 import { DialogService } from '@osumi/angular-tools';
 import ApplicationStateService from '@services/application/application-state.service';
+import DesktopBackupService from '@services/application/desktop-backup.service';
 import DesktopConfigurationService from '@services/application/desktop-configuration.service';
 import DesktopPrintingService from '@services/application/desktop-printing.service';
+import { getErrorMessage } from '@utils/error.utils';
 import { firstValueFrom } from 'rxjs';
 
 @Component({
@@ -64,6 +67,7 @@ export default class NewInstallationComponent {
   private readonly applicationStateService: ApplicationStateService =
     inject(ApplicationStateService);
   private readonly desktopPrintingService: DesktopPrintingService = inject(DesktopPrintingService);
+  private readonly desktopBackupService: DesktopBackupService = inject(DesktopBackupService);
 
   private readonly acceptedLogoTypes: readonly string[] = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -285,12 +289,41 @@ export default class NewInstallationComponent {
       this.logoMimeType(),
     );
 
+    const remoteCredentials: BackupRemoteCredentials | null = this.getRemoteBackupCredentials();
+
+    let remoteConfigured: boolean = false;
+    let installationCompleted: boolean = false;
+
     this.saving.set(true);
 
     try {
+      if (remoteCredentials !== null) {
+        try {
+          await this.desktopBackupService.configureRemote(remoteCredentials);
+
+          remoteConfigured = true;
+        } catch (error: unknown) {
+          console.error('Error validando las credenciales de TPV Backup:', error);
+
+          this.dialog.alert({
+            title: 'Error',
+            content: getErrorMessage(
+              error,
+              'No se han podido validar las credenciales de TPV Backup.',
+            ),
+          });
+
+          return;
+        }
+      }
+
       const result: InstallationResult = await this.desktopConfigurationService.install(command);
 
       if (result.status !== 'installed') {
+        if (remoteConfigured) {
+          await this.rollbackRemoteBackupConfiguration();
+        }
+
         const validationMessage: string = this.getValidationMessage(result.validationErrors);
 
         this.dialog.alert({
@@ -300,6 +333,8 @@ export default class NewInstallationComponent {
 
         return;
       }
+
+      installationCompleted = true;
 
       const printerSaved: boolean = await this.saveTicketPrinterConfiguration();
 
@@ -319,6 +354,10 @@ export default class NewInstallationComponent {
 
       await this.router.navigateByUrl('/ventas');
     } catch (error: unknown) {
+      if (remoteConfigured && !installationCompleted) {
+        await this.rollbackRemoteBackupConfiguration();
+      }
+
       console.error('Error comunicando con el backend:', error);
 
       this.dialog.alert({
@@ -347,6 +386,7 @@ export default class NewInstallationComponent {
       case 3: {
         this.installationForm.ventaOnline().markAsTouched();
         this.installationForm.opciones().markAsTouched();
+        this.installationForm.backupRemote().markAsTouched();
         this.installationForm.emailSmtp().markAsTouched();
         this.installationForm.ticketEmail().markAsTouched();
         this.installationForm.ticketBai().markAsTouched();
@@ -373,6 +413,7 @@ export default class NewInstallationComponent {
       this.installationForm.emailSmtp().invalid() ||
       this.installationForm.ticketEmail().invalid() ||
       this.installationForm.ticketBai().invalid() ||
+      this.installationForm.backupRemote().invalid() ||
       this.installationForm.opciones().invalid()
     );
   }
@@ -389,6 +430,39 @@ export default class NewInstallationComponent {
     }
 
     this.paso.set(3);
+  }
+
+  /**
+   * Obtiene las credenciales remotas introducidas
+   * durante la instalación.
+   *
+   * Devuelve null cuando TPV Backup no se ha configurado.
+   */
+  private getRemoteBackupCredentials(): BackupRemoteCredentials | null {
+    const keyId: string = this.installationModel().backupRemote.keyId;
+
+    const secret: string = this.installationModel().backupRemote.secret;
+
+    if (keyId === '' && secret === '') {
+      return null;
+    }
+
+    return {
+      keyId,
+      secret,
+    };
+  }
+
+  /**
+   * Elimina una configuración remota creada durante
+   * un intento de instalación que finalmente ha fallado.
+   */
+  private async rollbackRemoteBackupConfiguration(): Promise<void> {
+    try {
+      await this.desktopBackupService.removeRemoteConfiguration();
+    } catch (error: unknown) {
+      console.error('No se ha podido revertir la configuración de TPV Backup:', error);
+    }
   }
 
   private readFileAsDataUrl(file: File): Promise<string> {
@@ -419,6 +493,8 @@ export default class NewInstallationComponent {
     this.installationForm.empleado.confirmPassword().value.set('');
     this.installationForm.ventaOnline.secretApi().value.set('');
     this.installationForm.opciones.backupApiKey().value.set('');
+    this.installationForm.backupRemote.keyId().value.set('');
+    this.installationForm.backupRemote.secret().value.set('');
     this.installationForm.negocio.logoDataUrl().value.set('');
     this.installationForm.emailSmtp.pass().value.set('');
     this.installationForm.ticketBai.token().value.set('');

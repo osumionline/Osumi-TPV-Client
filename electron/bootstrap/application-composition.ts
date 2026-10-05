@@ -272,11 +272,17 @@ export default function createApplicationComposition(
 
   const backupCrypto: OtpvV3Crypto = new NodeOtpvV3Crypto();
 
+  const backupRemoteCredentialStorage: BackupRemoteCredentialStorage =
+    new ElectronSafeStorageBackupRemoteCredentialStorage(
+      applicationPaths.backupRemoteCredentialsFile,
+    );
+
   const backupPayloadBuilder: OtpvV3PayloadBuilder = new YazlOtpvV3PayloadBuilder(
     applicationPaths,
     databaseSnapshot,
     appDataRepository,
     operationalSecretStorage,
+    backupRemoteCredentialStorage,
     backupCrypto,
   );
 
@@ -290,11 +296,6 @@ export default function createApplicationComposition(
     operationalSecretStorage,
     backupPackageBuilder,
   );
-
-  const backupRemoteCredentialStorage: BackupRemoteCredentialStorage =
-    new ElectronSafeStorageBackupRemoteCredentialStorage(
-      applicationPaths.backupRemoteCredentialsFile,
-    );
 
   const backupRemoteClient: BackupRemoteClient = new HttpBackupRemoteClient(
     'https://apitpvbackup.osumi.dev/api/v1',
@@ -812,6 +813,7 @@ export default function createApplicationComposition(
       otpvV3PreparedRestoreStore,
       appDataRepository,
       printingSettingsRepository,
+      backupRemoteCredentialStorage,
       installationFinalizer,
     );
 

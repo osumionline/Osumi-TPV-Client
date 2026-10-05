@@ -39,7 +39,12 @@ describe('FileOtpvV3RestoreStagingPreparer', (): void => {
 
     const preparer = new FileOtpvV3RestoreStagingPreparer(paths, secretStorage);
 
-    await preparer.prepare(workspace, BACKUP_KEY);
+    const backupRemoteCredentials = await preparer.prepare(workspace, BACKUP_KEY);
+
+    expect(backupRemoteCredentials).toEqual({
+      keyId: 'remote-key-id',
+      secret: 'remote-secret',
+    });
 
     expect(secretStorage.savedSecrets).toEqual({
       secretApi: 'secret-api',
@@ -158,6 +163,10 @@ async function createWorkspaceFixture(workspace: FileOtpvV3RestoreWorkspace): Pr
           secretApi: 'secret-api',
           emailSmtpPass: 'smtp-password',
           ticketBaiToken: 'ticketbai-token',
+          backupRemoteCredentials: {
+            keyId: 'remote-key-id',
+            secret: 'remote-secret',
+          },
         },
         null,
         2,

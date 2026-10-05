@@ -211,6 +211,9 @@ export default class LegacyImportService {
           startedAt,
         );
 
+      const requiresBackupRemoteCredentials: boolean =
+        packageConfiguration.secrets.backupApiKey !== '';
+
       const command: LegacyImportExecutionCommand = {
         selectionId,
         packagePath: selection.packagePath,
@@ -269,6 +272,7 @@ export default class LegacyImportService {
         ...stagingResult,
         status: 'installed',
         completedAt,
+        requiresBackupRemoteCredentials,
       };
 
       this.selectionStore.setExecutionResult(selectionId, result);

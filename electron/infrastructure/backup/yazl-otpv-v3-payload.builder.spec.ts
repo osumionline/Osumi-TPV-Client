@@ -1,7 +1,9 @@
+import type BackupRemoteCredentialStorage from '@backend/contracts/backup/backup-remote-credential-storage.interface';
 import type DatabaseSnapshot from '@backend/contracts/backup/database-snapshot.interface';
 import type { OtpvV3EncryptionResult } from '@backend/contracts/backup/otpv-v3-crypto.interface';
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
+import type { BackupRemoteCredentials } from '@desktop-contracts/backup/backup-remote.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { InstallationSecretsData } from '@desktop-contracts/configuration/installation-command.interface';
 import NodeOtpvV3Crypto from '@infrastructure/backup/node-otpv-v3-crypto';
@@ -147,6 +149,10 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
       databaseSnapshot,
       appDataRepository,
       secretStorage,
+      new TestBackupRemoteCredentialStorage({
+        keyId: 'remote-key-id',
+        secret: 'remote-secret',
+      }),
       crypto,
     );
 
@@ -214,6 +220,10 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
       secretApi: 'secret-api',
       emailSmtpPass: 'smtp-password',
       ticketBaiToken: null,
+      backupRemoteCredentials: {
+        keyId: 'remote-key-id',
+        secret: 'remote-secret',
+      },
     });
     expect(portableSecrets).not.toHaveProperty('backupApiKey');
 
@@ -271,6 +281,10 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
       new BetterSqlite3DatabaseSnapshot(currentPaths.databaseFile),
       new JsonAppDataRepository(currentPaths.appDataFile),
       new TestSecretStorage(createSecrets()),
+      new TestBackupRemoteCredentialStorage({
+        keyId: 'remote-key-id',
+        secret: 'remote-secret',
+      }),
       crypto,
     );
 
@@ -588,5 +602,50 @@ class RecordingDatabaseSnapshot implements DatabaseSnapshot {
     this.destinationFile = destinationFile;
 
     await this.delegate.create(destinationFile);
+  }
+}
+
+/**
+ * Almacenamiento remoto en memoria utilizado
+ * exclusivamente por los tests del payload.
+ */
+class TestBackupRemoteCredentialStorage implements BackupRemoteCredentialStorage {
+  /**
+   * Crea el storage con las credenciales indicadas.
+   */
+  constructor(private credentials: BackupRemoteCredentials | null) {}
+
+  /**
+   * Indica si existen credenciales.
+   */
+  async exists(): Promise<boolean> {
+    return this.credentials !== null;
+  }
+
+  /**
+   * Recupera las credenciales configuradas.
+   */
+  async load(): Promise<BackupRemoteCredentials | null> {
+    return this.credentials === null
+      ? null
+      : {
+          ...this.credentials,
+        };
+  }
+
+  /**
+   * Guarda las credenciales indicadas.
+   */
+  async save(credentials: BackupRemoteCredentials): Promise<void> {
+    this.credentials = {
+      ...credentials,
+    };
+  }
+
+  /**
+   * Elimina las credenciales configuradas.
+   */
+  async delete(): Promise<void> {
+    this.credentials = null;
   }
 }

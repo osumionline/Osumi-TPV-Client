@@ -17,6 +17,7 @@ import type OtpvPackageInspection from '@backend/domain/backup/otpv-package-insp
 import type OtpvV3PayloadInspection from '@backend/domain/backup/otpv-v3-payload-inspection.interface';
 import { OTPV_V3_FORMAT_VERSION } from '@backend/domain/backup/otpv-v3.constants';
 import { DATABASE_SCHEMA_VERSION } from '@backend/domain/database/database-schema.constants';
+import type { BackupRemoteCredentials } from '@desktop-contracts/backup/backup-remote.interface';
 import type BackupRestoreUnlockResult from '@desktop-contracts/backup/backup-restore-unlock-result.interface';
 import InMemoryOtpvV3PreparedRestoreStore from '@infrastructure/backup/in-memory-otpv-v3-prepared-restore.store';
 import InMemoryOtpvV3RestoreSelectionStore from '@infrastructure/backup/in-memory-otpv-v3-restore-selection.store';
@@ -98,6 +99,10 @@ describe('OtpvV3RestoreUnlockService', (): void => {
     expect(preparedRestoreStore.resolve()).toEqual({
       selectionId,
       backupId: manifest.backupId,
+      backupRemoteCredentials: {
+        keyId: 'remote-key-id',
+        secret: 'remote-secret',
+      },
     });
   });
 
@@ -711,6 +716,10 @@ class TestRestoreStagingPreparer implements OtpvV3RestoreStagingPreparer {
   backupApiKey: string | null = null;
   preparationError: Error | null = null;
   clearCalls: number = 0;
+  backupRemoteCredentials: BackupRemoteCredentials | null = {
+    keyId: 'remote-key-id',
+    secret: 'remote-secret',
+  };
 
   /**
    * Registra la limpieza del staging canónico.
@@ -724,7 +733,10 @@ class TestRestoreStagingPreparer implements OtpvV3RestoreStagingPreparer {
   /**
    * Registra la preparación solicitada.
    */
-  prepare(workspace: OtpvV3RestoreWorkspace, backupApiKey: string): Promise<void> {
+  prepare(
+    workspace: OtpvV3RestoreWorkspace,
+    backupApiKey: string,
+  ): Promise<BackupRemoteCredentials | null> {
     this.calls += 1;
     this.workspace = workspace;
     this.backupApiKey = backupApiKey;
@@ -733,6 +745,12 @@ class TestRestoreStagingPreparer implements OtpvV3RestoreStagingPreparer {
       return Promise.reject(this.preparationError);
     }
 
-    return Promise.resolve();
+    return Promise.resolve(
+      this.backupRemoteCredentials === null
+        ? null
+        : {
+            ...this.backupRemoteCredentials,
+          },
+    );
   }
 }

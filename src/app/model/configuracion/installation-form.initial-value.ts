@@ -164,6 +164,11 @@ export default function createInstallationFormInitialValue(): InstallationFormMo
       token: '',
     },
 
+    backupRemote: {
+      keyId: '',
+      secret: '',
+    },
+
     opciones: {
       backupApiKey: '',
       fechaCaducidad: false,

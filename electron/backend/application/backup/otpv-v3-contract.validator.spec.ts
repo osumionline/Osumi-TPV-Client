@@ -136,19 +136,45 @@ describe('OTPV v3 contract validator', (): void => {
     expect((): void => assertOtpvV3ManifestCompatible(manifest)).toThrow('versión de esquema');
   });
 
-  it('valida los secretos portables sin incluir la TPV Backup key', (): void => {
+  it('valida los secretos portables incluyendo las credenciales remotas', (): void => {
     expect(
       validateOtpvV3PortableSecrets({
         schemaVersion: 1,
         secretApi: '',
         emailSmtpPass: null,
         ticketBaiToken: null,
+        backupRemoteCredentials: {
+          keyId: 'remote-key-id',
+          secret: 'remote-secret',
+        },
       }),
     ).toEqual({
       schemaVersion: 1,
       secretApi: '',
       emailSmtpPass: null,
       ticketBaiToken: null,
+      backupRemoteCredentials: {
+        keyId: 'remote-key-id',
+        secret: 'remote-secret',
+      },
+    });
+  });
+
+  it('admite una instalación sin credenciales remotas', (): void => {
+    expect(
+      validateOtpvV3PortableSecrets({
+        schemaVersion: 1,
+        secretApi: '',
+        emailSmtpPass: null,
+        ticketBaiToken: null,
+        backupRemoteCredentials: null,
+      }),
+    ).toEqual({
+      schemaVersion: 1,
+      secretApi: '',
+      emailSmtpPass: null,
+      ticketBaiToken: null,
+      backupRemoteCredentials: null,
     });
   });
 
@@ -160,6 +186,7 @@ describe('OTPV v3 contract validator', (): void => {
         backupApiKey: 'no-debe-viajar-en-el-backup',
         emailSmtpPass: null,
         ticketBaiToken: null,
+        backupRemoteCredentials: null,
       });
     }).toThrow('secrets/secrets.json no tiene la estructura exacta esperada.');
   });

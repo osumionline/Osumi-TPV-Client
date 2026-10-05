@@ -220,6 +220,7 @@ async function run(): Promise<void> {
       skippedRows: executionSummary.skippedRows,
       warningCount: executionSummary.warningCount,
       defaultedEmployeePasswords: executionSummary.defaultedEmployeePasswords,
+      requiresBackupRemoteCredentials: false,
     };
 
     const message: LegacyImportWorkerMessage = {

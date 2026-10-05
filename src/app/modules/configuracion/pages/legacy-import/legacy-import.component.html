@@ -406,6 +406,32 @@
                 </div>
                 }
 
+                @if (result.requiresBackupRemoteCredentials) {
+                <div class="import-staging-ready__warning"
+                     role="alert">
+                    <mat-icon aria-hidden="true">
+                        cloud_sync
+                    </mat-icon>
+
+                    <div>
+                        <strong>
+                            Completa la configuración de TPV Backup
+                        </strong>
+
+                        <p>
+                            Se ha recuperado la TPV Backup key de la instalación anterior,
+                            pero este formato de exportación no contiene el Key ID ni el Secret
+                            necesarios para acceder al servicio remoto.
+                        </p>
+
+                        <p>
+                            Cuando accedas a la aplicación, introdúcelos desde
+                            Gestión → Copias de seguridad.
+                        </p>
+                    </div>
+                </div>
+                }
+
                 @if (
                 result.warningCount -
                 result.defaultedEmployeePasswords >

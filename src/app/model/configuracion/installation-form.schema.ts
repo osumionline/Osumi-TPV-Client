@@ -243,6 +243,39 @@ export default function installationFormSchema(path: SchemaPathTree<Installation
       };
     }
   });
+
+  // Paso 3: TPV Backup
+
+  required(path.opciones.backupApiKey, {
+    message: 'La TPV Backup key es obligatoria cuando configuras TPV Backup.',
+    when: ({ valueOf }): boolean =>
+      valueOf(path.backupRemote.keyId).trim() !== '' || valueOf(path.backupRemote.secret) !== '',
+  });
+
+  required(path.backupRemote.keyId, {
+    message: 'El Key ID de TPV Backup es obligatorio.',
+    when: ({ valueOf }): boolean =>
+      valueOf(path.opciones.backupApiKey) !== '' || valueOf(path.backupRemote.secret) !== '',
+  });
+
+  required(path.backupRemote.secret, {
+    message: 'El Secret de TPV Backup es obligatorio.',
+    when: ({ valueOf }): boolean =>
+      valueOf(path.opciones.backupApiKey) !== '' || valueOf(path.backupRemote.keyId).trim() !== '',
+  });
+
+  validate(path.backupRemote.keyId, ({ value }) => {
+    const keyId: string = value();
+
+    if (keyId !== '' && keyId.trim() === '') {
+      return {
+        kind: 'invalidBackupRemoteKeyId',
+        message: 'El Key ID de TPV Backup no es válido.',
+      };
+    }
+
+    return null;
+  });
 }
 
 /**

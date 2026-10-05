@@ -269,8 +269,8 @@ class TestRestoreStagingPreparer implements OtpvV3RestoreStagingPreparer {
   /**
    * No se prepara staging en estos tests.
    */
-  prepare(): Promise<void> {
-    return Promise.resolve();
+  prepare(): Promise<null> {
+    return Promise.resolve(null);
   }
 
   /**

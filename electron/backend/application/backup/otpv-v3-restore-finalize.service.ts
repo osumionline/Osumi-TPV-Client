@@ -1,3 +1,4 @@
+import type BackupRemoteCredentialStorage from '@backend/contracts/backup/backup-remote-credential-storage.interface';
 import type OtpvV3PreparedRestoreStore from '@backend/contracts/backup/otpv-v3-prepared-restore-store.interface';
 import type OtpvV3RestoreSelectionStore from '@backend/contracts/backup/otpv-v3-restore-selection-store.interface';
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
@@ -5,6 +6,7 @@ import type InstallationFinalizer from '@backend/contracts/configuration/install
 import type PrintingSettingsRepository from '@backend/contracts/printing/printing-settings.repository.interface';
 import type OtpvV3PreparedRestore from '@backend/domain/backup/otpv-v3-prepared-restore.interface';
 import type OtpvV3RestoreSelection from '@backend/domain/backup/otpv-v3-restore-selection.interface';
+import type { BackupRemoteCredentials } from '@desktop-contracts/backup/backup-remote.interface';
 import type BackupRestoreFinalizeResult from '@desktop-contracts/backup/backup-restore-finalize-result.interface';
 
 /**
@@ -22,6 +24,7 @@ export default class OtpvV3RestoreFinalizeService {
     private readonly preparedRestoreStore: OtpvV3PreparedRestoreStore,
     private readonly appDataRepository: AppDataRepository,
     private readonly printingSettingsRepository: PrintingSettingsRepository,
+    private readonly backupRemoteCredentialStorage: BackupRemoteCredentialStorage,
     private readonly installationFinalizer: InstallationFinalizer,
   ) {}
 
@@ -69,6 +72,8 @@ export default class OtpvV3RestoreFinalizeService {
         ticketPrinterDeviceName: null,
       });
 
+      await this.restoreRemoteCredentials(preparedRestore.backupRemoteCredentials);
+
       await this.installationFinalizer.finalize();
 
       this.preparedRestoreStore.clear();
@@ -83,13 +88,44 @@ export default class OtpvV3RestoreFinalizeService {
     } catch (error: unknown) {
       this.preparedRestoreStore.clear();
 
-      await this.recoverSafely();
+      await Promise.all([this.clearRemoteCredentialsSafely(), this.recoverSafely()]);
 
       throw new Error('No se ha podido completar la restauración de la copia de seguridad.', {
         cause: error,
       });
     } finally {
       this.activeSelectionId = null;
+    }
+  }
+
+  /**
+   * Restaura la configuración remota incluida
+   * dentro del backup.
+   */
+  private async restoreRemoteCredentials(
+    credentials: BackupRemoteCredentials | null,
+  ): Promise<void> {
+    if (credentials === null) {
+      await this.backupRemoteCredentialStorage.delete();
+
+      return;
+    }
+
+    await this.backupRemoteCredentialStorage.save({
+      keyId: credentials.keyId,
+      secret: credentials.secret,
+    });
+  }
+
+  /**
+   * Elimina de forma segura una credencial remota
+   * restaurada durante una finalización fallida.
+   */
+  private async clearRemoteCredentialsSafely(): Promise<void> {
+    try {
+      await this.backupRemoteCredentialStorage.delete();
+    } catch (error: unknown) {
+      console.error('No se han podido limpiar las credenciales restauradas de TPV Backup:', error);
     }
   }
 

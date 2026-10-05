@@ -99,11 +99,15 @@ export default class OtpvV3RestoreUnlockService {
 
       await this.workspace.removeDecryptedPayload();
 
-      await this.restoreStagingPreparer.prepare(this.workspace, command.backupApiKey);
+      const backupRemoteCredentials = await this.restoreStagingPreparer.prepare(
+        this.workspace,
+        command.backupApiKey,
+      );
 
       this.preparedRestoreStore.save({
         selectionId: command.selectionId,
         backupId: selection.manifest.backupId,
+        backupRemoteCredentials,
       });
 
       return {

@@ -84,6 +84,11 @@ export interface InstallationOptionsFormModel {
   fechaCaducidad: boolean;
 }
 
+export interface InstallationBackupRemoteFormModel {
+  keyId: string;
+  secret: string;
+}
+
 export interface InstallationFormModel {
   negocio: InstallationBusinessFormModel;
   empleado: InstallationEmployeeFormModel;
@@ -95,5 +100,6 @@ export interface InstallationFormModel {
   emailSmtp: InstallationEmailSmtpFormModel;
   ticketEmail: InstallationTicketEmailFormModel;
   ticketBai: InstallationTicketBaiFormModel;
+  backupRemote: InstallationBackupRemoteFormModel;
   opciones: InstallationOptionsFormModel;
 }

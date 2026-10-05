@@ -26,6 +26,7 @@ import {
   OTPV_V3_SCRYPT_PARALLELIZATION,
 } from '@backend/domain/backup/otpv-v3.constants';
 import { DATABASE_SCHEMA_VERSION } from '@backend/domain/database/database-schema.constants';
+import type { BackupRemoteCredentials } from '@desktop-contracts/backup/backup-remote.interface';
 import { TextDecoder } from 'node:util';
 
 const BASE64_PATTERN: RegExp = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
@@ -171,7 +172,7 @@ export function validateOtpvV3PortableSecrets(value: unknown): OtpvV3PortableSec
 
   assertExactKeys(
     value,
-    ['schemaVersion', 'secretApi', 'emailSmtpPass', 'ticketBaiToken'],
+    ['schemaVersion', 'secretApi', 'emailSmtpPass', 'ticketBaiToken', 'backupRemoteCredentials'],
     'secrets/secrets.json',
   );
 
@@ -196,11 +197,48 @@ export function validateOtpvV3PortableSecrets(value: unknown): OtpvV3PortableSec
     'secrets/secrets.json',
   );
 
+  const backupRemoteCredentials: BackupRemoteCredentials | null = validateBackupRemoteCredentials(
+    value['backupRemoteCredentials'],
+  );
+
   return {
     schemaVersion,
     secretApi,
     emailSmtpPass,
     ticketBaiToken,
+    backupRemoteCredentials,
+  };
+}
+
+/**
+ * Valida las credenciales portables de TPV Backup.
+ */
+function validateBackupRemoteCredentials(value: unknown): BackupRemoteCredentials | null {
+  if (value === null) {
+    return null;
+  }
+
+  if (!isRecord(value)) {
+    throw new Error('secrets/secrets.json.backupRemoteCredentials no contiene un objeto válido.');
+  }
+
+  assertExactKeys(value, ['keyId', 'secret'], 'secrets/secrets.json.backupRemoteCredentials');
+
+  const keyId: string = requireNonEmptyString(
+    value,
+    'keyId',
+    'secrets/secrets.json.backupRemoteCredentials',
+  );
+
+  const secret: string = requireNonEmptyString(
+    value,
+    'secret',
+    'secrets/secrets.json.backupRemoteCredentials',
+  );
+
+  return {
+    keyId,
+    secret,
   };
 }
 

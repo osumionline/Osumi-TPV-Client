@@ -105,6 +105,10 @@ describe('FileOtpvV3RequiredContentValidator', (): void => {
           backupApiKey: 'no-debe-estar-aqui',
           emailSmtpPass: null,
           ticketBaiToken: null,
+          backupRemoteCredentials: {
+            keyId: 'remote-key-id',
+            secret: 'remote-secret',
+          },
         },
         null,
         2,
@@ -167,6 +171,10 @@ async function createValidFixture(): Promise<void> {
         secretApi: 'secret-api',
         emailSmtpPass: null,
         ticketBaiToken: null,
+        backupRemoteCredentials: {
+          keyId: 'remote-key-id',
+          secret: 'remote-secret',
+        },
       },
       null,
       2,

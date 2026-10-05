@@ -1,4 +1,5 @@
 import { validateOtpvV3PayloadEntries } from '@backend/application/backup/otpv-v3-package.validator';
+import type BackupRemoteCredentialStorage from '@backend/contracts/backup/backup-remote-credential-storage.interface';
 import type DatabaseSnapshot from '@backend/contracts/backup/database-snapshot.interface';
 import type {
   OtpvV3Crypto,
@@ -21,6 +22,7 @@ import {
   OTPV_V3_PORTABLE_SECRETS_SCHEMA_VERSION,
   OTPV_V3_SECRETS_ENTRY,
 } from '@backend/domain/backup/otpv-v3.constants';
+import type { BackupRemoteCredentials } from '@desktop-contracts/backup/backup-remote.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { InstallationSecretsData } from '@desktop-contracts/configuration/installation-command.interface';
 import { randomUUID } from 'node:crypto';
@@ -60,6 +62,7 @@ export default class YazlOtpvV3PayloadBuilder implements OtpvV3PayloadBuilder {
     private readonly databaseSnapshot: DatabaseSnapshot,
     private readonly appDataRepository: AppDataRepository,
     private readonly secretStorage: SecretStorage,
+    private readonly backupRemoteCredentialStorage: BackupRemoteCredentialStorage,
     private readonly crypto: OtpvV3Crypto,
   ) {}
 
@@ -71,6 +74,8 @@ export default class YazlOtpvV3PayloadBuilder implements OtpvV3PayloadBuilder {
 
     const appData: AppData = await this.loadRequiredAppData();
     const secrets: InstallationSecretsData = await this.loadRequiredSecrets();
+    const backupRemoteCredentials: BackupRemoteCredentials | null =
+      await this.backupRemoteCredentialStorage.load();
     const destinationDirectory: string = dirname(command.destinationFile);
 
     await mkdir(destinationDirectory, {
@@ -86,7 +91,7 @@ export default class YazlOtpvV3PayloadBuilder implements OtpvV3PayloadBuilder {
 
       const appDataBuffer: Buffer = this.serializeJson(appData);
 
-      portableSecretsBuffer = this.serializePortableSecrets(secrets);
+      portableSecretsBuffer = this.serializePortableSecrets(secrets, backupRemoteCredentials);
 
       const sources: readonly PayloadSource[] = [
         await this.createFileSource(snapshotFile, OTPV_V3_DATABASE_ENTRY),
@@ -176,12 +181,22 @@ export default class YazlOtpvV3PayloadBuilder implements OtpvV3PayloadBuilder {
    * Construye el documento portable de secretos
    * que solo existirá dentro del stream ZIP cifrado.
    */
-  private serializePortableSecrets(secrets: InstallationSecretsData): Buffer {
+  private serializePortableSecrets(
+    secrets: InstallationSecretsData,
+    backupRemoteCredentials: BackupRemoteCredentials | null,
+  ): Buffer {
     const portableSecrets: OtpvV3PortableSecrets = {
       schemaVersion: OTPV_V3_PORTABLE_SECRETS_SCHEMA_VERSION,
       secretApi: secrets.secretApi,
       emailSmtpPass: secrets.emailSmtpPass,
       ticketBaiToken: secrets.ticketBaiToken,
+      backupRemoteCredentials:
+        backupRemoteCredentials === null
+          ? null
+          : {
+              keyId: backupRemoteCredentials.keyId,
+              secret: backupRemoteCredentials.secret,
+            },
     };
 
     return this.serializeJson(portableSecrets);
