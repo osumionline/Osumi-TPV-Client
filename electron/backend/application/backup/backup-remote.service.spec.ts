@@ -9,6 +9,7 @@ import {
   BackupRemoteBackup,
   BackupRemoteConnection,
   BackupRemoteCredentials,
+  BackupRemoteUploadResult,
 } from '@desktop-contracts/backup/backup-remote.interface';
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -166,6 +167,77 @@ describe('BackupRemoteService', (): void => {
     expect(client.authenticateCalls).toHaveLength(0);
   });
 
+  it('sube una copia utilizando una sesión autorizada', async (): Promise<void> => {
+    credentialStorage.value = {
+      keyId: 'remote-key-id',
+      secret: 'remote-secret',
+    };
+
+    const result: BackupRemoteUploadResult = await service.upload(
+      'C:\\backups\\backup.otpv',
+      'backup.otpv',
+    );
+
+    expect(result).toEqual(client.uploadResult);
+
+    expect(client.uploadCalls).toEqual([
+      {
+        token: 'test-token',
+        filePath: 'C:\\backups\\backup.otpv',
+        fileName: 'backup.otpv',
+      },
+    ]);
+  });
+
+  it('no inicia una subida si la suscripción no permite crear copias', async (): Promise<void> => {
+    credentialStorage.value = {
+      keyId: 'remote-key-id',
+      secret: 'remote-secret',
+    };
+
+    client.sessions = [
+      {
+        ...createSession(NOW + 3600, 'expired-token'),
+        subscription: {
+          publicId: 'subscription-public-id',
+          name: 'Indomables',
+          status: 'expired',
+        },
+        canUpload: false,
+      },
+    ];
+
+    await expect(service.upload('C:\\backups\\backup.otpv', 'backup.otpv')).rejects.toMatchObject({
+      kind: 'forbidden',
+    });
+
+    expect(client.uploadCalls).toHaveLength(0);
+  });
+
+  it('renueva una vez el JWT si el servidor rechaza la sesión durante la subida', async (): Promise<void> => {
+    credentialStorage.value = {
+      keyId: 'remote-key-id',
+      secret: 'remote-secret',
+    };
+
+    client.sessions = [
+      createSession(NOW + 3600, 'first-token'),
+
+      createSession(NOW + 3600, 'second-token'),
+    ];
+
+    client.rejectUploadTokenOnce = 'first-token';
+
+    await service.upload('C:\\backups\\backup.otpv', 'backup.otpv');
+
+    expect(client.authenticateCalls).toHaveLength(2);
+
+    expect(client.uploadCalls.map((call): string => call.token)).toEqual([
+      'first-token',
+      'second-token',
+    ]);
+  });
+
   it('elimina la configuración remota persistida', async (): Promise<void> => {
     credentialStorage.value = {
       keyId: 'remote-key-id',
@@ -233,6 +305,23 @@ class TestBackupRemoteClient implements BackupRemoteClient {
   authenticateError: Error | null = null;
   rejectTokenOnce: string | null = null;
 
+  readonly uploadCalls: {
+    readonly token: string;
+    readonly filePath: string;
+    readonly fileName: string;
+  }[] = [];
+
+  readonly uploadResult: BackupRemoteUploadResult = {
+    publicId: 'uploaded-public-id',
+    backupId: '123e4567-e89b-42d3-a456-426614174001',
+    createdAtClient: '2026-10-05 16:00:00',
+    originalFilename: 'uploaded.otpv',
+    sizeBytes: 4096,
+    sha256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  };
+
+  rejectUploadTokenOnce: string | null = null;
+
   /**
    * Simula la autenticación remota.
    */
@@ -277,6 +366,31 @@ class TestBackupRemoteClient implements BackupRemoteClient {
     return this.backups.map((backup: BackupRemoteBackup): BackupRemoteBackup => ({
       ...backup,
     }));
+  }
+
+  /**
+   * Simula la subida de una copia remota.
+   */
+  async upload(
+    token: string,
+    filePath: string,
+    fileName: string,
+  ): Promise<BackupRemoteUploadResult> {
+    this.uploadCalls.push({
+      token,
+      filePath,
+      fileName,
+    });
+
+    if (this.rejectUploadTokenOnce !== null && this.rejectUploadTokenOnce === token) {
+      this.rejectUploadTokenOnce = null;
+
+      throw new BackupRemoteClientError('forbidden', 'Invalid installation access token.', 403);
+    }
+
+    return {
+      ...this.uploadResult,
+    };
   }
 }
 

@@ -23,6 +23,15 @@ export interface BackupRemoteConnection {
   readonly canUpload: boolean;
 }
 
+export interface BackupRemoteUploadResult {
+  readonly publicId: string;
+  readonly backupId: string;
+  readonly createdAtClient: string;
+  readonly originalFilename: string;
+  readonly sizeBytes: number;
+  readonly sha256: string;
+}
+
 export interface BackupRemoteBackup {
   readonly publicId: string;
   readonly backupId: string;

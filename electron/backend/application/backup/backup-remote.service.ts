@@ -8,6 +8,7 @@ import type {
   BackupRemoteBackup,
   BackupRemoteConnection,
   BackupRemoteCredentials,
+  BackupRemoteUploadResult,
 } from '@desktop-contracts/backup/backup-remote.interface';
 
 /**
@@ -98,6 +99,36 @@ export default class BackupRemoteService {
   }
 
   /**
+   * Sube una copia local a TPV Backup.
+   *
+   * Si el JWT ha sido invalidado administrativamente,
+   * se renueva una única vez antes de reintentar.
+   */
+  async upload(filePath: string, fileName: string): Promise<BackupRemoteUploadResult> {
+    const credentials: BackupRemoteCredentials = await this.loadRequiredCredentials();
+
+    const session: BackupRemoteSession = await this.ensureSession(credentials);
+
+    this.assertUploadAllowed(session);
+
+    try {
+      return await this.client.upload(session.token, filePath, fileName);
+    } catch (error: unknown) {
+      if (!this.isRejectedSession(error)) {
+        throw error;
+      }
+
+      this.session = null;
+
+      const refreshedSession: BackupRemoteSession = await this.ensureSession(credentials);
+
+      this.assertUploadAllowed(refreshedSession);
+
+      return this.client.upload(refreshedSession.token, filePath, fileName);
+    }
+  }
+
+  /**
    * Elimina la configuración remota local.
    *
    * El JWT en memoria solo se descarta después
@@ -145,6 +176,21 @@ export default class BackupRemoteService {
    */
   private isSessionUsable(session: BackupRemoteSession): boolean {
     return session.expiresAt > this.now() + BackupRemoteService.SESSION_EXPIRY_SKEW_SECONDS;
+  }
+
+  /**
+   * Impide iniciar una subida cuando la sesión
+   * ya indica que la suscripción no lo permite.
+   */
+  private assertUploadAllowed(session: BackupRemoteSession): void {
+    if (session.canUpload) {
+      return;
+    }
+
+    throw new BackupRemoteClientError(
+      'forbidden',
+      'La suscripción de TPV Backup no permite subir nuevas copias.',
+    );
   }
 
   /**

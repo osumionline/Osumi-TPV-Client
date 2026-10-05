@@ -1,6 +1,9 @@
 import { BackupRemoteClientError } from '@backend/contracts/backup/backup-remote-client.error';
 import type { BackupRemoteSession } from '@backend/contracts/backup/backup-remote-client.interface';
-import { BackupRemoteBackup } from '@desktop-contracts/backup/backup-remote.interface';
+import type {
+  BackupRemoteBackup,
+  BackupRemoteUploadResult,
+} from '@desktop-contracts/backup/backup-remote.interface';
 import HttpBackupRemoteClient from '@infrastructure/backup/http-backup-remote.client';
 import { describe, expect, it } from 'vitest';
 
@@ -229,6 +232,116 @@ describe('HttpBackupRemoteClient', (): void => {
       expect(error.kind).toBe('invalid-response');
       expect(error.httpStatus).toBe(200);
     }
+  });
+
+  it('sube una copia mediante multipart sin materializar el fichero completo', async (): Promise<void> => {
+    let capturedInput: FetchInput | null = null;
+    let capturedInit: RequestInit | undefined;
+    let openedPath: string | null = null;
+    let openedType: string | null = null;
+
+    const fetchImplementation: typeof globalThis.fetch = async (
+      input: FetchInput,
+      init?: RequestInit,
+    ): Promise<Response> => {
+      capturedInput = input;
+      capturedInit = init;
+
+      return new Response(
+        JSON.stringify({
+          status: 'ok',
+          message: '',
+          backup: {
+            publicId: 'backup-public-id',
+            backupId: '123e4567-e89b-42d3-a456-426614174000',
+            createdAtClient: '2026-10-05 07:18:39',
+            originalFilename: 'backup.otpv',
+            sizeBytes: 11,
+            sha256: '6bbab7ae745310e03a8a6b07d6fb7e01e94e4017c9f7355bf695eb5aab3a71b8',
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+    };
+
+    const openFileAsBlob = async (
+      path: string,
+      options?: {
+        readonly type?: string;
+      },
+    ): Promise<Blob> => {
+      openedPath = path;
+      openedType = options?.type ?? null;
+
+      return new Blob(['otpv-backup'], {
+        type: options?.type,
+      });
+    };
+
+    const client = new HttpBackupRemoteClient(
+      'https://backup.test/api/v1',
+      fetchImplementation,
+      openFileAsBlob,
+    );
+
+    const result: BackupRemoteUploadResult = await client.upload(
+      'test-token',
+      'C:\\backups\\backup.otpv',
+      'backup.otpv',
+    );
+
+    expect(openedPath).toBe('C:\\backups\\backup.otpv');
+
+    expect(openedType).toBe('application/octet-stream');
+
+    expect(getInputUrl(capturedInput)).toBe('https://backup.test/api/v1/backups');
+
+    expect(capturedInit?.method).toBe('POST');
+
+    const headers = new Headers(capturedInit?.headers);
+
+    expect(headers.get('Authorization')).toBe('Bearer test-token');
+
+    expect(headers.get('Content-Type')).toBeNull();
+
+    const body: RequestInit['body'] = capturedInit?.body;
+
+    expect(body).toBeInstanceOf(FormData);
+
+    if (!(body instanceof FormData)) {
+      throw new Error('Se esperaba un cuerpo FormData.');
+    }
+
+    const uploadedFile: File | string | null = body.get('file');
+
+    expect(uploadedFile).toBeInstanceOf(Blob);
+
+    if (!(uploadedFile instanceof Blob)) {
+      throw new Error('Se esperaba un fichero multipart.');
+    }
+
+    expect(uploadedFile.size).toBe(11);
+
+    expect('name' in uploadedFile ? uploadedFile.name : null).toBe('backup.otpv');
+
+    expect(result).toEqual({
+      publicId: 'backup-public-id',
+
+      backupId: '123e4567-e89b-42d3-a456-426614174000',
+
+      createdAtClient: '2026-10-05 07:18:39',
+
+      originalFilename: 'backup.otpv',
+
+      sizeBytes: 11,
+
+      sha256: '6bbab7ae745310e03a8a6b07d6fb7e01e94e4017c9f7355bf695eb5aab3a71b8',
+    });
   });
 });
 

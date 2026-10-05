@@ -3,6 +3,7 @@ import type {
   BackupRemoteCredentials,
   BackupRemoteInstallation,
   BackupRemoteSubscription,
+  BackupRemoteUploadResult,
 } from '@desktop-contracts/backup/backup-remote.interface';
 
 export interface BackupRemoteSession {
@@ -25,4 +26,12 @@ export interface BackupRemoteClient {
    * a la instalación autenticada.
    */
   list(token: string): Promise<readonly BackupRemoteBackup[]>;
+
+  /**
+   * Sube una copia local al almacenamiento remoto.
+   *
+   * El fichero debe transmitirse sin cargar
+   * todo su contenido en memoria.
+   */
+  upload(token: string, filePath: string, fileName: string): Promise<BackupRemoteUploadResult>;
 }

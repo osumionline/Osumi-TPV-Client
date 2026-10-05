@@ -2,20 +2,28 @@ import {
   BackupRemoteClientError,
   type BackupRemoteClientErrorKind,
 } from '@backend/contracts/backup/backup-remote-client.error';
-import {
+import type {
+  BackupRemoteClient,
   BackupRemoteSession,
-  type BackupRemoteClient,
 } from '@backend/contracts/backup/backup-remote-client.interface';
-import {
+import type {
   BackupRemoteBackup,
   BackupRemoteCredentials,
   BackupRemoteSubscriptionStatus,
+  BackupRemoteUploadResult,
 } from '@desktop-contracts/backup/backup-remote.interface';
+import { openAsBlob } from 'node:fs';
 
 interface JsonResponse {
   readonly response: Response;
   readonly payload: unknown;
 }
+
+interface OpenFileAsBlobOptions {
+  readonly type?: string;
+}
+
+type OpenFileAsBlob = (path: string, options?: OpenFileAsBlobOptions) => Promise<Blob>;
 
 /**
  * Cliente HTTP de la API remota de TPV Backup.
@@ -26,11 +34,16 @@ export default class HttpBackupRemoteClient implements BackupRemoteClient {
   /**
    * Crea el cliente remoto.
    *
-   * fetch puede inyectarse para tests e instrumentación.
+   * fetch y la apertura de ficheros pueden
+   * inyectarse para tests e instrumentación.
    */
   constructor(
     baseUrl: string,
     private readonly fetchImplementation: typeof globalThis.fetch = globalThis.fetch,
+    private readonly openFileAsBlob: OpenFileAsBlob = (
+      path: string,
+      options?: OpenFileAsBlobOptions,
+    ): Promise<Blob> => openAsBlob(path, options),
   ) {
     this.baseUrl = this.normalizeBaseUrl(baseUrl);
   }
@@ -102,6 +115,61 @@ export default class HttpBackupRemoteClient implements BackupRemoteClient {
     return result.payload.list.map((backup: BackupRemoteBackup): BackupRemoteBackup => ({
       ...backup,
     }));
+  }
+
+  /**
+   * Sube una copia `.otpv` mediante multipart/form-data
+   * utilizando un Blob respaldado por el fichero local.
+   */
+  async upload(
+    token: string,
+    filePath: string,
+    fileName: string,
+  ): Promise<BackupRemoteUploadResult> {
+    let file: Blob;
+
+    try {
+      file = await this.openFileAsBlob(filePath, {
+        type: 'application/octet-stream',
+      });
+    } catch (error: unknown) {
+      throw new BackupRemoteClientError(
+        'unexpected',
+        'No se ha podido abrir la copia local para subirla a TPV Backup.',
+        null,
+        error instanceof Error
+          ? {
+              cause: error,
+            }
+          : undefined,
+      );
+    }
+
+    const formData: FormData = new FormData();
+
+    formData.set('file', file, fileName);
+
+    const result: JsonResponse = await this.requestJson(`${this.baseUrl}/backups`, {
+      method: 'POST',
+
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+
+      body: formData,
+    });
+
+    if (!this.isUploadResponse(result.payload)) {
+      throw new BackupRemoteClientError(
+        'invalid-response',
+        'TPV Backup ha devuelto una respuesta de subida no válida.',
+        result.response.status,
+      );
+    }
+
+    return {
+      ...result.payload.backup,
+    };
   }
 
   /**
@@ -321,6 +389,46 @@ export default class HttpBackupRemoteClient implements BackupRemoteClient {
 
     return value['list'].every((backup: unknown): backup is BackupRemoteBackup =>
       this.isRemoteBackup(backup),
+    );
+  }
+
+  /**
+   * Comprueba la respuesta de una subida correcta.
+   */
+  private isUploadResponse(value: unknown): value is {
+    readonly status: 'ok';
+    readonly backup: BackupRemoteUploadResult;
+  } {
+    if (!this.isRecord(value) || value['status'] !== 'ok') {
+      return false;
+    }
+
+    return this.isRemoteUploadResult(value['backup']);
+  }
+
+  /**
+   * Comprueba los metadatos devueltos
+   * después de almacenar una copia.
+   */
+  private isRemoteUploadResult(value: unknown): value is BackupRemoteUploadResult {
+    if (!this.isRecord(value)) {
+      return false;
+    }
+
+    return (
+      typeof value['publicId'] === 'string' &&
+      value['publicId'] !== '' &&
+      typeof value['backupId'] === 'string' &&
+      value['backupId'] !== '' &&
+      typeof value['createdAtClient'] === 'string' &&
+      value['createdAtClient'] !== '' &&
+      typeof value['originalFilename'] === 'string' &&
+      value['originalFilename'] !== '' &&
+      typeof value['sizeBytes'] === 'number' &&
+      Number.isSafeInteger(value['sizeBytes']) &&
+      value['sizeBytes'] > 0 &&
+      typeof value['sha256'] === 'string' &&
+      /^[0-9a-f]{64}$/i.test(value['sha256'])
     );
   }
 
