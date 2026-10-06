@@ -21,6 +21,9 @@ class TestDesktopBackupService {
   remoteBackups: readonly BackupRemoteBackup[] = [createRemoteBackup()];
   removeCalls = 0;
 
+  remoteConnectionError: Error | null = null;
+  remoteBackupsError: Error | null = null;
+
   /**
    * Simula la creación correcta de una copia.
    */
@@ -54,6 +57,10 @@ class TestDesktopBackupService {
    * Devuelve la conexión remota configurada.
    */
   async getRemoteConnection(): Promise<BackupRemoteConnection | null> {
+    if (this.remoteConnectionError !== null) {
+      throw this.remoteConnectionError;
+    }
+
     return this.remoteConnection;
   }
 
@@ -70,6 +77,10 @@ class TestDesktopBackupService {
    * Devuelve las copias remotas simuladas.
    */
   async getRemoteBackups(): Promise<readonly BackupRemoteBackup[]> {
+    if (this.remoteBackupsError !== null) {
+      throw this.remoteBackupsError;
+    }
+
     return this.remoteBackups;
   }
 
@@ -176,6 +187,34 @@ describe('ManagementBackupsComponent', (): void => {
 
     expect(component.remoteConnection()).toBeNull();
     expect(component.remoteBackups()).toEqual([]);
+  });
+
+  it('elimina el estado remoto obsoleto si falla la conexión', async (): Promise<void> => {
+    component.remoteConnection.set(createRemoteConnection());
+    component.remoteBackups.set([createRemoteBackup()]);
+
+    backupService.remoteConnectionError = new Error('Las credenciales ya no son válidas.');
+
+    await component.loadRemoteState();
+
+    expect(component.remoteConnection()).toBeNull();
+    expect(component.remoteBackups()).toEqual([]);
+    expect(component.remoteError()).toBe('Las credenciales ya no son válidas.');
+    expect(component.remoteLoading()).toBe(false);
+  });
+
+  it('conserva la conexión pero elimina el listado obsoleto si falla la carga de copias', async (): Promise<void> => {
+    component.remoteConnection.set(createRemoteConnection());
+    component.remoteBackups.set([createRemoteBackup()]);
+
+    backupService.remoteBackupsError = new Error('No se puede cargar el listado.');
+
+    await component.loadRemoteState();
+
+    expect(component.remoteConnection()).toEqual(createRemoteConnection());
+    expect(component.remoteBackups()).toEqual([]);
+    expect(component.remoteError()).toBe('No se puede cargar el listado.');
+    expect(component.remoteLoading()).toBe(false);
   });
 
   it('configura credenciales sin modificar el secret', async (): Promise<void> => {

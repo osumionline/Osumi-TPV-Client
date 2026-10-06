@@ -253,6 +253,35 @@ describe('BackupRemoteService', (): void => {
     await expect(service.getConnection()).resolves.toBeNull();
   });
 
+  it('refresca el estado remoto aunque la sesión actual siga siendo válida', async (): Promise<void> => {
+    credentialStorage.value = {
+      keyId: 'remote-key-id',
+      secret: 'remote-secret',
+    };
+
+    client.sessions = [
+      createSession(NOW + 3600, 'active-token'),
+      {
+        ...createSession(NOW + 3600, 'expired-token'),
+        subscription: {
+          publicId: 'subscription-public-id',
+          name: 'Indomables',
+          status: 'expired',
+        },
+        canUpload: false,
+      },
+    ];
+
+    const activeConnection: BackupRemoteConnection | null = await service.getConnection();
+    const expiredConnection: BackupRemoteConnection | null = await service.getConnection();
+
+    expect(client.authenticateCalls).toHaveLength(2);
+    expect(activeConnection?.subscription.status).toBe('active');
+    expect(activeConnection?.canUpload).toBe(true);
+    expect(expiredConnection?.subscription.status).toBe('expired');
+    expect(expiredConnection?.canUpload).toBe(false);
+  });
+
   it('descarga una copia incluso con una suscripción caducada', async (): Promise<void> => {
     credentialStorage.value = {
       keyId: 'remote-key-id',

@@ -50,8 +50,9 @@ export default class BackupRemoteService {
   /**
    * Obtiene el estado remoto actual.
    *
-   * Si existen credenciales persistidas pero todavía
-   * no hay sesión, realiza la autenticación necesaria.
+   * Siempre renueva la sesión para que los datos
+   * administrativos de instalación y suscripción
+   * reflejen el estado actual del servidor.
    */
   async getConnection(): Promise<BackupRemoteConnection | null> {
     const credentials: BackupRemoteCredentials | null = await this.credentialStorage.load();
@@ -62,7 +63,9 @@ export default class BackupRemoteService {
       return null;
     }
 
-    const session: BackupRemoteSession = await this.ensureSession(credentials);
+    const session: BackupRemoteSession = await this.client.authenticate(credentials);
+
+    this.session = session;
 
     return this.createConnection(session);
   }

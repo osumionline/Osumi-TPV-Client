@@ -195,8 +195,14 @@ export default class ManagementBackupsComponent implements OnInit {
   }
 
   /**
-   * Carga la conexión y las copias remotas
+   * Carga el estado remoto y las copias
    * disponibles en TPV Backup.
+   *
+   * Un fallo de autenticación elimina cualquier
+   * estado remoto obsoleto de la pantalla.
+   *
+   * Un fallo posterior cargando el listado conserva
+   * la conexión válida, pero elimina la lista anterior.
    */
   async loadRemoteState(): Promise<void> {
     if (this.remoteLoading()) {
@@ -206,23 +212,46 @@ export default class ManagementBackupsComponent implements OnInit {
     this.remoteLoading.set(true);
     this.remoteError.set(null);
 
+    let connection: BackupRemoteConnection | null;
+
     try {
-      const connection: BackupRemoteConnection | null =
-        await this.backupService.getRemoteConnection();
-
-      this.remoteConnection.set(connection);
-
-      if (connection === null) {
-        this.remoteBackups.set([]);
-
-        return;
-      }
-
-      await this.loadRemoteBackups();
+      connection = await this.backupService.getRemoteConnection();
     } catch (error: unknown) {
-      console.error('Error cargando TPV Backup:', error);
+      console.error('Error cargando la conexión con TPV Backup:', error);
+
+      this.remoteConnection.set(null);
+      this.remoteBackups.set([]);
 
       this.remoteError.set(getErrorMessage(error, 'No se ha podido conectar con TPV Backup.'));
+
+      this.remoteLoading.set(false);
+
+      return;
+    }
+
+    this.remoteConnection.set(connection);
+
+    if (connection === null) {
+      this.remoteBackups.set([]);
+      this.remoteLoading.set(false);
+
+      return;
+    }
+
+    try {
+      await this.loadRemoteBackups();
+    } catch (error: unknown) {
+      console.error('Error cargando las copias remotas:', error);
+
+      /*
+       * La autenticación ha sido correcta,
+       * pero el listado disponible ya no es fiable.
+       */
+      this.remoteBackups.set([]);
+
+      this.remoteError.set(
+        getErrorMessage(error, 'No se han podido cargar las copias remotas de TPV Backup.'),
+      );
     } finally {
       this.remoteLoading.set(false);
     }
