@@ -12,6 +12,7 @@ import type {
 import ManagementBackupsComponent from '@modules/gestion/pages/management-backups/management-backups.component';
 import { DialogService } from '@osumi/angular-tools';
 import DesktopBackupService from '@services/application/desktop-backup.service';
+import { type Observable, of } from 'rxjs';
 
 class TestDesktopBackupService {
   readonly createCalls = signal<number>(0);
@@ -22,6 +23,7 @@ class TestDesktopBackupService {
   remoteBackups: readonly BackupRemoteBackup[] = [createRemoteBackup()];
   removeCalls = 0;
   readonly remoteDownloadCalls: string[] = [];
+  readonly remoteDeleteCalls: string[] = [];
 
   /**
    * Simula la creación correcta de una copia.
@@ -106,20 +108,41 @@ class TestDesktopBackupService {
       sha256: '6bbab7ae745310e03a8a6b07d6fb7e01e94e4017c9f7355bf695eb5aab3a71b8',
     };
   }
+
+  /**
+   * Simula el borrado de una copia remota.
+   */
+  async deleteRemote(publicId: string): Promise<void> {
+    this.remoteDeleteCalls.push(publicId);
+
+    this.remoteBackups = this.remoteBackups.filter(
+      (backup: BackupRemoteBackup): boolean => backup.publicId !== publicId,
+    );
+  }
 }
 
 class TestDialogService {
   readonly alerts: unknown[] = [];
+  readonly confirms: unknown[] = [];
+
+  confirmResult: boolean = true;
 
   /**
    * Registra las alertas solicitadas por el componente.
    */
-  alert(options: unknown): { subscribe(): void } {
+  alert(options: unknown): Observable<boolean> {
     this.alerts.push(options);
 
-    return {
-      subscribe: (): void => undefined,
-    };
+    return of(true);
+  }
+
+  /**
+   * Simula una confirmación del usuario.
+   */
+  confirm(options: unknown): Observable<boolean> {
+    this.confirms.push(options);
+
+    return of(this.confirmResult);
   }
 }
 
@@ -288,6 +311,47 @@ describe('ManagementBackupsComponent', (): void => {
     await component.downloadRemoteBackup(createRemoteBackup());
 
     expect(backupService.remoteDownloadCalls).toEqual(['backup-public-id']);
+  });
+
+  it('elimina una copia remota después de confirmarla', async (): Promise<void> => {
+    component.remoteConnection.set(createRemoteConnection());
+    component.remoteBackups.set([createRemoteBackup()]);
+
+    await component.deleteRemoteBackup(createRemoteBackup());
+
+    expect(dialogService.confirms).toHaveLength(1);
+    expect(backupService.remoteDeleteCalls).toEqual(['backup-public-id']);
+    expect(component.remoteBackups()).toEqual([]);
+    expect(component.remoteDeletingPublicId()).toBeNull();
+    expect(dialogService.alerts).toHaveLength(1);
+  });
+
+  it('no elimina una copia remota si el usuario cancela', async (): Promise<void> => {
+    dialogService.confirmResult = false;
+
+    await component.deleteRemoteBackup(createRemoteBackup());
+
+    expect(backupService.remoteDeleteCalls).toHaveLength(0);
+    expect(component.remoteDeletingPublicId()).toBeNull();
+  });
+
+  it('permite eliminar una copia con la suscripción caducada', async (): Promise<void> => {
+    component.remoteConnection.set({
+      ...createRemoteConnection(),
+
+      subscription: {
+        ...createRemoteConnection().subscription,
+        status: 'expired',
+      },
+
+      canUpload: false,
+    });
+
+    component.remoteBackups.set([createRemoteBackup()]);
+
+    await component.deleteRemoteBackup(createRemoteBackup());
+
+    expect(backupService.remoteDeleteCalls).toEqual(['backup-public-id']);
   });
 });
 

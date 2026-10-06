@@ -329,6 +329,17 @@
         white-space: nowrap;
     }
 
+    .management-backups__row-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+
+    .management-backups__delete-action {
+        color: var(--mat-sys-error, #ba1a1a);
+    }
+
     .management-backups__filename {
         display: flex;
         flex-direction: column;

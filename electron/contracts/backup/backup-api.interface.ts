@@ -69,4 +69,10 @@ export default interface BackupApi {
    * local de copias de seguridad.
    */
   downloadRemote(publicId: string): Promise<BackupRemoteDownloadResult>;
+
+  /**
+   * Elimina una copia almacenada
+   * en TPV Backup.
+   */
+  deleteRemote(publicId: string): Promise<void>;
 }

@@ -437,6 +437,70 @@ describe('HttpBackupRemoteClient', (): void => {
       });
     }
   });
+
+  it('elimina una copia utilizando el bearer token', async (): Promise<void> => {
+    let capturedInput: FetchInput | null = null;
+    let capturedInit: RequestInit | undefined;
+
+    const fetchImplementation: typeof globalThis.fetch = async (
+      input: FetchInput,
+      init?: RequestInit,
+    ): Promise<Response> => {
+      capturedInput = input;
+      capturedInit = init;
+
+      return new Response(
+        JSON.stringify({
+          status: 'ok',
+          publicId: 'backup-public-id',
+          message: '',
+        }),
+        {
+          status: 200,
+
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+    };
+
+    const client = new HttpBackupRemoteClient('https://backup.test/api/v1', fetchImplementation);
+
+    await client.delete('test-token', 'backup-public-id');
+
+    expect(getInputUrl(capturedInput)).toBe('https://backup.test/api/v1/backups/backup-public-id');
+
+    expect(capturedInit?.method).toBe('DELETE');
+
+    const headers = new Headers(capturedInit?.headers);
+
+    expect(headers.get('Authorization')).toBe('Bearer test-token');
+  });
+
+  it('rechaza una respuesta de borrado para otra copia', async (): Promise<void> => {
+    const fetchImplementation: typeof globalThis.fetch = async (): Promise<Response> =>
+      new Response(
+        JSON.stringify({
+          status: 'ok',
+          publicId: 'different-backup',
+          message: '',
+        }),
+        {
+          status: 200,
+
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+    const client = new HttpBackupRemoteClient('https://backup.test/api/v1', fetchImplementation);
+
+    await expect(client.delete('test-token', 'backup-public-id')).rejects.toMatchObject({
+      kind: 'invalid-response',
+    });
+  });
 });
 
 /**

@@ -348,6 +348,40 @@ export default class HttpBackupRemoteClient implements BackupRemoteClient {
   }
 
   /**
+   * Elimina una copia remota perteneciente
+   * a la instalación autenticada.
+   */
+  async delete(token: string, publicId: string): Promise<void> {
+    const normalizedPublicId: string = publicId.trim();
+
+    if (normalizedPublicId === '') {
+      throw new BackupRemoteClientError(
+        'unexpected',
+        'El identificador de la copia remota no es válido.',
+      );
+    }
+
+    const result: JsonResponse = await this.requestJson(
+      `${this.baseUrl}/backups/${encodeURIComponent(normalizedPublicId)}`,
+      {
+        method: 'DELETE',
+
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (!this.isDeleteResponse(result.payload) || result.payload.publicId !== normalizedPublicId) {
+      throw new BackupRemoteClientError(
+        'invalid-response',
+        'TPV Backup ha devuelto una respuesta de borrado no válida.',
+        result.response.status,
+      );
+    }
+  }
+
+  /**
    * Ejecuta una petición HTTP normalizando
    * exclusivamente los errores de transporte.
    */
@@ -646,6 +680,20 @@ export default class HttpBackupRemoteClient implements BackupRemoteClient {
     return value['list'].every((backup: unknown): backup is BackupRemoteBackup =>
       this.isRemoteBackup(backup),
     );
+  }
+
+  /**
+   * Comprueba la respuesta de un borrado correcto.
+   */
+  private isDeleteResponse(value: unknown): value is {
+    readonly status: 'ok';
+    readonly publicId: string;
+  } {
+    if (!this.isRecord(value) || value['status'] !== 'ok') {
+      return false;
+    }
+
+    return typeof value['publicId'] === 'string' && value['publicId'] !== '';
   }
 
   /**

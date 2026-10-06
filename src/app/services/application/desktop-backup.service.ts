@@ -85,4 +85,12 @@ export default class DesktopBackupService {
   downloadRemote(publicId: string): Promise<BackupRemoteDownloadResult> {
     return window.osumiDesktop.backup.downloadRemote(publicId);
   }
+
+  /**
+   * Elimina una copia almacenada
+   * en TPV Backup.
+   */
+  deleteRemote(publicId: string): Promise<void> {
+    return window.osumiDesktop.backup.deleteRemote(publicId);
+  }
 }

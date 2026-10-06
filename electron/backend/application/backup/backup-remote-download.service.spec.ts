@@ -188,6 +188,16 @@ class TestBackupRemoteClient implements BackupRemoteClient {
       sha256: createHash('sha256').update(this.downloadContent).digest('hex'),
     };
   }
+
+  /**
+   * No se utiliza durante estos tests.
+   */
+  delete(token: string, publicId: string): Promise<void> {
+    void token;
+    void publicId;
+
+    return Promise.resolve();
+  }
 }
 
 /**

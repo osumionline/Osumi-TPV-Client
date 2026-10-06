@@ -49,4 +49,10 @@ export interface BackupRemoteClient {
     publicId: string,
     destinationFile: string,
   ): Promise<BackupRemoteDownloadTransferResult>;
+
+  /**
+   * Elimina una copia perteneciente
+   * a la instalación autenticada.
+   */
+  delete(token: string, publicId: string): Promise<void>;
 }

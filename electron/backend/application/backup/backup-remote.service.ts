@@ -159,6 +159,34 @@ export default class BackupRemoteService {
   }
 
   /**
+   * Elimina una copia remota.
+   *
+   * Las suscripciones caducadas conservan
+   * el derecho a eliminar sus copias existentes.
+   */
+  async delete(value: unknown): Promise<void> {
+    const publicId: string = this.normalizePublicId(value);
+
+    const credentials: BackupRemoteCredentials = await this.loadRequiredCredentials();
+
+    const session: BackupRemoteSession = await this.ensureSession(credentials);
+
+    try {
+      await this.client.delete(session.token, publicId);
+    } catch (error: unknown) {
+      if (!this.isRejectedSession(error)) {
+        throw error;
+      }
+
+      this.session = null;
+
+      const refreshedSession: BackupRemoteSession = await this.ensureSession(credentials);
+
+      await this.client.delete(refreshedSession.token, publicId);
+    }
+  }
+
+  /**
    * Elimina la configuración remota local.
    *
    * El JWT en memoria solo se descarta después
@@ -229,6 +257,24 @@ export default class BackupRemoteService {
    */
   private isRejectedSession(error: unknown): boolean {
     return error instanceof BackupRemoteClientError && error.kind === 'forbidden';
+  }
+
+  /**
+   * Valida un identificador público recibido
+   * desde una frontera no confiable.
+   */
+  private normalizePublicId(value: unknown): string {
+    if (typeof value !== 'string') {
+      throw new Error('El identificador de la copia remota no es válido.');
+    }
+
+    const publicId: string = value.trim();
+
+    if (publicId === '') {
+      throw new Error('El identificador de la copia remota no puede estar vacío.');
+    }
+
+    return publicId;
   }
 
   /**

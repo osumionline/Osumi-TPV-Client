@@ -312,6 +312,60 @@ describe('BackupRemoteService', (): void => {
       'second-token',
     ]);
   });
+
+  it('elimina una copia aunque la suscripción esté caducada', async (): Promise<void> => {
+    credentialStorage.value = {
+      keyId: 'remote-key-id',
+      secret: 'remote-secret',
+    };
+
+    client.sessions = [
+      {
+        ...createSession(NOW + 3600, 'expired-token'),
+
+        subscription: {
+          publicId: 'subscription-public-id',
+          name: 'Indomables',
+          status: 'expired',
+        },
+
+        canUpload: false,
+      },
+    ];
+
+    await service.delete('backup-public-id');
+
+    expect(client.deleteCalls).toEqual([
+      {
+        token: 'expired-token',
+        publicId: 'backup-public-id',
+      },
+    ]);
+  });
+
+  it('renueva una vez el JWT si el servidor rechaza la sesión durante el borrado', async (): Promise<void> => {
+    credentialStorage.value = {
+      keyId: 'remote-key-id',
+      secret: 'remote-secret',
+    };
+
+    client.sessions = [
+      createSession(NOW + 3600, 'first-token'),
+
+      createSession(NOW + 3600, 'second-token'),
+    ];
+
+    client.rejectDeleteTokenOnce = 'first-token';
+
+    await service.delete('backup-public-id');
+
+    expect(client.authenticateCalls).toHaveLength(2);
+
+    expect(client.deleteCalls.map((call): string => call.token)).toEqual([
+      'first-token',
+      'second-token',
+    ]);
+  });
 });
 
 /**
@@ -389,6 +443,13 @@ class TestBackupRemoteClient implements BackupRemoteClient {
   };
 
   rejectDownloadTokenOnce: string | null = null;
+
+  readonly deleteCalls: {
+    readonly token: string;
+    readonly publicId: string;
+  }[] = [];
+
+  rejectDeleteTokenOnce: string | null = null;
 
   /**
    * Simula la autenticación remota.
@@ -484,6 +545,22 @@ class TestBackupRemoteClient implements BackupRemoteClient {
     return {
       ...this.downloadResult,
     };
+  }
+
+  /**
+   * Simula el borrado de una copia remota.
+   */
+  async delete(token: string, publicId: string): Promise<void> {
+    this.deleteCalls.push({
+      token,
+      publicId,
+    });
+
+    if (this.rejectDeleteTokenOnce !== null && this.rejectDeleteTokenOnce === token) {
+      this.rejectDeleteTokenOnce = null;
+
+      throw new BackupRemoteClientError('forbidden', 'Invalid installation access token.', 403);
+    }
   }
 }
 

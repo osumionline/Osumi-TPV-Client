@@ -91,6 +91,15 @@ export default function registerBackupIpc(
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.backupRemoteDelete,
+    async (event, publicId: unknown): Promise<void> => {
+      assertTrustedSender(event, getMainWindow);
+
+      await backupRemoteService.delete(publicId);
+    },
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.backupSelectRestorePackage,
     async (event): Promise<BackupRestorePackageSelectionResult> => {
       assertTrustedSender(event, getMainWindow);

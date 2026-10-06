@@ -22,6 +22,7 @@ import type {
 import { DialogService } from '@osumi/angular-tools';
 import DesktopBackupService from '@services/application/desktop-backup.service';
 import { getErrorMessage } from '@utils/error.utils';
+import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'otpv-management-backups',
@@ -48,6 +49,7 @@ export default class ManagementBackupsComponent implements OnInit {
   readonly editingRemoteConfiguration: WritableSignal<boolean> = signal<boolean>(false);
   readonly remoteCreating: WritableSignal<boolean> = signal<boolean>(false);
   readonly remoteDownloadingPublicId: WritableSignal<string | null> = signal<string | null>(null);
+  readonly remoteDeletingPublicId: WritableSignal<string | null> = signal<string | null>(null);
   readonly remoteKeyId: WritableSignal<string> = signal<string>('');
   readonly remoteSecret: WritableSignal<string> = signal<string>('');
 
@@ -55,6 +57,7 @@ export default class ManagementBackupsComponent implements OnInit {
     (): boolean =>
       !this.remoteSaving() &&
       this.remoteDownloadingPublicId() === null &&
+      this.remoteDeletingPublicId() === null &&
       this.remoteKeyId().trim() !== '' &&
       this.remoteSecret() !== '',
   );
@@ -70,7 +73,12 @@ export default class ManagementBackupsComponent implements OnInit {
    * Crea una copia local completa de Osumi TPV.
    */
   async createBackup(): Promise<void> {
-    if (this.creating() || this.remoteCreating() || this.remoteDownloadingPublicId() !== null) {
+    if (
+      this.creating() ||
+      this.remoteCreating() ||
+      this.remoteDownloadingPublicId() !== null ||
+      this.remoteDeletingPublicId() !== null
+    ) {
       return;
     }
 
@@ -102,7 +110,12 @@ export default class ManagementBackupsComponent implements OnInit {
    * directamente en TPV Backup.
    */
   async createRemoteBackup(): Promise<void> {
-    if (this.remoteCreating() || this.creating() || this.remoteDownloadingPublicId() !== null) {
+    if (
+      this.remoteCreating() ||
+      this.creating() ||
+      this.remoteDownloadingPublicId() !== null ||
+      this.remoteDeletingPublicId() !== null
+    ) {
       return;
     }
 
@@ -151,7 +164,8 @@ export default class ManagementBackupsComponent implements OnInit {
       this.remoteLoading() ||
       this.remoteSaving() ||
       this.remoteRemoving() ||
-      this.editingRemoteConfiguration()
+      this.editingRemoteConfiguration() ||
+      this.remoteDeletingPublicId() !== null
     ) {
       return;
     }
@@ -280,7 +294,11 @@ export default class ManagementBackupsComponent implements OnInit {
    * sin modificar ninguna copia almacenada en el servidor.
    */
   async removeRemoteConfiguration(): Promise<void> {
-    if (this.remoteRemoving() || this.remoteDownloadingPublicId() !== null) {
+    if (
+      this.remoteRemoving() ||
+      this.remoteDownloadingPublicId() !== null ||
+      this.remoteDeletingPublicId() !== null
+    ) {
       return;
     }
 
@@ -312,6 +330,67 @@ export default class ManagementBackupsComponent implements OnInit {
    */
   async refreshRemote(): Promise<void> {
     await this.loadRemoteState();
+  }
+
+  /**
+   * Solicita confirmación y elimina una copia
+   * almacenada en TPV Backup.
+   */
+  async deleteRemoteBackup(backup: BackupRemoteBackup): Promise<void> {
+    if (
+      this.remoteDeletingPublicId() !== null ||
+      this.remoteDownloadingPublicId() !== null ||
+      this.creating() ||
+      this.remoteCreating() ||
+      this.remoteLoading() ||
+      this.remoteSaving() ||
+      this.remoteRemoving() ||
+      this.editingRemoteConfiguration()
+    ) {
+      return;
+    }
+
+    const confirmed: boolean = await firstValueFrom(
+      this.dialog.confirm({
+        title: 'Eliminar copia remota',
+        content:
+          `¿Quieres eliminar definitivamente la copia "${backup.originalFilename}"? ` +
+          'Esta acción no se puede deshacer.',
+        ok: 'Eliminar',
+        cancel: 'Cancelar',
+        warn: true,
+      }),
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.remoteDeletingPublicId.set(backup.publicId);
+
+    this.remoteError.set(null);
+
+    try {
+      await this.backupService.deleteRemote(backup.publicId);
+
+      this.dialog.alert({
+        title: 'Copia eliminada',
+
+        content: `La copia "${backup.originalFilename}" se ha eliminado correctamente de TPV Backup.`,
+      });
+    } catch (error: unknown) {
+      console.error('Error eliminando la copia remota:', error);
+
+      this.remoteError.set(getErrorMessage(error, 'No se ha podido eliminar la copia remota.'));
+
+      return;
+    } finally {
+      this.remoteDeletingPublicId.set(null);
+    }
+
+    await this.reloadRemoteBackups(
+      'La copia se ha eliminado, pero no se ha podido actualizar el listado.',
+    );
   }
 
   /**

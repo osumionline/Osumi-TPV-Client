@@ -47,7 +47,8 @@
                 [disabled]="
                     creating() ||
                     remoteCreating() ||
-                    remoteDownloadingPublicId() !== null
+                    remoteDownloadingPublicId() !== null ||
+                    remoteDeletingPublicId() !== null
                 "
                 (click)="createBackup()">
             <mat-icon>
@@ -109,7 +110,8 @@
                           remoteSaving() ||
                           remoteRemoving() ||
                           remoteDownloadingPublicId() !== null ||
-                          editingRemoteConfiguration()
+                          editingRemoteConfiguration() ||
+                          remoteDeletingPublicId() !== null
                         "
                         (click)="createRemoteBackup()">
                     <mat-icon>cloud_upload</mat-icon>
@@ -123,7 +125,7 @@
 
                 <button mat-stroked-button
                         type="button"
-                        [disabled]="remoteLoading() || remoteDownloadingPublicId() !== null"
+                        [disabled]="remoteLoading() || remoteDownloadingPublicId() !== null || remoteDeletingPublicId() !== null"
                         (click)="refreshRemote()">
                     <mat-icon>refresh</mat-icon>
 
@@ -135,7 +137,8 @@
                         [disabled]="
                             remoteCreating() ||
                             remoteRemoving() ||
-                            remoteDownloadingPublicId() !== null
+                            remoteDownloadingPublicId() !== null ||
+                            remoteDeletingPublicId() !== null
                         "
                         (click)="startRemoteConfiguration()">
                     <mat-icon>key</mat-icon>
@@ -147,7 +150,8 @@
                         [disabled]="
                             remoteRemoving() ||
                             remoteCreating() ||
-                            remoteDownloadingPublicId() !== null
+                            remoteDownloadingPublicId() !== null ||
+                            remoteDeletingPublicId() !== null
                         "
                         (click)="removeRemoteConfiguration()">
                     <mat-icon>link_off</mat-icon>
@@ -339,32 +343,64 @@
                             </td>
 
                             <td class="management-backups__actions">
-                                <button mat-stroked-button
-                                        type="button"
-                                        [disabled]="
-                                            remoteDownloadingPublicId() !== null ||
-                                            remoteCreating() ||
-                                            creating() ||
-                                            remoteLoading() ||
-                                            remoteSaving() ||
-                                            remoteRemoving() ||
-                                            editingRemoteConfiguration()
-                                        "
-                                        (click)="downloadRemoteBackup(backup)">
-                                    <mat-icon>
+                                <div class="management-backups__row-actions">
+                                    <button mat-stroked-button
+                                            type="button"
+                                            [disabled]="
+                                                remoteDownloadingPublicId() !== null ||
+                                                remoteDeletingPublicId() !== null ||
+                                                remoteCreating() ||
+                                                creating() ||
+                                                remoteLoading() ||
+                                                remoteSaving() ||
+                                                remoteRemoving() ||
+                                                editingRemoteConfiguration()
+                                            "
+                                            (click)="downloadRemoteBackup(backup)">
+                                        <mat-icon>
+                                            {{
+                                                remoteDownloadingPublicId() === backup.publicId
+                                                    ? 'hourglass_top'
+                                                    : 'download'
+                                            }}
+                                        </mat-icon>
+
                                         {{
                                             remoteDownloadingPublicId() === backup.publicId
-                                                ? 'hourglass_top'
-                                                : 'download'
+                                                ? 'Descargando...'
+                                                : 'Descargar'
                                         }}
-                                    </mat-icon>
+                                    </button>
 
-                                    {{
-                                        remoteDownloadingPublicId() === backup.publicId
-                                            ? 'Descargando...'
-                                            : 'Descargar'
-                                    }}
-                                </button>
+                                    <button mat-stroked-button
+                                            type="button"
+                                            class="management-backups__delete-action"
+                                            [disabled]="
+                                                remoteDownloadingPublicId() !== null ||
+                                                remoteDeletingPublicId() !== null ||
+                                                remoteCreating() ||
+                                                creating() ||
+                                                remoteLoading() ||
+                                                remoteSaving() ||
+                                                remoteRemoving() ||
+                                                editingRemoteConfiguration()
+                                            "
+                                            (click)="deleteRemoteBackup(backup)">
+                                        <mat-icon>
+                                            {{
+                                                remoteDeletingPublicId() === backup.publicId
+                                                    ? 'hourglass_top'
+                                                    : 'delete'
+                                            }}
+                                        </mat-icon>
+
+                                        {{
+                                            remoteDeletingPublicId() === backup.publicId
+                                                ? 'Eliminando...'
+                                                : 'Eliminar'
+                                        }}
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                         }
