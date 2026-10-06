@@ -10,6 +10,7 @@ import type {
   BackupRemoteBackup,
   BackupRemoteConnection,
   BackupRemoteDownloadResult,
+  BackupRemoteRestoreAccess,
   BackupRemoteUploadResult,
 } from '@desktop-contracts/backup/backup-remote.interface';
 import type BackupRestoreFinalizeResult from '@desktop-contracts/backup/backup-restore-finalize-result.interface';
@@ -27,6 +28,7 @@ export default function registerBackupIpc(
   getMainWindow: MainWindowProvider,
   backupService: BackupService,
   backupRemoteService: BackupRemoteService,
+  backupRemoteRestoreService: BackupRemoteService,
   backupRemoteCreateService: BackupRemoteCreateService,
   backupRemoteDownloadService: BackupRemoteDownloadService,
   backupRestoreSelectionService: BackupRestoreSelectionService,
@@ -98,6 +100,44 @@ export default function registerBackupIpc(
       await backupRemoteService.delete(publicId);
     },
   );
+
+  ipcMain.handle(
+    IPC_CHANNELS.backupRemoteRestoreConnect,
+    async (event, credentials: unknown): Promise<BackupRemoteRestoreAccess> => {
+      assertTrustedSender(event, getMainWindow);
+
+      /*
+       * Invalida cualquier intento temporal anterior.
+       */
+      await backupRemoteRestoreService.removeConfiguration();
+
+      const connection: BackupRemoteConnection =
+        await backupRemoteRestoreService.configure(credentials);
+
+      try {
+        const backups: readonly BackupRemoteBackup[] = await backupRemoteRestoreService.list();
+
+        return {
+          connection,
+          backups,
+        };
+      } catch (error: unknown) {
+        /*
+         * Una autenticación seguida de un listado fallido
+         * no debe dejar credenciales temporales activas.
+         */
+        await backupRemoteRestoreService.removeConfiguration();
+
+        throw error;
+      }
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.backupRemoteRestoreDisconnect, async (event): Promise<void> => {
+    assertTrustedSender(event, getMainWindow);
+
+    await backupRemoteRestoreService.removeConfiguration();
+  });
 
   ipcMain.handle(
     IPC_CHANNELS.backupSelectRestorePackage,

@@ -1,4 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import type {
+  BackupRemoteCredentials,
+  BackupRemoteRestoreAccess,
+} from '@desktop-contracts/backup/backup-remote.interface';
 import type BackupRestoreFinalizeResult from '@desktop-contracts/backup/backup-restore-finalize-result.interface';
 import type BackupRestorePackageSelectionResult from '@desktop-contracts/backup/backup-restore-package-selection-result.type';
 import type BackupRestoreUnlockCommand from '@desktop-contracts/backup/backup-restore-unlock-command.interface';
@@ -101,7 +105,6 @@ describe('NativeRestoreComponent', (): void => {
     backupService.selectionResult = createNativeSelection();
 
     await component.selectPackage();
-
     await component.finalizeRestore();
 
     expect(backupService.finalizeSelectionId).toBeNull();
@@ -109,16 +112,42 @@ describe('NativeRestoreComponent', (): void => {
     component.restoreForm.backupApiKey().value.set('backup-key');
 
     await component.unlockRestore();
-
     await component.finalizeRestore();
 
     expect(backupService.finalizeSelectionId).toBe(SELECTION_ID);
-
     expect(component.installedResult()).toEqual({
       status: 'installed',
       selectionId: SELECTION_ID,
       backupId: BACKUP_ID,
     });
+  });
+
+  it('conecta temporalmente con TPV Backup y lista sus copias', async (): Promise<void> => {
+    component.remoteRestoreForm.keyId().value.set('  remote-key-id  ');
+    component.remoteRestoreForm.secret().value.set(' remote-secret ');
+
+    await component.connectRemoteRestore();
+
+    expect(backupService.remoteRestoreCredentials).toEqual({
+      keyId: '  remote-key-id  ',
+      secret: ' remote-secret ',
+    });
+
+    expect(component.remoteAccess()?.backups).toHaveLength(1);
+    expect(component.remoteRestoreForm.keyId().value()).toBe('');
+    expect(component.remoteRestoreForm.secret().value()).toBe('');
+    expect(component.remoteError()).toBeNull();
+  });
+
+  it('cierra la sesión temporal de restauración remota', async (): Promise<void> => {
+    component.remoteRestoreForm.keyId().value.set('remote-key-id');
+    component.remoteRestoreForm.secret().value.set('remote-secret');
+
+    await component.connectRemoteRestore();
+    await component.disconnectRemoteRestore();
+
+    expect(backupService.remoteRestoreDisconnectCalls).toBe(1);
+    expect(component.remoteAccess()).toBeNull();
   });
 });
 
@@ -151,6 +180,68 @@ class TestDesktopBackupService {
   unlockCommand: BackupRestoreUnlockCommand | null = null;
 
   finalizeSelectionId: string | null = null;
+
+  remoteRestoreCredentials: BackupRemoteCredentials | null = null;
+
+  remoteRestoreDisconnectCalls: number = 0;
+
+  /**
+   * Simula la apertura de una sesión temporal
+   * para restauración desde TPV Backup.
+   */
+  connectRemoteRestore(credentials: BackupRemoteCredentials): Promise<BackupRemoteRestoreAccess> {
+    this.remoteRestoreCredentials = {
+      ...credentials,
+    };
+
+    return Promise.resolve({
+      connection: {
+        expiresAt: 1_800_003_600,
+
+        installation: {
+          publicId: 'installation-public-id',
+          name: 'Tienda',
+        },
+
+        subscription: {
+          publicId: 'subscription-public-id',
+          name: 'Suscripción',
+          status: 'active',
+        },
+
+        canUpload: true,
+      },
+
+      backups: [
+        {
+          publicId: 'backup-public-id',
+
+          backupId: BACKUP_ID,
+
+          createdAtClient: '2026-10-06 12:00:00',
+
+          formatVersion: 3,
+          applicationVersion: '1.0.0',
+          databaseSchemaVersion: 1,
+          originalFilename: 'backup-remoto.otpv',
+          sizeBytes: 4096,
+
+          sha256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+
+          createdAt: '2026-10-06 12:01:00',
+        },
+      ],
+    });
+  }
+
+  /**
+   * Simula el cierre de la sesión temporal.
+   */
+  disconnectRemoteRestore(): Promise<void> {
+    this.remoteRestoreDisconnectCalls++;
+
+    return Promise.resolve();
+  }
 
   /**
    * Devuelve la selección configurada.

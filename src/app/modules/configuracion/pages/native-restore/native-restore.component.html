@@ -55,9 +55,10 @@
 
         <p>
             Selecciona una copia nativa .otpv creada
-            por Osumi TPV Client. Antes de activar la
-            instalación se comprobarán el cifrado,
-            la estructura y todo su contenido.
+            por Osumi TPV Client o recupérala directamente
+            desde TPV Backup. Antes de activar la instalación
+            se comprobarán el cifrado, la estructura
+            y todo su contenido.
         </p>
     </header>
 
@@ -164,20 +165,221 @@
         </mat-card>
         }
         @else {
-        <button type="button"
-                matButton="filled"
-                [disabled]="selecting()"
-                (click)="selectPackage()">
-            <mat-icon>
-                {{ selecting() ? 'hourglass_top' : 'folder_open' }}
-            </mat-icon>
+        <div class="restore-sources">
+            <section class="restore-source">
+                <header>
+                    <mat-icon aria-hidden="true">
+                        folder_open
+                    </mat-icon>
 
-            {{
-                selecting()
-                    ? 'Seleccionando…'
-                    : 'Seleccionar copia .otpv'
-            }}
-        </button>
+                    <div>
+                        <h2>
+                            Desde este equipo
+                        </h2>
+
+                        <p>
+                            Selecciona un archivo .otpv
+                            guardado localmente.
+                        </p>
+                    </div>
+                </header>
+
+                <button type="button"
+                        matButton="filled"
+                        [disabled]="selecting() || remoteConnecting()"
+                        (click)="selectPackage()">
+                    <mat-icon>
+                        {{ selecting() ? 'hourglass_top' : 'folder_open' }}
+                    </mat-icon>
+
+                    {{
+                        selecting()
+                            ? 'Seleccionando…'
+                            : 'Seleccionar copia .otpv'
+                    }}
+                </button>
+            </section>
+
+            <section class="restore-source">
+                <header>
+                    <mat-icon aria-hidden="true">
+                        cloud
+                    </mat-icon>
+
+                    <div>
+                        <h2>
+                            Desde TPV Backup
+                        </h2>
+
+                        <p>
+                            Conecta temporalmente con TPV Backup
+                            para consultar las copias de esta instalación.
+                        </p>
+                    </div>
+                </header>
+
+                @if (remoteAccess(); as access) {
+                <div class="restore-remote-connection">
+                    <div>
+                        <strong>
+                            {{ access.connection.installation.name }}
+                        </strong>
+
+                        <span>
+                            {{ access.connection.subscription.name }}
+                        </span>
+                    </div>
+
+                    <span>
+                        {{
+                            access.connection.subscription.status === 'active'
+                                ? 'Activa'
+                                : 'Caducada'
+                        }}
+                    </span>
+                </div>
+
+                <div class="restore-remote-backups">
+                    <div class="restore-remote-backups__header">
+                        <h3>
+                            Copias disponibles
+                        </h3>
+
+                        <button type="button"
+                                matButton
+                                (click)="disconnectRemoteRestore()">
+                            <mat-icon>
+                                link_off
+                            </mat-icon>
+
+                            Desconectar
+                        </button>
+                    </div>
+
+                    @if (access.backups.length === 0) {
+                    <p class="restore-remote-empty">
+                        Esta instalación no tiene copias
+                        almacenadas en TPV Backup.
+                    </p>
+                    }
+                    @else {
+                    <div class="restore-remote-list">
+                        @for (backup of access.backups; track backup.publicId) {
+                        <article class="restore-remote-backup">
+                            <div>
+                                <strong>
+                                    {{ backup.originalFilename }}
+                                </strong>
+
+                                <span>
+                                    {{ formatRemoteDate(backup.createdAtClient) }}
+                                </span>
+
+                                <small>
+                                    {{ formatSize(backup.sizeBytes) }}
+                                    · Client {{ backup.applicationVersion }}
+                                </small>
+                            </div>
+                        </article>
+                        }
+                    </div>
+                    }
+                </div>
+                }
+                @else {
+                <div class="restore-remote-form">
+                    <mat-form-field class="otpv-mat-field--transparent-subscript">
+                        <mat-label>
+                            Key ID
+                        </mat-label>
+
+                        <input matInput
+                               autocomplete="off"
+                               [formField]="remoteRestoreForm.keyId">
+
+                        @if (
+                        remoteValidationRequested() &&
+                        remoteRestoreForm.keyId().invalid()
+                        ) {
+                        <mat-error>
+                            {{
+                                remoteRestoreForm.keyId()
+                                    .errors()[0]?.message
+                            }}
+                        </mat-error>
+                        }
+                    </mat-form-field>
+
+                    <mat-form-field class="otpv-mat-field--transparent-subscript">
+                        <mat-label>
+                            Secret
+                        </mat-label>
+
+                        <input matInput
+                               autocomplete="off"
+                               [type]="remoteSecretVisible() ? 'text' : 'password'"
+                               [formField]="remoteRestoreForm.secret">
+
+                        <button mat-icon-button
+                                matSuffix
+                                type="button"
+                                [attr.aria-label]="
+                                    remoteSecretVisible()
+                                        ? 'Ocultar Secret'
+                                        : 'Mostrar Secret'
+                                "
+                                (click)="toggleRemoteSecretVisibility()">
+                            <mat-icon>
+                                {{
+                                    remoteSecretVisible()
+                                        ? 'visibility_off'
+                                        : 'visibility'
+                                }}
+                            </mat-icon>
+                        </button>
+
+                        @if (
+                        remoteValidationRequested() &&
+                        remoteRestoreForm.secret().invalid()
+                        ) {
+                        <mat-error>
+                            {{
+                                remoteRestoreForm.secret()
+                                    .errors()[0]?.message
+                            }}
+                        </mat-error>
+                        }
+                    </mat-form-field>
+
+                    <button type="button"
+                            matButton="filled"
+                            [disabled]="remoteConnecting() || selecting()"
+                            (click)="connectRemoteRestore()">
+                        <mat-icon>
+                            {{
+                                remoteConnecting()
+                                    ? 'hourglass_top'
+                                    : 'cloud'
+                            }}
+                        </mat-icon>
+
+                        {{
+                            remoteConnecting()
+                                ? 'Conectando…'
+                                : 'Conectar con TPV Backup'
+                        }}
+                    </button>
+                </div>
+                }
+
+                @if (remoteError(); as errorMessage) {
+                <p class="restore-error"
+                   role="alert">
+                    {{ errorMessage }}
+                </p>
+                }
+            </section>
+        </div>
         }
 
         @if (selectionError(); as errorMessage) {

@@ -103,6 +103,136 @@
     }
 }
 
+.restore-sources {
+    display: grid;
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    width: 100%;
+}
+
+.restore-source {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+    min-width: 0;
+    padding: 24px;
+    border: 1px solid var(--mat-sys-outline-variant,
+            currentColor);
+    border-radius: 18px;
+
+    >header {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+
+        >mat-icon {
+            color: var(--mat-sys-primary,
+                    currentColor);
+        }
+
+        h2 {
+            margin: 0 0 6px;
+        }
+
+        p {
+            margin: 0;
+            color: var(--mat-sys-on-surface-variant,
+                    currentColor);
+            line-height: 1.5;
+        }
+    }
+}
+
+.restore-remote-form {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+
+    mat-form-field {
+        width: 100%;
+    }
+}
+
+.restore-remote-connection {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    width: 100%;
+    padding: 14px 16px;
+    background: var(--mat-sys-surface-container-low,
+            transparent);
+    border-radius: 12px;
+
+    >div {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+    }
+
+    span {
+        color: var(--mat-sys-on-surface-variant,
+                currentColor);
+    }
+}
+
+.restore-remote-backups {
+    width: 100%;
+
+    &__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+
+        h3 {
+            margin: 0;
+        }
+    }
+}
+
+.restore-remote-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.restore-remote-backup {
+    padding: 14px 16px;
+    background: var(--mat-sys-surface-container-low,
+            transparent);
+    border-radius: 12px;
+
+    >div {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+    }
+
+    strong {
+        overflow-wrap: anywhere;
+    }
+
+    span,
+    small {
+        color: var(--mat-sys-on-surface-variant,
+                currentColor);
+    }
+}
+
+.restore-remote-empty {
+    margin: 16px 0 0;
+    color: var(--mat-sys-on-surface-variant,
+            currentColor);
+}
+
 .restore-key {
     display: flex;
     flex-direction: column;
@@ -185,6 +315,10 @@
     .restore-information,
     .restore-ready,
     .restore-completed {
+        grid-template-columns: 1fr;
+    }
+
+    .restore-sources {
         grid-template-columns: 1fr;
     }
 }

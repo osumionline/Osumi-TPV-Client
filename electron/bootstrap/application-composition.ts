@@ -8,6 +8,8 @@ import InventarioPrintService from '@backend/application/almacen/inventario/inve
 import InventarioService from '@backend/application/almacen/inventario/inventario.service';
 import ApplicationStateService from '@backend/application/application/application-state.service';
 import ArticulosService from '@backend/application/articulos/articulos.service';
+import BackupRemoteCreateService from '@backend/application/backup/backup-remote-create.service';
+import BackupRemoteDownloadService from '@backend/application/backup/backup-remote-download.service';
 import BackupRemoteService from '@backend/application/backup/backup-remote.service';
 import BackupRestoreSelectionService from '@backend/application/backup/backup-restore-selection.service';
 import BackupService from '@backend/application/backup/backup.service';
@@ -118,6 +120,7 @@ import FileOtpvV3RequiredContentValidator from '@infrastructure/backup/file-otpv
 import FileOtpvV3RestoreStagingPreparer from '@infrastructure/backup/file-otpv-v3-restore-staging.preparer';
 import FileOtpvV3RestoreWorkspace from '@infrastructure/backup/file-otpv-v3-restore-workspace';
 import HttpBackupRemoteClient from '@infrastructure/backup/http-backup-remote.client';
+import InMemoryBackupRemoteCredentialStorage from '@infrastructure/backup/in-memory-backup-remote-credential.storage';
 import InMemoryOtpvV3PreparedRestoreStore from '@infrastructure/backup/in-memory-otpv-v3-prepared-restore.store';
 import InMemoryOtpvV3RestoreSelectionStore from '@infrastructure/backup/in-memory-otpv-v3-restore-selection.store';
 import NodeOtpvV3Crypto from '@infrastructure/backup/node-otpv-v3-crypto';
@@ -224,8 +227,6 @@ import { registerSystemIpc } from '@ipc/register-system-ipc';
 import registerReservasIpc from '@ipc/ventas/register-reservas-ipc';
 import registerVentasIpc from '@ipc/ventas/register-ventas-ipc';
 import { join } from 'node:path';
-import BackupRemoteCreateService from '@backend/application/backup/backup-remote-create.service';
-import BackupRemoteDownloadService from '@backend/application/backup/backup-remote-download.service';
 
 /**
  * Construye el grafo de dependencias de la aplicación,
@@ -306,6 +307,20 @@ export default function createApplicationComposition(
   const backupRemoteService: BackupRemoteService = new BackupRemoteService(
     backupRemoteClient,
     backupRemoteCredentialStorage,
+  );
+
+  /*
+   * Sesión remota temporal utilizada exclusivamente
+   * durante una restauración sobre instalación limpia.
+   *
+   * Estas credenciales nunca se escriben en disco.
+   */
+  const backupRemoteRestoreCredentialStorage: BackupRemoteCredentialStorage =
+    new InMemoryBackupRemoteCredentialStorage();
+
+  const backupRemoteRestoreService: BackupRemoteService = new BackupRemoteService(
+    backupRemoteClient,
+    backupRemoteRestoreCredentialStorage,
   );
 
   const backupRemoteCreateService: BackupRemoteCreateService = new BackupRemoteCreateService(
@@ -876,6 +891,7 @@ export default function createApplicationComposition(
     getMainWindow,
     backupService,
     backupRemoteService,
+    backupRemoteRestoreService,
     backupRemoteCreateService,
     backupRemoteDownloadService,
     backupRestoreSelectionService,

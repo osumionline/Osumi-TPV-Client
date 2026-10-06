@@ -23,6 +23,11 @@ export interface BackupRemoteConnection {
   readonly canUpload: boolean;
 }
 
+export interface BackupRemoteRestoreAccess {
+  readonly connection: BackupRemoteConnection;
+  readonly backups: readonly BackupRemoteBackup[];
+}
+
 export interface BackupRemoteUploadResult {
   readonly publicId: string;
   readonly backupId: string;

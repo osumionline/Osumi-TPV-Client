@@ -9,6 +9,8 @@ const IPC_CHANNELS = {
   backupRemoteCreate: 'backup:remote-create',
   backupRemoteDownload: 'backup:remote-download',
   backupRemoteDelete: 'backup:remote-delete',
+  backupRemoteRestoreConnect: 'backup:remote-restore-connect',
+  backupRemoteRestoreDisconnect: 'backup:remote-restore-disconnect',
   backupSelectRestorePackage: 'backup:select-restore-package',
   backupUnlockRestorePackage: 'backup:unlock-restore-package',
   backupFinalizeRestorePackage: 'backup:finalize-restore-package',

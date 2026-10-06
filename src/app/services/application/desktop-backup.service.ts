@@ -5,6 +5,7 @@ import type {
   BackupRemoteConnection,
   BackupRemoteCredentials,
   BackupRemoteDownloadResult,
+  BackupRemoteRestoreAccess,
   BackupRemoteUploadResult,
 } from '@desktop-contracts/backup/backup-remote.interface';
 import type BackupRestoreFinalizeResult from '@desktop-contracts/backup/backup-restore-finalize-result.interface';
@@ -92,5 +93,21 @@ export default class DesktopBackupService {
    */
   deleteRemote(publicId: string): Promise<void> {
     return window.osumiDesktop.backup.deleteRemote(publicId);
+  }
+
+  /**
+   * Abre una sesión temporal con TPV Backup
+   * durante una restauración.
+   */
+  connectRemoteRestore(credentials: BackupRemoteCredentials): Promise<BackupRemoteRestoreAccess> {
+    return window.osumiDesktop.backup.connectRemoteRestore(credentials);
+  }
+
+  /**
+   * Elimina la sesión remota temporal
+   * utilizada durante una restauración.
+   */
+  disconnectRemoteRestore(): Promise<void> {
+    return window.osumiDesktop.backup.disconnectRemoteRestore();
   }
 }

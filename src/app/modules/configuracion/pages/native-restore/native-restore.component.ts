@@ -1,4 +1,4 @@
-import { Component, inject, signal, type WritableSignal } from '@angular/core';
+import { Component, inject, signal, type OnDestroy, type WritableSignal } from '@angular/core';
 import { FieldTree, FormField, form } from '@angular/forms/signals';
 import { MatButton, MatIconButton } from '@angular/material/button';
 import {
@@ -12,12 +12,18 @@ import {
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
+import type {
+  BackupRemoteCredentials,
+  BackupRemoteRestoreAccess,
+} from '@desktop-contracts/backup/backup-remote.interface';
 import type BackupRestoreFinalizeResult from '@desktop-contracts/backup/backup-restore-finalize-result.interface';
 import type BackupRestorePackageSelectionResult from '@desktop-contracts/backup/backup-restore-package-selection-result.type';
 import type BackupRestoreUnlockCommand from '@desktop-contracts/backup/backup-restore-unlock-command.interface';
 import type BackupRestoreUnlockResult from '@desktop-contracts/backup/backup-restore-unlock-result.interface';
 import type RestoreBackupFormModel from '@model/configuracion/restore-backup-form.model';
 import restoreBackupFormSchema from '@model/configuracion/restore-backup-form.schema';
+import type RestoreRemoteFormModel from '@model/configuracion/restore-remote-form.model';
+import restoreRemoteFormSchema from '@model/configuracion/restore-remote-form.schema';
 import DesktopBackupService from '@services/application/desktop-backup.service';
 import { getErrorMessage } from '@utils/error.utils';
 
@@ -48,7 +54,7 @@ type NativeRestoreSelection = Extract<
     MatInput,
   ],
 })
-export default class NativeRestoreComponent {
+export default class NativeRestoreComponent implements OnDestroy {
   private readonly backupService: DesktopBackupService = inject(DesktopBackupService);
 
   private readonly dateFormatter: Intl.DateTimeFormat = new Intl.DateTimeFormat('es-ES', {
@@ -65,29 +71,34 @@ export default class NativeRestoreComponent {
     restoreBackupFormSchema,
   );
 
+  readonly remoteRestoreModel: WritableSignal<RestoreRemoteFormModel> =
+    signal<RestoreRemoteFormModel>({
+      keyId: '',
+      secret: '',
+    });
+  readonly remoteRestoreForm: FieldTree<RestoreRemoteFormModel> = form(
+    this.remoteRestoreModel,
+    restoreRemoteFormSchema,
+  );
+  readonly remoteAccess: WritableSignal<BackupRemoteRestoreAccess | null> =
+    signal<BackupRemoteRestoreAccess | null>(null);
+  readonly remoteConnecting: WritableSignal<boolean> = signal<boolean>(false);
+  readonly remoteValidationRequested: WritableSignal<boolean> = signal<boolean>(false);
+  readonly remoteSecretVisible: WritableSignal<boolean> = signal<boolean>(false);
+  readonly remoteError: WritableSignal<string | null> = signal<string | null>(null);
   readonly selectedPackage: WritableSignal<NativeRestoreSelection | null> =
     signal<NativeRestoreSelection | null>(null);
-
   readonly unlockResult: WritableSignal<BackupRestoreUnlockResult | null> =
     signal<BackupRestoreUnlockResult | null>(null);
-
   readonly installedResult: WritableSignal<BackupRestoreFinalizeResult | null> =
     signal<BackupRestoreFinalizeResult | null>(null);
-
   readonly selecting: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly unlocking: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly finalizing: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly backupApiKeyVisible: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly keyValidationRequested: WritableSignal<boolean> = signal<boolean>(false);
-
   readonly selectionError: WritableSignal<string | null> = signal<string | null>(null);
-
   readonly unlockError: WritableSignal<string | null> = signal<string | null>(null);
-
   readonly finalizeError: WritableSignal<string | null> = signal<string | null>(null);
 
   /**
@@ -272,6 +283,140 @@ export default class NativeRestoreComponent {
     }
 
     return this.dateFormatter.format(date);
+  }
+
+  /**
+   * Elimina cualquier sesión remota temporal
+   * cuando se abandona el flujo de restauración.
+   */
+  ngOnDestroy(): void {
+    void this.backupService.disconnectRemoteRestore().catch((error: unknown): void => {
+      console.error('No se ha podido cerrar la sesión temporal de TPV Backup:', error);
+    });
+  }
+
+  /**
+   * Alterna la visibilidad del Secret remoto.
+   */
+  toggleRemoteSecretVisibility(): void {
+    this.remoteSecretVisible.update((visible: boolean): boolean => !visible);
+  }
+
+  /**
+   * Autentica temporalmente contra TPV Backup
+   * y recupera las copias disponibles.
+   */
+  async connectRemoteRestore(): Promise<void> {
+    if (this.remoteConnecting() || this.selecting() || this.unlocking() || this.finalizing()) {
+      return;
+    }
+
+    this.remoteValidationRequested.set(true);
+    this.remoteError.set(null);
+
+    if (this.remoteRestoreForm.keyId().invalid() || this.remoteRestoreForm.secret().invalid()) {
+      return;
+    }
+
+    const credentials: BackupRemoteCredentials = {
+      keyId: this.remoteRestoreForm.keyId().value(),
+
+      /*
+       * El Secret se transmite exactamente
+       * como lo ha introducido el usuario.
+       */
+      secret: this.remoteRestoreForm.secret().value(),
+    };
+
+    this.remoteConnecting.set(true);
+
+    try {
+      const access: BackupRemoteRestoreAccess =
+        await this.backupService.connectRemoteRestore(credentials);
+
+      this.remoteAccess.set(access);
+
+      /*
+       * Una vez copiadas al Main process,
+       * eliminamos las credenciales del Renderer.
+       */
+      this.clearRemoteCredentials();
+
+      this.remoteValidationRequested.set(false);
+    } catch (error: unknown) {
+      this.remoteAccess.set(null);
+
+      this.remoteError.set(getErrorMessage(error, 'No se ha podido conectar con TPV Backup.'));
+    } finally {
+      this.remoteConnecting.set(false);
+    }
+  }
+
+  /**
+   * Cierra la sesión temporal de restore remoto.
+   */
+  async disconnectRemoteRestore(): Promise<void> {
+    if (this.remoteConnecting()) {
+      return;
+    }
+
+    try {
+      await this.backupService.disconnectRemoteRestore();
+    } catch (error: unknown) {
+      console.error('Error cerrando la sesión temporal de TPV Backup:', error);
+    }
+
+    this.remoteAccess.set(null);
+    this.remoteError.set(null);
+    this.remoteValidationRequested.set(false);
+
+    this.clearRemoteCredentials();
+  }
+
+  /**
+   * Formatea el tamaño de una copia remota.
+   */
+  formatSize(sizeBytes: number): string {
+    if (sizeBytes < 1024) {
+      return `${sizeBytes} B`;
+    }
+
+    const sizeKb: number = sizeBytes / 1024;
+
+    if (sizeKb < 1024) {
+      return `${sizeKb.toFixed(1)} KB`;
+    }
+
+    const sizeMb: number = sizeKb / 1024;
+
+    if (sizeMb < 1024) {
+      return `${sizeMb.toFixed(1)} MB`;
+    }
+
+    return `${(sizeMb / 1024).toFixed(2)} GB`;
+  }
+
+  /**
+   * Formatea la fecha UTC recibida
+   * desde TPV Backup.
+   */
+  formatRemoteDate(value: string): string {
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
+      return this.formatDate(`${value.replace(' ', 'T')}Z`);
+    }
+
+    return this.formatDate(value);
+  }
+
+  /**
+   * Elimina Key ID y Secret del estado
+   * mantenido por el Renderer.
+   */
+  private clearRemoteCredentials(): void {
+    this.remoteRestoreForm.keyId().value.set('');
+    this.remoteRestoreForm.secret().value.set('');
+
+    this.remoteSecretVisible.set(false);
   }
 
   /**
