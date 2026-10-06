@@ -204,6 +204,10 @@
 }
 
 .restore-remote-backup {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
     padding: 14px 16px;
     background: var(--mat-sys-surface-container-low,
             transparent);
@@ -224,6 +228,10 @@
     small {
         color: var(--mat-sys-on-surface-variant,
                 currentColor);
+    }
+
+    >button {
+        flex: 0 0 auto;
     }
 }
 
@@ -320,5 +328,14 @@
 
     .restore-sources {
         grid-template-columns: 1fr;
+    }
+
+    .restore-remote-backup {
+        align-items: stretch;
+        flex-direction: column;
+
+        >button {
+            align-self: flex-start;
+        }
     }
 }

@@ -13,6 +13,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import type {
+  BackupRemoteBackup,
   BackupRemoteCredentials,
   BackupRemoteRestoreAccess,
 } from '@desktop-contracts/backup/backup-remote.interface';
@@ -86,6 +87,8 @@ export default class NativeRestoreComponent implements OnDestroy {
   readonly remoteValidationRequested: WritableSignal<boolean> = signal<boolean>(false);
   readonly remoteSecretVisible: WritableSignal<boolean> = signal<boolean>(false);
   readonly remoteError: WritableSignal<string | null> = signal<string | null>(null);
+  readonly remoteSelectingPublicId: WritableSignal<string | null> = signal<string | null>(null);
+  readonly selectedPackageFromRemote: WritableSignal<boolean> = signal<boolean>(false);
   readonly selectedPackage: WritableSignal<NativeRestoreSelection | null> =
     signal<NativeRestoreSelection | null>(null);
   readonly unlockResult: WritableSignal<BackupRestoreUnlockResult | null> =
@@ -105,7 +108,12 @@ export default class NativeRestoreComponent implements OnDestroy {
    * Abre el selector común de paquetes `.otpv`.
    */
   async selectPackage(): Promise<void> {
-    if (this.selecting() || this.unlocking() || this.finalizing()) {
+    if (
+      this.selecting() ||
+      this.unlocking() ||
+      this.finalizing() ||
+      this.remoteSelectingPublicId() !== null
+    ) {
       return;
     }
 
@@ -139,6 +147,7 @@ export default class NativeRestoreComponent implements OnDestroy {
 
       this.clearSensitiveKey();
 
+      this.selectedPackageFromRemote.set(false);
       this.selectedPackage.set(result);
       this.unlockResult.set(null);
       this.installedResult.set(null);
@@ -155,15 +164,79 @@ export default class NativeRestoreComponent implements OnDestroy {
   }
 
   /**
+   * Descarga una copia de TPV Backup y la registra
+   * en el mismo pipeline utilizado por un archivo local.
+   */
+  async selectRemotePackage(backup: BackupRemoteBackup): Promise<void> {
+    if (
+      this.remoteSelectingPublicId() !== null ||
+      this.selecting() ||
+      this.remoteConnecting() ||
+      this.unlocking() ||
+      this.finalizing()
+    ) {
+      return;
+    }
+
+    this.remoteSelectingPublicId.set(backup.publicId);
+
+    this.remoteError.set(null);
+    this.selectionError.set(null);
+    this.unlockError.set(null);
+    this.finalizeError.set(null);
+
+    try {
+      const result: BackupRestorePackageSelectionResult =
+        await this.backupService.selectRemoteRestorePackage(backup.publicId);
+
+      if (result.status !== 'selected' || result.mode !== 'native-restore') {
+        throw new Error('TPV Backup no ha devuelto una copia nativa válida.');
+      }
+
+      this.clearSensitiveKey();
+
+      this.selectedPackageFromRemote.set(true);
+      this.selectedPackage.set(result);
+      this.unlockResult.set(null);
+      this.installedResult.set(null);
+      this.keyValidationRequested.set(false);
+    } catch (error: unknown) {
+      this.selectedPackageFromRemote.set(false);
+
+      this.remoteError.set(
+        getErrorMessage(error, 'No se ha podido preparar la copia remota para restaurarla.'),
+      );
+    } finally {
+      this.remoteSelectingPublicId.set(null);
+    }
+  }
+
+  /**
    * Elimina la selección mostrada actualmente
    * antes de que exista un staging preparado.
    */
-  clearSelection(): void {
+  async clearSelection(): Promise<void> {
     if (this.unlockResult() !== null || this.unlocking() || this.finalizing()) {
       return;
     }
 
+    const fromRemote: boolean = this.selectedPackageFromRemote();
+
     this.clearLocalSelection();
+
+    if (!fromRemote) {
+      return;
+    }
+
+    try {
+      await this.backupService.clearRemoteRestorePackage();
+    } catch (error: unknown) {
+      console.error('No se ha podido limpiar la copia remota temporal:', error);
+
+      this.selectionError.set(
+        getErrorMessage(error, 'No se ha podido limpiar completamente la selección remota.'),
+      );
+    }
   }
 
   /**
@@ -307,7 +380,13 @@ export default class NativeRestoreComponent implements OnDestroy {
    * y recupera las copias disponibles.
    */
   async connectRemoteRestore(): Promise<void> {
-    if (this.remoteConnecting() || this.selecting() || this.unlocking() || this.finalizing()) {
+    if (
+      this.remoteConnecting() ||
+      this.selecting() ||
+      this.unlocking() ||
+      this.finalizing() ||
+      this.remoteSelectingPublicId() !== null
+    ) {
       return;
     }
 
@@ -356,7 +435,7 @@ export default class NativeRestoreComponent implements OnDestroy {
    * Cierra la sesión temporal de restore remoto.
    */
   async disconnectRemoteRestore(): Promise<void> {
-    if (this.remoteConnecting()) {
+    if (this.remoteConnecting() || this.remoteSelectingPublicId() !== null) {
       return;
     }
 
@@ -425,6 +504,7 @@ export default class NativeRestoreComponent implements OnDestroy {
    */
   private clearLocalSelection(): void {
     this.selectedPackage.set(null);
+    this.selectedPackageFromRemote.set(false);
     this.unlockResult.set(null);
     this.installedResult.set(null);
 

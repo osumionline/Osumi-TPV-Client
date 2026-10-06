@@ -1,5 +1,6 @@
 import type BackupRemoteCreateService from '@backend/application/backup/backup-remote-create.service';
 import type BackupRemoteDownloadService from '@backend/application/backup/backup-remote-download.service';
+import type BackupRemoteRestoreSelectionService from '@backend/application/backup/backup-remote-restore-selection.service';
 import type BackupRemoteService from '@backend/application/backup/backup-remote.service';
 import type BackupRestoreSelectionService from '@backend/application/backup/backup-restore-selection.service';
 import type BackupService from '@backend/application/backup/backup.service';
@@ -29,6 +30,7 @@ export default function registerBackupIpc(
   backupService: BackupService,
   backupRemoteService: BackupRemoteService,
   backupRemoteRestoreService: BackupRemoteService,
+  backupRemoteRestoreSelectionService: BackupRemoteRestoreSelectionService,
   backupRemoteCreateService: BackupRemoteCreateService,
   backupRemoteDownloadService: BackupRemoteDownloadService,
   backupRestoreSelectionService: BackupRestoreSelectionService,
@@ -136,7 +138,30 @@ export default function registerBackupIpc(
   ipcMain.handle(IPC_CHANNELS.backupRemoteRestoreDisconnect, async (event): Promise<void> => {
     assertTrustedSender(event, getMainWindow);
 
-    await backupRemoteRestoreService.removeConfiguration();
+    try {
+      await backupRemoteRestoreSelectionService.clear();
+    } finally {
+      /*
+       * Las credenciales temporales deben desaparecer
+       * incluso si falla la limpieza del fichero.
+       */
+      await backupRemoteRestoreService.removeConfiguration();
+    }
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.backupRemoteRestoreSelect,
+    async (event, publicId: unknown): Promise<BackupRestorePackageSelectionResult> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return backupRemoteRestoreSelectionService.select(publicId);
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.backupRemoteRestoreClearPackage, async (event): Promise<void> => {
+    assertTrustedSender(event, getMainWindow);
+
+    await backupRemoteRestoreSelectionService.clear();
   });
 
   ipcMain.handle(

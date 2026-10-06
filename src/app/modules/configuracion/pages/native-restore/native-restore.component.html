@@ -186,7 +186,7 @@
 
                 <button type="button"
                         matButton="filled"
-                        [disabled]="selecting() || remoteConnecting()"
+                        [disabled]="selecting() || remoteConnecting() || remoteSelectingPublicId() !== null"
                         (click)="selectPackage()">
                     <mat-icon>
                         {{ selecting() ? 'hourglass_top' : 'folder_open' }}
@@ -247,6 +247,7 @@
 
                         <button type="button"
                                 matButton
+                                [disabled]="remoteSelectingPublicId() !== null"
                                 (click)="disconnectRemoteRestore()">
                             <mat-icon>
                                 link_off
@@ -280,6 +281,29 @@
                                     · Client {{ backup.applicationVersion }}
                                 </small>
                             </div>
+                            <button type="button"
+                                    matButton="filled"
+                                    [disabled]="
+                                        remoteSelectingPublicId() !== null ||
+                                        selecting() ||
+                                        unlocking() ||
+                                        finalizing()
+                                    "
+                                    (click)="selectRemotePackage(backup)">
+                                <mat-icon>
+                                    {{
+                                        remoteSelectingPublicId() === backup.publicId
+                                            ? 'hourglass_top'
+                                            : 'restore'
+                                    }}
+                                </mat-icon>
+
+                                {{
+                                    remoteSelectingPublicId() === backup.publicId
+                                        ? 'Descargando…'
+                                        : 'Restaurar'
+                                }}
+                            </button>
                         </article>
                         }
                     </div>

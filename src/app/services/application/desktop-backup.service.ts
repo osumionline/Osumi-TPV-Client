@@ -110,4 +110,20 @@ export default class DesktopBackupService {
   disconnectRemoteRestore(): Promise<void> {
     return window.osumiDesktop.backup.disconnectRemoteRestore();
   }
+
+  /**
+   * Descarga y selecciona una copia remota
+   * para el pipeline de restauración.
+   */
+  selectRemoteRestorePackage(publicId: string): Promise<BackupRestorePackageSelectionResult> {
+    return window.osumiDesktop.backup.selectRemoteRestorePackage(publicId);
+  }
+
+  /**
+   * Elimina el paquete temporal
+   * de restauración remota.
+   */
+  clearRemoteRestorePackage(): Promise<void> {
+    return window.osumiDesktop.backup.clearRemoteRestorePackage();
+  }
 }

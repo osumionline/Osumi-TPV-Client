@@ -86,6 +86,28 @@ describe('BackupRestoreSelectionService', (): void => {
       createdAt: '2026-09-24T10:00:00.000Z',
     });
   });
+
+  it('permite registrar directamente una copia utilizando un nombre de presentación', async (): Promise<void> => {
+    const service: BackupRestoreSelectionService = createService(
+      new TestOtpvPackageDialog(null),
+      new TestOtpvPackageInspector({
+        formatVersion: OTPV_V3_FORMAT_VERSION,
+        manifest: createV3Manifest(),
+      }),
+    );
+
+    const result: BackupRestorePackageSelectionResult = await service.selectPackagePath(
+      'C:\\staging\\remote-restore\\temporary.otpv',
+      'copia-remota-original.otpv',
+    );
+
+    expect(result).toMatchObject({
+      status: 'selected',
+      mode: 'native-restore',
+      fileName: 'copia-remota-original.otpv',
+      backupId: '11111111-1111-4111-8111-111111111111',
+    });
+  });
 });
 
 /**

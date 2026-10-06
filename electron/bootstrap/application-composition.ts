@@ -10,6 +10,7 @@ import ApplicationStateService from '@backend/application/application/applicatio
 import ArticulosService from '@backend/application/articulos/articulos.service';
 import BackupRemoteCreateService from '@backend/application/backup/backup-remote-create.service';
 import BackupRemoteDownloadService from '@backend/application/backup/backup-remote-download.service';
+import BackupRemoteRestoreSelectionService from '@backend/application/backup/backup-remote-restore-selection.service';
 import BackupRemoteService from '@backend/application/backup/backup-remote.service';
 import BackupRestoreSelectionService from '@backend/application/backup/backup-restore-selection.service';
 import BackupService from '@backend/application/backup/backup.service';
@@ -322,6 +323,14 @@ export default function createApplicationComposition(
     backupRemoteClient,
     backupRemoteRestoreCredentialStorage,
   );
+
+  const backupRemoteRestoreDirectory: string = join(
+    applicationPaths.stagingDirectory,
+    'remote-restore',
+  );
+
+  const backupRemoteRestoreDownloadService: BackupRemoteDownloadService =
+    new BackupRemoteDownloadService(backupRemoteRestoreDirectory, backupRemoteRestoreService);
 
   const backupRemoteCreateService: BackupRemoteCreateService = new BackupRemoteCreateService(
     join(applicationPaths.stagingDirectory, 'remote-upload'),
@@ -821,6 +830,13 @@ export default function createApplicationComposition(
       otpvV3PreparedRestoreStore,
     );
 
+  const backupRemoteRestoreSelectionService: BackupRemoteRestoreSelectionService =
+    new BackupRemoteRestoreSelectionService(
+      backupRemoteRestoreDirectory,
+      backupRemoteRestoreDownloadService,
+      backupRestoreSelectionService,
+    );
+
   const otpvV3RestoreUnlockService: OtpvV3RestoreUnlockService = new OtpvV3RestoreUnlockService(
     otpvV3RestoreSelectionStore,
     otpvPackageInspector,
@@ -892,6 +908,7 @@ export default function createApplicationComposition(
     backupService,
     backupRemoteService,
     backupRemoteRestoreService,
+    backupRemoteRestoreSelectionService,
     backupRemoteCreateService,
     backupRemoteDownloadService,
     backupRestoreSelectionService,

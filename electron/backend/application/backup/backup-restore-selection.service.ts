@@ -1,4 +1,5 @@
 import type OtpvPackageSelectionService from '@backend/application/backup/otpv-package-selection.service';
+import type BackupRestorePackageSelector from '@backend/contracts/backup/backup-restore-package-selector.interface';
 import type OtpvPackageDialog from '@backend/contracts/backup/otpv-package-dialog.interface';
 import type OtpvV3PreparedRestoreStore from '@backend/contracts/backup/otpv-v3-prepared-restore-store.interface';
 import type OtpvV3RestoreStagingPreparer from '@backend/contracts/backup/otpv-v3-restore-staging-preparer.interface';
@@ -11,7 +12,7 @@ import { basename } from 'node:path';
  * Coordina la selección de un `.otpv`
  * y expone únicamente sus metadatos públicos.
  */
-export default class BackupRestoreSelectionService {
+export default class BackupRestoreSelectionService implements BackupRestorePackageSelector {
   /**
    * Crea el servicio de selección de restauración.
    */
@@ -24,8 +25,8 @@ export default class BackupRestoreSelectionService {
   ) {}
 
   /**
-   * Permite seleccionar un `.otpv` y lo enruta
-   * hacia importación legacy o restauración nativa.
+   * Permite seleccionar un `.otpv` mediante diálogo
+   * y lo enruta hacia el flujo correspondiente.
    */
   async selectPackage(): Promise<BackupRestorePackageSelectionResult> {
     const packagePath: string | null = await this.dialog.selectPackage();
@@ -36,6 +37,20 @@ export default class BackupRestoreSelectionService {
       };
     }
 
+    return this.selectPackagePath(packagePath);
+  }
+
+  /**
+   * Registra directamente un `.otpv` ya disponible
+   * en una ruta controlada por el proceso principal.
+   *
+   * fileName permite conservar un nombre de presentación
+   * distinto del nombre físico temporal.
+   */
+  async selectPackagePath(
+    packagePath: string,
+    fileName: string = basename(packagePath),
+  ): Promise<BackupRestorePackageSelectionResult> {
     this.preparedRestoreStore.clear();
 
     await Promise.all([this.restoreWorkspace.clear(), this.restoreStagingPreparer.clear()]);
@@ -62,7 +77,7 @@ export default class BackupRestoreSelectionService {
         mode: 'native-restore',
         selectionId: selection.selectionId,
         formatVersion: selection.formatVersion,
-        fileName: basename(packagePath),
+        fileName,
         backupId: selection.manifest.backupId,
         applicationVersion: selection.manifest.applicationVersion,
         databaseSchemaVersion: selection.manifest.databaseSchemaVersion,

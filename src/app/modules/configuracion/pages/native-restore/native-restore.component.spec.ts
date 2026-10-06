@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import type {
+  BackupRemoteBackup,
   BackupRemoteCredentials,
   BackupRemoteRestoreAccess,
 } from '@desktop-contracts/backup/backup-remote.interface';
@@ -149,6 +150,60 @@ describe('NativeRestoreComponent', (): void => {
     expect(backupService.remoteRestoreDisconnectCalls).toBe(1);
     expect(component.remoteAccess()).toBeNull();
   });
+
+  it('selecciona una copia remota utilizando el pipeline nativo', async (): Promise<void> => {
+    component.remoteRestoreForm.keyId().value.set('remote-key-id');
+
+    component.remoteRestoreForm.secret().value.set('remote-secret');
+
+    await component.connectRemoteRestore();
+
+    const backup: BackupRemoteBackup | undefined = component.remoteAccess()?.backups[0];
+
+    expect(backup).toBeDefined();
+
+    if (backup === undefined) {
+      throw new Error('No existe la copia remota de prueba.');
+    }
+
+    await component.selectRemotePackage(backup);
+
+    expect(backupService.remoteRestoreSelectionPublicIds).toEqual(['backup-public-id']);
+
+    expect(component.selectedPackage()).toMatchObject({
+      mode: 'native-restore',
+      backupId: BACKUP_ID,
+      fileName: 'backup-remoto.otpv',
+    });
+
+    expect(component.selectedPackageFromRemote()).toBe(true);
+
+    expect(component.remoteSelectingPublicId()).toBeNull();
+  });
+
+  it('elimina el temporal al quitar una selección remota', async (): Promise<void> => {
+    component.remoteRestoreForm.keyId().value.set('remote-key-id');
+
+    component.remoteRestoreForm.secret().value.set('remote-secret');
+
+    await component.connectRemoteRestore();
+
+    const backup: BackupRemoteBackup | undefined = component.remoteAccess()?.backups[0];
+
+    if (backup === undefined) {
+      throw new Error('No existe la copia remota de prueba.');
+    }
+
+    await component.selectRemotePackage(backup);
+
+    await component.clearSelection();
+
+    expect(backupService.remoteRestoreClearPackageCalls).toBe(1);
+
+    expect(component.selectedPackage()).toBeNull();
+
+    expect(component.selectedPackageFromRemote()).toBe(false);
+  });
 });
 
 /**
@@ -176,14 +231,12 @@ class TestDesktopBackupService {
   selectionResult: BackupRestorePackageSelectionResult = {
     status: 'cancelled',
   };
-
   unlockCommand: BackupRestoreUnlockCommand | null = null;
-
   finalizeSelectionId: string | null = null;
-
   remoteRestoreCredentials: BackupRemoteCredentials | null = null;
-
   remoteRestoreDisconnectCalls: number = 0;
+  readonly remoteRestoreSelectionPublicIds: string[] = [];
+  remoteRestoreClearPackageCalls: number = 0;
 
   /**
    * Simula la apertura de una sesión temporal
@@ -274,5 +327,26 @@ class TestDesktopBackupService {
       selectionId,
       backupId: BACKUP_ID,
     });
+  }
+
+  /**
+   * Simula la selección de una copia remota.
+   */
+  selectRemoteRestorePackage(publicId: string): Promise<BackupRestorePackageSelectionResult> {
+    this.remoteRestoreSelectionPublicIds.push(publicId);
+
+    return Promise.resolve({
+      ...createNativeSelection(),
+      fileName: 'backup-remoto.otpv',
+    });
+  }
+
+  /**
+   * Simula la limpieza del paquete remoto temporal.
+   */
+  clearRemoteRestorePackage(): Promise<void> {
+    this.remoteRestoreClearPackageCalls++;
+
+    return Promise.resolve();
   }
 }

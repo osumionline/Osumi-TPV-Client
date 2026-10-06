@@ -88,4 +88,16 @@ export default interface BackupApi {
    * durante una restauración remota.
    */
   disconnectRemoteRestore(): Promise<void>;
+
+  /**
+   * Descarga y registra una copia de TPV Backup
+   * como selección del restore nativo.
+   */
+  selectRemoteRestorePackage(publicId: string): Promise<BackupRestorePackageSelectionResult>;
+
+  /**
+   * Elimina el `.otpv` temporal utilizado
+   * por una selección remota.
+   */
+  clearRemoteRestorePackage(): Promise<void>;
 }

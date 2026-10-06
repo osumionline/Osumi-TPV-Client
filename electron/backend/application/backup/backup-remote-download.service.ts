@@ -1,6 +1,7 @@
 import type BackupRemoteService from '@backend/application/backup/backup-remote.service';
 import { BackupRemoteClientError } from '@backend/contracts/backup/backup-remote-client.error';
 import type { BackupRemoteDownloadTransferResult } from '@backend/contracts/backup/backup-remote-client.interface';
+import type BackupRemoteDownloader from '@backend/contracts/backup/backup-remote-downloader.interface';
 import type {
   BackupRemoteBackup,
   BackupRemoteDownloadResult,
@@ -11,16 +12,16 @@ import { join } from 'node:path';
 
 /**
  * Orquesta la descarga segura de una copia remota
- * hacia el directorio local de backups.
+ * hacia un directorio controlado.
  */
-export default class BackupRemoteDownloadService {
+export default class BackupRemoteDownloadService implements BackupRemoteDownloader {
   private downloading: boolean = false;
 
   /**
    * Crea el servicio de descarga remota.
    */
   constructor(
-    private readonly backupsDirectory: string,
+    private readonly destinationDirectory: string,
     private readonly remoteService: BackupRemoteService,
   ) {}
 
@@ -39,10 +40,13 @@ export default class BackupRemoteDownloadService {
 
     const downloadId: string = randomUUID();
 
-    const temporaryFile: string = join(this.backupsDirectory, `.remote-download-${downloadId}.tmp`);
+    const temporaryFile: string = join(
+      this.destinationDirectory,
+      `.remote-download-${downloadId}.tmp`,
+    );
     const fileName: string = `osumi-tpv-backup-remote-${downloadId}.otpv`;
 
-    const destinationFile: string = join(this.backupsDirectory, fileName);
+    const destinationFile: string = join(this.destinationDirectory, fileName);
 
     let promoted: boolean = false;
 

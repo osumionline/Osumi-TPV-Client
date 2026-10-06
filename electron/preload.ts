@@ -253,6 +253,15 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
         IPC_CHANNELS.backupFinalizeRestorePackage,
         selectionId,
       ) as Promise<BackupRestoreFinalizeResult>,
+
+    selectRemoteRestorePackage: (publicId: string): Promise<BackupRestorePackageSelectionResult> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.backupRemoteRestoreSelect,
+        publicId,
+      ) as Promise<BackupRestorePackageSelectionResult>,
+
+    clearRemoteRestorePackage: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.backupRemoteRestoreClearPackage) as Promise<void>,
   }),
 
   almacen: Object.freeze({
