@@ -355,11 +355,8 @@ describe('HttpBackupRemoteClient', (): void => {
 
       return new Response(content, {
         status: 200,
-
         headers: {
           'Content-Type': 'application/octet-stream',
-
-          'Content-Length': String(content.length),
         },
       });
     };

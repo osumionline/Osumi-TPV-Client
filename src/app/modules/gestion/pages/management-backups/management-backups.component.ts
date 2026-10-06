@@ -16,6 +16,7 @@ import type BackupCreateResult from '@desktop-contracts/backup/backup-create-res
 import type {
   BackupRemoteBackup,
   BackupRemoteConnection,
+  BackupRemoteDownloadResult,
   BackupRemoteUploadResult,
 } from '@desktop-contracts/backup/backup-remote.interface';
 import { DialogService } from '@osumi/angular-tools';
@@ -46,12 +47,16 @@ export default class ManagementBackupsComponent implements OnInit {
   readonly remoteError: WritableSignal<string | null> = signal<string | null>(null);
   readonly editingRemoteConfiguration: WritableSignal<boolean> = signal<boolean>(false);
   readonly remoteCreating: WritableSignal<boolean> = signal<boolean>(false);
+  readonly remoteDownloadingPublicId: WritableSignal<string | null> = signal<string | null>(null);
   readonly remoteKeyId: WritableSignal<string> = signal<string>('');
   readonly remoteSecret: WritableSignal<string> = signal<string>('');
 
   readonly canConfigureRemote: Signal<boolean> = computed(
     (): boolean =>
-      !this.remoteSaving() && this.remoteKeyId().trim() !== '' && this.remoteSecret() !== '',
+      !this.remoteSaving() &&
+      this.remoteDownloadingPublicId() === null &&
+      this.remoteKeyId().trim() !== '' &&
+      this.remoteSecret() !== '',
   );
 
   /**
@@ -65,7 +70,7 @@ export default class ManagementBackupsComponent implements OnInit {
    * Crea una copia local completa de Osumi TPV.
    */
   async createBackup(): Promise<void> {
-    if (this.creating() || this.remoteCreating()) {
+    if (this.creating() || this.remoteCreating() || this.remoteDownloadingPublicId() !== null) {
       return;
     }
 
@@ -97,7 +102,7 @@ export default class ManagementBackupsComponent implements OnInit {
    * directamente en TPV Backup.
    */
   async createRemoteBackup(): Promise<void> {
-    if (this.remoteCreating() || this.creating()) {
+    if (this.remoteCreating() || this.creating() || this.remoteDownloadingPublicId() !== null) {
       return;
     }
 
@@ -132,6 +137,47 @@ export default class ManagementBackupsComponent implements OnInit {
     await this.reloadRemoteBackups(
       'La copia se ha subido correctamente, pero no se ha podido actualizar el listado.',
     );
+  }
+
+  /**
+   * Descarga una copia remota y la conserva
+   * en el directorio local de backups.
+   */
+  async downloadRemoteBackup(backup: BackupRemoteBackup): Promise<void> {
+    if (
+      this.remoteDownloadingPublicId() !== null ||
+      this.creating() ||
+      this.remoteCreating() ||
+      this.remoteLoading() ||
+      this.remoteSaving() ||
+      this.remoteRemoving() ||
+      this.editingRemoteConfiguration()
+    ) {
+      return;
+    }
+
+    this.remoteDownloadingPublicId.set(backup.publicId);
+
+    this.remoteError.set(null);
+
+    try {
+      const result: BackupRemoteDownloadResult = await this.backupService.downloadRemote(
+        backup.publicId,
+      );
+
+      this.dialog.alert({
+        title: 'Copia descargada',
+        content:
+          `La copia "${result.originalFilename}" ` +
+          `se ha guardado localmente como "${result.fileName}".`,
+      });
+    } catch (error: unknown) {
+      console.error('Error descargando la copia remota:', error);
+
+      this.remoteError.set(getErrorMessage(error, 'No se ha podido descargar la copia remota.'));
+    } finally {
+      this.remoteDownloadingPublicId.set(null);
+    }
   }
 
   /**
@@ -234,7 +280,7 @@ export default class ManagementBackupsComponent implements OnInit {
    * sin modificar ninguna copia almacenada en el servidor.
    */
   async removeRemoteConfiguration(): Promise<void> {
-    if (this.remoteRemoving()) {
+    if (this.remoteRemoving() || this.remoteDownloadingPublicId() !== null) {
       return;
     }
 

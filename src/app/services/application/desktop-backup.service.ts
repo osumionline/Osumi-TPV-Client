@@ -4,6 +4,7 @@ import type {
   BackupRemoteBackup,
   BackupRemoteConnection,
   BackupRemoteCredentials,
+  BackupRemoteDownloadResult,
   BackupRemoteUploadResult,
 } from '@desktop-contracts/backup/backup-remote.interface';
 import type BackupRestoreFinalizeResult from '@desktop-contracts/backup/backup-restore-finalize-result.interface';
@@ -75,5 +76,13 @@ export default class DesktopBackupService {
    */
   createRemote(): Promise<BackupRemoteUploadResult> {
     return window.osumiDesktop.backup.createRemote();
+  }
+
+  /**
+   * Descarga una copia remota al directorio
+   * local de backups.
+   */
+  downloadRemote(publicId: string): Promise<BackupRemoteDownloadResult> {
+    return window.osumiDesktop.backup.downloadRemote(publicId);
   }
 }

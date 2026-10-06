@@ -32,6 +32,15 @@ export interface BackupRemoteUploadResult {
   readonly sha256: string;
 }
 
+export interface BackupRemoteDownloadResult {
+  readonly publicId: string;
+  readonly backupId: string;
+  readonly originalFilename: string;
+  readonly fileName: string;
+  readonly sizeBytes: number;
+  readonly sha256: string;
+}
+
 export interface BackupRemoteBackup {
   readonly publicId: string;
   readonly backupId: string;

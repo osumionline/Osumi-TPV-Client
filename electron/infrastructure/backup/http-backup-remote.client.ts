@@ -221,7 +221,7 @@ export default class HttpBackupRemoteClient implements BackupRemoteClient {
       throw this.createHttpError(response.status, payload);
     }
 
-    const expectedSize: number = this.getDownloadContentLength(response);
+    const expectedSize: number | null = this.getDownloadContentLength(response);
 
     if (response.body === null) {
       throw new BackupRemoteClientError(
@@ -268,7 +268,7 @@ export default class HttpBackupRemoteClient implements BackupRemoteClient {
             );
           }
 
-          if (sizeBytes > expectedSize) {
+          if (expectedSize !== null && sizeBytes > expectedSize) {
             throw new BackupRemoteClientError(
               'temporary',
               'La descarga recibida no coincide con el tamaño anunciado por TPV Backup.',
@@ -295,7 +295,7 @@ export default class HttpBackupRemoteClient implements BackupRemoteClient {
         reader.releaseLock();
       }
 
-      if (sizeBytes !== expectedSize) {
+      if (expectedSize !== null && sizeBytes !== expectedSize) {
         throw new BackupRemoteClientError(
           'temporary',
           'La descarga de TPV Backup ha quedado incompleta.',
@@ -518,15 +518,22 @@ export default class HttpBackupRemoteClient implements BackupRemoteClient {
 
   /**
    * Obtiene y valida el tamaño anunciado
-   * para una descarga remota.
+   * para una descarga remota cuando está disponible.
+   *
+   * Content-Length es opcional porque una respuesta
+   * HTTP servida por streaming puede no exponerlo.
    */
-  private getDownloadContentLength(response: Response): number {
+  private getDownloadContentLength(response: Response): number | null {
     const rawValue: string | null = response.headers.get('Content-Length');
 
-    if (rawValue === null || !/^\d+$/.test(rawValue)) {
+    if (rawValue === null) {
+      return null;
+    }
+
+    if (!/^\d+$/.test(rawValue)) {
       throw new BackupRemoteClientError(
         'invalid-response',
-        'TPV Backup no ha indicado un tamaño válido para la descarga.',
+        'TPV Backup ha indicado un tamaño de descarga no válido.',
         response.status,
       );
     }

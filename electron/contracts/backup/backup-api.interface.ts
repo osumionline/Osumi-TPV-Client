@@ -3,6 +3,7 @@ import type {
   BackupRemoteBackup,
   BackupRemoteConnection,
   BackupRemoteCredentials,
+  BackupRemoteDownloadResult,
   BackupRemoteUploadResult,
 } from '@desktop-contracts/backup/backup-remote.interface';
 import type BackupRestoreFinalizeResult from '@desktop-contracts/backup/backup-restore-finalize-result.interface';
@@ -62,4 +63,10 @@ export default interface BackupApi {
    * directamente en TPV Backup.
    */
   createRemote(): Promise<BackupRemoteUploadResult>;
+
+  /**
+   * Descarga una copia remota al almacenamiento
+   * local de copias de seguridad.
+   */
+  downloadRemote(publicId: string): Promise<BackupRemoteDownloadResult>;
 }

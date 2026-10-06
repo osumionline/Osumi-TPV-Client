@@ -324,6 +324,11 @@
         white-space: nowrap;
     }
 
+    .management-backups__actions {
+        text-align: right !important;
+        white-space: nowrap;
+    }
+
     .management-backups__filename {
         display: flex;
         flex-direction: column;

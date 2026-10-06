@@ -41,6 +41,7 @@ import type {
   BackupRemoteBackup,
   BackupRemoteConnection,
   BackupRemoteCredentials,
+  BackupRemoteDownloadResult,
   BackupRemoteUploadResult,
 } from '@desktop-contracts/backup/backup-remote.interface';
 import type BackupRestoreFinalizeResult from '@desktop-contracts/backup/backup-restore-finalize-result.interface';
@@ -212,6 +213,12 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
 
     createRemote: (): Promise<BackupRemoteUploadResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.backupRemoteCreate) as Promise<BackupRemoteUploadResult>,
+
+    downloadRemote: (publicId: string): Promise<BackupRemoteDownloadResult> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.backupRemoteDownload,
+        publicId,
+      ) as Promise<BackupRemoteDownloadResult>,
 
     selectRestorePackage: (): Promise<BackupRestorePackageSelectionResult> =>
       ipcRenderer.invoke(

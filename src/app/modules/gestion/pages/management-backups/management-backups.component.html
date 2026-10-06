@@ -44,7 +44,11 @@
 
         <button mat-flat-button
                 type="button"
-                [disabled]="creating() || remoteCreating()"
+                [disabled]="
+                    creating() ||
+                    remoteCreating() ||
+                    remoteDownloadingPublicId() !== null
+                "
                 (click)="createBackup()">
             <mat-icon>
                 {{ creating() ? 'hourglass_top' : 'save' }}
@@ -104,6 +108,7 @@
                           remoteLoading() ||
                           remoteSaving() ||
                           remoteRemoving() ||
+                          remoteDownloadingPublicId() !== null ||
                           editingRemoteConfiguration()
                         "
                         (click)="createRemoteBackup()">
@@ -118,7 +123,7 @@
 
                 <button mat-stroked-button
                         type="button"
-                        [disabled]="remoteLoading()"
+                        [disabled]="remoteLoading() || remoteDownloadingPublicId() !== null"
                         (click)="refreshRemote()">
                     <mat-icon>refresh</mat-icon>
 
@@ -127,7 +132,11 @@
 
                 <button mat-stroked-button
                         type="button"
-                        [disabled]="remoteCreating() || remoteRemoving()"
+                        [disabled]="
+                            remoteCreating() ||
+                            remoteRemoving() ||
+                            remoteDownloadingPublicId() !== null
+                        "
                         (click)="startRemoteConfiguration()">
                     <mat-icon>key</mat-icon>
                     Cambiar credenciales
@@ -135,7 +144,11 @@
 
                 <button mat-stroked-button
                         type="button"
-                        [disabled]="remoteRemoving() || remoteCreating()"
+                        [disabled]="
+                            remoteRemoving() ||
+                            remoteCreating() ||
+                            remoteDownloadingPublicId() !== null
+                        "
                         (click)="removeRemoteConfiguration()">
                     <mat-icon>link_off</mat-icon>
 
@@ -290,6 +303,11 @@
                                 class="management-backups__numeric">
                                 Tamaño
                             </th>
+
+                            <th scope="col"
+                                class="management-backups__actions">
+                                Acciones
+                            </th>
                         </tr>
                     </thead>
 
@@ -318,6 +336,35 @@
 
                             <td class="management-backups__numeric">
                                 {{ formatSize(backup.sizeBytes) }}
+                            </td>
+
+                            <td class="management-backups__actions">
+                                <button mat-stroked-button
+                                        type="button"
+                                        [disabled]="
+                                            remoteDownloadingPublicId() !== null ||
+                                            remoteCreating() ||
+                                            creating() ||
+                                            remoteLoading() ||
+                                            remoteSaving() ||
+                                            remoteRemoving() ||
+                                            editingRemoteConfiguration()
+                                        "
+                                        (click)="downloadRemoteBackup(backup)">
+                                    <mat-icon>
+                                        {{
+                                            remoteDownloadingPublicId() === backup.publicId
+                                                ? 'hourglass_top'
+                                                : 'download'
+                                        }}
+                                    </mat-icon>
+
+                                    {{
+                                        remoteDownloadingPublicId() === backup.publicId
+                                            ? 'Descargando...'
+                                            : 'Descargar'
+                                    }}
+                                </button>
                             </td>
                         </tr>
                         }

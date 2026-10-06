@@ -6,6 +6,7 @@ import type {
   BackupRemoteBackup,
   BackupRemoteConnection,
   BackupRemoteCredentials,
+  BackupRemoteDownloadResult,
   BackupRemoteUploadResult,
 } from '@desktop-contracts/backup/backup-remote.interface';
 import ManagementBackupsComponent from '@modules/gestion/pages/management-backups/management-backups.component';
@@ -20,6 +21,7 @@ class TestDesktopBackupService {
   remoteConnection: BackupRemoteConnection | null = createRemoteConnection();
   remoteBackups: readonly BackupRemoteBackup[] = [createRemoteBackup()];
   removeCalls = 0;
+  readonly remoteDownloadCalls: string[] = [];
 
   /**
    * Simula la creación correcta de una copia.
@@ -86,6 +88,22 @@ class TestDesktopBackupService {
       originalFilename: 'remote-backup.otpv',
       sizeBytes: 2_097_152,
       sha256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    };
+  }
+
+  /**
+   * Simula la descarga de una copia remota.
+   */
+  async downloadRemote(publicId: string): Promise<BackupRemoteDownloadResult> {
+    this.remoteDownloadCalls.push(publicId);
+
+    return {
+      publicId,
+      backupId: '123e4567-e89b-42d3-a456-426614174000',
+      originalFilename: 'backup.otpv',
+      fileName: 'osumi-tpv-backup-remote-test.otpv',
+      sizeBytes: 18_985_903,
+      sha256: '6bbab7ae745310e03a8a6b07d6fb7e01e94e4017c9f7355bf695eb5aab3a71b8',
     };
   }
 }
@@ -241,6 +259,35 @@ describe('ManagementBackupsComponent', (): void => {
     await component.createRemoteBackup();
 
     expect(backupService.remoteCreateCalls).toBe(0);
+  });
+
+  it('descarga una copia remota al almacenamiento local', async (): Promise<void> => {
+    component.remoteConnection.set(createRemoteConnection());
+
+    const backup: BackupRemoteBackup = createRemoteBackup();
+
+    await component.downloadRemoteBackup(backup);
+
+    expect(backupService.remoteDownloadCalls).toEqual(['backup-public-id']);
+    expect(component.remoteDownloadingPublicId()).toBeNull();
+    expect(dialogService.alerts).toHaveLength(1);
+  });
+
+  it('permite descargar una copia con la suscripción caducada', async (): Promise<void> => {
+    component.remoteConnection.set({
+      ...createRemoteConnection(),
+
+      subscription: {
+        ...createRemoteConnection().subscription,
+        status: 'expired',
+      },
+
+      canUpload: false,
+    });
+
+    await component.downloadRemoteBackup(createRemoteBackup());
+
+    expect(backupService.remoteDownloadCalls).toEqual(['backup-public-id']);
   });
 });
 
