@@ -77,6 +77,14 @@ app
      */
     await createMainWindow();
 
+    /*
+     * Copias remotas automáticas.
+     *
+     * El scheduler realiza una primera evaluación
+     * asíncrona y no bloquea el arranque de la ventana.
+     */
+    applicationComposition.backupAutomaticSchedulerService.start();
+
     app.on('activate', (): void => {
       if (BrowserWindow.getAllWindows().length === 0) {
         void createMainWindow();
@@ -93,6 +101,8 @@ app.on('before-quit', (event): void => {
   if (applicationQuitPrepared || applicationComposition === null) {
     return;
   }
+
+  applicationComposition.backupAutomaticSchedulerService.stop();
 
   event.preventDefault();
 

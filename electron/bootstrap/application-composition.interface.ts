@@ -1,4 +1,4 @@
-import type BackupAutomaticExecutionService from '@backend/application/backup/backup-automatic-execution.service';
+import type BackupAutomaticSchedulerService from '@backend/application/backup/backup-automatic-scheduler.service';
 import type TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 
 /**
@@ -7,5 +7,5 @@ import type TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/ty
  */
 export default interface ApplicationComposition {
   readonly applicationDatabase: TypeOrmApplicationDatabase;
-  readonly backupAutomaticExecutionService: BackupAutomaticExecutionService;
+  readonly backupAutomaticSchedulerService: BackupAutomaticSchedulerService;
 }

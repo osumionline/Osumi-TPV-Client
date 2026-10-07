@@ -10,6 +10,7 @@ import ApplicationStateService from '@backend/application/application/applicatio
 import ArticulosService from '@backend/application/articulos/articulos.service';
 import BackupAutomaticExecutionService from '@backend/application/backup/backup-automatic-execution.service';
 import BackupAutomaticScheduleResolver from '@backend/application/backup/backup-automatic-schedule.resolver';
+import BackupAutomaticSchedulerService from '@backend/application/backup/backup-automatic-scheduler.service';
 import BackupAutomaticStateService from '@backend/application/backup/backup-automatic-state.service';
 import BackupRemoteCreateService from '@backend/application/backup/backup-remote-create.service';
 import BackupRemoteDownloadService from '@backend/application/backup/backup-remote-download.service';
@@ -370,6 +371,9 @@ export default function createApplicationComposition(
       backupAutomaticStateService,
       backupRemoteCreateService,
     );
+
+  const backupAutomaticSchedulerService: BackupAutomaticSchedulerService =
+    new BackupAutomaticSchedulerService(backupAutomaticExecutionService);
 
   /*
    * Almacenamiento temporal utilizado durante
@@ -1005,6 +1009,6 @@ export default function createApplicationComposition(
 
   return {
     applicationDatabase: operationalDatabase,
-    backupAutomaticExecutionService,
+    backupAutomaticSchedulerService,
   };
 }
