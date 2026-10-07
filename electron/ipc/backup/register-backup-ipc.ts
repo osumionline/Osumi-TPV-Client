@@ -1,3 +1,4 @@
+import type BackupAutomaticQueryService from '@backend/application/backup/backup-automatic-query.service';
 import type BackupAutomaticSchedulerService from '@backend/application/backup/backup-automatic-scheduler.service';
 import type BackupRemoteCreateService from '@backend/application/backup/backup-remote-create.service';
 import type BackupRemoteDownloadService from '@backend/application/backup/backup-remote-download.service';
@@ -7,6 +8,7 @@ import type BackupRestoreSelectionService from '@backend/application/backup/back
 import type BackupService from '@backend/application/backup/backup.service';
 import type OtpvV3RestoreFinalizeService from '@backend/application/backup/otpv-v3-restore-finalize.service';
 import type OtpvV3RestoreUnlockService from '@backend/application/backup/otpv-v3-restore-unlock.service';
+import type BackupAutomaticInfo from '@desktop-contracts/backup/backup-automatic-info.interface';
 import type BackupCreateResult from '@desktop-contracts/backup/backup-create-result.interface';
 import type {
   BackupRemoteBackup,
@@ -29,6 +31,7 @@ import { ipcMain } from 'electron';
 export default function registerBackupIpc(
   getMainWindow: MainWindowProvider,
   backupService: BackupService,
+  backupAutomaticQueryService: BackupAutomaticQueryService,
   backupRemoteService: BackupRemoteService,
   backupRemoteRestoreService: BackupRemoteService,
   backupRemoteRestoreSelectionService: BackupRemoteRestoreSelectionService,
@@ -44,6 +47,15 @@ export default function registerBackupIpc(
 
     return backupService.createLocal();
   });
+
+  ipcMain.handle(
+    IPC_CHANNELS.backupAutomaticGetStatus,
+    async (event): Promise<BackupAutomaticInfo | null> => {
+      assertTrustedSender(event, getMainWindow);
+
+      return backupAutomaticQueryService.getStatus();
+    },
+  );
 
   ipcMain.handle(
     IPC_CHANNELS.backupRemoteConfigure,

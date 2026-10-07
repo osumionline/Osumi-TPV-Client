@@ -2,6 +2,7 @@ const IPC_CHANNELS = {
   systemGetAppInfo: 'system:get-app-info',
 
   backupCreateLocal: 'backup:create-local',
+  backupAutomaticGetStatus: 'backup:automatic-get-status',
   backupRemoteConfigure: 'backup:remote-configure',
   backupRemoteGetConnection: 'backup:remote-get-connection',
   backupRemoteRemoveConfiguration: 'backup:remote-remove-configuration',

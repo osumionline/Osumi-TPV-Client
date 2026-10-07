@@ -1,4 +1,5 @@
 import { Service } from '@angular/core';
+import type BackupAutomaticInfo from '@desktop-contracts/backup/backup-automatic-info.interface';
 import type BackupCreateResult from '@desktop-contracts/backup/backup-create-result.interface';
 import type {
   BackupRemoteBackup,
@@ -20,6 +21,14 @@ export default class DesktopBackupService {
    */
   createLocal(): Promise<BackupCreateResult> {
     return window.osumiDesktop.backup.createLocal();
+  }
+
+  /**
+   * Obtiene la información actual de
+   * las copias automáticas.
+   */
+  getAutomaticStatus(): Promise<BackupAutomaticInfo | null> {
+    return window.osumiDesktop.backup.getAutomaticStatus();
   }
 
   /**

@@ -9,6 +9,7 @@ import InventarioService from '@backend/application/almacen/inventario/inventari
 import ApplicationStateService from '@backend/application/application/application-state.service';
 import ArticulosService from '@backend/application/articulos/articulos.service';
 import BackupAutomaticExecutionService from '@backend/application/backup/backup-automatic-execution.service';
+import BackupAutomaticQueryService from '@backend/application/backup/backup-automatic-query.service';
 import BackupAutomaticScheduleResolver from '@backend/application/backup/backup-automatic-schedule.resolver';
 import BackupAutomaticSchedulerService from '@backend/application/backup/backup-automatic-scheduler.service';
 import BackupAutomaticStateService from '@backend/application/backup/backup-automatic-state.service';
@@ -362,6 +363,11 @@ export default function createApplicationComposition(
   const backupAutomaticStateService: BackupAutomaticStateService = new BackupAutomaticStateService(
     backupAutomaticStateRepository,
     backupAutomaticScheduleResolver,
+  );
+
+  const backupAutomaticQueryService: BackupAutomaticQueryService = new BackupAutomaticQueryService(
+    appDataRepository,
+    backupAutomaticStateService,
   );
 
   const backupAutomaticExecutionService: BackupAutomaticExecutionService =
@@ -938,6 +944,7 @@ export default function createApplicationComposition(
   registerBackupIpc(
     getMainWindow,
     backupService,
+    backupAutomaticQueryService,
     backupRemoteService,
     backupRemoteRestoreService,
     backupRemoteRestoreSelectionService,

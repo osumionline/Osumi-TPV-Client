@@ -36,6 +36,7 @@ import type {
 import type { ArticuloSaveInterface } from '@desktop-contracts/articulos/articulo-save.interface';
 import type { ArticuloInterface } from '@desktop-contracts/articulos/articulo.interface';
 import type CategoriaInterface from '@desktop-contracts/articulos/categorias/categoria.interface';
+import type BackupAutomaticInfo from '@desktop-contracts/backup/backup-automatic-info.interface';
 import type BackupCreateResult from '@desktop-contracts/backup/backup-create-result.interface';
 import type {
   BackupRemoteBackup,
@@ -192,6 +193,11 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
   backup: Object.freeze({
     createLocal: (): Promise<BackupCreateResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.backupCreateLocal) as Promise<BackupCreateResult>,
+
+    getAutomaticStatus: (): Promise<BackupAutomaticInfo | null> =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.backupAutomaticGetStatus,
+      ) as Promise<BackupAutomaticInfo | null>,
 
     configureRemote: (credentials: BackupRemoteCredentials): Promise<BackupRemoteConnection> =>
       ipcRenderer.invoke(

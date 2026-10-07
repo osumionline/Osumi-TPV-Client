@@ -1,3 +1,4 @@
+import type BackupAutomaticInfo from '@desktop-contracts/backup/backup-automatic-info.interface';
 import type BackupCreateResult from '@desktop-contracts/backup/backup-create-result.interface';
 import type {
   BackupRemoteBackup,
@@ -17,6 +18,12 @@ export default interface BackupApi {
    * Crea una copia local completa de la instalación.
    */
   createLocal(): Promise<BackupCreateResult>;
+
+  /**
+   * Obtiene el estado actual de la
+   * programación automática.
+   */
+  getAutomaticStatus(): Promise<BackupAutomaticInfo | null>;
 
   /**
    * Selecciona una copia o exportación `.otpv`
