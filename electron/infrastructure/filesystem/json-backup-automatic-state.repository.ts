@@ -90,7 +90,7 @@ export default class JsonBackupAutomaticStateRepository implements BackupAutomat
    * y promoción atómica.
    */
   async save(state: BackupAutomaticState): Promise<void> {
-    const temporaryFilePath: string = `this.filePath.tmp`;
+    const temporaryFilePath: string = `${this.filePath}.tmp`;
     const content: string = `${JSON.stringify(state, null, 2)}\n`;
 
     await writeFile(temporaryFilePath, content, {
