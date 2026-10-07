@@ -1,3 +1,4 @@
+import type BackupAutomaticSchedulerService from '@backend/application/backup/backup-automatic-scheduler.service';
 import type BackupRemoteCreateService from '@backend/application/backup/backup-remote-create.service';
 import type BackupRemoteDownloadService from '@backend/application/backup/backup-remote-download.service';
 import type BackupRemoteRestoreSelectionService from '@backend/application/backup/backup-remote-restore-selection.service';
@@ -36,6 +37,7 @@ export default function registerBackupIpc(
   backupRestoreSelectionService: BackupRestoreSelectionService,
   restoreUnlockService: OtpvV3RestoreUnlockService,
   restoreFinalizeService: OtpvV3RestoreFinalizeService,
+  backupAutomaticSchedulerService: BackupAutomaticSchedulerService,
 ): void {
   ipcMain.handle(IPC_CHANNELS.backupCreateLocal, async (event): Promise<BackupCreateResult> => {
     assertTrustedSender(event, getMainWindow);
@@ -48,7 +50,11 @@ export default function registerBackupIpc(
     async (event, credentials: unknown): Promise<BackupRemoteConnection> => {
       assertTrustedSender(event, getMainWindow);
 
-      return backupRemoteService.configure(credentials);
+      const connection: BackupRemoteConnection = await backupRemoteService.configure(credentials);
+
+      backupAutomaticSchedulerService.reevaluate();
+
+      return connection;
     },
   );
 
@@ -65,6 +71,8 @@ export default function registerBackupIpc(
     assertTrustedSender(event, getMainWindow);
 
     await backupRemoteService.removeConfiguration();
+
+    backupAutomaticSchedulerService.reevaluate();
   });
 
   ipcMain.handle(
@@ -187,7 +195,12 @@ export default function registerBackupIpc(
     async (event, selectionId: string): Promise<BackupRestoreFinalizeResult> => {
       assertTrustedSender(event, getMainWindow);
 
-      return restoreFinalizeService.finalize(selectionId);
+      const result: BackupRestoreFinalizeResult =
+        await restoreFinalizeService.finalize(selectionId);
+
+      backupAutomaticSchedulerService.reevaluate();
+
+      return result;
     },
   );
 }

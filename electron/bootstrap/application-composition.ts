@@ -946,6 +946,7 @@ export default function createApplicationComposition(
     backupRestoreSelectionService,
     otpvV3RestoreUnlockService,
     otpvV3RestoreFinalizeService,
+    backupAutomaticSchedulerService,
   );
   registerAlmacenIpc(
     getMainWindow,
@@ -1001,11 +1002,16 @@ export default function createApplicationComposition(
     ventasTicketBaiService,
   );
 
-  registerLegacyImportIpc(legacyImportService);
+  registerLegacyImportIpc(legacyImportService, backupAutomaticSchedulerService);
   registerSystemIpc(getMainWindow, systemService);
   registerPrintingIpc(getMainWindow, printingService);
 
-  registerConfigurationIpc(getMainWindow, configurationService, installationService);
+  registerConfigurationIpc(
+    getMainWindow,
+    configurationService,
+    installationService,
+    backupAutomaticSchedulerService,
+  );
 
   return {
     applicationDatabase: operationalDatabase,

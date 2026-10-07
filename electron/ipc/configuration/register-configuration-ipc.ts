@@ -1,3 +1,4 @@
+import type BackupAutomaticSchedulerService from '@backend/application/backup/backup-automatic-scheduler.service';
 import type ConfigurationService from '@backend/application/configuration/configuration.service';
 import type InstallationService from '@backend/application/configuration/installation.service';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
@@ -14,6 +15,7 @@ export default function registerConfigurationIpc(
   getMainWindow: MainWindowProvider,
   configurationService: ConfigurationService,
   installationService: InstallationService,
+  backupAutomaticSchedulerService: BackupAutomaticSchedulerService,
 ): void {
   ipcMain.handle(IPC_CHANNELS.configurationGetAppData, async (event): Promise<AppData | null> => {
     assertTrustedSender(event, getMainWindow);
@@ -35,7 +37,11 @@ export default function registerConfigurationIpc(
     async (event, command: ConfigurationUpdateCommand): Promise<AppData> => {
       assertTrustedSender(event, getMainWindow);
 
-      return configurationService.update(command);
+      const appData: AppData = await configurationService.update(command);
+
+      backupAutomaticSchedulerService.reevaluate();
+
+      return appData;
     },
   );
 
@@ -44,7 +50,13 @@ export default function registerConfigurationIpc(
     async (event, command: unknown): Promise<InstallationResult> => {
       assertTrustedSender(event, getMainWindow);
 
-      return installationService.install(command);
+      const result: InstallationResult = await installationService.install(command);
+
+      if (result.status === 'installed') {
+        backupAutomaticSchedulerService.reevaluate();
+      }
+
+      return result;
     },
   );
 }

@@ -1,3 +1,4 @@
+import type BackupAutomaticSchedulerService from '@backend/application/backup/backup-automatic-scheduler.service';
 import type LegacyImportService from '@backend/application/legacy-import/legacy-import.service';
 import type LegacyImportAnalysisReport from '@desktop-contracts/legacy-import/legacy-import-analysis-report.interface';
 import type LegacyImportPackageSelectionResult from '@desktop-contracts/legacy-import/legacy-import-package-selection-result.type';
@@ -9,7 +10,10 @@ import ipcChannels from '@ipc/channels';
 import type { IpcMainInvokeEvent } from 'electron';
 import { ipcMain } from 'electron';
 
-export default function registerLegacyImportIpc(legacyImportService: LegacyImportService): void {
+export default function registerLegacyImportIpc(
+  legacyImportService: LegacyImportService,
+  backupAutomaticSchedulerService: BackupAutomaticSchedulerService,
+): void {
   ipcMain.handle(
     ipcChannels.legacyImportSelectPackage,
 
@@ -37,13 +41,23 @@ export default function registerLegacyImportIpc(legacyImportService: LegacyImpor
   ipcMain.handle(
     ipcChannels.legacyImportStart,
 
-    async (event: IpcMainInvokeEvent, selectionId: string): Promise<LegacyImportStartResult> =>
-      legacyImportService.startImport(selectionId, (progress: LegacyImportProgress): void => {
-        if (event.sender.isDestroyed()) {
-          return;
-        }
+    async (event: IpcMainInvokeEvent, selectionId: string): Promise<LegacyImportStartResult> => {
+      const result: LegacyImportStartResult = await legacyImportService.startImport(
+        selectionId,
+        (progress: LegacyImportProgress): void => {
+          if (event.sender.isDestroyed()) {
+            return;
+          }
 
-        event.sender.send(ipcChannels.legacyImportProgress, progress);
-      }),
+          event.sender.send(ipcChannels.legacyImportProgress, progress);
+        },
+      );
+
+      if (result.status === 'installed') {
+        backupAutomaticSchedulerService.reevaluate();
+      }
+
+      return result;
+    },
   );
 }
