@@ -810,6 +810,7 @@ function createAppData(): AppData {
       environment: 'test',
     },
 
+    backupAutomaticTime: '03:00',
     fechaCad: false,
   };
 }

@@ -403,6 +403,7 @@ function createAppData(): AppData {
     urlApi: '',
     emailSmtp: null,
     ticketBai: null,
+    backupAutomaticTime: '03:00',
     fechaCad: false,
   };
 }

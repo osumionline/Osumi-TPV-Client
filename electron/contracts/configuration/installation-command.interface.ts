@@ -60,6 +60,7 @@ export interface InstallationTicketBaiData {
 }
 
 export interface InstallationOptionsData {
+  readonly backupAutomaticTime: string;
   readonly fechaCaducidad: boolean;
 }
 

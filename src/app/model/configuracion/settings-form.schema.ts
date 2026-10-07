@@ -1,4 +1,5 @@
 import { email, required, validate, type SchemaPathTree } from '@angular/forms/signals';
+import { isBackupAutomaticTime } from '@desktop-contracts/backup/backup-automatic-time';
 import { TICKET_EMAIL_TEMPLATE_VARIABLES } from '@desktop-contracts/configuration/ticket-email-config.interface';
 import type {
   IvaOptionFormModel,
@@ -162,6 +163,27 @@ export default function settingsFormSchema(path: SchemaPathTree<SettingsFormMode
   required(path.ticketBai.environment, {
     message: 'Debes elegir el entorno de TicketBAI.',
     when: ({ valueOf }): boolean => valueOf(path.ticketBai.active),
+  });
+
+  required(path.backup.automaticTime, {
+    message: 'La hora de la copia automática es obligatoria.',
+  });
+
+  validate(path.backup.automaticTime, ({ value }) => {
+    const automaticTime: string = value();
+
+    if (automaticTime === '') {
+      return null;
+    }
+
+    if (!isBackupAutomaticTime(automaticTime)) {
+      return {
+        kind: 'invalidBackupAutomaticTime',
+        message: 'Introduce una hora válida.',
+      };
+    }
+
+    return null;
   });
 }
 

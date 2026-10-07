@@ -161,6 +161,7 @@ function createInstallationCommand(): InstallationCommand {
     },
 
     opciones: {
+      backupAutomaticTime: '03:00',
       fechaCaducidad: false,
     },
 

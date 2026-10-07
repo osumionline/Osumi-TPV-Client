@@ -1,4 +1,8 @@
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
+import {
+  DEFAULT_BACKUP_AUTOMATIC_TIME,
+  isBackupAutomaticTime,
+} from '@desktop-contracts/backup/backup-automatic-time';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type EmailSmtpConfig from '@desktop-contracts/configuration/email-smtp-config.interface';
 import type TicketBaiConfig from '@desktop-contracts/configuration/ticket-bai-config.interface';
@@ -92,7 +96,11 @@ function isStoredTicketBaiConfig(value: unknown): value is StoredTicketBaiConfig
   );
 }
 
-type StoredAppData = Omit<AppData, 'frasesTicket' | 'ticketEmail' | 'emailSmtp' | 'ticketBai'> & {
+type StoredAppData = Omit<
+  AppData,
+  'backupAutomaticTime' | 'frasesTicket' | 'ticketEmail' | 'emailSmtp' | 'ticketBai'
+> & {
+  readonly backupAutomaticTime?: string;
   readonly frasesTicket?: readonly string[];
   readonly ticketEmail?: TicketEmailConfig;
   readonly emailSmtp?: EmailSmtpConfig | null;
@@ -155,6 +163,9 @@ function isStoredAppData(value: unknown): value is StoredAppData {
     data['ticketBai'] === null ||
     isStoredTicketBaiConfig(data['ticketBai']);
 
+  const validBackupAutomaticTime: boolean =
+    data['backupAutomaticTime'] === undefined || isBackupAutomaticTime(data['backupAutomaticTime']);
+
   return (
     validStrings &&
     validBooleans &&
@@ -163,6 +174,7 @@ function isStoredAppData(value: unknown): value is StoredAppData {
     validTicketEmail &&
     validEmailSmtp &&
     validTicketBai &&
+    validBackupAutomaticTime &&
     isNumberArray(data['ivaList']) &&
     isNumberArray(data['reList']) &&
     isNumberArray(data['marginList']) &&
@@ -215,6 +227,8 @@ export default class JsonAppDataRepository implements AppDataRepository {
                 nif: parsed.ticketBai.nif,
                 environment: parsed.ticketBai.environment ?? DEFAULT_TICKET_BAI_ENVIRONMENT,
               },
+
+        backupAutomaticTime: parsed.backupAutomaticTime ?? DEFAULT_BACKUP_AUTOMATIC_TIME,
       };
     } catch (error: unknown) {
       if (isFileNotFoundError(error)) {

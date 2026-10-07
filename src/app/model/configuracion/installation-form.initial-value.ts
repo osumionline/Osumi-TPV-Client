@@ -1,3 +1,4 @@
+import { DEFAULT_BACKUP_AUTOMATIC_TIME } from '@desktop-contracts/backup/backup-automatic-time';
 import {
   DEFAULT_TICKET_EMAIL_BODY_TEMPLATE,
   DEFAULT_TICKET_EMAIL_SUBJECT_TEMPLATE,
@@ -171,6 +172,7 @@ export default function createInstallationFormInitialValue(): InstallationFormMo
 
     opciones: {
       backupApiKey: '',
+      backupAutomaticTime: DEFAULT_BACKUP_AUTOMATIC_TIME,
       fechaCaducidad: false,
     },
   };

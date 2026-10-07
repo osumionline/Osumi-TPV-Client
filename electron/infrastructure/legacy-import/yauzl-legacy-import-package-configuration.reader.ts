@@ -1,6 +1,7 @@
 import type LegacyImportPackageConfigurationReader from '@backend/contracts/legacy-import/legacy-import-package-configuration-reader.interface';
 import type LegacyImportFileInventoryItem from '@backend/domain/legacy-import/legacy-import-file-inventory-item.interface';
 import type LegacyImportPackageConfiguration from '@backend/domain/legacy-import/legacy-import-package-configuration.interface';
+import { DEFAULT_BACKUP_AUTOMATIC_TIME } from '@desktop-contracts/backup/backup-automatic-time';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type EmailSmtpConfig from '@desktop-contracts/configuration/email-smtp-config.interface';
 import type {
@@ -201,6 +202,7 @@ export default class YauzlLegacyImportPackageConfigurationReader implements Lega
       urlApi: this.getDecodedString(source, 'urlApi'),
       emailSmtp: pluginConfiguration.emailSmtp,
       ticketBai: pluginConfiguration.ticketBai,
+      backupAutomaticTime: DEFAULT_BACKUP_AUTOMATIC_TIME,
       fechaCad: this.getBoolean(source, 'fechaCad'),
     };
 

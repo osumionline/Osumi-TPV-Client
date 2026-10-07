@@ -351,6 +351,7 @@ function createAppData(): AppData {
 
     ticketBai: null,
 
+    backupAutomaticTime: '03:00',
     fechaCad: false,
   };
 }

@@ -305,6 +305,23 @@ describe('ConfigurationService', (): void => {
       ticketBaiToken: 'old-ticketbai-token',
     });
   });
+
+  it('actualiza la hora de backup automático', async (): Promise<void> => {
+    const baseCommand: ConfigurationUpdateCommand = createCommand();
+
+    const command: ConfigurationUpdateCommand = {
+      ...baseCommand,
+
+      opciones: {
+        ...baseCommand.opciones,
+        backupAutomaticTime: '04:30',
+      },
+    };
+
+    await service.update(command);
+
+    expect(appDataRepository.value?.backupAutomaticTime).toBe('04:30');
+  });
 });
 
 function createAppData(): AppData {
@@ -351,6 +368,7 @@ function createAppData(): AppData {
       environment: 'production',
     },
 
+    backupAutomaticTime: '03:00',
     fechaCad: true,
   };
 }
@@ -391,6 +409,7 @@ function createCommand(): ConfigurationUpdateCommand {
     },
 
     opciones: {
+      backupAutomaticTime: '03:00',
       fechaCaducidad: true,
     },
 

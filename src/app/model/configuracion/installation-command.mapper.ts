@@ -102,6 +102,7 @@ export default function createInstallationCommand(
     },
 
     opciones: {
+      backupAutomaticTime: model.opciones.backupAutomaticTime,
       fechaCaducidad: model.opciones.fechaCaducidad,
     },
 

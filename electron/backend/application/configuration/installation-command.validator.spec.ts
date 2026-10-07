@@ -78,6 +78,24 @@ describe('validateInstallationCommand', (): void => {
       ),
     ).toBe(true);
   });
+
+  it('rechaza una hora de backup automático inválida', (): void => {
+    const command: InstallationCommand = {
+      ...createValidCommand(),
+
+      opciones: {
+        ...createValidCommand().opciones,
+        backupAutomaticTime: '24:00',
+      },
+    };
+
+    const errors: InstallationValidationError[] = validateInstallationCommand(command);
+
+    expect(errors).toContainEqual({
+      field: 'opciones.backupAutomaticTime',
+      message: 'La hora de la copia automática no es válida.',
+    });
+  });
 });
 
 /**
@@ -149,6 +167,7 @@ function createValidCommand(): InstallationCommand {
     },
 
     opciones: {
+      backupAutomaticTime: '03:00',
       fechaCaducidad: false,
     },
 

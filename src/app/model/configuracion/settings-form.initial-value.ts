@@ -87,6 +87,7 @@ export default function createSettingsFormInitialValue(appData: AppData): Settin
 
     backup: {
       backupApiKey: '',
+      automaticTime: appData.backupAutomaticTime,
     },
 
     opciones: {

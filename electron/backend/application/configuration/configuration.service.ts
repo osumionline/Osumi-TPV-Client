@@ -150,6 +150,7 @@ export default class ConfigurationService {
       reList: [...command.fiscalidad.reList],
       marginList: [...command.fiscalidad.marginList],
 
+      backupAutomaticTime: command.opciones.backupAutomaticTime,
       fechaCad: command.opciones.fechaCaducidad,
     };
 

@@ -53,6 +53,7 @@ export default function createAppData(command: InstallationCommand, installedAt:
         }
       : null,
 
+    backupAutomaticTime: command.opciones.backupAutomaticTime,
     fechaCad: command.opciones.fechaCaducidad,
   };
 }

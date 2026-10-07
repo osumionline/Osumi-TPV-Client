@@ -1,3 +1,4 @@
+import { DEFAULT_BACKUP_AUTOMATIC_TIME } from '@desktop-contracts/backup/backup-automatic-time';
 import {
   DEFAULT_TICKET_EMAIL_BODY_TEMPLATE,
   DEFAULT_TICKET_EMAIL_SUBJECT_TEMPLATE,
@@ -41,6 +42,8 @@ describe('JsonAppDataRepository', (): void => {
       subjectTemplate: DEFAULT_TICKET_EMAIL_SUBJECT_TEMPLATE,
       bodyTemplate: DEFAULT_TICKET_EMAIL_BODY_TEMPLATE,
     });
+
+    expect(appData?.backupAutomaticTime).toBe(DEFAULT_BACKUP_AUTOMATIC_TIME);
   });
 
   it('conserva las plantillas de email ya configuradas', async (): Promise<void> => {
@@ -67,6 +70,44 @@ describe('JsonAppDataRepository', (): void => {
       subjectTemplate: 'Su ticket {referencia}',
       bodyTemplate: 'Gracias por comprar en {nombreNegocio}.',
     });
+  });
+
+  it('conserva la hora de backup automático configurada', async (): Promise<void> => {
+    const filePath: string = join(requireTempDirectory(), 'app_data.json');
+
+    await writeFile(
+      filePath,
+      JSON.stringify({
+        ...createLegacyAppData(),
+        backupAutomaticTime: '04:30',
+      }),
+      'utf8',
+    );
+
+    const repository: JsonAppDataRepository = new JsonAppDataRepository(filePath);
+
+    const appData = await repository.load();
+
+    expect(appData?.backupAutomaticTime).toBe('04:30');
+  });
+
+  it('rechaza una hora de backup automático inválida', async (): Promise<void> => {
+    const filePath: string = join(requireTempDirectory(), 'app_data.json');
+
+    await writeFile(
+      filePath,
+      JSON.stringify({
+        ...createLegacyAppData(),
+        backupAutomaticTime: '25:00',
+      }),
+      'utf8',
+    );
+
+    const repository: JsonAppDataRepository = new JsonAppDataRepository(filePath);
+
+    await expect(repository.load()).rejects.toThrow(
+      'El archivo app_data.json no tiene una estructura válida.',
+    );
   });
 });
 

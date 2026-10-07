@@ -30,6 +30,7 @@ describe('buildVentaGiftTicketDocument', (): void => {
     urlApi: '',
     emailSmtp: null,
     ticketBai: null,
+    backupAutomaticTime: '03:00',
     fechaCad: false,
   };
 

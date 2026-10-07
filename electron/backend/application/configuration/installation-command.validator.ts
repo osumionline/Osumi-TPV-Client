@@ -1,3 +1,4 @@
+import { isBackupAutomaticTime } from '@desktop-contracts/backup/backup-automatic-time';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type { InstallationValidationError } from '@desktop-contracts/configuration/installation-result.interface';
 import { TICKET_EMAIL_TEMPLATE_VARIABLES } from '@desktop-contracts/configuration/ticket-email-config.interface';
@@ -129,7 +130,8 @@ export function isInstallationCommand(value: unknown): value is InstallationComm
 
   const validTicketBai: boolean = hasBoolean(ticketBai, 'active') && hasString(ticketBai, 'nif');
 
-  const validOptions: boolean = hasBoolean(opciones, 'fechaCaducidad');
+  const validOptions: boolean =
+    hasString(opciones, 'backupAutomaticTime') && hasBoolean(opciones, 'fechaCaducidad');
 
   const validSecrets: boolean =
     hasString(secretos, 'secretApi') &&
@@ -324,6 +326,10 @@ export function validateInstallationCommand(
       'secretos.ticketBaiToken',
       'No debe enviarse un token de TicketBAI si TicketBAI está desactivado.',
     );
+  }
+
+  if (!isBackupAutomaticTime(command.opciones.backupAutomaticTime)) {
+    addError('opciones.backupAutomaticTime', 'La hora de la copia automática no es válida.');
   }
 
   const acceptedLogoTypes: readonly string[] = ['image/jpeg', 'image/png', 'image/webp'];

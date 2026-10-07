@@ -1,10 +1,11 @@
 import { email, min, required, validate, type SchemaPathTree } from '@angular/forms/signals';
+import { isBackupAutomaticTime } from '@desktop-contracts/backup/backup-automatic-time';
 import { TICKET_EMAIL_TEMPLATE_VARIABLES } from '@desktop-contracts/configuration/ticket-email-config.interface';
 import {
   InstallationFormModel,
   IvaOptionFormModel,
   MarginOptionFormModel,
-} from './installation-form.model';
+} from '@model/configuracion/installation-form.model';
 
 export default function installationFormSchema(path: SchemaPathTree<InstallationFormModel>): void {
   // Paso 1: datos del negocio
@@ -245,6 +246,27 @@ export default function installationFormSchema(path: SchemaPathTree<Installation
   });
 
   // Paso 3: TPV Backup
+
+  required(path.opciones.backupAutomaticTime, {
+    message: 'La hora de la copia automática es obligatoria.',
+  });
+
+  validate(path.opciones.backupAutomaticTime, ({ value }) => {
+    const automaticTime: string = value();
+
+    if (automaticTime === '') {
+      return null;
+    }
+
+    if (!isBackupAutomaticTime(automaticTime)) {
+      return {
+        kind: 'invalidBackupAutomaticTime',
+        message: 'Introduce una hora válida.',
+      };
+    }
+
+    return null;
+  });
 
   required(path.opciones.backupApiKey, {
     message: 'La TPV Backup key es obligatoria cuando configuras TPV Backup.',

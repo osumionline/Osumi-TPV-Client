@@ -1,3 +1,4 @@
+import { isBackupAutomaticTime } from '@desktop-contracts/backup/backup-automatic-time';
 import type ConfigurationUpdateCommand from '@desktop-contracts/configuration/configuration-update-command.interface';
 import { TICKET_EMAIL_TEMPLATE_VARIABLES } from '@desktop-contracts/configuration/ticket-email-config.interface';
 
@@ -153,7 +154,8 @@ export function isConfigurationUpdateCommand(value: unknown): value is Configura
     hasNumberArray(fiscalidad, 'reList') &&
     hasNumberArray(fiscalidad, 'marginList');
 
-  const validOptions: boolean = hasBoolean(opciones, 'fechaCaducidad');
+  const validOptions: boolean =
+    hasString(opciones, 'backupAutomaticTime') && hasBoolean(opciones, 'fechaCaducidad');
 
   return (
     validBusiness && validSocial && validTicket && validTicketEmail && validTaxData && validOptions
@@ -213,6 +215,10 @@ export function validateConfigurationUpdateCommand(
     errors.push('El cuerpo del email del ticket es obligatorio.');
   } else if (findUnsupportedTicketEmailVariable(command.ticketEmail.bodyTemplate) !== null) {
     errors.push('El cuerpo del email contiene una variable no permitida.');
+  }
+
+  if (!isBackupAutomaticTime(command.opciones.backupAutomaticTime)) {
+    errors.push('La hora de la copia automática no es válida.');
   }
 
   validateIntegrations(command, errors);

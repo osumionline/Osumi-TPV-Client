@@ -62,6 +62,7 @@ export interface SettingsTicketBaiFormModel {
 
 export interface SettingsBackupFormModel {
   backupApiKey: string;
+  automaticTime: string;
 }
 
 export interface SettingsOptionsFormModel {

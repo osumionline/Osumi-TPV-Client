@@ -58,6 +58,7 @@ export default function createSettingsCommand(
     },
 
     opciones: {
+      backupAutomaticTime: model.backup.automaticTime,
       fechaCaducidad: model.opciones.fechaCaducidad,
     },
 
