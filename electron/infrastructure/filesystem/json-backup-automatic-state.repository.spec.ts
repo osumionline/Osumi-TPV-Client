@@ -169,6 +169,29 @@ describe('JsonBackupAutomaticStateRepository', (): void => {
 
     expect(consoleError).toHaveBeenCalled();
   });
+
+  it('elimina el estado y cualquier temporal pendiente', async (): Promise<void> => {
+    const filePath: string = createFilePath();
+
+    const repository: JsonBackupAutomaticStateRepository = new JsonBackupAutomaticStateRepository(
+      filePath,
+    );
+
+    await repository.save({
+      schemaVersion: 1,
+      lastSuccessfulAt: '2026-10-07T01:05:00.000Z',
+    });
+
+    await writeFile(`${filePath}.tmp`, 'temporal', {
+      encoding: 'utf8',
+    });
+
+    await repository.delete();
+
+    await expect(access(filePath)).rejects.toThrow();
+    await expect(access(`${filePath}.tmp`)).rejects.toThrow();
+    await expect(repository.load()).resolves.toBeNull();
+  });
 });
 
 /**

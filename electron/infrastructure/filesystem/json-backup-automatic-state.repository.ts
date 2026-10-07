@@ -1,6 +1,6 @@
 import type BackupAutomaticStateRepository from '@backend/contracts/backup/backup-automatic-state.repository.interface';
 import type BackupAutomaticState from '@backend/domain/backup/backup-automatic-state.interface';
-import { readFile, rename, writeFile } from 'node:fs/promises';
+import { readFile, rename, rm, writeFile } from 'node:fs/promises';
 
 /**
  * Comprueba si un error representa un fichero inexistente.
@@ -99,5 +99,21 @@ export default class JsonBackupAutomaticStateRepository implements BackupAutomat
     });
 
     await rename(temporaryFilePath, this.filePath);
+  }
+
+  /**
+   * Elimina el estado y cualquier temporal
+   * que pudiera haber quedado pendiente.
+   */
+  async delete(): Promise<void> {
+    await Promise.all([
+      rm(this.filePath, {
+        force: true,
+      }),
+
+      rm(`${this.filePath}.tmp`, {
+        force: true,
+      }),
+    ]);
   }
 }

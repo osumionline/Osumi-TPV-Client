@@ -17,4 +17,9 @@ export default interface BackupAutomaticStateRepository {
    * Sustituye atómicamente el estado actual.
    */
   save(state: BackupAutomaticState): Promise<void>;
+
+  /**
+   * Elimina cualquier estado persistido.
+   */
+  delete(): Promise<void>;
 }
