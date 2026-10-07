@@ -129,6 +129,9 @@ export default class FileInstallationFinalizer implements InstallationFinalizer 
       this.paths.logoFile,
       this.paths.secretsFile,
 
+      this.paths.backupAutomaticStateFile,
+      `${this.paths.backupAutomaticStateFile}.tmp`,
+
       `${this.paths.appDataFile}.tmp`,
       `${this.paths.logoFile}.tmp`,
       `${this.paths.secretsFile}.tmp`,
