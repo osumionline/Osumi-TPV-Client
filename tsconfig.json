@@ -26,6 +26,7 @@
       "@pipes/*": ["./src/app/pipes/*"],
       "@services/*": ["./src/app/services/*"],
       "@utils/*": ["./src/app/utils/*"],
+      "@electron/*": ["./electron/*"],
       "@desktop-contracts/*": ["./electron/contracts/*"]
     }
   },

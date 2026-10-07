@@ -12,6 +12,7 @@ export default interface ApplicationPaths {
 
   readonly appDataFile: string;
   readonly printingSettingsFile: string;
+  readonly backupAutomaticStateFile: string;
   readonly logoFile: string;
   readonly databaseFile: string;
   readonly secretsFile: string;

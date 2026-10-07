@@ -188,25 +188,15 @@ async function createWorkspaceFixture(workspace: FileOtpvV3RestoreWorkspace): Pr
  */
 function createApplicationPaths(): ApplicationPaths {
   const baseDirectory: string = requireTempDirectory();
-
   const rootDirectory: string = join(baseDirectory, 'osumi-tpv');
-
   const configDirectory: string = join(rootDirectory, 'config');
-
   const assetsDirectory: string = join(rootDirectory, 'assets');
-
   const filesDirectory: string = join(assetsDirectory, 'files');
-
   const databaseDirectory: string = join(rootDirectory, 'database');
-
   const backupsDirectory: string = join(rootDirectory, 'backups');
-
   const logsDirectory: string = join(rootDirectory, 'logs');
-
   const secretsDirectory: string = join(rootDirectory, 'secrets');
-
   const stagingDirectory: string = join(rootDirectory, 'staging');
-
   const stagingFilesDirectory: string = join(stagingDirectory, 'files');
 
   return {
@@ -222,6 +212,7 @@ function createApplicationPaths(): ApplicationPaths {
     stagingFilesDirectory,
     appDataFile: join(configDirectory, 'app_data.json'),
     printingSettingsFile: join(configDirectory, 'printing_settings.json'),
+    backupAutomaticStateFile: join(configDirectory, 'backup_automatic_state.json'),
     logoFile: join(assetsDirectory, 'logo.webp'),
     databaseFile: join(databaseDirectory, 'osumi-tpv.sqlite'),
     secretsFile: join(secretsDirectory, 'secrets.json'),

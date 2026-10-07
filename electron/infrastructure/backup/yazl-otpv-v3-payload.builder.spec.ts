@@ -436,6 +436,7 @@ function createApplicationPaths(rootDirectory: string): ApplicationPaths {
     stagingFilesDirectory,
     appDataFile: join(configDirectory, 'app_data.json'),
     printingSettingsFile: join(configDirectory, 'printing_settings.json'),
+    backupAutomaticStateFile: join(configDirectory, 'backup_automatic_state.json'),
     logoFile: join(assetsDirectory, 'logo.webp'),
     databaseFile: join(databaseDirectory, 'osumi-tpv.sqlite'),
     secretsFile: join(secretsDirectory, 'secrets.json'),

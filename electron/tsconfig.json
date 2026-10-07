@@ -16,6 +16,7 @@
     "noEmit": true,
     "types": ["node"],
     "paths": {
+      "@bootstrap/*": ["./bootstrap/*"],
       "@backend/*": ["./backend/*"],
       "@desktop-contracts/*": ["./contracts/*"],
       "@infrastructure/*": ["./infrastructure/*"],

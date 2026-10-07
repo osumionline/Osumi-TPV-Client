@@ -4,14 +4,14 @@ import { app, BrowserWindow, Menu, protocol } from 'electron';
 
 import type InstallationFinalizer from '@backend/contracts/configuration/installation-finalizer.interface';
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
-import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import ElectronApplicationPathsProvider from '@infrastructure/electron/electron-application-paths.provider';
 import { createMainWindow, getRendererAssetsDirectory } from '@infrastructure/electron/main-window';
 import registerAssetsProtocol from '@infrastructure/electron/register-assets-protocol';
 import ApplicationDirectoriesService from '@infrastructure/filesystem/application-directories.service';
 import FileInstallationFinalizer from '@infrastructure/filesystem/file-installation-finalizer';
 
-import createApplicationComposition from './bootstrap/application-composition';
+import createApplicationComposition from '@bootstrap/application-composition';
+import type ApplicationComposition from '@bootstrap/application-composition.interface';
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -24,7 +24,7 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
-let applicationDatabase: TypeOrmApplicationDatabase | null = null;
+let applicationComposition: ApplicationComposition | null = null;
 
 let applicationQuitPrepared: boolean = false;
 
@@ -66,7 +66,7 @@ app
     /*
      * Grafo de dependencias e IPC.
      */
-    applicationDatabase = createApplicationComposition(
+    applicationComposition = createApplicationComposition(
       applicationPaths,
       applicationVersion,
       installationFinalizer,
@@ -90,13 +90,13 @@ app
   });
 
 app.on('before-quit', (event): void => {
-  if (applicationQuitPrepared || applicationDatabase === null) {
+  if (applicationQuitPrepared || applicationComposition === null) {
     return;
   }
 
   event.preventDefault();
 
-  void applicationDatabase
+  void applicationComposition.applicationDatabase
     .disconnect()
     .catch((error: unknown): void => {
       console.error('No se ha podido cerrar la base de datos de la aplicación:', error);

@@ -8,6 +8,9 @@ import InventarioPrintService from '@backend/application/almacen/inventario/inve
 import InventarioService from '@backend/application/almacen/inventario/inventario.service';
 import ApplicationStateService from '@backend/application/application/application-state.service';
 import ArticulosService from '@backend/application/articulos/articulos.service';
+import BackupAutomaticExecutionService from '@backend/application/backup/backup-automatic-execution.service';
+import BackupAutomaticScheduleResolver from '@backend/application/backup/backup-automatic-schedule.resolver';
+import BackupAutomaticStateService from '@backend/application/backup/backup-automatic-state.service';
 import BackupRemoteCreateService from '@backend/application/backup/backup-remote-create.service';
 import BackupRemoteDownloadService from '@backend/application/backup/backup-remote-download.service';
 import BackupRemoteRestoreSelectionService from '@backend/application/backup/backup-remote-restore-selection.service';
@@ -63,6 +66,7 @@ import type InventarioCsvFileSaver from '@backend/contracts/almacen/inventario/i
 import type InventarioPrintWindow from '@backend/contracts/almacen/inventario/inventario-print-window.interface';
 import type InventarioRepository from '@backend/contracts/almacen/inventario/inventario.repository.interface';
 import type ArticulosRepository from '@backend/contracts/articulos/articulos.repository.interface';
+import type BackupAutomaticStateRepository from '@backend/contracts/backup/backup-automatic-state.repository.interface';
 import type { BackupRemoteClient } from '@backend/contracts/backup/backup-remote-client.interface';
 import type BackupRemoteCredentialStorage from '@backend/contracts/backup/backup-remote-credential-storage.interface';
 import type DatabaseSnapshot from '@backend/contracts/backup/database-snapshot.interface';
@@ -117,6 +121,7 @@ import type VentasPostventaRepository from '@backend/contracts/ventas/ventas-pos
 import type VentasTicketBaiRepository from '@backend/contracts/ventas/ventas-ticket-bai.repository.interface';
 import type VentasTicketsRepository from '@backend/contracts/ventas/ventas-tickets.repository.interface';
 import DefaultLegacyImportReviewDecisionValidator from '@backend/domain/legacy-import/default-legacy-import-review-decision.validator';
+import type ApplicationComposition from '@bootstrap/application-composition.interface';
 import FileOtpvV3RequiredContentValidator from '@infrastructure/backup/file-otpv-v3-required-content.validator';
 import FileOtpvV3RestoreStagingPreparer from '@infrastructure/backup/file-otpv-v3-restore-staging.preparer';
 import FileOtpvV3RestoreWorkspace from '@infrastructure/backup/file-otpv-v3-restore-workspace';
@@ -192,6 +197,7 @@ import FileVentaTicketPdfStorage from '@infrastructure/filesystem/file-venta-tic
 import FilesystemImageFileStorage from '@infrastructure/filesystem/filesystem-image-file.storage';
 import FilesystemImageStagingStorage from '@infrastructure/filesystem/filesystem-image-staging.storage';
 import JsonAppDataRepository from '@infrastructure/filesystem/json-app-data.repository';
+import JsonBackupAutomaticStateRepository from '@infrastructure/filesystem/json-backup-automatic-state.repository';
 import JsonPrintingSettingsRepository from '@infrastructure/filesystem/json-printing-settings.repository';
 import SharpImageProcessor from '@infrastructure/filesystem/sharp-image.processor';
 import InMemoryLegacyImportSelectionStore from '@infrastructure/legacy-import/in-memory-legacy-import-selection.store';
@@ -231,14 +237,14 @@ import { join } from 'node:path';
 
 /**
  * Construye el grafo de dependencias de la aplicación,
- * registra sus canales IPC y devuelve la base operacional,
+ * registra sus canales IPC y devuelve los servicios
  * cuyo ciclo de vida pertenece al proceso principal.
  */
 export default function createApplicationComposition(
   applicationPaths: ApplicationPaths,
   applicationVersion: string,
   installationFinalizer: InstallationFinalizer,
-): TypeOrmApplicationDatabase {
+): ApplicationComposition {
   /*
    * Configuración definitiva.
    */
@@ -342,6 +348,28 @@ export default function createApplicationComposition(
     applicationPaths.backupsDirectory,
     backupRemoteService,
   );
+
+  /*
+   * Copias remotas automáticas.
+   */
+  const backupAutomaticStateRepository: BackupAutomaticStateRepository =
+    new JsonBackupAutomaticStateRepository(applicationPaths.backupAutomaticStateFile);
+
+  const backupAutomaticScheduleResolver: BackupAutomaticScheduleResolver =
+    new BackupAutomaticScheduleResolver();
+
+  const backupAutomaticStateService: BackupAutomaticStateService = new BackupAutomaticStateService(
+    backupAutomaticStateRepository,
+    backupAutomaticScheduleResolver,
+  );
+
+  const backupAutomaticExecutionService: BackupAutomaticExecutionService =
+    new BackupAutomaticExecutionService(
+      appDataRepository,
+      backupRemoteCredentialStorage,
+      backupAutomaticStateService,
+      backupRemoteCreateService,
+    );
 
   /*
    * Almacenamiento temporal utilizado durante
@@ -975,5 +1003,8 @@ export default function createApplicationComposition(
 
   registerConfigurationIpc(getMainWindow, configurationService, installationService);
 
-  return operationalDatabase;
+  return {
+    applicationDatabase: operationalDatabase,
+    backupAutomaticExecutionService,
+  };
 }
