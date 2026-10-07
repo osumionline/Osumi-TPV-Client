@@ -2,6 +2,7 @@ import type BackupRemoteService from '@backend/application/backup/backup-remote.
 import type BackupService from '@backend/application/backup/backup.service';
 import type BackupCreatedFile from '@backend/contracts/backup/backup-created-file.interface';
 import { BackupRemoteClientError } from '@backend/contracts/backup/backup-remote-client.error';
+import type BackupRemoteCreator from '@backend/contracts/backup/backup-remote-creator.interface';
 import type {
   BackupRemoteConnection,
   BackupRemoteUploadResult,
@@ -12,7 +13,7 @@ import { rm } from 'node:fs/promises';
  * Orquesta la creación temporal y subida
  * de una copia a TPV Backup.
  */
-export default class BackupRemoteCreateService {
+export default class BackupRemoteCreateService implements BackupRemoteCreator {
   private creating: boolean = false;
 
   /**
