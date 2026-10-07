@@ -801,10 +801,13 @@
         introduce los datos asignados a esta instalación.
         La TPV Backup key cifra las copias, mientras que
         el Key ID y el Secret permiten acceder al servicio remoto.
+        La copia automática se realizará diariamente a la hora
+        indicada; si el equipo no está disponible en ese momento,
+        se realizará cuando vuelva a estar disponible.
       </p>
 
-      <div class="row">
-        <mat-form-field class="three otpv-mat-field--transparent-subscript">
+      <div class="backup-key-row">
+        <mat-form-field class="otpv-mat-field--transparent-subscript">
           <mat-label>TPV Backup key</mat-label>
 
           <input matInput
@@ -821,8 +824,10 @@
           </mat-error>
           }
         </mat-form-field>
+      </div>
 
-        <mat-form-field class="three otpv-mat-field--transparent-subscript">
+      <div class="backup-credentials-row">
+        <mat-form-field class="otpv-mat-field--transparent-subscript">
           <mat-label>Key ID</mat-label>
 
           <input matInput
@@ -840,7 +845,7 @@
           }
         </mat-form-field>
 
-        <mat-form-field class="three otpv-mat-field--transparent-subscript">
+        <mat-form-field class="otpv-mat-field--transparent-subscript">
           <mat-label>Secret</mat-label>
 
           <input matInput
@@ -858,20 +863,13 @@
           </mat-error>
           }
         </mat-form-field>
-      </div>
 
-      <div class="row">
-        <mat-form-field class="three">
-          <mat-label>Hora de la copia automática</mat-label>
+        <mat-form-field class="backup-time-field">
+          <mat-label>Hora</mat-label>
 
           <input matInput
                  type="time"
                  [formField]="installationForm.opciones.backupAutomaticTime">
-
-          <mat-hint>
-            Si el equipo no está disponible a esa hora,
-            la copia se realizará cuando vuelva a estar disponible.
-          </mat-hint>
 
           @if (
           installationForm.opciones.backupAutomaticTime().touched() &&
@@ -879,9 +877,9 @@
           ) {
           <mat-error>
             {{
-        installationForm.opciones.backupAutomaticTime()
-          .errors()[0]?.message
-      }}
+              installationForm.opciones.backupAutomaticTime()
+                .errors()[0]?.message
+            }}
           </mat-error>
           }
         </mat-form-field>

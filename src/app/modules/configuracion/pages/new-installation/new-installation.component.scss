@@ -107,6 +107,30 @@
         }
     }
 
+    .backup-key-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+
+        mat-form-field {
+            width: 100%;
+        }
+    }
+
+    .backup-credentials-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 160px;
+        gap: 16px;
+        align-items: start;
+
+        mat-form-field {
+            width: 100%;
+        }
+
+        .backup-time-field {
+            width: 160px;
+        }
+    }
+
     .printer-settings-row {
         display: flex;
         align-items: flex-start;
@@ -133,6 +157,14 @@
 
 @media (max-width: 900px) {
     .main {
+        .backup-credentials-row {
+            grid-template-columns: 1fr;
+
+            .backup-time-field {
+                width: min(200px, 100%);
+            }
+        }
+
         .printer-settings-row {
             flex-direction: column;
 

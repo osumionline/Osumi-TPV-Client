@@ -766,80 +766,77 @@
                     <p class="section-help">
                         Si tienes una suscripción con TPV Backup puedes configurar
                         aquí la clave utilizada para cifrar las copias y la hora
-                        diaria de creación automática.
+                        diaria de creación automática. Si el equipo no está
+                        disponible a esa hora, la copia se realizará cuando vuelva
+                        a estar disponible.
                     </p>
 
-                    <div class="secret-field-row">
-                        <mat-form-field class="secret-field">
-                            <mat-label>Backup API key</mat-label>
+                    <div class="backup-settings-row">
+                        <div class="secret-field-row">
+                            <mat-form-field class="secret-field">
+                                <mat-label>Backup API key</mat-label>
 
-                            <input matInput
-                                   autocomplete="off"
-                                   [type]="backupApiKeyVisible() ? 'text' : 'password'"
-                                   [formField]="settingsForm.backup.backupApiKey">
+                                <input matInput
+                                       autocomplete="off"
+                                       [type]="backupApiKeyVisible() ? 'text' : 'password'"
+                                       [formField]="settingsForm.backup.backupApiKey">
 
+                                <button mat-icon-button
+                                        matSuffix
+                                        type="button"
+                                        [attr.aria-label]="
+                                          backupApiKeyVisible()
+                                            ? 'Ocultar clave'
+                                            : 'Mostrar clave'
+                                        "
+                                        [matTooltip]="
+                                          backupApiKeyVisible()
+                                            ? 'Ocultar clave'
+                                            : 'Mostrar clave'
+                                        "
+                                        (click)="toggleSensitiveVisibility('backupApiKey')">
+                                    <mat-icon>
+                                        {{
+                                          backupApiKeyVisible()
+                                            ? 'visibility_off'
+                                            : 'visibility'
+                                        }}
+                                    </mat-icon>
+                                </button>
+
+                                <mat-hint>
+                                    Déjala vacía para conservar la clave actual.
+                                </mat-hint>
+                            </mat-form-field>
+
+                            @if (
+                            !backupApiKeyRevealed() &&
+                            settingsForm.backup.backupApiKey().value() === ''
+                            ) {
                             <button mat-icon-button
-                                    matSuffix
                                     type="button"
-                                    [attr.aria-label]="
-                                      backupApiKeyVisible()
-                                        ? 'Ocultar clave'
-                                        : 'Mostrar clave'
-                                    "
-                                    [matTooltip]="
-                                      backupApiKeyVisible()
-                                        ? 'Ocultar clave'
-                                        : 'Mostrar clave'
-                                    "
-                                    (click)="toggleSensitiveVisibility('backupApiKey')">
+                                    class="reveal-secret-button"
+                                    aria-label="Cargar la clave de TPV Backup almacenada"
+                                    matTooltip="Cargar la clave almacenada"
+                                    [disabled]="revealingSecret() !== null"
+                                    (click)="revealSecret('backupApiKey')">
                                 <mat-icon>
                                     {{
-                                      backupApiKeyVisible()
-                                        ? 'visibility_off'
+                                      revealingSecret() === 'backupApiKey'
+                                        ? 'hourglass_top'
                                         : 'visibility'
                                     }}
                                 </mat-icon>
                             </button>
+                            }
+                        </div>
 
-                            <mat-hint>
-                                Déjala vacía para conservar la clave actual.
-                            </mat-hint>
-                        </mat-form-field>
-
-                        @if (
-                        !backupApiKeyRevealed() &&
-                        settingsForm.backup.backupApiKey().value() === ''
-                        ) {
-                        <button mat-icon-button
-                                type="button"
-                                class="reveal-secret-button"
-                                aria-label="Cargar la clave de TPV Backup almacenada"
-                                matTooltip="Cargar la clave almacenada"
-                                [disabled]="revealingSecret() !== null"
-                                (click)="revealSecret('backupApiKey')">
-                            <mat-icon>
-                                {{
-                                  revealingSecret() === 'backupApiKey'
-                                    ? 'hourglass_top'
-                                    : 'visibility'
-                                }}
-                            </mat-icon>
-                        </button>
-                        }
-                    </div>
-
-                    <div class="form-row">
-                        <mat-form-field>
-                            <mat-label>Hora de la copia automática</mat-label>
+                        <mat-form-field class="backup-time-field">
+                            <mat-label>Hora</mat-label>
 
                             <input matInput
                                    type="time"
                                    [formField]="settingsForm.backup.automaticTime">
-
-                            <mat-hint>
-                                Se utilizará cuando este equipo tenga una conexión
-                                activa con TPV Backup.
-                            </mat-hint>
 
                             @if (
                             settingsForm.backup.automaticTime().touched() &&
