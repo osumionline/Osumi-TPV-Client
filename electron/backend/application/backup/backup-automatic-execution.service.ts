@@ -1,4 +1,5 @@
 import type BackupAutomaticStateService from '@backend/application/backup/backup-automatic-state.service';
+import type BackupAutomaticExecutor from '@backend/contracts/backup/backup-automatic-executor.interface';
 import type BackupRemoteCreator from '@backend/contracts/backup/backup-remote-creator.interface';
 import type BackupRemoteCredentialStorage from '@backend/contracts/backup/backup-remote-credential-storage.interface';
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
@@ -10,7 +11,7 @@ import type AppData from '@desktop-contracts/configuration/app-data.interface';
  * Evalúa y ejecuta una copia remota automática
  * cuando existe un ciclo diario pendiente.
  */
-export default class BackupAutomaticExecutionService {
+export default class BackupAutomaticExecutionService implements BackupAutomaticExecutor {
   private running: boolean = false;
 
   /**
