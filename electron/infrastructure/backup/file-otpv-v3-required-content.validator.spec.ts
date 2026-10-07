@@ -65,6 +65,20 @@ describe('FileOtpvV3RequiredContentValidator', (): void => {
     expect(sha256(databaseAfter)).toBe(hashBefore);
   });
 
+  it('acepta un app_data.json anterior sin hora de backup automático', async (): Promise<void> => {
+    const legacyAppData: Record<string, unknown> = {
+      ...createValidAppData(),
+    };
+
+    delete legacyAppData['backupAutomaticTime'];
+
+    await writeFile(paths.appDataFile, `${JSON.stringify(legacyAppData, null, 2)}\n`, {
+      encoding: 'utf8',
+    });
+
+    await expect(validator.validate(paths)).resolves.toBeUndefined();
+  });
+
   it('rechaza una SQLite que no pertenece a Osumi TPV', async (): Promise<void> => {
     await writeFile(paths.databaseFile, 'esto no es una base sqlite', {
       encoding: 'utf8',
