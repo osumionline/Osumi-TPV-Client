@@ -182,28 +182,70 @@
         }
 
         @if (remoteConnection(); as connection) {
-        <section class="management-backups__connection">
-            <div class="management-backups__connection-main">
-                <div class="management-backups__connection-icon">
-                    <mat-icon>cloud_done</mat-icon>
+        <div class="management-backups__overview">
+            <section class="management-backups__connection">
+                <div class="management-backups__connection-main">
+                    <div class="management-backups__connection-icon">
+                        <mat-icon>cloud_done</mat-icon>
+                    </div>
+
+                    <div>
+                        <strong>
+                            {{ connection.installation.name }}
+                        </strong>
+
+                        <span>
+                            {{ connection.subscription.name }}
+                        </span>
+                    </div>
                 </div>
 
-                <div>
+                <span class="management-backups__status"
+                      [class.management-backups__status--expired]="connection.subscription.status === 'expired'">
+                    {{ connection.subscription.status === 'active' ? 'Activa' : 'Caducada' }}
+                </span>
+            </section>
+
+            @if (automaticInfo(); as automatic) {
+            <section class="management-backups__automatic">
+                <div class="management-backups__automatic-icon">
+                    <mat-icon>schedule</mat-icon>
+                </div>
+
+                <div class="management-backups__automatic-summary">
                     <strong>
-                        {{ connection.installation.name }}
+                        Copias automáticas
                     </strong>
 
                     <span>
-                        {{ connection.subscription.name }}
+                        Todos los días a las {{ automatic.automaticTime }}
                     </span>
                 </div>
-            </div>
 
-            <span class="management-backups__status"
-                  [class.management-backups__status--expired]="connection.subscription.status === 'expired'">
-                {{ connection.subscription.status === 'active' ? 'Activa' : 'Caducada' }}
-            </span>
-        </section>
+                <div class="management-backups__automatic-last">
+                    <small>
+                        Última copia automática
+                    </small>
+
+                    @if (automatic.lastSuccessfulAt !== null) {
+                    <strong>
+                        {{ formatDate(automatic.lastSuccessfulAt) }}
+                    </strong>
+                    }
+                    @else {
+                    <strong>
+                        Todavía no se ha realizado ninguna
+                    </strong>
+                    }
+                </div>
+
+                <span class="management-backups__automatic-state"
+                      [class.management-backups__automatic-state--pending]="automatic.pending">
+                    {{ automatic.pending ? 'Pendiente' : 'Al día' }}
+                </span>
+            </section>
+            }
+        </div>
 
         @if (connection.subscription.status === 'expired') {
         <div class="management-backups__remote-warning">

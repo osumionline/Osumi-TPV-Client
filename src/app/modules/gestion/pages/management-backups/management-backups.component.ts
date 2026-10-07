@@ -12,6 +12,7 @@ import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
 import { RouterLink } from '@angular/router';
+import type BackupAutomaticInfo from '@desktop-contracts/backup/backup-automatic-info.interface';
 import type BackupCreateResult from '@desktop-contracts/backup/backup-create-result.interface';
 import type {
   BackupRemoteBackup,
@@ -37,6 +38,8 @@ export default class ManagementBackupsComponent implements OnInit {
   readonly creating: WritableSignal<boolean> = signal<boolean>(false);
   readonly lastBackup: WritableSignal<BackupCreateResult | null> =
     signal<BackupCreateResult | null>(null);
+  readonly automaticInfo: WritableSignal<BackupAutomaticInfo | null> =
+    signal<BackupAutomaticInfo | null>(null);
   readonly remoteLoading: WritableSignal<boolean> = signal<boolean>(false);
   readonly remoteSaving: WritableSignal<boolean> = signal<boolean>(false);
   readonly remoteRemoving: WritableSignal<boolean> = signal<boolean>(false);
@@ -63,9 +66,11 @@ export default class ManagementBackupsComponent implements OnInit {
   );
 
   /**
-   * Carga el estado remoto al abrir la pantalla.
+   * Carga el estado local automático y
+   * el estado remoto al abrir la pantalla.
    */
   ngOnInit(): void {
+    void this.loadAutomaticStatus();
     void this.loadRemoteState();
   }
 
@@ -191,6 +196,25 @@ export default class ManagementBackupsComponent implements OnInit {
       this.remoteError.set(getErrorMessage(error, 'No se ha podido descargar la copia remota.'));
     } finally {
       this.remoteDownloadingPublicId.set(null);
+    }
+  }
+
+  /**
+   * Carga la información local de la
+   * programación automática.
+   *
+   * Un fallo elimina cualquier información anterior
+   * para no mostrar un estado obsoleto.
+   */
+  async loadAutomaticStatus(): Promise<void> {
+    try {
+      const info: BackupAutomaticInfo | null = await this.backupService.getAutomaticStatus();
+
+      this.automaticInfo.set(info);
+    } catch (error: unknown) {
+      console.error('Error cargando el estado de las copias automáticas:', error);
+
+      this.automaticInfo.set(null);
     }
   }
 
@@ -354,11 +378,11 @@ export default class ManagementBackupsComponent implements OnInit {
   }
 
   /**
-   * Actualiza manualmente el estado y listado
-   * remotos de TPV Backup.
+   * Actualiza manualmente el estado automático,
+   * la conexión y el listado remoto.
    */
   async refreshRemote(): Promise<void> {
-    await this.loadRemoteState();
+    await Promise.all([this.loadAutomaticStatus(), this.loadRemoteState()]);
   }
 
   /**

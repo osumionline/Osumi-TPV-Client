@@ -166,15 +166,81 @@
         background: var(--mat-sys-tertiary-container, #ffdf9e);
     }
 
-    .management-backups__connection {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+    .management-backups__overview {
+        display: grid;
+        grid-template-columns: repeat(auto-fit,
+                minmax(min(520px, 100%), 1fr));
         gap: 24px;
         margin-bottom: 24px;
+    }
+
+    .management-backups__connection {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
         padding: 18px 20px;
         background: var(--mat-sys-surface-container-low, #f7f7f7);
         border-radius: 12px;
+    }
+
+    .management-backups__automatic {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: start;
+        align-content: start;
+        gap: 16px 24px;
+        padding: 18px 20px;
+        background: var(--mat-sys-surface-container-low, #f7f7f7);
+        border-radius: 12px;
+    }
+
+    .management-backups__automatic-icon {
+        display: grid;
+        width: 42px;
+        height: 42px;
+        place-items: center;
+        color: var(--main-color);
+        background: color-mix(in srgb, var(--main-color) 10%, transparent);
+        border-radius: 10px;
+    }
+
+    .management-backups__automatic-summary,
+    .management-backups__automatic-last {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    .management-backups__automatic-summary {
+        span {
+            opacity: 0.7;
+        }
+    }
+
+    .management-backups__automatic-last {
+        text-align: right;
+
+        small {
+            opacity: 0.65;
+        }
+    }
+
+    .management-backups__automatic-state {
+        padding: 5px 10px;
+        color: var(--mat-sys-on-primary-container, #001b3f);
+        font-size: 0.8rem;
+        font-weight: 600;
+        white-space: nowrap;
+        background: var(--mat-sys-primary-container, #d6e3ff);
+        border-radius: 999px;
+        grid-column: 3;
+        justify-self: end;
+    }
+
+    .management-backups__automatic-state--pending {
+        color: var(--mat-sys-on-tertiary-container, #221b00);
+        background: var(--mat-sys-tertiary-container, #ffdf9e);
     }
 
     .management-backups__connection-main {
@@ -377,6 +443,19 @@
 
         .management-backups__configuration-fields {
             grid-template-columns: 1fr;
+        }
+
+        .management-backups__automatic {
+            grid-template-columns: auto minmax(0, 1fr);
+        }
+
+        .management-backups__automatic-last,
+        .management-backups__automatic-state {
+            grid-column: 2;
+        }
+
+        .management-backups__automatic-state {
+            justify-self: start;
         }
     }
 }

@@ -1,6 +1,7 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import type BackupAutomaticInfo from '@desktop-contracts/backup/backup-automatic-info.interface';
 import type BackupCreateResult from '@desktop-contracts/backup/backup-create-result.interface';
 import type {
   BackupRemoteBackup,
@@ -24,6 +25,9 @@ class TestDesktopBackupService {
   remoteConnectionError: Error | null = null;
   remoteBackupsError: Error | null = null;
 
+  automaticInfo: BackupAutomaticInfo | null = createAutomaticInfo();
+  automaticStatusCalls: number = 0;
+
   /**
    * Simula la creación correcta de una copia.
    */
@@ -36,6 +40,15 @@ class TestDesktopBackupService {
       fileName: 'osumi-tpv-backup-test.otpv',
       sizeBytes: 1_048_576,
     };
+  }
+
+  /**
+   * Devuelve el estado automático simulado.
+   */
+  async getAutomaticStatus(): Promise<BackupAutomaticInfo | null> {
+    this.automaticStatusCalls++;
+
+    return this.automaticInfo;
   }
 
   /**
@@ -189,6 +202,55 @@ describe('ManagementBackupsComponent', (): void => {
     expect(component.remoteBackups()).toEqual([]);
   });
 
+  it('carga el estado de las copias automáticas', async (): Promise<void> => {
+    await component.loadAutomaticStatus();
+
+    expect(backupService.automaticStatusCalls).toBe(1);
+    expect(component.automaticInfo()).toEqual(createAutomaticInfo());
+  });
+
+  it('actualiza también el estado automático al refrescar TPV Backup', async (): Promise<void> => {
+    await component.refreshRemote();
+
+    expect(backupService.automaticStatusCalls).toBe(1);
+    expect(component.automaticInfo()).toEqual(createAutomaticInfo());
+  });
+
+  it('muestra la programación automática cuando existe conexión remota', async (): Promise<void> => {
+    fixture.detectChanges();
+
+    await fixture.whenStable();
+
+    fixture.detectChanges();
+
+    const content: string = fixture.nativeElement.textContent;
+
+    expect(content).toContain('Copias automáticas');
+    expect(content).toContain('Todos los días a las 03:00');
+    expect(content).toContain('Última copia automática');
+    expect(content).toContain('Al día');
+  });
+
+  it('indica cuando todavía no existe ninguna copia automática', async (): Promise<void> => {
+    backupService.automaticInfo = {
+      ...createAutomaticInfo(),
+      lastSuccessfulAt: null,
+      pending: true,
+    };
+
+    fixture.detectChanges();
+
+    await fixture.whenStable();
+
+    fixture.detectChanges();
+
+    const content: string = fixture.nativeElement.textContent;
+
+    expect(content).toContain('Todavía no se ha realizado ninguna');
+
+    expect(content).toContain('Pendiente');
+  });
+
   it('elimina el estado remoto obsoleto si falla la conexión', async (): Promise<void> => {
     component.remoteConnection.set(createRemoteConnection());
     component.remoteBackups.set([createRemoteBackup()]);
@@ -282,6 +344,20 @@ describe('ManagementBackupsComponent', (): void => {
     expect(backupService.remoteCreateCalls).toBe(0);
   });
 });
+
+/**
+ * Construye el estado de copias automáticas
+ * utilizado por los tests.
+ */
+function createAutomaticInfo(): BackupAutomaticInfo {
+  return {
+    automaticTime: '03:00',
+    lastSuccessfulAt: '2026-10-07T01:05:00.000Z',
+    latestScheduledAt: '2026-10-07T01:00:00.000Z',
+    nextScheduledAt: '2026-10-08T01:00:00.000Z',
+    pending: false,
+  };
+}
 
 /**
  * Construye una conexión remota de prueba.
