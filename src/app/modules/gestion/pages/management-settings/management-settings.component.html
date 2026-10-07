@@ -765,7 +765,8 @@
 
                     <p class="section-help">
                         Si tienes una suscripción con TPV Backup puedes configurar
-                        aquí la clave API utilizada para las copias de seguridad.
+                        aquí la clave utilizada para cifrar las copias y la hora
+                        diaria de creación automática.
                     </p>
 
                     <div class="secret-field-row">
@@ -781,22 +782,22 @@
                                     matSuffix
                                     type="button"
                                     [attr.aria-label]="
-                                  backupApiKeyVisible()
-                                    ? 'Ocultar clave'
-                                    : 'Mostrar clave'
-                                "
+                                      backupApiKeyVisible()
+                                        ? 'Ocultar clave'
+                                        : 'Mostrar clave'
+                                    "
                                     [matTooltip]="
-                                  backupApiKeyVisible()
-                                    ? 'Ocultar clave'
-                                    : 'Mostrar clave'
-                                "
+                                      backupApiKeyVisible()
+                                        ? 'Ocultar clave'
+                                        : 'Mostrar clave'
+                                    "
                                     (click)="toggleSensitiveVisibility('backupApiKey')">
                                 <mat-icon>
                                     {{
-                                  backupApiKeyVisible()
-                                    ? 'visibility_off'
-                                    : 'visibility'
-                                }}
+                                      backupApiKeyVisible()
+                                        ? 'visibility_off'
+                                        : 'visibility'
+                                    }}
                                 </mat-icon>
                             </button>
 
@@ -818,13 +819,40 @@
                                 (click)="revealSecret('backupApiKey')">
                             <mat-icon>
                                 {{
-                              revealingSecret() === 'backupApiKey'
-                                ? 'hourglass_top'
-                                : 'visibility'
-                            }}
+                                  revealingSecret() === 'backupApiKey'
+                                    ? 'hourglass_top'
+                                    : 'visibility'
+                                }}
                             </mat-icon>
                         </button>
                         }
+                    </div>
+
+                    <div class="form-row">
+                        <mat-form-field>
+                            <mat-label>Hora de la copia automática</mat-label>
+
+                            <input matInput
+                                   type="time"
+                                   [formField]="settingsForm.backup.automaticTime">
+
+                            <mat-hint>
+                                Se utilizará cuando este equipo tenga una conexión
+                                activa con TPV Backup.
+                            </mat-hint>
+
+                            @if (
+                            settingsForm.backup.automaticTime().touched() &&
+                            settingsForm.backup.automaticTime().invalid()
+                            ) {
+                            <mat-error>
+                                {{
+                                  settingsForm.backup.automaticTime()
+                                    .errors()[0]?.message
+                                }}
+                            </mat-error>
+                            }
+                        </mat-form-field>
                     </div>
                 </div>
 

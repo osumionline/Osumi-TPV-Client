@@ -106,7 +106,7 @@
       </div>
 
       <p>
-        <strong>Logo</strong>
+        <strong>Logo (obligatorio)</strong>
       </p>
 
       <div class="logo-row">
@@ -150,7 +150,7 @@
       }
 
       @if (
-      installationForm.negocio.logoDataUrl().touched() &&
+      installationForm.negocio().touched() &&
       installationForm.negocio.logoDataUrl().invalid()
       ) {
       <p class="form-error">
@@ -855,6 +855,33 @@
           ) {
           <mat-error>
             {{ installationForm.backupRemote.secret().errors()[0]?.message }}
+          </mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <div class="row">
+        <mat-form-field class="three">
+          <mat-label>Hora de la copia automática</mat-label>
+
+          <input matInput
+                 type="time"
+                 [formField]="installationForm.opciones.backupAutomaticTime">
+
+          <mat-hint>
+            Si el equipo no está disponible a esa hora,
+            la copia se realizará cuando vuelva a estar disponible.
+          </mat-hint>
+
+          @if (
+          installationForm.opciones.backupAutomaticTime().touched() &&
+          installationForm.opciones.backupAutomaticTime().invalid()
+          ) {
+          <mat-error>
+            {{
+        installationForm.opciones.backupAutomaticTime()
+          .errors()[0]?.message
+      }}
           </mat-error>
           }
         </mat-form-field>

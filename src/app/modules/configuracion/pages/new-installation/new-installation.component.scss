@@ -127,6 +127,10 @@
     }
 }
 
+.form-error {
+    color: var(--mat-form-field-error-text-color, var(--mat-sys-error));
+}
+
 @media (max-width: 900px) {
     .main {
         .printer-settings-row {
