@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 
-import { app, BrowserWindow, Menu, protocol } from 'electron';
+import { app, BrowserWindow, Menu, powerMonitor, protocol } from 'electron';
 
 import type InstallationFinalizer from '@backend/contracts/configuration/installation-finalizer.interface';
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
@@ -84,6 +84,17 @@ app
      * asíncrona y no bloquea el arranque de la ventana.
      */
     applicationComposition.backupAutomaticSchedulerService.start();
+
+    /*
+     * Al volver de una suspensión, el timer programado
+     * puede haber vencido mientras el equipo dormía.
+     *
+     * Forzamos una reevaluación para crear inmediatamente
+     * la copia pendiente si corresponde.
+     */
+    powerMonitor.on('resume', (): void => {
+      applicationComposition?.backupAutomaticSchedulerService.reevaluate();
+    });
 
     app.on('activate', (): void => {
       if (BrowserWindow.getAllWindows().length === 0) {

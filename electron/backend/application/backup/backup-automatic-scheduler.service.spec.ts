@@ -125,6 +125,36 @@ describe('BackupAutomaticSchedulerService', (): void => {
     expect(executor.executeCalls).toBe(2);
   });
 
+  it('pospone una reevaluación solicitada mientras otra evaluación está en curso', async (): Promise<void> => {
+    const pendingExecutor: PendingBackupAutomaticExecutor = new PendingBackupAutomaticExecutor();
+
+    const pendingScheduler: BackupAutomaticSchedulerService = new BackupAutomaticSchedulerService(
+      pendingExecutor,
+    );
+
+    pendingScheduler.start();
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(pendingExecutor.executeCalls).toBe(1);
+
+    pendingScheduler.reevaluate();
+    pendingScheduler.reevaluate();
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(pendingExecutor.executeCalls).toBe(1);
+
+    pendingExecutor.complete(createResult('not-pending', new Date(2026, 9, 8, 3, 0, 0, 0)));
+
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(pendingExecutor.executeCalls).toBe(2);
+
+    pendingScheduler.stop();
+  });
+
   it('no hace nada al reevaluar si todavía no está arrancado', async (): Promise<void> => {
     scheduler.reevaluate();
 
@@ -186,6 +216,51 @@ class TestBackupAutomaticExecutor implements BackupAutomaticExecutor {
     }
 
     return Promise.resolve(result);
+  }
+}
+
+/**
+ * Ejecutor cuya primera llamada permanece pendiente
+ * hasta que el test la completa explícitamente.
+ */
+class PendingBackupAutomaticExecutor implements BackupAutomaticExecutor {
+  executeCalls: number = 0;
+
+  private resolvePending: ((result: BackupAutomaticExecutionResult) => void) | null = null;
+
+  /**
+   * Mantiene pendiente la primera ejecución.
+   *
+   * Las posteriores devuelven un estado cubierto
+   * para que el scheduler pueda continuar normalmente.
+   */
+  execute(): Promise<BackupAutomaticExecutionResult> {
+    this.executeCalls++;
+
+    if (this.executeCalls > 1) {
+      return Promise.resolve(createResult('not-pending', new Date(2026, 9, 8, 3, 0, 0, 0)));
+    }
+
+    return new Promise<BackupAutomaticExecutionResult>(
+      (resolve: (result: BackupAutomaticExecutionResult) => void): void => {
+        this.resolvePending = resolve;
+      },
+    );
+  }
+
+  /**
+   * Completa la evaluación que permanece pendiente.
+   */
+  complete(result: BackupAutomaticExecutionResult): void {
+    if (this.resolvePending === null) {
+      throw new Error('No existe ninguna evaluación pendiente.');
+    }
+
+    const resolve: (result: BackupAutomaticExecutionResult) => void = this.resolvePending;
+
+    this.resolvePending = null;
+
+    resolve(result);
   }
 }
 
