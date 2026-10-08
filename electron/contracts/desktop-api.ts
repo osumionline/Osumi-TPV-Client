@@ -14,6 +14,7 @@ import type PrintingApi from '@desktop-contracts/configuration/printing/printing
 import type TiposPagoApi from '@desktop-contracts/configuration/tipos-pago/tipos-pago-api.interface';
 import type FilesApi from '@desktop-contracts/files/files-api.interface';
 import type LegacyImportApi from '@desktop-contracts/legacy-import/legacy-import-api.interface';
+import type LoggingApi from '@desktop-contracts/logging/logging-api.interface';
 import type SystemApi from '@desktop-contracts/system/system-api.interface';
 import type ReservasApi from '@desktop-contracts/ventas/reservas/reservas-api.interface';
 import type VentasApi from '@desktop-contracts/ventas/ventas-api.interface';
@@ -21,6 +22,7 @@ import type VentasApi from '@desktop-contracts/ventas/ventas-api.interface';
 export default interface OsumiDesktopApi {
   readonly isElectron: true;
   readonly application: ApplicationApi;
+  readonly logging: LoggingApi;
   readonly almacen: AlmacenApi;
   readonly compras: ComprasApi;
   readonly system: SystemApi;

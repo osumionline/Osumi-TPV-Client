@@ -38,6 +38,8 @@ const IPC_CHANNELS = {
 
   applicationGetState: 'application:get-state',
 
+  loggingWrite: 'logging:write',
+
   almacenSearchInventario: 'almacen:search-inventario',
   almacenSaveInventarioRow: 'almacen:save-inventario-row',
   almacenSaveInventarioRows: 'almacen:save-inventario-rows',

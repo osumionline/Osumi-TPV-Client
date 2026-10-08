@@ -233,6 +233,7 @@ import registerTiposPagoIpc from '@ipc/configuration/register-tipos-pago-ipc';
 import registerApplicationIpc from '@ipc/register-application-ipc';
 import registerFilesIpc from '@ipc/register-files-ipc';
 import registerLegacyImportIpc from '@ipc/register-legacy-import-ipc';
+import registerLoggingIpc from '@ipc/register-logging-ipc';
 import { registerSystemIpc } from '@ipc/register-system-ipc';
 import registerReservasIpc from '@ipc/ventas/register-reservas-ipc';
 import registerVentasIpc from '@ipc/ventas/register-ventas-ipc';
@@ -942,6 +943,7 @@ export default function createApplicationComposition(
   /*
    * Canales IPC.
    */
+  registerLoggingIpc(getMainWindow, applicationLogger);
   registerApplicationIpc(applicationStateService);
   registerBackupIpc(
     getMainWindow,

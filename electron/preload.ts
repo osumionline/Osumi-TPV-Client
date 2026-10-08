@@ -153,6 +153,7 @@ import type LegacyImportPreparationResult from '@desktop-contracts/legacy-import
 import type LegacyImportProgress from '@desktop-contracts/legacy-import/legacy-import-progress.interface';
 import type { LegacyImportReviewDecision } from '@desktop-contracts/legacy-import/legacy-import-review-decision.type';
 import type LegacyImportStartResult from '@desktop-contracts/legacy-import/legacy-import-start-result.interface';
+import type { RendererLogCommand } from '@desktop-contracts/logging/renderer-log-command';
 import AppInfo from '@desktop-contracts/system/app-info.interface';
 import type AccesoDirectoVentaInterface from '@desktop-contracts/ventas/acceso-directo-venta.interface';
 import type ArticuloVentaInterface from '@desktop-contracts/ventas/articulo-venta.interface';
@@ -184,6 +185,11 @@ const desktopApi: OsumiDesktopApi = Object.freeze({
     getState: (): Promise<ApplicationStateResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.applicationGetState) as Promise<ApplicationStateResult>,
   },
+
+  logging: Object.freeze({
+    write: (command: RendererLogCommand): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.loggingWrite, command) as Promise<void>,
+  }),
 
   system: Object.freeze({
     getAppInfo: (): Promise<AppInfo> =>
