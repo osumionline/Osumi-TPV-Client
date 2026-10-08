@@ -2,6 +2,7 @@ import { registerLocaleData } from '@angular/common';
 import localeEs from '@angular/common/locales/es';
 import {
   ApplicationConfig,
+  ErrorHandler,
   inject,
   LOCALE_ID,
   provideAppInitializer,
@@ -22,6 +23,7 @@ import {
 } from '@angular/router';
 import routes from '@app/app.routes';
 import type ApplicationStateResult from '@desktop-contracts/application/application-state-result.interface';
+import ApplicationErrorHandler from '@services/application/application-error-handler.service';
 import ApplicationStateService from '@services/application/application-state.service';
 import SpanishPaginatorIntlService from '@services/application/spanish-paginator-intl.service';
 
@@ -46,6 +48,10 @@ const appConfig: ApplicationConfig = {
     {
       provide: MatPaginatorIntl,
       useClass: SpanishPaginatorIntlService,
+    },
+    {
+      provide: ErrorHandler,
+      useClass: ApplicationErrorHandler,
     },
     provideBrowserGlobalErrorListeners(),
     provideRouter(
