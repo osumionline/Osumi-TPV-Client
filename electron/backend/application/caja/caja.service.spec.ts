@@ -1,8 +1,10 @@
 import CajaService from '@backend/application/caja/caja.service';
 import type CajaRepository from '@backend/contracts/caja/caja.repository.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type CajaAbiertaRecord from '@backend/domain/caja/caja-abierta-record.interface';
 import type { CajaCierreRecord } from '@backend/domain/caja/caja-cierre-record.interface';
 import type SalidaCajaRecord from '@backend/domain/caja/salida-caja-record.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type { CerrarCajaCommand } from '@desktop-contracts/caja/cerrar-caja-command.interface';
 import type {
   ActualizarSalidaCajaCommand,
@@ -16,13 +18,15 @@ const ORIGINAL_TIMEZONE: string | undefined = process.env['TZ'];
 
 let repository: FakeCajaRepository;
 let service: CajaService;
+let applicationLogger: TestApplicationLogger;
 
 describe('CajaService', (): void => {
   beforeEach((): void => {
     process.env['TZ'] = 'Europe/Madrid';
 
     repository = new FakeCajaRepository();
-    service = new CajaService(repository);
+    applicationLogger = new TestApplicationLogger();
+    service = new CajaService(repository, applicationLogger);
   });
 
   afterEach((): void => {
@@ -187,6 +191,31 @@ describe('CajaService', (): void => {
         cajaPublicId: 'caja-cerrada',
       }),
     ).rejects.toThrow('La caja indicada no está abierta.');
+    expect(applicationLogger.errorEvents).toEqual([]);
+  });
+
+  it('registra un fallo técnico al cargar el snapshot de cierre', async (): Promise<void> => {
+    const error: Error = new Error('SQLite read failed.');
+
+    repository.findCierreError = error;
+
+    await expect(
+      service.getCierre({
+        cajaPublicId: 'caja-1',
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.errorEvents).toEqual([
+      {
+        area: 'caja',
+        operation: 'load-close-snapshot',
+        message: 'No se ha podido cargar el snapshot económico para cerrar la caja.',
+        error,
+        context: {
+          cajaPublicId: 'caja-1',
+        },
+      },
+    ]);
   });
 
   it('protege el cálculo del saldo final frente a desbordamientos', async (): Promise<void> => {
@@ -252,6 +281,46 @@ describe('CajaService', (): void => {
     });
   });
 
+  it('registra y propaga un fallo técnico al persistir el cierre', async (): Promise<void> => {
+    const error: Error = new Error('SQLite close failed.');
+
+    repository.closeError = error;
+
+    await expect(
+      service.close({
+        cajaPublicId: 'caja-1',
+        retiradoCents: 2_000,
+        entradaCents: 1_000,
+        recuento: [
+          {
+            valorCents: 10_000,
+            cantidad: 1,
+          },
+        ],
+        tiposPago: [
+          {
+            tipoPagoPublicId: 'tipo-tarjeta',
+            importeRealCents: 6_000,
+          },
+        ],
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.errorEvents).toEqual([
+      {
+        area: 'caja',
+        operation: 'close-cash-register',
+        message: 'No se ha podido persistir el cierre definitivo de la caja.',
+        error,
+        context: {
+          cajaPublicId: 'caja-1',
+          recountEntryCount: 1,
+          paymentTypeCount: 1,
+        },
+      },
+    ]);
+  });
+
   it('impide cerrar sin haber realizado un recuento', async (): Promise<void> => {
     await expect(
       service.close({
@@ -264,6 +333,7 @@ describe('CajaService', (): void => {
     ).rejects.toThrow('Es obligatorio realizar el recuento de efectivo antes de cerrar la caja.');
 
     expect(repository.lastCloseCommand).toBeNull();
+    expect(applicationLogger.errorEvents).toEqual([]);
   });
 
   it('rechaza denominaciones duplicadas o no admitidas', async (): Promise<void> => {
@@ -302,6 +372,50 @@ describe('CajaService', (): void => {
     ).rejects.toThrow('Una denominación del recuento de caja no es válida.');
   });
 });
+
+/**
+ * Logger controlado utilizado por los tests
+ * del servicio de Caja.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly errorEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora entradas de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora entradas informativas.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora avisos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva los errores registrados por Caja.
+   */
+  error(event: ApplicationLogEvent): void {
+    this.errorEvents.push(event);
+  }
+
+  /**
+   * No existen escrituras pendientes
+   * en este logger de memoria.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
+}
 
 class FakeCajaRepository implements CajaRepository {
   findSalidasCalls: number = 0;
@@ -352,12 +466,18 @@ class FakeCajaRepository implements CajaRepository {
   };
 
   lastCloseCommand: CerrarCajaCommand | null = null;
+  findCierreError: Error | null = null;
+  closeError: Error | null = null;
 
   /**
    * Registra el comando de cierre recibido.
    */
   close(command: CerrarCajaCommand): Promise<void> {
     this.lastCloseCommand = command;
+
+    if (this.closeError !== null) {
+      return Promise.reject(this.closeError);
+    }
 
     return Promise.resolve();
   }
@@ -418,6 +538,10 @@ class FakeCajaRepository implements CajaRepository {
    */
   findCierre(cajaPublicId: string): Promise<CajaCierreRecord | null> {
     this.lastCierrePublicId = cajaPublicId;
+
+    if (this.findCierreError !== null) {
+      return Promise.reject(this.findCierreError);
+    }
 
     return Promise.resolve(this.cierre);
   }

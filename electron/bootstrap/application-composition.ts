@@ -647,7 +647,7 @@ export default function createApplicationComposition(
   const categoriasService: CategoriasService = new CategoriasService(categoriaRepository);
 
   const cajaRepository: CajaRepository = new TypeOrmCajaRepository(operationalDatabase);
-  const cajaService: CajaService = new CajaService(cajaRepository);
+  const cajaService: CajaService = new CajaService(cajaRepository, applicationLogger);
 
   const informePeriodoResolver: InformePeriodoResolver = new InformePeriodoResolver();
 
