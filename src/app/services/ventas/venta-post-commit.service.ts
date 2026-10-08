@@ -1,4 +1,5 @@
 import { inject, Service } from '@angular/core';
+import ApplicationLoggingService from '@services/application/application-logging.service';
 import ClientesService from '@services/clientes/clientes.service';
 import ReservasService from '@services/ventas/reservas.service';
 import VentaTicketBaiService from '@services/ventas/venta-ticket-bai.service';
@@ -13,6 +14,7 @@ export default class VentaPostCommitService {
   private readonly ventaTicketDocumentService: VentaTicketDocumentService = inject(
     VentaTicketDocumentService,
   );
+  private readonly loggingService: ApplicationLoggingService = inject(ApplicationLoggingService);
 
   /**
    * Ejecuta los trabajos posteriores al COMMIT de una venta.
@@ -95,6 +97,16 @@ export default class VentaPostCommitService {
     try {
       await this.ventaTicketBaiService.processInitial(idVenta);
     } catch (error: unknown) {
+      this.loggingService.warn({
+        area: 'ventas',
+        operation: 'post-commit-ticketbai',
+        message: 'No se ha podido completar TicketBAI después de confirmar la venta.',
+        error,
+        context: {
+          idVenta,
+        },
+      });
+
       warnings.push(
         `No se ha podido completar TicketBAI. El ticket se imprimirá sin el código QR fiscal. ${getErrorMessage(
           error,
@@ -108,6 +120,16 @@ export default class VentaPostCommitService {
     try {
       await this.ventaTicketDocumentService.generateAndSavePdf(idVenta);
     } catch (error: unknown) {
+      this.loggingService.warn({
+        area: 'ventas',
+        operation: 'post-commit-ticket-pdf',
+        message: 'No se ha podido conservar el PDF histórico del ticket.',
+        error,
+        context: {
+          idVenta,
+        },
+      });
+
       warnings.push(
         `No se ha podido conservar el PDF histórico del ticket. ${getErrorMessage(
           error,
@@ -121,6 +143,16 @@ export default class VentaPostCommitService {
     try {
       await this.ventaTicketDocumentService.print(idVenta);
     } catch (error: unknown) {
+      this.loggingService.warn({
+        area: 'ventas',
+        operation: 'post-commit-ticket-print',
+        message: 'No se ha podido imprimir el ticket después de confirmar la venta.',
+        error,
+        context: {
+          idVenta,
+        },
+      });
+
       warnings.push(
         `No se ha podido imprimir el ticket. ${getErrorMessage(
           error,
@@ -143,6 +175,13 @@ export default class VentaPostCommitService {
     warnings: string[],
   ): Promise<void> {
     if (clientePublicId === null || clientePublicId.trim() === '') {
+      this.loggingService.warn({
+        area: 'ventas',
+        operation: 'post-commit-invoice-create',
+        message:
+          'Se ha solicitado crear una factura después de confirmar una venta sin cliente persistido.',
+      });
+
       warnings.push(
         'No se ha podido crear la factura porque la venta no tiene un cliente persistido asociado.',
       );
@@ -151,6 +190,13 @@ export default class VentaPostCommitService {
     }
 
     if (ventaPublicId === null || ventaPublicId.trim() === '') {
+      this.loggingService.warn({
+        area: 'ventas',
+        operation: 'post-commit-invoice-create',
+        message:
+          'Se ha solicitado crear una factura después de confirmar una venta sin identificador persistido válido.',
+      });
+
       warnings.push(
         'No se ha podido crear la factura porque la venta guardada no contiene un identificador válido.',
       );
@@ -170,6 +216,16 @@ export default class VentaPostCommitService {
       facturaPublicId = factura.publicId;
       numeroFactura = factura.numeroFactura;
     } catch (error: unknown) {
+      this.loggingService.warn({
+        area: 'ventas',
+        operation: 'post-commit-invoice-create',
+        message: 'No se ha podido crear la factura después de confirmar la venta.',
+        error,
+        context: {
+          ventaPublicId,
+        },
+      });
+
       warnings.push(
         `No se ha podido crear la factura de la venta. ${getErrorMessage(
           error,
@@ -186,6 +242,18 @@ export default class VentaPostCommitService {
         facturaPublicId,
       });
     } catch (error: unknown) {
+      this.loggingService.warn({
+        area: 'ventas',
+        operation: 'post-commit-invoice-print',
+        message:
+          'La factura se ha creado correctamente, pero no se ha podido abrir su diálogo de impresión.',
+        error,
+        context: {
+          ventaPublicId,
+          facturaPublicId,
+        },
+      });
+
       const referencia: string =
         numeroFactura === null ? 'La factura' : `La factura ${numeroFactura}`;
 

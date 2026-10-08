@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import type { ClienteFacturaDocumentoConsulta } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type CrearClienteFacturaDesdeVentaCommand from '@desktop-contracts/clientes/crear-cliente-factura-desde-venta-command.interface';
+import ApplicationLoggingService from '@services/application/application-logging.service';
 import ClientesService from '@services/clientes/clientes.service';
 import ReservasService from '@services/ventas/reservas.service';
 import VentaPostCommitService from '@services/ventas/venta-post-commit.service';
@@ -13,6 +14,7 @@ describe('VentaPostCommitService', (): void => {
   let reservasService: FakeReservasService;
   let ticketBaiService: FakeVentaTicketBaiService;
   let documentService: FakeVentaTicketDocumentService;
+  let loggingService: FakeApplicationLoggingService;
   let executionOrder: string[];
 
   beforeEach((): void => {
@@ -22,6 +24,7 @@ describe('VentaPostCommitService', (): void => {
     reservasService = new FakeReservasService();
     ticketBaiService = new FakeVentaTicketBaiService(executionOrder);
     documentService = new FakeVentaTicketDocumentService(executionOrder);
+    loggingService = new FakeApplicationLoggingService();
 
     TestBed.configureTestingModule({
       providers: [
@@ -41,6 +44,10 @@ describe('VentaPostCommitService', (): void => {
         {
           provide: VentaTicketDocumentService,
           useValue: documentService,
+        },
+        {
+          provide: ApplicationLoggingService,
+          useValue: loggingService,
         },
       ],
     });
@@ -73,6 +80,17 @@ describe('VentaPostCommitService', (): void => {
     expect(warnings).toEqual([
       'No se ha podido completar TicketBAI. El ticket se imprimirá sin el código QR fiscal. TicketBAI no disponible.',
     ]);
+    expect(loggingService.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'post-commit-ticketbai',
+        message: 'No se ha podido completar TicketBAI después de confirmar la venta.',
+        error: ticketBaiService.error,
+        context: {
+          idVenta: 123,
+        },
+      },
+    ]);
     expect(ticketBaiService.processedVentaIds).toEqual([123]);
     expect(documentService.generatePdfVentaIds).toEqual([123]);
     expect(documentService.printVentaIds).toEqual([123]);
@@ -98,26 +116,43 @@ describe('VentaPostCommitService', (): void => {
     expect(warnings).toEqual([
       'No se ha podido conservar el PDF histórico del ticket. No se ha podido generar el PDF.',
     ]);
-
     expect(documentService.generatePdfVentaIds).toEqual([123]);
-
     expect(documentService.printVentaIds).toEqual([123]);
+    expect(loggingService.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'post-commit-ticket-pdf',
+        message: 'No se ha podido conservar el PDF histórico del ticket.',
+        error: documentService.generatePdfError,
+        context: {
+          idVenta: 123,
+        },
+      },
+    ]);
   });
 
   it('conserva el resultado del PDF aunque falle la impresión', async (): Promise<void> => {
     documentService.printError = new Error('No hay una impresora de tickets configurada.');
 
     const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
-
     const warnings: readonly string[] = await service.run(123, false, null, true);
 
     expect(warnings).toEqual([
       'No se ha podido imprimir el ticket. No hay una impresora de tickets configurada.',
     ]);
-
     expect(documentService.generatePdfVentaIds).toEqual([123]);
-
     expect(documentService.printVentaIds).toEqual([123]);
+    expect(loggingService.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'post-commit-ticket-print',
+        message: 'No se ha podido imprimir el ticket después de confirmar la venta.',
+        error: documentService.printError,
+        context: {
+          idVenta: 123,
+        },
+      },
+    ]);
   });
 
   it('recoge conjuntamente las incidencias de PDF e impresión', async (): Promise<void> => {
@@ -257,7 +292,6 @@ describe('VentaPostCommitService', (): void => {
     clientesService.createFacturaError = new Error('La venta ya no está disponible para facturar.');
 
     const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
-
     const warnings: readonly string[] = await service.run(
       123,
       false,
@@ -270,17 +304,25 @@ describe('VentaPostCommitService', (): void => {
     expect(warnings).toEqual([
       'No se ha podido crear la factura de la venta. La venta ya no está disponible para facturar.',
     ]);
-
     expect(clientesService.printFacturaConsultas).toEqual([]);
-
     expect(executionOrder).toEqual(['ticketbai', 'pdf', 'print', 'factura']);
+    expect(loggingService.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'post-commit-invoice-create',
+        message: 'No se ha podido crear la factura después de confirmar la venta.',
+        error: clientesService.createFacturaError,
+        context: {
+          ventaPublicId: 'venta-1',
+        },
+      },
+    ]);
   });
 
   it('conserva la factura emitida aunque falle su diálogo de impresión', async (): Promise<void> => {
     clientesService.printFacturaError = new Error('No hay impresoras disponibles.');
 
     const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
-
     const warnings: readonly string[] = await service.run(
       123,
       false,
@@ -293,12 +335,46 @@ describe('VentaPostCommitService', (): void => {
     expect(warnings).toEqual([
       'La factura 21_2026 se ha creado correctamente, pero no se ha podido abrir el diálogo de impresión. No hay impresoras disponibles.',
     ]);
-
     expect(clientesService.createFacturaCommands).toHaveLength(1);
-
     expect(clientesService.printFacturaConsultas).toHaveLength(1);
+    expect(loggingService.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'post-commit-invoice-print',
+        message:
+          'La factura se ha creado correctamente, pero no se ha podido abrir su diálogo de impresión.',
+        error: clientesService.printFacturaError,
+        context: {
+          ventaPublicId: 'venta-1',
+          facturaPublicId: 'factura-1',
+        },
+      },
+    ]);
   });
 });
+
+interface TestLogEvent {
+  readonly area: string;
+  readonly operation: string;
+  readonly message: string;
+  readonly error?: unknown;
+  readonly context?: Readonly<Record<string, string | number | boolean | null>>;
+}
+
+/**
+ * Logger controlado utilizado por los tests
+ * de postprocesado de ventas.
+ */
+class FakeApplicationLoggingService {
+  readonly warnEvents: TestLogEvent[] = [];
+
+  /**
+   * Conserva los avisos solicitados por el servicio.
+   */
+  warn(event: TestLogEvent): void {
+    this.warnEvents.push(event);
+  }
+}
 
 class FakeReservasService {
   reloadCalls: number = 0;
