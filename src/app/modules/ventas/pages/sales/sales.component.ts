@@ -426,6 +426,14 @@ export default class SalesComponent implements OnInit {
       if (this.ventasContextService.puedeVender() && !this.ventasService.hasVentas()) {
         this.nuevaVenta();
       }
+    } catch {
+      /*
+       * VentasContextService conserva el mensaje visible y registra
+       * la incidencia técnica en el logger de aplicación.
+       *
+       * No propagamos de nuevo el mismo error al ErrorHandler global.
+       */
+      return;
     } finally {
       this.initializing.set(false);
     }

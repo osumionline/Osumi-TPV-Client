@@ -1,11 +1,12 @@
 import type { Signal, WritableSignal } from '@angular/core';
-import { computed, Service, signal } from '@angular/core';
+import { computed, inject, Service, signal } from '@angular/core';
 import type CajaAbiertaInterface from '@desktop-contracts/caja/caja-abierta.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type TipoPagoInterface from '@desktop-contracts/configuration/tipos-pago/tipo-pago.interface';
 import type TerminalInterface from '@desktop-contracts/terminales/terminal.interface';
 import type VentasContextInterface from '@desktop-contracts/ventas/ventas-context.interface';
 import TipoPago from '@model/tipos-pago/tipo-pago.model';
+import ApplicationLoggingService from '@services/application/application-logging.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 /**
@@ -13,6 +14,8 @@ import { getErrorMessage } from '@utils/error.utils';
  */
 @Service()
 export default class VentasContextService {
+  private readonly loggingService: ApplicationLoggingService = inject(ApplicationLoggingService);
+
   private readonly appDataSignal: WritableSignal<AppData | null> = signal<AppData | null>(null);
   private readonly terminalSignal: WritableSignal<TerminalInterface | null> =
     signal<TerminalInterface | null>(null);
@@ -143,6 +146,13 @@ export default class VentasContextService {
     } catch (error: unknown) {
       this.resetData();
 
+      this.loggingService.error({
+        area: 'ventas',
+        operation: 'load-context',
+        message: 'No se ha podido cargar el contexto operativo de Ventas.',
+        error,
+      });
+
       const message: string = getErrorMessage(error);
 
       this.errorSignal.set(message);
@@ -167,6 +177,16 @@ export default class VentasContextService {
 
       this.cajaAbiertaSignal.set(cajaAbierta);
     } catch (error: unknown) {
+      this.loggingService.error({
+        area: 'caja',
+        operation: 'open-cash-register',
+        message: 'No se ha podido abrir la caja del terminal actual.',
+        error,
+        context: {
+          terminalPublicId,
+        },
+      });
+
       const message: string = getErrorMessage(error);
 
       this.errorSignal.set(message);
