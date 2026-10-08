@@ -6,6 +6,8 @@ import type {
   BackupRemoteSession,
 } from '@backend/contracts/backup/backup-remote-client.interface';
 import type BackupRemoteCredentialStorage from '@backend/contracts/backup/backup-remote-credential-storage.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type {
   BackupRemoteBackup,
   BackupRemoteCredentials,
@@ -26,6 +28,7 @@ const BACKUP_SHA256: string = createHash('sha256').update(BACKUP_CONTENT).digest
 let tempDirectory: string | null = null;
 let client: TestBackupRemoteClient;
 let remoteService: BackupRemoteService;
+let applicationLogger: TestApplicationLogger;
 let service: BackupRemoteDownloadService;
 
 describe('BackupRemoteDownloadService', (): void => {
@@ -33,6 +36,7 @@ describe('BackupRemoteDownloadService', (): void => {
     tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-remote-download-service-'));
 
     client = new TestBackupRemoteClient();
+    applicationLogger = new TestApplicationLogger();
 
     remoteService = new BackupRemoteService(
       client,
@@ -40,7 +44,7 @@ describe('BackupRemoteDownloadService', (): void => {
       (): number => NOW,
     );
 
-    service = new BackupRemoteDownloadService(tempDirectory, remoteService);
+    service = new BackupRemoteDownloadService(tempDirectory, remoteService, applicationLogger);
   });
 
   afterEach(async (): Promise<void> => {
@@ -235,6 +239,52 @@ class TestBackupRemoteCredentialStorage implements BackupRemoteCredentialStorage
    * No se utiliza durante estos tests.
    */
   delete(): Promise<void> {
+    return Promise.resolve();
+  }
+}
+
+/**
+ * Logger controlado utilizado por los tests
+ * del servicio de descarga remota.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  /**
+   * Ignora entradas de diagnóstico no relevantes
+   * para estos tests.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora entradas informativas no relevantes
+   * para estos tests.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora avisos no provocados explícitamente
+   * por estos tests.
+   */
+  warn(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora errores no relevantes
+   * para estos tests.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No existe ninguna escritura pendiente
+   * en este logger de pruebas.
+   */
+  flush(): Promise<void> {
     return Promise.resolve();
   }
 }

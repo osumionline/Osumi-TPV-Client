@@ -2,6 +2,7 @@ import type BackupRemoteService from '@backend/application/backup/backup-remote.
 import { BackupRemoteClientError } from '@backend/contracts/backup/backup-remote-client.error';
 import type { BackupRemoteDownloadTransferResult } from '@backend/contracts/backup/backup-remote-client.interface';
 import type BackupRemoteDownloader from '@backend/contracts/backup/backup-remote-downloader.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type {
   BackupRemoteBackup,
   BackupRemoteDownloadResult,
@@ -23,6 +24,7 @@ export default class BackupRemoteDownloadService implements BackupRemoteDownload
   constructor(
     private readonly destinationDirectory: string,
     private readonly remoteService: BackupRemoteService,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   /**
@@ -147,7 +149,12 @@ export default class BackupRemoteDownloadService implements BackupRemoteDownload
         force: true,
       });
     } catch (error: unknown) {
-      console.error('No se ha podido eliminar una descarga temporal de TPV Backup:', error);
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'remote-download-cleanup',
+        message: 'No se ha podido eliminar una descarga temporal de TPV Backup.',
+        error,
+      });
     }
   }
 }

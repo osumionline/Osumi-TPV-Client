@@ -341,17 +341,23 @@ export default function createApplicationComposition(
   );
 
   const backupRemoteRestoreDownloadService: BackupRemoteDownloadService =
-    new BackupRemoteDownloadService(backupRemoteRestoreDirectory, backupRemoteRestoreService);
+    new BackupRemoteDownloadService(
+      backupRemoteRestoreDirectory,
+      backupRemoteRestoreService,
+      applicationLogger,
+    );
 
   const backupRemoteCreateService: BackupRemoteCreateService = new BackupRemoteCreateService(
     join(applicationPaths.stagingDirectory, 'remote-upload'),
     backupService,
     backupRemoteService,
+    applicationLogger,
   );
 
   const backupRemoteDownloadService: BackupRemoteDownloadService = new BackupRemoteDownloadService(
     applicationPaths.backupsDirectory,
     backupRemoteService,
+    applicationLogger,
   );
 
   /*

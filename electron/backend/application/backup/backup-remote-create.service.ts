@@ -3,6 +3,7 @@ import type BackupService from '@backend/application/backup/backup.service';
 import type BackupCreatedFile from '@backend/contracts/backup/backup-created-file.interface';
 import { BackupRemoteClientError } from '@backend/contracts/backup/backup-remote-client.error';
 import type BackupRemoteCreator from '@backend/contracts/backup/backup-remote-creator.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type {
   BackupRemoteConnection,
   BackupRemoteUploadResult,
@@ -23,6 +24,7 @@ export default class BackupRemoteCreateService implements BackupRemoteCreator {
     private readonly temporaryDirectory: string,
     private readonly backupService: BackupService,
     private readonly remoteService: BackupRemoteService,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   /**
@@ -99,7 +101,12 @@ export default class BackupRemoteCreateService implements BackupRemoteCreator {
         force: true,
       });
     } catch (error: unknown) {
-      console.error('No se ha podido eliminar la copia temporal utilizada para TPV Backup:', error);
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'remote-upload-cleanup',
+        message: 'No se ha podido eliminar la copia temporal utilizada para TPV Backup.',
+        error,
+      });
     }
   }
 }
