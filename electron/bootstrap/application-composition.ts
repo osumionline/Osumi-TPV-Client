@@ -98,6 +98,7 @@ import type LogoStorage from '@backend/contracts/configuration/logo-storage.inte
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
 import type { EmailSender } from '@backend/contracts/email/email-sender.interface';
 import type EmpleadoRepository from '@backend/contracts/empleados/empleado.repository.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type MarcaRepository from '@backend/contracts/marcas/marca.repository.interface';
 import type A4DocumentRenderer from '@backend/contracts/printing/a4-document-renderer.interface';
 import type HtmlDocumentRenderer from '@backend/contracts/printing/html-document-renderer.interface';
@@ -246,6 +247,7 @@ export default function createApplicationComposition(
   applicationPaths: ApplicationPaths,
   applicationVersion: string,
   installationFinalizer: InstallationFinalizer,
+  applicationLogger: ApplicationLogger,
 ): ApplicationComposition {
   /*
    * Configuración definitiva.
@@ -1022,6 +1024,7 @@ export default function createApplicationComposition(
 
   return {
     applicationDatabase: operationalDatabase,
+    applicationLogger,
     backupAutomaticSchedulerService,
   };
 }
