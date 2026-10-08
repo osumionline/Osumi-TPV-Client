@@ -1,3 +1,4 @@
+import ApplicationLogTextSanitizer from '@backend/application/logging/application-log-text-sanitizer';
 import type { NormalizedApplicationError } from '@backend/domain/logging/application-log.types';
 
 /**
@@ -15,6 +16,13 @@ export default class ApplicationErrorNormalizer {
   private static readonly MAX_NAME_LENGTH: number = 200;
   private static readonly MAX_MESSAGE_LENGTH: number = 4_096;
   private static readonly MAX_STACK_LENGTH: number = 16_384;
+
+  /**
+   * Crea el normalizador seguro de errores.
+   */
+  constructor(
+    private readonly textSanitizer: ApplicationLogTextSanitizer = new ApplicationLogTextSanitizer(),
+  ) {}
 
   /**
    * Normaliza un error desconocido.
@@ -52,7 +60,7 @@ export default class ApplicationErrorNormalizer {
 
     const stack: string | null =
       typeof value.stack === 'string' && value.stack.trim() !== ''
-        ? this.sanitizeAndLimit(value.stack, ApplicationErrorNormalizer.MAX_STACK_LENGTH)
+        ? this.textSanitizer.sanitize(value.stack, ApplicationErrorNormalizer.MAX_STACK_LENGTH)
         : null;
 
     if (depth >= ApplicationErrorNormalizer.MAX_CAUSE_DEPTH) {
@@ -107,40 +115,8 @@ export default class ApplicationErrorNormalizer {
    * un fallback cuando queda vacío.
    */
   private normalizeRequiredText(value: string, fallback: string, maxLength: number): string {
-    const normalized: string = this.sanitizeAndLimit(value, maxLength).trim();
+    const normalized: string = this.textSanitizer.sanitize(value, maxLength).trim();
 
     return normalized === '' ? fallback : normalized;
-  }
-
-  /**
-   * Elimina patrones evidentes de credenciales
-   * y limita el tamaño máximo almacenado.
-   *
-   * Esta protección es complementaria:
-   * la regla principal sigue siendo no entregar
-   * secretos ni objetos arbitrarios al logger.
-   */
-  private sanitizeAndLimit(value: string, maxLength: number): string {
-    const sanitized: string = value
-      .replace(/\bBearer\s+[^\s]+/gi, 'Bearer [REDACTED]')
-      .replace(
-        /\b(?:authorization|token|secret|secretApi|backupApiKey|password|pass|contraseña)\s*[:=]\s*[^\s,;]+/giu,
-        (match: string): string => {
-          const separatorIndex: number = Math.max(match.indexOf(':'), match.indexOf('='));
-
-          if (separatorIndex === -1) {
-            return '[REDACTED]';
-          }
-
-          return `${match.slice(0, separatorIndex + 1)}[REDACTED]`;
-        },
-      )
-      .replace(/\beyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[REDACTED_JWT]');
-
-    if (sanitized.length <= maxLength) {
-      return sanitized;
-    }
-
-    return `${sanitized.slice(0, maxLength - 1)}…`;
   }
 }

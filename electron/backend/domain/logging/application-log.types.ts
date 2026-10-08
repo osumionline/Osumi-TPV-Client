@@ -32,8 +32,13 @@ export type ApplicationLogContext = Readonly<Record<string, ApplicationLogContex
  *
  * El error todavía puede ser unknown porque su
  * normalización pertenece al logger.
+ *
+ * source se omite en los eventos normales de Main.
+ * El bridge de Renderer lo indicará explícitamente
+ * cuando se integre su canal IPC.
  */
 export interface ApplicationLogEvent {
+  readonly source?: ApplicationLogSource;
   readonly area: string;
   readonly operation: string;
   readonly message: string;
