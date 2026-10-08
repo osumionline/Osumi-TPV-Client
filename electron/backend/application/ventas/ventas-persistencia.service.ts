@@ -1,3 +1,4 @@
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type {
   GuardarVentaLineaRecordCommand,
   GuardarVentaPagoRecordCommand,
@@ -14,25 +15,33 @@ import type {
 const MICROS_PER_CENT: number = 10_000;
 
 export default class VentasPersistenciaService {
-  constructor(private readonly ventasPersistenciaRepository: VentasPersistenciaRepository) {}
+  /**
+   * Crea el servicio de persistencia comercial de ventas.
+   */
+  constructor(
+    private readonly ventasPersistenciaRepository: VentasPersistenciaRepository,
+    private readonly applicationLogger: ApplicationLogger,
+  ) {}
 
+  /**
+   * Valida, normaliza y persiste definitivamente una venta.
+   *
+   * Los errores de validación se propagan sin registrarse como
+   * incidencias técnicas. Solo un fallo producido al ejecutar
+   * la persistencia real se registra como error de aplicación.
+   */
   async save(command: GuardarVentaCommand): Promise<VentaPersistidaRecord> {
     const publicId: string = this.requirePublicId(command.publicId, 'venta');
-
     const cajaPublicId: string = this.requirePublicId(command.cajaPublicId, 'caja');
-
     const empleadoPublicId: string = this.requirePublicId(command.empleadoPublicId, 'empleado');
-
     const clientePublicId: string | null = this.normalizeNullablePublicId(
       command.clientePublicId,
       'cliente',
     );
-
     const devolucionVentaOrigenPublicId: string | null = this.normalizeNullablePublicId(
       command.devolucionVentaOrigenPublicId,
       'venta origen de la devolución',
     );
-
     const reservasOrigenPublicIds: readonly string[] = this.normalizeReservasOrigen(
       command.reservasOrigenPublicIds,
     );
@@ -46,9 +55,7 @@ export default class VentasPersistenciaService {
     }
 
     const devolucionesOrigen: Set<string> = new Set<string>();
-
     const reservasLineasOrigen: Set<string> = new Set<string>();
-
     const lineas: readonly GuardarVentaLineaRecordCommand[] = command.lineas.map(
       (linea: GuardarVentaLineaCommand): GuardarVentaLineaRecordCommand =>
         this.normalizeLinea(linea, devolucionesOrigen, reservasLineasOrigen),
@@ -62,7 +69,6 @@ export default class VentasPersistenciaService {
     );
 
     const totalLineasMicros: number = this.sumLineasMicros(lineas);
-
     const totalLineasCents: number = this.microsToCents(totalLineasMicros);
 
     if (totalLineasCents !== totalCents) {
@@ -86,7 +92,27 @@ export default class VentasPersistenciaService {
       pagos,
     };
 
-    return this.ventasPersistenciaRepository.save(recordCommand);
+    try {
+      return await this.ventasPersistenciaRepository.save(recordCommand);
+    } catch (error: unknown) {
+      this.applicationLogger.error({
+        area: 'ventas',
+        operation: 'persist-sale',
+        message: 'No se ha podido persistir definitivamente la venta.',
+        error,
+        context: {
+          ventaPublicId: publicId,
+          cajaPublicId,
+          lineCount: lineas.length,
+          paymentCount: pagos.length,
+          hasClient: clientePublicId !== null,
+          hasReturn: devolucionVentaOrigenPublicId !== null,
+          reservationCount: reservasOrigenPublicIds.length,
+        },
+      });
+
+      throw error;
+    }
   }
 
   private normalizeLinea(

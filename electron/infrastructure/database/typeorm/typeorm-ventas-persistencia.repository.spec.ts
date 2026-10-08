@@ -1,6 +1,8 @@
 import VentasPersistenciaService from '@backend/application/ventas/ventas-persistencia.service';
 import VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type VentaTicketPdfStorage from '@backend/contracts/ventas/venta-ticket-pdf-storage.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type VentaPersistidaRecord from '@backend/domain/ventas/venta-persistida-record.interface';
 import type { GuardarVentaCommand } from '@desktop-contracts/ventas/guardar-venta-command.interface';
 import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
@@ -103,6 +105,7 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
 
     ventasPersistenciaService = new VentasPersistenciaService(
       new TypeOrmVentasPersistenciaRepository(applicationDatabase),
+      new TestApplicationLogger(),
     );
     ventasHistoricoRepository = new TypeOrmVentasHistoricoRepository(applicationDatabase);
   });
@@ -1297,6 +1300,52 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
     expect(snapshot.marca_snapshot_public_id).toBe('marca-2');
   });
 });
+
+/**
+ * Logger mínimo utilizado por los tests de integración
+ * de persistencia de ventas.
+ *
+ * Estos tests comprueban la transacción y el rollback,
+ * no el contenido del logging.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  /**
+   * Ignora entradas de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora entradas informativas.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora avisos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora errores, permitiendo que el servicio
+   * vuelva a propagar la excepción original.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No existen escrituras pendientes
+   * en este logger de pruebas.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
+}
 
 async function createSchema(dataSource: DataSource): Promise<void> {
   await dataSource.query('PRAGMA foreign_keys = ON');
