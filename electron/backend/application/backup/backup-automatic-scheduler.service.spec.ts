@@ -1,10 +1,14 @@
 import BackupAutomaticSchedulerService from '@backend/application/backup/backup-automatic-scheduler.service';
 import type BackupAutomaticExecutor from '@backend/contracts/backup/backup-automatic-executor.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type BackupAutomaticExecutionResult from '@backend/domain/backup/backup-automatic-execution-result.interface';
 import type BackupAutomaticStatus from '@backend/domain/backup/backup-automatic-status.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 let executor: TestBackupAutomaticExecutor;
+let applicationLogger: TestApplicationLogger;
 let scheduler: BackupAutomaticSchedulerService;
 
 describe('BackupAutomaticSchedulerService', (): void => {
@@ -14,8 +18,9 @@ describe('BackupAutomaticSchedulerService', (): void => {
     vi.setSystemTime(new Date(2026, 9, 7, 8, 0, 0, 0));
 
     executor = new TestBackupAutomaticExecutor();
+    applicationLogger = new TestApplicationLogger();
 
-    scheduler = new BackupAutomaticSchedulerService(executor);
+    scheduler = new BackupAutomaticSchedulerService(executor, applicationLogger);
   });
 
   afterEach((): void => {
@@ -59,11 +64,11 @@ describe('BackupAutomaticSchedulerService', (): void => {
     expect(executor.executeCalls).toBe(2);
   });
 
-  it('reintenta aproximadamente una hora después de un fallo', async (): Promise<void> => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation((): void => undefined);
+  it('registra el fallo y reintenta aproximadamente una hora después', async (): Promise<void> => {
+    const executionError: Error = new Error('TPV Backup no disponible.');
 
     executor.results.push(
-      new Error('TPV Backup no disponible.'),
+      executionError,
 
       createResult('created', new Date(2026, 9, 8, 3, 0, 0, 0)),
     );
@@ -73,7 +78,17 @@ describe('BackupAutomaticSchedulerService', (): void => {
     await vi.advanceTimersByTimeAsync(0);
 
     expect(executor.executeCalls).toBe(1);
-    expect(consoleError).toHaveBeenCalled();
+    expect(applicationLogger.errorEvents).toEqual([
+      {
+        area: 'backup',
+        operation: 'automatic-scheduler-evaluate',
+        message: 'No se ha podido completar la evaluación de la copia remota automática.',
+        error: executionError,
+        context: {
+          retryDelayMs: 60 * 60 * 1000,
+        },
+      },
+    ]);
 
     await vi.advanceTimersByTimeAsync(59 * 60 * 1000);
 
@@ -82,6 +97,26 @@ describe('BackupAutomaticSchedulerService', (): void => {
     await vi.advanceTimersByTimeAsync(60 * 1000);
 
     expect(executor.executeCalls).toBe(2);
+  });
+
+  it('registra la creación correcta de una copia automática', async (): Promise<void> => {
+    executor.results.push(createResult('created', new Date(2026, 9, 8, 3, 0, 0, 0)));
+
+    scheduler.start();
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(applicationLogger.infoEvents).toEqual([
+      {
+        area: 'backup',
+        operation: 'automatic-backup-created',
+        message: 'Se ha creado correctamente una copia remota automática.',
+        context: {
+          lastSuccessfulAt: '2026-10-07T01:05:00.000Z',
+          nextScheduledAt: new Date(2026, 9, 8, 3, 0, 0, 0).toISOString(),
+        },
+      },
+    ]);
   });
 
   it('reintenta una hora después cuando todavía no existe instalación', async (): Promise<void> => {
@@ -130,6 +165,7 @@ describe('BackupAutomaticSchedulerService', (): void => {
 
     const pendingScheduler: BackupAutomaticSchedulerService = new BackupAutomaticSchedulerService(
       pendingExecutor,
+      applicationLogger,
     );
 
     pendingScheduler.start();
@@ -261,6 +297,53 @@ class PendingBackupAutomaticExecutor implements BackupAutomaticExecutor {
     this.resolvePending = null;
 
     resolve(result);
+  }
+}
+
+/**
+ * Logger controlado utilizado por los tests
+ * del scheduler automático.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly infoEvents: ApplicationLogEvent[] = [];
+
+  readonly errorEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora entradas de diagnóstico no relevantes
+   * para estos tests.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva las entradas informativas recibidas.
+   */
+  info(event: ApplicationLogEvent): void {
+    this.infoEvents.push(event);
+  }
+
+  /**
+   * Ignora avisos no relevantes para estos tests.
+   */
+  warn(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva los errores recibidos.
+   */
+  error(event: ApplicationLogEvent): void {
+    this.errorEvents.push(event);
+  }
+
+  /**
+   * No existe escritura asíncrona pendiente
+   * en este logger de memoria.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
   }
 }
 

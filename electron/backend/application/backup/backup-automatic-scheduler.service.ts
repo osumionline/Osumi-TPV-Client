@@ -1,4 +1,5 @@
 import type BackupAutomaticExecutor from '@backend/contracts/backup/backup-automatic-executor.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type BackupAutomaticExecutionResult from '@backend/domain/backup/backup-automatic-execution-result.interface';
 
 /**
@@ -23,6 +24,7 @@ export default class BackupAutomaticSchedulerService {
    */
   constructor(
     private readonly executor: BackupAutomaticExecutor,
+    private readonly applicationLogger: ApplicationLogger,
     private readonly now: () => Date = (): Date => new Date(),
   ) {}
 
@@ -93,8 +95,28 @@ export default class BackupAutomaticSchedulerService {
       const result: BackupAutomaticExecutionResult = await this.executor.execute();
 
       nextDelayMs = this.resolveNextDelay(result);
+
+      if (result.outcome === 'created') {
+        this.applicationLogger.info({
+          area: 'backup',
+          operation: 'automatic-backup-created',
+          message: 'Se ha creado correctamente una copia remota automática.',
+          context: {
+            lastSuccessfulAt: result.status?.lastSuccessfulAt ?? null,
+            nextScheduledAt: result.status?.nextScheduledAt ?? null,
+          },
+        });
+      }
     } catch (error: unknown) {
-      console.error('Error ejecutando la copia automática de TPV Backup:', error);
+      this.applicationLogger.error({
+        area: 'backup',
+        operation: 'automatic-scheduler-evaluate',
+        message: 'No se ha podido completar la evaluación de la copia remota automática.',
+        error,
+        context: {
+          retryDelayMs: BackupAutomaticSchedulerService.RETRY_DELAY_MS,
+        },
+      });
     } finally {
       this.evaluating = false;
     }
@@ -129,7 +151,16 @@ export default class BackupAutomaticSchedulerService {
     const now: Date = this.now();
 
     if (Number.isNaN(nextScheduledAt.getTime()) || Number.isNaN(now.getTime())) {
-      console.error('No se ha podido calcular el próximo ciclo de copia automática.');
+      this.applicationLogger.error({
+        area: 'backup',
+        operation: 'automatic-scheduler-schedule',
+        message: 'No se ha podido calcular el próximo ciclo de copia automática.',
+        context: {
+          nextScheduledAt: result.status.nextScheduledAt,
+          currentTime: Number.isNaN(now.getTime()) ? null : now.toISOString(),
+          retryDelayMs: BackupAutomaticSchedulerService.RETRY_DELAY_MS,
+        },
+      });
 
       return BackupAutomaticSchedulerService.RETRY_DELAY_MS;
     }

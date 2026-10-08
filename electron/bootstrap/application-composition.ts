@@ -382,7 +382,7 @@ export default function createApplicationComposition(
     );
 
   const backupAutomaticSchedulerService: BackupAutomaticSchedulerService =
-    new BackupAutomaticSchedulerService(backupAutomaticExecutionService);
+    new BackupAutomaticSchedulerService(backupAutomaticExecutionService, applicationLogger);
 
   /*
    * Almacenamiento temporal utilizado durante
