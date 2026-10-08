@@ -21,6 +21,7 @@ import type {
   BackupRemoteUploadResult,
 } from '@desktop-contracts/backup/backup-remote.interface';
 import { DialogService } from '@osumi/angular-tools';
+import ApplicationLoggingService from '@services/application/application-logging.service';
 import DesktopBackupService from '@services/application/desktop-backup.service';
 import { getErrorMessage } from '@utils/error.utils';
 import { firstValueFrom } from 'rxjs';
@@ -33,6 +34,7 @@ import { firstValueFrom } from 'rxjs';
 })
 export default class ManagementBackupsComponent implements OnInit {
   private readonly backupService: DesktopBackupService = inject(DesktopBackupService);
+  private readonly loggingService: ApplicationLoggingService = inject(ApplicationLoggingService);
   private readonly dialog: DialogService = inject(DialogService);
 
   readonly creating: WritableSignal<boolean> = signal<boolean>(false);
@@ -99,7 +101,12 @@ export default class ManagementBackupsComponent implements OnInit {
         content: `La copia de seguridad "${result.fileName}" se ha creado correctamente.`,
       });
     } catch (error: unknown) {
-      console.error('Error creando la copia de seguridad:', error);
+      this.loggingService.error({
+        area: 'backup',
+        operation: 'create-local',
+        message: 'No se ha podido crear una copia de seguridad local desde Gestión.',
+        error,
+      });
 
       this.dialog.alert({
         title: 'Error',
@@ -143,7 +150,12 @@ export default class ManagementBackupsComponent implements OnInit {
           'se ha almacenado correctamente en TPV Backup.',
       });
     } catch (error: unknown) {
-      console.error('Error creando la copia remota:', error);
+      this.loggingService.error({
+        area: 'backup',
+        operation: 'create-remote',
+        message: 'No se ha podido crear una copia remota desde Gestión.',
+        error,
+      });
 
       this.remoteError.set(getErrorMessage(error, 'No se ha podido crear la copia remota.'));
 
@@ -191,7 +203,15 @@ export default class ManagementBackupsComponent implements OnInit {
           `se ha guardado localmente como "${result.fileName}".`,
       });
     } catch (error: unknown) {
-      console.error('Error descargando la copia remota:', error);
+      this.loggingService.error({
+        area: 'backup',
+        operation: 'download-remote',
+        message: 'No se ha podido descargar una copia remota.',
+        error,
+        context: {
+          backupPublicId: backup.publicId,
+        },
+      });
 
       this.remoteError.set(getErrorMessage(error, 'No se ha podido descargar la copia remota.'));
     } finally {
@@ -212,7 +232,12 @@ export default class ManagementBackupsComponent implements OnInit {
 
       this.automaticInfo.set(info);
     } catch (error: unknown) {
-      console.error('Error cargando el estado de las copias automáticas:', error);
+      this.loggingService.warn({
+        area: 'backup',
+        operation: 'load-automatic-status',
+        message: 'No se ha podido cargar el estado de las copias automáticas.',
+        error,
+      });
 
       this.automaticInfo.set(null);
     }
@@ -241,7 +266,12 @@ export default class ManagementBackupsComponent implements OnInit {
     try {
       connection = await this.backupService.getRemoteConnection();
     } catch (error: unknown) {
-      console.error('Error cargando la conexión con TPV Backup:', error);
+      this.loggingService.warn({
+        area: 'backup',
+        operation: 'load-remote-connection',
+        message: 'No se ha podido cargar la conexión con TPV Backup.',
+        error,
+      });
 
       this.remoteConnection.set(null);
       this.remoteBackups.set([]);
@@ -265,7 +295,12 @@ export default class ManagementBackupsComponent implements OnInit {
     try {
       await this.loadRemoteBackups();
     } catch (error: unknown) {
-      console.error('Error cargando las copias remotas:', error);
+      this.loggingService.warn({
+        area: 'backup',
+        operation: 'load-remote-backups',
+        message: 'No se ha podido cargar el listado de copias remotas.',
+        error,
+      });
 
       /*
        * La autenticación ha sido correcta,
@@ -326,7 +361,12 @@ export default class ManagementBackupsComponent implements OnInit {
       this.remoteSecret.set('');
       this.editingRemoteConfiguration.set(false);
     } catch (error: unknown) {
-      console.error('Error configurando TPV Backup:', error);
+      this.loggingService.warn({
+        area: 'backup',
+        operation: 'configure-remote',
+        message: 'No se ha podido validar o configurar la conexión con TPV Backup.',
+        error,
+      });
 
       this.remoteError.set(
         getErrorMessage(error, 'No se han podido validar las credenciales de TPV Backup.'),
@@ -367,7 +407,12 @@ export default class ManagementBackupsComponent implements OnInit {
       this.remoteSecret.set('');
       this.editingRemoteConfiguration.set(false);
     } catch (error: unknown) {
-      console.error('Error eliminando la configuración de TPV Backup:', error);
+      this.loggingService.error({
+        area: 'backup',
+        operation: 'remove-remote-configuration',
+        message: 'No se ha podido eliminar la configuración local de TPV Backup.',
+        error,
+      });
 
       this.remoteError.set(
         getErrorMessage(error, 'No se ha podido eliminar la configuración de TPV Backup.'),
@@ -432,7 +477,15 @@ export default class ManagementBackupsComponent implements OnInit {
         content: `La copia "${backup.originalFilename}" se ha eliminado correctamente de TPV Backup.`,
       });
     } catch (error: unknown) {
-      console.error('Error eliminando la copia remota:', error);
+      this.loggingService.error({
+        area: 'backup',
+        operation: 'delete-remote',
+        message: 'No se ha podido eliminar una copia remota.',
+        error,
+        context: {
+          backupPublicId: backup.publicId,
+        },
+      });
 
       this.remoteError.set(getErrorMessage(error, 'No se ha podido eliminar la copia remota.'));
 
@@ -517,7 +570,12 @@ export default class ManagementBackupsComponent implements OnInit {
     try {
       await this.loadRemoteBackups();
     } catch (error: unknown) {
-      console.error('Error cargando las copias remotas:', error);
+      this.loggingService.warn({
+        area: 'backup',
+        operation: 'reload-remote-backups',
+        message: 'No se ha podido actualizar el listado de copias remotas.',
+        error,
+      });
 
       this.remoteError.set(getErrorMessage(error, errorMessage));
     }

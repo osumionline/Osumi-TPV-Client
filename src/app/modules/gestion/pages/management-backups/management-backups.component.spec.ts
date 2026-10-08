@@ -11,7 +11,16 @@ import type {
 } from '@desktop-contracts/backup/backup-remote.interface';
 import ManagementBackupsComponent from '@modules/gestion/pages/management-backups/management-backups.component';
 import { DialogService } from '@osumi/angular-tools';
+import ApplicationLoggingService from '@services/application/application-logging.service';
 import DesktopBackupService from '@services/application/desktop-backup.service';
+
+interface TestLogEvent {
+  readonly area: string;
+  readonly operation: string;
+  readonly message: string;
+  readonly error?: unknown;
+  readonly context?: Readonly<Record<string, string | number | boolean | null>>;
+}
 
 class TestDesktopBackupService {
   readonly createCalls = signal<number>(0);
@@ -28,11 +37,18 @@ class TestDesktopBackupService {
   automaticInfo: BackupAutomaticInfo | null = createAutomaticInfo();
   automaticStatusCalls: number = 0;
 
+  localCreateError: Error | null = null;
+  automaticStatusError: Error | null = null;
+
   /**
    * Simula la creación correcta de una copia.
    */
   async createLocal(): Promise<BackupCreateResult> {
     this.createCalls.update((value: number): number => value + 1);
+
+    if (this.localCreateError !== null) {
+      throw this.localCreateError;
+    }
 
     return {
       backupId: '123e4567-e89b-42d3-a456-426614174000',
@@ -47,6 +63,10 @@ class TestDesktopBackupService {
    */
   async getAutomaticStatus(): Promise<BackupAutomaticInfo | null> {
     this.automaticStatusCalls++;
+
+    if (this.automaticStatusError !== null) {
+      throw this.automaticStatusError;
+    }
 
     return this.automaticInfo;
   }
@@ -114,6 +134,25 @@ class TestDesktopBackupService {
   }
 }
 
+class TestApplicationLoggingService {
+  readonly warnEvents: TestLogEvent[] = [];
+  readonly errorEvents: TestLogEvent[] = [];
+
+  /**
+   * Conserva los avisos solicitados por el componente.
+   */
+  warn(event: TestLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Conserva los errores solicitados por el componente.
+   */
+  error(event: TestLogEvent): void {
+    this.errorEvents.push(event);
+  }
+}
+
 class TestDialogService {
   readonly alerts: unknown[] = [];
 
@@ -134,10 +173,12 @@ describe('ManagementBackupsComponent', (): void => {
   let component: ManagementBackupsComponent;
   let backupService: TestDesktopBackupService;
   let dialogService: TestDialogService;
+  let loggingService: TestApplicationLoggingService;
 
   beforeEach(async (): Promise<void> => {
     backupService = new TestDesktopBackupService();
     dialogService = new TestDialogService();
+    loggingService = new TestApplicationLoggingService();
 
     await TestBed.configureTestingModule({
       imports: [ManagementBackupsComponent],
@@ -150,6 +191,10 @@ describe('ManagementBackupsComponent', (): void => {
         {
           provide: DialogService,
           useValue: dialogService,
+        },
+        {
+          provide: ApplicationLoggingService,
+          useValue: loggingService,
         },
       ],
     }).compileComponents();
@@ -173,6 +218,47 @@ describe('ManagementBackupsComponent', (): void => {
 
     expect(component.creating()).toBe(false);
     expect(dialogService.alerts).toHaveLength(1);
+  });
+
+  it('registra el fallo al crear una copia local', async (): Promise<void> => {
+    const error: Error = new Error('No se puede crear el backup.');
+
+    backupService.localCreateError = error;
+
+    await component.createBackup();
+
+    expect(component.creating()).toBe(false);
+    expect(component.lastBackup()).toBeNull();
+    expect(dialogService.alerts).toHaveLength(1);
+
+    expect(loggingService.errorEvents).toEqual([
+      {
+        area: 'backup',
+        operation: 'create-local',
+        message: 'No se ha podido crear una copia de seguridad local desde Gestión.',
+        error,
+      },
+    ]);
+  });
+
+  it('registra un aviso si no puede cargar el estado de las copias automáticas', async (): Promise<void> => {
+    const error: Error = new Error('No se puede cargar el estado automático.');
+
+    component.automaticInfo.set(createAutomaticInfo());
+    backupService.automaticStatusError = error;
+
+    await component.loadAutomaticStatus();
+
+    expect(component.automaticInfo()).toBeNull();
+
+    expect(loggingService.warnEvents).toEqual([
+      {
+        area: 'backup',
+        operation: 'load-automatic-status',
+        message: 'No se ha podido cargar el estado de las copias automáticas.',
+        error,
+      },
+    ]);
   });
 
   it('evita lanzar dos copias simultáneamente', async (): Promise<void> => {
@@ -255,7 +341,9 @@ describe('ManagementBackupsComponent', (): void => {
     component.remoteConnection.set(createRemoteConnection());
     component.remoteBackups.set([createRemoteBackup()]);
 
-    backupService.remoteConnectionError = new Error('Las credenciales ya no son válidas.');
+    const error: Error = new Error('Las credenciales ya no son válidas.');
+
+    backupService.remoteConnectionError = error;
 
     await component.loadRemoteState();
 
@@ -263,13 +351,23 @@ describe('ManagementBackupsComponent', (): void => {
     expect(component.remoteBackups()).toEqual([]);
     expect(component.remoteError()).toBe('Las credenciales ya no son válidas.');
     expect(component.remoteLoading()).toBe(false);
+    expect(loggingService.warnEvents).toEqual([
+      {
+        area: 'backup',
+        operation: 'load-remote-connection',
+        message: 'No se ha podido cargar la conexión con TPV Backup.',
+        error,
+      },
+    ]);
   });
 
   it('conserva la conexión pero elimina el listado obsoleto si falla la carga de copias', async (): Promise<void> => {
     component.remoteConnection.set(createRemoteConnection());
     component.remoteBackups.set([createRemoteBackup()]);
 
-    backupService.remoteBackupsError = new Error('No se puede cargar el listado.');
+    const error: Error = new Error('No se puede cargar el listado.');
+
+    backupService.remoteBackupsError = error;
 
     await component.loadRemoteState();
 
@@ -277,6 +375,14 @@ describe('ManagementBackupsComponent', (): void => {
     expect(component.remoteBackups()).toEqual([]);
     expect(component.remoteError()).toBe('No se puede cargar el listado.');
     expect(component.remoteLoading()).toBe(false);
+    expect(loggingService.warnEvents).toEqual([
+      {
+        area: 'backup',
+        operation: 'load-remote-backups',
+        message: 'No se ha podido cargar el listado de copias remotas.',
+        error,
+      },
+    ]);
   });
 
   it('configura credenciales sin modificar el secret', async (): Promise<void> => {
