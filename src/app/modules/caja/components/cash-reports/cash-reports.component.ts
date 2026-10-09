@@ -232,7 +232,12 @@ export default class CashReportsComponent implements OnInit {
         this.selectedCategoryId.set(firstCategory.id);
       }
     } catch (error: unknown) {
-      console.error('Error cargando las categorías para Informes:', error);
+      /*
+       * CategoriasService registra la incidencia en su origen.
+       * Este componente solo absorbe el fallo porque el resto
+       * de tipos de informe puede seguir utilizándose.
+       */
+      void error;
     }
   }
 }

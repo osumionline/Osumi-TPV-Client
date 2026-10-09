@@ -1,7 +1,7 @@
-import type { Signal, WritableSignal } from '@angular/core';
-import { Service, signal } from '@angular/core';
+import { type Signal, type WritableSignal, inject, Service, signal } from '@angular/core';
 import type CategoriaInterface from '@desktop-contracts/articulos/categorias/categoria.interface';
 import Categoria from '@model/categorias/categoria.model';
+import ApplicationLoggingService from '@services/application/application-logging.service';
 
 interface CategoriasState {
   readonly tree: readonly Categoria[];
@@ -10,6 +10,8 @@ interface CategoriasState {
 
 @Service()
 export default class CategoriasService {
+  private readonly loggingService: ApplicationLoggingService = inject(ApplicationLoggingService);
+
   private readonly categoriasSignal: WritableSignal<readonly Categoria[]> = signal<
     readonly Categoria[]
   >([]);
@@ -66,6 +68,12 @@ export default class CategoriasService {
     return this.pendingRequest;
   }
 
+  /**
+   * Recupera y construye el catálogo de categorías.
+   *
+   * Cualquier fallo técnico o incoherencia del árbol
+   * se registra aquí como único origen funcional.
+   */
   private async requestCategorias(): Promise<void> {
     try {
       const result: readonly CategoriaInterface[] = await window.osumiDesktop.categorias.getAll();
@@ -75,6 +83,15 @@ export default class CategoriasService {
       this.categoriasSignal.set(state.tree);
       this.categoriasPlainSignal.set(state.plain);
       this.loadedSignal.set(true);
+    } catch (error: unknown) {
+      this.loggingService.warn({
+        area: 'articulos',
+        operation: 'load-categories',
+        message: 'No se han podido cargar las categorías.',
+        error,
+      });
+
+      throw error;
     } finally {
       this.pendingRequest = null;
     }
