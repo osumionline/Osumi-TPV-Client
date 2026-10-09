@@ -1,4 +1,5 @@
 import { BASIS_POINTS_TOTAL } from '@backend/constants/percentage.constants';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type CrearReservaRecordCommand from '@backend/contracts/reservas/crear-reserva-record-command.interface';
 import type { CrearReservaLineaRecordCommand } from '@backend/contracts/reservas/crear-reserva-record-command.interface';
 import type ReservasRepository from '@backend/contracts/reservas/reservas.repository.interface';
@@ -11,7 +12,13 @@ import type ReservaInterface from '@desktop-contracts/ventas/reservas/reserva.in
 import type { ReservaLineaInterface } from '@desktop-contracts/ventas/reservas/reserva.interface';
 
 export default class ReservasService {
-  constructor(private readonly reservasRepository: ReservasRepository) {}
+  /**
+   * Crea el servicio de gestión de reservas.
+   */
+  constructor(
+    private readonly reservasRepository: ReservasRepository,
+    private readonly applicationLogger: ApplicationLogger,
+  ) {}
 
   /**
    * Crea una reserva después de normalizar y validar
@@ -96,11 +103,30 @@ export default class ReservasService {
 
   /**
    * Elimina una línea y recupera su stock.
+   *
+   * Solo los fallos técnicos de persistencia se registran.
+   * Una línea inexistente o ya inactiva es un estado de negocio.
    */
   async deleteLinea(publicId: string): Promise<void> {
     const normalizedPublicId: string = this.requirePublicId(publicId);
 
-    const deleted: boolean = await this.reservasRepository.deleteLinea(normalizedPublicId);
+    let deleted: boolean;
+
+    try {
+      deleted = await this.reservasRepository.deleteLinea(normalizedPublicId);
+    } catch (error: unknown) {
+      this.applicationLogger.error({
+        area: 'ventas',
+        operation: 'delete-reservation-line',
+        message: 'No se ha podido eliminar una línea de reserva.',
+        error,
+        context: {
+          reservaLineaPublicId: normalizedPublicId,
+        },
+      });
+
+      throw error;
+    }
 
     if (!deleted) {
       throw new Error('La línea de reserva indicada no existe o ya no está activa.');
@@ -109,11 +135,30 @@ export default class ReservasService {
 
   /**
    * Cancela una reserva y recupera todo su stock.
+   *
+   * Solo los fallos técnicos de persistencia se registran.
+   * Una reserva inexistente o ya inactiva es un estado de negocio.
    */
   async deleteReserva(publicId: string): Promise<void> {
     const normalizedPublicId: string = this.requirePublicId(publicId);
 
-    const deleted: boolean = await this.reservasRepository.deleteReserva(normalizedPublicId);
+    let deleted: boolean;
+
+    try {
+      deleted = await this.reservasRepository.deleteReserva(normalizedPublicId);
+    } catch (error: unknown) {
+      this.applicationLogger.error({
+        area: 'ventas',
+        operation: 'delete-reservation',
+        message: 'No se ha podido cancelar una reserva.',
+        error,
+        context: {
+          reservaPublicId: normalizedPublicId,
+        },
+      });
+
+      throw error;
+    }
 
     if (!deleted) {
       throw new Error('La reserva indicada no existe o ya no está activa.');
