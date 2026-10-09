@@ -8,8 +8,10 @@ import type {
   EmailSendRequest,
   EmailSender,
 } from '@backend/contracts/email/email-sender.interface';
+import ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type VentaTicketPdfStorage from '@backend/contracts/ventas/venta-ticket-pdf-storage.interface';
 import type VentasTicketsRepository from '@backend/contracts/ventas/ventas-tickets.repository.interface';
+import { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type { VentaTicketRecord } from '@backend/domain/ventas/venta-ticket-record.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { InstallationSecretsData } from '@desktop-contracts/configuration/installation-command.interface';
@@ -25,18 +27,16 @@ let ventasTicketsRepository: FakeVentasTicketsRepository;
 let pdfStorage: FakeVentaTicketPdfStorage;
 let emailSender: FakeEmailSender;
 let service: VentasTicketEmailService;
+let applicationLogger: TestApplicationLogger;
 
 describe('VentasTicketEmailService', (): void => {
   beforeEach((): void => {
     appDataRepository = new FakeAppDataRepository();
-
     secretStorage = new FakeSecretStorage();
-
     ventasTicketsRepository = new FakeVentasTicketsRepository();
-
     pdfStorage = new FakeVentaTicketPdfStorage();
-
     emailSender = new FakeEmailSender();
+    applicationLogger = new TestApplicationLogger();
 
     const configurationService: ConfigurationService = new ConfigurationService(
       appDataRepository,
@@ -54,6 +54,7 @@ describe('VentasTicketEmailService', (): void => {
       secretStorage,
       ventasTicketsService,
       emailSender,
+      applicationLogger,
     );
   });
 
@@ -86,10 +87,9 @@ describe('VentasTicketEmailService', (): void => {
     const attachment = emailSender.requests[0]?.attachments[0];
 
     expect(attachment?.filename).toBe('ticket-A-456.pdf');
-
     expect(attachment?.contentType).toBe('application/pdf');
-
     expect(attachment?.content).toEqual(pdfStorage.readResult);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('rechaza el envío si el PDF vigente no está disponible', async (): Promise<void> => {
@@ -103,6 +103,19 @@ describe('VentasTicketEmailService', (): void => {
     ).rejects.toThrow('El PDF vigente del ticket no está disponible.');
 
     expect(emailSender.requests).toEqual([]);
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'prepare-ticket-email',
+        message: 'No se ha podido preparar un ticket para enviarlo por email.',
+        error: expect.objectContaining({
+          message: 'El PDF vigente del ticket no está disponible.',
+        }),
+        context: {
+          idVenta: 123,
+        },
+      },
+    ]);
   });
 
   it('rechaza el envío cuando SMTP no está configurado', async (): Promise<void> => {
@@ -121,6 +134,7 @@ describe('VentasTicketEmailService', (): void => {
     ).rejects.toThrow('El envío de emails por SMTP no está configurado.');
 
     expect(emailSender.requests).toEqual([]);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('rechaza el envío cuando falta la contraseña SMTP', async (): Promise<void> => {
@@ -137,6 +151,7 @@ describe('VentasTicketEmailService', (): void => {
     ).rejects.toThrow('La contraseña SMTP no está disponible.');
 
     expect(emailSender.requests).toEqual([]);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('rechaza un destinatario no válido', async (): Promise<void> => {
@@ -148,6 +163,7 @@ describe('VentasTicketEmailService', (): void => {
     ).rejects.toThrow('La dirección de email del destinatario no es válida.');
 
     expect(emailSender.requests).toEqual([]);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('no envía un PDF si la revisión cambia durante la preparación', async (): Promise<void> => {
@@ -169,8 +185,94 @@ describe('VentasTicketEmailService', (): void => {
     ).rejects.toThrow('El ticket ha cambiado mientras se preparaba el email.');
 
     expect(emailSender.requests).toEqual([]);
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'prepare-ticket-email',
+        message: 'No se ha podido preparar un ticket para enviarlo por email.',
+        error: expect.objectContaining({
+          message: 'El ticket ha cambiado mientras se preparaba el email.',
+        }),
+        context: {
+          idVenta: 123,
+        },
+      },
+    ]);
+  });
+
+  it('registra el fallo SMTP sin incorporar información sensible al log', async (): Promise<void> => {
+    const error: Error = new Error('Fallo smtp smtp.example.com cliente@example.com smtp-password');
+
+    emailSender.sendError = error;
+
+    await expect(
+      service.send({
+        idVenta: 123,
+        destinatario: 'cliente@example.com',
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'send-ticket-email',
+        message: 'No se ha podido enviar un ticket por email.',
+        error: expect.objectContaining({
+          message: 'El transporte SMTP no ha podido completar el envío del ticket.',
+        }),
+        context: {
+          idVenta: 123,
+        },
+      },
+    ]);
+
+    expect(applicationLogger.warnEvents[0]?.error).not.toBe(error);
   });
 });
+
+/**
+ * Logger controlado utilizado por los tests
+ * del envío de tickets por email.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora entradas de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora entradas informativas.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva los avisos emitidos durante las pruebas.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Ignora errores.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No existen escrituras pendientes
+   * en este logger de memoria.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
+}
 
 class FakeAppDataRepository implements AppDataRepository {
   appData: AppData | null = createAppData();
@@ -296,11 +398,18 @@ class FakeVentaTicketPdfStorage implements VentaTicketPdfStorage {
 class FakeEmailSender implements EmailSender {
   readonly requests: EmailSendRequest[] = [];
 
+  sendError: Error | null = null;
+
   /**
-   * Registra el email solicitado.
+   * Registra el email solicitado y permite
+   * simular un fallo del transporte SMTP.
    */
   send(request: EmailSendRequest): Promise<void> {
     this.requests.push(request);
+
+    if (this.sendError !== null) {
+      return Promise.reject(this.sendError);
+    }
 
     return Promise.resolve();
   }

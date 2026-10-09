@@ -6,6 +6,7 @@ import type {
   EmailSender,
   EmailSenderSmtpConfig,
 } from '@backend/contracts/email/email-sender.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type EmailSmtpConfig from '@desktop-contracts/configuration/email-smtp-config.interface';
 import type EmailSmtpSecurity from '@desktop-contracts/configuration/email-smtp-security.type';
@@ -19,63 +20,59 @@ interface TicketEmailTemplateValues {
   readonly referencia: string;
 }
 
+interface PreparedTicketEmailDocument {
+  readonly ticket: VentaTicketInterface;
+  readonly pdf: Uint8Array;
+}
+
 export default class VentasTicketEmailService {
+  /**
+   * Crea el servicio encargado del envío por email
+   * de los tickets documentales ya persistidos.
+   */
   constructor(
     private readonly configurationService: ConfigurationService,
     private readonly secretStorage: SecretStorage,
     private readonly ventasTicketsService: VentasTicketsService,
     private readonly emailSender: EmailSender,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   /**
    * Envía al destinatario indicado el PDF documental
    * vigente de una venta.
+   *
+   * Las validaciones conocidas de destinatario y configuración
+   * no generan log. Las incidencias técnicas e inconsistencias
+   * del documento se registran sin incluir datos del email.
    */
   async send(command: VentaTicketEmailCommand): Promise<void> {
     this.validateVentaId(command.idVenta);
 
     const destinatario: string = this.normalizeRecipient(command.destinatario);
 
-    const appData: AppData | null = await this.configurationService.load();
+    let appData: AppData | null;
+
+    try {
+      appData = await this.configurationService.load();
+    } catch (error: unknown) {
+      this.logPreparationFailure(command.idVenta, error);
+
+      throw error;
+    }
 
     if (appData === null) {
       throw new Error('No se ha podido recuperar la configuración de la aplicación.');
     }
 
-    const smtp: EmailSenderSmtpConfig = await this.resolveSmtpConfig(appData.emailSmtp);
-
-    const ticketAntes: VentaTicketInterface | null = await this.ventasTicketsService.getByVentaId(
+    const smtp: EmailSenderSmtpConfig = await this.resolveSmtpConfig(
+      appData.emailSmtp,
       command.idVenta,
     );
 
-    if (ticketAntes === null) {
-      throw new Error('No se ha encontrado la venta cuyo ticket se quiere enviar.');
-    }
+    const prepared: PreparedTicketEmailDocument = await this.prepareTicketDocument(command.idVenta);
 
-    const pdf: Uint8Array | null = await this.ventasTicketsService.getCurrentPdf(command.idVenta);
-
-    if (pdf === null) {
-      throw new Error('El PDF vigente del ticket no está disponible.');
-    }
-
-    /*
-     * getCurrentPdf ya protege su propia lectura frente
-     * a carreras. Esta segunda lectura estrecha todavía
-     * más la ventana antes de entregar el documento al SMTP.
-     */
-    const ticketDespues: VentaTicketInterface | null = await this.ventasTicketsService.getByVentaId(
-      command.idVenta,
-    );
-
-    if (
-      ticketDespues === null ||
-      ticketDespues.ticketRevision !== ticketAntes.ticketRevision ||
-      ticketDespues.ticketPdfRevision !== ticketDespues.ticketRevision
-    ) {
-      throw new Error('El ticket ha cambiado mientras se preparaba el email.');
-    }
-
-    const referencia: string = this.formatTicketReference(ticketDespues);
+    const referencia: string = this.formatTicketReference(prepared.ticket);
 
     const nombreNegocio: string = this.resolveBusinessName(appData);
 
@@ -111,19 +108,106 @@ export default class VentasTicketEmailService {
           filename: this.buildAttachmentFileName(referencia),
 
           contentType: 'application/pdf',
-          content: pdf,
+          content: prepared.pdf,
         },
       ],
     };
 
-    await this.emailSender.send(request);
+    try {
+      await this.emailSender.send(request);
+    } catch (error: unknown) {
+      /*
+       * No entregamos el error del proveedor directamente al logger.
+       * El transporte podría contener información SMTP en implementaciones
+       * distintas de la actual.
+       */
+      const safeError: Error = new Error(
+        'El transporte SMTP no ha podido completar el envío del ticket.',
+      );
+
+      this.applicationLogger.warn({
+        area: 'ventas',
+        operation: 'send-ticket-email',
+        message: 'No se ha podido enviar un ticket por email.',
+        error: safeError,
+        context: {
+          idVenta: command.idVenta,
+        },
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Recupera un snapshot documental estable junto con
+   * el PDF vigente que se enviará como adjunto.
+   *
+   * Las desapariciones o cambios de revisión en esta fase
+   * son inconsistencias recuperables y quedan registradas.
+   */
+  private async prepareTicketDocument(idVenta: number): Promise<PreparedTicketEmailDocument> {
+    try {
+      const ticketAntes: VentaTicketInterface | null =
+        await this.ventasTicketsService.getByVentaId(idVenta);
+
+      if (ticketAntes === null) {
+        throw new Error('No se ha encontrado la venta cuyo ticket se quiere enviar.');
+      }
+
+      const pdf: Uint8Array | null = await this.ventasTicketsService.getCurrentPdf(idVenta);
+
+      if (pdf === null) {
+        throw new Error('El PDF vigente del ticket no está disponible.');
+      }
+
+      const ticketDespues: VentaTicketInterface | null =
+        await this.ventasTicketsService.getByVentaId(idVenta);
+
+      if (
+        ticketDespues === null ||
+        ticketDespues.ticketRevision !== ticketAntes.ticketRevision ||
+        ticketDespues.ticketPdfRevision !== ticketDespues.ticketRevision
+      ) {
+        throw new Error('El ticket ha cambiado mientras se preparaba el email.');
+      }
+
+      return {
+        ticket: ticketDespues,
+        pdf,
+      };
+    } catch (error: unknown) {
+      this.logPreparationFailure(idVenta, error);
+
+      throw error;
+    }
+  }
+
+  /**
+   * Registra un fallo durante la preparación de un email
+   * sin incorporar destinatario, configuración SMTP,
+   * plantillas ni contenido documental.
+   */
+  private logPreparationFailure(idVenta: number, error: unknown): void {
+    this.applicationLogger.warn({
+      area: 'ventas',
+      operation: 'prepare-ticket-email',
+      message: 'No se ha podido preparar un ticket para enviarlo por email.',
+      error,
+      context: {
+        idVenta,
+      },
+    });
   }
 
   /**
    * Obtiene y valida toda la configuración SMTP,
    * incluyendo la contraseña almacenada de forma segura.
    */
-  private async resolveSmtpConfig(config: EmailSmtpConfig | null): Promise<EmailSenderSmtpConfig> {
+  private async resolveSmtpConfig(
+    config: EmailSmtpConfig | null,
+    idVenta: number,
+  ): Promise<EmailSenderSmtpConfig> {
     if (config === null) {
       throw new Error('El envío de emails por SMTP no está configurado.');
     }
@@ -149,7 +233,15 @@ export default class VentasTicketEmailService {
 
     const security: EmailSmtpSecurity = this.normalizeSecurity(config.secure);
 
-    const secrets: InstallationSecretsData | null = await this.secretStorage.load();
+    let secrets: InstallationSecretsData | null;
+
+    try {
+      secrets = await this.secretStorage.load();
+    } catch (error: unknown) {
+      this.logPreparationFailure(idVenta, error);
+
+      throw error;
+    }
 
     const pass: string = this.requireNonEmptyString(
       secrets?.emailSmtpPass ?? null,
