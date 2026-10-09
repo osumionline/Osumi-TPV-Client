@@ -1,5 +1,6 @@
 import ClienteFacturaPdfHtmlBuilder from '@backend/application/clientes/cliente-factura-pdf-html.builder';
 import type ClienteFacturaPdfStorage from '@backend/contracts/clientes/cliente-factura-pdf-storage.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type A4DocumentRenderer from '@backend/contracts/printing/a4-document-renderer.interface';
 import type {
   ClienteFacturaDocumentoConsulta,
@@ -21,11 +22,16 @@ export default class ClienteFacturaPdfService {
     Promise<Uint8Array>
   >();
 
+  /**
+   * Crea el servicio encargado de materializar
+   * los PDFs definitivos de facturas.
+   */
   constructor(
     private readonly documentosService: ClienteFacturaDocumentoProvider,
     private readonly htmlBuilder: ClienteFacturaPdfHtmlBuilder,
     private readonly documentRenderer: A4DocumentRenderer,
     private readonly pdfStorage: ClienteFacturaPdfStorage,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   /**
@@ -42,7 +48,7 @@ export default class ClienteFacturaPdfService {
       return pendingRequest;
     }
 
-    const request: Promise<Uint8Array> = this.resolvePdf(normalizedConsulta);
+    const request: Promise<Uint8Array> = this.resolvePdfWithLogging(normalizedConsulta);
 
     this.pendingRequests.set(requestKey, request);
 
@@ -58,12 +64,39 @@ export default class ClienteFacturaPdfService {
   /**
    * Intenta materializar el PDF después del COMMIT sin
    * permitir que un fallo documental invalide la emisión.
+   *
+   * getOrCreatePdf() registra la incidencia en el punto
+   * documental de origen, por lo que aquí solo la absorbemos.
    */
   async materializeAfterEmit(consulta: ClienteFacturaDocumentoConsulta): Promise<void> {
     try {
       await this.getOrCreatePdf(consulta);
     } catch (error: unknown) {
-      console.error('No se ha podido materializar el PDF definitivo de la factura:', error);
+      void error;
+    }
+  }
+
+  /**
+   * Materializa el PDF y registra una única incidencia
+   * para toda la petición deduplicada cuando el proceso falla.
+   */
+  private async resolvePdfWithLogging(
+    consulta: ClienteFacturaDocumentoConsulta,
+  ): Promise<Uint8Array> {
+    try {
+      return await this.resolvePdf(consulta);
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'clientes',
+        operation: 'generate-invoice-pdf',
+        message: 'No se ha podido generar o conservar el PDF definitivo de una factura.',
+        error,
+        context: {
+          facturaPublicId: consulta.facturaPublicId,
+        },
+      });
+
+      throw error;
     }
   }
 

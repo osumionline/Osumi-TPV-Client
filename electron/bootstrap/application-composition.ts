@@ -627,6 +627,7 @@ export default function createApplicationComposition(
     clienteFacturaPdfHtmlBuilder,
     a4DocumentRenderer,
     clienteFacturaPdfStorage,
+    applicationLogger,
   );
 
   const clienteFacturaPrintDialog: PdfPrintDialog = new ElectronPdfPrintDialog(getMainWindow);

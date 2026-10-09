@@ -1,12 +1,14 @@
 import ClienteFacturaPdfHtmlBuilder from '@backend/application/clientes/cliente-factura-pdf-html.builder';
 import ClienteFacturaPdfService from '@backend/application/clientes/cliente-factura-pdf.service';
 import type ClienteFacturaPdfStorage from '@backend/contracts/clientes/cliente-factura-pdf-storage.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type A4DocumentRenderer from '@backend/contracts/printing/a4-document-renderer.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type {
   ClienteFacturaDocumentoConsulta,
   ClienteFacturaDocumentoInterface,
 } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 class FakeClienteFacturaDocumentoProvider {
   documento: ClienteFacturaDocumentoInterface = createDocumento();
@@ -84,6 +86,50 @@ class FakeClienteFacturaPdfStorage implements ClienteFacturaPdfStorage {
       this.storedPdf = pdf;
     }
 
+    return Promise.resolve();
+  }
+}
+
+/**
+ * Logger controlado utilizado por las pruebas
+ * de materialización documental de facturas.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora entradas de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora entradas informativas.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva los avisos emitidos durante las pruebas.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Ignora errores.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No existen escrituras pendientes
+   * en este logger de memoria.
+   */
+  flush(): Promise<void> {
     return Promise.resolve();
   }
 }
@@ -184,16 +230,16 @@ describe('ClienteFacturaPdfService', (): void => {
     expect(secondResult).toEqual(renderer.result);
   });
 
-  it('no propaga un fallo de materialización después de una emisión confirmada', async (): Promise<void> => {
+  it('registra pero no propaga un fallo de materialización después de una emisión confirmada', async (): Promise<void> => {
     const provider = new FakeClienteFacturaDocumentoProvider();
     const renderer = new FakeA4DocumentRenderer();
     const storage = new FakeClienteFacturaPdfStorage();
+    const applicationLogger = new TestApplicationLogger();
+    const error: Error = new Error('Chromium no disponible');
 
-    renderer.error = new Error('Chromium no disponible');
+    renderer.error = error;
 
-    const consoleError = vi.spyOn(console, 'error').mockImplementation((): void => undefined);
-
-    const service = createService(provider, renderer, storage);
+    const service = createService(provider, renderer, storage, applicationLogger);
 
     await expect(
       service.materializeAfterEmit({
@@ -202,10 +248,133 @@ describe('ClienteFacturaPdfService', (): void => {
       }),
     ).resolves.toBeUndefined();
 
-    expect(consoleError).toHaveBeenCalledOnce();
     expect(storage.storedPdf).toBeNull();
 
-    consoleError.mockRestore();
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'clientes',
+        operation: 'generate-invoice-pdf',
+        message: 'No se ha podido generar o conservar el PDF definitivo de una factura.',
+        error,
+        context: {
+          facturaPublicId: 'factura-1',
+        },
+      },
+    ]);
+  });
+
+  it('registra y propaga un fallo al materializar el PDF bajo demanda', async (): Promise<void> => {
+    const provider = new FakeClienteFacturaDocumentoProvider();
+    const renderer = new FakeA4DocumentRenderer();
+    const storage = new FakeClienteFacturaPdfStorage();
+    const applicationLogger = new TestApplicationLogger();
+    const error: Error = new Error('Filesystem no disponible');
+
+    renderer.error = error;
+
+    const service = createService(provider, renderer, storage, applicationLogger);
+
+    await expect(
+      service.getOrCreatePdf({
+        clientePublicId: 'cliente-1',
+        facturaPublicId: 'factura-1',
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'clientes',
+        operation: 'generate-invoice-pdf',
+        message: 'No se ha podido generar o conservar el PDF definitivo de una factura.',
+        error,
+        context: {
+          facturaPublicId: 'factura-1',
+        },
+      },
+    ]);
+  });
+
+  it('no registra una consulta documental inválida como incidencia técnica', async (): Promise<void> => {
+    const provider = new FakeClienteFacturaDocumentoProvider();
+    const renderer = new FakeA4DocumentRenderer();
+    const storage = new FakeClienteFacturaPdfStorage();
+    const applicationLogger = new TestApplicationLogger();
+
+    const service = createService(provider, renderer, storage, applicationLogger);
+
+    await expect(
+      service.getOrCreatePdf({
+        clientePublicId: '',
+        facturaPublicId: 'factura-1',
+      }),
+    ).rejects.toThrow('El identificador de cliente no es válido.');
+
+    expect(applicationLogger.warnEvents).toEqual([]);
+    expect(provider.calls).toBe(0);
+    expect(renderer.calls).toBe(0);
+    expect(storage.readCalls).toBe(0);
+  });
+
+  it('registra una sola vez el fallo de dos materializaciones simultáneas de la misma factura', async (): Promise<void> => {
+    const provider = new FakeClienteFacturaDocumentoProvider();
+    const renderer = new FakeA4DocumentRenderer();
+    const storage = new FakeClienteFacturaPdfStorage();
+    const applicationLogger = new TestApplicationLogger();
+    const error: Error = new Error('Chromium no disponible');
+
+    let releaseRenderer: () => void = (): void => {
+      throw new Error('El desbloqueo del renderer no se ha inicializado.');
+    };
+
+    let notifyRendererStarted: () => void = (): void => {
+      throw new Error('La notificación del renderer no se ha inicializado.');
+    };
+
+    renderer.blocker = new Promise<void>((resolve: () => void): void => {
+      releaseRenderer = resolve;
+    });
+
+    const rendererStarted: Promise<void> = new Promise<void>((resolve: () => void): void => {
+      notifyRendererStarted = resolve;
+    });
+
+    renderer.onRenderStarted = (): void => {
+      notifyRendererStarted();
+    };
+
+    renderer.error = error;
+
+    const service = createService(provider, renderer, storage, applicationLogger);
+
+    const consulta: ClienteFacturaDocumentoConsulta = {
+      clientePublicId: 'cliente-1',
+      facturaPublicId: 'factura-1',
+    };
+
+    const firstRequest: Promise<Uint8Array> = service.getOrCreatePdf(consulta);
+
+    await rendererStarted;
+
+    const secondRequest: Promise<Uint8Array> = service.getOrCreatePdf(consulta);
+
+    releaseRenderer();
+
+    await expect(firstRequest).rejects.toBe(error);
+    await expect(secondRequest).rejects.toBe(error);
+
+    expect(renderer.calls).toBe(1);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'clientes',
+        operation: 'generate-invoice-pdf',
+        message: 'No se ha podido generar o conservar el PDF definitivo de una factura.',
+        error,
+        context: {
+          facturaPublicId: 'factura-1',
+        },
+      },
+    ]);
   });
 });
 
@@ -216,12 +385,14 @@ function createService(
   provider: FakeClienteFacturaDocumentoProvider,
   renderer: A4DocumentRenderer,
   storage: ClienteFacturaPdfStorage,
+  applicationLogger: ApplicationLogger = new TestApplicationLogger(),
 ): ClienteFacturaPdfService {
   return new ClienteFacturaPdfService(
     provider,
     new ClienteFacturaPdfHtmlBuilder(),
     renderer,
     storage,
+    applicationLogger,
   );
 }
 
