@@ -7,6 +7,8 @@ import type {
   EmailSendRequest,
   EmailSender,
 } from '@backend/contracts/email/email-sender.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type {
   ClienteFacturaDocumentoConsulta,
   ClienteFacturaDocumentoInterface,
@@ -21,6 +23,7 @@ let documentoProvider: FakeClienteFacturaDocumentoProvider;
 let pdfProvider: FakeClienteFacturaPdfProvider;
 let emailSender: FakeEmailSender;
 let service: ClienteFacturaEmailService;
+let applicationLogger: TestApplicationLogger;
 
 describe('ClienteFacturaEmailService', (): void => {
   beforeEach((): void => {
@@ -29,6 +32,7 @@ describe('ClienteFacturaEmailService', (): void => {
     documentoProvider = new FakeClienteFacturaDocumentoProvider();
     pdfProvider = new FakeClienteFacturaPdfProvider();
     emailSender = new FakeEmailSender();
+    applicationLogger = new TestApplicationLogger();
 
     service = new ClienteFacturaEmailService(
       new ConfigurationService(appDataRepository, secretStorage, createNoopLogoStorage()),
@@ -36,6 +40,7 @@ describe('ClienteFacturaEmailService', (): void => {
       documentoProvider,
       pdfProvider,
       emailSender,
+      applicationLogger,
     );
   });
 
@@ -76,6 +81,7 @@ describe('ClienteFacturaEmailService', (): void => {
     expect(attachment?.filename).toBe('factura-21_2026.pdf');
     expect(attachment?.contentType).toBe('application/pdf');
     expect(attachment?.content).toBe(pdfProvider.pdf);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('rechaza un destinatario no válido antes de enviar', async (): Promise<void> => {
@@ -90,6 +96,7 @@ describe('ClienteFacturaEmailService', (): void => {
     expect(emailSender.requests).toEqual([]);
     expect(documentoProvider.calls).toBe(0);
     expect(pdfProvider.calls).toBe(0);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('rechaza el envío cuando SMTP no está configurado', async (): Promise<void> => {
@@ -107,6 +114,7 @@ describe('ClienteFacturaEmailService', (): void => {
     ).rejects.toThrow('El envío de emails por SMTP no está configurado.');
 
     expect(emailSender.requests).toEqual([]);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('rechaza el envío cuando falta la contraseña SMTP', async (): Promise<void> => {
@@ -124,6 +132,7 @@ describe('ClienteFacturaEmailService', (): void => {
     ).rejects.toThrow('La contraseña SMTP no está disponible.');
 
     expect(emailSender.requests).toEqual([]);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('no permite enviar borradores ni facturas anuladas', async (): Promise<void> => {
@@ -163,8 +172,161 @@ describe('ClienteFacturaEmailService', (): void => {
 
     expect(pdfProvider.calls).toBe(0);
     expect(emailSender.requests).toEqual([]);
+    expect(applicationLogger.warnEvents).toEqual([]);
+  });
+
+  it('registra y propaga un fallo técnico al preparar el documento', async (): Promise<void> => {
+    const error: Error = new Error('SQLite invoice document read failed.');
+
+    documentoProvider.error = error;
+
+    await expect(
+      service.send({
+        clientePublicId: 'cliente-1',
+        facturaPublicId: 'factura-1',
+        destinatario: 'cliente@example.com',
+      }),
+    ).rejects.toBe(error);
+
+    expect(pdfProvider.calls).toBe(0);
+    expect(emailSender.requests).toEqual([]);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'clientes',
+        operation: 'prepare-invoice-email',
+        message: 'No se ha podido preparar una factura para enviarla por email.',
+        error,
+        context: {
+          facturaPublicId: 'factura-1',
+        },
+      },
+    ]);
+  });
+
+  it('registra una incoherencia de identidad documental', async (): Promise<void> => {
+    documentoProvider.documento = {
+      ...createDocumento(),
+      facturaPublicId: 'otra-factura',
+    };
+
+    await expect(
+      service.send({
+        clientePublicId: 'cliente-1',
+        facturaPublicId: 'factura-1',
+        destinatario: 'cliente@example.com',
+      }),
+    ).rejects.toThrow('El documento recuperado no corresponde a la factura solicitada.');
+
+    expect(pdfProvider.calls).toBe(0);
+    expect(emailSender.requests).toEqual([]);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'clientes',
+        operation: 'prepare-invoice-email',
+        message: 'No se ha podido preparar una factura para enviarla por email.',
+        error: expect.objectContaining({
+          message: 'El documento recuperado no corresponde a la factura solicitada.',
+        }),
+        context: {
+          facturaPublicId: 'factura-1',
+        },
+      },
+    ]);
+  });
+
+  it('no duplica el logging cuando falla el PDF definitivo', async (): Promise<void> => {
+    const error: Error = new Error('No se ha podido materializar el PDF.');
+
+    pdfProvider.error = error;
+
+    await expect(
+      service.send({
+        clientePublicId: 'cliente-1',
+        facturaPublicId: 'factura-1',
+        destinatario: 'cliente@example.com',
+      }),
+    ).rejects.toBe(error);
+
+    expect(emailSender.requests).toEqual([]);
+    expect(applicationLogger.warnEvents).toEqual([]);
+  });
+
+  it('registra el fallo SMTP sin incorporar información sensible al log', async (): Promise<void> => {
+    const error: Error = new Error('Falló smtp.example.com cliente@example.com smtp-password');
+
+    emailSender.sendError = error;
+
+    await expect(
+      service.send({
+        clientePublicId: 'cliente-1',
+        facturaPublicId: 'factura-1',
+        destinatario: 'cliente@example.com',
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'clientes',
+        operation: 'send-invoice-email',
+        message: 'No se ha podido enviar una factura por email.',
+        error: expect.objectContaining({
+          message: 'El transporte SMTP no ha podido completar el envío de la factura.',
+        }),
+        context: {
+          facturaPublicId: 'factura-1',
+        },
+      },
+    ]);
+
+    expect(applicationLogger.warnEvents[0]?.error).not.toBe(error);
   });
 });
+
+/**
+ * Logger controlado utilizado por los tests
+ * del envío de facturas por email.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora entradas de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora entradas informativas.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva los avisos emitidos durante las pruebas.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Ignora errores.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No existen escrituras pendientes
+   * en este logger de memoria.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
+}
 
 class FakeAppDataRepository implements AppDataRepository {
   appData: AppData | null = createAppData();
@@ -242,15 +404,21 @@ class FakeClienteFacturaDocumentoProvider {
   documento: ClienteFacturaDocumentoInterface = createDocumento();
   receivedConsulta: ClienteFacturaDocumentoConsulta | null = null;
   calls: number = 0;
+  error: Error | null = null;
 
   /**
-   * Devuelve el documento configurado.
+   * Devuelve el documento configurado o simula
+   * una incidencia durante su recuperación.
    */
   getDocumento(
     consulta: ClienteFacturaDocumentoConsulta,
   ): Promise<ClienteFacturaDocumentoInterface> {
     this.calls += 1;
     this.receivedConsulta = consulta;
+
+    if (this.error !== null) {
+      return Promise.reject(this.error);
+    }
 
     return Promise.resolve(this.documento);
   }
@@ -260,13 +428,19 @@ class FakeClienteFacturaPdfProvider {
   readonly pdf: Uint8Array = new TextEncoder().encode('%PDF-1.7\nfactura\n%%EOF');
   receivedConsulta: ClienteFacturaDocumentoConsulta | null = null;
   calls: number = 0;
+  error: Error | null = null;
 
   /**
-   * Devuelve los bytes definitivos simulados.
+   * Devuelve los bytes definitivos simulados o
+   * propaga el fallo preparado para la prueba.
    */
   getOrCreatePdf(consulta: ClienteFacturaDocumentoConsulta): Promise<Uint8Array> {
     this.calls += 1;
     this.receivedConsulta = consulta;
+
+    if (this.error !== null) {
+      return Promise.reject(this.error);
+    }
 
     return Promise.resolve(this.pdf);
   }
@@ -275,11 +449,18 @@ class FakeClienteFacturaPdfProvider {
 class FakeEmailSender implements EmailSender {
   readonly requests: EmailSendRequest[] = [];
 
+  sendError: Error | null = null;
+
   /**
-   * Registra el envío solicitado.
+   * Registra el envío solicitado y permite
+   * simular un fallo del transporte.
    */
   send(request: EmailSendRequest): Promise<void> {
     this.requests.push(request);
+
+    if (this.sendError !== null) {
+      return Promise.reject(this.sendError);
+    }
 
     return Promise.resolve();
   }

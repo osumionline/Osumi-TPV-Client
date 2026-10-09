@@ -785,6 +785,7 @@ export default function createApplicationComposition(
     clienteFacturaDocumentosService,
     clienteFacturaPdfService,
     emailSender,
+    applicationLogger,
   );
 
   const ventasTicketEmailService: VentasTicketEmailService = new VentasTicketEmailService(

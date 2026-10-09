@@ -5,6 +5,7 @@ import type {
   EmailSender,
   EmailSenderSmtpConfig,
 } from '@backend/contracts/email/email-sender.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type {
   ClienteFacturaDocumentoConsulta,
   ClienteFacturaDocumentoInterface,
@@ -32,17 +33,27 @@ interface ClienteFacturaPdfProvider {
 }
 
 export default class ClienteFacturaEmailService {
+  /**
+   * Crea el servicio encargado del envío por email
+   * de las facturas documentales ya emitidas.
+   */
   constructor(
     private readonly configurationService: ConfigurationService,
     private readonly secretStorage: SecretStorage,
     private readonly documentoProvider: ClienteFacturaDocumentoProvider,
     private readonly pdfProvider: ClienteFacturaPdfProvider,
     private readonly emailSender: EmailSender,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   /**
    * Envía exactamente el PDF definitivo e inmutable
    * de una factura emitida.
+   *
+   * Las validaciones conocidas no generan log.
+   * Las incidencias técnicas de preparación y transporte
+   * se registran sin incorporar datos del destinatario,
+   * del cliente ni de la configuración SMTP.
    */
   async send(command: ClienteFacturaEmailCommand): Promise<void> {
     if (typeof command !== 'object' || command === null) {
@@ -53,21 +64,35 @@ export default class ClienteFacturaEmailService {
       clientePublicId: this.requirePublicId(command.clientePublicId, 'cliente'),
       facturaPublicId: this.requirePublicId(command.facturaPublicId, 'factura'),
     };
+
     const destinatario: string = this.normalizeRecipient(command.destinatario);
 
-    const appData: AppData | null = await this.configurationService.load();
+    let appData: AppData | null;
+
+    try {
+      appData = await this.configurationService.load();
+    } catch (error: unknown) {
+      this.logPreparationFailure(consulta.facturaPublicId, error);
+
+      throw error;
+    }
 
     if (appData === null) {
       throw new Error('No se ha podido recuperar la configuración de la aplicación.');
     }
 
-    const smtp: EmailSenderSmtpConfig = await this.resolveSmtpConfig(appData.emailSmtp);
+    const smtp: EmailSenderSmtpConfig = await this.resolveSmtpConfig(
+      appData.emailSmtp,
+      consulta.facturaPublicId,
+    );
 
-    const documento: ClienteFacturaDocumentoInterface =
-      await this.documentoProvider.getDocumento(consulta);
+    const documento: ClienteFacturaDocumentoInterface = await this.prepareDocumento(consulta);
 
-    this.validateDocumento(documento, consulta.facturaPublicId);
-
+    /*
+     * ClienteFacturaPdfService registra cualquier incidencia
+     * de generación, lectura o persistencia del PDF.
+     * No la capturamos aquí para evitar duplicarla.
+     */
     const pdf: Uint8Array = await this.pdfProvider.getOrCreatePdf(consulta);
 
     const nombreEmail: string = this.resolveEmailBusinessName(appData);
@@ -89,31 +114,78 @@ export default class ClienteFacturaEmailService {
       ],
     };
 
-    await this.emailSender.send(request);
+    try {
+      await this.emailSender.send(request);
+    } catch (error: unknown) {
+      /*
+       * El error entregado al logger es deliberadamente genérico.
+       * Una implementación de EmailSender podría incorporar
+       * destinatarios, credenciales o detalles SMTP en su error.
+       */
+      const safeError: Error = new Error(
+        'El transporte SMTP no ha podido completar el envío de la factura.',
+      );
+
+      this.applicationLogger.warn({
+        area: 'clientes',
+        operation: 'send-invoice-email',
+        message: 'No se ha podido enviar una factura por email.',
+        error: safeError,
+        context: {
+          facturaPublicId: consulta.facturaPublicId,
+        },
+      });
+
+      throw error;
+    }
   }
 
   /**
-   * Valida que el documento corresponda a una
-   * factura emitida y todavía activa.
+   * Recupera y valida el documento que se utilizará
+   * para preparar el email de una factura.
+   *
+   * Un estado que no permite envío es una precondición
+   * de negocio y no genera log. Una identidad documental
+   * incoherente sí se considera incidencia técnica.
    */
-  private validateDocumento(
-    documento: ClienteFacturaDocumentoInterface,
-    facturaPublicId: string,
-  ): void {
-    if (documento.facturaPublicId !== facturaPublicId) {
-      throw new Error('El documento recuperado no corresponde a la factura solicitada.');
+  private async prepareDocumento(
+    consulta: ClienteFacturaDocumentoConsulta,
+  ): Promise<ClienteFacturaDocumentoInterface> {
+    let documento: ClienteFacturaDocumentoInterface;
+
+    try {
+      documento = await this.documentoProvider.getDocumento(consulta);
+    } catch (error: unknown) {
+      this.logPreparationFailure(consulta.facturaPublicId, error);
+
+      throw error;
+    }
+
+    if (documento.facturaPublicId !== consulta.facturaPublicId) {
+      const error: Error = new Error(
+        'El documento recuperado no corresponde a la factura solicitada.',
+      );
+
+      this.logPreparationFailure(consulta.facturaPublicId, error);
+
+      throw error;
     }
 
     if (documento.estado !== 'emitida' || documento.previsualizacion || documento.numero === null) {
       throw new Error('Solo se pueden enviar por email facturas emitidas.');
     }
+
+    return documento;
   }
 
   /**
    * Obtiene y valida la configuración SMTP y
    * recupera su contraseña del almacén seguro.
    */
-  private async resolveSmtpConfig(config: EmailSmtpConfig | null): Promise<EmailSenderSmtpConfig> {
+  private async resolveSmtpConfig(
+    config: EmailSmtpConfig | null,
+    facturaPublicId: string,
+  ): Promise<EmailSenderSmtpConfig> {
     if (config === null) {
       throw new Error('El envío de emails por SMTP no está configurado.');
     }
@@ -138,7 +210,15 @@ export default class ClienteFacturaEmailService {
 
     const security: EmailSmtpSecurity = this.normalizeSecurity(config.secure);
 
-    const secrets: InstallationSecretsData | null = await this.secretStorage.load();
+    let secrets: InstallationSecretsData | null;
+
+    try {
+      secrets = await this.secretStorage.load();
+    } catch (error: unknown) {
+      this.logPreparationFailure(facturaPublicId, error);
+
+      throw error;
+    }
     const pass: string = this.requireNonEmptyString(
       secrets?.emailSmtpPass ?? null,
       'La contraseña SMTP no está disponible.',
@@ -151,6 +231,22 @@ export default class ClienteFacturaEmailService {
       user,
       pass,
     };
+  }
+
+  /**
+   * Registra un fallo durante la preparación del email
+   * utilizando únicamente la identidad técnica de la factura.
+   */
+  private logPreparationFailure(facturaPublicId: string, error: unknown): void {
+    this.applicationLogger.warn({
+      area: 'clientes',
+      operation: 'prepare-invoice-email',
+      message: 'No se ha podido preparar una factura para enviarla por email.',
+      error,
+      context: {
+        facturaPublicId,
+      },
+    });
   }
 
   /**
