@@ -1392,33 +1392,49 @@ export default class SaleWorkspaceComponent {
   private async resolveCode(codigo: string): Promise<void> {
     this.searching.set(true);
 
+    let articulo: ArticuloVenta | null;
+
     try {
-      const articulo: ArticuloVenta | null =
-        await this.ventasArticulosService.resolveArticulo(codigo);
+      articulo = await this.ventasArticulosService.resolveArticulo(codigo);
+    } catch (error: unknown) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: getErrorMessage(error, 'No se ha podido resolver el código introducido.'),
+        })
+        .subscribe((): void => {
+          this.localizador.set('');
 
-      if (articulo === null) {
-        this.dialog
-          .alert({
-            title: 'Error',
-            content: 'El código introducido no se encuentra.',
-          })
-          .subscribe((): void => {
-            this.localizador.set('');
-
-            this.ventasService.setFocusTarget(this.venta().idTemporal, {
-              type: 'localizador',
-            });
+          this.ventasService.setFocusTarget(this.venta().idTemporal, {
+            type: 'localizador',
           });
+        });
 
-        return;
-      }
-
-      this.localizador.set('');
-
-      this.ventasService.agregarArticulos(this.venta().idTemporal, [articulo]);
+      return;
     } finally {
       this.searching.set(false);
     }
+
+    if (articulo === null) {
+      this.dialog
+        .alert({
+          title: 'Error',
+          content: 'El código introducido no se encuentra.',
+        })
+        .subscribe((): void => {
+          this.localizador.set('');
+
+          this.ventasService.setFocusTarget(this.venta().idTemporal, {
+            type: 'localizador',
+          });
+        });
+
+      return;
+    }
+
+    this.localizador.set('');
+
+    this.ventasService.agregarArticulos(this.venta().idTemporal, [articulo]);
   }
 
   /**

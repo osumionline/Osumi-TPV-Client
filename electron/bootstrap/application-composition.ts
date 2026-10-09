@@ -697,6 +697,7 @@ export default function createApplicationComposition(
 
   const ventasArticulosService: VentasArticulosService = new VentasArticulosService(
     ventasArticulosRepository,
+    applicationLogger,
   );
 
   const ventasDevolucionesRepository: VentasDevolucionesRepository =

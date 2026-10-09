@@ -1,3 +1,4 @@
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type VentasArticulosRepository from '@backend/contracts/ventas/ventas-articulos.repository.interface';
 import type {
   AccesoDirectoVentaRecord,
@@ -10,7 +11,14 @@ import type ArticuloVentaInterface from '@desktop-contracts/ventas/articulo-vent
  * Resuelve y busca artículos utilizando las reglas necesarias para el módulo de ventas.
  */
 export default class VentasArticulosService {
-  constructor(private readonly ventasArticulosRepository: VentasArticulosRepository) {}
+  /**
+   * Crea el servicio de consulta de artículos
+   * utilizados durante una venta.
+   */
+  constructor(
+    private readonly ventasArticulosRepository: VentasArticulosRepository,
+    private readonly applicationLogger: ApplicationLogger,
+  ) {}
 
   /**
    * Resuelve un código introducido o escaneado y devuelve el artículo correspondiente.
@@ -24,10 +32,23 @@ export default class VentasArticulosService {
 
     const codigoNumerico: number | null = this.getNumericCode(normalizedCode);
 
-    const articulo: ArticuloVentaRecord | null = await this.ventasArticulosRepository.resolveByCode(
-      normalizedCode,
-      codigoNumerico,
-    );
+    let articulo: ArticuloVentaRecord | null;
+
+    try {
+      articulo = await this.ventasArticulosRepository.resolveByCode(normalizedCode, codigoNumerico);
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'ventas',
+        operation: 'resolve-sale-article',
+        message: 'No se ha podido resolver un artículo para la venta.',
+        error,
+        context: {
+          isNumericCode: codigoNumerico !== null,
+        },
+      });
+
+      throw error;
+    }
 
     return articulo === null ? null : this.mapArticulo(articulo);
   }
@@ -38,8 +59,23 @@ export default class VentasArticulosService {
   async searchArticulos(query: string): Promise<readonly ArticuloVentaInterface[]> {
     const searchPattern: string = this.getSearchPattern(query);
 
-    const articulos: readonly ArticuloVentaRecord[] =
-      await this.ventasArticulosRepository.search(searchPattern);
+    let articulos: readonly ArticuloVentaRecord[];
+
+    try {
+      articulos = await this.ventasArticulosRepository.search(searchPattern);
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'ventas',
+        operation: 'search-sale-articles',
+        message: 'No se ha podido buscar artículos para la venta.',
+        error,
+        context: {
+          hasQuery: query.trim().length > 0,
+        },
+      });
+
+      throw error;
+    }
 
     return articulos.map((articulo: ArticuloVentaRecord): ArticuloVentaInterface =>
       this.mapArticulo(articulo),
@@ -50,8 +86,20 @@ export default class VentasArticulosService {
    * Obtiene la lista de accesos directos disponibles para la venta.
    */
   async getAccesosDirectos(): Promise<readonly AccesoDirectoVentaInterface[]> {
-    const accesos: readonly AccesoDirectoVentaRecord[] =
-      await this.ventasArticulosRepository.getAccesosDirectos();
+    let accesos: readonly AccesoDirectoVentaRecord[];
+
+    try {
+      accesos = await this.ventasArticulosRepository.getAccesosDirectos();
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'ventas',
+        operation: 'load-sale-direct-accesses',
+        message: 'No se han podido cargar los accesos directos de venta.',
+        error,
+      });
+
+      throw error;
+    }
 
     return accesos.map((acceso: AccesoDirectoVentaRecord): AccesoDirectoVentaInterface => ({
       id: acceso.id,
