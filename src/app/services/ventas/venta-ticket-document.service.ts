@@ -5,6 +5,7 @@ import buildVentaGiftTicketDocument from '@model/ventas/venta-gift-ticket-docume
 import buildVentaTicketDocument from '@model/ventas/venta-ticket-document.builder';
 import VentasContextService from '@services/ventas/ventas-context.service';
 import VentasTicketsService from '@services/ventas/ventas-tickets.service';
+import ApplicationLoggingService from '@services/application/application-logging.service';
 
 interface VentaTicketDocumentSnapshot {
   readonly html: string;
@@ -15,6 +16,7 @@ interface VentaTicketDocumentSnapshot {
 export default class VentaTicketDocumentService {
   private readonly ventasContextService: VentasContextService = inject(VentasContextService);
   private readonly ventasTicketsService: VentasTicketsService = inject(VentasTicketsService);
+  private readonly loggingService: ApplicationLoggingService = inject(ApplicationLoggingService);
 
   /**
    * Recupera el snapshot vigente y construye su HTML autocontenido.
@@ -26,30 +28,70 @@ export default class VentaTicketDocumentService {
   }
 
   /**
-   * Genera el PDF de una revisión concreta y solicita
-   * al backend que la materialice solo si sigue vigente.
-   */
-  async generateAndSavePdf(idVenta: number): Promise<void> {
+ 	* Genera el PDF de una revisión concreta y solicita
+ 	* al backend que la materialice solo si sigue vigente.
+ 	*
+ 	* Cualquier incidencia de construcción, renderizado
+ 	* o persistencia se registra aquí como único origen funcional.
+ 	*/
+async generateAndSavePdf(idVenta: number): Promise<void> {
+  try {
     const document: VentaTicketDocumentSnapshot = await this.buildDocument(idVenta);
 
     const pdf: Uint8Array = await window.osumiDesktop.printing.renderPdf(document.html);
 
     await this.ventasTicketsService.savePdf(idVenta, document.ticketRevision, pdf);
-  }
+  } catch (error: unknown) {
+    this.loggingService.warn({
+      area: 'ventas',
+      operation: 'generate-ticket-pdf',
+      message: 'No se ha podido generar o conservar el PDF histórico de un ticket.',
+      error,
+      context: {
+        idVenta,
+      },
+    });
+
+    throw error;
+  	}
+}
 
   /**
-   * Garantiza que exista un PDF correspondiente
-   * a la revisión documental actualmente vigente.
-   */
-  async ensureCurrentPdf(idVenta: number): Promise<void> {
-    const currentPdf: Uint8Array | null = await this.ventasTicketsService.getCurrentPdf(idVenta);
+ * Garantiza que exista un PDF correspondiente
+ * a la revisión documental actualmente vigente.
+ *
+ * La ausencia o desactualización del PDF es un estado normal.
+ * Solo se registra un fallo técnico durante su comprobación.
+ */
+async ensureCurrentPdf(idVenta: number): Promise<void> {
+  let currentPdf: Uint8Array | null;
 
-    if (currentPdf !== null) {
-      return;
-    }
+  try {
+    currentPdf = await this.ventasTicketsService.getCurrentPdf(idVenta);
+  } catch (error: unknown) {
+    this.loggingService.warn({
+      area: 'ventas',
+      operation: 'load-current-ticket-pdf',
+      message: 'No se ha podido comprobar el PDF vigente de un ticket.',
+      error,
+      context: {
+        idVenta,
+      },
+    });
 
-    await this.generateAndSavePdf(idVenta);
+    throw error;
   }
+
+  if (currentPdf !== null) {
+    return;
+  }
+
+  /*
+   * generateAndSavePdf() registra sus propias incidencias.
+   * No las capturamos aquí para evitar duplicarlas.
+   */
+  await this.generateAndSavePdf(idVenta);
+}
 
   /**
    * Imprime silenciosamente el snapshot vigente recuperado

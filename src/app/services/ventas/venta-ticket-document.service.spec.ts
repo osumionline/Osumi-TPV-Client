@@ -4,12 +4,14 @@ import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticke
 import VentaTicketDocumentService from '@services/ventas/venta-ticket-document.service';
 import VentasContextService from '@services/ventas/ventas-context.service';
 import VentasTicketsService from '@services/ventas/ventas-tickets.service';
+import ApplicationLoggingService from '@services/application/application-logging.service';
 
 describe('VentaTicketDocumentService', (): void => {
   let originalDesktopDescriptor: PropertyDescriptor | undefined;
 
   let contextService: FakeVentasContextService;
   let ticketsService: FakeVentasTicketsService;
+  let loggingService: TestApplicationLoggingService;
 
   let renderPdfCalls: string[];
   let printTicketCalls: string[];
@@ -26,8 +28,8 @@ describe('VentaTicketDocumentService', (): void => {
     originalDesktopDescriptor = Object.getOwnPropertyDescriptor(window, 'osumiDesktop');
 
     contextService = new FakeVentasContextService();
-
     ticketsService = new FakeVentasTicketsService();
+    loggingService = new TestApplicationLoggingService();
 
     renderPdfCalls = [];
     printTicketCalls = [];
@@ -88,6 +90,10 @@ describe('VentaTicketDocumentService', (): void => {
           provide: VentasTicketsService,
           useValue: ticketsService,
         },
+        {
+          provide: ApplicationLoggingService,
+  		  useValue: loggingService,
+		},
       ],
     });
   });
@@ -163,6 +169,17 @@ describe('VentaTicketDocumentService', (): void => {
     );
 
     expect(ticketsService.savedPdfs).toEqual([]);
+    expect(loggingService.warnEvents).toEqual([
+  {
+    area: 'ventas',
+    operation: 'generate-ticket-pdf',
+    message: 'No se ha podido generar o conservar el PDF histórico de un ticket.',
+    error: renderPdfError,
+    context: {
+      idVenta: 123,
+    },
+  },
+]);
   });
 
   it('propaga un error al guardar el PDF histórico', async (): Promise<void> => {
@@ -175,6 +192,17 @@ describe('VentaTicketDocumentService', (): void => {
     );
 
     expect(renderPdfCalls).toHaveLength(1);
+    expect(loggingService.warnEvents).toEqual([
+  {
+    area: 'ventas',
+    operation: 'generate-ticket-pdf',
+    message: 'No se ha podido generar o conservar el PDF histórico de un ticket.',
+    error: ticketsService.savePdfError,
+    context: {
+      idVenta: 123,
+    },
+  },
+]);
   });
 
   it('imprime exactamente el HTML construido desde la venta persistida', async (): Promise<void> => {
@@ -295,7 +323,78 @@ describe('VentaTicketDocumentService', (): void => {
       'No hay una impresora de tickets configurada.',
     );
   });
+  
+  it('registra y propaga un fallo técnico al comprobar el PDF vigente', async (): Promise<void> => {
+  const error: Error = new Error('No se ha podido leer el PDF vigente.');
+
+  ticketsService.currentPdfError = error;
+
+  const service: VentaTicketDocumentService = TestBed.inject(VentaTicketDocumentService);
+
+  await expect(service.ensureCurrentPdf(123)).rejects.toBe(error);
+
+  expect(renderPdfCalls).toEqual([]);
+
+  expect(loggingService.warnEvents).toEqual([
+    {
+      area: 'ventas',
+      operation: 'load-current-ticket-pdf',
+      message: 'No se ha podido comprobar el PDF vigente de un ticket.',
+      error,
+      context: {
+        idVenta: 123,
+      },
+    },
+  ]);
 });
+
+it('registra una sola vez el fallo al regenerar un PDF ausente', async (): Promise<void> => {
+  ticketsService.currentPdf = null;
+
+  const error: Error = new Error('No se ha podido renderizar el PDF.');
+
+  renderPdfError = error;
+
+  const service: VentaTicketDocumentService = TestBed.inject(VentaTicketDocumentService);
+
+  await expect(service.ensureCurrentPdf(123)).rejects.toBe(error);
+
+  expect(loggingService.warnEvents).toEqual([
+    {
+      area: 'ventas',
+      operation: 'generate-ticket-pdf',
+      message: 'No se ha podido generar o conservar el PDF histórico de un ticket.',
+      error,
+      context: {
+        idVenta: 123,
+      },
+    },
+  ]);
+});
+});
+
+interface TestLogEvent {
+  readonly area: string;
+  readonly operation: string;
+  readonly message: string;
+  readonly error?: unknown;
+  readonly context?: Readonly<Record<string, string | number | boolean | null>>;
+}
+
+/**
+ * Logger controlado utilizado por los tests
+ * del pipeline documental de tickets.
+ */
+class TestApplicationLoggingService {
+  readonly warnEvents: TestLogEvent[] = [];
+
+  /**
+   * Conserva los avisos solicitados por el servicio.
+   */
+  warn(event: TestLogEvent): void {
+    this.warnEvents.push(event);
+  }
+}
 
 class FakeVentasContextService {
   appDataValue: AppData | null = createAppData();
@@ -312,12 +411,11 @@ interface SavedPdf {
 class FakeVentasTicketsService {
   ticket: VentaTicketInterface | null = createTicket();
   savePdfError: Error | null = null;
-
   readonly requestedVentaIds: number[] = [];
   readonly savedPdfs: SavedPdf[] = [];
-
   currentPdf: Uint8Array | null = new TextEncoder().encode('%PDF-1.7\npdf vigente\n%%EOF');
   readonly currentPdfRequests: number[] = [];
+  currentPdfError: Error | null = null;
 
   getByVentaId(idVenta: number): Promise<VentaTicketInterface | null> {
     this.requestedVentaIds.push(idVenta);
@@ -326,13 +424,17 @@ class FakeVentasTicketsService {
   }
 
   /**
-   * Devuelve el PDF vigente configurado para el test.
-   */
-  getCurrentPdf(idVenta: number): Promise<Uint8Array | null> {
-    this.currentPdfRequests.push(idVenta);
+ * Devuelve el PDF vigente configurado para el test.
+ */
+getCurrentPdf(idVenta: number): Promise<Uint8Array | null> {
+  this.currentPdfRequests.push(idVenta);
 
-    return Promise.resolve(this.currentPdf);
+  if (this.currentPdfError !== null) {
+    return Promise.reject(this.currentPdfError);
   }
+
+  return Promise.resolve(this.currentPdf);
+}
 
   /**
    * Registra el PDF y la revisión exacta solicitada.

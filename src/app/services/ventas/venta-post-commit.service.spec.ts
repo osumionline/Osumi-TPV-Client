@@ -118,17 +118,7 @@ describe('VentaPostCommitService', (): void => {
     ]);
     expect(documentService.generatePdfVentaIds).toEqual([123]);
     expect(documentService.printVentaIds).toEqual([123]);
-    expect(loggingService.warnEvents).toEqual([
-      {
-        area: 'ventas',
-        operation: 'post-commit-ticket-pdf',
-        message: 'No se ha podido conservar el PDF histórico del ticket.',
-        error: documentService.generatePdfError,
-        context: {
-          idVenta: 123,
-        },
-      },
-    ]);
+    expect(loggingService.warnEvents).toEqual([]);
   });
 
   it('conserva el resultado del PDF aunque falle la impresión', async (): Promise<void> => {
