@@ -1,6 +1,7 @@
 import InformePeriodoResolver from '@backend/application/caja/informes/informe-periodo.resolver';
 import type InformeVentasProvider from '@backend/contracts/caja/informes/informe-ventas-provider.interface';
 import type InformeVentasRepository from '@backend/contracts/caja/informes/informe-ventas.repository.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type { InformePeriodosResueltos } from '@backend/domain/caja/informes/informe-periodo-resuelto.interface';
 import type {
   InformeVentasCategoriaRecord,
@@ -25,13 +26,9 @@ interface InformeVentasAggregate {
 
 interface InformeVentasBuildContext {
   readonly categoriasById: ReadonlyMap<number, InformeVentasCategoriaRecord>;
-
   readonly childrenByParent: ReadonlyMap<number, readonly InformeVentasCategoriaRecord[]>;
-
   readonly articleIdsByCategory: ReadonlyMap<number, ReadonlySet<number>>;
-
   readonly linesByArticle: ReadonlyMap<number, readonly InformeVentasLineaRecord[]>;
-
   readonly linesById: ReadonlyMap<number, InformeVentasLineaRecord>;
 }
 
@@ -45,10 +42,14 @@ interface BuiltCategoria {
  * la clasificación actual de los artículos.
  */
 export default class InformeVentasService implements InformeVentasProvider {
+  /**
+   * Crea el servicio encargado de construir
+   * el Informe de Ventas de Caja.
+   */
   constructor(
     private readonly repository: InformeVentasRepository,
-
     private readonly periodoResolver: InformePeriodoResolver,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   /**
@@ -58,10 +59,18 @@ export default class InformeVentasService implements InformeVentasProvider {
   async getInforme(consulta: InformeVentasConsulta): Promise<InformeVentasResultado> {
     const periodos: InformePeriodosResueltos = this.periodoResolver.resolve(consulta);
 
-    const record: InformeVentasRepositoryResult = await this.repository.findByPeriod(
-      periodos.actual.desde,
-      periodos.actual.hastaExclusive,
-    );
+    let record: InformeVentasRepositoryResult;
+
+    try {
+      record = await this.repository.findByPeriod(
+        periodos.actual.desde,
+        periodos.actual.hastaExclusive,
+      );
+    } catch (error: unknown) {
+      this.logReportFailure(consulta, error);
+
+      throw error;
+    }
 
     const context: InformeVentasBuildContext = this.createContext(record);
 
@@ -69,15 +78,40 @@ export default class InformeVentasService implements InformeVentasProvider {
       throw new RangeError('La categoría seleccionada no existe.');
     }
 
-    const built: BuiltCategoria | null = this.buildCategoria(
-      consulta.idCategoria,
-      context,
-      new Set<number>(),
-    );
+    try {
+      const built: BuiltCategoria | null = this.buildCategoria(
+        consulta.idCategoria,
+        context,
+        new Set<number>(),
+      );
 
-    return {
-      categoria: built?.categoria ?? null,
-    };
+      return {
+        categoria: built?.categoria ?? null,
+      };
+    } catch (error: unknown) {
+      this.logReportFailure(consulta, error);
+
+      throw error;
+    }
+  }
+
+  /**
+   * Registra una incidencia técnica durante
+   * la construcción del Informe de Ventas.
+   *
+   * No incluye la categoría ni datos económicos.
+   */
+  private logReportFailure(consulta: InformeVentasConsulta, error: unknown): void {
+    this.applicationLogger.warn({
+      area: 'caja',
+      operation: 'load-sales-report',
+      message: 'No se ha podido generar el Informe de Ventas de Caja.',
+      error,
+      context: {
+        year: consulta.year,
+        month: consulta.month,
+      },
+    });
   }
 
   /**

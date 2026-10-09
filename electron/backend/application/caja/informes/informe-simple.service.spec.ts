@@ -1,5 +1,7 @@
 import InformePeriodoResolver from '@backend/application/caja/informes/informe-periodo.resolver';
 import InformeSimpleService from '@backend/application/caja/informes/informe-simple.service';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type {
   InformeSimpleImporteTipoPago,
   InformeSimpleItem,
@@ -18,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 let tempDirectory: string | null = null;
 let applicationDatabase: TypeOrmApplicationDatabase | null = null;
 let service: InformeSimpleService | null = null;
+let applicationLogger: TestApplicationLogger;
 
 describe('InformeSimpleService', (): void => {
   beforeEach(async (): Promise<void> => {
@@ -32,10 +35,12 @@ describe('InformeSimpleService', (): void => {
 
     await createSchema(dataSource);
     await seedInformeSimple(dataSource);
+    applicationLogger = new TestApplicationLogger();
 
     service = new InformeSimpleService(
       new TypeOrmInformeSimpleRepository(applicationDatabase),
       new InformePeriodoResolver(),
+      applicationLogger,
     );
   });
 
@@ -226,7 +231,61 @@ describe('InformeSimpleService', (): void => {
       sumaCents: 0,
     });
   });
+
+  it('no registra un periodo inválido como incidencia técnica', async (): Promise<void> => {
+    await expect(
+      requireService().getInforme({
+        year: 1,
+        month: 9,
+      }),
+    ).rejects.toThrow('El año del informe no es válido.');
+
+    expect(applicationLogger.warnEvents).toEqual([]);
+  });
 });
+
+/**
+ * Logger controlado utilizado por las pruebas
+ * de generación de informes de Caja.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora entradas de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora entradas informativas.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva los avisos emitidos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Ignora errores.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No existen escrituras pendientes.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
+}
 
 /**
  * Crea todas las tablas del esquema actual.

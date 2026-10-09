@@ -1,6 +1,7 @@
 import InformePeriodoResolver from '@backend/application/caja/informes/informe-periodo.resolver';
 import type InformeDetalladoProvider from '@backend/contracts/caja/informes/informe-detallado-provider.interface';
 import type InformeDetalladoRepository from '@backend/contracts/caja/informes/informe-detallado.repository.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type {
   InformeDetalladoArticuloRecord,
   InformeDetalladoMarcaRecord,
@@ -22,9 +23,14 @@ import type {
  * a partir de los agregados persistidos.
  */
 export default class InformeDetalladoService implements InformeDetalladoProvider {
+  /**
+   * Crea el servicio encargado de construir
+   * el Informe Detallado de Caja.
+   */
   constructor(
     private readonly repository: InformeDetalladoRepository,
     private readonly periodoResolver: InformePeriodoResolver,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   /**
@@ -34,90 +40,106 @@ export default class InformeDetalladoService implements InformeDetalladoProvider
   async getInforme(consulta: InformeDetalladoConsulta): Promise<InformeDetalladoResultado> {
     const periodos: InformePeriodosResueltos = this.periodoResolver.resolve(consulta);
 
-    const record: InformeDetalladoRepositoryResult = await this.repository.find(
-      periodos.actual.desde,
-      periodos.actual.hastaExclusive,
-      periodos.anterior.desde,
-      periodos.anterior.hastaExclusive,
-    );
+    try {
+      const record: InformeDetalladoRepositoryResult = await this.repository.find(
+        periodos.actual.desde,
+        periodos.actual.hastaExclusive,
+        periodos.anterior.desde,
+        periodos.anterior.hastaExclusive,
+      );
 
-    const margenActualBps: number = this.calculateMarginBps(
-      record.actual.totalBeneficioMicros,
-      record.actual.totalVentasPvpMicros,
-    );
+      const margenActualBps: number = this.calculateMarginBps(
+        record.actual.totalBeneficioMicros,
+        record.actual.totalVentasPvpMicros,
+      );
 
-    const margenAnteriorBps: number | null =
-      record.anterior.totalVentasPvpMicros === 0
-        ? null
-        : this.calculateMarginBps(
-            record.anterior.totalBeneficioMicros,
-            record.anterior.totalVentasPvpMicros,
-          );
+      const margenAnteriorBps: number | null =
+        record.anterior.totalVentasPvpMicros === 0
+          ? null
+          : this.calculateMarginBps(
+              record.anterior.totalBeneficioMicros,
+              record.anterior.totalVentasPvpMicros,
+            );
 
-    const ventas: InformeDetalladoVentas = {
-      numeroVentas: record.actual.numeroVentas,
-      numeroVentasAnterior: record.anterior.numeroVentas,
-      diferenciaNumeroVentas: record.actual.numeroVentas - record.anterior.numeroVentas,
-      margenBps: margenActualBps,
-      margenAnteriorBps,
-      diferenciaMargenBps: margenAnteriorBps === null ? null : margenActualBps - margenAnteriorBps,
-    };
+      const ventas: InformeDetalladoVentas = {
+        numeroVentas: record.actual.numeroVentas,
+        numeroVentasAnterior: record.anterior.numeroVentas,
+        diferenciaNumeroVentas: record.actual.numeroVentas - record.anterior.numeroVentas,
+        margenBps: margenActualBps,
+        margenAnteriorBps,
+        diferenciaMargenBps:
+          margenAnteriorBps === null ? null : margenActualBps - margenAnteriorBps,
+      };
 
-    const totalVentasMarcasMicros: number = record.marcas.reduce(
-      (total: number, marca: InformeDetalladoMarcaRecord): number =>
-        total + marca.totalVentasPvpMicros,
-      0,
-    );
-
-    const totalBeneficioMarcasMicros: number = record.marcas.reduce(
-      (total: number, marca: InformeDetalladoMarcaRecord): number =>
-        total + marca.totalBeneficioMicros,
-      0,
-    );
-
-    const marcas: readonly InformeDetalladoMarca[] = record.marcas.map(
-      (marca: InformeDetalladoMarcaRecord): InformeDetalladoMarca =>
-        this.mapMarca(marca, totalVentasMarcasMicros),
-    );
-
-    const marcasTotales: InformeDetalladoMarcasTotales = {
-      totalVentasPvpMicros: totalVentasMarcasMicros,
-      totalBeneficioMicros: totalBeneficioMarcasMicros,
-      margenBps: this.calculateMarginBps(totalBeneficioMarcasMicros, totalVentasMarcasMicros),
-    };
-
-    const articulos: readonly InformeDetalladoArticulo[] = record.articulos.map(
-      (articulo: InformeDetalladoArticuloRecord): InformeDetalladoArticulo =>
-        this.mapArticulo(articulo, record.actual.numeroVentas),
-    );
-
-    const articulosTotales: InformeDetalladoArticulosTotales = {
-      totalUnidadesVendidas: articulos.reduce(
-        (total: number, articulo: InformeDetalladoArticulo): number =>
-          total + articulo.totalUnidadesVendidas,
+      const totalVentasMarcasMicros: number = record.marcas.reduce(
+        (total: number, marca: InformeDetalladoMarcaRecord): number =>
+          total + marca.totalVentasPvpMicros,
         0,
-      ),
+      );
 
-      totalVentasPvpMicros: articulos.reduce(
-        (total: number, articulo: InformeDetalladoArticulo): number =>
-          total + articulo.totalVentasPvpMicros,
+      const totalBeneficioMarcasMicros: number = record.marcas.reduce(
+        (total: number, marca: InformeDetalladoMarcaRecord): number =>
+          total + marca.totalBeneficioMicros,
         0,
-      ),
+      );
 
-      totalBeneficioMicros: articulos.reduce(
-        (total: number, articulo: InformeDetalladoArticulo): number =>
-          total + articulo.totalBeneficioMicros,
-        0,
-      ),
-    };
+      const marcas: readonly InformeDetalladoMarca[] = record.marcas.map(
+        (marca: InformeDetalladoMarcaRecord): InformeDetalladoMarca =>
+          this.mapMarca(marca, totalVentasMarcasMicros),
+      );
 
-    return {
-      ventas,
-      marcas,
-      marcasTotales,
-      articulos,
-      articulosTotales,
-    };
+      const marcasTotales: InformeDetalladoMarcasTotales = {
+        totalVentasPvpMicros: totalVentasMarcasMicros,
+        totalBeneficioMicros: totalBeneficioMarcasMicros,
+        margenBps: this.calculateMarginBps(totalBeneficioMarcasMicros, totalVentasMarcasMicros),
+      };
+
+      const articulos: readonly InformeDetalladoArticulo[] = record.articulos.map(
+        (articulo: InformeDetalladoArticuloRecord): InformeDetalladoArticulo =>
+          this.mapArticulo(articulo, record.actual.numeroVentas),
+      );
+
+      const articulosTotales: InformeDetalladoArticulosTotales = {
+        totalUnidadesVendidas: articulos.reduce(
+          (total: number, articulo: InformeDetalladoArticulo): number =>
+            total + articulo.totalUnidadesVendidas,
+          0,
+        ),
+
+        totalVentasPvpMicros: articulos.reduce(
+          (total: number, articulo: InformeDetalladoArticulo): number =>
+            total + articulo.totalVentasPvpMicros,
+          0,
+        ),
+
+        totalBeneficioMicros: articulos.reduce(
+          (total: number, articulo: InformeDetalladoArticulo): number =>
+            total + articulo.totalBeneficioMicros,
+          0,
+        ),
+      };
+
+      return {
+        ventas,
+        marcas,
+        marcasTotales,
+        articulos,
+        articulosTotales,
+      };
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'caja',
+        operation: 'load-detailed-report',
+        message: 'No se ha podido generar el Informe Detallado de Caja.',
+        error,
+        context: {
+          year: consulta.year,
+          month: consulta.month,
+        },
+      });
+
+      throw error;
+    }
   }
 
   /**

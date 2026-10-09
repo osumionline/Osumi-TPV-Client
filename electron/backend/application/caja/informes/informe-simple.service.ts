@@ -1,6 +1,7 @@
 import InformePeriodoResolver from '@backend/application/caja/informes/informe-periodo.resolver';
 import type InformeSimpleProvider from '@backend/contracts/caja/informes/informe-simple-provider.interface';
 import type InformeSimpleRepository from '@backend/contracts/caja/informes/informe-simple.repository.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type { InformePeriodosResueltos } from '@backend/domain/caja/informes/informe-periodo-resuelto.interface';
 import type {
   InformeSimpleRepositoryResult,
@@ -41,9 +42,14 @@ interface LocalDateParts {
  * de ventas y pagos históricos persistidos.
  */
 export default class InformeSimpleService implements InformeSimpleProvider {
+  /**
+   * Crea el servicio encargado de construir
+   * el Informe Simple de Caja.
+   */
   constructor(
     private readonly repository: InformeSimpleRepository,
     private readonly periodoResolver: InformePeriodoResolver,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   /**
@@ -53,189 +59,206 @@ export default class InformeSimpleService implements InformeSimpleProvider {
   async getInforme(consulta: InformeSimpleConsulta): Promise<InformeSimpleResultado> {
     const periodos: InformePeriodosResueltos = this.periodoResolver.resolve(consulta);
 
-    const record: InformeSimpleRepositoryResult = await this.repository.findByPeriod(
-      periodos.actual.desde,
-      periodos.actual.hastaExclusive,
-    );
-
-    const granularidad: InformeSimpleGranularidad = consulta.month === 'todos' ? 'mes' : 'dia';
-
-    const buckets: MutableInformeSimpleBucket[] = this.createBuckets(consulta.year, consulta.month);
-
-    const bucketsByKey: Map<string, MutableInformeSimpleBucket> = new Map<
-      string,
-      MutableInformeSimpleBucket
-    >(
-      buckets.map((bucket: MutableInformeSimpleBucket): [string, MutableInformeSimpleBucket] => [
-        this.getBucketKey(bucket.month, bucket.day, granularidad),
-        bucket,
-      ]),
-    );
-
-    const bucketsByVentaId: Map<number, MutableInformeSimpleBucket> = new Map<
-      number,
-      MutableInformeSimpleBucket
-    >();
-
-    let primerTicket: InformeSimpleTicket | null = null;
-    let ultimoTicket: InformeSimpleTicket | null = null;
-    let numeroVentas: number = 0;
-    let totalCents: number = 0;
-
-    for (const venta of record.ventas) {
-      const dateParts: LocalDateParts = this.getLocalDateParts(venta.fecha);
-
-      const bucketKey: string = this.getBucketKey(
-        dateParts.month,
-        granularidad === 'dia' ? dateParts.day : null,
-        granularidad,
+    try {
+      const record: InformeSimpleRepositoryResult = await this.repository.findByPeriod(
+        periodos.actual.desde,
+        periodos.actual.hastaExclusive,
       );
 
-      const bucket: MutableInformeSimpleBucket | undefined = bucketsByKey.get(bucketKey);
-
-      if (bucket === undefined || dateParts.year !== consulta.year) {
-        throw new Error('Una venta del Informe Simple queda fuera del periodo solicitado.');
-      }
-
-      const ticket: InformeSimpleTicket = this.toTicket(venta);
-
-      bucket.numeroVentas = this.safeAdd(
-        bucket.numeroVentas,
-        1,
-        'El número de ventas del Informe Simple supera el rango numérico seguro.',
+      const granularidad: InformeSimpleGranularidad = consulta.month === 'todos' ? 'mes' : 'dia';
+      const buckets: MutableInformeSimpleBucket[] = this.createBuckets(
+        consulta.year,
+        consulta.month,
       );
 
-      bucket.primerTicket ??= ticket;
-      bucket.ultimoTicket = ticket;
-
-      bucket.totalCents = this.safeAdd(
-        bucket.totalCents,
-        venta.totalCents,
-        'El total de una fila del Informe Simple supera el rango numérico seguro.',
+      const bucketsByKey: Map<string, MutableInformeSimpleBucket> = new Map<
+        string,
+        MutableInformeSimpleBucket
+      >(
+        buckets.map((bucket: MutableInformeSimpleBucket): [string, MutableInformeSimpleBucket] => [
+          this.getBucketKey(bucket.month, bucket.day, granularidad),
+          bucket,
+        ]),
       );
 
-      bucketsByVentaId.set(venta.id, bucket);
+      const bucketsByVentaId: Map<number, MutableInformeSimpleBucket> = new Map<
+        number,
+        MutableInformeSimpleBucket
+      >();
 
-      numeroVentas = this.safeAdd(
-        numeroVentas,
-        1,
-        'El número total de ventas del Informe Simple supera el rango numérico seguro.',
-      );
+      let primerTicket: InformeSimpleTicket | null = null;
+      let ultimoTicket: InformeSimpleTicket | null = null;
+      let numeroVentas: number = 0;
+      let totalCents: number = 0;
 
-      totalCents = this.safeAdd(
-        totalCents,
-        venta.totalCents,
-        'El total del Informe Simple supera el rango numérico seguro.',
-      );
+      for (const venta of record.ventas) {
+        const dateParts: LocalDateParts = this.getLocalDateParts(venta.fecha);
 
-      primerTicket ??= ticket;
-      ultimoTicket = ticket;
-    }
+        const bucketKey: string = this.getBucketKey(
+          dateParts.month,
+          granularidad === 'dia' ? dateParts.day : null,
+          granularidad,
+        );
 
-    const tipoPagoIds: Set<string> = new Set<string>(
-      record.tiposPago.map((tipoPago: InformeSimpleTipoPagoRecord): string => tipoPago.publicId),
-    );
+        const bucket: MutableInformeSimpleBucket | undefined = bucketsByKey.get(bucketKey);
 
-    for (const pago of record.pagos) {
-      if (!tipoPagoIds.has(pago.tipoPagoPublicId)) {
-        throw new Error('Un pago del Informe Simple utiliza un tipo de pago desconocido.');
-      }
+        if (bucket === undefined || dateParts.year !== consulta.year) {
+          throw new Error('Una venta del Informe Simple queda fuera del periodo solicitado.');
+        }
 
-      const bucket: MutableInformeSimpleBucket | undefined = bucketsByVentaId.get(pago.idVenta);
+        const ticket: InformeSimpleTicket = this.toTicket(venta);
 
-      if (bucket === undefined) {
-        throw new Error('Un pago del Informe Simple no pertenece a ninguna venta del periodo.');
-      }
+        bucket.numeroVentas = this.safeAdd(
+          bucket.numeroVentas,
+          1,
+          'El número de ventas del Informe Simple supera el rango numérico seguro.',
+        );
 
-      const currentValue: number = bucket.importesTipoPago.get(pago.tipoPagoPublicId) ?? 0;
+        bucket.primerTicket ??= ticket;
+        bucket.ultimoTicket = ticket;
 
-      bucket.importesTipoPago.set(
-        pago.tipoPagoPublicId,
-        this.safeAdd(
-          currentValue,
-          pago.importeCents,
-          'El importe de un tipo de pago del Informe Simple supera el rango numérico seguro.',
-        ),
-      );
-    }
-
-    const tiposPago: readonly InformeSimpleTipoPago[] = record.tiposPago.map(
-      (tipoPago: InformeSimpleTipoPagoRecord): InformeSimpleTipoPago => ({
-        publicId: tipoPago.publicId,
-        nombre: tipoPago.nombre,
-        slug: tipoPago.slug,
-        orden: tipoPago.orden,
-      }),
-    );
-
-    const totalImportesTipoPago: Map<string, number> = new Map<string, number>();
-
-    let sumaCents: number = 0;
-
-    const items: readonly InformeSimpleItem[] = buckets.map(
-      (bucket: MutableInformeSimpleBucket): InformeSimpleItem => {
-        sumaCents = this.safeAdd(
-          sumaCents,
+        bucket.totalCents = this.safeAdd(
           bucket.totalCents,
-          'El acumulado del Informe Simple supera el rango numérico seguro.',
+          venta.totalCents,
+          'El total de una fila del Informe Simple supera el rango numérico seguro.',
         );
 
-        const importesTipoPago: readonly InformeSimpleImporteTipoPago[] = tiposPago.map(
-          (tipoPago: InformeSimpleTipoPago): InformeSimpleImporteTipoPago => {
-            const importeCents: number = bucket.importesTipoPago.get(tipoPago.publicId) ?? 0;
+        bucketsByVentaId.set(venta.id, bucket);
 
-            const totalActual: number = totalImportesTipoPago.get(tipoPago.publicId) ?? 0;
-
-            totalImportesTipoPago.set(
-              tipoPago.publicId,
-              this.safeAdd(
-                totalActual,
-                importeCents,
-                'El total de un tipo de pago del Informe Simple supera el rango numérico seguro.',
-              ),
-            );
-
-            return {
-              tipoPagoPublicId: tipoPago.publicId,
-              importeCents,
-            };
-          },
+        numeroVentas = this.safeAdd(
+          numeroVentas,
+          1,
+          'El número total de ventas del Informe Simple supera el rango numérico seguro.',
         );
 
-        return {
-          year: bucket.year,
-          month: bucket.month,
-          day: bucket.day,
-          numeroVentas: bucket.numeroVentas,
-          primerTicket: bucket.primerTicket,
-          ultimoTicket: bucket.ultimoTicket,
-          importesTipoPago,
-          totalCents: bucket.totalCents,
-          sumaCents,
-        };
-      },
-    );
+        totalCents = this.safeAdd(
+          totalCents,
+          venta.totalCents,
+          'El total del Informe Simple supera el rango numérico seguro.',
+        );
 
-    const totales: InformeSimpleTotales = {
-      numeroVentas,
-      primerTicket,
-      ultimoTicket,
-      importesTipoPago: tiposPago.map(
-        (tipoPago: InformeSimpleTipoPago): InformeSimpleImporteTipoPago => ({
-          tipoPagoPublicId: tipoPago.publicId,
-          importeCents: totalImportesTipoPago.get(tipoPago.publicId) ?? 0,
+        primerTicket ??= ticket;
+        ultimoTicket = ticket;
+      }
+
+      const tipoPagoIds: Set<string> = new Set<string>(
+        record.tiposPago.map((tipoPago: InformeSimpleTipoPagoRecord): string => tipoPago.publicId),
+      );
+
+      for (const pago of record.pagos) {
+        if (!tipoPagoIds.has(pago.tipoPagoPublicId)) {
+          throw new Error('Un pago del Informe Simple utiliza un tipo de pago desconocido.');
+        }
+
+        const bucket: MutableInformeSimpleBucket | undefined = bucketsByVentaId.get(pago.idVenta);
+
+        if (bucket === undefined) {
+          throw new Error('Un pago del Informe Simple no pertenece a ninguna venta del periodo.');
+        }
+
+        const currentValue: number = bucket.importesTipoPago.get(pago.tipoPagoPublicId) ?? 0;
+
+        bucket.importesTipoPago.set(
+          pago.tipoPagoPublicId,
+          this.safeAdd(
+            currentValue,
+            pago.importeCents,
+            'El importe de un tipo de pago del Informe Simple supera el rango numérico seguro.',
+          ),
+        );
+      }
+
+      const tiposPago: readonly InformeSimpleTipoPago[] = record.tiposPago.map(
+        (tipoPago: InformeSimpleTipoPagoRecord): InformeSimpleTipoPago => ({
+          publicId: tipoPago.publicId,
+          nombre: tipoPago.nombre,
+          slug: tipoPago.slug,
+          orden: tipoPago.orden,
         }),
-      ),
-      totalCents,
-      sumaCents,
-    };
+      );
 
-    return {
-      granularidad,
-      tiposPago,
-      items,
-      totales,
-    };
+      const totalImportesTipoPago: Map<string, number> = new Map<string, number>();
+
+      let sumaCents: number = 0;
+
+      const items: readonly InformeSimpleItem[] = buckets.map(
+        (bucket: MutableInformeSimpleBucket): InformeSimpleItem => {
+          sumaCents = this.safeAdd(
+            sumaCents,
+            bucket.totalCents,
+            'El acumulado del Informe Simple supera el rango numérico seguro.',
+          );
+
+          const importesTipoPago: readonly InformeSimpleImporteTipoPago[] = tiposPago.map(
+            (tipoPago: InformeSimpleTipoPago): InformeSimpleImporteTipoPago => {
+              const importeCents: number = bucket.importesTipoPago.get(tipoPago.publicId) ?? 0;
+
+              const totalActual: number = totalImportesTipoPago.get(tipoPago.publicId) ?? 0;
+
+              totalImportesTipoPago.set(
+                tipoPago.publicId,
+                this.safeAdd(
+                  totalActual,
+                  importeCents,
+                  'El total de un tipo de pago del Informe Simple supera el rango numérico seguro.',
+                ),
+              );
+
+              return {
+                tipoPagoPublicId: tipoPago.publicId,
+                importeCents,
+              };
+            },
+          );
+
+          return {
+            year: bucket.year,
+            month: bucket.month,
+            day: bucket.day,
+            numeroVentas: bucket.numeroVentas,
+            primerTicket: bucket.primerTicket,
+            ultimoTicket: bucket.ultimoTicket,
+            importesTipoPago,
+            totalCents: bucket.totalCents,
+            sumaCents,
+          };
+        },
+      );
+
+      const totales: InformeSimpleTotales = {
+        numeroVentas,
+        primerTicket,
+        ultimoTicket,
+        importesTipoPago: tiposPago.map(
+          (tipoPago: InformeSimpleTipoPago): InformeSimpleImporteTipoPago => ({
+            tipoPagoPublicId: tipoPago.publicId,
+            importeCents: totalImportesTipoPago.get(tipoPago.publicId) ?? 0,
+          }),
+        ),
+        totalCents,
+        sumaCents,
+      };
+
+      return {
+        granularidad,
+        tiposPago,
+        items,
+        totales,
+      };
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'caja',
+        operation: 'load-simple-report',
+        message: 'No se ha podido generar el Informe Simple de Caja.',
+        error,
+        context: {
+          year: consulta.year,
+          month: consulta.month,
+        },
+      });
+
+      throw error;
+    }
   }
 
   /**

@@ -1,5 +1,7 @@
 import InformePeriodoResolver from '@backend/application/caja/informes/informe-periodo.resolver';
 import InformeVentasService from '@backend/application/caja/informes/informe-ventas.service';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type {
   InformeVentasArticulo,
   InformeVentasCategoria,
@@ -41,10 +43,9 @@ interface LineaSeed {
 }
 
 let tempDirectory: string | null = null;
-
 let applicationDatabase: TypeOrmApplicationDatabase | null = null;
-
 let service: InformeVentasService | null = null;
+let applicationLogger: TestApplicationLogger;
 
 describe('InformeVentasService', (): void => {
   beforeEach(async (): Promise<void> => {
@@ -58,12 +59,13 @@ describe('InformeVentasService', (): void => {
     const dataSource: DataSource = await applicationDatabase.connect();
 
     await createSchema(dataSource);
-
     await seedInformeVentas(dataSource);
+    applicationLogger = new TestApplicationLogger();
 
     service = new InformeVentasService(
       new TypeOrmInformeVentasRepository(applicationDatabase),
       new InformePeriodoResolver(),
+      applicationLogger,
     );
   });
 
@@ -317,8 +319,52 @@ describe('InformeVentasService', (): void => {
         idCategoria: 999,
       }),
     ).rejects.toThrow('La categoría seleccionada no existe.');
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 });
+
+/**
+ * Logger controlado utilizado por las pruebas
+ * de generación de informes de Caja.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora entradas de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora entradas informativas.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva los avisos emitidos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Ignora errores.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No existen escrituras pendientes.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
+}
 
 /**
  * Crea el esquema completo actual.

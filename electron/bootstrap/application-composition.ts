@@ -663,6 +663,7 @@ export default function createApplicationComposition(
   const informeSimpleService: InformeSimpleService = new InformeSimpleService(
     informeSimpleRepository,
     informePeriodoResolver,
+    applicationLogger,
   );
 
   const informeDetalladoRepository: InformeDetalladoRepository =
@@ -671,6 +672,7 @@ export default function createApplicationComposition(
   const informeDetalladoService: InformeDetalladoService = new InformeDetalladoService(
     informeDetalladoRepository,
     informePeriodoResolver,
+    applicationLogger,
   );
 
   const informeVentasRepository: InformeVentasRepository = new TypeOrmInformeVentasRepository(
@@ -680,6 +682,7 @@ export default function createApplicationComposition(
   const informeVentasService: InformeVentasService = new InformeVentasService(
     informeVentasRepository,
     informePeriodoResolver,
+    applicationLogger,
   );
 
   const cajaInformePrintWindow: CajaInformePrintWindow = new ElectronCajaInformePrintWindow(

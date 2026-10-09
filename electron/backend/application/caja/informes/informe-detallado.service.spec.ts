@@ -1,5 +1,7 @@
 import InformeDetalladoService from '@backend/application/caja/informes/informe-detallado.service';
 import InformePeriodoResolver from '@backend/application/caja/informes/informe-periodo.resolver';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type {
   InformeDetalladoArticulo,
   InformeDetalladoMarca,
@@ -18,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 let tempDirectory: string | null = null;
 let applicationDatabase: TypeOrmApplicationDatabase | null = null;
 let service: InformeDetalladoService | null = null;
+let applicationLogger: TestApplicationLogger;
 
 describe('InformeDetalladoService', (): void => {
   beforeEach(async (): Promise<void> => {
@@ -32,10 +35,12 @@ describe('InformeDetalladoService', (): void => {
 
     await createSchema(dataSource);
     await seedInformeDetallado(dataSource);
+    applicationLogger = new TestApplicationLogger();
 
     service = new InformeDetalladoService(
       new TypeOrmInformeDetalladoRepository(applicationDatabase),
       new InformePeriodoResolver(),
+      applicationLogger,
     );
   });
 
@@ -271,7 +276,61 @@ describe('InformeDetalladoService', (): void => {
 
     expect(result.ventas.diferenciaNumeroVentas).toBe(4);
   });
+
+  it('no registra un periodo inválido como incidencia técnica', async (): Promise<void> => {
+    await expect(
+      requireService().getInforme({
+        year: 2026,
+        month: 13 as never,
+      }),
+    ).rejects.toThrow('El mes del informe no es válido.');
+
+    expect(applicationLogger.warnEvents).toEqual([]);
+  });
 });
+
+/**
+ * Logger controlado utilizado por las pruebas
+ * de generación de informes de Caja.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora entradas de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora entradas informativas.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva los avisos emitidos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Ignora errores.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No existen escrituras pendientes.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
+}
 
 /**
  * Crea todas las tablas del esquema actual.
