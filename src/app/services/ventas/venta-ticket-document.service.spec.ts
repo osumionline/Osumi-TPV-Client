@@ -1,10 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
+import ApplicationLoggingService from '@services/application/application-logging.service';
 import VentaTicketDocumentService from '@services/ventas/venta-ticket-document.service';
 import VentasContextService from '@services/ventas/ventas-context.service';
 import VentasTicketsService from '@services/ventas/ventas-tickets.service';
-import ApplicationLoggingService from '@services/application/application-logging.service';
 
 describe('VentaTicketDocumentService', (): void => {
   let originalDesktopDescriptor: PropertyDescriptor | undefined;
@@ -92,8 +92,8 @@ describe('VentaTicketDocumentService', (): void => {
         },
         {
           provide: ApplicationLoggingService,
-  		  useValue: loggingService,
-		},
+          useValue: loggingService,
+        },
       ],
     });
   });
@@ -170,16 +170,16 @@ describe('VentaTicketDocumentService', (): void => {
 
     expect(ticketsService.savedPdfs).toEqual([]);
     expect(loggingService.warnEvents).toEqual([
-  {
-    area: 'ventas',
-    operation: 'generate-ticket-pdf',
-    message: 'No se ha podido generar o conservar el PDF histórico de un ticket.',
-    error: renderPdfError,
-    context: {
-      idVenta: 123,
-    },
-  },
-]);
+      {
+        area: 'ventas',
+        operation: 'generate-ticket-pdf',
+        message: 'No se ha podido generar o conservar el PDF histórico de un ticket.',
+        error: renderPdfError,
+        context: {
+          idVenta: 123,
+        },
+      },
+    ]);
   });
 
   it('propaga un error al guardar el PDF histórico', async (): Promise<void> => {
@@ -193,16 +193,16 @@ describe('VentaTicketDocumentService', (): void => {
 
     expect(renderPdfCalls).toHaveLength(1);
     expect(loggingService.warnEvents).toEqual([
-  {
-    area: 'ventas',
-    operation: 'generate-ticket-pdf',
-    message: 'No se ha podido generar o conservar el PDF histórico de un ticket.',
-    error: ticketsService.savePdfError,
-    context: {
-      idVenta: 123,
-    },
-  },
-]);
+      {
+        area: 'ventas',
+        operation: 'generate-ticket-pdf',
+        message: 'No se ha podido generar o conservar el PDF histórico de un ticket.',
+        error: ticketsService.savePdfError,
+        context: {
+          idVenta: 123,
+        },
+      },
+    ]);
   });
 
   it('imprime exactamente el HTML construido desde la venta persistida', async (): Promise<void> => {
@@ -251,6 +251,7 @@ describe('VentaTicketDocumentService', (): void => {
     expect(printTicketCalls[0]).not.toContain('Cliente de prueba');
     expect(renderPdfCalls).toEqual([]);
     expect(ticketsService.savedPdfs).toEqual([]);
+    expect(loggingService.warnEvents).toEqual([]);
   });
 
   it('rechaza imprimir un ticket regalo para una devolución pura', async (): Promise<void> => {
@@ -275,6 +276,7 @@ describe('VentaTicketDocumentService', (): void => {
     expect(printTicketCalls).toEqual([]);
     expect(renderPdfCalls).toEqual([]);
     expect(ticketsService.savedPdfs).toEqual([]);
+    expect(loggingService.warnEvents).toEqual([]);
   });
 
   it('rechaza generar el documento si no están disponibles los datos del negocio', async (): Promise<void> => {
@@ -299,6 +301,7 @@ describe('VentaTicketDocumentService', (): void => {
     expect(renderPdfCalls).toEqual([]);
     expect(ticketsService.requestedVentaIds).toEqual([]);
     expect(ticketsService.savedPdfs).toEqual([]);
+    expect(loggingService.warnEvents).toEqual([]);
   });
 
   it('repara un PDF ausente antes de reimprimirlo', async (): Promise<void> => {
@@ -314,63 +317,173 @@ describe('VentaTicketDocumentService', (): void => {
     expect(printPdfCalls).toEqual([renderedPdf]);
   });
 
-  it('propaga un fallo al reimprimir el PDF vigente', async (): Promise<void> => {
-    printPdfError = new Error('No hay una impresora de tickets configurada.');
+  it('registra y propaga un fallo al reimprimir el PDF vigente', async (): Promise<void> => {
+    const error: Error = new Error('No hay una impresora de tickets configurada.');
+
+    printPdfError = error;
 
     const service: VentaTicketDocumentService = TestBed.inject(VentaTicketDocumentService);
 
-    await expect(service.reprint(123)).rejects.toThrow(
-      'No hay una impresora de tickets configurada.',
-    );
+    await expect(service.reprint(123)).rejects.toBe(error);
+
+    expect(loggingService.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'reprint-ticket',
+        message: 'No se ha podido reimprimir el PDF vigente de un ticket.',
+        error,
+        context: {
+          idVenta: 123,
+        },
+      },
+    ]);
   });
-  
+
+  it('registra una sola vez el fallo al consultar el PDF que se quiere reimprimir', async (): Promise<void> => {
+    const error: Error = new Error('SQLite ticket PDF lookup failed.');
+
+    ticketsService.currentPdfError = error;
+
+    const service: VentaTicketDocumentService = TestBed.inject(VentaTicketDocumentService);
+
+    await expect(service.reprint(123)).rejects.toBe(error);
+
+    expect(printPdfCalls).toEqual([]);
+
+    expect(loggingService.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'load-current-ticket-pdf',
+        message: 'No se ha podido comprobar el PDF vigente de un ticket.',
+        error,
+        context: {
+          idVenta: 123,
+        },
+      },
+    ]);
+  });
+
+  it('no duplica como reimpresión un fallo producido al regenerar el PDF', async (): Promise<void> => {
+    ticketsService.currentPdf = null;
+
+    const error: Error = new Error('No se ha podido renderizar el PDF.');
+
+    renderPdfError = error;
+
+    const service: VentaTicketDocumentService = TestBed.inject(VentaTicketDocumentService);
+
+    await expect(service.reprint(123)).rejects.toBe(error);
+
+    expect(printPdfCalls).toEqual([]);
+
+    expect(loggingService.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'generate-ticket-pdf',
+        message: 'No se ha podido generar o conservar el PDF histórico de un ticket.',
+        error,
+        context: {
+          idVenta: 123,
+        },
+      },
+    ]);
+  });
+
+  it('registra y propaga un fallo físico al imprimir un ticket regalo', async (): Promise<void> => {
+    const error: Error = new Error('La impresora configurada no está disponible.');
+
+    printTicketError = error;
+
+    const service: VentaTicketDocumentService = TestBed.inject(VentaTicketDocumentService);
+
+    await expect(service.printGift(123)).rejects.toBe(error);
+
+    expect(loggingService.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'print-gift-ticket',
+        message: 'No se ha podido imprimir un ticket regalo.',
+        error,
+        context: {
+          idVenta: 123,
+        },
+      },
+    ]);
+  });
+
+  it('registra que la venta ha desaparecido al solicitar un ticket regalo', async (): Promise<void> => {
+    ticketsService.ticket = null;
+
+    const service: VentaTicketDocumentService = TestBed.inject(VentaTicketDocumentService);
+
+    await expect(service.printGift(123)).rejects.toThrow(
+      'No se ha podido recuperar la venta para generar su ticket regalo.',
+    );
+
+    expect(printTicketCalls).toEqual([]);
+
+    expect(loggingService.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'print-gift-ticket',
+        message: 'No se ha podido imprimir un ticket regalo.',
+        error: expect.objectContaining({
+          message: 'No se ha podido recuperar la venta para generar su ticket regalo.',
+        }),
+        context: {
+          idVenta: 123,
+        },
+      },
+    ]);
+  });
+
   it('registra y propaga un fallo técnico al comprobar el PDF vigente', async (): Promise<void> => {
-  const error: Error = new Error('No se ha podido leer el PDF vigente.');
+    const error: Error = new Error('No se ha podido leer el PDF vigente.');
 
-  ticketsService.currentPdfError = error;
+    ticketsService.currentPdfError = error;
 
-  const service: VentaTicketDocumentService = TestBed.inject(VentaTicketDocumentService);
+    const service: VentaTicketDocumentService = TestBed.inject(VentaTicketDocumentService);
 
-  await expect(service.ensureCurrentPdf(123)).rejects.toBe(error);
+    await expect(service.ensureCurrentPdf(123)).rejects.toBe(error);
 
-  expect(renderPdfCalls).toEqual([]);
+    expect(renderPdfCalls).toEqual([]);
 
-  expect(loggingService.warnEvents).toEqual([
-    {
-      area: 'ventas',
-      operation: 'load-current-ticket-pdf',
-      message: 'No se ha podido comprobar el PDF vigente de un ticket.',
-      error,
-      context: {
-        idVenta: 123,
+    expect(loggingService.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'load-current-ticket-pdf',
+        message: 'No se ha podido comprobar el PDF vigente de un ticket.',
+        error,
+        context: {
+          idVenta: 123,
+        },
       },
-    },
-  ]);
-});
+    ]);
+  });
 
-it('registra una sola vez el fallo al regenerar un PDF ausente', async (): Promise<void> => {
-  ticketsService.currentPdf = null;
+  it('registra una sola vez el fallo al regenerar un PDF ausente', async (): Promise<void> => {
+    ticketsService.currentPdf = null;
 
-  const error: Error = new Error('No se ha podido renderizar el PDF.');
+    const error: Error = new Error('No se ha podido renderizar el PDF.');
 
-  renderPdfError = error;
+    renderPdfError = error;
 
-  const service: VentaTicketDocumentService = TestBed.inject(VentaTicketDocumentService);
+    const service: VentaTicketDocumentService = TestBed.inject(VentaTicketDocumentService);
 
-  await expect(service.ensureCurrentPdf(123)).rejects.toBe(error);
+    await expect(service.ensureCurrentPdf(123)).rejects.toBe(error);
 
-  expect(loggingService.warnEvents).toEqual([
-    {
-      area: 'ventas',
-      operation: 'generate-ticket-pdf',
-      message: 'No se ha podido generar o conservar el PDF histórico de un ticket.',
-      error,
-      context: {
-        idVenta: 123,
+    expect(loggingService.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'generate-ticket-pdf',
+        message: 'No se ha podido generar o conservar el PDF histórico de un ticket.',
+        error,
+        context: {
+          idVenta: 123,
+        },
       },
-    },
-  ]);
-});
+    ]);
+  });
 });
 
 interface TestLogEvent {
@@ -424,17 +537,17 @@ class FakeVentasTicketsService {
   }
 
   /**
- * Devuelve el PDF vigente configurado para el test.
- */
-getCurrentPdf(idVenta: number): Promise<Uint8Array | null> {
-  this.currentPdfRequests.push(idVenta);
+   * Devuelve el PDF vigente configurado para el test.
+   */
+  getCurrentPdf(idVenta: number): Promise<Uint8Array | null> {
+    this.currentPdfRequests.push(idVenta);
 
-  if (this.currentPdfError !== null) {
-    return Promise.reject(this.currentPdfError);
+    if (this.currentPdfError !== null) {
+      return Promise.reject(this.currentPdfError);
+    }
+
+    return Promise.resolve(this.currentPdf);
   }
-
-  return Promise.resolve(this.currentPdf);
-}
 
   /**
    * Registra el PDF y la revisión exacta solicitada.

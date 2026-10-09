@@ -3,9 +3,9 @@ import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { VentaTicketInterface } from '@desktop-contracts/ventas/venta-ticket.interface';
 import buildVentaGiftTicketDocument from '@model/ventas/venta-gift-ticket-document.builder';
 import buildVentaTicketDocument from '@model/ventas/venta-ticket-document.builder';
+import ApplicationLoggingService from '@services/application/application-logging.service';
 import VentasContextService from '@services/ventas/ventas-context.service';
 import VentasTicketsService from '@services/ventas/ventas-tickets.service';
-import ApplicationLoggingService from '@services/application/application-logging.service';
 
 interface VentaTicketDocumentSnapshot {
   readonly html: string;
@@ -28,70 +28,54 @@ export default class VentaTicketDocumentService {
   }
 
   /**
- 	* Genera el PDF de una revisión concreta y solicita
- 	* al backend que la materialice solo si sigue vigente.
- 	*
- 	* Cualquier incidencia de construcción, renderizado
- 	* o persistencia se registra aquí como único origen funcional.
- 	*/
-async generateAndSavePdf(idVenta: number): Promise<void> {
-  try {
-    const document: VentaTicketDocumentSnapshot = await this.buildDocument(idVenta);
+   * Genera el PDF de una revisión concreta y solicita
+   * al backend que la materialice solo si sigue vigente.
+   *
+   * Cualquier incidencia de construcción, renderizado
+   * o persistencia se registra aquí como único origen funcional.
+   */
+  async generateAndSavePdf(idVenta: number): Promise<void> {
+    try {
+      const document: VentaTicketDocumentSnapshot = await this.buildDocument(idVenta);
 
-    const pdf: Uint8Array = await window.osumiDesktop.printing.renderPdf(document.html);
+      const pdf: Uint8Array = await window.osumiDesktop.printing.renderPdf(document.html);
 
-    await this.ventasTicketsService.savePdf(idVenta, document.ticketRevision, pdf);
-  } catch (error: unknown) {
-    this.loggingService.warn({
-      area: 'ventas',
-      operation: 'generate-ticket-pdf',
-      message: 'No se ha podido generar o conservar el PDF histórico de un ticket.',
-      error,
-      context: {
-        idVenta,
-      },
-    });
+      await this.ventasTicketsService.savePdf(idVenta, document.ticketRevision, pdf);
+    } catch (error: unknown) {
+      this.loggingService.warn({
+        area: 'ventas',
+        operation: 'generate-ticket-pdf',
+        message: 'No se ha podido generar o conservar el PDF histórico de un ticket.',
+        error,
+        context: {
+          idVenta,
+        },
+      });
 
-    throw error;
-  	}
-}
+      throw error;
+    }
+  }
 
   /**
- * Garantiza que exista un PDF correspondiente
- * a la revisión documental actualmente vigente.
- *
- * La ausencia o desactualización del PDF es un estado normal.
- * Solo se registra un fallo técnico durante su comprobación.
- */
-async ensureCurrentPdf(idVenta: number): Promise<void> {
-  let currentPdf: Uint8Array | null;
-
-  try {
-    currentPdf = await this.ventasTicketsService.getCurrentPdf(idVenta);
-  } catch (error: unknown) {
-    this.loggingService.warn({
-      area: 'ventas',
-      operation: 'load-current-ticket-pdf',
-      message: 'No se ha podido comprobar el PDF vigente de un ticket.',
-      error,
-      context: {
-        idVenta,
-      },
-    });
-
-    throw error;
-  }
-
-  if (currentPdf !== null) {
-    return;
-  }
-
-  /*
-   * generateAndSavePdf() registra sus propias incidencias.
-   * No las capturamos aquí para evitar duplicarlas.
+   * Garantiza que exista un PDF correspondiente
+   * a la revisión documental actualmente vigente.
+   *
+   * La ausencia o desactualización del PDF es un estado normal.
+   * Solo se registra un fallo técnico durante su comprobación.
    */
-  await this.generateAndSavePdf(idVenta);
-}
+  async ensureCurrentPdf(idVenta: number): Promise<void> {
+    const currentPdf: Uint8Array | null = await this.loadCurrentPdf(idVenta);
+
+    if (currentPdf !== null) {
+      return;
+    }
+
+    /*
+     * generateAndSavePdf() registra sus propias incidencias.
+     * No las capturamos aquí para evitar duplicarlas.
+     */
+    await this.generateAndSavePdf(idVenta);
+  }
 
   /**
    * Imprime silenciosamente el snapshot vigente recuperado
@@ -110,44 +94,165 @@ async ensureCurrentPdf(idVenta: number): Promise<void> {
    * primero mediante el pipeline documental revisionado.
    */
   async reprint(idVenta: number): Promise<void> {
-    let pdf: Uint8Array | null = await this.ventasTicketsService.getCurrentPdf(idVenta);
+    let pdf: Uint8Array | null = await this.loadCurrentPdf(idVenta);
 
     if (pdf === null) {
+      /*
+       * generateAndSavePdf() registra cualquier incidencia propia.
+       * No la capturamos aquí para no duplicarla como reimpresión.
+       */
       await this.generateAndSavePdf(idVenta);
 
-      pdf = await this.ventasTicketsService.getCurrentPdf(idVenta);
+      pdf = await this.loadCurrentPdf(idVenta);
     }
 
     if (pdf === null) {
-      throw new Error('No se ha podido obtener el PDF vigente del ticket.');
+      const error: Error = new Error('No se ha podido obtener el PDF vigente del ticket.');
+
+      this.loggingService.warn({
+        area: 'ventas',
+        operation: 'reprint-ticket',
+        message: 'No se ha podido reimprimir el PDF vigente de un ticket.',
+        error,
+        context: {
+          idVenta,
+        },
+      });
+
+      throw error;
     }
 
-    await window.osumiDesktop.printing.printPdf(pdf);
+    try {
+      await window.osumiDesktop.printing.printPdf(pdf);
+    } catch (error: unknown) {
+      this.loggingService.warn({
+        area: 'ventas',
+        operation: 'reprint-ticket',
+        message: 'No se ha podido reimprimir el PDF vigente de un ticket.',
+        error,
+        context: {
+          idVenta,
+        },
+      });
+
+      throw error;
+    }
   }
 
   /**
    * Genera e imprime bajo demanda un ticket regalo
    * sin crear ni modificar ningún artefacto PDF histórico.
+   *
+   * Una operación sin líneas de compra es una precondición
+   * de negocio y no genera una entrada de log.
    */
   async printGift(idVenta: number): Promise<void> {
-    const ticket: VentaTicketInterface | null =
-      await this.ventasTicketsService.getByVentaId(idVenta);
+    let ticket: VentaTicketInterface | null;
+
+    try {
+      ticket = await this.ventasTicketsService.getByVentaId(idVenta);
+    } catch (error: unknown) {
+      this.loggingService.warn({
+        area: 'ventas',
+        operation: 'print-gift-ticket',
+        message: 'No se ha podido imprimir un ticket regalo.',
+        error,
+        context: {
+          idVenta,
+        },
+      });
+
+      throw error;
+    }
 
     if (ticket === null) {
-      throw new Error('No se ha podido recuperar la venta para generar su ticket regalo.');
+      const error: Error = new Error(
+        'No se ha podido recuperar la venta para generar su ticket regalo.',
+      );
+
+      this.loggingService.warn({
+        area: 'ventas',
+        operation: 'print-gift-ticket',
+        message: 'No se ha podido imprimir un ticket regalo.',
+        error,
+        context: {
+          idVenta,
+        },
+      });
+
+      throw error;
+    }
+
+    const hasPurchaseLines: boolean = ticket.lineas.some((linea): boolean => linea.unidades > 0);
+
+    if (!hasPurchaseLines) {
+      throw new Error(
+        'No se puede generar un ticket regalo para una operación sin líneas de compra.',
+      );
     }
 
     const appData: AppData | null = this.ventasContextService.appData();
 
     if (appData === null) {
-      throw new Error(
+      const error: Error = new Error(
         'No se han podido obtener los datos del negocio para generar el ticket regalo.',
       );
+
+      this.loggingService.warn({
+        area: 'ventas',
+        operation: 'print-gift-ticket',
+        message: 'No se ha podido imprimir un ticket regalo.',
+        error,
+        context: {
+          idVenta,
+        },
+      });
+
+      throw error;
     }
 
-    const documentHtml: string = buildVentaGiftTicketDocument(appData, ticket);
+    try {
+      const documentHtml: string = buildVentaGiftTicketDocument(appData, ticket);
 
-    await window.osumiDesktop.printing.printTicket(documentHtml);
+      await window.osumiDesktop.printing.printTicket(documentHtml);
+    } catch (error: unknown) {
+      this.loggingService.warn({
+        area: 'ventas',
+        operation: 'print-gift-ticket',
+        message: 'No se ha podido imprimir un ticket regalo.',
+        error,
+        context: {
+          idVenta,
+        },
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Recupera el PDF documental vigente y registra únicamente
+   * los fallos técnicos producidos durante la comprobación.
+   *
+   * Un resultado null es normal: indica que el documento
+   * falta físicamente o pertenece a una revisión anterior.
+   */
+  private async loadCurrentPdf(idVenta: number): Promise<Uint8Array | null> {
+    try {
+      return await this.ventasTicketsService.getCurrentPdf(idVenta);
+    } catch (error: unknown) {
+      this.loggingService.warn({
+        area: 'ventas',
+        operation: 'load-current-ticket-pdf',
+        message: 'No se ha podido comprobar el PDF vigente de un ticket.',
+        error,
+        context: {
+          idVenta,
+        },
+      });
+
+      throw error;
+    }
   }
 
   /**

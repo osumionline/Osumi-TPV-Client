@@ -150,24 +150,24 @@ export default class VentaPostCommitService {
   }
 
   /**
- * Intenta conservar el PDF histórico después del COMMIT.
- *
- * VentaTicketDocumentService registra la incidencia
- * en su origen funcional; aquí solo la convertimos
- * en un aviso para el usuario.
- */
-private async generateAndSavePdf(idVenta: number, warnings: string[]): Promise<void> {
-  try {
-    await this.ventaTicketDocumentService.generateAndSavePdf(idVenta);
-  } catch (error: unknown) {
-    warnings.push(
-      `No se ha podido conservar el PDF histórico del ticket. ${getErrorMessage(
-        error,
-        'Se ha producido un error inesperado.',
-      )}`,
-    );
+   * Intenta conservar el PDF histórico después del COMMIT.
+   *
+   * VentaTicketDocumentService registra la incidencia
+   * en su origen funcional; aquí solo la convertimos
+   * en un aviso para el usuario.
+   */
+  private async generateAndSavePdf(idVenta: number, warnings: string[]): Promise<void> {
+    try {
+      await this.ventaTicketDocumentService.generateAndSavePdf(idVenta);
+    } catch (error: unknown) {
+      warnings.push(
+        `No se ha podido conservar el PDF histórico del ticket. ${getErrorMessage(
+          error,
+          'Se ha producido un error inesperado.',
+        )}`,
+      );
+    }
   }
-}
 
   private async printTicket(idVenta: number, warnings: string[]): Promise<void> {
     try {
