@@ -1,5 +1,7 @@
 import VentasHistoricoService from '@backend/application/ventas/ventas-historico.service';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type VentasHistoricoRepository from '@backend/contracts/ventas/ventas-historico.repository.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type {
   VentaHistoricoDetalleRecord,
   VentasHistoricoResultadoRecord,
@@ -13,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 const ORIGINAL_TIMEZONE: string | undefined = process.env['TZ'];
 
 let repository: FakeVentasHistoricoRepository;
+let applicationLogger: TestApplicationLogger;
 let service: VentasHistoricoService;
 
 describe('VentasHistoricoService', (): void => {
@@ -20,7 +23,8 @@ describe('VentasHistoricoService', (): void => {
     process.env['TZ'] = 'Europe/Madrid';
 
     repository = new FakeVentasHistoricoRepository();
-    service = new VentasHistoricoService(repository);
+    applicationLogger = new TestApplicationLogger();
+    service = new VentasHistoricoService(repository, applicationLogger);
   });
 
   afterEach((): void => {
@@ -53,6 +57,33 @@ describe('VentasHistoricoService', (): void => {
         totalesPorTipoPago: [],
       },
     });
+  });
+
+  it('registra y propaga un fallo técnico al cargar el histórico', async (): Promise<void> => {
+    const error: Error = new Error('SQLite history read failed.');
+
+    repository.periodError = error;
+
+    await expect(
+      service.findByPeriod({
+        desde: '2026-08-25',
+        hasta: '2026-08-31',
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'load-sales-history',
+        message: 'No se ha podido recuperar el histórico de ventas.',
+        error,
+        context: {
+          desde: '2026-08-25',
+          hasta: '2026-08-31',
+          hasClientFilter: false,
+        },
+      },
+    ]);
   });
 
   it('normaliza y propaga el filtro opcional de cliente', async (): Promise<void> => {
@@ -150,6 +181,27 @@ describe('VentasHistoricoService', (): void => {
     ).rejects.toThrow('La fecha inicial del histórico no puede ser posterior a la fecha final.');
 
     expect(repository.findByPeriodCalls).toBe(0);
+    expect(applicationLogger.warnEvents).toEqual([]);
+  });
+
+  it('registra y propaga un fallo técnico al cargar el detalle histórico', async (): Promise<void> => {
+    const error: Error = new Error('SQLite history detail read failed.');
+
+    repository.detalleError = error;
+
+    await expect(service.findDetalleByVentaId(15)).rejects.toBe(error);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'load-sales-history-detail',
+        message: 'No se ha podido recuperar el detalle histórico de una venta.',
+        error,
+        context: {
+          idVenta: 15,
+        },
+      },
+    ]);
   });
 
   it('transforma el detalle y deriva las capacidades postventa desde hechos persistidos', async (): Promise<void> => {
@@ -358,8 +410,53 @@ describe('VentasHistoricoService', (): void => {
 
     expect(detalle).toBeNull();
     expect(repository.lastDetalleVentaId).toBe(999);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 });
+
+/**
+ * Logger controlado utilizado por los tests
+ * de consulta del histórico.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora entradas de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora entradas informativas.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva los avisos registrados por Histórico.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Ignora errores.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No existen escrituras pendientes
+   * en este logger de memoria.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
+}
 
 class FakeVentasHistoricoRepository implements VentasHistoricoRepository {
   findByPeriodCalls: number = 0;
@@ -368,6 +465,8 @@ class FakeVentasHistoricoRepository implements VentasHistoricoRepository {
   lastHastaExclusive: string | null = null;
   lastDetalleVentaId: number | null = null;
   lastClientePublicId: string | null = null;
+  periodError: Error | null = null;
+  detalleError: Error | null = null;
 
   periodResult: VentasHistoricoResultadoRecord = {
     ventas: [],
@@ -395,6 +494,10 @@ class FakeVentasHistoricoRepository implements VentasHistoricoRepository {
     this.lastHastaExclusive = hastaExclusive;
     this.lastClientePublicId = clientePublicId;
 
+    if (this.periodError !== null) {
+      return Promise.reject(this.periodError);
+    }
+
     return Promise.resolve(this.periodResult);
   }
 
@@ -404,6 +507,10 @@ class FakeVentasHistoricoRepository implements VentasHistoricoRepository {
   findDetalleByVentaId(idVenta: number): Promise<VentaHistoricoDetalleRecord | null> {
     this.findDetalleCalls++;
     this.lastDetalleVentaId = idVenta;
+
+    if (this.detalleError !== null) {
+      return Promise.reject(this.detalleError);
+    }
 
     return Promise.resolve(this.detalleResult);
   }

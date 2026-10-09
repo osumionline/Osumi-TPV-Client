@@ -1,7 +1,9 @@
 import VentasHistoricoService from '@backend/application/ventas/ventas-historico.service';
 import VentasPostventaService from '@backend/application/ventas/ventas-postventa.service';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type VentasHistoricoRepository from '@backend/contracts/ventas/ventas-historico.repository.interface';
 import type VentasPostventaRepository from '@backend/contracts/ventas/ventas-postventa.repository.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type {
   VentaHistoricoDetalleRecord,
   VentasHistoricoResultadoRecord,
@@ -20,6 +22,7 @@ describe('VentasPostventaService', (): void => {
 
     const historicoService: VentasHistoricoService = new VentasHistoricoService(
       historicoRepository,
+      new TestApplicationLogger(),
     );
 
     service = new VentasPostventaService(postventaRepository, historicoService);
@@ -145,6 +148,50 @@ describe('VentasPostventaService', (): void => {
     expect(historicoRepository.findDetalleCalls).toBe(1);
   });
 });
+
+/**
+ * Logger mínimo utilizado por los tests de postventa.
+ *
+ * Estos tests no verifican el logging del Histórico;
+ * únicamente necesitan satisfacer su dependencia.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  /**
+   * Ignora entradas de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora entradas informativas.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora avisos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora errores.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No existen escrituras pendientes
+   * en este logger de test.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
+}
 
 class FakeVentasPostventaRepository implements VentasPostventaRepository {
   cambiarClienteCalls: number = 0;
