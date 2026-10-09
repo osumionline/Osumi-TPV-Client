@@ -634,6 +634,7 @@ export default function createApplicationComposition(
   const clienteFacturaPrintService: ClienteFacturaPrintService = new ClienteFacturaPrintService(
     clienteFacturaPdfService,
     clienteFacturaPrintDialog,
+    applicationLogger,
   );
 
   const clienteFacturaPreviewWindow: ClienteFacturaPreviewWindow =
