@@ -704,6 +704,7 @@ export default function createApplicationComposition(
 
   const ventasDevolucionesService: VentasDevolucionesService = new VentasDevolucionesService(
     ventasDevolucionesRepository,
+    applicationLogger,
   );
 
   const ventasContextRepository: VentasContextRepository = new TypeOrmVentasContextRepository(

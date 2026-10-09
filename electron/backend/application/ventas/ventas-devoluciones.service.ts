@@ -1,3 +1,4 @@
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type VentasDevolucionesRepository from '@backend/contracts/ventas/ventas-devoluciones.repository.interface';
 import type VentaDevolucionRecord from '@backend/domain/ventas/venta-devolucion-record.interface';
 import type {
@@ -11,7 +12,14 @@ import type {
 } from '@desktop-contracts/ventas/venta-devolucion.interface';
 
 export default class VentasDevolucionesService {
-  constructor(private readonly ventasDevolucionesRepository: VentasDevolucionesRepository) {}
+  /**
+   * Crea el servicio de consulta de ventas disponibles
+   * como origen de una devolución.
+   */
+  constructor(
+    private readonly ventasDevolucionesRepository: VentasDevolucionesRepository,
+    private readonly applicationLogger: ApplicationLogger,
+  ) {}
 
   /**
    * Recupera una venta histórica mediante el identificador
@@ -22,8 +30,23 @@ export default class VentasDevolucionesService {
       throw new RangeError('El identificador de la venta no es válido.');
     }
 
-    const venta: VentaDevolucionRecord | null =
-      await this.ventasDevolucionesRepository.findByVentaId(idVenta);
+    let venta: VentaDevolucionRecord | null;
+
+    try {
+      venta = await this.ventasDevolucionesRepository.findByVentaId(idVenta);
+    } catch (error: unknown) {
+      this.applicationLogger.error({
+        area: 'ventas',
+        operation: 'load-return-source',
+        message: 'No se ha podido recuperar la venta histórica para realizar una devolución.',
+        error,
+        context: {
+          idVenta,
+        },
+      });
+
+      throw error;
+    }
 
     if (venta === null) {
       return null;
