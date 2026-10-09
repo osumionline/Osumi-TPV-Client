@@ -320,10 +320,24 @@ export default class CajaService {
 
     const period: UtcPeriod = this.toUtcPeriod(desde, hasta);
 
-    const records: readonly SalidaCajaRecord[] = await this.cajaRepository.findSalidasByPeriod(
-      period.desde,
-      period.hastaExclusive,
-    );
+    let records: readonly SalidaCajaRecord[];
+
+    try {
+      records = await this.cajaRepository.findSalidasByPeriod(period.desde, period.hastaExclusive);
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'caja',
+        operation: 'load-cash-outflows',
+        message: 'No se han podido cargar las salidas de caja.',
+        error,
+        context: {
+          desde: consulta.desde,
+          hasta: consulta.hasta,
+        },
+      });
+
+      throw error;
+    }
 
     return records.map((record: SalidaCajaRecord): SalidaCajaInterface =>
       this.toSalidaInterface(record),
@@ -339,7 +353,25 @@ export default class CajaService {
       ...this.normalizeSalidaFields(command),
     };
 
-    return this.toSalidaInterface(await this.cajaRepository.createSalida(normalizedCommand));
+    let record: SalidaCajaRecord;
+
+    try {
+      record = await this.cajaRepository.createSalida(normalizedCommand);
+    } catch (error: unknown) {
+      this.applicationLogger.error({
+        area: 'caja',
+        operation: 'create-cash-outflow',
+        message: 'No se ha podido persistir una nueva salida de caja.',
+        error,
+        context: {
+          cajaPublicId: normalizedCommand.cajaPublicId,
+        },
+      });
+
+      throw error;
+    }
+
+    return this.toSalidaInterface(record);
   }
 
   /**
@@ -352,7 +384,26 @@ export default class CajaService {
       ...this.normalizeSalidaFields(command),
     };
 
-    return this.toSalidaInterface(await this.cajaRepository.updateSalida(normalizedCommand));
+    let record: SalidaCajaRecord;
+
+    try {
+      record = await this.cajaRepository.updateSalida(normalizedCommand);
+    } catch (error: unknown) {
+      this.applicationLogger.error({
+        area: 'caja',
+        operation: 'update-cash-outflow',
+        message: 'No se ha podido persistir la modificación de una salida de caja.',
+        error,
+        context: {
+          cajaPublicId: normalizedCommand.cajaPublicId,
+          salidaPublicId: normalizedCommand.publicId,
+        },
+      });
+
+      throw error;
+    }
+
+    return this.toSalidaInterface(record);
   }
 
   /**
@@ -365,7 +416,22 @@ export default class CajaService {
       cajaPublicId: this.requirePublicId(command?.cajaPublicId, 'La caja indicada no es válida.'),
     };
 
-    await this.cajaRepository.deleteSalida(normalizedCommand);
+    try {
+      await this.cajaRepository.deleteSalida(normalizedCommand);
+    } catch (error: unknown) {
+      this.applicationLogger.error({
+        area: 'caja',
+        operation: 'delete-cash-outflow',
+        message: 'No se ha podido eliminar una salida de caja.',
+        error,
+        context: {
+          cajaPublicId: normalizedCommand.cajaPublicId,
+          salidaPublicId: normalizedCommand.publicId,
+        },
+      });
+
+      throw error;
+    }
   }
 
   /**

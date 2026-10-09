@@ -77,6 +77,34 @@ describe('CajaService', (): void => {
     expect(result).toEqual(repository.salidas);
   });
 
+  it('registra un aviso si falla la carga de salidas', async (): Promise<void> => {
+    const error: Error = new Error('SQLite read failed.');
+
+    repository.findSalidasError = error;
+
+    await expect(
+      service.findSalidas({
+        desde: '2026-09-20',
+        hasta: '2026-09-21',
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'caja',
+        operation: 'load-cash-outflows',
+        message: 'No se han podido cargar las salidas de caja.',
+        error,
+        context: {
+          desde: '2026-09-20',
+          hasta: '2026-09-21',
+        },
+      },
+    ]);
+
+    expect(applicationLogger.errorEvents).toEqual([]);
+  });
+
   it('rechaza fechas inválidas y rangos invertidos', async (): Promise<void> => {
     await expect(
       service.findSalidas({
@@ -95,6 +123,8 @@ describe('CajaService', (): void => {
     );
 
     expect(repository.findSalidasCalls).toBe(0);
+    expect(applicationLogger.warnEvents).toEqual([]);
+    expect(applicationLogger.errorEvents).toEqual([]);
   });
 
   it('normaliza una nueva salida antes de persistirla', async (): Promise<void> => {
@@ -111,6 +141,33 @@ describe('CajaService', (): void => {
       descripcion: 'Compra de material',
       importeCents: 1_250,
     });
+  });
+
+  it('registra y propaga un fallo al persistir una nueva salida', async (): Promise<void> => {
+    const error: Error = new Error('SQLite insert failed.');
+
+    repository.createSalidaError = error;
+
+    await expect(
+      service.createSalida({
+        cajaPublicId: 'caja-1',
+        concepto: 'Folios',
+        descripcion: 'Compra de material',
+        importeCents: 1_250,
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.errorEvents).toEqual([
+      {
+        area: 'caja',
+        operation: 'create-cash-outflow',
+        message: 'No se ha podido persistir una nueva salida de caja.',
+        error,
+        context: {
+          cajaPublicId: 'caja-1',
+        },
+      },
+    ]);
   });
 
   it('normaliza una descripción vacía a null al actualizar', async (): Promise<void> => {
@@ -131,6 +188,35 @@ describe('CajaService', (): void => {
     });
   });
 
+  it('registra y propaga un fallo al modificar una salida', async (): Promise<void> => {
+    const error: Error = new Error('SQLite update failed.');
+
+    repository.updateSalidaError = error;
+
+    await expect(
+      service.updateSalida({
+        publicId: 'salida-1',
+        cajaPublicId: 'caja-1',
+        concepto: 'Folios',
+        descripcion: null,
+        importeCents: 2_000,
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.errorEvents).toEqual([
+      {
+        area: 'caja',
+        operation: 'update-cash-outflow',
+        message: 'No se ha podido persistir la modificación de una salida de caja.',
+        error,
+        context: {
+          cajaPublicId: 'caja-1',
+          salidaPublicId: 'salida-1',
+        },
+      },
+    ]);
+  });
+
   it('normaliza los identificadores al eliminar', async (): Promise<void> => {
     await service.deleteSalida({
       publicId: '  salida-1  ',
@@ -141,6 +227,32 @@ describe('CajaService', (): void => {
       publicId: 'salida-1',
       cajaPublicId: 'caja-1',
     });
+  });
+
+  it('registra y propaga un fallo al eliminar una salida', async (): Promise<void> => {
+    const error: Error = new Error('SQLite delete failed.');
+
+    repository.deleteSalidaError = error;
+
+    await expect(
+      service.deleteSalida({
+        publicId: 'salida-1',
+        cajaPublicId: 'caja-1',
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.errorEvents).toEqual([
+      {
+        area: 'caja',
+        operation: 'delete-cash-outflow',
+        message: 'No se ha podido eliminar una salida de caja.',
+        error,
+        context: {
+          cajaPublicId: 'caja-1',
+          salidaPublicId: 'salida-1',
+        },
+      },
+    ]);
   });
 
   it('rechaza datos económicos inválidos antes de acceder al repository', async (): Promise<void> => {
@@ -163,6 +275,8 @@ describe('CajaService', (): void => {
     ).rejects.toThrow('El importe de la salida de caja debe ser mayor que cero.');
 
     expect(repository.lastCreateCommand).toBeNull();
+    expect(applicationLogger.warnEvents).toEqual([]);
+    expect(applicationLogger.errorEvents).toEqual([]);
   });
 
   it('calcula el saldo final teórico a partir del snapshot canónico', async (): Promise<void> => {
@@ -378,6 +492,7 @@ describe('CajaService', (): void => {
  * del servicio de Caja.
  */
 class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
   readonly errorEvents: ApplicationLogEvent[] = [];
 
   /**
@@ -395,10 +510,10 @@ class TestApplicationLogger implements ApplicationLogger {
   }
 
   /**
-   * Ignora avisos.
+   * Conserva los avisos registrados por Caja.
    */
   warn(event: ApplicationLogEvent): void {
-    void event;
+    this.warnEvents.push(event);
   }
 
   /**
@@ -425,6 +540,10 @@ class FakeCajaRepository implements CajaRepository {
   lastCreateCommand: CrearSalidaCajaCommand | null = null;
   lastUpdateCommand: ActualizarSalidaCajaCommand | null = null;
   lastDeleteCommand: EliminarSalidaCajaCommand | null = null;
+  findSalidasError: Error | null = null;
+  createSalidaError: Error | null = null;
+  updateSalidaError: Error | null = null;
+  deleteSalidaError: Error | null = null;
 
   persistedSalida: SalidaCajaRecord = {
     publicId: 'salida-1',
@@ -503,6 +622,10 @@ class FakeCajaRepository implements CajaRepository {
     this.lastDesde = desde;
     this.lastHastaExclusive = hastaExclusive;
 
+    if (this.findSalidasError !== null) {
+      return Promise.reject(this.findSalidasError);
+    }
+
     return Promise.resolve(this.salidas);
   }
 
@@ -511,6 +634,10 @@ class FakeCajaRepository implements CajaRepository {
    */
   createSalida(command: CrearSalidaCajaCommand): Promise<SalidaCajaRecord> {
     this.lastCreateCommand = command;
+
+    if (this.createSalidaError !== null) {
+      return Promise.reject(this.createSalidaError);
+    }
 
     return Promise.resolve(this.persistedSalida);
   }
@@ -521,6 +648,10 @@ class FakeCajaRepository implements CajaRepository {
   updateSalida(command: ActualizarSalidaCajaCommand): Promise<SalidaCajaRecord> {
     this.lastUpdateCommand = command;
 
+    if (this.updateSalidaError !== null) {
+      return Promise.reject(this.updateSalidaError);
+    }
+
     return Promise.resolve(this.persistedSalida);
   }
 
@@ -529,6 +660,10 @@ class FakeCajaRepository implements CajaRepository {
    */
   deleteSalida(command: EliminarSalidaCajaCommand): Promise<void> {
     this.lastDeleteCommand = command;
+
+    if (this.deleteSalidaError !== null) {
+      return Promise.reject(this.deleteSalidaError);
+    }
 
     return Promise.resolve();
   }
