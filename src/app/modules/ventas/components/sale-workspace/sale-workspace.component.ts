@@ -1335,71 +1335,15 @@ export default class SaleWorkspaceComponent {
       const devolucion: VentaDevolucionInterface | null =
         await this.ventasDevolucionesService.getDevolucion(origen.id);
 
-      if (devolucion === null) {
-        this.showDevolucionError('No se ha podido recuperar el ticket original de la devolución.');
+      const selectorState: VentaDevolucionSelectorState =
+        this.ventasDevolucionesService.reconcileDevolucionEnCurso(this.venta(), devolucion);
 
-        return;
-      }
-
-      if (devolucion.publicId !== origen.publicId) {
-        this.showDevolucionError('El ticket recuperado no coincide con la devolución en curso.');
-
-        return;
-      }
-
-      const seleccionInicial: readonly VentaDevolucionSeleccion[] =
-        this.buildDevolucionInitialSelection(devolucion);
-
-      this.devolucionSelectorState.set({
-        devolucion,
-        seleccionInicial,
-      });
+      this.devolucionSelectorState.set(selectorState);
     } catch (error: unknown) {
       this.showDevolucionError(getErrorMessage(error, 'No se ha podido recuperar la devolución.'));
     } finally {
       this.searching.set(false);
     }
-  }
-
-  /**
-   * Reconstruye la selección actual de devolución utilizando
-   * las líneas recién recuperadas del ticket histórico.
-   */
-  private buildDevolucionInitialSelection(
-    devolucion: VentaDevolucionInterface,
-  ): readonly VentaDevolucionSeleccion[] {
-    const seleccion: VentaDevolucionSeleccion[] = [];
-
-    for (const lineaVenta of this.venta().lineas) {
-      if (!lineaVenta.esDevolucion) {
-        continue;
-      }
-
-      const origen = lineaVenta.devolucionOrigen;
-
-      if (origen === null) {
-        throw new Error('Una línea de devolución no dispone de su referencia histórica.');
-      }
-
-      const lineaHistorica = devolucion.lineas.find((linea): boolean => linea.id === origen.id);
-
-      if (lineaHistorica === undefined) {
-        throw new Error('Una de las líneas de la devolución ya no existe en el ticket original.');
-      }
-
-      const unidades: number = lineaVenta.unidadesDevolucion;
-
-      if (unidades > lineaHistorica.unidadesDisponibles) {
-        throw new Error('La disponibilidad del ticket ha cambiado y la devolución debe revisarse.');
-      }
-
-      seleccion.push({
-        linea: lineaHistorica,
-        unidades,
-      });
-    }
-
-    return seleccion;
   }
 
   /**
