@@ -33,11 +33,11 @@ export default class VentaPostCommitService {
     const warnings: string[] = [];
 
     if (clientePublicId !== null) {
-      await this.invalidateClienteEstadisticas(clientePublicId, warnings);
+      await this.invalidateClienteEstadisticas(idVenta, clientePublicId, warnings);
     }
 
     if (reloadReservas) {
-      await this.reloadReservas(warnings);
+      await this.reloadReservas(idVenta, warnings);
     }
 
     await this.processTicketBai(idVenta, warnings);
@@ -54,13 +54,29 @@ export default class VentaPostCommitService {
     return warnings;
   }
 
+  /**
+   * Invalida las estadísticas cacheadas del cliente
+   * después de haber confirmado definitivamente la venta.
+   */
   private async invalidateClienteEstadisticas(
+    idVenta: number,
     clientePublicId: string,
     warnings: string[],
   ): Promise<void> {
     try {
       await this.clientesService.invalidateEstadisticas(clientePublicId);
     } catch (error: unknown) {
+      this.loggingService.warn({
+        area: 'ventas',
+        operation: 'post-commit-client-statistics',
+        message:
+          'No se han podido actualizar las estadísticas del cliente después de confirmar la venta.',
+        error,
+        context: {
+          idVenta,
+        },
+      });
+
       warnings.push(
         `No se han podido actualizar las estadísticas del cliente. ${getErrorMessage(
           error,
@@ -70,7 +86,14 @@ export default class VentaPostCommitService {
     }
   }
 
-  private async reloadReservas(warnings: string[]): Promise<void> {
+  /**
+   * Actualiza la colección de reservas después
+   * de una venta que las haya consumido.
+   *
+   * Los errores normales de carga son registrados
+   * por ReservasService en su punto de origen.
+   */
+  private async reloadReservas(idVenta: number, warnings: string[]): Promise<void> {
     try {
       await this.reservasService.reload();
 
@@ -80,6 +103,16 @@ export default class VentaPostCommitService {
         warnings.push(`No se ha podido actualizar la lista de reservas. ${reservasError}`);
       }
     } catch (error: unknown) {
+      this.loggingService.warn({
+        area: 'ventas',
+        operation: 'post-commit-reservations-reload',
+        message: 'La venta se ha confirmado, pero ha fallado la recarga de reservas.',
+        error,
+        context: {
+          idVenta,
+        },
+      });
+
       warnings.push(
         `No se ha podido actualizar la lista de reservas. ${getErrorMessage(
           error,

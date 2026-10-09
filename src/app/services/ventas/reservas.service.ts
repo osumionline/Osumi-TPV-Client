@@ -1,30 +1,27 @@
 import type { Signal, WritableSignal } from '@angular/core';
-import { Service, signal } from '@angular/core';
+import { inject, Service, signal } from '@angular/core';
 import type ReservaInterface from '@desktop-contracts/ventas/reservas/reserva.interface';
 import mapVentaToCrearReservaCommand from '@model/reservas/crear-reserva-command.mapper';
 import type VentaEnCurso from '@model/ventas/venta-en-curso.model';
+import ApplicationLoggingService from '@services/application/application-logging.service';
 import { getErrorMessage } from '@utils/error.utils';
 
 @Service()
 export default class ReservasService {
+  private readonly loggingService: ApplicationLoggingService = inject(ApplicationLoggingService);
+
   private readonly reservasSignal: WritableSignal<readonly ReservaInterface[]> = signal<
     readonly ReservaInterface[]
   >([]);
-
   private readonly loadedSignal: WritableSignal<boolean> = signal<boolean>(false);
-
   private readonly loadingSignal: WritableSignal<boolean> = signal<boolean>(false);
-
   private readonly errorSignal: WritableSignal<string | null> = signal<string | null>(null);
 
   private pendingRequest: Promise<void> | null = null;
 
   readonly reservas: Signal<readonly ReservaInterface[]> = this.reservasSignal.asReadonly();
-
   readonly loaded: Signal<boolean> = this.loadedSignal.asReadonly();
-
   readonly loading: Signal<boolean> = this.loadingSignal.asReadonly();
-
   readonly error: Signal<string | null> = this.errorSignal.asReadonly();
 
   /**
@@ -132,6 +129,13 @@ export default class ReservasService {
 
       this.loadedSignal.set(true);
     } catch (error: unknown) {
+      this.loggingService.warn({
+        area: 'ventas',
+        operation: 'load-reservations',
+        message: 'No se han podido cargar las reservas.',
+        error,
+      });
+
       this.errorSignal.set(getErrorMessage(error, 'No se han podido cargar las reservas.'));
     } finally {
       this.loadingSignal.set(false);

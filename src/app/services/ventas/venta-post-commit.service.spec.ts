@@ -180,9 +180,34 @@ describe('VentaPostCommitService', (): void => {
     expect(warnings).toEqual([
       'No se ha podido actualizar la lista de reservas. No se han podido cargar las reservas.',
     ]);
+    expect(documentService.generatePdfVentaIds).toEqual([123]);
+    expect(documentService.printVentaIds).toEqual([123]);
+  });
+
+  it('registra una excepción inesperada al recargar reservas después del COMMIT', async (): Promise<void> => {
+    reservasService.reloadError = new Error('Fallo inesperado recargando reservas.');
+
+    const service: VentaPostCommitService = TestBed.inject(VentaPostCommitService);
+
+    const warnings: readonly string[] = await service.run(123, true, null, true);
+
+    expect(warnings).toEqual([
+      'No se ha podido actualizar la lista de reservas. Fallo inesperado recargando reservas.',
+    ]);
+
+    expect(loggingService.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'post-commit-reservations-reload',
+        message: 'La venta se ha confirmado, pero ha fallado la recarga de reservas.',
+        error: reservasService.reloadError,
+        context: {
+          idVenta: 123,
+        },
+      },
+    ]);
 
     expect(documentService.generatePdfVentaIds).toEqual([123]);
-
     expect(documentService.printVentaIds).toEqual([123]);
   });
 
@@ -213,6 +238,18 @@ describe('VentaPostCommitService', (): void => {
 
     expect(warnings).toEqual([
       'No se han podido actualizar las estadísticas del cliente. Fallo de caché.',
+    ]);
+    expect(loggingService.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'post-commit-client-statistics',
+        message:
+          'No se han podido actualizar las estadísticas del cliente después de confirmar la venta.',
+        error: clientesService.invalidateError,
+        context: {
+          idVenta: 123,
+        },
+      },
     ]);
 
     expect(documentService.generatePdfVentaIds).toEqual([123]);
@@ -378,13 +415,20 @@ class FakeApplicationLoggingService {
 
 class FakeReservasService {
   reloadCalls: number = 0;
-
   errorValue: string | null = null;
+  reloadError: Error | null = null;
 
   readonly error = (): string | null => this.errorValue;
 
+  /**
+   * Simula la recarga de reservas posterior al COMMIT.
+   */
   reload(): Promise<void> {
     this.reloadCalls++;
+
+    if (this.reloadError !== null) {
+      return Promise.reject(this.reloadError);
+    }
 
     return Promise.resolve();
   }
