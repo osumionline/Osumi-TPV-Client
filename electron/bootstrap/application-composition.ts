@@ -741,6 +741,7 @@ export default function createApplicationComposition(
   const ventasPostventaService: VentasPostventaService = new VentasPostventaService(
     ventasPostventaRepository,
     ventasHistoricoService,
+    applicationLogger,
   );
 
   const ventasTicketsRepository: VentasTicketsRepository = new TypeOrmVentasTicketsRepository(

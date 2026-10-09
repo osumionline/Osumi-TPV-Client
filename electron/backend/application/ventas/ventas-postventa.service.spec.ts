@@ -13,19 +13,21 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 let postventaRepository: FakeVentasPostventaRepository;
 let historicoRepository: FakeVentasHistoricoRepository;
+let applicationLogger: TestApplicationLogger;
 let service: VentasPostventaService;
 
 describe('VentasPostventaService', (): void => {
   beforeEach((): void => {
     postventaRepository = new FakeVentasPostventaRepository();
     historicoRepository = new FakeVentasHistoricoRepository();
+    applicationLogger = new TestApplicationLogger();
 
     const historicoService: VentasHistoricoService = new VentasHistoricoService(
       historicoRepository,
-      new TestApplicationLogger(),
+      applicationLogger,
     );
 
-    service = new VentasPostventaService(postventaRepository, historicoService);
+    service = new VentasPostventaService(postventaRepository, historicoService, applicationLogger);
   });
 
   it('normaliza el cliente, ejecuta la corrección y devuelve el detalle actualizado', async (): Promise<void> => {
@@ -113,6 +115,7 @@ describe('VentasPostventaService', (): void => {
 
     expect(postventaRepository.cambiarClienteCalls).toBe(0);
     expect(postventaRepository.cambiarTipoPagoCalls).toBe(0);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('rechaza publicIds vacíos antes de acceder al repository', async (): Promise<void> => {
@@ -132,6 +135,7 @@ describe('VentasPostventaService', (): void => {
 
     expect(postventaRepository.cambiarClienteCalls).toBe(0);
     expect(postventaRepository.cambiarTipoPagoCalls).toBe(0);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('rechaza la operación si el detalle desaparece después de una corrección', async (): Promise<void> => {
@@ -146,6 +150,75 @@ describe('VentasPostventaService', (): void => {
 
     expect(postventaRepository.cambiarClienteCalls).toBe(1);
     expect(historicoRepository.findDetalleCalls).toBe(1);
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'post-sale-refresh-detail',
+        message:
+          'La corrección postventa se ha guardado, pero no se ha podido recuperar el detalle actualizado.',
+        error: expect.objectContaining({
+          message: 'La venta modificada ya no se encuentra disponible.',
+        }),
+        context: {
+          idVenta: 15,
+        },
+      },
+    ]);
+  });
+
+  it('registra y propaga un fallo al cambiar el cliente de una venta', async (): Promise<void> => {
+    const error: Error = new Error('SQLite post-sale client update failed.');
+
+    postventaRepository.cambiarClienteError = error;
+
+    await expect(
+      service.cambiarCliente({
+        idVenta: 15,
+        clientePublicId: 'cliente-2',
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'post-sale-change-client',
+        message: 'No se ha podido cambiar el cliente de una venta histórica.',
+        error,
+        context: {
+          idVenta: 15,
+          hasClient: true,
+        },
+      },
+    ]);
+
+    expect(historicoRepository.findDetalleCalls).toBe(0);
+  });
+
+  it('registra y propaga un fallo al cambiar el tipo de pago de una venta', async (): Promise<void> => {
+    const error: Error = new Error('SQLite post-sale payment update failed.');
+
+    postventaRepository.cambiarTipoPagoError = error;
+
+    await expect(
+      service.cambiarTipoPago({
+        idVenta: 15,
+        tipoPagoPublicId: 'tipo-pago-tarjeta',
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'post-sale-change-payment-type',
+        message: 'No se ha podido cambiar el tipo de pago de una venta histórica.',
+        error,
+        context: {
+          idVenta: 15,
+        },
+      },
+    ]);
+
+    expect(historicoRepository.findDetalleCalls).toBe(0);
   });
 });
 
@@ -156,6 +229,8 @@ describe('VentasPostventaService', (): void => {
  * únicamente necesitan satisfacer su dependencia.
  */
 class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
   /**
    * Ignora entradas de diagnóstico.
    */
@@ -171,10 +246,10 @@ class TestApplicationLogger implements ApplicationLogger {
   }
 
   /**
-   * Ignora avisos.
+   * Conserva los avisos registrados durante las pruebas.
    */
   warn(event: ApplicationLogEvent): void {
-    void event;
+    this.warnEvents.push(event);
   }
 
   /**
@@ -203,6 +278,9 @@ class FakeVentasPostventaRepository implements VentasPostventaRepository {
   lastCambiarTipoPagoVentaId: number | null = null;
   lastTipoPagoPublicId: string | null = null;
 
+  cambiarClienteError: Error | null = null;
+  cambiarTipoPagoError: Error | null = null;
+
   /**
    * Registra una solicitud simulada de cambio de cliente.
    */
@@ -210,6 +288,10 @@ class FakeVentasPostventaRepository implements VentasPostventaRepository {
     this.cambiarClienteCalls++;
     this.lastCambiarClienteVentaId = idVenta;
     this.lastClientePublicId = clientePublicId;
+
+    if (this.cambiarClienteError !== null) {
+      return Promise.reject(this.cambiarClienteError);
+    }
 
     return Promise.resolve();
   }
@@ -221,6 +303,10 @@ class FakeVentasPostventaRepository implements VentasPostventaRepository {
     this.cambiarTipoPagoCalls++;
     this.lastCambiarTipoPagoVentaId = idVenta;
     this.lastTipoPagoPublicId = tipoPagoPublicId;
+
+    if (this.cambiarTipoPagoError !== null) {
+      return Promise.reject(this.cambiarTipoPagoError);
+    }
 
     return Promise.resolve();
   }
