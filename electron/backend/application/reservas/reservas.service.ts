@@ -54,7 +54,24 @@ export default class ReservasService {
       lineas,
     };
 
-    return this.reservasRepository.create(recordCommand);
+    try {
+      return await this.reservasRepository.create(recordCommand);
+    } catch (error: unknown) {
+      this.applicationLogger.error({
+        area: 'ventas',
+        operation: 'create-reservation',
+        message: 'No se ha podido persistir una nueva reserva.',
+        error,
+        context: {
+          lineCount: lineas.length,
+          articleLineCount: lineas.filter(
+            (linea: CrearReservaLineaRecordCommand): boolean => linea.articuloPublicId !== null,
+          ).length,
+        },
+      });
+
+      throw error;
+    }
   }
 
   /**

@@ -54,6 +54,108 @@ describe('ReservasService', (): void => {
     ]);
   });
 
+  it('normaliza una reserva antes de persistirla sin generar errores', async (): Promise<void> => {
+    const publicId: string = await service.create({
+      clientePublicId: '  cliente-1  ',
+      lineas: [
+        {
+          articuloPublicId: '  articulo-1  ',
+          nombre: '  Folios  ',
+          pucMicros: 500_000,
+          pvpMicros: 1_250_000,
+          ivaBps: 2_100,
+          importeMicros: 2_500_000,
+          descuentoBps: 0,
+          importeDescuentoMicros: 0,
+          unidades: 2,
+        },
+      ],
+    });
+
+    expect(publicId).toBe('reserva-1');
+
+    expect(repository.lastCreateCommand).toEqual({
+      clientePublicId: 'cliente-1',
+      totalCents: 250,
+      lineas: [
+        {
+          articuloPublicId: 'articulo-1',
+          nombre: 'Folios',
+          pucMicros: 500_000,
+          pvpCents: 125,
+          ivaBps: 2_100,
+          importeCents: 250,
+          descuentoBps: 0,
+          importeDescuentoCents: 0,
+          unidades: 2,
+        },
+      ],
+    });
+
+    expect(applicationLogger.errorEvents).toEqual([]);
+  });
+
+  it('registra y propaga un fallo técnico al persistir una reserva', async (): Promise<void> => {
+    const error: Error = new Error('SQLite reservation insert failed.');
+
+    repository.createError = error;
+
+    await expect(
+      service.create({
+        clientePublicId: 'cliente-1',
+        lineas: [
+          {
+            articuloPublicId: 'articulo-1',
+            nombre: 'Folios',
+            pucMicros: 500_000,
+            pvpMicros: 1_250_000,
+            ivaBps: 2_100,
+            importeMicros: 1_250_000,
+            descuentoBps: 0,
+            importeDescuentoMicros: 0,
+            unidades: 1,
+          },
+          {
+            articuloPublicId: null,
+            nombre: 'Varios',
+            pucMicros: 0,
+            pvpMicros: 500_000,
+            ivaBps: 2_100,
+            importeMicros: 500_000,
+            descuentoBps: 0,
+            importeDescuentoMicros: 0,
+            unidades: 1,
+          },
+        ],
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.errorEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'create-reservation',
+        message: 'No se ha podido persistir una nueva reserva.',
+        error,
+        context: {
+          lineCount: 2,
+          articleLineCount: 1,
+        },
+      },
+    ]);
+  });
+
+  it('no registra como fallo técnico una reserva rechazada durante la validación', async (): Promise<void> => {
+    await expect(
+      service.create({
+        clientePublicId: 'cliente-1',
+        lineas: [],
+      }),
+    ).rejects.toThrow('La reserva debe contener al menos una línea.');
+
+    expect(repository.lastCreateCommand).toBeNull();
+    expect(applicationLogger.errorEvents).toEqual([]);
+  });
+
   it('cancela una reserva sin registrar errores cuando persistencia termina correctamente', async (): Promise<void> => {
     await service.deleteReserva('  reserva-1  ');
 
@@ -150,6 +252,10 @@ class TestApplicationLogger implements ApplicationLogger {
  * el comportamiento de ReservasService.
  */
 class FakeReservasRepository implements ReservasRepository {
+  lastCreateCommand: CrearReservaRecordCommand | null = null;
+  createResult: string = 'reserva-1';
+  createError: Error | null = null;
+
   lastDeleteLineaPublicId: string | null = null;
   lastDeleteReservaPublicId: string | null = null;
 
@@ -160,12 +266,17 @@ class FakeReservasRepository implements ReservasRepository {
   deleteReservaError: Error | null = null;
 
   /**
-   * Implementación mínima de creación requerida por el contrato.
+   * Registra la creación solicitada y permite
+   * simular un fallo de persistencia.
    */
   create(command: CrearReservaRecordCommand): Promise<string> {
-    void command;
+    this.lastCreateCommand = command;
 
-    return Promise.resolve('reserva-1');
+    if (this.createError !== null) {
+      return Promise.reject(this.createError);
+    }
+
+    return Promise.resolve(this.createResult);
   }
 
   /**
