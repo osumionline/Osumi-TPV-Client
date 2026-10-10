@@ -6,7 +6,23 @@ import type OtpvV3RestoreStagingPreparer from '@backend/contracts/backup/otpv-v3
 import type OtpvV3RestoreWorkspace from '@backend/contracts/backup/otpv-v3-restore-workspace.interface';
 import type OtpvPackageSelectionResult from '@backend/domain/backup/otpv-package-selection-result.type';
 import type BackupRestorePackageSelectionResult from '@desktop-contracts/backup/backup-restore-package-selection-result.type';
-import { basename } from 'node:path';
+import { basename, win32 } from 'node:path';
+
+/**
+ * Obtiene el nombre de presentación de un paquete
+ * independientemente del formato de ruta recibido.
+ *
+ * Los diálogos nativos utilizan rutas de la plataforma
+ * actual, pero los flujos y tests pueden manejar también
+ * rutas Windows en otros sistemas operativos.
+ */
+function resolvePackageFileName(packagePath: string): string {
+  if (win32.isAbsolute(packagePath)) {
+    return win32.basename(packagePath);
+  }
+
+  return basename(packagePath);
+}
 
 /**
  * Coordina la selección de un `.otpv`
@@ -49,7 +65,7 @@ export default class BackupRestoreSelectionService implements BackupRestorePacka
    */
   async selectPackagePath(
     packagePath: string,
-    fileName: string = basename(packagePath),
+    fileName: string = resolvePackageFileName(packagePath),
   ): Promise<BackupRestorePackageSelectionResult> {
     this.preparedRestoreStore.clear();
 

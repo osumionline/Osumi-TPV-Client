@@ -3,6 +3,7 @@ import type { CajaInformePrintDocumento } from '@desktop-contracts/caja/informes
 import { getRendererAssetsDirectory } from '@infrastructure/electron/main-window';
 import { BrowserWindow } from 'electron';
 import { join } from 'node:path';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 
 type BrowserWindowProvider = () => BrowserWindow | null;
 
@@ -17,26 +18,51 @@ export default class ElectronCajaInformePrintWindow implements CajaInformePrintW
 
   private documento: CajaInformePrintDocumento | null = null;
 
-  constructor(private readonly getMainWindow: BrowserWindowProvider) {}
+  /**
+ * Crea el gestor de la ventana independiente
+ * utilizada por los informes imprimibles de Caja.
+ */
+constructor(
+  private readonly getMainWindow: BrowserWindowProvider,
+  private readonly applicationLogger: ApplicationLogger,
+) {}
 
   /**
-   * Abre una ventana independiente
-   * con el snapshot indicado.
-   */
-  async open(documento: CajaInformePrintDocumento): Promise<void> {
-    if (this.printWindow !== null && !this.printWindow.isDestroyed()) {
-      this.printWindow.focus();
+ * Abre una ventana independiente
+ * con el snapshot indicado.
+ *
+ * Tener ya un informe abierto es un estado esperado
+ * y no se registra como incidencia técnica.
+ */
+async open(documento: CajaInformePrintDocumento): Promise<void> {
+  if (this.printWindow !== null && !this.printWindow.isDestroyed()) {
+    this.printWindow.focus();
 
-      throw new Error('Ya hay un informe de Caja abierto.');
-    }
+    throw new Error('Ya hay un informe de Caja abierto.');
+  }
 
-    const mainWindow: BrowserWindow | null = this.getMainWindow();
+  const mainWindow: BrowserWindow | null = this.getMainWindow();
 
-    if (mainWindow === null || mainWindow.isDestroyed()) {
-      throw new Error('La ventana principal no está disponible.');
-    }
+  if (mainWindow === null || mainWindow.isDestroyed()) {
+    const error: Error = new Error('La ventana principal no está disponible.');
 
-    const browserWindow: BrowserWindow = new BrowserWindow({
+    this.applicationLogger.warn({
+      area: 'caja',
+      operation: 'open-report-window',
+      message: 'No se ha podido abrir una ventana de informe de Caja.',
+      error,
+      context: {
+        reportType: documento.tipo,
+      },
+    });
+
+    throw error;
+  }
+
+  let browserWindow: BrowserWindow | null = null;
+
+  try {
+    browserWindow = new BrowserWindow({
       parent: mainWindow,
       width: 1600,
       height: 900,
@@ -71,29 +97,47 @@ export default class ElectronCajaInformePrintWindow implements CajaInformePrintW
       this.documento = null;
     });
 
-    try {
-      await this.loadRenderer(browserWindow);
+    await this.loadRenderer(browserWindow);
 
-      if (browserWindow.isDestroyed()) {
-        throw new Error('La ventana del informe se ha cerrado durante su carga.');
-      }
-
-      browserWindow.maximize();
-      browserWindow.show();
-    } catch (error: unknown) {
-      if (!browserWindow.isDestroyed()) {
-        browserWindow.destroy();
-      }
-
-      throw error;
+    if (browserWindow.isDestroyed()) {
+      throw new Error('La ventana del informe se ha cerrado durante su carga.');
     }
+
+    browserWindow.maximize();
+    browserWindow.show();
+  } catch (error: unknown) {
+    if (browserWindow !== null && !browserWindow.isDestroyed()) {
+      browserWindow.destroy();
+    }
+
+    if (this.printWindow === browserWindow) {
+      this.printWindow = null;
+      this.documento = null;
+    }
+
+    this.applicationLogger.warn({
+      area: 'caja',
+      operation: 'open-report-window',
+      message: 'No se ha podido abrir una ventana de informe de Caja.',
+      error,
+      context: {
+        reportType: documento.tipo,
+      },
+    });
+
+    throw error;
   }
+}
 
   /**
-   * Devuelve el snapshot exclusivamente
-   * al renderer autorizado.
-   */
-  getDocumento(senderWebContentsId: number): CajaInformePrintDocumento {
+ * Devuelve el snapshot exclusivamente
+ * al renderer autorizado.
+ *
+ * Una imposibilidad de recuperar el snapshot desde
+ * la ventana ya abierta indica una incidencia técnica.
+ */
+getDocumento(senderWebContentsId: number): CajaInformePrintDocumento {
+  try {
     this.requireAuthorizedWindow(senderWebContentsId);
 
     if (this.documento === null) {
@@ -101,13 +145,32 @@ export default class ElectronCajaInformePrintWindow implements CajaInformePrintW
     }
 
     return this.documento;
+  } catch (error: unknown) {
+    this.applicationLogger.warn({
+      area: 'caja',
+      operation: 'load-report-document',
+      message: 'No se ha podido recuperar el documento de un informe de Caja.',
+      error,
+      context: {
+        reportType: this.documento?.tipo ?? 'unknown',
+      },
+    });
+
+    throw error;
   }
+}
 
   /**
-   * Abre el diálogo estándar de impresión
-   * para el documento actualmente visible.
-   */
-  async print(senderWebContentsId: number): Promise<void> {
+ * Abre el diálogo estándar de impresión
+ * para el documento actualmente visible.
+ *
+ * La cancelación voluntaria del usuario se resuelve
+ * normalmente y no genera ninguna entrada de log.
+ */
+async print(senderWebContentsId: number): Promise<void> {
+  const reportType: string = this.documento?.tipo ?? 'unknown';
+
+  try {
     const browserWindow: BrowserWindow = this.requireAuthorizedWindow(senderWebContentsId);
 
     await new Promise<void>((resolve: () => void, reject: (reason: Error) => void): void => {
@@ -148,7 +211,20 @@ export default class ElectronCajaInformePrintWindow implements CajaInformePrintW
         },
       );
     });
+  } catch (error: unknown) {
+    this.applicationLogger.warn({
+      area: 'caja',
+      operation: 'print-report',
+      message: 'No se ha podido imprimir un informe de Caja.',
+      error,
+      context: {
+        reportType,
+      },
+    });
+
+    throw error;
   }
+}
 
   /**
    * Comprueba que el IPC procede exactamente

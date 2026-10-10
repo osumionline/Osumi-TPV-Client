@@ -686,8 +686,9 @@ export default function createApplicationComposition(
   );
 
   const cajaInformePrintWindow: CajaInformePrintWindow = new ElectronCajaInformePrintWindow(
-    getMainWindow,
-  );
+  getMainWindow,
+  applicationLogger,
+);
 
   const cajaInformePrintService: CajaInformePrintService = new CajaInformePrintService(
     informeSimpleService,
