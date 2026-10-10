@@ -1033,6 +1033,7 @@ export default function createApplicationComposition(
     clienteFacturaDocumentosService,
     clienteFacturasService,
     clienteFacturaPdfService,
+    applicationLogger,
   );
   registerCategoriasIpc(getMainWindow, categoriasService);
   registerCajaIpc(getMainWindow, cajaService, cajaInformePrintService);
