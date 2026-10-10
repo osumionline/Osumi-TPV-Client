@@ -450,6 +450,7 @@ export default function createApplicationComposition(
     applicationPaths.appDataFile,
     dataSourceFactory,
     databaseSchemaService,
+    applicationLogger,
   );
 
   /*
