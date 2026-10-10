@@ -1,5 +1,6 @@
 import type ImprentaPrintProvider from '@backend/contracts/almacen/imprenta/imprenta-print-provider.interface';
 import type ImprentaRepository from '@backend/contracts/almacen/imprenta/imprenta.repository.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type ImprentaArticuloSearchRecord from '@backend/domain/almacen/imprenta/imprenta-articulo-search-record.interface';
 import type ImprentaPrintArticuloRecord from '@backend/domain/almacen/imprenta/imprenta-print-articulo-record.interface';
 import type {
@@ -15,7 +16,10 @@ export default class ImprentaService implements ImprentaPrintProvider {
   /**
    * Crea el servicio de Imprenta.
    */
-  constructor(private readonly imprentaRepository: ImprentaRepository) {}
+  constructor(
+    private readonly imprentaRepository: ImprentaRepository,
+    private readonly applicationLogger: ApplicationLogger,
+  ) {}
 
   /**
    * Valida y ejecuta la búsqueda de artículos
@@ -76,15 +80,29 @@ export default class ImprentaService implements ImprentaPrintProvider {
   async getImprentaPrintArticulos(
     idsArticulos: readonly number[],
   ): Promise<readonly ImprentaPrintArticuloInterface[]> {
-    const rows: readonly ImprentaPrintArticuloRecord[] =
-      await this.imprentaRepository.getImprentaPrintArticulos(idsArticulos);
+    try {
+      const rows: readonly ImprentaPrintArticuloRecord[] =
+        await this.imprentaRepository.getImprentaPrintArticulos(idsArticulos);
 
-    return rows.map((row: ImprentaPrintArticuloRecord): ImprentaPrintArticuloInterface => ({
-      idArticulo: row.idArticulo,
-      localizador: row.localizador,
-      marcaNombre: row.marcaNombre,
-      nombre: row.nombre,
-      pvpCents: row.pvpCents,
-    }));
+      return rows.map((row: ImprentaPrintArticuloRecord): ImprentaPrintArticuloInterface => ({
+        idArticulo: row.idArticulo,
+        localizador: row.localizador,
+        marcaNombre: row.marcaNombre,
+        nombre: row.nombre,
+        pvpCents: row.pvpCents,
+      }));
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'almacen',
+        operation: 'load-print-articles',
+        message: 'No se han podido recuperar los artículos para Imprenta.',
+        error,
+        context: {
+          articleCount: idsArticulos.length,
+        },
+      });
+
+      throw error;
+    }
   }
 }

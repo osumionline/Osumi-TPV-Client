@@ -499,7 +499,10 @@ export default function createApplicationComposition(
     caducidadesRepository,
     applicationLogger,
   );
-  const imprentaService: ImprentaService = new ImprentaService(imprentaRepository);
+  const imprentaService: ImprentaService = new ImprentaService(
+    imprentaRepository,
+    applicationLogger,
+  );
 
   const inventarioCsvBuilder: InventarioCsvBuilder = new InventarioCsvBuilder();
   const inventarioCsvFileSaver: InventarioCsvFileSaver = new ElectronInventarioCsvFileSaver(
