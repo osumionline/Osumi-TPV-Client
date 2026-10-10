@@ -1,4 +1,5 @@
 import type ClienteFacturaPreviewWindow from '@backend/contracts/clientes/cliente-factura-preview-window.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type { ClienteFacturaDocumentoConsulta } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import { getRendererAssetsDirectory } from '@infrastructure/electron/main-window';
@@ -15,11 +16,21 @@ export default class ElectronClienteFacturaPreviewWindow implements ClienteFactu
   private emittedFactura: ClienteFacturaInterface | null = null;
   private resolveResult: ((factura: ClienteFacturaInterface | null) => void) | null = null;
 
-  constructor(private readonly getMainWindow: BrowserWindowProvider) {}
+  /**
+   * Crea el gestor de la ventana de previsualización
+   * de facturas.
+   */
+  constructor(
+    private readonly getMainWindow: BrowserWindowProvider,
+    private readonly applicationLogger: ApplicationLogger,
+  ) {}
 
   /**
    * Crea una ventana hija maximizada destinada
    * exclusivamente a la factura indicada.
+   *
+   * Tener ya una previsualización abierta es un estado
+   * esperado y no se registra como incidencia técnica.
    */
   async open(consulta: ClienteFacturaDocumentoConsulta): Promise<ClienteFacturaInterface | null> {
     if (this.previewWindow !== null && !this.previewWindow.isDestroyed()) {
@@ -31,69 +42,104 @@ export default class ElectronClienteFacturaPreviewWindow implements ClienteFactu
     const mainWindow: BrowserWindow | null = this.getMainWindow();
 
     if (mainWindow === null || mainWindow.isDestroyed()) {
-      throw new Error('La ventana principal no está disponible.');
-    }
+      const error: Error = new Error('La ventana principal no está disponible.');
 
-    const browserWindow: BrowserWindow = new BrowserWindow({
-      parent: mainWindow,
-      width: 1600,
-      height: 900,
-      minWidth: 1024,
-      minHeight: 700,
-      show: false,
-      backgroundColor: '#ffffff',
-      title: 'Previsualización de factura',
-      webPreferences: {
-        preload: join(__dirname, 'factura-preview-preload.js'),
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-      },
-    });
-
-    this.previewWindow = browserWindow;
-    this.consulta = {
-      clientePublicId: consulta.clientePublicId,
-      facturaPublicId: consulta.facturaPublicId,
-    };
-    this.emittedFactura = null;
-
-    const resultPromise: Promise<ClienteFacturaInterface | null> =
-      new Promise<ClienteFacturaInterface | null>(
-        (resolve: (factura: ClienteFacturaInterface | null) => void): void => {
-          this.resolveResult = resolve;
+      this.applicationLogger.warn({
+        area: 'clientes',
+        operation: 'open-invoice-preview-window',
+        message: 'No se ha podido abrir la previsualización de una factura.',
+        error,
+        context: {
+          facturaPublicId: consulta.facturaPublicId,
         },
-      );
-
-    browserWindow.once('ready-to-show', (): void => {
-      browserWindow.maximize();
-      browserWindow.show();
-    });
-
-    browserWindow.once('closed', (): void => {
-      const emittedFactura: ClienteFacturaInterface | null = this.emittedFactura;
-      const resolveResult: ((factura: ClienteFacturaInterface | null) => void) | null =
-        this.resolveResult;
-
-      this.previewWindow = null;
-      this.consulta = null;
-      this.emittedFactura = null;
-      this.resolveResult = null;
-
-      resolveResult?.(emittedFactura);
-    });
-
-    try {
-      await this.loadRenderer(browserWindow);
-    } catch (error: unknown) {
-      if (!browserWindow.isDestroyed()) {
-        browserWindow.destroy();
-      }
+      });
 
       throw error;
     }
 
-    return resultPromise;
+    let browserWindow: BrowserWindow | null = null;
+
+    try {
+      browserWindow = new BrowserWindow({
+        parent: mainWindow,
+        width: 1600,
+        height: 900,
+        minWidth: 1024,
+        minHeight: 700,
+        show: false,
+        backgroundColor: '#ffffff',
+        title: 'Previsualización de factura',
+        webPreferences: {
+          preload: join(__dirname, 'factura-preview-preload.js'),
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true,
+        },
+      });
+
+      this.previewWindow = browserWindow;
+      this.consulta = {
+        clientePublicId: consulta.clientePublicId,
+        facturaPublicId: consulta.facturaPublicId,
+      };
+      this.emittedFactura = null;
+
+      const resultPromise: Promise<ClienteFacturaInterface | null> =
+        new Promise<ClienteFacturaInterface | null>(
+          (resolve: (factura: ClienteFacturaInterface | null) => void): void => {
+            this.resolveResult = resolve;
+          },
+        );
+
+      browserWindow.once('ready-to-show', (): void => {
+        browserWindow?.maximize();
+        browserWindow?.show();
+      });
+
+      browserWindow.once('closed', (): void => {
+        const emittedFactura: ClienteFacturaInterface | null = this.emittedFactura;
+        const resolveResult: ((factura: ClienteFacturaInterface | null) => void) | null =
+          this.resolveResult;
+
+        this.previewWindow = null;
+        this.consulta = null;
+        this.emittedFactura = null;
+        this.resolveResult = null;
+
+        resolveResult?.(emittedFactura);
+      });
+
+      await this.loadRenderer(browserWindow);
+
+      if (browserWindow.isDestroyed()) {
+        throw new Error('La previsualización de factura se ha cerrado durante su carga.');
+      }
+
+      return resultPromise;
+    } catch (error: unknown) {
+      if (browserWindow !== null && !browserWindow.isDestroyed()) {
+        browserWindow.destroy();
+      }
+
+      if (this.previewWindow === browserWindow) {
+        this.previewWindow = null;
+        this.consulta = null;
+        this.emittedFactura = null;
+        this.resolveResult = null;
+      }
+
+      this.applicationLogger.warn({
+        area: 'clientes',
+        operation: 'open-invoice-preview-window',
+        message: 'No se ha podido abrir la previsualización de una factura.',
+        error,
+        context: {
+          facturaPublicId: consulta.facturaPublicId,
+        },
+      });
+
+      throw error;
+    }
   }
 
   /**
@@ -101,16 +147,27 @@ export default class ElectronClienteFacturaPreviewWindow implements ClienteFactu
    * es el webContents de la preview activa.
    */
   getConsulta(senderWebContentsId: number): ClienteFacturaDocumentoConsulta {
-    if (
-      this.previewWindow === null ||
-      this.previewWindow.isDestroyed() ||
-      this.previewWindow.webContents.id !== senderWebContentsId ||
-      this.consulta === null
-    ) {
-      throw new Error('IPC request received from an unauthorized invoice preview window.');
-    }
+    try {
+      if (
+        this.previewWindow === null ||
+        this.previewWindow.isDestroyed() ||
+        this.previewWindow.webContents.id !== senderWebContentsId ||
+        this.consulta === null
+      ) {
+        throw new Error('IPC request received from an unauthorized invoice preview window.');
+      }
 
-    return this.consulta;
+      return this.consulta;
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'clientes',
+        operation: 'load-invoice-preview-context',
+        message: 'No se ha podido recuperar el contexto de la previsualización de factura.',
+        error,
+      });
+
+      throw error;
+    }
   }
 
   /**

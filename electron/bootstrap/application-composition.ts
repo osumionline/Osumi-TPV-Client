@@ -653,7 +653,7 @@ export default function createApplicationComposition(
   );
 
   const clienteFacturaPreviewWindow: ClienteFacturaPreviewWindow =
-    new ElectronClienteFacturaPreviewWindow(getMainWindow);
+    new ElectronClienteFacturaPreviewWindow(getMainWindow, applicationLogger);
 
   const reservasRepository: ReservasRepository = new TypeOrmReservasRepository(operationalDatabase);
   const reservasService: ReservasService = new ReservasService(
