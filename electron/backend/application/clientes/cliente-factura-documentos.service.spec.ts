@@ -4,7 +4,9 @@ import type ClienteFacturaDocumentosRepository from '@backend/contracts/clientes
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
 import type LogoStorage from '@backend/contracts/configuration/logo-storage.interface';
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type { ClienteFacturaDocumentoRecord } from '@backend/domain/clientes/cliente-factura-documento-record.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type { ClienteFacturaDocumentoInterface } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { InstallationSecretsData } from '@desktop-contracts/configuration/installation-command.interface';
@@ -290,6 +292,7 @@ function createService(
       appDataRepository,
       createEmptySecretStorage(),
       createNoopLogoStorage(),
+      createNoopApplicationLogger(),
     ),
     repository,
   );
@@ -434,5 +437,19 @@ function createAppData(): AppData {
 
     backupAutomaticTime: '03:00',
     fechaCad: false,
+  };
+}
+
+/**
+ * Crea un logger neutro para pruebas que únicamente
+ * utilizan ConfigurationService como lector de AppData.
+ */
+function createNoopApplicationLogger(): ApplicationLogger {
+  return {
+    debug: (event: ApplicationLogEvent): void => void event,
+    info: (event: ApplicationLogEvent): void => void event,
+    warn: (event: ApplicationLogEvent): void => void event,
+    error: (event: ApplicationLogEvent): void => void event,
+    flush: (): Promise<void> => Promise.resolve(),
   };
 }

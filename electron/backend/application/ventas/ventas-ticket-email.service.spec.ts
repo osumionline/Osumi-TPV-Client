@@ -42,6 +42,7 @@ describe('VentasTicketEmailService', (): void => {
       appDataRepository,
       secretStorage,
       createNoopLogoStorage(),
+      applicationLogger,
     );
 
     const ventasTicketsService: VentasTicketsService = new VentasTicketsService(

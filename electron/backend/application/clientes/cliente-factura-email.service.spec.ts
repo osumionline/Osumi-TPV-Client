@@ -35,7 +35,12 @@ describe('ClienteFacturaEmailService', (): void => {
     applicationLogger = new TestApplicationLogger();
 
     service = new ClienteFacturaEmailService(
-      new ConfigurationService(appDataRepository, secretStorage, createNoopLogoStorage()),
+      new ConfigurationService(
+        appDataRepository,
+        secretStorage,
+        createNoopLogoStorage(),
+        applicationLogger,
+      ),
       secretStorage,
       documentoProvider,
       pdfProvider,

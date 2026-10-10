@@ -5,6 +5,7 @@ import {
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
 import type LogoStorage from '@backend/contracts/configuration/logo-storage.interface';
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type ConfigurationUpdateCommand from '@desktop-contracts/configuration/configuration-update-command.interface';
 import type {
@@ -16,10 +17,14 @@ import type {
 import type { InstallationSecretsData } from '@desktop-contracts/configuration/installation-command.interface';
 
 export default class ConfigurationService {
+  /**
+   * Crea el servicio de configuración de la instalación.
+   */
   constructor(
     private readonly appDataRepository: AppDataRepository,
     private readonly secretStorage: SecretStorage,
     private readonly logoStorage: LogoStorage,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   /**
@@ -79,15 +84,37 @@ export default class ConfigurationService {
       throw new Error(validationErrors.join(' '));
     }
 
-    const currentAppData: AppData | null = await this.appDataRepository.load();
+    let currentAppData: AppData | null;
+
+    try {
+      currentAppData = await this.appDataRepository.load();
+    } catch (error: unknown) {
+      this.logUpdateFailure(error);
+
+      throw error;
+    }
 
     if (currentAppData === null) {
       throw new Error('La aplicación todavía no está configurada.');
     }
 
-    const currentSecrets: InstallationSecretsData | null =
-      command.integrations === undefined ? null : await this.secretStorage.load();
+    let currentSecrets: InstallationSecretsData | null = null;
 
+    if (command.integrations !== undefined) {
+      try {
+        currentSecrets = await this.secretStorage.load();
+      } catch (error: unknown) {
+        this.logUpdateFailure(error);
+
+        throw error;
+      }
+    }
+
+    /*
+     * Las validaciones de secretos existentes se mantienen
+     * fuera de la frontera técnica de logging porque son
+     * precondiciones conocidas del comando recibido.
+     */
     const updatedSecrets: InstallationSecretsData | null =
       command.integrations === undefined
         ? null
@@ -113,6 +140,8 @@ export default class ConfigurationService {
 
       return updatedAppData;
     } catch (error: unknown) {
+      this.logUpdateFailure(error);
+
       await this.rollbackUpdate(currentAppData, currentSecrets, updatedSecrets !== null);
 
       throw error;
@@ -288,6 +317,26 @@ export default class ConfigurationService {
     return currentSecrets.ticketBaiToken;
   }
 
+  /**
+   * Registra un fallo técnico durante la actualización
+   * sin incorporar datos ni secretos de configuración.
+   */
+  private logUpdateFailure(error: unknown): void {
+    this.applicationLogger.error({
+      area: 'configuration',
+      operation: 'update-configuration',
+      message: 'No se ha podido actualizar la configuración de la aplicación.',
+      error,
+    });
+  }
+
+  /**
+   * Intenta restaurar best-effort la configuración anterior
+   * después de fallar una actualización.
+   *
+   * Los fallos secundarios se registran pero nunca sustituyen
+   * la excepción original que provocó el rollback.
+   */
   private async rollbackUpdate(
     currentAppData: AppData,
     currentSecrets: InstallationSecretsData | null,
@@ -296,7 +345,13 @@ export default class ConfigurationService {
     try {
       await this.appDataRepository.save(currentAppData);
     } catch (rollbackError: unknown) {
-      console.error('No se ha podido restaurar app_data.json tras un error:', rollbackError);
+      this.applicationLogger.warn({
+        area: 'configuration',
+        operation: 'rollback-app-data',
+        message:
+          'No se ha podido restaurar la configuración pública después de fallar una actualización.',
+        error: rollbackError,
+      });
     }
 
     if (!secretsChanged) {
@@ -310,7 +365,12 @@ export default class ConfigurationService {
         await this.secretStorage.save(currentSecrets);
       }
     } catch (rollbackError: unknown) {
-      console.error('No se han podido restaurar los secretos tras un error:', rollbackError);
+      this.applicationLogger.warn({
+        area: 'configuration',
+        operation: 'rollback-secrets',
+        message: 'No se han podido restaurar los secretos después de fallar una actualización.',
+        error: rollbackError,
+      });
     }
   }
 }

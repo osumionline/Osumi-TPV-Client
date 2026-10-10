@@ -272,6 +272,7 @@ export default function createApplicationComposition(
     appDataRepository,
     operationalSecretStorage,
     operationalLogoStorage,
+    applicationLogger,
   );
 
   const printingSettingsRepository: PrintingSettingsRepository = new JsonPrintingSettingsRepository(

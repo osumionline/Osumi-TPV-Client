@@ -2,6 +2,8 @@ import ConfigurationService from '@backend/application/configuration/configurati
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
 import type LogoStorage from '@backend/contracts/configuration/logo-storage.interface';
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type ConfigurationUpdateCommand from '@desktop-contracts/configuration/configuration-update-command.interface';
 import type {
@@ -87,6 +89,7 @@ let appDataRepository: MemoryAppDataRepository;
 let secretStorage: MemorySecretStorage;
 let logoStorage: MemoryLogoStorage;
 let service: ConfigurationService;
+let applicationLogger: TestApplicationLogger;
 
 describe('ConfigurationService', (): void => {
   beforeEach((): void => {
@@ -101,7 +104,14 @@ describe('ConfigurationService', (): void => {
 
     logoStorage = new MemoryLogoStorage();
 
-    service = new ConfigurationService(appDataRepository, secretStorage, logoStorage);
+    applicationLogger = new TestApplicationLogger();
+
+    service = new ConfigurationService(
+      appDataRepository,
+      secretStorage,
+      logoStorage,
+      applicationLogger,
+    );
   });
 
   it('conserva los secretos existentes cuando llegan como null', async (): Promise<void> => {
@@ -182,6 +192,8 @@ describe('ConfigurationService', (): void => {
     await expect(service.update(command)).rejects.toThrow(
       'Debes indicar el secreto de la API al activar la tienda online.',
     );
+    expect(applicationLogger.errorEvents).toEqual([]);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('restaura configuración y secretos si falla el logo', async (): Promise<void> => {
@@ -237,8 +249,90 @@ describe('ConfigurationService', (): void => {
     await expect(service.update(command)).rejects.toThrow('Error guardando logo');
 
     expect(appDataRepository.value).toEqual(originalAppData);
-
     expect(secretStorage.value).toEqual(originalSecrets);
+    expect(applicationLogger.errorEvents).toEqual([
+      {
+        area: 'configuration',
+        operation: 'update-configuration',
+        message: 'No se ha podido actualizar la configuración de la aplicación.',
+        error: expect.objectContaining({
+          message: 'Error guardando logo',
+        }),
+      },
+    ]);
+    expect(applicationLogger.warnEvents).toEqual([]);
+  });
+
+  it('registra los fallos secundarios de rollback sin ocultar el error original', async (): Promise<void> => {
+    const rollbackAppDataError: Error = new Error(
+      'No se ha podido restaurar la configuración pública.',
+    );
+    const rollbackSecretsError: Error = new Error('No se han podido restaurar los secretos.');
+
+    const failingAppDataRepository = new RollbackFailingAppDataRepository(
+      createAppData(),
+      rollbackAppDataError,
+    );
+
+    const failingSecretStorage = new RollbackFailingSecretStorage(
+      {
+        secretApi: 'old-api-secret',
+        backupApiKey: 'backup-secret',
+        emailSmtpPass: 'old-smtp-password',
+        ticketBaiToken: 'old-ticketbai-token',
+      },
+      rollbackSecretsError,
+    );
+
+    const failingLogoStorage = new MemoryLogoStorage();
+    failingLogoStorage.failOnSave = true;
+
+    const logger = new TestApplicationLogger();
+
+    const failingService = new ConfigurationService(
+      failingAppDataRepository,
+      failingSecretStorage,
+      failingLogoStorage,
+      logger,
+    );
+
+    const command: ConfigurationUpdateCommand = {
+      ...createCommand(),
+      logo: {
+        fileName: 'logo.png',
+        mimeType: 'image/png',
+        dataUrl: 'data:image/png;base64,AAAA',
+      },
+    };
+
+    await expect(failingService.update(command)).rejects.toThrow('Error guardando logo');
+
+    expect(logger.errorEvents).toEqual([
+      {
+        area: 'configuration',
+        operation: 'update-configuration',
+        message: 'No se ha podido actualizar la configuración de la aplicación.',
+        error: expect.objectContaining({
+          message: 'Error guardando logo',
+        }),
+      },
+    ]);
+
+    expect(logger.warnEvents).toEqual([
+      {
+        area: 'configuration',
+        operation: 'rollback-app-data',
+        message:
+          'No se ha podido restaurar la configuración pública después de fallar una actualización.',
+        error: rollbackAppDataError,
+      },
+      {
+        area: 'configuration',
+        operation: 'rollback-secrets',
+        message: 'No se han podido restaurar los secretos después de fallar una actualización.',
+        error: rollbackSecretsError,
+      },
+    ]);
   });
 
   it('revela los secretos operacionales autorizados', async (): Promise<void> => {
@@ -439,4 +533,114 @@ function createCommand(): ConfigurationUpdateCommand {
       backupApiKey: null,
     },
   };
+}
+
+/**
+ * Repositorio que permite simular exclusivamente
+ * un fallo al restaurar AppData durante el rollback.
+ */
+class RollbackFailingAppDataRepository extends MemoryAppDataRepository {
+  private saveCalls: number = 0;
+
+  /**
+   * Crea el repositorio con el error de rollback
+   * que debe simular la prueba.
+   */
+  constructor(
+    value: AppData,
+    private readonly rollbackError: Error,
+  ) {
+    super(value);
+  }
+
+  /**
+   * Permite la escritura principal y falla
+   * únicamente al intentar restaurar AppData.
+   */
+  override save(appData: AppData): Promise<void> {
+    this.saveCalls++;
+
+    if (this.saveCalls > 1) {
+      return Promise.reject(this.rollbackError);
+    }
+
+    return super.save(appData);
+  }
+}
+
+/**
+ * Almacenamiento que permite simular exclusivamente
+ * un fallo al restaurar secretos durante el rollback.
+ */
+class RollbackFailingSecretStorage extends MemorySecretStorage {
+  private saveCalls: number = 0;
+
+  /**
+   * Crea el almacenamiento con el error de rollback
+   * que debe simular la prueba.
+   */
+  constructor(
+    value: InstallationSecretsData,
+    private readonly rollbackError: Error,
+  ) {
+    super(value);
+  }
+
+  /**
+   * Permite la escritura principal y falla
+   * únicamente al intentar restaurar los secretos.
+   */
+  override save(secrets: InstallationSecretsData): Promise<void> {
+    this.saveCalls++;
+
+    if (this.saveCalls > 1) {
+      return Promise.reject(this.rollbackError);
+    }
+
+    return super.save(secrets);
+  }
+}
+
+/**
+ * Logger controlado utilizado por las pruebas
+ * de actualización de configuración.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+  readonly errorEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora entradas de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora entradas informativas.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva los avisos recibidos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Conserva los errores recibidos.
+   */
+  error(event: ApplicationLogEvent): void {
+    this.errorEvents.push(event);
+  }
+
+  /**
+   * No existen escrituras pendientes.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
 }

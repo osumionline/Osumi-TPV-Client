@@ -361,7 +361,7 @@ export default class ManagementSettingsComponent {
         });
       }
     } catch (error: unknown) {
-      console.error('Error guardando los ajustes:', error);
+      void error;
 
       this.dialog.alert({
         title: 'Error',
