@@ -205,6 +205,9 @@ export default class VentasTicketBaiService {
   /**
    * Consulta el estado remoto de una venta cuyo
    * resultado anterior quedó pendiente o ambiguo.
+   *
+   * Los estados que no requieren reconciliación son
+   * salidas normales y no generan ninguna incidencia.
    */
   async reconcile(idVenta: number): Promise<void> {
     this.validateVentaId(idVenta);
@@ -223,60 +226,67 @@ export default class VentasTicketBaiService {
       return;
     }
 
-    const configuration: TicketBaiClientConfiguration = {
-      token: await this.requireToken(),
-      issuerNif: this.requireFrozenText(
-        record.nifEmisor,
-        'El NIF emisor TicketBAI de la venta no está disponible.',
-      ),
-      environment: this.requireFrozenEnvironment(record),
-    };
-    const serie: string = this.requireFrozenText(
-      record.serie,
-      'La serie TicketBAI de la venta no está disponible.',
-    );
-    const numero: string = this.requireFrozenText(
-      record.numero,
-      'El número TicketBAI de la venta no está disponible.',
-    );
-
-    const result: TicketBaiGetInvoiceResult = await this.client.getInvoice(configuration, {
-      serie,
-      numero,
-    });
-
-    if (result.status === 'pending') {
-      await this.repository.markRemotePending({
-        idVenta,
-        huella: result.huella,
-        qr: result.qr,
-        url: result.url,
-        respuestaPayload: result.responsePayload,
-      });
-
-      return;
-    }
-
-    if (result.status === 'accepted') {
-      await this.repository.markAccepted({
-        idVenta,
-        huella: result.huella,
-        qr: result.qr,
-        url: result.url,
-        respuestaPayload: result.responsePayload,
-      });
-
-      return;
-    }
-
-    await this.repository.markReconciledRejected({
+    return this.executeWithLogging(
+      'ticketbai-reconcile',
+      'No se ha podido reconciliar el estado de TicketBAI.',
       idVenta,
-      huella: result.huella,
-      qr: result.qr,
-      url: result.url,
-      ultimoError: 'TicketBaiWS informa que la factura se encuentra en estado ERROR.',
-      respuestaPayload: result.responsePayload,
-    });
+      async (): Promise<void> => {
+        const configuration: TicketBaiClientConfiguration = {
+          token: await this.requireToken(),
+          issuerNif: this.requireFrozenText(
+            record.nifEmisor,
+            'El NIF emisor TicketBAI de la venta no está disponible.',
+          ),
+          environment: this.requireFrozenEnvironment(record),
+        };
+        const serie: string = this.requireFrozenText(
+          record.serie,
+          'La serie TicketBAI de la venta no está disponible.',
+        );
+        const numero: string = this.requireFrozenText(
+          record.numero,
+          'El número TicketBAI de la venta no está disponible.',
+        );
+
+        const result: TicketBaiGetInvoiceResult = await this.client.getInvoice(configuration, {
+          serie,
+          numero,
+        });
+
+        if (result.status === 'pending') {
+          await this.repository.markRemotePending({
+            idVenta,
+            huella: result.huella,
+            qr: result.qr,
+            url: result.url,
+            respuestaPayload: result.responsePayload,
+          });
+
+          return;
+        }
+
+        if (result.status === 'accepted') {
+          await this.repository.markAccepted({
+            idVenta,
+            huella: result.huella,
+            qr: result.qr,
+            url: result.url,
+            respuestaPayload: result.responsePayload,
+          });
+
+          return;
+        }
+
+        await this.repository.markReconciledRejected({
+          idVenta,
+          huella: result.huella,
+          qr: result.qr,
+          url: result.url,
+          ultimoError: 'TicketBaiWS informa que la factura se encuentra en estado ERROR.',
+          respuestaPayload: result.responsePayload,
+        });
+      },
+    );
   }
 
   /**

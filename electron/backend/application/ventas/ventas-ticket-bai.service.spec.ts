@@ -267,6 +267,7 @@ describe('VentasTicketBaiService', (): void => {
     expect(repository.record?.huella).toBe('HUELLA-GET');
     expect(repository.record?.qr).toBe('QR-GET');
     expect(repository.record?.url).toBe('https://example.test/tbai/get');
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('reconcilia como aceptada una factura remota procesada correctamente', async (): Promise<void> => {
@@ -299,7 +300,7 @@ describe('VentasTicketBaiService', (): void => {
     );
   });
 
-  it('mantiene intacto el estado local cuando falla la consulta remota', async (): Promise<void> => {
+  it('registra el fallo y mantiene intacto el estado local cuando falla la consulta remota', async (): Promise<void> => {
     repository.record = createReconcilableRecord();
 
     const initialRecord: VentaTicketBaiRecord = {
@@ -312,6 +313,18 @@ describe('VentasTicketBaiService', (): void => {
 
     expect(client.getCalls).toBe(1);
     expect(repository.record).toEqual(initialRecord);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'ticketbai-reconcile',
+        message: 'No se ha podido reconciliar el estado de TicketBAI.',
+        error: client.getError,
+        context: {
+          idVenta: 15,
+        },
+      },
+    ]);
   });
 
   it('reconcilia un error temporal antes de realizar cualquier nuevo envío', async (): Promise<void> => {
@@ -331,6 +344,7 @@ describe('VentasTicketBaiService', (): void => {
 
     expect(client.getCalls).toBe(0);
     expect(repository.record?.estado).toBe('aceptada');
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('reenvía una factura rechazada usando su identidad fiscal congelada', async (): Promise<void> => {
