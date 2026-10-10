@@ -510,6 +510,7 @@ export default function createApplicationComposition(
     inventarioService,
     inventarioCsvBuilder,
     inventarioCsvFileSaver,
+    applicationLogger,
   );
 
   const inventarioPrintWindow: InventarioPrintWindow = new ElectronInventarioPrintWindow(
