@@ -535,7 +535,10 @@ export default function createApplicationComposition(
     caducidadReportWindow,
   );
 
-  const imprentaPrintWindow: ImprentaPrintWindow = new ElectronImprentaPrintWindow(getMainWindow);
+  const imprentaPrintWindow: ImprentaPrintWindow = new ElectronImprentaPrintWindow(
+    getMainWindow,
+    applicationLogger,
+  );
   const imprentaPrintService: ImprentaPrintService = new ImprentaPrintService(
     imprentaService,
     imprentaPrintWindow,
