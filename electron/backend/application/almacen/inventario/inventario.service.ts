@@ -3,6 +3,7 @@ import type InventarioFilterQuery from '@backend/contracts/almacen/inventario/in
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario/inventario-query.interface';
 import type InventarioReportProvider from '@backend/contracts/almacen/inventario/inventario-report-provider.interface';
 import type InventarioRepository from '@backend/contracts/almacen/inventario/inventario.repository.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type {
   InventarioResultadoRecord,
   InventarioRowRecord,
@@ -37,6 +38,7 @@ export default class InventarioService implements InventarioReportProvider {
    */
   constructor(
     private readonly inventarioRepository: InventarioRepository,
+    private readonly applicationLogger: ApplicationLogger,
     private readonly currentDateProvider: () => Date = (): Date => new Date(),
   ) {}
 
@@ -105,6 +107,9 @@ export default class InventarioService implements InventarioReportProvider {
   /**
    * Recupera un snapshot persistido completo
    * para reportes de Inventario.
+   *
+   * Los filtros y columnas inválidos son precondiciones
+   * conocidas y no generan entradas de log.
    */
   async getInventarioReport(
     consulta: InventarioReportConsulta,
@@ -113,29 +118,48 @@ export default class InventarioService implements InventarioReportProvider {
 
     this.validateReportColumns(consulta.columnas);
 
-    const result: InventarioReportRecord =
-      await this.inventarioRepository.getInventarioReport(filter);
+    try {
+      const result: InventarioReportRecord =
+        await this.inventarioRepository.getInventarioReport(filter);
 
-    return {
-      rows: result.rows.map((row: InventarioReportRowRecord): InventarioReportRowInterface => ({
-        localizador: row.localizador,
-        proveedorNombre: row.proveedorNombre,
-        marcaNombre: row.marcaNombre,
-        referencia: row.referencia,
-        categorias: [...row.categorias],
-        nombre: row.nombre,
-        stock: row.stock,
-        precioAlbaranMicros: row.precioAlbaranMicros,
-        pucMicros: row.pucMicros,
-        pvpCents: row.pvpCents,
-        margenMicroporcentaje: row.margenMicroporcentaje,
-        codigosBarrasAdicionales: [...row.codigosBarrasAdicionales],
-      })),
-      totalRows: result.totalRows,
-      mediaMargenMicroporcentaje: result.mediaMargenMicroporcentaje,
-      totalPucMicros: result.totalPucMicros,
-      totalPvpCents: result.totalPvpCents,
-    };
+      return {
+        rows: result.rows.map((row: InventarioReportRowRecord): InventarioReportRowInterface => ({
+          localizador: row.localizador,
+          proveedorNombre: row.proveedorNombre,
+          marcaNombre: row.marcaNombre,
+          referencia: row.referencia,
+          categorias: [...row.categorias],
+          nombre: row.nombre,
+          stock: row.stock,
+          precioAlbaranMicros: row.precioAlbaranMicros,
+          pucMicros: row.pucMicros,
+          pvpCents: row.pvpCents,
+          margenMicroporcentaje: row.margenMicroporcentaje,
+          codigosBarrasAdicionales: [...row.codigosBarrasAdicionales],
+        })),
+        totalRows: result.totalRows,
+        mediaMargenMicroporcentaje: result.mediaMargenMicroporcentaje,
+        totalPucMicros: result.totalPucMicros,
+        totalPvpCents: result.totalPvpCents,
+      };
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'almacen',
+        operation: 'load-inventory-report',
+        message: 'No se ha podido generar el reporte de Inventario.',
+        error,
+        context: {
+          hasSupplierFilter: filter.idProveedor !== null,
+          hasBrandFilter: filter.idMarca !== null,
+          hasCategoryFilter: filter.idCategoria !== null,
+          hasTextFilter: filter.texto !== null,
+          withDiscount: filter.conDescuento,
+          columnCount: consulta.columnas.length,
+        },
+      });
+
+      throw error;
+    }
   }
 
   /**

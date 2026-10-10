@@ -2,9 +2,11 @@ import InventarioService from '@backend/application/almacen/inventario/inventari
 import type InventarioFilterQuery from '@backend/contracts/almacen/inventario/inventario-filter-query.interface';
 import type InventarioRepositoryQuery from '@backend/contracts/almacen/inventario/inventario-query.interface';
 import type InventarioRepository from '@backend/contracts/almacen/inventario/inventario.repository.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type { InventarioResultadoRecord } from '@backend/domain/almacen/inventario/inventario-record.interface';
 import type { InventarioReportRecord } from '@backend/domain/almacen/inventario/inventario-report-record.interface';
 import type InventarioSaveRecord from '@backend/domain/almacen/inventario/inventario-save-record.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type { InventarioSaveCommand } from '@desktop-contracts/almacen/inventario/inventario-save.interface';
 import type {
   InventarioConsulta,
@@ -18,6 +20,7 @@ class FakeInventarioRepository implements InventarioRepository {
   lastSavedCommands: readonly InventarioSaveRecord[] | null = null;
   lastDeactivatedArticuloId: number | null = null;
   lastReportQuery: InventarioFilterQuery | null = null;
+  reportError: Error | null = null;
 
   reportResult: InventarioReportRecord = {
     rows: [],
@@ -67,10 +70,15 @@ class FakeInventarioRepository implements InventarioRepository {
   }
 
   /**
-   * Devuelve el reporte configurado.
+   * Devuelve el reporte configurado o simula
+   * una incidencia técnica del repository.
    */
   getInventarioReport(query: InventarioFilterQuery): Promise<InventarioReportRecord> {
     this.lastReportQuery = query;
+
+    if (this.reportError !== null) {
+      return Promise.reject(this.reportError);
+    }
 
     return Promise.resolve(this.reportResult);
   }
@@ -99,6 +107,49 @@ class FakeInventarioRepository implements InventarioRepository {
   deactivateArticulo(idArticulo: number): Promise<void> {
     this.lastDeactivatedArticuloId = idArticulo;
 
+    return Promise.resolve();
+  }
+}
+
+/**
+ * Logger controlado utilizado por las pruebas
+ * del servicio de Inventario.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora entradas de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora entradas informativas.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva los avisos emitidos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Ignora errores.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No existen escrituras pendientes.
+   */
+  flush(): Promise<void> {
     return Promise.resolve();
   }
 }
@@ -263,13 +314,80 @@ describe('InventarioService', (): void => {
 
     expect(repository.lastReportQuery).toBeNull();
   });
+
+  it('registra y propaga un fallo técnico al generar un reporte', async (): Promise<void> => {
+    const repository = new FakeInventarioRepository();
+    const applicationLogger = new TestApplicationLogger();
+    const error: Error = new Error('SQLite no disponible.');
+
+    repository.reportError = error;
+
+    const service = createService(repository, applicationLogger);
+
+    await expect(
+      service.getInventarioReport({
+        idProveedor: 4,
+        idMarca: 3,
+        idCategoria: 7,
+        texto: '  camiseta azul  ',
+        conDescuento: true,
+        columnas: ['localizador', 'nombre', 'stock'],
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'almacen',
+        operation: 'load-inventory-report',
+        message: 'No se ha podido generar el reporte de Inventario.',
+        error,
+        context: {
+          hasSupplierFilter: true,
+          hasBrandFilter: true,
+          hasCategoryFilter: true,
+          hasTextFilter: true,
+          withDiscount: true,
+          columnCount: 3,
+        },
+      },
+    ]);
+  });
+
+  it('no registra columnas inválidas como incidencia técnica', async (): Promise<void> => {
+    const repository = new FakeInventarioRepository();
+    const applicationLogger = new TestApplicationLogger();
+
+    const service = createService(repository, applicationLogger);
+
+    await expect(
+      service.getInventarioReport({
+        idProveedor: null,
+        idMarca: null,
+        idCategoria: null,
+        texto: '',
+        conDescuento: false,
+        columnas: ['nombre', 'nombre'],
+      }),
+    ).rejects.toThrow('Hay columnas repetidas en el reporte.');
+
+    expect(repository.lastReportQuery).toBeNull();
+    expect(applicationLogger.warnEvents).toEqual([]);
+  });
 });
 
 /**
- * Crea un servicio con fecha estable.
+ * Crea un servicio con fecha estable
+ * y logger controlado.
  */
-function createService(repository: FakeInventarioRepository): InventarioService {
-  return new InventarioService(repository, (): Date => new Date('2026-09-07T08:00:00.000Z'));
+function createService(
+  repository: FakeInventarioRepository,
+  applicationLogger: ApplicationLogger = new TestApplicationLogger(),
+): InventarioService {
+  return new InventarioService(
+    repository,
+    applicationLogger,
+    (): Date => new Date('2026-09-07T08:00:00.000Z'),
+  );
 }
 
 /**
