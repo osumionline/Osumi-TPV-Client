@@ -377,6 +377,7 @@ describe('VentasTicketBaiService', (): void => {
     expect(repository.record?.respuestaPayload).toBe('{"result":"OK","return":{}}');
 
     expect(client.getCalls).toBe(0);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('persiste un nuevo rechazo cuando falla así el reenvío manual', async (): Promise<void> => {
@@ -395,6 +396,19 @@ describe('VentasTicketBaiService', (): void => {
     expect(repository.record?.intentos).toBe(2);
     expect(repository.record?.ultimoError).toBe('TicketBaiWS sigue rechazando la factura.');
     expect(repository.record?.respuestaPayload).toBe('{"result":"ERROR"}');
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'ticketbai-retry',
+        message: 'No se ha podido completar el reintento manual de TicketBAI.',
+        error: expect.objectContaining({
+          message: 'TicketBaiWS sigue rechazando la factura.',
+        }),
+        context: {
+          idVenta: 15,
+        },
+      },
+    ]);
   });
 
   it('persiste error_temporal cuando el reenvío queda ambiguo de forma conocida', async (): Promise<void> => {
@@ -429,6 +443,7 @@ describe('VentasTicketBaiService', (): void => {
     expect(client.resendCalls).toBe(0);
     expect(repository.record?.estado).toBe('error_temporal');
     expect(repository.record?.intentos).toBe(2);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('persiste error_permanente cuando el reenvío falla de forma definitiva', async (): Promise<void> => {
@@ -463,9 +478,10 @@ describe('VentasTicketBaiService', (): void => {
     expect(client.resendCalls).toBe(0);
     expect(repository.record?.estado).toBe('error_permanente');
     expect(repository.record?.intentos).toBe(2);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
-  it('mantiene enviando ante un fallo no normalizado durante el reenvío', async (): Promise<void> => {
+  it('registra y mantiene enviando ante un fallo no normalizado durante el reenvío', async (): Promise<void> => {
     repository.record = createRejectedRecord();
 
     client.resendError = new Error('La conexión se perdió después de enviar la petición.');
@@ -477,6 +493,18 @@ describe('VentasTicketBaiService', (): void => {
     expect(client.resendCalls).toBe(1);
     expect(repository.record?.estado).toBe('enviando');
     expect(repository.record?.intentos).toBe(2);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'ticketbai-retry',
+        message: 'No se ha podido completar el reintento manual de TicketBAI.',
+        error: client.resendError,
+        context: {
+          idVenta: 15,
+        },
+      },
+    ]);
   });
 
   it('solo realiza un resend ante dos reintentos manuales concurrentes', async (): Promise<void> => {
