@@ -3,6 +3,7 @@ import type CaducidadFilterQuery from '@backend/contracts/almacen/caducidades/ca
 import type CaducidadRepositoryQuery from '@backend/contracts/almacen/caducidades/caducidad-query.interface';
 import type CaducidadReportProvider from '@backend/contracts/almacen/caducidades/caducidad-report-provider.interface';
 import type CaducidadesRepository from '@backend/contracts/almacen/caducidades/caducidades.repository.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type {
   CaducidadArticuloSearchRecord,
   CaducidadCreateRecord,
@@ -39,20 +40,19 @@ import type {
   CaducidadRowInterface,
 } from '@desktop-contracts/almacen/caducidades/caducidad.interface';
 import { PAGE_SIZE_OPTIONS } from '@desktop-contracts/shared/pagination.constants';
-import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 
 /**
  * Expone los casos de uso propios de Caducidades.
  */
 export default class CaducidadesService implements CaducidadReportProvider {
   /**
- * Crea el servicio de Caducidades.
- */
-constructor(
-  private readonly caducidadesRepository: CaducidadesRepository,
-  private readonly applicationLogger: ApplicationLogger,
-  private readonly currentDateProvider: () => Date = (): Date => new Date(),
-) {}
+   * Crea el servicio de Caducidades.
+   */
+  constructor(
+    private readonly caducidadesRepository: CaducidadesRepository,
+    private readonly applicationLogger: ApplicationLogger,
+    private readonly currentDateProvider: () => Date = (): Date => new Date(),
+  ) {}
 
   /**
    * Busca artículos activos candidatos a registrar
@@ -185,32 +185,29 @@ constructor(
   }
 
   /**
- * Valida los filtros y recupera el informe
- * agregado persistido de Caducidades.
- *
- * Los filtros inválidos son precondiciones conocidas
- * y no generan log. Las incidencias técnicas posteriores
- * a su normalización se registran sin incluir datos
- * comerciales ni el texto buscado.
- */
-async getCaducidadReport(
-  consulta: CaducidadReportConsulta,
-): Promise<CaducidadReportInterface> {
-  const query: CaducidadFilterQuery = this.mapCaducidadFilterQuery(consulta);
+   * Valida los filtros y recupera el informe
+   * agregado persistido de Caducidades.
+   *
+   * Los filtros inválidos son precondiciones conocidas
+   * y no generan log. Las incidencias técnicas posteriores
+   * a su normalización se registran sin incluir datos
+   * comerciales ni el texto buscado.
+   */
+  async getCaducidadReport(consulta: CaducidadReportConsulta): Promise<CaducidadReportInterface> {
+    const query: CaducidadFilterQuery = this.mapCaducidadFilterQuery(consulta);
 
-  try {
-    const result: CaducidadReportRecord =
-      await this.caducidadesRepository.getCaducidadReport(query);
+    try {
+      const result: CaducidadReportRecord =
+        await this.caducidadesRepository.getCaducidadReport(query);
 
-    return {
-      anios: result.anios.map(
-        (anio: CaducidadReportAnioRecord): CaducidadReportAnioInterface => ({
-          anio: anio.anio,
-          unidades: anio.unidades,
-          totalPvpCents: anio.totalPvpCents,
-          totalPucMicros: anio.totalPucMicros,
-          meses: anio.meses.map(
-            (mes: CaducidadReportMesRecord): CaducidadReportMesInterface => ({
+      return {
+        anios: result.anios.map(
+          (anio: CaducidadReportAnioRecord): CaducidadReportAnioInterface => ({
+            anio: anio.anio,
+            unidades: anio.unidades,
+            totalPvpCents: anio.totalPvpCents,
+            totalPucMicros: anio.totalPucMicros,
+            meses: anio.meses.map((mes: CaducidadReportMesRecord): CaducidadReportMesInterface => ({
               mes: mes.mes,
               unidades: mes.unidades,
               totalPvpCents: mes.totalPvpCents,
@@ -224,31 +221,30 @@ async getCaducidadReport(
                   totalPucMicros: marca.totalPucMicros,
                 }),
               ),
-            }),
-          ),
-        }),
-      ),
-      totalUnidades: result.totalUnidades,
-      totalPvpCents: result.totalPvpCents,
-      totalPucMicros: result.totalPucMicros,
-    };
-  } catch (error: unknown) {
-    this.applicationLogger.warn({
-      area: 'almacen',
-      operation: 'load-expiration-report',
-      message: 'No se ha podido generar el informe de Caducidades.',
-      error,
-      context: {
-        year: query.anio,
-        month: query.mes,
-        hasBrandFilter: query.idMarca !== null,
-        hasNameFilter: query.nombre !== null,
-      },
-    });
+            })),
+          }),
+        ),
+        totalUnidades: result.totalUnidades,
+        totalPvpCents: result.totalPvpCents,
+        totalPucMicros: result.totalPucMicros,
+      };
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'almacen',
+        operation: 'load-expiration-report',
+        message: 'No se ha podido generar el informe de Caducidades.',
+        error,
+        context: {
+          year: query.anio,
+          month: query.mes,
+          hasBrandFilter: query.idMarca !== null,
+          hasNameFilter: query.nombre !== null,
+        },
+      });
 
-    throw error;
+      throw error;
+    }
   }
-}
 
   /**
    * Recupera las opciones históricas disponibles

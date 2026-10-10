@@ -118,18 +118,18 @@ class FakeCaducidadesRepository implements CaducidadesRepository {
   }
 
   /**
- * Devuelve el informe configurado o simula
- * una incidencia técnica del repository.
- */
-getCaducidadReport(query: CaducidadFilterQuery): Promise<CaducidadReportRecord> {
-  this.lastReportQuery = query;
+   * Devuelve el informe configurado o simula
+   * una incidencia técnica del repository.
+   */
+  getCaducidadReport(query: CaducidadFilterQuery): Promise<CaducidadReportRecord> {
+    this.lastReportQuery = query;
 
-  if (this.reportError !== null) {
-    return Promise.reject(this.reportError);
+    if (this.reportError !== null) {
+      return Promise.reject(this.reportError);
+    }
+
+    return Promise.resolve(this.reportResult);
   }
-
-  return Promise.resolve(this.reportResult);
-}
 
   getCaducidadFilterOptions(): Promise<CaducidadFilterOptionsRecord> {
     return Promise.resolve(this.filterOptions);
@@ -355,64 +355,64 @@ describe('CaducidadesService', (): void => {
 
     expect(repository.lastDeactivatedCaducidadId).toBeNull();
   });
-  
+
   it('registra y propaga un fallo técnico al generar el informe', async (): Promise<void> => {
-  const repository = new FakeCaducidadesRepository();
-  const applicationLogger = new TestApplicationLogger();
-  const error: Error = new Error('SQLite no disponible.');
+    const repository = new FakeCaducidadesRepository();
+    const applicationLogger = new TestApplicationLogger();
+    const error: Error = new Error('SQLite no disponible.');
 
-  repository.reportError = error;
+    repository.reportError = error;
 
-  const service = createService(repository, applicationLogger);
+    const service = createService(repository, applicationLogger);
 
-  await expect(
-    service.getCaducidadReport({
-      anio: 2025,
-      mes: 12,
-      idMarca: 3,
-      nombre: '  pienso adulto  ',
-    }),
-  ).rejects.toBe(error);
+    await expect(
+      service.getCaducidadReport({
+        anio: 2025,
+        mes: 12,
+        idMarca: 3,
+        nombre: '  pienso adulto  ',
+      }),
+    ).rejects.toBe(error);
 
-  expect(applicationLogger.warnEvents).toEqual([
-    {
-      area: 'almacen',
-      operation: 'load-expiration-report',
-      message: 'No se ha podido generar el informe de Caducidades.',
-      error,
-      context: {
-        year: 2025,
-        month: 12,
-        hasBrandFilter: true,
-        hasNameFilter: true,
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'almacen',
+        operation: 'load-expiration-report',
+        message: 'No se ha podido generar el informe de Caducidades.',
+        error,
+        context: {
+          year: 2025,
+          month: 12,
+          hasBrandFilter: true,
+          hasNameFilter: true,
+        },
       },
-    },
-  ]);
-});
+    ]);
+  });
 
-it('no registra filtros inválidos del informe como incidencia técnica', async (): Promise<void> => {
-  const repository = new FakeCaducidadesRepository();
-  const applicationLogger = new TestApplicationLogger();
+  it('no registra filtros inválidos del informe como incidencia técnica', async (): Promise<void> => {
+    const repository = new FakeCaducidadesRepository();
+    const applicationLogger = new TestApplicationLogger();
 
-  const service = createService(repository, applicationLogger);
+    const service = createService(repository, applicationLogger);
 
-  await expect(
-    service.getCaducidadReport({
-      anio: 2025,
-      mes: 13,
-      idMarca: null,
-      nombre: '',
-    }),
-  ).rejects.toThrow('El mes del filtro de caducidades no es válido.');
+    await expect(
+      service.getCaducidadReport({
+        anio: 2025,
+        mes: 13,
+        idMarca: null,
+        nombre: '',
+      }),
+    ).rejects.toThrow('El mes del filtro de caducidades no es válido.');
 
-  expect(repository.lastReportQuery).toBeNull();
-  expect(applicationLogger.warnEvents).toEqual([]);
-});
+    expect(repository.lastReportQuery).toBeNull();
+    expect(applicationLogger.warnEvents).toEqual([]);
+  });
 
   it('normaliza filtros antes de crear el informe', async (): Promise<void> => {
     const repository = new FakeCaducidadesRepository();
     const applicationLogger = new TestApplicationLogger();
-const service = createService(repository, applicationLogger);
+    const service = createService(repository, applicationLogger);
 
     const consulta: CaducidadReportConsulta = {
       anio: 2025,

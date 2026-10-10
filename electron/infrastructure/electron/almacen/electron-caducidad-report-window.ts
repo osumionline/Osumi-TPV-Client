@@ -1,4 +1,5 @@
 import type CaducidadReportWindow from '@backend/contracts/almacen/caducidades/caducidad-report-window.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type { CaducidadReportInterface } from '@desktop-contracts/almacen/caducidades/caducidad-report.interface';
 import { getRendererAssetsDirectory } from '@infrastructure/electron/main-window';
 import { BrowserWindow } from 'electron';
@@ -15,10 +16,20 @@ export default class ElectronCaducidadReportWindow implements CaducidadReportWin
   private reportWindow: BrowserWindow | null = null;
   private documento: CaducidadReportInterface | null = null;
 
-  constructor(private readonly getMainWindow: BrowserWindowProvider) {}
+  /**
+   * Crea el gestor de la ventana independiente
+   * utilizada por el informe de Caducidades.
+   */
+  constructor(
+    private readonly getMainWindow: BrowserWindowProvider,
+    private readonly applicationLogger: ApplicationLogger,
+  ) {}
 
   /**
    * Abre una ventana independiente con el snapshot indicado.
+   *
+   * Tener ya un informe abierto es un estado esperado
+   * y no se registra como incidencia técnica.
    */
   async open(documento: CaducidadReportInterface): Promise<void> {
     if (this.reportWindow !== null && !this.reportWindow.isDestroyed()) {
@@ -30,44 +41,55 @@ export default class ElectronCaducidadReportWindow implements CaducidadReportWin
     const mainWindow: BrowserWindow | null = this.getMainWindow();
 
     if (mainWindow === null || mainWindow.isDestroyed()) {
-      throw new Error('La ventana principal no está disponible.');
+      const error: Error = new Error('La ventana principal no está disponible.');
+
+      this.applicationLogger.warn({
+        area: 'almacen',
+        operation: 'open-expiration-report-window',
+        message: 'No se ha podido abrir la ventana del informe de Caducidades.',
+        error,
+      });
+
+      throw error;
     }
 
-    const browserWindow: BrowserWindow = new BrowserWindow({
-      parent: mainWindow,
-      width: 1200,
-      height: 800,
-      minWidth: 900,
-      minHeight: 650,
-      show: false,
-      backgroundColor: '#ffffff',
-      title: 'Caducidades - Informe',
-      webPreferences: {
-        preload: join(__dirname, 'caducidad-report-preload.js'),
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-        backgroundThrottling: false,
-      },
-    });
-
-    browserWindow.webContents.setWindowOpenHandler((): { action: 'deny' } => ({
-      action: 'deny',
-    }));
-
-    this.reportWindow = browserWindow;
-    this.documento = documento;
-
-    browserWindow.once('closed', (): void => {
-      if (this.reportWindow !== browserWindow) {
-        return;
-      }
-
-      this.reportWindow = null;
-      this.documento = null;
-    });
+    let browserWindow: BrowserWindow | null = null;
 
     try {
+      browserWindow = new BrowserWindow({
+        parent: mainWindow,
+        width: 1200,
+        height: 800,
+        minWidth: 900,
+        minHeight: 650,
+        show: false,
+        backgroundColor: '#ffffff',
+        title: 'Caducidades - Informe',
+        webPreferences: {
+          preload: join(__dirname, 'caducidad-report-preload.js'),
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true,
+          backgroundThrottling: false,
+        },
+      });
+
+      browserWindow.webContents.setWindowOpenHandler((): { action: 'deny' } => ({
+        action: 'deny',
+      }));
+
+      this.reportWindow = browserWindow;
+      this.documento = documento;
+
+      browserWindow.once('closed', (): void => {
+        if (this.reportWindow !== browserWindow) {
+          return;
+        }
+
+        this.reportWindow = null;
+        this.documento = null;
+      });
+
       await this.loadRenderer(browserWindow);
 
       if (browserWindow.isDestroyed()) {
@@ -77,9 +99,21 @@ export default class ElectronCaducidadReportWindow implements CaducidadReportWin
       browserWindow.maximize();
       browserWindow.show();
     } catch (error: unknown) {
-      if (!browserWindow.isDestroyed()) {
+      if (browserWindow !== null && !browserWindow.isDestroyed()) {
         browserWindow.destroy();
       }
+
+      if (this.reportWindow === browserWindow) {
+        this.reportWindow = null;
+        this.documento = null;
+      }
+
+      this.applicationLogger.warn({
+        area: 'almacen',
+        operation: 'open-expiration-report-window',
+        message: 'No se ha podido abrir la ventana del informe de Caducidades.',
+        error,
+      });
 
       throw error;
     }
@@ -87,59 +121,87 @@ export default class ElectronCaducidadReportWindow implements CaducidadReportWin
 
   /**
    * Devuelve el snapshot exclusivamente al renderer autorizado.
+   *
+   * Una imposibilidad de recuperar el snapshot desde
+   * la ventana abierta indica una incidencia técnica.
    */
   getDocumento(senderWebContentsId: number): CaducidadReportInterface {
-    this.requireAuthorizedWindow(senderWebContentsId);
+    try {
+      this.requireAuthorizedWindow(senderWebContentsId);
 
-    if (this.documento === null) {
-      throw new Error('No hay un informe de Caducidades disponible.');
+      if (this.documento === null) {
+        throw new Error('No hay un informe de Caducidades disponible.');
+      }
+
+      return this.documento;
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'almacen',
+        operation: 'load-expiration-report-document',
+        message: 'No se ha podido recuperar el documento del informe de Caducidades.',
+        error,
+      });
+
+      throw error;
     }
-
-    return this.documento;
   }
 
   /**
    * Abre el diálogo estándar de impresión del sistema
    * para el estado actualmente visible del informe.
+   *
+   * La cancelación voluntaria del usuario se resuelve
+   * normalmente y no genera ninguna entrada de log.
    */
   async print(senderWebContentsId: number): Promise<void> {
-    const browserWindow: BrowserWindow = this.requireAuthorizedWindow(senderWebContentsId);
+    try {
+      const browserWindow: BrowserWindow = this.requireAuthorizedWindow(senderWebContentsId);
 
-    await new Promise<void>((resolve: () => void, reject: (reason: Error) => void): void => {
-      browserWindow.webContents.print(
-        {
-          silent: false,
-          printBackground: true,
-          pageSize: 'A4',
-          margins: {
-            marginType: 'default',
+      await new Promise<void>((resolve: () => void, reject: (reason: Error) => void): void => {
+        browserWindow.webContents.print(
+          {
+            silent: false,
+            printBackground: true,
+            pageSize: 'A4',
+            margins: {
+              marginType: 'default',
+            },
           },
-        },
-        (success: boolean, failureReason: string): void => {
-          if (success) {
-            resolve();
+          (success: boolean, failureReason: string): void => {
+            if (success) {
+              resolve();
 
-            return;
-          }
+              return;
+            }
 
-          const reason: string = failureReason.trim();
+            const reason: string = failureReason.trim();
 
-          if (reason.toLowerCase().includes('cancel')) {
-            resolve();
+            if (reason.toLowerCase().includes('cancel')) {
+              resolve();
 
-            return;
-          }
+              return;
+            }
 
-          reject(
-            new Error(
-              reason.length === 0
-                ? 'No se ha podido imprimir el informe de caducidades.'
-                : `No se ha podido imprimir el informe de caducidades: ${reason}`,
-            ),
-          );
-        },
-      );
-    });
+            reject(
+              new Error(
+                reason.length === 0
+                  ? 'No se ha podido imprimir el informe de caducidades.'
+                  : `No se ha podido imprimir el informe de caducidades: ${reason}`,
+              ),
+            );
+          },
+        );
+      });
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'almacen',
+        operation: 'print-expiration-report',
+        message: 'No se ha podido imprimir el informe de Caducidades.',
+        error,
+      });
+
+      throw error;
+    }
   }
 
   /**

@@ -493,9 +493,9 @@ export default function createApplicationComposition(
   const imprentaRepository: ImprentaRepository = new TypeOrmImprentaRepository(operationalDatabase);
   const inventarioService: InventarioService = new InventarioService(inventarioRepository);
   const caducidadesService: CaducidadesService = new CaducidadesService(
-  caducidadesRepository,
-  applicationLogger,
-);
+    caducidadesRepository,
+    applicationLogger,
+  );
   const imprentaService: ImprentaService = new ImprentaService(imprentaRepository);
 
   const inventarioCsvBuilder: InventarioCsvBuilder = new InventarioCsvBuilder();
@@ -520,6 +520,7 @@ export default function createApplicationComposition(
 
   const caducidadReportWindow: CaducidadReportWindow = new ElectronCaducidadReportWindow(
     getMainWindow,
+    applicationLogger,
   );
   const caducidadReportService: CaducidadReportService = new CaducidadReportService(
     caducidadesService,
@@ -689,9 +690,9 @@ export default function createApplicationComposition(
   );
 
   const cajaInformePrintWindow: CajaInformePrintWindow = new ElectronCajaInformePrintWindow(
-  getMainWindow,
-  applicationLogger,
-);
+    getMainWindow,
+    applicationLogger,
+  );
 
   const cajaInformePrintService: CajaInformePrintService = new CajaInformePrintService(
     informeSimpleService,
