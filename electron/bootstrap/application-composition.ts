@@ -794,6 +794,7 @@ export default function createApplicationComposition(
     ventaTicketBaiMapper,
     ventasTicketBaiRepository,
     ticketBaiClient,
+    applicationLogger,
   );
 
   const emailSender: EmailSender = new NodemailerEmailSender();

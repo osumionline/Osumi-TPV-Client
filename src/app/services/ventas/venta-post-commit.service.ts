@@ -130,16 +130,6 @@ export default class VentaPostCommitService {
     try {
       await this.ventaTicketBaiService.processInitial(idVenta);
     } catch (error: unknown) {
-      this.loggingService.warn({
-        area: 'ventas',
-        operation: 'post-commit-ticketbai',
-        message: 'No se ha podido completar TicketBAI después de confirmar la venta.',
-        error,
-        context: {
-          idVenta,
-        },
-      });
-
       warnings.push(
         `No se ha podido completar TicketBAI. El ticket se imprimirá sin el código QR fiscal. ${getErrorMessage(
           error,

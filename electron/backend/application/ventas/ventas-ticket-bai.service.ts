@@ -2,6 +2,7 @@ import type ConfigurationService from '@backend/application/configuration/config
 import VentaTicketBaiMapper from '@backend/application/ventas/venta-ticket-bai.mapper';
 import type VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import {
   TicketBaiClientError,
   type TicketBaiClientErrorKind,
@@ -38,6 +39,7 @@ export default class VentasTicketBaiService {
     private readonly mapper: VentaTicketBaiMapper,
     private readonly repository: VentasTicketBaiRepository,
     private readonly client: TicketBaiClient,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   /**
@@ -50,146 +52,154 @@ export default class VentasTicketBaiService {
   async processInitial(idVenta: number): Promise<void> {
     this.validateVentaId(idVenta);
 
-    const existing: VentaTicketBaiRecord | null = await this.repository.findByVentaId(idVenta);
-
-    /*
-     * Únicamente permitimos continuar una fila
-     * pendiente. Cualquier otro estado demuestra que
-     * el flujo inicial ya tomó una decisión.
-     *
-     * Esto incluye expresamente error/rechazo:
-     * nunca hacemos retry automático.
-     */
-    if (existing !== null && existing.estado !== 'pendiente') {
-      return;
-    }
-
-    let issuerNif: string;
-    let environment: TicketBaiClientConfiguration['environment'];
-
-    if (existing === null) {
-      const appData: AppData | null = await this.configurationService.load();
-
-      if (appData === null) {
-        throw new Error('No se ha podido obtener la configuración para TicketBAI.');
-      }
-
-      const ticketBaiConfig: TicketBaiConfig | null = appData.ticketBai;
-
-      if (ticketBaiConfig === null) {
-        await this.repository.initializeNoAplica(idVenta);
-        return;
-      }
-
-      issuerNif = this.requireIssuerNif(ticketBaiConfig);
-      environment = ticketBaiConfig.environment;
-    } else {
-      issuerNif = this.requireFrozenText(
-        existing.nifEmisor,
-        'El NIF emisor TicketBAI de la venta no está disponible.',
-      );
-      environment = this.requireFrozenEnvironment(existing);
-    }
-
-    const token: string = await this.requireToken();
-
-    const ticket: VentaTicketInterface | null =
-      await this.ventasTicketsService.getByVentaId(idVenta);
-
-    if (ticket === null) {
-      throw new Error('No se ha podido recuperar la venta para generar TicketBAI.');
-    }
-
-    /*
-     * El mapper es también nuestra barrera
-     * provisional frente a devoluciones y operaciones
-     * mixtas, cuya semántica fiscal sigue bloqueada.
-     */
-    const request: TicketBaiCreateInvoiceRequest = this.mapper.map(ticket);
-
-    const requestPayload: string = this.serializeRequest(request);
-
-    const pending: VentaTicketBaiRecord = await this.repository.initializePending({
+    return this.executeWithLogging(
+      'ticketbai-process-initial',
+      'No se ha podido completar el procesamiento inicial de TicketBAI.',
       idVenta,
-      entorno: environment,
-      nifEmisor: issuerNif,
-      serie: request.serie,
-      numero: request.numero,
-      solicitudPayload: requestPayload,
-    });
+      async (): Promise<void> => {
+        const existing: VentaTicketBaiRecord | null = await this.repository.findByVentaId(idVenta);
 
-    /*
-     * initializePending es idempotente. Si en una
-     * carrera otro flujo ya avanzó la fila, no debemos
-     * adquirir un segundo envío.
-     */
-    if (pending.estado !== 'pendiente') {
-      return;
-    }
+        /*
+         * Únicamente permitimos continuar una fila
+         * pendiente. Cualquier otro estado demuestra que
+         * el flujo inicial ya tomó una decisión.
+         *
+         * Esto incluye expresamente error/rechazo:
+         * nunca hacemos retry automático.
+         */
+        if (existing !== null && existing.estado !== 'pendiente') {
+          return;
+        }
 
-    const attempt: VentaTicketBaiRecord | null = await this.repository.beginInitialAttempt(idVenta);
+        let issuerNif: string;
+        let environment: TicketBaiClientConfiguration['environment'];
 
-    if (attempt === null) {
-      return;
-    }
+        if (existing === null) {
+          const appData: AppData | null = await this.configurationService.load();
 
-    let result: TicketBaiCreateInvoiceResult;
+          if (appData === null) {
+            throw new Error('No se ha podido obtener la configuración para TicketBAI.');
+          }
 
-    try {
-      result = await this.client.createInvoice(
-        {
-          token,
-          issuerNif,
-          environment,
-        },
-        request,
-      );
-    } catch (error: unknown) {
-      /*
-       * Solo los errores normalizados por nuestra
-       * frontera TicketBaiClient permiten afirmar
-       * cómo debe finalizar el intento.
-       *
-       * Un error inesperado deja deliberadamente
-       * "enviando" para reconciliarlo posteriormente,
-       * porque no sabemos si el proveedor recibió
-       * realmente la operación.
-       */
-      if (!(error instanceof TicketBaiClientError)) {
-        throw error;
-      }
+          const ticketBaiConfig: TicketBaiConfig | null = appData.ticketBai;
 
-      await this.repository.markFailure({
-        idVenta,
-        estado: this.mapFailureState(error.kind),
-        ultimoError: error.message,
-        respuestaPayload: error.responsePayload,
-      });
+          if (ticketBaiConfig === null) {
+            await this.repository.initializeNoAplica(idVenta);
+            return;
+          }
 
-      throw new Error(error.message, {
-        cause: error,
-      });
-    }
+          issuerNif = this.requireIssuerNif(ticketBaiConfig);
+          environment = ticketBaiConfig.environment;
+        } else {
+          issuerNif = this.requireFrozenText(
+            existing.nifEmisor,
+            'El NIF emisor TicketBAI de la venta no está disponible.',
+          );
+          environment = this.requireFrozenEnvironment(existing);
+        }
 
-    if (result.status === 'pending') {
-      await this.repository.markRemotePending({
-        idVenta,
-        huella: result.huella,
-        qr: result.qr,
-        url: result.url,
-        respuestaPayload: result.responsePayload,
-      });
+        const token: string = await this.requireToken();
 
-      return;
-    }
+        const ticket: VentaTicketInterface | null =
+          await this.ventasTicketsService.getByVentaId(idVenta);
 
-    await this.repository.markAccepted({
-      idVenta,
-      huella: result.huella,
-      qr: result.qr,
-      url: result.url,
-      respuestaPayload: result.responsePayload,
-    });
+        if (ticket === null) {
+          throw new Error('No se ha podido recuperar la venta para generar TicketBAI.');
+        }
+
+        /*
+         * El mapper es también nuestra barrera
+         * provisional frente a devoluciones y operaciones
+         * mixtas, cuya semántica fiscal sigue bloqueada.
+         */
+        const request: TicketBaiCreateInvoiceRequest = this.mapper.map(ticket);
+
+        const requestPayload: string = this.serializeRequest(request);
+
+        const pending: VentaTicketBaiRecord = await this.repository.initializePending({
+          idVenta,
+          entorno: environment,
+          nifEmisor: issuerNif,
+          serie: request.serie,
+          numero: request.numero,
+          solicitudPayload: requestPayload,
+        });
+
+        /*
+         * initializePending es idempotente. Si en una
+         * carrera otro flujo ya avanzó la fila, no debemos
+         * adquirir un segundo envío.
+         */
+        if (pending.estado !== 'pendiente') {
+          return;
+        }
+
+        const attempt: VentaTicketBaiRecord | null =
+          await this.repository.beginInitialAttempt(idVenta);
+
+        if (attempt === null) {
+          return;
+        }
+
+        let result: TicketBaiCreateInvoiceResult;
+
+        try {
+          result = await this.client.createInvoice(
+            {
+              token,
+              issuerNif,
+              environment,
+            },
+            request,
+          );
+        } catch (error: unknown) {
+          /*
+           * Solo los errores normalizados por nuestra
+           * frontera TicketBaiClient permiten afirmar
+           * cómo debe finalizar el intento.
+           *
+           * Un error inesperado deja deliberadamente
+           * "enviando" para reconciliarlo posteriormente,
+           * porque no sabemos si el proveedor recibió
+           * realmente la operación.
+           */
+          if (!(error instanceof TicketBaiClientError)) {
+            throw error;
+          }
+
+          await this.repository.markFailure({
+            idVenta,
+            estado: this.mapFailureState(error.kind),
+            ultimoError: error.message,
+            respuestaPayload: error.responsePayload,
+          });
+
+          throw new Error(error.message, {
+            cause: error,
+          });
+        }
+
+        if (result.status === 'pending') {
+          await this.repository.markRemotePending({
+            idVenta,
+            huella: result.huella,
+            qr: result.qr,
+            url: result.url,
+            respuestaPayload: result.responsePayload,
+          });
+
+          return;
+        }
+
+        await this.repository.markAccepted({
+          idVenta,
+          huella: result.huella,
+          qr: result.qr,
+          url: result.url,
+          respuestaPayload: result.responsePayload,
+        });
+      },
+    );
   }
 
   /**
@@ -349,6 +359,37 @@ export default class VentasTicketBaiService {
       idVenta,
       respuestaPayload: result.responsePayload,
     });
+  }
+
+  /**
+   * Ejecuta una operación TicketBAI y registra
+   * una única incidencia cuando no puede completarse.
+   *
+   * El contexto se limita al identificador interno
+   * de la venta y nunca incorpora token, payload
+   * fiscal, NIF, serie, número o respuesta remota.
+   */
+  private async executeWithLogging(
+    operation: string,
+    message: string,
+    idVenta: number,
+    action: () => Promise<void>,
+  ): Promise<void> {
+    try {
+      await action();
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'ventas',
+        operation,
+        message,
+        error,
+        context: {
+          idVenta,
+        },
+      });
+
+      throw error;
+    }
   }
 
   /**

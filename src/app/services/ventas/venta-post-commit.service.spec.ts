@@ -80,17 +80,7 @@ describe('VentaPostCommitService', (): void => {
     expect(warnings).toEqual([
       'No se ha podido completar TicketBAI. El ticket se imprimirá sin el código QR fiscal. TicketBAI no disponible.',
     ]);
-    expect(loggingService.warnEvents).toEqual([
-      {
-        area: 'ventas',
-        operation: 'post-commit-ticketbai',
-        message: 'No se ha podido completar TicketBAI después de confirmar la venta.',
-        error: ticketBaiService.error,
-        context: {
-          idVenta: 123,
-        },
-      },
-    ]);
+    expect(loggingService.warnEvents).toEqual([]);
     expect(ticketBaiService.processedVentaIds).toEqual([123]);
     expect(documentService.generatePdfVentaIds).toEqual([123]);
     expect(documentService.printVentaIds).toEqual([123]);

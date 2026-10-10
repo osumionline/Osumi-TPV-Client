@@ -1,5 +1,6 @@
 import VentaTicketBaiMapper from '@backend/application/ventas/venta-ticket-bai.mapper';
 import VentasTicketBaiService from '@backend/application/ventas/ventas-ticket-bai.service';
+import ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import { TicketBaiClientError } from '@backend/contracts/ticket-bai/ticket-bai-client.error';
 import type {
   TicketBaiClient,
@@ -19,6 +20,7 @@ import type {
   MarkVentaTicketBaiRemotePendingRecordCommand,
 } from '@backend/contracts/ventas/venta-ticket-bai-record-command.interface';
 import type VentasTicketBaiRepository from '@backend/contracts/ventas/ventas-ticket-bai.repository.interface';
+import { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type { VentaTicketBaiRecord } from '@backend/domain/ventas/venta-ticket-bai-record.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { InstallationSecretsData } from '@desktop-contracts/configuration/installation-command.interface';
@@ -31,6 +33,7 @@ let ticketsService: FakeVentasTicketsService;
 let repository: FakeVentasTicketBaiRepository;
 let client: FakeTicketBaiClient;
 let service: VentasTicketBaiService;
+let applicationLogger: TestApplicationLogger;
 
 describe('VentasTicketBaiService', (): void => {
   beforeEach((): void => {
@@ -39,6 +42,7 @@ describe('VentasTicketBaiService', (): void => {
     ticketsService = new FakeVentasTicketsService();
     repository = new FakeVentasTicketBaiRepository();
     client = new FakeTicketBaiClient();
+    applicationLogger = new TestApplicationLogger();
 
     service = new VentasTicketBaiService(
       configurationService,
@@ -47,6 +51,7 @@ describe('VentasTicketBaiService', (): void => {
       new VentaTicketBaiMapper(),
       repository,
       client,
+      applicationLogger,
     );
   });
 
@@ -150,6 +155,19 @@ describe('VentasTicketBaiService', (): void => {
     await service.processInitial(15);
 
     expect(client.calls).toBe(1);
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'ticketbai-process-initial',
+        message: 'No se ha podido completar el procesamiento inicial de TicketBAI.',
+        error: expect.objectContaining({
+          message: 'TicketBaiWS ha rechazado el documento.',
+        }),
+        context: {
+          idVenta: 15,
+        },
+      },
+    ]);
     expect(repository.record?.estado).toBe('rechazada');
   });
 
@@ -207,6 +225,17 @@ describe('VentasTicketBaiService', (): void => {
 
     expect(repository.record?.estado).toBe('enviando');
     expect(repository.record?.intentos).toBe(1);
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'ticketbai-process-initial',
+        message: 'No se ha podido completar el procesamiento inicial de TicketBAI.',
+        error: client.error,
+        context: {
+          idVenta: 15,
+        },
+      },
+    ]);
   });
 
   it('reconcilia un PENDING usando la identidad fiscal congelada', async (): Promise<void> => {
@@ -922,4 +951,47 @@ function createTicketBaiRecord(
     createdAt: '2026-08-28T11:00:00.000Z',
     updatedAt: '2026-08-28T11:00:00.000Z',
   };
+}
+
+/**
+ * Logger controlado utilizado por las pruebas
+ * del flujo TicketBAI.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora entradas de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora entradas informativas.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva los avisos recibidos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Ignora errores.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No existen escrituras pendientes.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
 }
