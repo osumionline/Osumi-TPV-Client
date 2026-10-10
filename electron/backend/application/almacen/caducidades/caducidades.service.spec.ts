@@ -24,6 +24,8 @@ import type {
   CaducidadResultado,
 } from '@desktop-contracts/almacen/caducidades/caducidad.interface';
 import { describe, expect, it } from 'vitest';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 
 class FakeCaducidadesRepository implements CaducidadesRepository {
   lastQuery: CaducidadRepositoryQuery | null = null;
@@ -31,6 +33,7 @@ class FakeCaducidadesRepository implements CaducidadesRepository {
   lastArticleSearch: string | null = null;
   lastCreatedCaducidad: CaducidadCreateRecord | null = null;
   lastDeactivatedCaducidadId: number | null = null;
+  reportError: Error | null = null;
 
   filterOptions: CaducidadFilterOptionsRecord = {
     anios: [2026, 2025],
@@ -114,11 +117,19 @@ class FakeCaducidadesRepository implements CaducidadesRepository {
     return Promise.resolve(this.result);
   }
 
-  getCaducidadReport(query: CaducidadFilterQuery): Promise<CaducidadReportRecord> {
-    this.lastReportQuery = query;
+  /**
+ * Devuelve el informe configurado o simula
+ * una incidencia técnica del repository.
+ */
+getCaducidadReport(query: CaducidadFilterQuery): Promise<CaducidadReportRecord> {
+  this.lastReportQuery = query;
 
-    return Promise.resolve(this.reportResult);
+  if (this.reportError !== null) {
+    return Promise.reject(this.reportError);
   }
+
+  return Promise.resolve(this.reportResult);
+}
 
   getCaducidadFilterOptions(): Promise<CaducidadFilterOptionsRecord> {
     return Promise.resolve(this.filterOptions);
@@ -139,6 +150,49 @@ class FakeCaducidadesRepository implements CaducidadesRepository {
   deactivateCaducidad(idCaducidad: number): Promise<void> {
     this.lastDeactivatedCaducidadId = idCaducidad;
 
+    return Promise.resolve();
+  }
+}
+
+/**
+ * Logger controlado utilizado por las pruebas
+ * del servicio de Caducidades.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora entradas de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora entradas informativas.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva los avisos emitidos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Ignora errores.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No existen escrituras pendientes.
+   */
+  flush(): Promise<void> {
     return Promise.resolve();
   }
 }
@@ -301,10 +355,64 @@ describe('CaducidadesService', (): void => {
 
     expect(repository.lastDeactivatedCaducidadId).toBeNull();
   });
+  
+  it('registra y propaga un fallo técnico al generar el informe', async (): Promise<void> => {
+  const repository = new FakeCaducidadesRepository();
+  const applicationLogger = new TestApplicationLogger();
+  const error: Error = new Error('SQLite no disponible.');
+
+  repository.reportError = error;
+
+  const service = createService(repository, applicationLogger);
+
+  await expect(
+    service.getCaducidadReport({
+      anio: 2025,
+      mes: 12,
+      idMarca: 3,
+      nombre: '  pienso adulto  ',
+    }),
+  ).rejects.toBe(error);
+
+  expect(applicationLogger.warnEvents).toEqual([
+    {
+      area: 'almacen',
+      operation: 'load-expiration-report',
+      message: 'No se ha podido generar el informe de Caducidades.',
+      error,
+      context: {
+        year: 2025,
+        month: 12,
+        hasBrandFilter: true,
+        hasNameFilter: true,
+      },
+    },
+  ]);
+});
+
+it('no registra filtros inválidos del informe como incidencia técnica', async (): Promise<void> => {
+  const repository = new FakeCaducidadesRepository();
+  const applicationLogger = new TestApplicationLogger();
+
+  const service = createService(repository, applicationLogger);
+
+  await expect(
+    service.getCaducidadReport({
+      anio: 2025,
+      mes: 13,
+      idMarca: null,
+      nombre: '',
+    }),
+  ).rejects.toThrow('El mes del filtro de caducidades no es válido.');
+
+  expect(repository.lastReportQuery).toBeNull();
+  expect(applicationLogger.warnEvents).toEqual([]);
+});
 
   it('normaliza filtros antes de crear el informe', async (): Promise<void> => {
     const repository = new FakeCaducidadesRepository();
-    const service = createService(repository);
+    const applicationLogger = new TestApplicationLogger();
+const service = createService(repository, applicationLogger);
 
     const consulta: CaducidadReportConsulta = {
       anio: 2025,
@@ -324,13 +432,22 @@ describe('CaducidadesService', (): void => {
 
     expect(result.totalUnidades).toBe(3);
     expect(result.totalPvpCents).toBe(5070);
+    expect(applicationLogger.warnEvents).toEqual([]);
     expect(result.anios[0]?.meses[0]?.marcas[0]?.nombre).toBe('Marca de prueba');
   });
 });
 
 /**
- * Crea un servicio con fecha estable.
+ * Crea un servicio con fecha estable
+ * y logger controlado.
  */
-function createService(repository: FakeCaducidadesRepository): CaducidadesService {
-  return new CaducidadesService(repository, (): Date => new Date('2026-09-07T08:00:00.000Z'));
+function createService(
+  repository: FakeCaducidadesRepository,
+  applicationLogger: ApplicationLogger = new TestApplicationLogger(),
+): CaducidadesService {
+  return new CaducidadesService(
+    repository,
+    applicationLogger,
+    (): Date => new Date('2026-09-07T08:00:00.000Z'),
+  );
 }

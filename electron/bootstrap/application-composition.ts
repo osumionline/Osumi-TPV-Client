@@ -492,7 +492,10 @@ export default function createApplicationComposition(
   );
   const imprentaRepository: ImprentaRepository = new TypeOrmImprentaRepository(operationalDatabase);
   const inventarioService: InventarioService = new InventarioService(inventarioRepository);
-  const caducidadesService: CaducidadesService = new CaducidadesService(caducidadesRepository);
+  const caducidadesService: CaducidadesService = new CaducidadesService(
+  caducidadesRepository,
+  applicationLogger,
+);
   const imprentaService: ImprentaService = new ImprentaService(imprentaRepository);
 
   const inventarioCsvBuilder: InventarioCsvBuilder = new InventarioCsvBuilder();
