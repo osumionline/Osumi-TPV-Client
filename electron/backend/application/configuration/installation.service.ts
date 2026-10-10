@@ -7,6 +7,7 @@ import {
 import type InstallationDatabase from '@backend/contracts/configuration/installation-database.interface';
 import type InstallationFinalizer from '@backend/contracts/configuration/installation-finalizer.interface';
 import type InstallationStaging from '@backend/contracts/configuration/installation-staging.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
 import type {
@@ -15,11 +16,15 @@ import type {
 } from '@desktop-contracts/configuration/installation-result.interface';
 
 export default class InstallationService {
+  /**
+   * Crea el servicio responsable de una nueva instalación.
+   */
   constructor(
     private readonly configurationService: ConfigurationService,
     private readonly staging: InstallationStaging,
     private readonly installationDatabase: InstallationDatabase,
     private readonly installationFinalizer: InstallationFinalizer,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   async install(value: unknown): Promise<InstallationResult> {
@@ -64,15 +69,11 @@ export default class InstallationService {
       }
 
       const command: InstallationCommand = value;
-
       const installedAt: string = new Date().toISOString();
-
       const appData: AppData = createAppData(command, installedAt);
 
       await this.staging.prepare(appData, command.logo, command.secretos);
-
       await this.installationDatabase.prepare(command);
-
       await this.installationFinalizer.finalize();
 
       return {
@@ -81,12 +82,22 @@ export default class InstallationService {
         validationErrors: [],
       };
     } catch (error: unknown) {
-      console.error('Error completando la instalación:', error);
+      this.applicationLogger.error({
+        area: 'installation',
+        operation: 'install',
+        message: 'No se ha podido completar la instalación de la aplicación.',
+        error,
+      });
 
       try {
         await this.installationFinalizer.recover();
       } catch (recoveryError: unknown) {
-        console.error('No se ha podido recuperar la instalación incompleta:', recoveryError);
+        this.applicationLogger.warn({
+          area: 'installation',
+          operation: 'recover-incomplete-installation',
+          message: 'No se ha podido recuperar completamente una instalación fallida.',
+          error: recoveryError,
+        });
       }
 
       return {

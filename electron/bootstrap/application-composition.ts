@@ -961,6 +961,7 @@ export default function createApplicationComposition(
     installationStaging,
     installationDatabase,
     installationFinalizer,
+    applicationLogger,
   );
 
   /*
