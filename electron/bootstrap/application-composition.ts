@@ -515,6 +515,7 @@ export default function createApplicationComposition(
 
   const inventarioPrintWindow: InventarioPrintWindow = new ElectronInventarioPrintWindow(
     getMainWindow,
+    applicationLogger,
   );
 
   const inventarioPrintService: InventarioPrintService = new InventarioPrintService(
