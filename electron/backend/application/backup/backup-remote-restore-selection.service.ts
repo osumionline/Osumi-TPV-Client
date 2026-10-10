@@ -1,6 +1,7 @@
 import { BackupRemoteClientError } from '@backend/contracts/backup/backup-remote-client.error';
 import type BackupRemoteDownloader from '@backend/contracts/backup/backup-remote-downloader.interface';
 import type BackupRestorePackageSelector from '@backend/contracts/backup/backup-restore-package-selector.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type { BackupRemoteDownloadResult } from '@desktop-contracts/backup/backup-remote.interface';
 import type BackupRestorePackageSelectionResult from '@desktop-contracts/backup/backup-restore-package-selection-result.type';
 import { rm } from 'node:fs/promises';
@@ -20,6 +21,7 @@ export default class BackupRemoteRestoreSelectionService {
     private readonly downloadDirectory: string,
     private readonly remoteDownloader: BackupRemoteDownloader,
     private readonly packageSelector: BackupRestorePackageSelector,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   /**
@@ -99,10 +101,12 @@ export default class BackupRemoteRestoreSelectionService {
     try {
       await this.clear();
     } catch (error: unknown) {
-      console.error(
-        'No se ha podido limpiar la copia temporal utilizada para restauración remota:',
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'cleanup-remote-restore-package',
+        message: 'No se ha podido limpiar el paquete temporal de restauración remota.',
         error,
-      );
+      });
     }
   }
 }

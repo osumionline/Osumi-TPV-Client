@@ -6,11 +6,13 @@ import type { OtpvV3Manifest } from '@backend/contracts/backup/otpv-v3-manifest.
 import type OtpvV3RestoreStagingPreparer from '@backend/contracts/backup/otpv-v3-restore-staging-preparer.interface';
 import type OtpvV3RestoreWorkspace from '@backend/contracts/backup/otpv-v3-restore-workspace.interface';
 import type LegacyImportPackageInspector from '@backend/contracts/legacy-import/legacy-import-package-inspector.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type OtpvPackageInspection from '@backend/domain/backup/otpv-package-inspection.type';
 import { OTPV_V3_FORMAT_VERSION } from '@backend/domain/backup/otpv-v3.constants';
 import { DATABASE_SCHEMA_VERSION } from '@backend/domain/database/database-schema.constants';
 import type LegacyImportPackageInspection from '@backend/domain/legacy-import/legacy-import-package-inspection.interface';
 import { LEGACY_IMPORT_SUPPORTED_FORMAT_VERSION } from '@backend/domain/legacy-import/legacy-import.constants';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type BackupRestorePackageSelectionResult from '@desktop-contracts/backup/backup-restore-package-selection-result.type';
 import InMemoryOtpvV3PreparedRestoreStore from '@infrastructure/backup/in-memory-otpv-v3-prepared-restore.store';
 import InMemoryOtpvV3RestoreSelectionStore from '@infrastructure/backup/in-memory-otpv-v3-restore-selection.store';
@@ -108,8 +110,36 @@ describe('BackupRestoreSelectionService', (): void => {
       backupId: '11111111-1111-4111-8111-111111111111',
     });
   });
+
+  it('registra el fallo al inspeccionar un paquete seleccionado', async (): Promise<void> => {
+    const applicationLogger = new TestApplicationLogger();
+    const error: Error = new Error('El ZIP está dañado.');
+
+    const service: BackupRestoreSelectionService = createService(
+      new TestOtpvPackageDialog('C:\\backups\\corrupto.otpv'),
+      new TestOtpvPackageInspector(error),
+      applicationLogger,
+    );
+
+    await expect(service.selectPackage()).rejects.toThrow(
+      'El archivo seleccionado no es una copia o exportación válida de Osumi TPV.',
+    );
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'backup',
+        operation: 'inspect-restore-package',
+        message: 'No se ha podido inspeccionar el paquete seleccionado para restauración.',
+        error,
+      },
+    ]);
+  });
 });
 
+/**
+ * Construye el servicio con dependencias
+ * controladas para cada test.
+ */
 /**
  * Construye el servicio con dependencias
  * controladas para cada test.
@@ -117,6 +147,7 @@ describe('BackupRestoreSelectionService', (): void => {
 function createService(
   dialog: OtpvPackageDialog,
   packageInspector: OtpvPackageInspector,
+  applicationLogger: ApplicationLogger = new TestApplicationLogger(),
 ): BackupRestoreSelectionService {
   const packageSelectionService: OtpvPackageSelectionService = new OtpvPackageSelectionService(
     packageInspector,
@@ -131,6 +162,7 @@ function createService(
     new TestRestoreWorkspace(),
     new TestRestoreStagingPreparer(),
     new InMemoryOtpvV3PreparedRestoreStore(),
+    applicationLogger,
   );
 }
 
@@ -156,15 +188,20 @@ class TestOtpvPackageDialog implements OtpvPackageDialog {
  */
 class TestOtpvPackageInspector implements OtpvPackageInspector {
   /**
-   * Crea el inspector con un resultado fijo.
+   * Crea el inspector con un resultado o error fijo.
    */
-  constructor(private readonly inspection: OtpvPackageInspection) {}
+  constructor(private readonly result: OtpvPackageInspection | Error) {}
 
   /**
-   * Devuelve la inspección configurada.
+   * Devuelve la inspección configurada
+   * o simula una incidencia técnica.
    */
   async inspect(): Promise<OtpvPackageInspection> {
-    return this.inspection;
+    if (this.result instanceof Error) {
+      throw this.result;
+    }
+
+    return this.result;
   }
 }
 
@@ -299,6 +336,49 @@ class TestRestoreStagingPreparer implements OtpvV3RestoreStagingPreparer {
    * Simula la limpieza del staging anterior.
    */
   clear(): Promise<void> {
+    return Promise.resolve();
+  }
+}
+
+/**
+ * Logger controlado utilizado por las pruebas
+ * de selección de restauración.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora entradas de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora entradas informativas.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva los avisos recibidos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Ignora errores.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No existen escrituras pendientes.
+   */
+  flush(): Promise<void> {
     return Promise.resolve();
   }
 }

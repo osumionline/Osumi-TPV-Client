@@ -4,6 +4,7 @@ import type OtpvPackageDialog from '@backend/contracts/backup/otpv-package-dialo
 import type OtpvV3PreparedRestoreStore from '@backend/contracts/backup/otpv-v3-prepared-restore-store.interface';
 import type OtpvV3RestoreStagingPreparer from '@backend/contracts/backup/otpv-v3-restore-staging-preparer.interface';
 import type OtpvV3RestoreWorkspace from '@backend/contracts/backup/otpv-v3-restore-workspace.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type OtpvPackageSelectionResult from '@backend/domain/backup/otpv-package-selection-result.type';
 import type BackupRestorePackageSelectionResult from '@desktop-contracts/backup/backup-restore-package-selection-result.type';
 import { basename, win32 } from 'node:path';
@@ -38,6 +39,7 @@ export default class BackupRestoreSelectionService implements BackupRestorePacka
     private readonly restoreWorkspace: OtpvV3RestoreWorkspace,
     private readonly restoreStagingPreparer: OtpvV3RestoreStagingPreparer,
     private readonly preparedRestoreStore: OtpvV3PreparedRestoreStore,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   /**
@@ -100,7 +102,12 @@ export default class BackupRestoreSelectionService implements BackupRestorePacka
         createdAt: selection.manifest.createdAt,
       };
     } catch (error: unknown) {
-      console.error('Error inspeccionando el paquete .otpv seleccionado:', error);
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'inspect-restore-package',
+        message: 'No se ha podido inspeccionar el paquete seleccionado para restauración.',
+        error,
+      });
 
       throw new Error(
         'El archivo seleccionado no es una copia o exportación válida de Osumi TPV.',

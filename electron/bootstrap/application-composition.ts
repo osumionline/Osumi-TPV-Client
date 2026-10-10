@@ -906,6 +906,7 @@ export default function createApplicationComposition(
       otpvV3RestoreWorkspace,
       otpvV3RestoreStagingPreparer,
       otpvV3PreparedRestoreStore,
+      applicationLogger,
     );
 
   const backupRemoteRestoreSelectionService: BackupRemoteRestoreSelectionService =
@@ -913,6 +914,7 @@ export default function createApplicationComposition(
       backupRemoteRestoreDirectory,
       backupRemoteRestoreDownloadService,
       backupRestoreSelectionService,
+      applicationLogger,
     );
 
   const otpvV3RestoreUnlockService: OtpvV3RestoreUnlockService = new OtpvV3RestoreUnlockService(
