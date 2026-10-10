@@ -66,6 +66,7 @@ app
      */
     const installationFinalizer: InstallationFinalizer = new FileInstallationFinalizer(
       applicationPaths,
+      applicationLogger,
     );
 
     await installationFinalizer.recover();

@@ -1,4 +1,5 @@
 import type InstallationFinalizer from '@backend/contracts/configuration/installation-finalizer.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
 import { access, mkdir, rename, rm } from 'node:fs/promises';
 
@@ -10,7 +11,14 @@ interface FilePromotion {
 export default class FileInstallationFinalizer implements InstallationFinalizer {
   private readonly promotions: readonly FilePromotion[];
 
-  constructor(private readonly paths: ApplicationPaths) {
+  /**
+   * Crea el finalizador encargado de promocionar
+   * o recuperar una instalación.
+   */
+  constructor(
+    private readonly paths: ApplicationPaths,
+    private readonly applicationLogger: ApplicationLogger,
+  ) {
     /*
      * app_data.json debe ser siempre el último.
      */
@@ -21,7 +29,6 @@ export default class FileInstallationFinalizer implements InstallationFinalizer 
       },
       {
         source: this.paths.stagingFilesDirectory,
-
         destination: this.paths.filesDirectory,
       },
       {
@@ -178,6 +185,10 @@ export default class FileInstallationFinalizer implements InstallationFinalizer 
     });
   }
 
+  /**
+   * Limpia best-effort los residuos temporales cuando
+   * la instalación ya se considera completada.
+   */
   private async cleanStagingSafely(): Promise<void> {
     try {
       await this.resetStaging();
@@ -187,7 +198,12 @@ export default class FileInstallationFinalizer implements InstallationFinalizer 
        * la instalación está completa. Un fallo limpiando
        * staging no debe revertir el resultado.
        */
-      console.error('No se ha podido limpiar staging:', error);
+      this.applicationLogger.warn({
+        area: 'installation',
+        operation: 'cleanup-installation-staging',
+        message: 'La instalación está completa, pero no se ha podido limpiar su staging.',
+        error,
+      });
     }
   }
 

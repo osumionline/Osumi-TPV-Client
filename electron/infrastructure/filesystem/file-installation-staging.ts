@@ -2,6 +2,7 @@ import type AppDataRepository from '@backend/contracts/configuration/app-data.re
 import type InstallationStaging from '@backend/contracts/configuration/installation-staging.interface';
 import type LogoStorage from '@backend/contracts/configuration/logo-storage.interface';
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type {
   InstallationLogoData,
@@ -10,12 +11,17 @@ import type {
 import { mkdir, rm } from 'node:fs/promises';
 
 export default class FileInstallationStaging implements InstallationStaging {
+  /**
+   * Crea el almacenamiento temporal utilizado
+   * durante una nueva instalación.
+   */
   constructor(
     private readonly stagingDirectory: string,
     private readonly stagingFilesDirectory: string,
     private readonly appDataRepository: AppDataRepository,
     private readonly logoStorage: LogoStorage,
     private readonly secretStorage: SecretStorage,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   async reset(): Promise<void> {
@@ -57,11 +63,24 @@ export default class FileInstallationStaging implements InstallationStaging {
     }
   }
 
+  /**
+   * Intenta limpiar best-effort el staging después
+   * de fallar su preparación.
+   *
+   * Esta incidencia nunca sustituye al error principal
+   * que provocó la limpieza.
+   */
   private async cleanAfterError(): Promise<void> {
     try {
       await this.reset();
     } catch (cleanupError: unknown) {
-      console.error('No se ha podido limpiar la instalación temporal:', cleanupError);
+      this.applicationLogger.warn({
+        area: 'installation',
+        operation: 'cleanup-installation-staging-after-error',
+        message:
+          'No se ha podido limpiar completamente el staging después de fallar su preparación.',
+        error: cleanupError,
+      });
     }
   }
 }

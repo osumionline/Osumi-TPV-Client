@@ -414,6 +414,7 @@ export default function createApplicationComposition(
     stagingAppDataRepository,
     stagingLogoStorage,
     stagingSecretStorage,
+    applicationLogger,
   );
 
   /*
