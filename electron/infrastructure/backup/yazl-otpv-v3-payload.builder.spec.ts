@@ -2,7 +2,9 @@ import type BackupRemoteCredentialStorage from '@backend/contracts/backup/backup
 import type DatabaseSnapshot from '@backend/contracts/backup/database-snapshot.interface';
 import type { OtpvV3EncryptionResult } from '@backend/contracts/backup/otpv-v3-crypto.interface';
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type { BackupRemoteCredentials } from '@desktop-contracts/backup/backup-remote.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type { InstallationSecretsData } from '@desktop-contracts/configuration/installation-command.interface';
@@ -27,10 +29,9 @@ const AUTHENTICATED_DATA: Buffer = Buffer.from(
 );
 
 let tempDirectory: string | null = null;
-
 let paths: ApplicationPaths | null = null;
-
 let sourceDatabase: Database.Database | null = null;
+let applicationLogger: TestApplicationLogger;
 
 describe('YazlOtpvV3PayloadBuilder', (): void => {
   beforeEach(async (): Promise<void> => {
@@ -41,43 +42,34 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
     await mkdir(requirePaths().configDirectory, {
       recursive: true,
     });
-
     await mkdir(requirePaths().assetsDirectory, {
       recursive: true,
     });
-
     await mkdir(requirePaths().databaseDirectory, {
       recursive: true,
     });
-
     await mkdir(requirePaths().secretsDirectory, {
       recursive: true,
     });
-
     await mkdir(join(requirePaths().filesDirectory, 'articles'), {
       recursive: true,
     });
-
     await mkdir(join(requirePaths().filesDirectory, 'orders'), {
       recursive: true,
     });
 
     await writeFile(requirePaths().logoFile, Buffer.from('logo-webp'));
-
     await writeFile(
       join(requirePaths().filesDirectory, 'articles', 'photo.webp'),
       Buffer.from('article-photo'),
     );
-
     await writeFile(
       join(requirePaths().filesDirectory, 'orders', 'order.pdf'),
       Buffer.from('order-pdf'),
     );
-
     await writeFile(requirePaths().printingSettingsFile, '{"ticketPrinterDeviceName":"LOCAL"}\n', {
       encoding: 'utf8',
     });
-
     await writeFile(requirePaths().secretsFile, '{"encryptedData":"LOCAL-SAFE-STORAGE"}\n', {
       encoding: 'utf8',
     });
@@ -89,7 +81,6 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
     await appDataRepository.save(createAppData());
 
     sourceDatabase = new Database(requirePaths().databaseFile);
-
     sourceDatabase.pragma('journal_mode = WAL');
 
     sourceDatabase.exec(`
@@ -113,6 +104,8 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
             `,
       )
       .run(1, 'snapshot-data');
+
+    applicationLogger = new TestApplicationLogger();
   });
 
   afterEach(async (): Promise<void> => {
@@ -154,6 +147,7 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
         secret: 'remote-secret',
       }),
       crypto,
+      applicationLogger,
     );
 
     const payloadFile: string = join(currentPaths.backupsDirectory, 'payload.enc');
@@ -263,6 +257,7 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
     } finally {
       restoredDatabase.close();
     }
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('admite una instalación sin assets/files', async (): Promise<void> => {
@@ -286,6 +281,7 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
         secret: 'remote-secret',
       }),
       crypto,
+      applicationLogger,
     );
 
     const payloadFile: string = join(currentPaths.backupsDirectory, 'empty-files.enc');
@@ -315,6 +311,58 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
       'config/app_data.json',
       'database/osumi-tpv.sqlite',
       'secrets/secrets.json',
+    ]);
+    expect(applicationLogger.warnEvents).toEqual([]);
+  });
+
+  it('registra sin propagar un fallo eliminando el snapshot SQLite temporal', async (): Promise<void> => {
+    const currentPaths: ApplicationPaths = requirePaths();
+
+    const cleanupError: Error = new Error('No se ha podido eliminar el snapshot.');
+
+    const removeFile = async (
+      filePath: string,
+      options: {
+        readonly force: boolean;
+      },
+    ): Promise<void> => {
+      void filePath;
+      void options;
+
+      throw cleanupError;
+    };
+
+    const builder = new YazlOtpvV3PayloadBuilder(
+      currentPaths,
+      new BetterSqlite3DatabaseSnapshot(currentPaths.databaseFile),
+      new JsonAppDataRepository(currentPaths.appDataFile),
+      new TestSecretStorage(createSecrets()),
+      new TestBackupRemoteCredentialStorage({
+        keyId: 'remote-key-id',
+        secret: 'remote-secret',
+      }),
+      new NodeOtpvV3Crypto(),
+      applicationLogger,
+      removeFile,
+    );
+
+    const payloadFile: string = join(currentPaths.backupsDirectory, 'snapshot-cleanup-warning.enc');
+
+    await expect(
+      builder.create({
+        backupApiKey: BACKUP_API_KEY,
+        authenticatedData: AUTHENTICATED_DATA,
+        destinationFile: payloadFile,
+      }),
+    ).resolves.toBeDefined();
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'backup',
+        operation: 'payload-snapshot-cleanup',
+        message: 'No se ha podido eliminar el snapshot SQLite temporal utilizado por el backup.',
+        error: cleanupError,
+      },
     ]);
   });
 });
@@ -649,5 +697,48 @@ class TestBackupRemoteCredentialStorage implements BackupRemoteCredentialStorage
    */
   async delete(): Promise<void> {
     this.credentials = null;
+  }
+}
+
+/**
+ * Logger controlado utilizado por las pruebas
+ * del payload de backup.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora eventos de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora eventos informativos.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva avisos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Ignora errores principales.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No mantiene escrituras pendientes.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
   }
 }

@@ -300,6 +300,7 @@ export default function createApplicationComposition(
     operationalSecretStorage,
     backupRemoteCredentialStorage,
     backupCrypto,
+    applicationLogger,
   );
 
   const backupPackageBuilder: OtpvV3PackageBuilder = new YazlOtpvV3PackageBuilder(

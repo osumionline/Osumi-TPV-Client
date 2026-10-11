@@ -31,6 +31,7 @@ import { access, lstat, mkdir, readdir, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { Readable } from 'node:stream';
 import { ZipFile } from 'yazl';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 
 interface PayloadFileSource {
   readonly kind: 'file';
@@ -48,6 +49,13 @@ interface PayloadBufferSource {
 
 type PayloadSource = PayloadFileSource | PayloadBufferSource;
 
+type RemoveFile = (
+  filePath: string,
+  options: {
+    readonly force: boolean;
+  },
+) => Promise<void>;
+
 /**
  * Construye el ZIP interior de `.otpv` v3
  * y lo cifra directamente sin materializarlo en claro.
@@ -56,6 +64,9 @@ export default class YazlOtpvV3PayloadBuilder implements OtpvV3PayloadBuilder {
   /**
    * Crea el builder con las dependencias
    * necesarias para obtener el estado portable.
+   *
+   * La eliminación de ficheros puede inyectarse
+   * para verificar fallos best-effort de cleanup.
    */
   constructor(
     private readonly paths: ApplicationPaths,
@@ -64,6 +75,8 @@ export default class YazlOtpvV3PayloadBuilder implements OtpvV3PayloadBuilder {
     private readonly secretStorage: SecretStorage,
     private readonly backupRemoteCredentialStorage: BackupRemoteCredentialStorage,
     private readonly crypto: OtpvV3Crypto,
+    private readonly applicationLogger: ApplicationLogger,
+    private readonly removeFile: RemoveFile = rm,
   ) {}
 
   /**
@@ -355,14 +368,22 @@ export default class YazlOtpvV3PayloadBuilder implements OtpvV3PayloadBuilder {
   /**
    * Elimina el snapshot temporal incluso
    * cuando la construcción del payload falla.
+   *
+   * Un fallo de cleanup no modifica el resultado
+   * de la operación principal.
    */
   private async removeSnapshotSafely(snapshotFile: string): Promise<void> {
     try {
-      await rm(snapshotFile, {
+      await this.removeFile(snapshotFile, {
         force: true,
       });
     } catch (cleanupError: unknown) {
-      console.error('No se ha podido limpiar el snapshot SQLite temporal:', cleanupError);
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'payload-snapshot-cleanup',
+        message: 'No se ha podido eliminar el snapshot SQLite temporal utilizado por el backup.',
+        error: cleanupError,
+      });
     }
   }
 }
