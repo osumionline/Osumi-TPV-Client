@@ -3,6 +3,8 @@ import type {
   BackupRemoteDownloadTransferResult,
   BackupRemoteSession,
 } from '@backend/contracts/backup/backup-remote-client.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type {
   BackupRemoteBackup,
   BackupRemoteUploadResult,
@@ -15,6 +17,13 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 type FetchInput = Parameters<typeof globalThis.fetch>[0];
+
+type TestOpenFileAsBlob = (
+  path: string,
+  options?: {
+    readonly type?: string;
+  },
+) => Promise<Blob>;
 
 describe('HttpBackupRemoteClient', (): void => {
   it('autentica una instalación mediante keyId y secret', async (): Promise<void> => {
@@ -54,7 +63,7 @@ describe('HttpBackupRemoteClient', (): void => {
       );
     };
 
-    const client = new HttpBackupRemoteClient('https://backup.test/api/v1/', fetchImplementation);
+    const client = createClient('https://backup.test/api/v1/', fetchImplementation);
     const result: BackupRemoteSession = await client.authenticate({
       keyId: 'key-id',
       secret: 'secret-value',
@@ -127,7 +136,7 @@ describe('HttpBackupRemoteClient', (): void => {
       );
     };
 
-    const client = new HttpBackupRemoteClient('https://backup.test/api/v1', fetchImplementation);
+    const client = createClient('https://backup.test/api/v1', fetchImplementation);
     const result: readonly BackupRemoteBackup[] = await client.list('test-token');
 
     expect(getInputUrl(capturedInput)).toBe('https://backup.test/api/v1/backups');
@@ -156,7 +165,7 @@ describe('HttpBackupRemoteClient', (): void => {
         },
       );
 
-    const client = new HttpBackupRemoteClient('https://backup.test/api/v1', fetchImplementation);
+    const client = createClient('https://backup.test/api/v1', fetchImplementation);
 
     try {
       await client.authenticate({
@@ -182,7 +191,7 @@ describe('HttpBackupRemoteClient', (): void => {
       throw new Error('network unavailable');
     };
 
-    const client = new HttpBackupRemoteClient('https://backup.test/api/v1', fetchImplementation);
+    const client = createClient('https://backup.test/api/v1', fetchImplementation);
 
     try {
       await client.list('test-token');
@@ -220,7 +229,7 @@ describe('HttpBackupRemoteClient', (): void => {
         },
       );
 
-    const client = new HttpBackupRemoteClient('https://backup.test/api/v1', fetchImplementation);
+    const client = createClient('https://backup.test/api/v1', fetchImplementation);
 
     try {
       await client.list('test-token');
@@ -287,11 +296,7 @@ describe('HttpBackupRemoteClient', (): void => {
       });
     };
 
-    const client = new HttpBackupRemoteClient(
-      'https://backup.test/api/v1',
-      fetchImplementation,
-      openFileAsBlob,
-    );
+    const client = createClient('https://backup.test/api/v1', fetchImplementation, openFileAsBlob);
 
     const result: BackupRemoteUploadResult = await client.upload(
       'test-token',
@@ -366,7 +371,7 @@ describe('HttpBackupRemoteClient', (): void => {
     try {
       const destinationFile: string = join(tempDirectory, 'backup.otpv');
 
-      const client = new HttpBackupRemoteClient('https://backup.test/api/v1', fetchImplementation);
+      const client = createClient('https://backup.test/api/v1', fetchImplementation);
 
       const result: BackupRemoteDownloadTransferResult = await client.download(
         'test-token',
@@ -398,6 +403,63 @@ describe('HttpBackupRemoteClient', (): void => {
     }
   });
 
+  it('registra un fallo secundario al cancelar el stream de una descarga fallida', async (): Promise<void> => {
+    const streamError: Error = new Error('El stream remoto ha fallado.');
+
+    const fetchImplementation: typeof globalThis.fetch = async (): Promise<Response> => {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller): void {
+          controller.error(streamError);
+        },
+      });
+
+      return new Response(body, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/octet-stream',
+        },
+      });
+    };
+
+    const tempDirectory: string = await mkdtemp(
+      join(tmpdir(), 'osumi-tpv-remote-download-stream-error-'),
+    );
+
+    const applicationLogger = new TestApplicationLogger();
+
+    try {
+      const destinationFile: string = join(tempDirectory, 'partial.otpv');
+
+      const client = createClient(
+        'https://backup.test/api/v1',
+        fetchImplementation,
+        undefined,
+        applicationLogger,
+      );
+
+      await expect(
+        client.download('test-token', 'backup-public-id', destinationFile),
+      ).rejects.toMatchObject({
+        kind: 'unexpected',
+      });
+
+      expect(applicationLogger.warnEvents).toEqual([
+        {
+          area: 'backup',
+          operation: 'remote-download-stream-cancel',
+          message:
+            'No se ha podido cancelar correctamente el stream de una descarga fallida de TPV Backup.',
+          error: streamError,
+        },
+      ]);
+    } finally {
+      await rm(tempDirectory, {
+        recursive: true,
+        force: true,
+      });
+    }
+  });
+
   it('elimina el fichero parcial si la descarga queda incompleta', async (): Promise<void> => {
     const content: Buffer = Buffer.from('partial-download', 'utf8');
 
@@ -419,7 +481,7 @@ describe('HttpBackupRemoteClient', (): void => {
     try {
       const destinationFile: string = join(tempDirectory, 'partial.otpv');
 
-      const client = new HttpBackupRemoteClient('https://backup.test/api/v1', fetchImplementation);
+      const client = createClient('https://backup.test/api/v1', fetchImplementation);
 
       await expect(
         client.download('test-token', 'backup-public-id', destinationFile),
@@ -465,7 +527,7 @@ describe('HttpBackupRemoteClient', (): void => {
       );
     };
 
-    const client = new HttpBackupRemoteClient('https://backup.test/api/v1', fetchImplementation);
+    const client = createClient('https://backup.test/api/v1', fetchImplementation);
 
     await client.delete('test-token', 'backup-public-id');
 
@@ -495,7 +557,7 @@ describe('HttpBackupRemoteClient', (): void => {
         },
       );
 
-    const client = new HttpBackupRemoteClient('https://backup.test/api/v1', fetchImplementation);
+    const client = createClient('https://backup.test/api/v1', fetchImplementation);
 
     await expect(client.delete('test-token', 'backup-public-id')).rejects.toMatchObject({
       kind: 'invalid-response',
@@ -520,4 +582,69 @@ function getInputUrl(input: FetchInput | null): string {
   }
 
   return input.url;
+}
+
+/**
+ * Construye el cliente HTTP con un logger controlado,
+ * conservando las dependencias opcionales de los tests.
+ */
+function createClient(
+  baseUrl: string,
+  fetchImplementation: typeof globalThis.fetch = globalThis.fetch,
+  openFileAsBlob?: TestOpenFileAsBlob,
+  applicationLogger: ApplicationLogger = new TestApplicationLogger(),
+): HttpBackupRemoteClient {
+  if (openFileAsBlob === undefined) {
+    return new HttpBackupRemoteClient(baseUrl, applicationLogger, fetchImplementation);
+  }
+
+  return new HttpBackupRemoteClient(
+    baseUrl,
+    applicationLogger,
+    fetchImplementation,
+    openFileAsBlob,
+  );
+}
+
+/**
+ * Logger controlado utilizado por las pruebas
+ * del cliente remoto de TPV Backup.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora eventos de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora eventos informativos.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva avisos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Ignora errores.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No mantiene escrituras pendientes.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
 }

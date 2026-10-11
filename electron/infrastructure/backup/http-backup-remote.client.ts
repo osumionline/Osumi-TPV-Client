@@ -7,6 +7,7 @@ import type {
   BackupRemoteDownloadTransferResult,
   BackupRemoteSession,
 } from '@backend/contracts/backup/backup-remote-client.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import { OTPV_V3_MAX_PACKAGE_SIZE_BYTES } from '@backend/domain/backup/otpv-v3.constants';
 import type {
   BackupRemoteBackup,
@@ -39,11 +40,15 @@ export default class HttpBackupRemoteClient implements BackupRemoteClient {
   /**
    * Crea el cliente remoto.
    *
+   * El logger se utiliza exclusivamente para incidencias
+   * secundarias de cleanup que no pueden propagarse.
+   *
    * fetch y la apertura de ficheros pueden
    * inyectarse para tests e instrumentación.
    */
   constructor(
     baseUrl: string,
+    private readonly applicationLogger: ApplicationLogger,
     private readonly fetchImplementation: typeof globalThis.fetch = globalThis.fetch,
     private readonly openFileAsBlob: OpenFileAsBlob = (
       path: string,
@@ -283,11 +288,18 @@ export default class HttpBackupRemoteClient implements BackupRemoteClient {
       } catch (error: unknown) {
         try {
           await reader.cancel();
-        } catch {
+        } catch (cancelError: unknown) {
           /*
            * No ocultamos el error original
            * si la cancelación del stream también falla.
            */
+          this.applicationLogger.warn({
+            area: 'backup',
+            operation: 'remote-download-stream-cancel',
+            message:
+              'No se ha podido cancelar correctamente el stream de una descarga fallida de TPV Backup.',
+            error: cancelError,
+          });
         }
 
         throw error;
@@ -334,10 +346,13 @@ export default class HttpBackupRemoteClient implements BackupRemoteClient {
         try {
           await fileHandle.close();
         } catch (error: unknown) {
-          console.error(
-            'No se ha podido cerrar el fichero parcial descargado desde TPV Backup:',
+          this.applicationLogger.warn({
+            area: 'backup',
+            operation: 'remote-download-partial-close',
+            message:
+              'No se ha podido cerrar correctamente el fichero parcial de una descarga fallida de TPV Backup.',
             error,
-          );
+          });
         }
       }
 
@@ -614,6 +629,10 @@ export default class HttpBackupRemoteClient implements BackupRemoteClient {
   /**
    * Elimina un fichero parcial de descarga
    * sin ocultar el error original.
+   *
+   * La capa de aplicación vuelve a intentar la limpieza
+   * del fichero controlado y es la propietaria del log
+   * si finalmente el temporal no puede eliminarse.
    */
   private async removeDownloadSafely(filePath: string): Promise<void> {
     try {
@@ -621,7 +640,7 @@ export default class HttpBackupRemoteClient implements BackupRemoteClient {
         force: true,
       });
     } catch (error: unknown) {
-      console.error('No se ha podido eliminar una descarga parcial de TPV Backup:', error);
+      void error;
     }
   }
 

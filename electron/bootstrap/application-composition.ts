@@ -315,6 +315,7 @@ export default function createApplicationComposition(
 
   const backupRemoteClient: BackupRemoteClient = new HttpBackupRemoteClient(
     'https://apitpvbackup.osumi.dev/api/v1',
+    applicationLogger,
   );
 
   const backupRemoteService: BackupRemoteService = new BackupRemoteService(
