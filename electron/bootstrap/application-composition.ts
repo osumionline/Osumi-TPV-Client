@@ -947,6 +947,7 @@ export default function createApplicationComposition(
       printingSettingsRepository,
       backupRemoteCredentialStorage,
       installationFinalizer,
+      applicationLogger,
     );
 
   /*

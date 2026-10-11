@@ -3,23 +3,30 @@ import type BackupRemoteCredentialStorage from '@backend/contracts/backup/backup
 import type { OtpvV3Manifest } from '@backend/contracts/backup/otpv-v3-manifest.interface';
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
 import type InstallationFinalizer from '@backend/contracts/configuration/installation-finalizer.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type PrintingSettingsRepository from '@backend/contracts/printing/printing-settings.repository.interface';
 import { OTPV_V3_FORMAT_VERSION } from '@backend/domain/backup/otpv-v3.constants';
 import { DATABASE_SCHEMA_VERSION } from '@backend/domain/database/database-schema.constants';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type { BackupRemoteCredentials } from '@desktop-contracts/backup/backup-remote.interface';
 import type BackupRestoreFinalizeResult from '@desktop-contracts/backup/backup-restore-finalize-result.interface';
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type PrintingSettings from '@desktop-contracts/configuration/printing/printing-settings.interface';
 import InMemoryOtpvV3PreparedRestoreStore from '@infrastructure/backup/in-memory-otpv-v3-prepared-restore.store';
 import InMemoryOtpvV3RestoreSelectionStore from '@infrastructure/backup/in-memory-otpv-v3-restore-selection.store';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 const REMOTE_CREDENTIALS: BackupRemoteCredentials = {
   keyId: 'remote-key-id',
   secret: 'remote-secret',
 };
+let applicationLogger: TestApplicationLogger;
 
 describe('OtpvV3RestoreFinalizeService', (): void => {
+  beforeEach((): void => {
+    applicationLogger = new TestApplicationLogger();
+  });
+
   it('promueve la restauración preparada e invalida su estado', async (): Promise<void> => {
     const selectionStore = new InMemoryOtpvV3RestoreSelectionStore();
 
@@ -53,6 +60,7 @@ describe('OtpvV3RestoreFinalizeService', (): void => {
       printingSettingsRepository,
       backupRemoteCredentialStorage,
       finalizer,
+      applicationLogger,
     );
 
     const result: BackupRestoreFinalizeResult = await service.finalize(selectionId);
@@ -76,8 +84,9 @@ describe('OtpvV3RestoreFinalizeService', (): void => {
     });
 
     expect(selectionStore.resolve(selectionId)).toBeNull();
-
     expect(preparedStore.resolve()).toBeNull();
+    expect(applicationLogger.errorEvents).toEqual([]);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('rechaza una selección cuyo staging no está preparado', async (): Promise<void> => {
@@ -101,6 +110,7 @@ describe('OtpvV3RestoreFinalizeService', (): void => {
       new TestPrintingSettingsRepository(),
       backupRemoteCredentialStorage,
       finalizer,
+      applicationLogger,
     );
 
     await expect(service.finalize(selectionId)).rejects.toThrow(
@@ -108,6 +118,8 @@ describe('OtpvV3RestoreFinalizeService', (): void => {
     );
 
     expect(finalizer.finalizeCalls).toBe(0);
+    expect(applicationLogger.errorEvents).toEqual([]);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('rechaza un staging preparado para otra selección', async (): Promise<void> => {
@@ -139,6 +151,7 @@ describe('OtpvV3RestoreFinalizeService', (): void => {
       new TestPrintingSettingsRepository(),
       backupRemoteCredentialStorage,
       finalizer,
+      applicationLogger,
     );
 
     await expect(service.finalize(selectionId)).rejects.toThrow(
@@ -146,6 +159,8 @@ describe('OtpvV3RestoreFinalizeService', (): void => {
     );
 
     expect(finalizer.finalizeCalls).toBe(0);
+    expect(applicationLogger.errorEvents).toEqual([]);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('impide restaurar sobre una instalación ya configurada', async (): Promise<void> => {
@@ -183,12 +198,15 @@ describe('OtpvV3RestoreFinalizeService', (): void => {
       printingSettingsRepository,
       backupRemoteCredentialStorage,
       finalizer,
+      applicationLogger,
     );
 
     await expect(service.finalize(selectionId)).rejects.toThrow('instalación ya configurada');
 
     expect(finalizer.finalizeCalls).toBe(0);
     expect(printingSettingsRepository.savedSettings).toBeNull();
+    expect(applicationLogger.errorEvents).toEqual([]);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('recupera una promoción fallida e invalida el staging preparado', async (): Promise<void> => {
@@ -222,6 +240,7 @@ describe('OtpvV3RestoreFinalizeService', (): void => {
       new TestPrintingSettingsRepository(),
       backupRemoteCredentialStorage,
       finalizer,
+      applicationLogger,
     );
 
     await expect(service.finalize(selectionId)).rejects.toThrow(
@@ -242,6 +261,91 @@ describe('OtpvV3RestoreFinalizeService', (): void => {
      * volver a desbloquear la misma copia.
      */
     expect(selectionStore.resolve(selectionId)).not.toBeNull();
+    expect(applicationLogger.errorEvents).toEqual([
+      {
+        area: 'backup',
+        operation: 'finalize-restore',
+        message: 'No se ha podido completar la restauración de la copia de seguridad.',
+        error: finalizer.finalizeError,
+      },
+    ]);
+
+    expect(applicationLogger.warnEvents).toEqual([]);
+  });
+
+  it('registra los fallos secundarios de recuperación sin ocultar el error original', async (): Promise<void> => {
+    const selectionStore = new InMemoryOtpvV3RestoreSelectionStore();
+
+    const preparedStore = new InMemoryOtpvV3PreparedRestoreStore();
+
+    const manifest: OtpvV3Manifest = createManifest();
+
+    const selectionId: string = selectionStore.save({
+      packagePath: 'C:\\backup.otpv',
+      manifest,
+    });
+
+    preparedStore.save({
+      selectionId,
+      backupId: manifest.backupId,
+      backupRemoteCredentials: REMOTE_CREDENTIALS,
+    });
+
+    const finalizeError: Error = new Error('Falló una promoción.');
+    const credentialsCleanupError: Error = new Error('No se han podido eliminar las credenciales.');
+    const recoveryError: Error = new Error('No se ha podido recuperar la instalación.');
+
+    const finalizer = new TestInstallationFinalizer();
+
+    finalizer.finalizeError = finalizeError;
+    finalizer.recoverError = recoveryError;
+
+    const backupRemoteCredentialStorage = new TestBackupRemoteCredentialStorage();
+
+    backupRemoteCredentialStorage.deleteError = credentialsCleanupError;
+
+    const service = new OtpvV3RestoreFinalizeService(
+      selectionStore,
+      preparedStore,
+      new TestAppDataRepository(),
+      new TestPrintingSettingsRepository(),
+      backupRemoteCredentialStorage,
+      finalizer,
+      applicationLogger,
+    );
+
+    await expect(service.finalize(selectionId)).rejects.toThrow(
+      'No se ha podido completar la restauración',
+    );
+
+    expect(applicationLogger.errorEvents).toEqual([
+      {
+        area: 'backup',
+        operation: 'finalize-restore',
+        message: 'No se ha podido completar la restauración de la copia de seguridad.',
+        error: finalizeError,
+      },
+    ]);
+
+    expect(applicationLogger.warnEvents).toHaveLength(2);
+
+    expect(applicationLogger.warnEvents).toEqual(
+      expect.arrayContaining([
+        {
+          area: 'backup',
+          operation: 'restore-remote-credentials-cleanup',
+          message:
+            'No se han podido limpiar las credenciales de TPV Backup después de fallar una restauración.',
+          error: credentialsCleanupError,
+        },
+        {
+          area: 'backup',
+          operation: 'recover-incomplete-restore',
+          message: 'No se ha podido recuperar completamente una restauración fallida.',
+          error: recoveryError,
+        },
+      ]),
+    );
   });
 });
 
@@ -352,12 +456,17 @@ class TestInstallationFinalizer implements InstallationFinalizer {
   finalizeCalls: number = 0;
   recoverCalls: number = 0;
   finalizeError: Error | null = null;
+  recoverError: Error | null = null;
 
   /**
    * Simula la recuperación del filesystem.
    */
   recover(): Promise<void> {
     this.recoverCalls += 1;
+
+    if (this.recoverError !== null) {
+      return Promise.reject(this.recoverError);
+    }
 
     return Promise.resolve();
   }
@@ -385,6 +494,7 @@ class TestBackupRemoteCredentialStorage implements BackupRemoteCredentialStorage
 
   saveCalls: number = 0;
   deleteCalls: number = 0;
+  deleteError: Error | null = null;
 
   /**
    * Indica si existen credenciales almacenadas.
@@ -421,6 +531,54 @@ class TestBackupRemoteCredentialStorage implements BackupRemoteCredentialStorage
   async delete(): Promise<void> {
     this.deleteCalls++;
 
+    if (this.deleteError !== null) {
+      throw this.deleteError;
+    }
+
     this.value = null;
+  }
+}
+
+/**
+ * Logger controlado utilizado por las pruebas
+ * de finalización de restauraciones.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+  readonly errorEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora eventos de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora eventos informativos.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva avisos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Conserva errores.
+   */
+  error(event: ApplicationLogEvent): void {
+    this.errorEvents.push(event);
+  }
+
+  /**
+   * No mantiene escrituras pendientes.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
   }
 }

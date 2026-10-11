@@ -3,6 +3,7 @@ import type OtpvV3PreparedRestoreStore from '@backend/contracts/backup/otpv-v3-p
 import type OtpvV3RestoreSelectionStore from '@backend/contracts/backup/otpv-v3-restore-selection-store.interface';
 import type AppDataRepository from '@backend/contracts/configuration/app-data.repository';
 import type InstallationFinalizer from '@backend/contracts/configuration/installation-finalizer.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type PrintingSettingsRepository from '@backend/contracts/printing/printing-settings.repository.interface';
 import type OtpvV3PreparedRestore from '@backend/domain/backup/otpv-v3-prepared-restore.interface';
 import type OtpvV3RestoreSelection from '@backend/domain/backup/otpv-v3-restore-selection.interface';
@@ -17,7 +18,8 @@ export default class OtpvV3RestoreFinalizeService {
   private activeSelectionId: string | null = null;
 
   /**
-   * Crea el servicio de finalización.
+   * Crea el servicio encargado de activar
+   * una restauración OTPV previamente preparada.
    */
   constructor(
     private readonly selectionStore: OtpvV3RestoreSelectionStore,
@@ -26,6 +28,7 @@ export default class OtpvV3RestoreFinalizeService {
     private readonly printingSettingsRepository: PrintingSettingsRepository,
     private readonly backupRemoteCredentialStorage: BackupRemoteCredentialStorage,
     private readonly installationFinalizer: InstallationFinalizer,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   /**
@@ -86,6 +89,13 @@ export default class OtpvV3RestoreFinalizeService {
         backupId: selection.manifest.backupId,
       };
     } catch (error: unknown) {
+      this.applicationLogger.error({
+        area: 'backup',
+        operation: 'finalize-restore',
+        message: 'No se ha podido completar la restauración de la copia de seguridad.',
+        error,
+      });
+
       this.preparedRestoreStore.clear();
 
       await Promise.all([this.clearRemoteCredentialsSafely(), this.recoverSafely()]);
@@ -125,7 +135,13 @@ export default class OtpvV3RestoreFinalizeService {
     try {
       await this.backupRemoteCredentialStorage.delete();
     } catch (error: unknown) {
-      console.error('No se han podido limpiar las credenciales restauradas de TPV Backup:', error);
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'restore-remote-credentials-cleanup',
+        message:
+          'No se han podido limpiar las credenciales de TPV Backup después de fallar una restauración.',
+        error,
+      });
     }
   }
 
@@ -137,7 +153,12 @@ export default class OtpvV3RestoreFinalizeService {
     try {
       await this.installationFinalizer.recover();
     } catch (error: unknown) {
-      console.error('No se ha podido recuperar la restauración incompleta:', error);
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'recover-incomplete-restore',
+        message: 'No se ha podido recuperar completamente una restauración fallida.',
+        error,
+      });
     }
   }
 }
