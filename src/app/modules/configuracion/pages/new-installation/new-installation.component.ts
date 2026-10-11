@@ -32,6 +32,7 @@ import { InstallationFormModel } from '@model/configuracion/installation-form.mo
 import installationFormSchema from '@model/configuracion/installation-form.schema';
 import InstallationStep from '@model/configuracion/installation-step.type';
 import { DialogService } from '@osumi/angular-tools';
+import ApplicationLoggingService from '@services/application/application-logging.service';
 import ApplicationStateService from '@services/application/application-state.service';
 import DesktopBackupService from '@services/application/desktop-backup.service';
 import DesktopConfigurationService from '@services/application/desktop-configuration.service';
@@ -68,6 +69,7 @@ export default class NewInstallationComponent {
     inject(ApplicationStateService);
   private readonly desktopPrintingService: DesktopPrintingService = inject(DesktopPrintingService);
   private readonly desktopBackupService: DesktopBackupService = inject(DesktopBackupService);
+  private readonly loggingService: ApplicationLoggingService = inject(ApplicationLoggingService);
 
   private readonly acceptedLogoTypes: readonly string[] = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -128,7 +130,12 @@ export default class NewInstallationComponent {
 
       this.printers.set(printers);
     } catch (error: unknown) {
-      console.error('Error obteniendo las impresoras:', error);
+      this.loggingService.warn({
+        area: 'printing',
+        operation: 'load-printers',
+        message: 'No se ha podido obtener el listado de impresoras.',
+        error,
+      });
 
       this.printerError.set('No se ha podido obtener el listado de impresoras.');
     } finally {
@@ -171,7 +178,13 @@ export default class NewInstallationComponent {
       this.logoFileName.set(file.name);
       this.logoMimeType.set(file.type);
     } catch (error: unknown) {
-      console.error('Error leyendo el archivo de logo:', error);
+      this.loggingService.warn({
+        area: 'installation',
+        operation: 'read-logo-file',
+        message: 'No se ha podido leer el logo seleccionado para la instalación.',
+        error,
+      });
+
       this.logoError.set('No se ha podido leer el archivo seleccionado.');
     } finally {
       input.value = '';
@@ -246,6 +259,10 @@ export default class NewInstallationComponent {
     }
   }
 
+  /**
+   * Guarda la impresora de tickets seleccionada
+   * después de completar la instalación.
+   */
   private async saveTicketPrinterConfiguration(): Promise<boolean> {
     try {
       const deviceName: string = this.ticketPrinterDeviceName();
@@ -256,7 +273,12 @@ export default class NewInstallationComponent {
 
       return true;
     } catch (error: unknown) {
-      console.error('Error guardando la impresora de tickets:', error);
+      this.loggingService.warn({
+        area: 'printing',
+        operation: 'save-ticket-printer',
+        message: 'No se ha podido guardar la impresora de tickets.',
+        error,
+      });
 
       return false;
     }
@@ -293,6 +315,7 @@ export default class NewInstallationComponent {
 
     let remoteConfigured: boolean = false;
     let installationCompleted: boolean = false;
+    let rendererFailureOperation: string | null = 'install-request';
 
     this.saving.set(true);
 
@@ -303,7 +326,12 @@ export default class NewInstallationComponent {
 
           remoteConfigured = true;
         } catch (error: unknown) {
-          console.error('Error validando las credenciales de TPV Backup:', error);
+          this.loggingService.warn({
+            area: 'backup',
+            operation: 'configure-remote-during-installation',
+            message: 'No se ha podido validar o configurar TPV Backup durante la instalación.',
+            error,
+          });
 
           this.dialog.alert({
             title: 'Error',
@@ -338,7 +366,14 @@ export default class NewInstallationComponent {
 
       const printerSaved: boolean = await this.saveTicketPrinterConfiguration();
 
+      /*
+       * Los fallos técnicos de esta consulta pertenecen
+       * al servicio de estado de Main y no deben duplicarse.
+       */
+      rendererFailureOperation = null;
       await this.applicationStateService.refresh();
+
+      rendererFailureOperation = 'post-installation-ui';
 
       this.clearSensitiveData();
 
@@ -358,7 +393,14 @@ export default class NewInstallationComponent {
         await this.rollbackRemoteBackupConfiguration();
       }
 
-      console.error('Error comunicando con el backend:', error);
+      if (rendererFailureOperation !== null) {
+        this.loggingService.error({
+          area: 'installation',
+          operation: rendererFailureOperation,
+          message: 'No se ha podido completar el flujo de instalación en Renderer.',
+          error,
+        });
+      }
 
       this.dialog.alert({
         title: 'Error',
@@ -461,7 +503,13 @@ export default class NewInstallationComponent {
     try {
       await this.desktopBackupService.removeRemoteConfiguration();
     } catch (error: unknown) {
-      console.error('No se ha podido revertir la configuración de TPV Backup:', error);
+      this.loggingService.warn({
+        area: 'backup',
+        operation: 'rollback-remote-configuration',
+        message:
+          'No se ha podido revertir la configuración de TPV Backup después de fallar la instalación.',
+        error,
+      });
     }
   }
 
