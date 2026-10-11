@@ -6,11 +6,14 @@ import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/cl
 import type CrearClienteFacturaDesdeVentaRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-desde-venta-record-command.interface';
 import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
 import type EmitirClienteFacturaRecordCommand from '@backend/contracts/clientes/emitir-cliente-factura-record-command.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
+import ClienteFacturaBusinessError from '@backend/domain/clientes/cliente-factura-business.error';
 import type { ClienteFacturaRecord } from '@backend/domain/clientes/cliente-factura-record.interface';
 import type {
   ClienteFacturaVentaDisponibleRecord,
   ClienteFacturaVentaRecord,
 } from '@backend/domain/clientes/cliente-factura-venta-record.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type AnularClienteFacturaCommand from '@desktop-contracts/clientes/anular-cliente-factura-command.interface';
 import type {
   ClienteFacturaVentaDisponibleInterface,
@@ -18,7 +21,9 @@ import type {
 } from '@desktop-contracts/clientes/cliente-factura-venta.interface';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import type CrearClienteFacturaDesdeVentaCommand from '@desktop-contracts/clientes/crear-cliente-factura-desde-venta-command.interface';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+
+let applicationLogger: TestApplicationLogger;
 
 class FakeClienteFacturasRepository implements ClienteFacturasRepository {
   records: readonly ClienteFacturaRecord[] = [];
@@ -63,6 +68,7 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
   requestedVentasClientePublicId: string | null = null;
   requestedFacturaPublicId: string | null = null;
   requestedBorradorPublicId: string | null = null;
+  mutationError: Error | null = null;
 
   /**
    * Registra el cliente solicitado y devuelve las
@@ -79,6 +85,9 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
    * el borrador preparado para la prueba.
    */
   createBorrador(command: CrearClienteFacturaBorradorRecordCommand): Promise<ClienteFacturaRecord> {
+    if (this.mutationError !== null) {
+      return Promise.reject(this.mutationError);
+    }
     this.requestedCreateCommand = command;
 
     return Promise.resolve(this.createdRecord);
@@ -91,6 +100,9 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
   updateBorrador(
     command: ActualizarClienteFacturaBorradorRecordCommand,
   ): Promise<ClienteFacturaRecord> {
+    if (this.mutationError !== null) {
+      return Promise.reject(this.mutationError);
+    }
     this.requestedUpdateCommand = command;
 
     return Promise.resolve(this.updatedRecord);
@@ -101,6 +113,9 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
    * un borrador de factura.
    */
   deleteBorrador(command: EliminarClienteFacturaBorradorRecordCommand): Promise<void> {
+    if (this.mutationError !== null) {
+      return Promise.reject(this.mutationError);
+    }
     this.requestedDeleteCommand = command;
 
     return Promise.resolve();
@@ -111,6 +126,9 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
    * la factura emitida preparada para la prueba.
    */
   emitBorrador(command: EmitirClienteFacturaRecordCommand): Promise<ClienteFacturaRecord> {
+    if (this.mutationError !== null) {
+      return Promise.reject(this.mutationError);
+    }
     this.requestedEmitCommand = command;
 
     return Promise.resolve(this.emittedRecord);
@@ -123,6 +141,9 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
   createEmitidaFromVenta(
     command: CrearClienteFacturaDesdeVentaRecordCommand,
   ): Promise<ClienteFacturaRecord> {
+    if (this.mutationError !== null) {
+      return Promise.reject(this.mutationError);
+    }
     this.requestedCreateFromVentaCommand = command;
 
     return Promise.resolve(this.createdFromVentaRecord);
@@ -133,6 +154,9 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
    * la factura anulada preparada para la prueba.
    */
   anularFactura(command: AnularClienteFacturaRecordCommand): Promise<ClienteFacturaRecord> {
+    if (this.mutationError !== null) {
+      return Promise.reject(this.mutationError);
+    }
     this.requestedAnnulCommand = command;
 
     return Promise.resolve(this.annulledRecord);
@@ -168,6 +192,10 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
 }
 
 describe('ClienteFacturasService', (): void => {
+  beforeEach((): void => {
+    applicationLogger = new TestApplicationLogger();
+  });
+
   it('normaliza el cliente y construye el modelo público de todos los estados', async (): Promise<void> => {
     const repository = new FakeClienteFacturasRepository();
 
@@ -204,7 +232,7 @@ describe('ClienteFacturasService', (): void => {
       }),
     ];
 
-    const service = new ClienteFacturasService(repository);
+    const service = new ClienteFacturasService(repository, applicationLogger);
 
     const result: readonly ClienteFacturaInterface[] =
       await service.getByClientePublicId('  cliente-1  ');
@@ -283,7 +311,7 @@ describe('ClienteFacturasService', (): void => {
 
   it('normaliza y crea un borrador mediante el repository', async (): Promise<void> => {
     const repository = new FakeClienteFacturasRepository();
-    const service = new ClienteFacturasService(repository);
+    const service = new ClienteFacturasService(repository, applicationLogger);
 
     const result: ClienteFacturaInterface = await service.createBorrador({
       clientePublicId: '  cliente-1  ',
@@ -300,7 +328,7 @@ describe('ClienteFacturasService', (): void => {
 
   it('normaliza y actualiza un borrador mediante el repository', async (): Promise<void> => {
     const repository = new FakeClienteFacturasRepository();
-    const service = new ClienteFacturasService(repository);
+    const service = new ClienteFacturasService(repository, applicationLogger);
 
     const result: ClienteFacturaInterface = await service.updateBorrador({
       clientePublicId: '  cliente-1  ',
@@ -319,7 +347,7 @@ describe('ClienteFacturasService', (): void => {
 
   it('normaliza y elimina un borrador mediante el repository', async (): Promise<void> => {
     const repository = new FakeClienteFacturasRepository();
-    const service = new ClienteFacturasService(repository);
+    const service = new ClienteFacturasService(repository, applicationLogger);
 
     await service.deleteBorrador({
       clientePublicId: '  cliente-1  ',
@@ -334,7 +362,7 @@ describe('ClienteFacturasService', (): void => {
 
   it('normaliza y emite un borrador mediante el repository', async (): Promise<void> => {
     const repository = new FakeClienteFacturasRepository();
-    const service = new ClienteFacturasService(repository);
+    const service = new ClienteFacturasService(repository, applicationLogger);
 
     const result: ClienteFacturaInterface = await service.emitBorrador({
       clientePublicId: '  cliente-1  ',
@@ -365,7 +393,7 @@ describe('ClienteFacturasService', (): void => {
 
   it('normaliza y anula una factura emitida mediante el repository', async (): Promise<void> => {
     const repository = new FakeClienteFacturasRepository();
-    const service = new ClienteFacturasService(repository);
+    const service = new ClienteFacturasService(repository, applicationLogger);
 
     const command: AnularClienteFacturaCommand = {
       clientePublicId: '  cliente-1  ',
@@ -405,7 +433,7 @@ describe('ClienteFacturasService', (): void => {
 
   it('rechaza comandos de borrador inválidos antes de consultar el repository', async (): Promise<void> => {
     const repository = new FakeClienteFacturasRepository();
-    const service = new ClienteFacturasService(repository);
+    const service = new ClienteFacturasService(repository, applicationLogger);
 
     await expect(
       service.createBorrador({
@@ -462,11 +490,12 @@ describe('ClienteFacturasService', (): void => {
     expect(repository.requestedDeleteCommand).toBeNull();
     expect(repository.requestedEmitCommand).toBeNull();
     expect(repository.requestedAnnulCommand).toBeNull();
+    expect(applicationLogger.errorEvents).toEqual([]);
   });
 
   it('normaliza y crea una factura emitida directamente desde una venta', async (): Promise<void> => {
     const repository = new FakeClienteFacturasRepository();
-    const service = new ClienteFacturasService(repository);
+    const service = new ClienteFacturasService(repository, applicationLogger);
 
     const command: CrearClienteFacturaDesdeVentaCommand = {
       clientePublicId: '  cliente-1  ',
@@ -501,7 +530,7 @@ describe('ClienteFacturasService', (): void => {
 
   it('rechaza una venta sin identificador antes de crear su factura directa', async (): Promise<void> => {
     const repository = new FakeClienteFacturasRepository();
-    const service = new ClienteFacturasService(repository);
+    const service = new ClienteFacturasService(repository, applicationLogger);
 
     await expect(
       service.createFacturaDesdeVenta({
@@ -533,7 +562,7 @@ describe('ClienteFacturasService', (): void => {
       }),
     ];
 
-    const service = new ClienteFacturasService(repository);
+    const service = new ClienteFacturasService(repository, applicationLogger);
     const result: readonly ClienteFacturaVentaInterface[] = await service.getVentas({
       clientePublicId: '  cliente-1  ',
       facturaPublicId: '  factura-emitida  ',
@@ -567,7 +596,7 @@ describe('ClienteFacturasService', (): void => {
 
   it('rechaza identificadores inválidos antes de consultar las ventas de una factura', async (): Promise<void> => {
     const repository = new FakeClienteFacturasRepository();
-    const service = new ClienteFacturasService(repository);
+    const service = new ClienteFacturasService(repository, applicationLogger);
 
     await expect(
       service.getVentas({
@@ -600,7 +629,7 @@ describe('ClienteFacturasService', (): void => {
       }),
     ];
 
-    const service = new ClienteFacturasService(repository);
+    const service = new ClienteFacturasService(repository, applicationLogger);
 
     const result: readonly ClienteFacturaVentaDisponibleInterface[] =
       await service.getVentasDisponibles({
@@ -649,7 +678,7 @@ describe('ClienteFacturasService', (): void => {
       }),
     ];
 
-    const service = new ClienteFacturasService(repository);
+    const service = new ClienteFacturasService(repository, applicationLogger);
 
     const result: readonly ClienteFacturaVentaDisponibleInterface[] =
       await service.getVentasDisponibles({
@@ -665,7 +694,7 @@ describe('ClienteFacturasService', (): void => {
 
   it('rechaza identificadores no válidos antes de consultar las ventas', async (): Promise<void> => {
     const repository = new FakeClienteFacturasRepository();
-    const service = new ClienteFacturasService(repository);
+    const service = new ClienteFacturasService(repository, applicationLogger);
 
     await expect(
       service.getVentasDisponibles({
@@ -694,7 +723,7 @@ describe('ClienteFacturasService', (): void => {
       }),
     ];
 
-    const service = new ClienteFacturasService(repository);
+    const service = new ClienteFacturasService(repository, applicationLogger);
 
     await expect(
       service.getVentasDisponibles({
@@ -708,7 +737,7 @@ describe('ClienteFacturasService', (): void => {
 
   it('rechaza un identificador de cliente vacío antes de consultar el repository', async (): Promise<void> => {
     const repository = new FakeClienteFacturasRepository();
-    const service = new ClienteFacturasService(repository);
+    const service = new ClienteFacturasService(repository, applicationLogger);
 
     await expect(service.getByClientePublicId('   ')).rejects.toThrow(
       'El identificador del cliente no es válido.',
@@ -729,7 +758,7 @@ describe('ClienteFacturasService', (): void => {
       }),
     ];
 
-    const service = new ClienteFacturasService(repository);
+    const service = new ClienteFacturasService(repository, applicationLogger);
 
     await expect(service.getByClientePublicId('cliente-1')).rejects.toThrow(
       'La factura no tiene una numeración o fecha de emisión válidas.',
@@ -749,11 +778,58 @@ describe('ClienteFacturasService', (): void => {
       }),
     ];
 
-    const service = new ClienteFacturasService(repository);
+    const service = new ClienteFacturasService(repository, applicationLogger);
 
     await expect(service.getByClientePublicId('cliente-1')).rejects.toThrow(
       'La factura anulada no tiene fecha de anulación.',
     );
+  });
+
+  it('registra un fallo técnico al crear un borrador', async (): Promise<void> => {
+    const repository = new FakeClienteFacturasRepository();
+
+    const error: Error = new Error('SQLite no está disponible.');
+
+    repository.mutationError = error;
+
+    const service = new ClienteFacturasService(repository, applicationLogger);
+
+    await expect(
+      service.createBorrador({
+        clientePublicId: 'cliente-1',
+        ventasPublicIds: ['venta-1'],
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.errorEvents).toEqual([
+      {
+        area: 'clientes',
+        operation: 'create-invoice-draft',
+        message: 'No se ha podido crear el borrador de factura.',
+        error,
+      },
+    ]);
+  });
+
+  it('no registra como incidencia un rechazo de negocio al crear un borrador', async (): Promise<void> => {
+    const repository = new FakeClienteFacturasRepository();
+
+    const error = new ClienteFacturaBusinessError(
+      'Alguna de las ventas seleccionadas ya no está disponible para facturar.',
+    );
+
+    repository.mutationError = error;
+
+    const service = new ClienteFacturasService(repository, applicationLogger);
+
+    await expect(
+      service.createBorrador({
+        clientePublicId: 'cliente-1',
+        ventasPublicIds: ['venta-1'],
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.errorEvents).toEqual([]);
   });
 });
 
@@ -800,4 +876,47 @@ function createVentaRecord(
     ],
     ...overrides,
   };
+}
+
+/**
+ * Logger controlado utilizado por las pruebas
+ * del servicio de facturación de clientes.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly errorEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora eventos de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora eventos informativos.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora avisos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva fallos técnicos.
+   */
+  error(event: ApplicationLogEvent): void {
+    this.errorEvents.push(event);
+  }
+
+  /**
+   * No mantiene escrituras pendientes.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
 }

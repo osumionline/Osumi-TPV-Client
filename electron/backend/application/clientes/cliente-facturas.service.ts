@@ -5,6 +5,8 @@ import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/cl
 import type CrearClienteFacturaDesdeVentaRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-desde-venta-record-command.interface';
 import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
 import type EmitirClienteFacturaRecordCommand from '@backend/contracts/clientes/emitir-cliente-factura-record-command.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
+import ClienteFacturaBusinessError from '@backend/domain/clientes/cliente-factura-business.error';
 import type {
   ClienteFacturaEstadoRecord,
   ClienteFacturaRecord,
@@ -33,7 +35,15 @@ import type EliminarClienteFacturaBorradorCommand from '@desktop-contracts/clien
 import type EmitirClienteFacturaCommand from '@desktop-contracts/clientes/emitir-cliente-factura-command.interface';
 
 export default class ClienteFacturasService {
-  constructor(private readonly clienteFacturasRepository: ClienteFacturasRepository) {}
+  /**
+   * Crea el servicio de facturación de clientes.
+   */
+  constructor(
+    private readonly clienteFacturasRepository: ClienteFacturasRepository,
+    private readonly applicationLogger: ApplicationLogger,
+  ) {
+    void this.applicationLogger;
+  }
 
   /**
    * Recupera las facturas visibles del cliente y
@@ -66,10 +76,16 @@ export default class ClienteFacturasService {
       ventasPublicIds: this.normalizeVentasPublicIds(command.ventasPublicIds),
     };
 
-    const record: ClienteFacturaRecord =
-      await this.clienteFacturasRepository.createBorrador(recordCommand);
+    return this.executeMutationWithLogging(
+      'create-invoice-draft',
+      'No se ha podido crear el borrador de factura.',
+      async (): Promise<ClienteFacturaInterface> => {
+        const record: ClienteFacturaRecord =
+          await this.clienteFacturasRepository.createBorrador(recordCommand);
 
-    return this.toInterface(record);
+        return this.toInterface(record);
+      },
+    );
   }
 
   /**
@@ -89,10 +105,16 @@ export default class ClienteFacturasService {
       ventasPublicIds: this.normalizeVentasPublicIds(command.ventasPublicIds),
     };
 
-    const record: ClienteFacturaRecord =
-      await this.clienteFacturasRepository.updateBorrador(recordCommand);
+    return this.executeMutationWithLogging(
+      'update-invoice-draft',
+      'No se ha podido actualizar el borrador de factura.',
+      async (): Promise<ClienteFacturaInterface> => {
+        const record: ClienteFacturaRecord =
+          await this.clienteFacturasRepository.updateBorrador(recordCommand);
 
-    return this.toInterface(record);
+        return this.toInterface(record);
+      },
+    );
   }
 
   /**
@@ -109,7 +131,13 @@ export default class ClienteFacturasService {
       borradorPublicId: this.requireBorradorPublicId(command.borradorPublicId),
     };
 
-    await this.clienteFacturasRepository.deleteBorrador(recordCommand);
+    await this.executeMutationWithLogging(
+      'delete-invoice-draft',
+      'No se ha podido eliminar el borrador de factura.',
+      async (): Promise<void> => {
+        await this.clienteFacturasRepository.deleteBorrador(recordCommand);
+      },
+    );
   }
 
   /**
@@ -126,10 +154,16 @@ export default class ClienteFacturasService {
       borradorPublicId: this.requireBorradorPublicId(command.borradorPublicId),
     };
 
-    const record: ClienteFacturaRecord =
-      await this.clienteFacturasRepository.emitBorrador(recordCommand);
+    return this.executeMutationWithLogging(
+      'emit-invoice-draft',
+      'No se ha podido emitir el borrador de factura.',
+      async (): Promise<ClienteFacturaInterface> => {
+        const record: ClienteFacturaRecord =
+          await this.clienteFacturasRepository.emitBorrador(recordCommand);
 
-    return this.toInterface(record);
+        return this.toInterface(record);
+      },
+    );
   }
 
   /**
@@ -148,10 +182,16 @@ export default class ClienteFacturasService {
       ventaPublicId: this.requireVentaPublicId(command.ventaPublicId),
     };
 
-    const record: ClienteFacturaRecord =
-      await this.clienteFacturasRepository.createEmitidaFromVenta(recordCommand);
+    return this.executeMutationWithLogging(
+      'create-invoice-from-sale',
+      'No se ha podido crear la factura desde la venta.',
+      async (): Promise<ClienteFacturaInterface> => {
+        const record: ClienteFacturaRecord =
+          await this.clienteFacturasRepository.createEmitidaFromVenta(recordCommand);
 
-    return this.toInterface(record);
+        return this.toInterface(record);
+      },
+    );
   }
 
   /**
@@ -168,10 +208,16 @@ export default class ClienteFacturasService {
       facturaPublicId: this.requireFacturaPublicId(command.facturaPublicId),
     };
 
-    const record: ClienteFacturaRecord =
-      await this.clienteFacturasRepository.anularFactura(recordCommand);
+    return this.executeMutationWithLogging(
+      'annul-invoice',
+      'No se ha podido anular la factura.',
+      async (): Promise<ClienteFacturaInterface> => {
+        const record: ClienteFacturaRecord =
+          await this.clienteFacturasRepository.anularFactura(recordCommand);
 
-    return this.toInterface(record);
+        return this.toInterface(record);
+      },
+    );
   }
 
   /**
@@ -225,6 +271,34 @@ export default class ClienteFacturasService {
       (record: ClienteFacturaVentaDisponibleRecord): ClienteFacturaVentaDisponibleInterface =>
         this.toVentaDisponibleInterface(record),
     );
+  }
+
+  /**
+   * Ejecuta una mutación de factura registrando únicamente
+   * fallos técnicos que impiden completar la operación.
+   *
+   * Los estados de negocio o concurrencia esperables
+   * siguen propagándose a la UX sin generar incidencia.
+   */
+  private async executeMutationWithLogging<T>(
+    operation: string,
+    message: string,
+    action: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await action();
+    } catch (error: unknown) {
+      if (!(error instanceof ClienteFacturaBusinessError)) {
+        this.applicationLogger.error({
+          area: 'clientes',
+          operation,
+          message,
+          error,
+        });
+      }
+
+      throw error;
+    }
   }
 
   /**

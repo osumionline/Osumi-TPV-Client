@@ -635,6 +635,7 @@ export default function createApplicationComposition(
 
   const clienteFacturasService: ClienteFacturasService = new ClienteFacturasService(
     clienteFacturasRepository,
+    applicationLogger,
   );
   const clienteFacturaDocumentosService: ClienteFacturaDocumentosService =
     new ClienteFacturaDocumentosService(configurationService, clienteFacturaDocumentosRepository);

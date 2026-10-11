@@ -6,6 +6,7 @@ import type CrearClienteFacturaBorradorRecordCommand from '@backend/contracts/cl
 import type CrearClienteFacturaDesdeVentaRecordCommand from '@backend/contracts/clientes/crear-cliente-factura-desde-venta-record-command.interface';
 import type EliminarClienteFacturaBorradorRecordCommand from '@backend/contracts/clientes/eliminar-cliente-factura-borrador-record-command.interface';
 import type EmitirClienteFacturaRecordCommand from '@backend/contracts/clientes/emitir-cliente-factura-record-command.interface';
+import ClienteFacturaBusinessError from '@backend/domain/clientes/cliente-factura-business.error';
 import type {
   ClienteFacturaDocumentoLineaRecord,
   ClienteFacturaDocumentoRecord,
@@ -1025,7 +1026,9 @@ export default class TypeOrmClienteFacturasRepository
     const factura: ClienteFacturaEmitidaAnulableDatabaseRow | undefined = rows[0];
 
     if (factura === undefined) {
-      throw new Error('La factura no pertenece al cliente o ya no está disponible para anular.');
+      throw new ClienteFacturaBusinessError(
+        'La factura no pertenece al cliente o ya no está disponible para anular.',
+      );
     }
 
     return factura;
@@ -1065,7 +1068,7 @@ export default class TypeOrmClienteFacturasRepository
     )) as readonly ClienteFacturaChangesDatabaseRow[];
 
     if (rows[0]?.total !== 1) {
-      throw new Error('La factura ya no está disponible para anular.');
+      throw new ClienteFacturaBusinessError('La factura ya no está disponible para anular.');
     }
   }
 
@@ -1169,7 +1172,7 @@ export default class TypeOrmClienteFacturasRepository
     const cliente: ClienteFacturaClienteDatabaseRow | undefined = rows[0];
 
     if (cliente === undefined) {
-      throw new Error('El cliente indicado no existe o ya no está activo.');
+      throw new ClienteFacturaBusinessError('El cliente indicado no existe o ya no está activo.');
     }
 
     return cliente;
@@ -1204,7 +1207,9 @@ export default class TypeOrmClienteFacturasRepository
     const borrador: ClienteFacturaBorradorEditableDatabaseRow | undefined = rows[0];
 
     if (borrador === undefined) {
-      throw new Error('El borrador de factura no pertenece al cliente o ya no está disponible.');
+      throw new ClienteFacturaBusinessError(
+        'El borrador de factura no pertenece al cliente o ya no está disponible.',
+      );
     }
 
     return borrador;
@@ -1238,7 +1243,9 @@ export default class TypeOrmClienteFacturasRepository
     `)) as readonly ClienteFacturaChangesDatabaseRow[];
 
     if (rows[0]?.total !== 1) {
-      throw new Error('El borrador de factura no pertenece al cliente o ya no está disponible.');
+      throw new ClienteFacturaBusinessError(
+        'El borrador de factura no pertenece al cliente o ya no está disponible.',
+      );
     }
   }
 
@@ -1350,7 +1357,9 @@ export default class TypeOrmClienteFacturasRepository
     )) as readonly ClienteFacturaVentaSeleccionadaDatabaseRow[];
 
     if (rows.length !== publicIds.length) {
-      throw new Error('Alguna de las ventas seleccionadas ya no está disponible para facturar.');
+      throw new ClienteFacturaBusinessError(
+        'Alguna de las ventas seleccionadas ya no está disponible para facturar.',
+      );
     }
 
     return rows;
@@ -1535,7 +1544,9 @@ export default class TypeOrmClienteFacturasRepository
     )) as readonly ClienteFacturaChangesDatabaseRow[];
 
     if (rows[0]?.total !== 1) {
-      throw new Error('El borrador de factura ya no está disponible para emitir.');
+      throw new ClienteFacturaBusinessError(
+        'El borrador de factura ya no está disponible para emitir.',
+      );
     }
   }
 
