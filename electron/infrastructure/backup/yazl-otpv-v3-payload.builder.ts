@@ -346,12 +346,19 @@ export default class YazlOtpvV3PayloadBuilder implements OtpvV3PayloadBuilder {
   /**
    * Evita realizar el trabajo de snapshot
    * si el payload de destino ya existe.
+   *
+   * Solo ENOENT significa que el destino está libre.
+   * Cualquier otro fallo del filesystem debe propagarse.
    */
   private async assertDestinationDoesNotExist(destinationFile: string): Promise<void> {
     try {
       await access(destinationFile);
-    } catch {
-      return;
+    } catch (error: unknown) {
+      if (this.isFileNotFoundError(error)) {
+        return;
+      }
+
+      throw error;
     }
 
     throw new Error('El fichero payload.enc de destino ya existe.');

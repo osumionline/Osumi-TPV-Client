@@ -68,6 +68,27 @@ describe('ElectronLogoStorage', (): void => {
     expect(await storage.exists()).toBe(true);
   });
 
+  it('devuelve false cuando el logo no existe', async (): Promise<void> => {
+    tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-logo-'));
+
+    const storage = new ElectronLogoStorage(
+      join(tempDirectory, 'logo.webp'),
+      new FakeImageProcessor(),
+    );
+
+    await expect(storage.exists()).resolves.toBe(false);
+  });
+
+  it('propaga errores distintos de ENOENT al comprobar si existe el logo', async (): Promise<void> => {
+    tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-logo-'));
+
+    const invalidFilePath: string = `${join(tempDirectory, 'logo.webp')}\0`;
+
+    const storage = new ElectronLogoStorage(invalidFilePath, new FakeImageProcessor());
+
+    await expect(storage.exists()).rejects.toBeInstanceOf(Error);
+  });
+
   it('rechaza logos que superan las dimensiones permitidas', async (): Promise<void> => {
     tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-logo-'));
 

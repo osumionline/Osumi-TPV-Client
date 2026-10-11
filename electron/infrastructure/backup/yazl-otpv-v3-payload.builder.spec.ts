@@ -365,6 +365,73 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
       },
     ]);
   });
+
+  it('rechaza la creación cuando payload.enc ya existe', async (): Promise<void> => {
+    const currentPaths: ApplicationPaths = requirePaths();
+
+    await mkdir(currentPaths.backupsDirectory, {
+      recursive: true,
+    });
+
+    const payloadFile: string = join(currentPaths.backupsDirectory, 'existing-payload.enc');
+
+    await writeFile(payloadFile, Buffer.from('existing-payload'));
+
+    const builder = new YazlOtpvV3PayloadBuilder(
+      currentPaths,
+      new BetterSqlite3DatabaseSnapshot(currentPaths.databaseFile),
+      new JsonAppDataRepository(currentPaths.appDataFile),
+      new TestSecretStorage(createSecrets()),
+      new TestBackupRemoteCredentialStorage({
+        keyId: 'remote-key-id',
+        secret: 'remote-secret',
+      }),
+      new NodeOtpvV3Crypto(),
+      applicationLogger,
+    );
+
+    await expect(
+      builder.create({
+        backupApiKey: BACKUP_API_KEY,
+        authenticatedData: AUTHENTICATED_DATA,
+        destinationFile: payloadFile,
+      }),
+    ).rejects.toThrow('El fichero payload.enc de destino ya existe.');
+
+    expect(applicationLogger.warnEvents).toEqual([]);
+  });
+
+  it('propaga errores distintos de ENOENT al comprobar el destino del payload', async (): Promise<void> => {
+    const currentPaths: ApplicationPaths = requirePaths();
+
+    const invalidPayloadFile: string = `${join(
+      currentPaths.backupsDirectory,
+      'invalid-payload.enc',
+    )}\0`;
+
+    const builder = new YazlOtpvV3PayloadBuilder(
+      currentPaths,
+      new BetterSqlite3DatabaseSnapshot(currentPaths.databaseFile),
+      new JsonAppDataRepository(currentPaths.appDataFile),
+      new TestSecretStorage(createSecrets()),
+      new TestBackupRemoteCredentialStorage({
+        keyId: 'remote-key-id',
+        secret: 'remote-secret',
+      }),
+      new NodeOtpvV3Crypto(),
+      applicationLogger,
+    );
+
+    await expect(
+      builder.create({
+        backupApiKey: BACKUP_API_KEY,
+        authenticatedData: AUTHENTICATED_DATA,
+        destinationFile: invalidPayloadFile,
+      }),
+    ).rejects.toBeInstanceOf(Error);
+
+    expect(applicationLogger.warnEvents).toEqual([]);
+  });
 });
 
 /**

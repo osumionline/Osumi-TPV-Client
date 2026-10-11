@@ -23,14 +23,21 @@ export default class ElectronLogoStorage implements LogoStorage {
 
   /**
    * Comprueba si existe un logo persistido.
+   *
+   * La ausencia física del fichero es un estado normal.
+   * Cualquier otro fallo del filesystem debe propagarse.
    */
   async exists(): Promise<boolean> {
     try {
       await access(this.filePath);
 
       return true;
-    } catch {
-      return false;
+    } catch (error: unknown) {
+      if (this.isFileNotFoundError(error)) {
+        return false;
+      }
+
+      throw error;
     }
   }
 
@@ -93,5 +100,13 @@ export default class ElectronLogoStorage implements LogoStorage {
     }
 
     return Buffer.from(encodedData, 'base64');
+  }
+
+  /**
+   * Identifica un error ENOENT
+   * sin depender del tipo concreto del filesystem.
+   */
+  private isFileNotFoundError(error: unknown): boolean {
+    return error instanceof Error && 'code' in error && error.code === 'ENOENT';
   }
 }
