@@ -1,4 +1,5 @@
 import type BackupAutomaticStateRepository from '@backend/contracts/backup/backup-automatic-state.repository.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type BackupAutomaticState from '@backend/domain/backup/backup-automatic-state.interface';
 import { readFile, rename, rm, writeFile } from 'node:fs/promises';
 
@@ -44,7 +45,10 @@ export default class JsonBackupAutomaticStateRepository implements BackupAutomat
   /**
    * Crea el repositorio para el fichero indicado.
    */
-  constructor(private readonly filePath: string) {}
+  constructor(
+    private readonly filePath: string,
+    private readonly applicationLogger: ApplicationLogger,
+  ) {}
 
   /**
    * Recupera el último estado válido.
@@ -68,21 +72,32 @@ export default class JsonBackupAutomaticStateRepository implements BackupAutomat
       throw error;
     }
 
+    let parsed: unknown;
+
     try {
-      const parsed: unknown = JSON.parse(content);
-
-      if (!isBackupAutomaticState(parsed)) {
-        console.error('El archivo backup_automatic_state.json no tiene una estructura válida.');
-
-        return null;
-      }
-
-      return parsed;
+      parsed = JSON.parse(content);
     } catch (error: unknown) {
-      console.error('No se ha podido leer el estado de las copias automáticas:', error);
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'load-automatic-backup-state',
+        message: 'El estado persistido de las copias automáticas contiene un JSON no válido.',
+        error,
+      });
 
       return null;
     }
+
+    if (!isBackupAutomaticState(parsed)) {
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'load-automatic-backup-state',
+        message: 'El estado persistido de las copias automáticas tiene una estructura no válida.',
+      });
+
+      return null;
+    }
+
+    return parsed;
   }
 
   /**

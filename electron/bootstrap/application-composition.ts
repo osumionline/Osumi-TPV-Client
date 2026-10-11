@@ -365,7 +365,10 @@ export default function createApplicationComposition(
    * Copias remotas automáticas.
    */
   const backupAutomaticStateRepository: BackupAutomaticStateRepository =
-    new JsonBackupAutomaticStateRepository(applicationPaths.backupAutomaticStateFile);
+    new JsonBackupAutomaticStateRepository(
+      applicationPaths.backupAutomaticStateFile,
+      applicationLogger,
+    );
 
   const backupAutomaticScheduleResolver: BackupAutomaticScheduleResolver =
     new BackupAutomaticScheduleResolver();
