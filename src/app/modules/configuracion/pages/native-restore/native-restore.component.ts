@@ -25,6 +25,7 @@ import type RestoreBackupFormModel from '@model/configuracion/restore-backup-for
 import restoreBackupFormSchema from '@model/configuracion/restore-backup-form.schema';
 import type RestoreRemoteFormModel from '@model/configuracion/restore-remote-form.model';
 import restoreRemoteFormSchema from '@model/configuracion/restore-remote-form.schema';
+import ApplicationLoggingService from '@services/application/application-logging.service';
 import DesktopBackupService from '@services/application/desktop-backup.service';
 import { getErrorMessage } from '@utils/error.utils';
 
@@ -57,6 +58,7 @@ type NativeRestoreSelection = Extract<
 })
 export default class NativeRestoreComponent implements OnDestroy {
   private readonly backupService: DesktopBackupService = inject(DesktopBackupService);
+  private readonly loggingService: ApplicationLoggingService = inject(ApplicationLoggingService);
 
   private readonly dateFormatter: Intl.DateTimeFormat = new Intl.DateTimeFormat('es-ES', {
     dateStyle: 'medium',
@@ -231,7 +233,12 @@ export default class NativeRestoreComponent implements OnDestroy {
     try {
       await this.backupService.clearRemoteRestorePackage();
     } catch (error: unknown) {
-      console.error('No se ha podido limpiar la copia remota temporal:', error);
+      this.loggingService.warn({
+        area: 'backup',
+        operation: 'clear-remote-restore-selection',
+        message: 'No se ha podido limpiar completamente la selección remota.',
+        error,
+      });
 
       this.selectionError.set(
         getErrorMessage(error, 'No se ha podido limpiar completamente la selección remota.'),
@@ -364,7 +371,13 @@ export default class NativeRestoreComponent implements OnDestroy {
    */
   ngOnDestroy(): void {
     void this.backupService.disconnectRemoteRestore().catch((error: unknown): void => {
-      console.error('No se ha podido cerrar la sesión temporal de TPV Backup:', error);
+      this.loggingService.warn({
+        area: 'backup',
+        operation: 'disconnect-remote-restore-on-destroy',
+        message:
+          'No se ha podido cerrar completamente la sesión temporal de TPV Backup al abandonar la restauración.',
+        error,
+      });
     });
   }
 
@@ -423,6 +436,13 @@ export default class NativeRestoreComponent implements OnDestroy {
 
       this.remoteValidationRequested.set(false);
     } catch (error: unknown) {
+      this.loggingService.warn({
+        area: 'backup',
+        operation: 'connect-remote-restore',
+        message: 'No se ha podido establecer la sesión temporal de restauración con TPV Backup.',
+        error,
+      });
+
       this.remoteAccess.set(null);
 
       this.remoteError.set(getErrorMessage(error, 'No se ha podido conectar con TPV Backup.'));
@@ -442,7 +462,12 @@ export default class NativeRestoreComponent implements OnDestroy {
     try {
       await this.backupService.disconnectRemoteRestore();
     } catch (error: unknown) {
-      console.error('Error cerrando la sesión temporal de TPV Backup:', error);
+      this.loggingService.warn({
+        area: 'backup',
+        operation: 'disconnect-remote-restore',
+        message: 'No se ha podido cerrar completamente la sesión temporal de TPV Backup.',
+        error,
+      });
     }
 
     this.remoteAccess.set(null);
