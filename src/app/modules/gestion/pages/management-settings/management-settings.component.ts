@@ -30,6 +30,7 @@ import type { SettingsFormModel } from '@model/configuracion/settings-form.model
 import settingsFormSchema from '@model/configuracion/settings-form.schema';
 import { DialogService } from '@osumi/angular-tools';
 import AppDataService from '@services/application/app-data.service';
+import ApplicationLoggingService from '@services/application/application-logging.service';
 import DesktopConfigurationService from '@services/application/desktop-configuration.service';
 import DesktopPrintingService from '@services/application/desktop-printing.service';
 import { firstValueFrom } from 'rxjs';
@@ -64,6 +65,7 @@ export default class ManagementSettingsComponent {
   );
   private readonly dialog: DialogService = inject(DialogService);
   private readonly desktopPrintingService: DesktopPrintingService = inject(DesktopPrintingService);
+  private readonly loggingService: ApplicationLoggingService = inject(ApplicationLoggingService);
 
   private readonly acceptedLogoTypes: readonly string[] = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -136,7 +138,12 @@ export default class ManagementSettingsComponent {
 
       this.printers.set(printers);
     } catch (error: unknown) {
-      console.error('Error obteniendo las impresoras:', error);
+      this.loggingService.warn({
+        area: 'printing',
+        operation: 'load-printers',
+        message: 'No se ha podido obtener el listado de impresoras.',
+        error,
+      });
 
       this.printerError.set('No se ha podido obtener el listado de impresoras.');
     } finally {
@@ -185,7 +192,12 @@ export default class ManagementSettingsComponent {
       this.logoMimeType.set(file.type);
       this.logoPreviewUrl.set(dataUrl);
     } catch (error: unknown) {
-      console.error('Error leyendo el nuevo logo:', error);
+      this.loggingService.warn({
+        area: 'configuration',
+        operation: 'read-logo-file',
+        message: 'No se ha podido leer el nuevo logo seleccionado.',
+        error,
+      });
 
       this.logoError.set('No se ha podido leer el archivo seleccionado.');
     } finally {
@@ -275,7 +287,7 @@ export default class ManagementSettingsComponent {
 
       this.setSecretValue(secret, value);
     } catch (error: unknown) {
-      console.error('Error revelando secreto:', error);
+      void error;
 
       this.dialog.alert({
         title: 'Error',
@@ -392,7 +404,12 @@ export default class ManagementSettingsComponent {
 
       this.initialTicketPrinterDeviceName.set(deviceName);
     } catch (error: unknown) {
-      console.error('Error cargando la configuración de impresión:', error);
+      this.loggingService.warn({
+        area: 'printing',
+        operation: 'load-printing-configuration',
+        message: 'No se ha podido cargar la configuración de impresión.',
+        error,
+      });
 
       this.printerError.set('No se ha podido cargar la configuración de impresión.');
     } finally {
@@ -417,7 +434,12 @@ export default class ManagementSettingsComponent {
 
       return true;
     } catch (error: unknown) {
-      console.error('Error guardando la impresora de tickets:', error);
+      this.loggingService.warn({
+        area: 'printing',
+        operation: 'save-ticket-printer',
+        message: 'No se ha podido guardar la impresora de tickets.',
+        error,
+      });
 
       return false;
     }

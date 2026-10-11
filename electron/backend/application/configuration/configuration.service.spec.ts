@@ -337,9 +337,7 @@ describe('ConfigurationService', (): void => {
 
   it('revela los secretos operacionales autorizados', async (): Promise<void> => {
     await expect(service.revealSecret('secretApi')).resolves.toBe('old-api-secret');
-
     await expect(service.revealSecret('backupApiKey')).resolves.toBe('backup-secret');
-
     await expect(service.revealSecret('ticketBaiToken')).resolves.toBe('old-ticketbai-token');
   });
 
@@ -352,9 +350,7 @@ describe('ConfigurationService', (): void => {
     };
 
     await expect(service.revealSecret('secretApi')).resolves.toBeNull();
-
     await expect(service.revealSecret('backupApiKey')).resolves.toBeNull();
-
     await expect(service.revealSecret('ticketBaiToken')).resolves.toBeNull();
 
     secretStorage.value = null;
@@ -366,10 +362,39 @@ describe('ConfigurationService', (): void => {
     await expect(service.revealSecret('emailSmtpPass')).rejects.toThrow(
       'El secreto solicitado no puede revelarse.',
     );
-
     await expect(service.revealSecret('otroSecreto')).rejects.toThrow(
       'El secreto solicitado no puede revelarse.',
     );
+    expect(applicationLogger.errorEvents).toEqual([]);
+    expect(applicationLogger.warnEvents).toEqual([]);
+  });
+
+  it('registra un fallo técnico al recuperar un secreto', async (): Promise<void> => {
+    const error: Error = new Error('No se ha podido leer el almacenamiento de secretos.');
+
+    const failingSecretStorage = new FailingLoadSecretStorage(error);
+
+    const logger = new TestApplicationLogger();
+
+    const failingService = new ConfigurationService(
+      appDataRepository,
+      failingSecretStorage,
+      logoStorage,
+      logger,
+    );
+
+    await expect(failingService.revealSecret('ticketBaiToken')).rejects.toBe(error);
+
+    expect(logger.errorEvents).toEqual([
+      {
+        area: 'configuration',
+        operation: 'reveal-secret',
+        message: 'No se ha podido recuperar un secreto de configuración.',
+        error,
+      },
+    ]);
+
+    expect(logger.warnEvents).toEqual([]);
   });
 
   it('actualiza backupApiKey sin modificar los demás secretos', async (): Promise<void> => {
@@ -642,5 +667,25 @@ class TestApplicationLogger implements ApplicationLogger {
    */
   flush(): Promise<void> {
     return Promise.resolve();
+  }
+}
+
+/**
+ * Almacenamiento que simula un fallo técnico
+ * al recuperar los secretos persistidos.
+ */
+class FailingLoadSecretStorage extends MemorySecretStorage {
+  /**
+   * Crea el almacenamiento con el error esperado.
+   */
+  constructor(private readonly loadError: Error) {
+    super(null);
+  }
+
+  /**
+   * Simula el fallo al leer los secretos.
+   */
+  override load(): Promise<InstallationSecretsData | null> {
+    return Promise.reject(this.loadError);
   }
 }

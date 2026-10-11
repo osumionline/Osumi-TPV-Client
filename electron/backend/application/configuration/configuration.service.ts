@@ -55,7 +55,20 @@ export default class ConfigurationService {
       throw new Error('El secreto solicitado no puede revelarse.');
     }
 
-    const secrets: InstallationSecretsData | null = await this.secretStorage.load();
+    let secrets: InstallationSecretsData | null;
+
+    try {
+      secrets = await this.secretStorage.load();
+    } catch (error: unknown) {
+      this.applicationLogger.error({
+        area: 'configuration',
+        operation: 'reveal-secret',
+        message: 'No se ha podido recuperar un secreto de configuración.',
+        error,
+      });
+
+      throw error;
+    }
 
     if (secrets === null) {
       return null;
