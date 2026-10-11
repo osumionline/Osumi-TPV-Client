@@ -13,19 +13,26 @@ import type OtpvV3RequiredContentExtractor from '@backend/contracts/backup/otpv-
 import type OtpvV3RequiredContentValidator from '@backend/contracts/backup/otpv-v3-required-content-validator.interface';
 import type OtpvV3RestoreStagingPreparer from '@backend/contracts/backup/otpv-v3-restore-staging-preparer.interface';
 import type OtpvV3RestoreWorkspace from '@backend/contracts/backup/otpv-v3-restore-workspace.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type OtpvPackageInspection from '@backend/domain/backup/otpv-package-inspection.type';
 import type OtpvV3PayloadInspection from '@backend/domain/backup/otpv-v3-payload-inspection.interface';
 import { OTPV_V3_FORMAT_VERSION } from '@backend/domain/backup/otpv-v3.constants';
 import { DATABASE_SCHEMA_VERSION } from '@backend/domain/database/database-schema.constants';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type { BackupRemoteCredentials } from '@desktop-contracts/backup/backup-remote.interface';
 import type BackupRestoreUnlockResult from '@desktop-contracts/backup/backup-restore-unlock-result.interface';
 import InMemoryOtpvV3PreparedRestoreStore from '@infrastructure/backup/in-memory-otpv-v3-prepared-restore.store';
 import InMemoryOtpvV3RestoreSelectionStore from '@infrastructure/backup/in-memory-otpv-v3-restore-selection.store';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 const BACKUP_KEY: string = 'backup-key-exacta';
+let applicationLogger: TestApplicationLogger;
 
 describe('OtpvV3RestoreUnlockService', (): void => {
+  beforeEach((): void => {
+    applicationLogger = new TestApplicationLogger();
+  });
+
   it('extrae y descifra el payload seleccionado', async (): Promise<void> => {
     const manifest: OtpvV3Manifest = createManifest();
     const store = new InMemoryOtpvV3RestoreSelectionStore();
@@ -60,6 +67,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       restoreStagingPreparer,
       preparedRestoreStore,
       workspace,
+      applicationLogger,
     );
 
     const result: BackupRestoreUnlockResult = await service.unlock({
@@ -122,6 +130,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRestoreStagingPreparer(),
       new InMemoryOtpvV3PreparedRestoreStore(),
       new TestWorkspace(),
+      applicationLogger,
     );
 
     await expect(
@@ -165,6 +174,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRestoreStagingPreparer(),
       new InMemoryOtpvV3PreparedRestoreStore(),
       workspace,
+      applicationLogger,
     );
 
     await expect(
@@ -215,6 +225,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRestoreStagingPreparer(),
       new InMemoryOtpvV3PreparedRestoreStore(),
       workspace,
+      applicationLogger,
     );
 
     await expect(
@@ -226,6 +237,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
 
     expect(workspace.clearCalls).toBe(1);
     expect(workspace.removeEncryptedPayloadCalls).toBe(0);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('limpia el workspace si el ZIP interior no es válido', async (): Promise<void> => {
@@ -258,6 +270,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRestoreStagingPreparer(),
       new InMemoryOtpvV3PreparedRestoreStore(),
       workspace,
+      applicationLogger,
     );
 
     await expect(
@@ -305,6 +318,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRestoreStagingPreparer(),
       new InMemoryOtpvV3PreparedRestoreStore(),
       workspace,
+      applicationLogger,
     );
 
     await expect(
@@ -350,6 +364,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRestoreStagingPreparer(),
       new InMemoryOtpvV3PreparedRestoreStore(),
       workspace,
+      applicationLogger,
     );
 
     await expect(
@@ -393,6 +408,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       new TestRestoreStagingPreparer(),
       new InMemoryOtpvV3PreparedRestoreStore(),
       workspace,
+      applicationLogger,
     );
 
     await expect(
@@ -440,6 +456,7 @@ describe('OtpvV3RestoreUnlockService', (): void => {
       restoreStagingPreparer,
       new InMemoryOtpvV3PreparedRestoreStore(),
       workspace,
+      applicationLogger,
     );
 
     await expect(
@@ -457,6 +474,85 @@ describe('OtpvV3RestoreUnlockService', (): void => {
      * protección general de error.
      */
     expect(workspace.clearCalls).toBe(1);
+  });
+
+  it('registra los fallos secundarios de cleanup sin ocultar el error principal', async (): Promise<void> => {
+    const manifest: OtpvV3Manifest = createManifest();
+
+    const store = new InMemoryOtpvV3RestoreSelectionStore();
+
+    const selectionId: string = store.save({
+      packagePath: 'C:\\backup.otpv',
+      manifest,
+    });
+
+    const originalError: Error = new Error('Ha fallado el descifrado.');
+    const workspaceCleanupError: Error = new Error('No se ha podido limpiar restore-work.');
+    const stagingCleanupError: Error = new Error('No se ha podido limpiar el staging.');
+
+    const crypto = new TestCrypto();
+
+    crypto.decryptionError = originalError;
+
+    const workspace = new TestWorkspace();
+
+    workspace.clearError = workspaceCleanupError;
+
+    const restoreStagingPreparer = new TestRestoreStagingPreparer();
+
+    restoreStagingPreparer.clearError = stagingCleanupError;
+
+    /*
+     * La primera limpieza pertenece al comienzo normal
+     * del intento. Solo debe fallar la limpieza posterior.
+     */
+    restoreStagingPreparer.clearErrorFromCall = 2;
+
+    const service = new OtpvV3RestoreUnlockService(
+      store,
+      new TestPackageInspector({
+        formatVersion: OTPV_V3_FORMAT_VERSION,
+        manifest,
+      }),
+      new TestPayloadExtractor(),
+      crypto,
+      new TestPayloadInspector(),
+      new TestRequiredContentExtractor(),
+      new TestRequiredContentValidator(),
+      new TestFilesExtractor(),
+      restoreStagingPreparer,
+      new InMemoryOtpvV3PreparedRestoreStore(),
+      workspace,
+      applicationLogger,
+    );
+
+    await expect(
+      service.unlock({
+        selectionId,
+        backupApiKey: BACKUP_KEY,
+      }),
+    ).rejects.toBe(originalError);
+
+    expect(applicationLogger.warnEvents).toHaveLength(2);
+
+    expect(applicationLogger.warnEvents).toEqual(
+      expect.arrayContaining([
+        {
+          area: 'backup',
+          operation: 'restore-unlock-workspace-cleanup',
+          message:
+            'No se ha podido limpiar completamente el workspace después de fallar el desbloqueo de una copia.',
+          error: workspaceCleanupError,
+        },
+        {
+          area: 'backup',
+          operation: 'restore-unlock-staging-cleanup',
+          message:
+            'No se ha podido limpiar completamente el staging después de fallar el desbloqueo de una copia.',
+          error: stagingCleanupError,
+        },
+      ]),
+    );
   });
 });
 
@@ -546,6 +642,7 @@ class TestWorkspace implements OtpvV3RestoreWorkspace {
   resetCalls: number = 0;
   removeEncryptedPayloadCalls: number = 0;
   clearCalls: number = 0;
+  clearError: Error | null = null;
 
   /**
    * Registra el reinicio.
@@ -562,10 +659,15 @@ class TestWorkspace implements OtpvV3RestoreWorkspace {
   }
 
   /**
-   * Registra la limpieza completa.
+   * Registra la limpieza completa y permite
+   * simular un fallo secundario de cleanup.
    */
   async clear(): Promise<void> {
     this.clearCalls += 1;
+
+    if (this.clearError !== null) {
+      throw this.clearError;
+    }
   }
 
   /**
@@ -720,12 +822,19 @@ class TestRestoreStagingPreparer implements OtpvV3RestoreStagingPreparer {
     keyId: 'remote-key-id',
     secret: 'remote-secret',
   };
+  clearError: Error | null = null;
+  clearErrorFromCall: number = 1;
 
   /**
-   * Registra la limpieza del staging canónico.
+   * Registra la limpieza del staging canónico
+   * y permite simular fallos desde una llamada concreta.
    */
   clear(): Promise<void> {
     this.clearCalls += 1;
+
+    if (this.clearError !== null && this.clearCalls >= this.clearErrorFromCall) {
+      return Promise.reject(this.clearError);
+    }
 
     return Promise.resolve();
   }
@@ -752,5 +861,48 @@ class TestRestoreStagingPreparer implements OtpvV3RestoreStagingPreparer {
             ...this.backupRemoteCredentials,
           },
     );
+  }
+}
+
+/**
+ * Logger controlado utilizado por las pruebas
+ * del desbloqueo de restauraciones.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora eventos de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora eventos informativos.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva avisos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * El servicio no registra errores principales.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No mantiene escrituras pendientes.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
   }
 }

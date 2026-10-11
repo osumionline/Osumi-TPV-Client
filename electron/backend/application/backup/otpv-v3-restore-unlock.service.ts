@@ -9,6 +9,7 @@ import type OtpvV3RequiredContentValidator from '@backend/contracts/backup/otpv-
 import type OtpvV3RestoreSelectionStore from '@backend/contracts/backup/otpv-v3-restore-selection-store.interface';
 import type OtpvV3RestoreStagingPreparer from '@backend/contracts/backup/otpv-v3-restore-staging-preparer.interface';
 import type OtpvV3RestoreWorkspace from '@backend/contracts/backup/otpv-v3-restore-workspace.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type OtpvPackageInspection from '@backend/domain/backup/otpv-package-inspection.type';
 import type OtpvV3RestoreSelection from '@backend/domain/backup/otpv-v3-restore-selection.interface';
 import { OTPV_V3_FORMAT_VERSION } from '@backend/domain/backup/otpv-v3.constants';
@@ -22,7 +23,8 @@ import { isDeepStrictEqual } from 'node:util';
  */
 export default class OtpvV3RestoreUnlockService {
   /**
-   * Crea el servicio de desbloqueo.
+   * Crea el servicio encargado de autenticar
+   * y preparar una restauración OTPV v3.
    */
   constructor(
     private readonly selectionStore: OtpvV3RestoreSelectionStore,
@@ -36,6 +38,7 @@ export default class OtpvV3RestoreUnlockService {
     private readonly restoreStagingPreparer: OtpvV3RestoreStagingPreparer,
     private readonly preparedRestoreStore: OtpvV3PreparedRestoreStore,
     private readonly workspace: OtpvV3RestoreWorkspace,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   /**
@@ -171,7 +174,13 @@ export default class OtpvV3RestoreUnlockService {
     try {
       await this.workspace.clear();
     } catch (error: unknown) {
-      console.error('No se ha podido limpiar el workspace de restauración:', error);
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'restore-unlock-workspace-cleanup',
+        message:
+          'No se ha podido limpiar completamente el workspace después de fallar el desbloqueo de una copia.',
+        error,
+      });
     }
   }
 
@@ -183,7 +192,13 @@ export default class OtpvV3RestoreUnlockService {
     try {
       await this.restoreStagingPreparer.clear();
     } catch (error: unknown) {
-      console.error('No se ha podido limpiar el staging de restauración:', error);
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'restore-unlock-staging-cleanup',
+        message:
+          'No se ha podido limpiar completamente el staging después de fallar el desbloqueo de una copia.',
+        error,
+      });
     }
   }
 }

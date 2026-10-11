@@ -937,6 +937,7 @@ export default function createApplicationComposition(
     otpvV3RestoreStagingPreparer,
     otpvV3PreparedRestoreStore,
     otpvV3RestoreWorkspace,
+    applicationLogger,
   );
 
   const otpvV3RestoreFinalizeService: OtpvV3RestoreFinalizeService =
