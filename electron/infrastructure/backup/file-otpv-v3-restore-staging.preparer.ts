@@ -3,6 +3,7 @@ import type OtpvV3PortableSecrets from '@backend/contracts/backup/otpv-v3-portab
 import type OtpvV3RestoreStagingPreparer from '@backend/contracts/backup/otpv-v3-restore-staging-preparer.interface';
 import type OtpvV3RestoreWorkspace from '@backend/contracts/backup/otpv-v3-restore-workspace.interface';
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
 import type { BackupRemoteCredentials } from '@desktop-contracts/backup/backup-remote.interface';
 import type { InstallationSecretsData } from '@desktop-contracts/configuration/installation-command.interface';
@@ -14,12 +15,13 @@ import { mkdir, readFile, rename, rm } from 'node:fs/promises';
  */
 export default class FileOtpvV3RestoreStagingPreparer implements OtpvV3RestoreStagingPreparer {
   /**
-   * Crea el preparador sobre las rutas y el
-   * SecretStorage de staging de la máquina destino.
+   * Crea el preparador sobre las rutas, el
+   * SecretStorage de staging y el logger de aplicación.
    */
   constructor(
     private readonly paths: ApplicationPaths,
     private readonly secretStorage: SecretStorage,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   /**
@@ -179,7 +181,13 @@ export default class FileOtpvV3RestoreStagingPreparer implements OtpvV3RestoreSt
     try {
       await this.cleanCanonicalStaging();
     } catch (error: unknown) {
-      console.error('No se ha podido limpiar el staging parcial de restauración:', error);
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'restore-staging-cleanup',
+        message:
+          'No se ha podido limpiar completamente el staging después de fallar la preparación de una restauración.',
+        error,
+      });
     }
   }
 
@@ -191,7 +199,13 @@ export default class FileOtpvV3RestoreStagingPreparer implements OtpvV3RestoreSt
     try {
       await workspace.clear();
     } catch (error: unknown) {
-      console.error('No se ha podido limpiar restore-work después de un error:', error);
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'restore-workspace-cleanup',
+        message:
+          'No se ha podido limpiar completamente restore-work después de fallar la preparación de una restauración.',
+        error,
+      });
     }
   }
 }

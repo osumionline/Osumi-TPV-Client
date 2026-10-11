@@ -1,5 +1,7 @@
 import type SecretStorage from '@backend/contracts/configuration/secret-storage.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type { InstallationSecretsData } from '@desktop-contracts/configuration/installation-command.interface';
 import FileOtpvV3RestoreStagingPreparer from '@infrastructure/backup/file-otpv-v3-restore-staging.preparer';
 import FileOtpvV3RestoreWorkspace from '@infrastructure/backup/file-otpv-v3-restore-workspace';
@@ -11,10 +13,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 const BACKUP_KEY: string = '  backup-key-exacta-con-espacios  ';
 
 let tempDirectory: string | null = null;
+let applicationLogger: TestApplicationLogger;
 
 describe('FileOtpvV3RestoreStagingPreparer', (): void => {
   beforeEach(async (): Promise<void> => {
     tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-restore-staging-'));
+    applicationLogger = new TestApplicationLogger();
   });
 
   afterEach(async (): Promise<void> => {
@@ -37,7 +41,7 @@ describe('FileOtpvV3RestoreStagingPreparer', (): void => {
 
     const secretStorage = new TestSecretStorage(paths.stagingSecretsFile, paths.stagingAppDataFile);
 
-    const preparer = new FileOtpvV3RestoreStagingPreparer(paths, secretStorage);
+    const preparer = new FileOtpvV3RestoreStagingPreparer(paths, secretStorage, applicationLogger);
 
     const backupRemoteCredentials = await preparer.prepare(workspace, BACKUP_KEY);
 
@@ -80,6 +84,7 @@ describe('FileOtpvV3RestoreStagingPreparer', (): void => {
     ).toBe('pdf');
 
     expect(await fileExists(join(paths.stagingDirectory, 'restore-work'))).toBe(false);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('limpia staging y restore-work si falla la reconstrucción de secretos', async (): Promise<void> => {
@@ -93,25 +98,154 @@ describe('FileOtpvV3RestoreStagingPreparer', (): void => {
 
     secretStorage.saveError = new Error('No se ha podido usar safeStorage.');
 
-    const preparer = new FileOtpvV3RestoreStagingPreparer(paths, secretStorage);
+    const preparer = new FileOtpvV3RestoreStagingPreparer(paths, secretStorage, applicationLogger);
 
     await expect(preparer.prepare(workspace, BACKUP_KEY)).rejects.toThrow(
       'No se ha podido usar safeStorage.',
     );
 
     expect(await fileExists(paths.stagingDatabaseFile)).toBe(false);
-
     expect(await fileExists(paths.stagingFilesDirectory)).toBe(false);
-
     expect(await fileExists(paths.stagingLogoFile)).toBe(false);
-
     expect(await fileExists(paths.stagingSecretsFile)).toBe(false);
-
     expect(await fileExists(paths.stagingAppDataFile)).toBe(false);
-
     expect(await fileExists(join(paths.stagingDirectory, 'restore-work'))).toBe(false);
+    expect(applicationLogger.warnEvents).toEqual([]);
+  });
+
+  it('registra un fallo secundario limpiando restore-work sin ocultar el error original', async (): Promise<void> => {
+    const paths: ApplicationPaths = createApplicationPaths();
+
+    const workspace = new FailingCleanupRestoreWorkspace(
+      join(paths.stagingDirectory, 'restore-work'),
+    );
+
+    await createWorkspaceFixture(workspace);
+
+    const secretStorage = new TestSecretStorage(paths.stagingSecretsFile, paths.stagingAppDataFile);
+
+    const originalError: Error = new Error('No se ha podido usar safeStorage.');
+    const cleanupError: Error = new Error('No se ha podido eliminar restore-work.');
+
+    secretStorage.saveError = originalError;
+    workspace.clearError = cleanupError;
+
+    const preparer = new FileOtpvV3RestoreStagingPreparer(paths, secretStorage, applicationLogger);
+
+    await expect(preparer.prepare(workspace, BACKUP_KEY)).rejects.toBe(originalError);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'backup',
+        operation: 'restore-workspace-cleanup',
+        message:
+          'No se ha podido limpiar completamente restore-work después de fallar la preparación de una restauración.',
+        error: cleanupError,
+      },
+    ]);
+  });
+
+  it('registra un fallo secundario limpiando el staging canónico', async (): Promise<void> => {
+    const validPaths: ApplicationPaths = createApplicationPaths();
+
+    const workspace = new FileOtpvV3RestoreWorkspace(
+      join(validPaths.stagingDirectory, 'restore-work'),
+    );
+
+    await createWorkspaceFixture(workspace);
+
+    const invalidPaths: ApplicationPaths = {
+      ...validPaths,
+      stagingLogoFile: `${validPaths.stagingLogoFile}\0`,
+    };
+
+    const secretStorage = new TestSecretStorage(
+      invalidPaths.stagingSecretsFile,
+      invalidPaths.stagingAppDataFile,
+    );
+
+    const preparer = new FileOtpvV3RestoreStagingPreparer(
+      invalidPaths,
+      secretStorage,
+      applicationLogger,
+    );
+
+    await expect(preparer.prepare(workspace, BACKUP_KEY)).rejects.toBeInstanceOf(Error);
+
+    expect(applicationLogger.warnEvents).toHaveLength(1);
+
+    expect(applicationLogger.warnEvents[0]).toMatchObject({
+      area: 'backup',
+      operation: 'restore-staging-cleanup',
+      message:
+        'No se ha podido limpiar completamente el staging después de fallar la preparación de una restauración.',
+      error: expect.any(Error),
+    });
   });
 });
+
+/**
+ * Workspace real que permite simular exclusivamente
+ * un fallo durante la limpieza posterior a un error.
+ */
+class FailingCleanupRestoreWorkspace extends FileOtpvV3RestoreWorkspace {
+  clearError: Error | null = null;
+
+  /**
+   * Ejecuta la limpieza real salvo cuando
+   * la prueba ha configurado un fallo explícito.
+   */
+  override async clear(): Promise<void> {
+    if (this.clearError !== null) {
+      throw this.clearError;
+    }
+
+    await super.clear();
+  }
+}
+
+/**
+ * Logger controlado utilizado por las pruebas
+ * del preparador de staging de restauración.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora eventos de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora eventos informativos.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva avisos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Ignora errores principales.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No mantiene escrituras pendientes.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
+}
 
 /**
  * Crea el contenido portable previamente

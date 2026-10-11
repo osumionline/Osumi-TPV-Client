@@ -905,7 +905,7 @@ export default function createApplicationComposition(
   const otpvV3FilesExtractor: YauzlOtpvV3FilesExtractor = new YauzlOtpvV3FilesExtractor();
 
   const otpvV3RestoreStagingPreparer: FileOtpvV3RestoreStagingPreparer =
-    new FileOtpvV3RestoreStagingPreparer(applicationPaths, stagingSecretStorage);
+    new FileOtpvV3RestoreStagingPreparer(applicationPaths, stagingSecretStorage, applicationLogger);
 
   const backupRestoreSelectionService: BackupRestoreSelectionService =
     new BackupRestoreSelectionService(
