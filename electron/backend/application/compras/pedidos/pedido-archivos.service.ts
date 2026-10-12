@@ -1,6 +1,7 @@
 import type PedidoArchivoDialog from '@backend/contracts/compras/pedidos/pedido-archivo-dialog.interface';
 import type PedidoArchivoStorage from '@backend/contracts/compras/pedidos/pedido-archivo-storage.interface';
 import type PedidoArchivosRepository from '@backend/contracts/compras/pedidos/pedido-archivos.repository.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type PedidoArchivoCreateRecord from '@backend/domain/compras/pedidos/pedido-archivo-create-record.interface';
 import type { PedidoArchivoRecord } from '@backend/domain/compras/pedidos/pedido-archivo-record.interface';
 import type {
@@ -16,10 +17,14 @@ import { randomUUID } from 'node:crypto';
  * persistencia de PDFs relacionados con Pedidos.
  */
 export default class PedidoArchivosService {
+  /**
+   * Crea el servicio de documentos asociados a Pedidos.
+   */
   constructor(
     private readonly repository: PedidoArchivosRepository,
     private readonly dialog: PedidoArchivoDialog,
     private readonly storage: PedidoArchivoStorage,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   /**
@@ -120,10 +125,12 @@ export default class PedidoArchivosService {
     try {
       await this.storage.remove(publicId);
     } catch (cleanupError: unknown) {
-      console.error(
-        'No se ha podido eliminar físicamente un PDF de Pedido ya desvinculado:',
-        cleanupError,
-      );
+      this.applicationLogger.warn({
+        area: 'compras',
+        operation: 'delete-orphan-order-pdf',
+        message: 'No se ha podido eliminar físicamente un PDF de Pedido ya desvinculado.',
+        error: cleanupError,
+      });
     }
   }
 
@@ -161,10 +168,12 @@ export default class PedidoArchivosService {
     try {
       await this.storage.remove(publicId);
     } catch (cleanupError: unknown) {
-      console.error(
-        'No se ha podido limpiar un PDF de Pedido cuya persistencia ha fallado:',
-        cleanupError,
-      );
+      this.applicationLogger.warn({
+        area: 'compras',
+        operation: 'cleanup-order-pdf-after-persistence-error',
+        message: 'No se ha podido limpiar un PDF de Pedido después de fallar su persistencia.',
+        error: cleanupError,
+      });
     }
   }
 }

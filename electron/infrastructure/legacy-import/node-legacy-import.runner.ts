@@ -16,6 +16,10 @@ export default class NodeLegacyImportRunner implements LegacyImportRunner {
     private readonly applicationVersion: string,
   ) {}
 
+  /**
+   * Ejecuta la importación en el Worker dedicado
+   * y traduce sus mensajes al contrato de aplicación.
+   */
   run(
     command: LegacyImportExecutionCommand,
     progressListener: LegacyImportProgressListener,
@@ -64,10 +68,6 @@ export default class NodeLegacyImportRunner implements LegacyImportRunner {
 
             case 'failed':
               completed = true;
-
-              console.error(
-                ['Error en el Worker de importación.', value.message, value.stack ?? ''].join('\n'),
-              );
 
               reject(new Error(value.message));
 

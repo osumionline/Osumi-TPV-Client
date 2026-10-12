@@ -10,6 +10,7 @@ import type LegacyImportProgressListener from '@backend/contracts/legacy-import/
 import type LegacyImportReviewDecisionValidator from '@backend/contracts/legacy-import/legacy-import-review-decision-validator.interface';
 import type LegacyImportRunner from '@backend/contracts/legacy-import/legacy-import-runner.interface';
 import type LegacyImportSelectionStore from '@backend/contracts/legacy-import/legacy-import-selection-store.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type LegacyImportExecutionCommand from '@backend/domain/legacy-import/legacy-import-execution-command.interface';
 import type LegacyImportPackageAnalysis from '@backend/domain/legacy-import/legacy-import-package-analysis.type';
 import LegacyImportPackageConfiguration from '@backend/domain/legacy-import/legacy-import-package-configuration.interface';
@@ -25,6 +26,9 @@ import type LegacyImportStartResult from '@desktop-contracts/legacy-import/legac
 export default class LegacyImportService {
   private activeImportSelectionId: string | null = null;
 
+  /**
+   * Crea el coordinador del flujo de importación legacy.
+   */
   constructor(
     private readonly dialog: LegacyImportDialog,
     private readonly packageInspector: LegacyImportPackageInspector,
@@ -37,8 +41,12 @@ export default class LegacyImportService {
     private readonly stagingLogoStorage: LogoStorage,
     private readonly stagingSecretStorage: SecretStorage,
     private readonly installationFinalizer: InstallationFinalizer,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
+  /**
+   * Selecciona e inspecciona una exportación legacy.
+   */
   async selectPackage(): Promise<LegacyImportPackageSelectionResult> {
     const packagePath: string | null = await this.dialog.selectPackage();
 
@@ -74,7 +82,12 @@ export default class LegacyImportService {
     } catch (error: unknown) {
       this.selectionStore.clear();
 
-      console.error('Error inspeccionando el paquete .otpv:', error);
+      this.applicationLogger.warn({
+        area: 'legacy-import',
+        operation: 'inspect-package',
+        message: 'No se ha podido inspeccionar el paquete de importación legacy.',
+        error,
+      });
 
       throw new Error('El paquete seleccionado no es una exportación válida de Osumi TPV.', {
         cause: error,
@@ -82,6 +95,10 @@ export default class LegacyImportService {
     }
   }
 
+  /**
+   * Analiza la base de datos incluida
+   * en el paquete legacy seleccionado.
+   */
   async analyzePackage(selectionId: string): Promise<LegacyImportAnalysisReport> {
     const selection: LegacyImportSelection | null = this.selectionStore.resolve(selectionId);
 
@@ -104,7 +121,12 @@ export default class LegacyImportService {
         ...analysis,
       };
     } catch (error: unknown) {
-      console.error('Error analizando database.sql:', error);
+      this.applicationLogger.warn({
+        area: 'legacy-import',
+        operation: 'analyze-package',
+        message: 'No se ha podido analizar la base de datos del paquete legacy.',
+        error,
+      });
 
       throw new Error('No se ha podido analizar la base de datos incluida en el paquete.', {
         cause: error,
@@ -112,6 +134,10 @@ export default class LegacyImportService {
     }
   }
 
+  /**
+   * Valida y conserva las decisiones adoptadas
+   * sobre los conflictos detectados en el análisis.
+   */
   async confirmReviewDecisions(
     selectionId: string,
     decisions: readonly LegacyImportReviewDecision[],
@@ -153,14 +179,16 @@ export default class LegacyImportService {
         decisions: normalizedDecisions.length,
       };
     } catch (error: unknown) {
-      console.error('Error validando las decisiones de importación:', error);
-
       throw new Error('Las decisiones indicadas no son válidas para el análisis actual.', {
         cause: error,
       });
     }
   }
 
+  /**
+   * Ejecuta y activa definitivamente
+   * una importación legacy ya preparada.
+   */
   async startImport(
     selectionId: string,
     progressListener: LegacyImportProgressListener,
@@ -286,12 +314,22 @@ export default class LegacyImportService {
 
       return result;
     } catch (error: unknown) {
-      console.error('Error completando la importación legacy:', error);
+      this.applicationLogger.error({
+        area: 'legacy-import',
+        operation: 'start-import',
+        message: 'No se ha podido completar la importación legacy.',
+        error,
+      });
 
       try {
         await this.installationFinalizer.recover();
       } catch (recoveryError: unknown) {
-        console.error('No se ha podido recuperar la instalación interrumpida:', recoveryError);
+        this.applicationLogger.warn({
+          area: 'legacy-import',
+          operation: 'recover-failed-import',
+          message: 'No se ha podido recuperar completamente una importación legacy fallida.',
+          error: recoveryError,
+        });
       }
 
       throw new Error('No se ha podido completar la importación e instalación.', {

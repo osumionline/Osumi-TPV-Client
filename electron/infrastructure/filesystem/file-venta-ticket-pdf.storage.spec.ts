@@ -1,3 +1,5 @@
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import FileVentaTicketPdfStorage from '@infrastructure/filesystem/file-venta-ticket-pdf.storage';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -5,10 +7,12 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 let tempDirectory: string | null = null;
+let applicationLogger: TestApplicationLogger;
 
 describe('FileVentaTicketPdfStorage', (): void => {
   beforeEach(async (): Promise<void> => {
     tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-ticket-pdf-'));
+    applicationLogger = new TestApplicationLogger();
   });
 
   afterEach(async (): Promise<void> => {
@@ -25,7 +29,10 @@ describe('FileVentaTicketPdfStorage', (): void => {
   it('guarda el PDF vigente de una venta', async (): Promise<void> => {
     const directory: string = getTicketsDirectory();
 
-    const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(directory);
+    const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(
+      directory,
+      applicationLogger,
+    );
 
     const pdf: Uint8Array = createPdf('ticket-original');
 
@@ -41,7 +48,10 @@ describe('FileVentaTicketPdfStorage', (): void => {
   it('recupera exactamente los bytes del PDF vigente', async (): Promise<void> => {
     const directory: string = getTicketsDirectory();
 
-    const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(directory);
+    const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(
+      directory,
+      applicationLogger,
+    );
 
     const pdf: Uint8Array = createPdf('ticket-vigente');
 
@@ -57,7 +67,10 @@ describe('FileVentaTicketPdfStorage', (): void => {
   });
 
   it('devuelve null al leer un PDF que no existe', async (): Promise<void> => {
-    const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(getTicketsDirectory());
+    const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(
+      getTicketsDirectory(),
+      applicationLogger,
+    );
 
     expect(await storage.read(123)).toBeNull();
   });
@@ -65,7 +78,10 @@ describe('FileVentaTicketPdfStorage', (): void => {
   it('crea el directorio de tickets si todavía no existe', async (): Promise<void> => {
     const directory: string = join(requireTempDirectory(), 'uno', 'dos', 'ventas', 'tickets');
 
-    const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(directory);
+    const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(
+      directory,
+      applicationLogger,
+    );
 
     await storage.save(123, createPdf('ticket'));
 
@@ -75,7 +91,10 @@ describe('FileVentaTicketPdfStorage', (): void => {
   it('archiva el PDF anterior y promueve la nueva revisión', async (): Promise<void> => {
     const directory: string = getTicketsDirectory();
 
-    const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(directory);
+    const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(
+      directory,
+      applicationLogger,
+    );
 
     await storage.save(123, createPdf('documento-original'));
 
@@ -105,13 +124,19 @@ describe('FileVentaTicketPdfStorage', (): void => {
   });
 
   it('informa de que no existe un PDF todavía no generado', async (): Promise<void> => {
-    const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(getTicketsDirectory());
+    const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(
+      getTicketsDirectory(),
+      applicationLogger,
+    );
 
     expect(await storage.exists(123)).toBe(false);
   });
 
   it('rechaza identificadores de venta no válidos', async (): Promise<void> => {
-    const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(getTicketsDirectory());
+    const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(
+      getTicketsDirectory(),
+      applicationLogger,
+    );
 
     await expect(storage.read(0)).rejects.toThrow('El identificador de la venta no es válido.');
 
@@ -119,13 +144,66 @@ describe('FileVentaTicketPdfStorage', (): void => {
   });
 
   it('rechaza contenido que no sea un PDF', async (): Promise<void> => {
-    const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(getTicketsDirectory());
+    const storage: FileVentaTicketPdfStorage = new FileVentaTicketPdfStorage(
+      getTicketsDirectory(),
+      applicationLogger,
+    );
 
     const invalidPdf: Uint8Array = new TextEncoder().encode('esto no es un pdf');
 
     await expect(storage.save(123, invalidPdf)).rejects.toThrow(
       'El documento recibido no contiene un PDF válido.',
     );
+  });
+
+  it('propaga errores distintos de ENOENT al comprobar si existe un ticket', async (): Promise<void> => {
+    const storage = new FileVentaTicketPdfStorage(`${getTicketsDirectory()}\0`, applicationLogger);
+
+    await expect(storage.exists(123)).rejects.toBeInstanceOf(Error);
+
+    expect(applicationLogger.warnEvents).toEqual([]);
+  });
+
+  it('registra el cleanup fallido sin ocultar un error de promoción', async (): Promise<void> => {
+    const promotionError: Error = new Error('No se ha podido promover el ticket.');
+    const cleanupError: Error = new Error('No se ha podido eliminar el temporal.');
+
+    const removeFile = async (
+      filePath: string,
+      options: {
+        readonly force: boolean;
+      },
+    ): Promise<void> => {
+      void filePath;
+      void options;
+
+      throw cleanupError;
+    };
+
+    const renameFile = async (oldPath: string, newPath: string): Promise<void> => {
+      void oldPath;
+      void newPath;
+
+      throw promotionError;
+    };
+
+    const storage = new FileVentaTicketPdfStorage(
+      getTicketsDirectory(),
+      applicationLogger,
+      removeFile,
+      renameFile,
+    );
+
+    await expect(storage.save(123, createPdf('ticket'))).rejects.toBe(promotionError);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'ventas',
+        operation: 'ticket-pdf-temp-cleanup',
+        message: 'No se ha podido limpiar el PDF temporal de un ticket.',
+        error: cleanupError,
+      },
+    ]);
   });
 });
 
@@ -152,4 +230,28 @@ function requireTempDirectory(): string {
   }
 
   return tempDirectory;
+}
+
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
 }

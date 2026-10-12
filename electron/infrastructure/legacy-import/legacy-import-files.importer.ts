@@ -181,7 +181,17 @@ export default class LegacyImportFilesImporter implements LegacyImportPhaseImpor
         warningCount: counters.warningCount,
       };
     } catch (error: unknown) {
-      await this.cleanAfterError();
+      const cleanupError: Error | null = await this.cleanAfterError();
+
+      if (cleanupError !== null) {
+        throw new AggregateError(
+          [error, cleanupError],
+          'No se han podido importar los archivos del paquete legacy ni limpiar completamente su staging.',
+          {
+            cause: error,
+          },
+        );
+      }
 
       throw new Error('No se han podido importar los archivos del paquete legacy.', {
         cause: error,
@@ -710,11 +720,19 @@ export default class LegacyImportFilesImporter implements LegacyImportPhaseImpor
     });
   }
 
-  private async cleanAfterError(): Promise<void> {
+  /**
+   * Intenta limpiar los archivos del staging después
+   * de un fallo sin ocultar la incidencia principal.
+   */
+  private async cleanAfterError(): Promise<Error | null> {
     try {
       await this.resetStagingFiles();
+
+      return null;
     } catch (error: unknown) {
-      console.error('No se han podido limpiar los archivos temporales de importación:', error);
+      return error instanceof Error
+        ? error
+        : new Error('No se han podido limpiar los archivos temporales de la importación.');
     }
   }
 

@@ -566,12 +566,14 @@ export default function createApplicationComposition(
   const pedidoArchivoDialog: PedidoArchivoDialog = new ElectronPedidoArchivoDialog(getMainWindow);
   const pedidoArchivoStorage: PedidoArchivoStorage = new FilePedidoArchivoStorage(
     applicationPaths.filesDirectory,
+    applicationLogger,
   );
 
   const pedidoArchivosService: PedidoArchivosService = new PedidoArchivosService(
     pedidoArchivosRepository,
     pedidoArchivoDialog,
     pedidoArchivoStorage,
+    applicationLogger,
   );
 
   /*
@@ -643,6 +645,7 @@ export default function createApplicationComposition(
 
   const clienteFacturaPdfStorage: ClienteFacturaPdfStorage = new FileClienteFacturaPdfStorage(
     join(applicationPaths.filesDirectory, 'clientes', 'facturas'),
+    applicationLogger,
   );
   const a4DocumentRenderer: A4DocumentRenderer = new ElectronA4DocumentRenderer();
   const clienteFacturaPdfHtmlBuilder: ClienteFacturaPdfHtmlBuilder =
@@ -782,6 +785,7 @@ export default function createApplicationComposition(
 
   const ventaTicketPdfStorage: VentaTicketPdfStorage = new FileVentaTicketPdfStorage(
     join(applicationPaths.filesDirectory, 'ventas', 'tickets'),
+    applicationLogger,
   );
 
   const ventasTicketsService: VentasTicketsService = new VentasTicketsService(
@@ -870,6 +874,7 @@ export default function createApplicationComposition(
     stagingLogoStorage,
     stagingSecretStorage,
     installationFinalizer,
+    applicationLogger,
   );
 
   /*

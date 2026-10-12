@@ -1,3 +1,5 @@
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import FileClienteFacturaPdfStorage from '@infrastructure/filesystem/file-cliente-factura-pdf.storage';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -7,11 +9,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 describe('FileClienteFacturaPdfStorage', (): void => {
   let directory: string;
   let storage: FileClienteFacturaPdfStorage;
+  let applicationLogger: TestApplicationLogger;
 
   beforeEach(async (): Promise<void> => {
     directory = await mkdtemp(join(tmpdir(), 'osumi-factura-pdf-'));
-
-    storage = new FileClienteFacturaPdfStorage(directory);
+    applicationLogger = new TestApplicationLogger();
+    storage = new FileClienteFacturaPdfStorage(directory, applicationLogger);
   });
 
   afterEach(async (): Promise<void> => {
@@ -56,6 +59,41 @@ describe('FileClienteFacturaPdfStorage', (): void => {
       'El identificador de la factura no es válido.',
     );
   });
+
+  it('registra sin propagar un fallo limpiando el PDF temporal', async (): Promise<void> => {
+    const cleanupError: Error = new Error('No se ha podido eliminar el temporal.');
+
+    const removeFile = async (
+      filePath: string,
+      options: {
+        readonly force: boolean;
+      },
+    ): Promise<void> => {
+      void filePath;
+      void options;
+
+      throw cleanupError;
+    };
+
+    const failingStorage = new FileClienteFacturaPdfStorage(
+      directory,
+      applicationLogger,
+      removeFile,
+    );
+
+    await expect(
+      failingStorage.save('factura-cleanup', createPdf('contenido')),
+    ).resolves.toBeUndefined();
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'clientes',
+        operation: 'invoice-pdf-temp-cleanup',
+        message: 'No se ha podido limpiar un PDF temporal de una factura.',
+        error: cleanupError,
+      },
+    ]);
+  });
 });
 
 /**
@@ -64,4 +102,28 @@ describe('FileClienteFacturaPdfStorage', (): void => {
  */
 function createPdf(content: string): Uint8Array {
   return new TextEncoder().encode(`%PDF-1.7\n${content}`);
+}
+
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
 }

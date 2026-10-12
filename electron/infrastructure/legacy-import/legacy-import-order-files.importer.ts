@@ -213,7 +213,17 @@ export default class LegacyImportOrderFilesImporter implements LegacyImportPhase
         warningCount: counters.warningCount,
       };
     } catch (error: unknown) {
-      await this.cleanExtractedFiles(extractedPaths);
+      const cleanupErrors: readonly Error[] = await this.cleanExtractedFiles(extractedPaths);
+
+      if (cleanupErrors.length > 0) {
+        throw new AggregateError(
+          [error, ...cleanupErrors],
+          'No se han podido importar los PDF de pedidos ni limpiar completamente los archivos extraídos.',
+          {
+            cause: error,
+          },
+        );
+      }
 
       throw new Error('No se han podido importar los PDF de pedidos.', {
         cause: error,
@@ -891,18 +901,28 @@ export default class LegacyImportOrderFilesImporter implements LegacyImportPhase
     return item.mimeType;
   }
 
-  private async cleanExtractedFiles(paths: readonly string[]): Promise<void> {
-    await Promise.all(
-      paths.map(async (filePath: string): Promise<void> => {
-        try {
-          await rm(filePath, {
-            force: true,
-          });
-        } catch (error: unknown) {
-          console.error(`No se ha podido eliminar ${filePath}:`, error);
-        }
-      }),
-    );
+  /**
+   * Elimina los PDFs extraídos durante un intento fallido
+   * y devuelve las incidencias secundarias de cleanup.
+   */
+  private async cleanExtractedFiles(paths: readonly string[]): Promise<readonly Error[]> {
+    const cleanupErrors: Error[] = [];
+
+    for (const filePath of paths) {
+      try {
+        await rm(filePath, {
+          force: true,
+        });
+      } catch (error: unknown) {
+        cleanupErrors.push(
+          error instanceof Error
+            ? error
+            : new Error('No se ha podido eliminar un PDF temporal de la importación.'),
+        );
+      }
+    }
+
+    return cleanupErrors;
   }
 
   private reportProgress(

@@ -2,13 +2,28 @@ import type ClienteFacturaPdfStorage from '@backend/contracts/clientes/cliente-f
 import { randomUUID } from 'node:crypto';
 import { constants, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 
 const PDF_SIGNATURE: Uint8Array = new TextEncoder().encode('%PDF-');
 const MAX_FACTURA_PDF_SIZE: number = 25 * 1024 * 1024;
 const PUBLIC_ID_PATTERN: RegExp = /^[A-Za-z0-9_-]{1,128}$/;
 
+type RemoveFile = (
+  filePath: string,
+  options: {
+    readonly force: boolean;
+  },
+) => Promise<void>;
+
 export default class FileClienteFacturaPdfStorage implements ClienteFacturaPdfStorage {
-  constructor(private readonly directory: string) {}
+  /**
+   * Crea el almacenamiento de PDFs definitivos de facturas.
+   */
+  constructor(
+    private readonly directory: string,
+    private readonly applicationLogger: ApplicationLogger,
+    private readonly removeFile: RemoveFile = rm,
+  ) {}
 
   /**
    * Recupera el PDF definitivo cuando existe y
@@ -156,11 +171,16 @@ export default class FileClienteFacturaPdfStorage implements ClienteFacturaPdfSt
    */
   private async removeTemporaryFileSafely(filePath: string): Promise<void> {
     try {
-      await rm(filePath, {
+      await this.removeFile(filePath, {
         force: true,
       });
     } catch (error: unknown) {
-      console.error('No se ha podido limpiar el PDF temporal de la factura:', error);
+      this.applicationLogger.warn({
+        area: 'clientes',
+        operation: 'invoice-pdf-temp-cleanup',
+        message: 'No se ha podido limpiar un PDF temporal de una factura.',
+        error,
+      });
     }
   }
 }

@@ -1,16 +1,32 @@
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type VentaTicketPdfStorage from '@backend/contracts/ventas/venta-ticket-pdf-storage.interface';
 import { randomUUID } from 'node:crypto';
 import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const PDF_SIGNATURE: Uint8Array = new TextEncoder().encode('%PDF-');
-
 const MAX_TICKET_PDF_SIZE: number = 10 * 1024 * 1024;
-
 const MAX_ARCHIVE_NAME_ATTEMPTS: number = 10_000;
 
+type RemoveFile = (
+  filePath: string,
+  options: {
+    readonly force: boolean;
+  },
+) => Promise<void>;
+
+type RenameFile = (oldPath: string, newPath: string) => Promise<void>;
+
 export default class FileVentaTicketPdfStorage implements VentaTicketPdfStorage {
-  constructor(private readonly directory: string) {}
+  /**
+   * Crea el almacenamiento de PDFs definitivos de tickets.
+   */
+  constructor(
+    private readonly directory: string,
+    private readonly applicationLogger: ApplicationLogger,
+    private readonly removeFile: RemoveFile = rm,
+    private readonly renameFile: RenameFile = rename,
+  ) {}
 
   /**
    * Comprueba si existe el PDF actualmente vigente de una venta.
@@ -69,11 +85,11 @@ export default class FileVentaTicketPdfStorage implements VentaTicketPdfStorage 
       if (await this.fileExists(filePath)) {
         archivedFilePath = await this.getAvailableArchiveFilePath(idVenta);
 
-        await rename(filePath, archivedFilePath);
+        await this.renameFile(filePath, archivedFilePath);
       }
 
       try {
-        await rename(temporaryFilePath, filePath);
+        await this.renameFile(temporaryFilePath, filePath);
       } catch (error: unknown) {
         if (archivedFilePath !== null) {
           await this.restoreArchivedFileSafely(archivedFilePath, filePath);
@@ -154,15 +170,22 @@ export default class FileVentaTicketPdfStorage implements VentaTicketPdfStorage 
   }
 
   /**
-   * Comprueba la existencia de una ruta sin propagar ENOENT.
+   * Comprueba la existencia de una ruta.
+   *
+   * Solo ENOENT representa ausencia; cualquier otro
+   * error del filesystem debe propagarse.
    */
   private async fileExists(filePath: string): Promise<boolean> {
     try {
       await access(filePath);
 
       return true;
-    } catch {
-      return false;
+    } catch (error: unknown) {
+      if (this.hasErrorCode(error, 'ENOENT')) {
+        return false;
+      }
+
+      throw error;
     }
   }
 
@@ -179,9 +202,15 @@ export default class FileVentaTicketPdfStorage implements VentaTicketPdfStorage 
         return;
       }
 
-      await rename(archivedFilePath, filePath);
+      await this.renameFile(archivedFilePath, filePath);
     } catch (error: unknown) {
-      console.error('No se ha podido restaurar el PDF anterior del ticket:', error);
+      this.applicationLogger.warn({
+        area: 'ventas',
+        operation: 'restore-ticket-pdf-after-promotion-error',
+        message:
+          'No se ha podido restaurar el PDF anterior del ticket después de fallar una nueva revisión.',
+        error,
+      });
     }
   }
 
@@ -202,11 +231,16 @@ export default class FileVentaTicketPdfStorage implements VentaTicketPdfStorage 
    */
   private async removeTemporaryFileSafely(filePath: string): Promise<void> {
     try {
-      await rm(filePath, {
+      await this.removeFile(filePath, {
         force: true,
       });
     } catch (error: unknown) {
-      console.error('No se ha podido limpiar el PDF temporal del ticket:', error);
+      this.applicationLogger.warn({
+        area: 'ventas',
+        operation: 'ticket-pdf-temp-cleanup',
+        message: 'No se ha podido limpiar el PDF temporal de un ticket.',
+        error,
+      });
     }
   }
 }

@@ -1,3 +1,5 @@
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import FilePedidoArchivoStorage from '@infrastructure/filesystem/file-pedido-archivo.storage';
 import { createHash } from 'node:crypto';
 import { access, mkdtemp, readFile, rm, truncate, writeFile } from 'node:fs/promises';
@@ -6,18 +8,16 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 let tempDirectory: string | null = null;
-
 let filesDirectory: string | null = null;
-
 let storage: FilePedidoArchivoStorage | null = null;
+let applicationLogger: TestApplicationLogger;
 
 describe('FilePedidoArchivoStorage', (): void => {
   beforeEach(async (): Promise<void> => {
     tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-order-pdf-'));
-
     filesDirectory = join(tempDirectory, 'files');
-
-    storage = new FilePedidoArchivoStorage(filesDirectory);
+    applicationLogger = new TestApplicationLogger();
+    storage = new FilePedidoArchivoStorage(filesDirectory, applicationLogger);
   });
 
   afterEach(async (): Promise<void> => {
@@ -99,6 +99,45 @@ describe('FilePedidoArchivoStorage', (): void => {
       'El PDF solicitado no está disponible.',
     );
   });
+
+  it('registra un fallo secundario limpiando un temporal sin ocultar el error principal', async (): Promise<void> => {
+    const cleanupError: Error = new Error('No se ha podido eliminar el temporal.');
+
+    const failingRemove = async (
+      filePath: string,
+      options: {
+        readonly force: boolean;
+      },
+    ): Promise<void> => {
+      void filePath;
+      void options;
+
+      throw cleanupError;
+    };
+
+    const failingStorage = new FilePedidoArchivoStorage(
+      requireFilesDirectory(),
+      applicationLogger,
+      failingRemove,
+    );
+
+    const sourcePath: string = join(requireTempDirectory(), 'falso-cleanup.pdf');
+
+    await writeFile(sourcePath, 'esto no es un pdf');
+
+    await expect(failingStorage.save('pdf-cleanup', sourcePath)).rejects.toThrow(
+      'El archivo seleccionado no contiene un PDF válido.',
+    );
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'compras',
+        operation: 'order-pdf-temp-cleanup',
+        message: 'No se ha podido limpiar un archivo temporal de un PDF de Pedido.',
+        error: cleanupError,
+      },
+    ]);
+  });
 });
 
 /**
@@ -132,4 +171,28 @@ function requireFilesDirectory(): string {
   }
 
   return filesDirectory;
+}
+
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
 }

@@ -2,6 +2,7 @@ import PedidoArchivosService from '@backend/application/compras/pedidos/pedido-a
 import type PedidoArchivoDialog from '@backend/contracts/compras/pedidos/pedido-archivo-dialog.interface';
 import type PedidoArchivoStorage from '@backend/contracts/compras/pedidos/pedido-archivo-storage.interface';
 import type PedidoArchivosRepository from '@backend/contracts/compras/pedidos/pedido-archivos.repository.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type PedidoArchivoCreateRecord from '@backend/domain/compras/pedidos/pedido-archivo-create-record.interface';
 import type { PedidoArchivoRecord } from '@backend/domain/compras/pedidos/pedido-archivo-record.interface';
 import {
@@ -9,6 +10,7 @@ import {
   PedidoArchivoResourceRecord,
 } from '@backend/domain/compras/pedidos/pedido-archivo-resource-record.interface';
 import type PedidoArchivoStoredRecord from '@backend/domain/compras/pedidos/pedido-archivo-stored-record.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type { PedidoArchivoInterface } from '@desktop-contracts/compras/pedidos/pedido-archivo.interface';
 import { describe, expect, it } from 'vitest';
 
@@ -26,12 +28,10 @@ class FakePedidoArchivoDialog implements PedidoArchivoDialog {
 
 class FakePedidoArchivoStorage implements PedidoArchivoStorage {
   savedPublicId: string | null = null;
-
   savedSourcePath: string | null = null;
-
   removedPublicId: string | null = null;
-
   openedPublicId: string | null = null;
+  removeError: Error | null = null;
 
   async open(publicId: string): Promise<void> {
     this.openedPublicId = publicId;
@@ -51,8 +51,16 @@ class FakePedidoArchivoStorage implements PedidoArchivoStorage {
     };
   }
 
+  /**
+   * Registra la eliminación o produce
+   * el fallo configurado para la prueba.
+   */
   async remove(publicId: string): Promise<void> {
     this.removedPublicId = publicId;
+
+    if (this.removeError !== null) {
+      throw this.removeError;
+    }
   }
 }
 
@@ -120,7 +128,12 @@ describe('PedidoArchivosService', (): void => {
 
     const repository = new FakePedidoArchivosRepository();
 
-    const service = new PedidoArchivosService(repository, dialog, storage);
+    const service = new PedidoArchivosService(
+      repository,
+      dialog,
+      storage,
+      new TestApplicationLogger(),
+    );
 
     const result: PedidoArchivoInterface | null = await service.attachPdf(3);
 
@@ -148,7 +161,12 @@ describe('PedidoArchivosService', (): void => {
 
     const repository = new FakePedidoArchivosRepository();
 
-    const service = new PedidoArchivosService(repository, dialog, storage);
+    const service = new PedidoArchivosService(
+      repository,
+      dialog,
+      storage,
+      new TestApplicationLogger(),
+    );
 
     await expect(service.attachPdf(1)).resolves.toBeNull();
 
@@ -164,6 +182,7 @@ describe('PedidoArchivosService', (): void => {
       new FakePedidoArchivosRepository(),
       dialog,
       new FakePedidoArchivoStorage(),
+      new TestApplicationLogger(),
     );
 
     await expect(service.attachPdf(0)).rejects.toThrow('El identificador del pedido no es válido.');
@@ -178,7 +197,12 @@ describe('PedidoArchivosService', (): void => {
 
     const storage = new FakePedidoArchivoStorage();
 
-    const service = new PedidoArchivosService(repository, new FakePedidoArchivoDialog(), storage);
+    const service = new PedidoArchivosService(
+      repository,
+      new FakePedidoArchivoDialog(),
+      storage,
+      new TestApplicationLogger(),
+    );
 
     await expect(service.attachPdf(1)).rejects.toThrow('Error de persistencia');
 
@@ -190,7 +214,12 @@ describe('PedidoArchivosService', (): void => {
 
     const storage = new FakePedidoArchivoStorage();
 
-    const service = new PedidoArchivosService(repository, new FakePedidoArchivoDialog(), storage);
+    const service = new PedidoArchivosService(
+      repository,
+      new FakePedidoArchivoDialog(),
+      storage,
+      new TestApplicationLogger(),
+    );
 
     await service.openPdf(3, 91);
 
@@ -206,7 +235,12 @@ describe('PedidoArchivosService', (): void => {
 
     const storage = new FakePedidoArchivoStorage();
 
-    const service = new PedidoArchivosService(repository, new FakePedidoArchivoDialog(), storage);
+    const service = new PedidoArchivosService(
+      repository,
+      new FakePedidoArchivoDialog(),
+      storage,
+      new TestApplicationLogger(),
+    );
 
     await expect(service.openPdf(3, 91)).rejects.toThrow('El PDF indicado no pertenece al pedido.');
 
@@ -218,7 +252,12 @@ describe('PedidoArchivosService', (): void => {
 
     const storage = new FakePedidoArchivoStorage();
 
-    const service = new PedidoArchivosService(repository, new FakePedidoArchivoDialog(), storage);
+    const service = new PedidoArchivosService(
+      repository,
+      new FakePedidoArchivoDialog(),
+      storage,
+      new TestApplicationLogger(),
+    );
 
     await service.deletePdf(3, 91);
 
@@ -237,10 +276,100 @@ describe('PedidoArchivosService', (): void => {
 
     const storage = new FakePedidoArchivoStorage();
 
-    const service = new PedidoArchivosService(repository, new FakePedidoArchivoDialog(), storage);
+    const service = new PedidoArchivosService(
+      repository,
+      new FakePedidoArchivoDialog(),
+      storage,
+      new TestApplicationLogger(),
+    );
 
     await service.deletePdf(3, 91);
 
     expect(storage.removedPublicId).toBeNull();
   });
+
+  it('registra el cleanup fallido después de un error de persistencia', async (): Promise<void> => {
+    const repository = new FakePedidoArchivosRepository();
+    const storage = new FakePedidoArchivoStorage();
+    const applicationLogger = new TestApplicationLogger();
+
+    const cleanupError: Error = new Error('No se ha podido eliminar el PDF.');
+
+    repository.fail = true;
+    storage.removeError = cleanupError;
+
+    const service = new PedidoArchivosService(
+      repository,
+      new FakePedidoArchivoDialog(),
+      storage,
+      applicationLogger,
+    );
+
+    await expect(service.attachPdf(1)).rejects.toThrow('Error de persistencia');
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'compras',
+        operation: 'cleanup-order-pdf-after-persistence-error',
+        message: 'No se ha podido limpiar un PDF de Pedido después de fallar su persistencia.',
+        error: cleanupError,
+      },
+    ]);
+  });
+
+  it('registra sin propagar un fallo eliminando un PDF ya desvinculado', async (): Promise<void> => {
+    const repository = new FakePedidoArchivosRepository();
+    const storage = new FakePedidoArchivoStorage();
+    const applicationLogger = new TestApplicationLogger();
+
+    const cleanupError: Error = new Error('No se ha podido eliminar el PDF.');
+
+    storage.removeError = cleanupError;
+
+    const service = new PedidoArchivosService(
+      repository,
+      new FakePedidoArchivoDialog(),
+      storage,
+      applicationLogger,
+    );
+
+    await expect(service.deletePdf(3, 91)).resolves.toBeUndefined();
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'compras',
+        operation: 'delete-orphan-order-pdf',
+        message: 'No se ha podido eliminar físicamente un PDF de Pedido ya desvinculado.',
+        error: cleanupError,
+      },
+    ]);
+  });
 });
+
+/**
+ * Logger controlado utilizado por las pruebas
+ * de documentos de Pedidos.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
+}
