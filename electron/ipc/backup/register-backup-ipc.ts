@@ -3,6 +3,7 @@ import type BackupAutomaticSchedulerService from '@backend/application/backup/ba
 import type BackupRemoteCreateService from '@backend/application/backup/backup-remote-create.service';
 import type BackupRemoteDownloadService from '@backend/application/backup/backup-remote-download.service';
 import type BackupRemoteRestoreSelectionService from '@backend/application/backup/backup-remote-restore-selection.service';
+import type BackupRemoteRestoreSessionService from '@backend/application/backup/backup-remote-restore-session.service';
 import type BackupRemoteService from '@backend/application/backup/backup-remote.service';
 import type BackupRestoreSelectionService from '@backend/application/backup/backup-restore-selection.service';
 import type BackupService from '@backend/application/backup/backup.service';
@@ -33,7 +34,7 @@ export default function registerBackupIpc(
   backupService: BackupService,
   backupAutomaticQueryService: BackupAutomaticQueryService,
   backupRemoteService: BackupRemoteService,
-  backupRemoteRestoreService: BackupRemoteService,
+  backupRemoteRestoreSessionService: BackupRemoteRestoreSessionService,
   backupRemoteRestoreSelectionService: BackupRemoteRestoreSelectionService,
   backupRemoteCreateService: BackupRemoteCreateService,
   backupRemoteDownloadService: BackupRemoteDownloadService,
@@ -128,45 +129,14 @@ export default function registerBackupIpc(
     async (event, credentials: unknown): Promise<BackupRemoteRestoreAccess> => {
       assertTrustedSender(event, getMainWindow);
 
-      /*
-       * Invalida cualquier intento temporal anterior.
-       */
-      await backupRemoteRestoreService.removeConfiguration();
-
-      const connection: BackupRemoteConnection =
-        await backupRemoteRestoreService.configure(credentials);
-
-      try {
-        const backups: readonly BackupRemoteBackup[] = await backupRemoteRestoreService.list();
-
-        return {
-          connection,
-          backups,
-        };
-      } catch (error: unknown) {
-        /*
-         * Una autenticación seguida de un listado fallido
-         * no debe dejar credenciales temporales activas.
-         */
-        await backupRemoteRestoreService.removeConfiguration();
-
-        throw error;
-      }
+      return backupRemoteRestoreSessionService.connect(credentials);
     },
   );
 
   ipcMain.handle(IPC_CHANNELS.backupRemoteRestoreDisconnect, async (event): Promise<void> => {
     assertTrustedSender(event, getMainWindow);
 
-    try {
-      await backupRemoteRestoreSelectionService.clear();
-    } finally {
-      /*
-       * Las credenciales temporales deben desaparecer
-       * incluso si falla la limpieza del fichero.
-       */
-      await backupRemoteRestoreService.removeConfiguration();
-    }
+    await backupRemoteRestoreSessionService.disconnect();
   });
 
   ipcMain.handle(

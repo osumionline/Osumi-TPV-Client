@@ -16,6 +16,7 @@ import BackupAutomaticStateService from '@backend/application/backup/backup-auto
 import BackupRemoteCreateService from '@backend/application/backup/backup-remote-create.service';
 import BackupRemoteDownloadService from '@backend/application/backup/backup-remote-download.service';
 import BackupRemoteRestoreSelectionService from '@backend/application/backup/backup-remote-restore-selection.service';
+import BackupRemoteRestoreSessionService from '@backend/application/backup/backup-remote-restore-session.service';
 import BackupRemoteService from '@backend/application/backup/backup-remote.service';
 import BackupRestoreSelectionService from '@backend/application/backup/backup-restore-selection.service';
 import BackupService from '@backend/application/backup/backup.service';
@@ -927,6 +928,13 @@ export default function createApplicationComposition(
       applicationLogger,
     );
 
+  const backupRemoteRestoreSessionService: BackupRemoteRestoreSessionService =
+    new BackupRemoteRestoreSessionService(
+      backupRemoteRestoreService,
+      backupRemoteRestoreSelectionService,
+      applicationLogger,
+    );
+
   const otpvV3RestoreUnlockService: OtpvV3RestoreUnlockService = new OtpvV3RestoreUnlockService(
     otpvV3RestoreSelectionStore,
     otpvPackageInspector,
@@ -1002,7 +1010,7 @@ export default function createApplicationComposition(
     backupService,
     backupAutomaticQueryService,
     backupRemoteService,
-    backupRemoteRestoreService,
+    backupRemoteRestoreSessionService,
     backupRemoteRestoreSelectionService,
     backupRemoteCreateService,
     backupRemoteDownloadService,

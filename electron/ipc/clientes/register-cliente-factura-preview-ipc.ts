@@ -7,6 +7,7 @@ import type {
   ClienteFacturaDocumentoConsulta,
   ClienteFacturaDocumentoInterface,
 } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
+import type ClienteFacturaPreviewEmitResult from '@desktop-contracts/clientes/cliente-factura-preview-emit-result.type';
 import type { ClienteFacturaInterface } from '@desktop-contracts/clientes/cliente-factura.interface';
 import IPC_CHANNELS from '@ipc/channels';
 import { ipcMain } from 'electron';
@@ -51,7 +52,7 @@ export default function registerClienteFacturaPreviewIpc(
 
   ipcMain.handle(
     IPC_CHANNELS.clienteFacturaPreviewEmitir,
-    async (event): Promise<ClienteFacturaDocumentoInterface> => {
+    async (event): Promise<ClienteFacturaPreviewEmitResult> => {
       /*
        * Una incidencia de autorización pertenece a
        * ElectronClienteFacturaPreviewWindow.
@@ -59,11 +60,8 @@ export default function registerClienteFacturaPreviewIpc(
       const consulta: ClienteFacturaDocumentoConsulta = previewWindow.getConsulta(event.sender.id);
 
       /*
-       * Esta operación todavía es pre-COMMIT.
-       *
-       * No registramos aquí sus errores porque ClienteFacturasService
-       * puede devolver también estados o precondiciones de negocio que
-       * esta capa no puede clasificar con suficiente precisión.
+       * Los errores pre-COMMIT pertenecen a ClienteFacturasService,
+       * que ya distingue estados de negocio de fallos técnicos.
        */
       const factura: ClienteFacturaInterface = await facturasService.emitBorrador({
         clientePublicId: consulta.clientePublicId,
@@ -72,17 +70,12 @@ export default function registerClienteFacturaPreviewIpc(
 
       /*
        * A partir de aquí el COMMIT es definitivo.
-       * Guardamos primero el resultado para que cerrar
-       * la preview nunca pierda esa información.
        */
       previewWindow.markEmitted(event.sender.id, factura);
 
       /*
-       * La factura ya puede responder como emitida aunque
-       * Chromium o filesystem fallen materializando el PDF.
-       *
-       * ClienteFacturaPdfService registra y absorbe
-       * internamente cualquier incidencia de este proceso.
+       * La materialización del PDF es post-COMMIT
+       * y posee su propio logging.
        */
       void pdfService.materializeAfterEmit({
         clientePublicId: consulta.clientePublicId,
@@ -90,7 +83,13 @@ export default function registerClienteFacturaPreviewIpc(
       });
 
       try {
-        return await documentosService.getDocumento(consulta);
+        const documento: ClienteFacturaDocumentoInterface =
+          await documentosService.getDocumento(consulta);
+
+        return {
+          status: 'updated',
+          documento,
+        };
       } catch (error: unknown) {
         applicationLogger.warn({
           area: 'clientes',
@@ -102,7 +101,13 @@ export default function registerClienteFacturaPreviewIpc(
           },
         });
 
-        throw error;
+        /*
+         * No rechazamos la operación como si el COMMIT
+         * hubiese fallado: comunicamos expresamente el estado.
+         */
+        return {
+          status: 'emitted-refresh-failed',
+        };
       }
     },
   );

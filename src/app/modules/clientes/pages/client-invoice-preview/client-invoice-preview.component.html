@@ -21,6 +21,19 @@
         </button>
     </section>
     }
+    @else if (postCommitRefreshFailed()) {
+    <section class="invoice-preview__state"
+             role="status">
+        <h1>
+            Factura emitida correctamente
+        </h1>
+
+        <p>
+            La factura se ha guardado correctamente, pero no se ha podido actualizar su
+            previsualización. Cierra esta ventana para continuar.
+        </p>
+    </section>
+    }
     @else if (documento(); as factura) {
     <article class="invoice-document">
         <header class="invoice-document__header">

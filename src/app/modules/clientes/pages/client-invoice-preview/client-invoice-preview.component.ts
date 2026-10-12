@@ -11,6 +11,7 @@ import type {
   ClienteFacturaDocumentoInterface,
   ClienteFacturaDocumentoVentaInterface,
 } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
+import type ClienteFacturaPreviewEmitResult from '@desktop-contracts/clientes/cliente-factura-preview-emit-result.type';
 import BUSINESS_LOGO_URL from '@model/documents/business-logo-url.constant';
 import { getErrorMessage } from '@utils/error.utils';
 
@@ -44,6 +45,7 @@ export default class ClientInvoicePreviewComponent implements OnInit {
   readonly loadError: WritableSignal<string | null> = signal<string | null>(null);
   readonly processing: WritableSignal<boolean> = signal<boolean>(false);
   readonly operationError: WritableSignal<string | null> = signal<string | null>(null);
+  readonly postCommitRefreshFailed: WritableSignal<boolean> = signal<boolean>(false);
   readonly expandedVentas: WritableSignal<ReadonlySet<string>> = signal<ReadonlySet<string>>(
     new Set<string>(),
   );
@@ -55,6 +57,7 @@ export default class ClientInvoicePreviewComponent implements OnInit {
       documento !== null &&
       documento.previsualizacion &&
       documento.estado === 'borrador' &&
+      !this.postCommitRefreshFailed() &&
       !this.loading() &&
       !this.processing()
     );
@@ -171,11 +174,22 @@ export default class ClientInvoicePreviewComponent implements OnInit {
     this.operationError.set(null);
 
     try {
-      const documento: ClienteFacturaDocumentoInterface =
+      const result: ClienteFacturaPreviewEmitResult =
         await window.osumiFacturaPreview.emitFactura();
 
-      this.documento.set(documento);
       this.expandedVentas.set(new Set<string>());
+
+      if (result.status === 'updated') {
+        this.documento.set(result.documento);
+
+        return;
+      }
+
+      /*
+       * El COMMIT ya está confirmado. No debe volver
+       * a ofrecerse la acción Facturar.
+       */
+      this.postCommitRefreshFailed.set(true);
     } catch (error: unknown) {
       this.operationError.set(getErrorMessage(error, 'No se ha podido emitir la factura.'));
     } finally {
@@ -269,6 +283,7 @@ export default class ClientInvoicePreviewComponent implements OnInit {
     this.loading.set(true);
     this.loadError.set(null);
     this.operationError.set(null);
+    this.postCommitRefreshFailed.set(false);
     this.expandedVentas.set(new Set<string>());
 
     try {

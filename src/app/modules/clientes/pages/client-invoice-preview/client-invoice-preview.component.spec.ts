@@ -2,6 +2,7 @@ import type { ComponentFixture } from '@angular/core/testing';
 import { TestBed } from '@angular/core/testing';
 import type { ClienteFacturaDocumentoInterface } from '@desktop-contracts/clientes/cliente-factura-documento.interface';
 import type ClienteFacturaPreviewApi from '@desktop-contracts/clientes/cliente-factura-preview-api.interface';
+import type ClienteFacturaPreviewEmitResult from '@desktop-contracts/clientes/cliente-factura-preview-emit-result.type';
 import ClientInvoicePreviewComponent from '@modules/clientes/pages/client-invoice-preview/client-invoice-preview.component';
 import { vi } from 'vitest';
 
@@ -10,17 +11,20 @@ describe('ClientInvoicePreviewComponent', (): void => {
   let originalPreviewDescriptor: PropertyDescriptor | undefined;
   let documento: ClienteFacturaDocumentoInterface;
   let emittedDocumento: ClienteFacturaDocumentoInterface;
+  let emitResult: ClienteFacturaPreviewEmitResult;
 
   beforeEach(async (): Promise<void> => {
     originalPreviewDescriptor = Object.getOwnPropertyDescriptor(window, 'osumiFacturaPreview');
     documento = createDocumento(true);
     emittedDocumento = createDocumento(false);
+    emitResult = {
+      status: 'updated',
+      documento: emittedDocumento,
+    };
 
     const api: ClienteFacturaPreviewApi = {
       getDocumento: (): Promise<ClienteFacturaDocumentoInterface> => Promise.resolve(documento),
-
-      emitFactura: (): Promise<ClienteFacturaDocumentoInterface> =>
-        Promise.resolve(emittedDocumento),
+      emitFactura: (): Promise<ClienteFacturaPreviewEmitResult> => Promise.resolve(emitResult),
     };
 
     Object.defineProperty(window, 'osumiFacturaPreview', {
@@ -91,6 +95,27 @@ describe('ClientInvoicePreviewComponent', (): void => {
     expect(fixture.componentInstance.documento()).toEqual(emittedDocumento);
     expect(fixture.componentInstance.canEmit()).toBe(false);
     expect(fixture.componentInstance.expandedVentas().size).toBe(0);
+  });
+
+  it('bloquea una segunda emisión si el COMMIT termina pero falla el refresco documental', async (): Promise<void> => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    emitResult = {
+      status: 'emitted-refresh-failed',
+    };
+
+    await fixture.componentInstance.emitFactura();
+
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.postCommitRefreshFailed()).toBe(true);
+    expect(fixture.componentInstance.canEmit()).toBe(false);
+    expect(fixture.componentInstance.operationError()).toBeNull();
+
+    const textContent: string = fixture.nativeElement.textContent ?? '';
+
+    expect(textContent).toContain('Factura emitida correctamente');
+    expect(textContent).toContain('Cierra esta ventana para continuar');
   });
 });
 
