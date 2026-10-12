@@ -1,4 +1,5 @@
 import type DatabaseSnapshot from '@backend/contracts/backup/database-snapshot.interface';
+import hasFileSystemErrorCode from '@infrastructure/filesystem/filesystem-error.utils';
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { access, mkdir, rename, rm, stat } from 'node:fs/promises';
@@ -88,8 +89,12 @@ export default class BetterSqlite3DatabaseSnapshot implements DatabaseSnapshot {
   private async assertDestinationDoesNotExist(destinationFile: string): Promise<void> {
     try {
       await access(destinationFile);
-    } catch {
-      return;
+    } catch (error: unknown) {
+      if (hasFileSystemErrorCode(error, 'ENOENT')) {
+        return;
+      }
+
+      throw error;
     }
 
     throw new Error('El fichero de destino del snapshot ya existe.');

@@ -5,6 +5,7 @@ import {
   OTPV_V3_MAX_PACKAGE_SIZE_BYTES,
   OTPV_V3_PAYLOAD_ENTRY,
 } from '@backend/domain/backup/otpv-v3.constants';
+import hasFileSystemErrorCode from '@infrastructure/filesystem/filesystem-error.utils';
 import { randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
 import { access, mkdir, rename, rm } from 'node:fs/promises';
@@ -274,8 +275,12 @@ export default class YauzlOtpvV3EncryptedPayloadExtractor implements OtpvV3Encry
   private async assertDestinationDoesNotExist(destinationFile: string): Promise<void> {
     try {
       await access(destinationFile);
-    } catch {
-      return;
+    } catch (error: unknown) {
+      if (hasFileSystemErrorCode(error, 'ENOENT')) {
+        return;
+      }
+
+      throw error;
     }
 
     throw new Error('El fichero de destino de payload.enc ya existe.');

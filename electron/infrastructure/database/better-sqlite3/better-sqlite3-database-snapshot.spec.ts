@@ -198,6 +198,16 @@ describe('BetterSqlite3DatabaseSnapshot', (): void => {
     ).toBe('contenido existente');
   });
 
+  it('propaga errores distintos de ENOENT al comprobar el destino', async (): Promise<void> => {
+    const snapshot: BetterSqlite3DatabaseSnapshot = new BetterSqlite3DatabaseSnapshot(
+      requireSourceDatabaseFile(),
+    );
+
+    const invalidDestinationFile: string = `${requireSnapshotFile()}\0`;
+
+    await expect(snapshot.create(invalidDestinationFile)).rejects.toBeInstanceOf(TypeError);
+  });
+
   it('falla limpiamente si la base origen no existe', async (): Promise<void> => {
     const missingSource: string = join(requireTempDirectory(), 'missing.sqlite');
     const destinationFile: string = join(requireTempDirectory(), 'missing-backup.sqlite');

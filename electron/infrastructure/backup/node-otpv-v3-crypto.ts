@@ -16,17 +16,18 @@ import {
   OTPV_V3_GCM_AUTH_TAG_LENGTH_BYTES,
   OTPV_V3_GCM_IV_LENGTH_BYTES,
   OTPV_V3_KDF_ALGORITHM,
-  OTPV_V3_SCRYPT_BLOCK_SIZE,
-  OTPV_V3_SCRYPT_COST,
-  OTPV_V3_SCRYPT_MAXMEM_BYTES,
-  OTPV_V3_SCRYPT_PARALLELIZATION,
   OTPV_V3_KDF_LENGTH_BYTES,
   OTPV_V3_KEY_WRAP_AAD_PREFIX,
   OTPV_V3_PAYLOAD_AAD_PREFIX,
   OTPV_V3_PAYLOAD_ENTRY,
   OTPV_V3_PAYLOAD_FORMAT,
   OTPV_V3_SALT_LENGTH_BYTES,
+  OTPV_V3_SCRYPT_BLOCK_SIZE,
+  OTPV_V3_SCRYPT_COST,
+  OTPV_V3_SCRYPT_MAXMEM_BYTES,
+  OTPV_V3_SCRYPT_PARALLELIZATION,
 } from '@backend/domain/backup/otpv-v3.constants';
+import hasFileSystemErrorCode from '@infrastructure/filesystem/filesystem-error.utils';
 import { createCipheriv, createDecipheriv, randomBytes, randomUUID, scrypt } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { access, mkdir, rename, rm } from 'node:fs/promises';
@@ -438,8 +439,12 @@ export default class NodeOtpvV3Crypto implements OtpvV3Crypto {
   private async assertDestinationDoesNotExist(destinationFile: string): Promise<void> {
     try {
       await access(destinationFile);
-    } catch {
-      return;
+    } catch (error: unknown) {
+      if (hasFileSystemErrorCode(error, 'ENOENT')) {
+        return;
+      }
+
+      throw error;
     }
 
     throw new Error('El fichero de destino ya existe.');

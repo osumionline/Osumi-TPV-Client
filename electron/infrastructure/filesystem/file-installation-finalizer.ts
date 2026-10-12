@@ -1,6 +1,7 @@
 import type InstallationFinalizer from '@backend/contracts/configuration/installation-finalizer.interface';
 import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
+import hasFileSystemErrorCode from '@infrastructure/filesystem/filesystem-error.utils';
 import { access, mkdir, rename, rm } from 'node:fs/promises';
 
 interface FilePromotion {
@@ -212,8 +213,12 @@ export default class FileInstallationFinalizer implements InstallationFinalizer 
       await access(filePath);
 
       return true;
-    } catch {
-      return false;
+    } catch (error: unknown) {
+      if (hasFileSystemErrorCode(error, 'ENOENT')) {
+        return false;
+      }
+
+      throw error;
     }
   }
 }

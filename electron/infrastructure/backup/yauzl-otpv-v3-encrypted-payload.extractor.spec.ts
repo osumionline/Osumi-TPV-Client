@@ -73,6 +73,14 @@ describe('YauzlOtpvV3EncryptedPayloadExtractor', (): void => {
       }),
     ).toBe('existente');
   });
+
+  it('propaga errores distintos de ENOENT al comprobar el destino', async (): Promise<void> => {
+    const extractor = new YauzlOtpvV3EncryptedPayloadExtractor();
+
+    await expect(extractor.extract('unused.otpv', 'invalid\0payload.enc')).rejects.toBeInstanceOf(
+      Error,
+    );
+  });
 });
 
 /**

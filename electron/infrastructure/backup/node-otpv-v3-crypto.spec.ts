@@ -17,10 +17,10 @@ import NodeOtpvV3Crypto from '@infrastructure/backup/node-otpv-v3-crypto';
 import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const BACKUP_API_KEY: string = 'test-backup-api-key-with-enough-random-material';
-
 const AUTHENTICATED_DATA: Buffer = Buffer.from('{"formatVersion":3,"backupId":"test"}', 'utf8');
 
 let tempDirectory: string | null = null;
@@ -197,6 +197,19 @@ describe('NodeOtpvV3Crypto', (): void => {
         encoding: 'utf8',
       }),
     ).toBe('existente');
+  });
+
+  it('propaga errores distintos de ENOENT al comprobar el destino', async (): Promise<void> => {
+    const crypto = new NodeOtpvV3Crypto();
+
+    await expect(
+      crypto.encryptStream({
+        backupApiKey: 'backup-key',
+        authenticatedData: Buffer.from('metadata'),
+        sourceStream: Readable.from(Buffer.from('payload')),
+        destinationFile: 'invalid\0destination.enc',
+      }),
+    ).rejects.toBeInstanceOf(Error);
   });
 });
 

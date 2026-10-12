@@ -24,6 +24,7 @@ import {
   OTPV_V3_PAYLOAD_ENTRY,
 } from '@backend/domain/backup/otpv-v3.constants';
 import { DATABASE_SCHEMA_VERSION } from '@backend/domain/database/database-schema.constants';
+import hasFileSystemErrorCode from '@infrastructure/filesystem/filesystem-error.utils';
 import { randomUUID } from 'node:crypto';
 import type { Stats } from 'node:fs';
 import { createWriteStream } from 'node:fs';
@@ -205,8 +206,12 @@ export default class YazlOtpvV3PackageBuilder implements OtpvV3PackageBuilder {
   private async assertDestinationDoesNotExist(destinationFile: string): Promise<void> {
     try {
       await access(destinationFile);
-    } catch {
-      return;
+    } catch (error: unknown) {
+      if (hasFileSystemErrorCode(error, 'ENOENT')) {
+        return;
+      }
+
+      throw error;
     }
 
     throw new Error('El fichero .otpv de destino ya existe.');

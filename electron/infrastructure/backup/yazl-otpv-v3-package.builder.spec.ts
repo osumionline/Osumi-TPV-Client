@@ -115,6 +115,26 @@ describe('YazlOtpvV3PackageBuilder', (): void => {
     expect(await readFile(destinationFile, { encoding: 'utf8' })).toBe('existente');
   });
 
+  it('propaga errores distintos de ENOENT al comprobar el destino', async (): Promise<void> => {
+    const payloadBuilder: TestPayloadBuilder = new TestPayloadBuilder();
+
+    const builder: YazlOtpvV3PackageBuilder = new YazlOtpvV3PackageBuilder('1.2.3', payloadBuilder);
+
+    const destinationFile: string = `${getPath('invalid.otpv')}\0`;
+
+    await expect(
+      builder.create({
+        backupApiKey: BACKUP_API_KEY,
+        destinationFile,
+      }),
+    ).rejects.toBeInstanceOf(TypeError);
+
+    expect(payloadBuilder.authenticatedData).toBeNull();
+    expect(payloadBuilder.destinationFile).toBeNull();
+
+    expect(await readdir(requireTempDirectory())).toEqual([]);
+  });
+
   it('elimina los temporales cuando falla la creación del payload', async (): Promise<void> => {
     const builder: YazlOtpvV3PackageBuilder = new YazlOtpvV3PackageBuilder(
       '1.2.3',
