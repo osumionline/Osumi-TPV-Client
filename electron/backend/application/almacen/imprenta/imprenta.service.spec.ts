@@ -19,6 +19,7 @@ class FakeImprentaRepository implements ImprentaRepository {
 
   lastPrintIds: readonly number[] | null = null;
   printError: Error | null = null;
+  searchError: Error | null = null;
 
   searchResult: readonly ImprentaArticuloSearchRecord[] = [
     {
@@ -40,6 +41,10 @@ class FakeImprentaRepository implements ImprentaRepository {
     },
   ];
 
+  /**
+   * Registra la búsqueda solicitada o simula
+   * una incidencia técnica del repository.
+   */
   searchImprentaArticulos(
     texto: string,
     idsArticulosExcluidos: readonly number[],
@@ -48,6 +53,10 @@ class FakeImprentaRepository implements ImprentaRepository {
       texto,
       idsArticulosExcluidos: [...idsArticulosExcluidos],
     };
+
+    if (this.searchError !== null) {
+      return Promise.reject(this.searchError);
+    }
 
     return Promise.resolve(this.searchResult);
   }
@@ -165,7 +174,8 @@ describe('ImprentaService', (): void => {
 
   it('rechaza identificadores excluidos no válidos', async (): Promise<void> => {
     const repository = new FakeImprentaRepository();
-    const service = createService(repository);
+    const applicationLogger = new TestApplicationLogger();
+    const service = createService(repository, applicationLogger);
 
     await expect(
       service.searchImprentaArticulos({
@@ -175,6 +185,7 @@ describe('ImprentaService', (): void => {
     ).rejects.toThrow('Uno de los artículos excluidos de Imprenta no es válido.');
 
     expect(repository.lastSearch).toBeNull();
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
   it('expone los datos canónicos actuales para impresión', async (): Promise<void> => {
@@ -217,6 +228,32 @@ describe('ImprentaService', (): void => {
         context: {
           articleCount: 2,
         },
+      },
+    ]);
+  });
+
+  it('registra y propaga un fallo técnico al buscar artículos para Imprenta', async (): Promise<void> => {
+    const repository = new FakeImprentaRepository();
+    const applicationLogger = new TestApplicationLogger();
+    const error: Error = new Error('SQLite no disponible.');
+
+    repository.searchError = error;
+
+    const service = createService(repository, applicationLogger);
+
+    await expect(
+      service.searchImprentaArticulos({
+        texto: 'artículo',
+        idsArticulosExcluidos: [3, 9],
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'almacen',
+        operation: 'search-imprenta-articles',
+        message: 'No se han podido buscar artículos para Imprenta.',
+        error,
       },
     ]);
   });

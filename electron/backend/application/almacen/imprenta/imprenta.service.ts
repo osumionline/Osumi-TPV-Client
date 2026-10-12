@@ -61,16 +61,27 @@ export default class ImprentaService implements ImprentaPrintProvider {
       (left: number, right: number): number => left - right,
     );
 
-    const rows: readonly ImprentaArticuloSearchRecord[] =
-      await this.imprentaRepository.searchImprentaArticulos(texto, idsArticulosExcluidos);
+    try {
+      const rows: readonly ImprentaArticuloSearchRecord[] =
+        await this.imprentaRepository.searchImprentaArticulos(texto, idsArticulosExcluidos);
 
-    return rows.map((row: ImprentaArticuloSearchRecord): ImprentaArticuloSearchInterface => ({
-      id: row.id,
-      localizador: row.localizador,
-      marcaNombre: row.marcaNombre,
-      nombre: row.nombre,
-      pvpCents: row.pvpCents,
-    }));
+      return rows.map((row: ImprentaArticuloSearchRecord): ImprentaArticuloSearchInterface => ({
+        id: row.id,
+        localizador: row.localizador,
+        marcaNombre: row.marcaNombre,
+        nombre: row.nombre,
+        pvpCents: row.pvpCents,
+      }));
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'almacen',
+        operation: 'search-imprenta-articles',
+        message: 'No se han podido buscar artículos para Imprenta.',
+        error,
+      });
+
+      throw error;
+    }
   }
 
   /**
