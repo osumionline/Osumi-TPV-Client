@@ -53,6 +53,16 @@ export default class ArticlePhotosComponent {
   readonly cropFile: WritableSignal<File | null> = signal<File | null>(null);
 
   /**
+   * Activa la protección de lifecycle utilizada
+   * por las operaciones asíncronas de staging.
+   */
+  constructor() {
+    this.destroyRef.onDestroy((): void => {
+      this.destroyed = true;
+    });
+  }
+
+  /**
    * Abre el selector nativo de imágenes.
    */
   openFilePicker(inputElement: HTMLInputElement): void {
@@ -133,7 +143,7 @@ export default class ArticlePhotosComponent {
    * Si todavía es temporal, elimina también su staging.
    */
   async remove(index: number): Promise<void> {
-    if (this.uploading()) {
+    if (this.uploading() || this.destroyed) {
       return;
     }
 
@@ -149,10 +159,16 @@ export default class ArticlePhotosComponent {
       try {
         await this.filesService.discardStagedImage(foto.stagingId);
       } catch (error: unknown) {
-        this.error.set(getErrorMessage(error, 'No se ha podido eliminar la imagen temporal.'));
+        if (!this.destroyed) {
+          this.error.set(getErrorMessage(error, 'No se ha podido eliminar la imagen temporal.'));
+        }
 
         return;
       }
+    }
+
+    if (this.destroyed) {
+      return;
     }
 
     this.photosChangeEvent.emit(removeArticuloFoto(this.fotos(), index));
@@ -247,7 +263,7 @@ export default class ArticlePhotosComponent {
    * de forma atómica desde el punto de vista del draft.
    */
   private async stageFiles(files: readonly File[]): Promise<void> {
-    if (files.length === 0 || this.uploading()) {
+    if (files.length === 0 || this.uploading() || this.destroyed) {
       return;
     }
 
@@ -261,39 +277,46 @@ export default class ArticlePhotosComponent {
         stagedImages.push(await this.filesService.stageArticleImage(file));
 
         if (this.destroyed) {
-          await Promise.allSettled(
-            stagedImages.map((stagedImage: StagedImageInterface): Promise<void> =>
-              this.filesService.discardStagedImage(stagedImage.stagingId),
-            ),
-          );
+          await this.discardStagedImages(stagedImages);
 
           return;
         }
       }
 
       if (this.destroyed) {
-        await Promise.allSettled(
-          stagedImages.map((stagedImage: StagedImageInterface): Promise<void> =>
-            this.filesService.discardStagedImage(stagedImage.stagingId),
-          ),
-        );
+        await this.discardStagedImages(stagedImages);
 
         return;
       }
 
       this.photosChangeEvent.emit(appendStagedArticuloFotos(this.fotos(), stagedImages));
     } catch (error: unknown) {
-      await Promise.allSettled(
-        stagedImages.map((stagedImage: StagedImageInterface): Promise<void> =>
-          this.filesService.discardStagedImage(stagedImage.stagingId),
-        ),
-      );
+      await this.discardStagedImages(stagedImages);
 
-      this.error.set(
-        getErrorMessage(error, 'No se han podido preparar las imágenes seleccionadas.'),
-      );
+      if (!this.destroyed) {
+        this.error.set(
+          getErrorMessage(error, 'No se han podido preparar las imágenes seleccionadas.'),
+        );
+      }
     } finally {
-      this.uploading.set(false);
+      if (!this.destroyed) {
+        this.uploading.set(false);
+      }
     }
+  }
+
+  /**
+   * Descarta best-effort las imágenes temporales
+   * creadas durante una operación que no se ha consumido.
+   *
+   * Los fallos físicos quedan registrados por Main
+   * mediante ImageStagingService.
+   */
+  private async discardStagedImages(stagedImages: readonly StagedImageInterface[]): Promise<void> {
+    await Promise.allSettled(
+      stagedImages.map((stagedImage: StagedImageInterface): Promise<void> =>
+        this.filesService.discardStagedImage(stagedImage.stagingId),
+      ),
+    );
   }
 }

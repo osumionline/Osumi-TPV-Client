@@ -59,7 +59,7 @@ app
       applicationVersion,
     );
 
-    registerAssetsProtocol(applicationPaths, getRendererAssetsDirectory());
+    registerAssetsProtocol(applicationPaths, getRendererAssetsDirectory(), applicationLogger);
 
     /*
      * Recuperación de instalaciones interrumpidas.
