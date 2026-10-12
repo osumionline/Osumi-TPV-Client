@@ -52,11 +52,17 @@ export default class ClienteFacturasService {
   async getByClientePublicId(publicId: string): Promise<readonly ClienteFacturaInterface[]> {
     const normalizedPublicId: string = this.requirePublicId(publicId);
 
-    const records: readonly ClienteFacturaRecord[] =
-      await this.clienteFacturasRepository.findByClientePublicId(normalizedPublicId);
+    return this.executeReadWithLogging(
+      'load-invoices',
+      'No se han podido cargar las facturas del cliente.',
+      async (): Promise<readonly ClienteFacturaInterface[]> => {
+        const records: readonly ClienteFacturaRecord[] =
+          await this.clienteFacturasRepository.findByClientePublicId(normalizedPublicId);
 
-    return records.map((record: ClienteFacturaRecord): ClienteFacturaInterface =>
-      this.toInterface(record),
+        return records.map((record: ClienteFacturaRecord): ClienteFacturaInterface =>
+          this.toInterface(record),
+        );
+      },
     );
   }
 
@@ -233,14 +239,21 @@ export default class ClienteFacturasService {
 
     const clientePublicId: string = this.requirePublicId(consulta.clientePublicId);
     const facturaPublicId: string = this.requireFacturaPublicId(consulta.facturaPublicId);
-    const records: readonly ClienteFacturaVentaRecord[] =
-      await this.clienteFacturasRepository.findVentasByFacturaPublicId(
-        clientePublicId,
-        facturaPublicId,
-      );
 
-    return records.map((record: ClienteFacturaVentaRecord): ClienteFacturaVentaInterface =>
-      this.toVentaInterface(record),
+    return this.executeReadWithLogging(
+      'load-invoice-sales',
+      'No se han podido cargar las ventas relacionadas con la factura.',
+      async (): Promise<readonly ClienteFacturaVentaInterface[]> => {
+        const records: readonly ClienteFacturaVentaRecord[] =
+          await this.clienteFacturasRepository.findVentasByFacturaPublicId(
+            clientePublicId,
+            facturaPublicId,
+          );
+
+        return records.map((record: ClienteFacturaVentaRecord): ClienteFacturaVentaInterface =>
+          this.toVentaInterface(record),
+        );
+      },
     );
   }
 
@@ -260,16 +273,25 @@ export default class ClienteFacturasService {
       consulta.borradorPublicId,
     );
 
-    if (borradorPublicId !== null) {
-      await this.requireBorradorEditable(clientePublicId, borradorPublicId);
-    }
+    return this.executeReadWithLogging(
+      'load-available-invoice-sales',
+      'No se han podido cargar las ventas disponibles para facturar.',
+      async (): Promise<readonly ClienteFacturaVentaDisponibleInterface[]> => {
+        if (borradorPublicId !== null) {
+          await this.requireBorradorEditable(clientePublicId, borradorPublicId);
+        }
 
-    const records: readonly ClienteFacturaVentaDisponibleRecord[] =
-      await this.clienteFacturasRepository.findVentasDisponibles(clientePublicId, borradorPublicId);
+        const records: readonly ClienteFacturaVentaDisponibleRecord[] =
+          await this.clienteFacturasRepository.findVentasDisponibles(
+            clientePublicId,
+            borradorPublicId,
+          );
 
-    return records.map(
-      (record: ClienteFacturaVentaDisponibleRecord): ClienteFacturaVentaDisponibleInterface =>
-        this.toVentaDisponibleInterface(record),
+        return records.map(
+          (record: ClienteFacturaVentaDisponibleRecord): ClienteFacturaVentaDisponibleInterface =>
+            this.toVentaDisponibleInterface(record),
+        );
+      },
     );
   }
 
@@ -302,6 +324,34 @@ export default class ClienteFacturasService {
   }
 
   /**
+   * Ejecuta una lectura de facturación registrando
+   * únicamente fallos técnicos recuperables.
+   *
+   * Los estados de negocio esperables se propagan
+   * a la UX sin generar una incidencia persistente.
+   */
+  private async executeReadWithLogging<T>(
+    operation: string,
+    message: string,
+    action: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await action();
+    } catch (error: unknown) {
+      if (!(error instanceof ClienteFacturaBusinessError)) {
+        this.applicationLogger.warn({
+          area: 'clientes',
+          operation,
+          message,
+          error,
+        });
+      }
+
+      throw error;
+    }
+  }
+
+  /**
    * Comprueba que la factura indicada sea un borrador
    * activo perteneciente al cliente solicitado.
    */
@@ -317,7 +367,9 @@ export default class ClienteFacturasService {
     );
 
     if (borrador === undefined || borrador.estado !== 'borrador') {
-      throw new Error('El borrador de factura no pertenece al cliente o ya no está disponible.');
+      throw new ClienteFacturaBusinessError(
+        'El borrador de factura no pertenece al cliente o ya no está disponible.',
+      );
     }
   }
 

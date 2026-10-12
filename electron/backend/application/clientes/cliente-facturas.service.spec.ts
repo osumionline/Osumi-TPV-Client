@@ -69,12 +69,17 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
   requestedFacturaPublicId: string | null = null;
   requestedBorradorPublicId: string | null = null;
   mutationError: Error | null = null;
+  readError: Error | null = null;
 
   /**
    * Registra el cliente solicitado y devuelve las
    * facturas preparadas para cada prueba.
    */
   findByClientePublicId(publicId: string): Promise<readonly ClienteFacturaRecord[]> {
+    if (this.readError !== null) {
+      return Promise.reject(this.readError);
+    }
+
     this.requestedPublicId = publicId;
 
     return Promise.resolve(this.records);
@@ -170,6 +175,10 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
     clientePublicId: string,
     facturaPublicId: string,
   ): Promise<readonly ClienteFacturaVentaRecord[]> {
+    if (this.readError !== null) {
+      return Promise.reject(this.readError);
+    }
+
     this.requestedVentasClientePublicId = clientePublicId;
     this.requestedFacturaPublicId = facturaPublicId;
 
@@ -184,6 +193,10 @@ class FakeClienteFacturasRepository implements ClienteFacturasRepository {
     clientePublicId: string,
     borradorPublicId: string | null,
   ): Promise<readonly ClienteFacturaVentaDisponibleRecord[]> {
+    if (this.readError !== null) {
+      return Promise.reject(this.readError);
+    }
+
     this.requestedVentasClientePublicId = clientePublicId;
     this.requestedBorradorPublicId = borradorPublicId;
 
@@ -733,6 +746,8 @@ describe('ClienteFacturasService', (): void => {
     ).rejects.toThrow('El borrador de factura no pertenece al cliente o ya no está disponible.');
 
     expect(repository.requestedVentasClientePublicId).toBeNull();
+    expect(applicationLogger.warnEvents).toEqual([]);
+    expect(applicationLogger.errorEvents).toEqual([]);
   });
 
   it('rechaza un identificador de cliente vacío antes de consultar el repository', async (): Promise<void> => {
@@ -744,6 +759,8 @@ describe('ClienteFacturasService', (): void => {
     );
 
     expect(repository.requestedPublicId).toBeNull();
+    expect(applicationLogger.warnEvents).toEqual([]);
+    expect(applicationLogger.errorEvents).toEqual([]);
   });
 
   it('rechaza una factura finalizada sin numeración oficial', async (): Promise<void> => {
@@ -831,6 +848,57 @@ describe('ClienteFacturasService', (): void => {
 
     expect(applicationLogger.errorEvents).toEqual([]);
   });
+
+  it('registra un fallo técnico al cargar las facturas de un cliente', async (): Promise<void> => {
+    const repository = new FakeClienteFacturasRepository();
+
+    const error: Error = new Error('SQLite no está disponible.');
+
+    repository.readError = error;
+
+    const service = new ClienteFacturasService(repository, applicationLogger);
+
+    await expect(service.getByClientePublicId('cliente-1')).rejects.toBe(error);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'clientes',
+        operation: 'load-invoices',
+        message: 'No se han podido cargar las facturas del cliente.',
+        error,
+      },
+    ]);
+
+    expect(applicationLogger.errorEvents).toEqual([]);
+  });
+
+  it('registra un fallo técnico al cargar las ventas relacionadas con una factura', async (): Promise<void> => {
+    const repository = new FakeClienteFacturasRepository();
+
+    const error: Error = new Error('No se ha podido consultar SQLite.');
+
+    repository.readError = error;
+
+    const service = new ClienteFacturasService(repository, applicationLogger);
+
+    await expect(
+      service.getVentas({
+        clientePublicId: 'cliente-1',
+        facturaPublicId: 'factura-1',
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'clientes',
+        operation: 'load-invoice-sales',
+        message: 'No se han podido cargar las ventas relacionadas con la factura.',
+        error,
+      },
+    ]);
+
+    expect(applicationLogger.errorEvents).toEqual([]);
+  });
 });
 
 /**
@@ -883,6 +951,7 @@ function createVentaRecord(
  * del servicio de facturación de clientes.
  */
 class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
   readonly errorEvents: ApplicationLogEvent[] = [];
 
   /**
@@ -900,10 +969,10 @@ class TestApplicationLogger implements ApplicationLogger {
   }
 
   /**
-   * Ignora avisos.
+   * Conserva avisos técnicos de lectura.
    */
   warn(event: ApplicationLogEvent): void {
-    void event;
+    this.warnEvents.push(event);
   }
 
   /**
