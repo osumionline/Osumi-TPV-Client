@@ -39,9 +39,9 @@ export default class BackupRemoteRestoreSelectionService {
       /*
        * Solo conservamos un paquete remoto temporal.
        */
-      await this.clear();
+      await this.clearBeforeSelection();
 
-      const download: BackupRemoteDownloadResult = await this.remoteDownloader.download(publicId);
+      const download: BackupRemoteDownloadResult = await this.downloadForRestore(publicId);
 
       const packagePath: string = join(this.downloadDirectory, download.fileName);
 
@@ -72,6 +72,45 @@ export default class BackupRemoteRestoreSelectionService {
   }
 
   /**
+   * Limpia el área temporal antes de iniciar una
+   * nueva selección de restauración remota.
+   */
+  private async clearBeforeSelection(): Promise<void> {
+    try {
+      await this.clear();
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'prepare-remote-restore-directory',
+        message:
+          'No se ha podido limpiar el área temporal antes de preparar una restauración remota.',
+        error,
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Descarga la copia remota dejando el diagnóstico
+   * funcional en esta frontera de restauración.
+   */
+  private async downloadForRestore(value: unknown): Promise<BackupRemoteDownloadResult> {
+    try {
+      return await this.remoteDownloader.download(value);
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'download-remote-restore-package',
+        message: 'No se ha podido descargar la copia remota para preparar su restauración.',
+        error,
+      });
+
+      throw error;
+    }
+  }
+
+  /**
    * Comprueba que el paquete inspeccionado
    * sea exactamente la copia remota descargada.
    */
@@ -87,10 +126,20 @@ export default class BackupRemoteRestoreSelectionService {
       return;
     }
 
-    throw new BackupRemoteClientError(
+    const error = new BackupRemoteClientError(
       'invalid-backup',
       'La copia descargada desde TPV Backup no coincide con sus metadatos de restauración.',
     );
+
+    this.applicationLogger.warn({
+      area: 'backup',
+      operation: 'validate-remote-restore-package',
+      message:
+        'La copia remota preparada no coincide con los metadatos esperados para la restauración.',
+      error,
+    });
+
+    throw error;
   }
 
   /**

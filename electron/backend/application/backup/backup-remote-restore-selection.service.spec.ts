@@ -41,12 +41,13 @@ describe('BackupRemoteRestoreSelectionService', (): void => {
   it('entrega la copia descargada al selector nativo', async (): Promise<void> => {
     const downloader = new TestRemoteDownloader();
     const selector = new TestPackageSelector();
+    const applicationLogger = new TestApplicationLogger();
 
     const service = new BackupRemoteRestoreSelectionService(
       requireTempDirectory(),
       downloader,
       selector,
-      new TestApplicationLogger(),
+      applicationLogger,
     );
 
     const result = await service.select('backup-public-id');
@@ -59,11 +60,13 @@ describe('BackupRemoteRestoreSelectionService', (): void => {
       mode: 'native-restore',
       backupId: BACKUP_ID,
     });
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 
-  it('rechaza una selección cuyo backupId no coincide', async (): Promise<void> => {
+  it('registra una selección cuyo backupId no coincide', async (): Promise<void> => {
     const selector = new TestPackageSelector();
     const downloader = new TestRemoteDownloader();
+    const applicationLogger = new TestApplicationLogger();
 
     selector.result = {
       ...createSelection(),
@@ -74,12 +77,96 @@ describe('BackupRemoteRestoreSelectionService', (): void => {
       requireTempDirectory(),
       downloader,
       selector,
-      new TestApplicationLogger(),
+      applicationLogger,
     );
 
     await expect(service.select('backup-public-id')).rejects.toMatchObject({
       kind: 'invalid-backup',
     });
+
+    expect(applicationLogger.warnEvents).toHaveLength(1);
+
+    expect(applicationLogger.warnEvents[0]).toMatchObject({
+      area: 'backup',
+      operation: 'validate-remote-restore-package',
+      message:
+        'La copia remota preparada no coincide con los metadatos esperados para la restauración.',
+      error: expect.objectContaining({
+        kind: 'invalid-backup',
+      }),
+    });
+  });
+
+  it('registra un fallo al descargar la copia para restauración', async (): Promise<void> => {
+    const downloader = new TestRemoteDownloader();
+    const applicationLogger = new TestApplicationLogger();
+
+    const error: Error = new Error('TPV Backup no está disponible.');
+
+    downloader.error = error;
+
+    const service = new BackupRemoteRestoreSelectionService(
+      requireTempDirectory(),
+      downloader,
+      new TestPackageSelector(),
+      applicationLogger,
+    );
+
+    await expect(service.select('backup-public-id')).rejects.toBe(error);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'backup',
+        operation: 'download-remote-restore-package',
+        message: 'No se ha podido descargar la copia remota para preparar su restauración.',
+        error,
+      },
+    ]);
+  });
+
+  it('no duplica el fallo registrado por el selector de paquetes', async (): Promise<void> => {
+    const selector = new TestPackageSelector();
+    const applicationLogger = new TestApplicationLogger();
+
+    const error: Error = new Error('El paquete OTPV no es válido.');
+
+    selector.error = error;
+
+    const service = new BackupRemoteRestoreSelectionService(
+      requireTempDirectory(),
+      new TestRemoteDownloader(),
+      selector,
+      applicationLogger,
+    );
+
+    await expect(service.select('backup-public-id')).rejects.toBe(error);
+
+    expect(applicationLogger.warnEvents).toEqual([]);
+  });
+
+  it('registra un fallo al limpiar el área temporal antes de seleccionar', async (): Promise<void> => {
+    const applicationLogger = new TestApplicationLogger();
+    const cleanupError: Error = new Error('No se ha podido limpiar el directorio.');
+
+    const service = new InitialCleanupFailingBackupRemoteRestoreSelectionService(
+      requireTempDirectory(),
+      new TestRemoteDownloader(),
+      new TestPackageSelector(),
+      applicationLogger,
+      cleanupError,
+    );
+
+    await expect(service.select('backup-public-id')).rejects.toBe(cleanupError);
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'backup',
+        operation: 'prepare-remote-restore-directory',
+        message:
+          'No se ha podido limpiar el área temporal antes de preparar una restauración remota.',
+        error: cleanupError,
+      },
+    ]);
   });
 
   it('registra un fallo de limpieza sin ocultar el error principal', async (): Promise<void> => {
@@ -104,14 +191,24 @@ describe('BackupRemoteRestoreSelectionService', (): void => {
       kind: 'invalid-backup',
     });
 
-    expect(applicationLogger.warnEvents).toEqual([
-      {
-        area: 'backup',
-        operation: 'cleanup-remote-restore-package',
-        message: 'No se ha podido limpiar el paquete temporal de restauración remota.',
-        error: cleanupError,
-      },
-    ]);
+    expect(applicationLogger.warnEvents).toHaveLength(2);
+
+    expect(applicationLogger.warnEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          area: 'backup',
+          operation: 'validate-remote-restore-package',
+          message:
+            'La copia remota preparada no coincide con los metadatos esperados para la restauración.',
+        }),
+        {
+          area: 'backup',
+          operation: 'cleanup-remote-restore-package',
+          message: 'No se ha podido limpiar el paquete temporal de restauración remota.',
+          error: cleanupError,
+        },
+      ]),
+    );
   });
 });
 
@@ -120,12 +217,18 @@ describe('BackupRemoteRestoreSelectionService', (): void => {
  */
 class TestRemoteDownloader implements BackupRemoteDownloader {
   readonly publicIds: unknown[] = [];
+  error: Error | null = null;
 
   /**
-   * Devuelve una descarga remota simulada.
+   * Devuelve una descarga remota simulada
+   * o el fallo configurado para la prueba.
    */
   async download(value: unknown): Promise<BackupRemoteDownloadResult> {
     this.publicIds.push(value);
+
+    if (this.error !== null) {
+      throw this.error;
+    }
 
     return {
       publicId: 'backup-public-id',
@@ -144,19 +247,23 @@ class TestRemoteDownloader implements BackupRemoteDownloader {
 class TestPackageSelector implements BackupRestorePackageSelector {
   packagePath: string | null = null;
   fileName: string | null = null;
-
   result: BackupRestorePackageSelectionResult = createSelection();
+  error: Error | null = null;
 
   /**
-   * Registra los datos recibidos.
+   * Registra los datos recibidos y devuelve
+   * la selección o el fallo configurado.
    */
   async selectPackagePath(
     packagePath: string,
     fileName?: string,
   ): Promise<BackupRestorePackageSelectionResult> {
     this.packagePath = packagePath;
-
     this.fileName = fileName ?? null;
+
+    if (this.error !== null) {
+      throw this.error;
+    }
 
     return this.result;
   }
@@ -265,6 +372,42 @@ class TestApplicationLogger implements ApplicationLogger {
    * No existen escrituras pendientes.
    */
   flush(): Promise<void> {
+    return Promise.resolve();
+  }
+}
+
+/**
+ * Variante del servicio que falla únicamente durante
+ * la limpieza inicial y permite la recuperación posterior.
+ */
+class InitialCleanupFailingBackupRemoteRestoreSelectionService extends BackupRemoteRestoreSelectionService {
+  private clearCalls: number = 0;
+
+  /**
+   * Crea el servicio con el fallo que debe producir
+   * la primera limpieza del directorio temporal.
+   */
+  constructor(
+    downloadDirectory: string,
+    remoteDownloader: BackupRemoteDownloader,
+    packageSelector: BackupRestorePackageSelector,
+    applicationLogger: ApplicationLogger,
+    private readonly cleanupError: Error,
+  ) {
+    super(downloadDirectory, remoteDownloader, packageSelector, applicationLogger);
+  }
+
+  /**
+   * Falla en la primera limpieza y permite que
+   * la limpieza de recuperación posterior termine.
+   */
+  override clear(): Promise<void> {
+    this.clearCalls++;
+
+    if (this.clearCalls === 1) {
+      return Promise.reject(this.cleanupError);
+    }
+
     return Promise.resolve();
   }
 }
