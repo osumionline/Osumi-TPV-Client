@@ -1,12 +1,17 @@
 import type StageImageCommand from '@backend/application/files/stage-image-command.interface';
 import type StagedImageDiscarder from '@backend/contracts/files/staged-image-discarder.interface';
 import type StagedImageRegistry from '@backend/contracts/files/staged-image-registry.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
 import type {
   ImageProcessor,
   ProcessedImage,
 } from '@backend/contracts/system/image-processor.interface';
 import type ImageStagingStorage from '@backend/contracts/system/image-staging-storage.interface';
+import type {
+  ImageAssetPurpose,
+  StoredImageFile,
+} from '@backend/domain/files/image-asset.interface';
 import type StagedImageRecord from '@backend/domain/files/staged-image-record.interface';
 import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
 import { randomUUID } from 'node:crypto';
@@ -25,6 +30,7 @@ export default class ImageStagingService implements StagedImageRegistry, StagedI
     private readonly imageProcessor: ImageProcessor,
     private readonly imageStagingStorage: ImageStagingStorage,
     private readonly assetUrlBuilder: AssetUrlBuilder,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   /**
@@ -35,7 +41,15 @@ export default class ImageStagingService implements StagedImageRegistry, StagedI
 
     const stagingId: string = randomUUID();
 
-    const storedFile = await this.imageStagingStorage.save(stagingId, processedImage);
+    let storedFile: StoredImageFile;
+
+    try {
+      storedFile = await this.imageStagingStorage.save(stagingId, processedImage);
+    } catch (error: unknown) {
+      this.logStageFailure(command.purpose, error);
+
+      throw error;
+    }
 
     const record: StagedImageRecord = {
       stagingId,
@@ -49,9 +63,21 @@ export default class ImageStagingService implements StagedImageRegistry, StagedI
       height: processedImage.height,
     };
 
+    let publicRecord: StagedImageInterface;
+
+    try {
+      publicRecord = this.mapPublic(record);
+    } catch (error: unknown) {
+      const finalError: unknown = await this.cleanupStageAfterFailure(record.relativePath, error);
+
+      this.logStageFailure(command.purpose, finalError);
+
+      throw finalError;
+    }
+
     this.records.set(stagingId, record);
 
-    return this.mapPublic(record);
+    return publicRecord;
   }
 
   /**
@@ -64,7 +90,21 @@ export default class ImageStagingService implements StagedImageRegistry, StagedI
       return;
     }
 
-    await this.imageStagingStorage.delete(record.relativePath);
+    try {
+      await this.imageStagingStorage.delete(record.relativePath);
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'files',
+        operation: 'discard-staged-image',
+        message: 'No se ha podido eliminar una imagen temporal del staging.',
+        error,
+        context: {
+          purpose: record.purpose,
+        },
+      });
+
+      throw error;
+    }
 
     this.records.delete(stagingId);
   }
@@ -74,6 +114,45 @@ export default class ImageStagingService implements StagedImageRegistry, StagedI
    */
   getRecord(stagingId: string): StagedImageRecord | null {
     return this.records.get(stagingId) ?? null;
+  }
+
+  /**
+   * Limpia el fichero staged cuando una incidencia posterior
+   * impide completar la preparación de la imagen.
+   */
+  private async cleanupStageAfterFailure(
+    relativePath: string,
+    originalError: unknown,
+  ): Promise<unknown> {
+    try {
+      await this.imageStagingStorage.delete(relativePath);
+
+      return originalError;
+    } catch (cleanupError: unknown) {
+      return new AggregateError(
+        [originalError, cleanupError],
+        'No se ha podido preparar la imagen temporal ni limpiar completamente su staging.',
+        {
+          cause: originalError,
+        },
+      );
+    }
+  }
+
+  /**
+   * Registra un fallo técnico que impide preparar
+   * una imagen temporal para el draft.
+   */
+  private logStageFailure(purpose: ImageAssetPurpose, error: unknown): void {
+    this.applicationLogger.error({
+      area: 'files',
+      operation: 'stage-image',
+      message: 'No se ha podido preparar una imagen temporal.',
+      error,
+      context: {
+        purpose,
+      },
+    });
   }
 
   /**

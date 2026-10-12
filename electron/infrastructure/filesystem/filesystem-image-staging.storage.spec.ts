@@ -78,6 +78,49 @@ describe('FilesystemImageStagingStorage', (): void => {
 
     expect(result).toEqual(image.buffer);
   });
+
+  it('conserva el error principal cuando también falla el cleanup del temporal', async (): Promise<void> => {
+    tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-staging-'));
+
+    const promotionError: Error = new Error('No se ha podido promover el temporal.');
+    const cleanupError: Error = new Error('No se ha podido limpiar el temporal.');
+
+    const removeFile = async (
+      filePath: string,
+      options: {
+        readonly force: boolean;
+      },
+    ): Promise<void> => {
+      void filePath;
+      void options;
+
+      throw cleanupError;
+    };
+
+    const renameFile = async (oldPath: string, newPath: string): Promise<void> => {
+      void oldPath;
+      void newPath;
+
+      throw promotionError;
+    };
+
+    const storage = new FilesystemImageStagingStorage(tempDirectory, removeFile, renameFile);
+
+    let receivedError: unknown = null;
+
+    try {
+      await storage.save('staging-id', createProcessedImage());
+    } catch (error: unknown) {
+      receivedError = error;
+    }
+
+    expect(receivedError).toBeInstanceOf(AggregateError);
+
+    const aggregateError: AggregateError = receivedError as AggregateError;
+
+    expect(aggregateError.errors).toEqual([promotionError, cleanupError]);
+    expect(aggregateError.cause).toBe(cleanupError);
+  });
 });
 
 /**

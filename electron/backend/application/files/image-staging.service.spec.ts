@@ -1,4 +1,5 @@
 import ImageStagingService from '@backend/application/files/image-staging.service';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
 import type {
   ImageProcessor,
@@ -7,8 +8,9 @@ import type {
 import type ImageStagingStorage from '@backend/contracts/system/image-staging-storage.interface';
 import type { StoredImageFile } from '@backend/domain/files/image-asset.interface';
 import type StagedImageRecord from '@backend/domain/files/staged-image-record.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type StagedImageInterface from '@desktop-contracts/files/staged-image.interface';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 class FakeImageProcessor implements ImageProcessor {
   /**
@@ -31,14 +33,23 @@ class FakeImageProcessor implements ImageProcessor {
 
 class FakeImageStagingStorage implements ImageStagingStorage {
   deletedPath: string | null = null;
+  savedPath: string | null = null;
+  saveError: Error | null = null;
+  deleteError: Error | null = null;
 
   /**
    * Simula la escritura temporal.
    */
   save(stagingId: string): Promise<StoredImageFile> {
+    if (this.saveError !== null) {
+      return Promise.reject(this.saveError);
+    }
+
+    this.savedPath = `staging/draft-images/${stagingId}.webp`;
+
     return Promise.resolve({
       internalName: `${stagingId}.webp`,
-      relativePath: `staging/draft-images/${stagingId}.webp`,
+      relativePath: this.savedPath,
     });
   }
 
@@ -53,6 +64,10 @@ class FakeImageStagingStorage implements ImageStagingStorage {
    * Registra el archivo temporal eliminado.
    */
   delete(relativePath: string): Promise<void> {
+    if (this.deleteError !== null) {
+      return Promise.reject(this.deleteError);
+    }
+
     this.deletedPath = relativePath;
 
     return Promise.resolve();
@@ -60,20 +75,33 @@ class FakeImageStagingStorage implements ImageStagingStorage {
 }
 
 class FakeAssetUrlBuilder implements AssetUrlBuilder {
+  error: Error | null = null;
+
   /**
    * Genera una URL segura de test.
    */
   build(relativePath: string | null): string | null {
+    if (this.error !== null) {
+      throw this.error;
+    }
+
     return relativePath === null ? null : `test://${relativePath}`;
   }
 }
 
+let applicationLogger: TestApplicationLogger;
+
 describe('ImageStagingService', (): void => {
+  beforeEach((): void => {
+    applicationLogger = new TestApplicationLogger();
+  });
+
   it('procesa y registra una imagen temporal', async (): Promise<void> => {
     const service = new ImageStagingService(
       new FakeImageProcessor(),
       new FakeImageStagingStorage(),
       new FakeAssetUrlBuilder(),
+      applicationLogger,
     );
 
     const result: StagedImageInterface = await service.stage({
@@ -109,6 +137,7 @@ describe('ImageStagingService', (): void => {
       new FakeImageProcessor(),
       new FakeImageStagingStorage(),
       new FakeAssetUrlBuilder(),
+      applicationLogger,
     );
 
     const result: StagedImageInterface = await service.stage({
@@ -140,6 +169,7 @@ describe('ImageStagingService', (): void => {
       new FakeImageProcessor(),
       new FakeImageStagingStorage(),
       new FakeAssetUrlBuilder(),
+      applicationLogger,
     );
 
     const result: StagedImageInterface = await service.stage({
@@ -173,6 +203,7 @@ describe('ImageStagingService', (): void => {
       new FakeImageProcessor(),
       storage,
       new FakeAssetUrlBuilder(),
+      applicationLogger,
     );
 
     const staged: StagedImageInterface = await service.stage({
@@ -195,10 +226,162 @@ describe('ImageStagingService', (): void => {
       new FakeImageProcessor(),
       storage,
       new FakeAssetUrlBuilder(),
+      applicationLogger,
     );
 
     await service.discard('does-not-exist');
 
     expect(storage.deletedPath).toBeNull();
   });
+
+  it('registra un fallo técnico al guardar una imagen temporal', async (): Promise<void> => {
+    const storage = new FakeImageStagingStorage();
+    const error: Error = new Error('No se puede escribir en staging.');
+
+    storage.saveError = error;
+
+    const service = new ImageStagingService(
+      new FakeImageProcessor(),
+      storage,
+      new FakeAssetUrlBuilder(),
+      applicationLogger,
+    );
+
+    await expect(
+      service.stage({
+        purpose: 'article_image',
+        originalName: 'foto.jpg',
+        buffer: Buffer.from('original'),
+      }),
+    ).rejects.toBe(error);
+
+    expect(applicationLogger.errorEvents).toEqual([
+      {
+        area: 'files',
+        operation: 'stage-image',
+        message: 'No se ha podido preparar una imagen temporal.',
+        error,
+        context: {
+          purpose: 'article_image',
+        },
+      },
+    ]);
+  });
+
+  it('registra un fallo al descartar una imagen temporal y conserva su record', async (): Promise<void> => {
+    const storage = new FakeImageStagingStorage();
+
+    const service = new ImageStagingService(
+      new FakeImageProcessor(),
+      storage,
+      new FakeAssetUrlBuilder(),
+      applicationLogger,
+    );
+
+    const staged: StagedImageInterface = await service.stage({
+      purpose: 'article_image',
+      originalName: 'foto.jpg',
+      buffer: Buffer.from('original'),
+    });
+
+    const error: Error = new Error('No se puede eliminar el staging.');
+
+    storage.deleteError = error;
+
+    await expect(service.discard(staged.stagingId)).rejects.toBe(error);
+
+    expect(service.getRecord(staged.stagingId)).not.toBeNull();
+
+    expect(applicationLogger.warnEvents).toEqual([
+      {
+        area: 'files',
+        operation: 'discard-staged-image',
+        message: 'No se ha podido eliminar una imagen temporal del staging.',
+        error,
+        context: {
+          purpose: 'article_image',
+        },
+      },
+    ]);
+  });
+
+  it('limpia el fichero staged cuando falla la construcción de su URL', async (): Promise<void> => {
+    const storage = new FakeImageStagingStorage();
+    const assetUrlBuilder = new FakeAssetUrlBuilder();
+    const error: Error = new Error('No se ha podido construir la URL.');
+
+    assetUrlBuilder.error = error;
+
+    const service = new ImageStagingService(
+      new FakeImageProcessor(),
+      storage,
+      assetUrlBuilder,
+      applicationLogger,
+    );
+
+    await expect(
+      service.stage({
+        purpose: 'article_image',
+        originalName: 'foto.jpg',
+        buffer: Buffer.from('original'),
+      }),
+    ).rejects.toBe(error);
+
+    expect(storage.deletedPath).toBe(storage.savedPath);
+
+    expect(applicationLogger.errorEvents).toEqual([
+      {
+        area: 'files',
+        operation: 'stage-image',
+        message: 'No se ha podido preparar una imagen temporal.',
+        error,
+        context: {
+          purpose: 'article_image',
+        },
+      },
+    ]);
+  });
 });
+
+/**
+ * Logger controlado utilizado por las pruebas.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+  readonly errorEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora entradas de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora entradas informativas.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva avisos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Conserva errores.
+   */
+  error(event: ApplicationLogEvent): void {
+    this.errorEvents.push(event);
+  }
+
+  /**
+   * No mantiene escrituras pendientes.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
+}

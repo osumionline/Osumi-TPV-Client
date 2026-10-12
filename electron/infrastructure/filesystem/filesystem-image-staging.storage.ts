@@ -7,6 +7,15 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 const DRAFT_IMAGES_DIRECTORY: string = 'draft-images';
 const STAGING_RELATIVE_PREFIX: string = 'staging/draft-images/';
 
+type RemoveFile = (
+  filePath: string,
+  options: {
+    readonly force: boolean;
+  },
+) => Promise<void>;
+
+type RenameFile = (oldPath: string, newPath: string) => Promise<void>;
+
 /**
  * Gestiona las imágenes temporales pertenecientes
  * a drafts todavía no persistidos.
@@ -15,7 +24,11 @@ export default class FilesystemImageStagingStorage implements ImageStagingStorag
   /**
    * Crea el storage sobre staging/files.
    */
-  constructor(private readonly stagingFilesDirectory: string) {}
+  constructor(
+    private readonly stagingFilesDirectory: string,
+    private readonly removeFile: RemoveFile = rm,
+    private readonly renameFile: RenameFile = rename,
+  ) {}
 
   /**
    * Guarda atómicamente un WebP temporal.
@@ -39,11 +52,21 @@ export default class FilesystemImageStagingStorage implements ImageStagingStorag
         flag: 'wx',
       });
 
-      await rename(temporaryPath, destinationPath);
+      await this.renameFile(temporaryPath, destinationPath);
     } catch (error: unknown) {
-      await rm(temporaryPath, {
-        force: true,
-      });
+      try {
+        await this.removeFile(temporaryPath, {
+          force: true,
+        });
+      } catch (cleanupError: unknown) {
+        throw new AggregateError(
+          [error, cleanupError],
+          'No se ha podido guardar la imagen temporal ni limpiar su archivo provisional.',
+          {
+            cause: cleanupError,
+          },
+        );
+      }
 
       throw error;
     }
@@ -69,7 +92,7 @@ export default class FilesystemImageStagingStorage implements ImageStagingStorag
   async delete(relativePath: string): Promise<void> {
     const absolutePath: string = this.resolveManagedPath(relativePath);
 
-    await rm(absolutePath, {
+    await this.removeFile(absolutePath, {
       force: true,
     });
   }

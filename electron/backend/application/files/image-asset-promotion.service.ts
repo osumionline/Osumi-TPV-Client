@@ -1,5 +1,6 @@
 import type ImageAssetPromoter from '@backend/contracts/files/image-asset-promoter.interface';
 import type StagedImageRegistry from '@backend/contracts/files/staged-image-registry.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type ImageFileStorage from '@backend/contracts/system/image-file-storage.interface';
 import type { ProcessedImage } from '@backend/contracts/system/image-processor.interface';
 import type ImageStagingStorage from '@backend/contracts/system/image-staging-storage.interface';
@@ -24,6 +25,7 @@ export default class ImageAssetPromotionService implements ImageAssetPromoter {
     private readonly stagedImageRegistry: StagedImageRegistry,
     private readonly imageStagingStorage: ImageStagingStorage,
     private readonly imageFileStorage: ImageFileStorage,
+    private readonly applicationLogger: ApplicationLogger,
   ) {}
 
   /**
@@ -44,9 +46,33 @@ export default class ImageAssetPromotionService implements ImageAssetPromoter {
       throw new Error('La imagen temporal no pertenece al tipo de recurso esperado.');
     }
 
-    const buffer: Buffer = await this.imageStagingStorage.read(record.relativePath);
+    let buffer: Buffer;
 
-    this.assertIntegrity(record, buffer);
+    try {
+      buffer = await this.imageStagingStorage.read(record.relativePath);
+    } catch (error: unknown) {
+      this.logPreparationFailure(
+        'read-staged-image',
+        'No se ha podido leer una imagen temporal antes de promoverla.',
+        record.purpose,
+        error,
+      );
+
+      throw error;
+    }
+
+    try {
+      this.assertIntegrity(record, buffer);
+    } catch (error: unknown) {
+      this.logPreparationFailure(
+        'validate-staged-image',
+        'La imagen temporal ha perdido su integridad antes de promoverla.',
+        record.purpose,
+        error,
+      );
+
+      throw error;
+    }
 
     const processedImage: ProcessedImage = {
       buffer,
@@ -60,11 +86,20 @@ export default class ImageAssetPromotionService implements ImageAssetPromoter {
 
     const publicId: string = randomUUID();
 
-    const storedFile: StoredImageFile = await this.imageFileStorage.save(
-      record.purpose,
-      publicId,
-      processedImage,
-    );
+    let storedFile: StoredImageFile;
+
+    try {
+      storedFile = await this.imageFileStorage.save(record.purpose, publicId, processedImage);
+    } catch (error: unknown) {
+      this.logPreparationFailure(
+        'promote-staged-image',
+        'No se ha podido copiar una imagen temporal al almacenamiento definitivo.',
+        record.purpose,
+        error,
+      );
+
+      throw error;
+    }
 
     const archivo: ArchivoCreateRecord = {
       publicId,
@@ -90,7 +125,43 @@ export default class ImageAssetPromotionService implements ImageAssetPromoter {
    * la operación SQLite que debía consumirla ha fallado.
    */
   async rollback(prepared: PreparedImageAsset): Promise<void> {
-    await this.imageFileStorage.delete(prepared.archivo.relativePath);
+    try {
+      await this.imageFileStorage.delete(prepared.archivo.relativePath);
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'files',
+        operation: 'rollback-promoted-image',
+        message:
+          'No se ha podido limpiar una imagen definitiva preparada después de fallar su persistencia.',
+        error,
+        context: {
+          purpose: prepared.archivo.purpose,
+        },
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Registra un fallo técnico durante la preparación
+   * de una imagen definitiva.
+   */
+  private logPreparationFailure(
+    operation: string,
+    message: string,
+    purpose: ImageAssetPurpose,
+    error: unknown,
+  ): void {
+    this.applicationLogger.error({
+      area: 'files',
+      operation,
+      message,
+      error,
+      context: {
+        purpose,
+      },
+    });
   }
 
   /**

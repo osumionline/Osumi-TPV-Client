@@ -482,12 +482,14 @@ export default function createApplicationComposition(
     imageProcessor,
     imageStagingStorage,
     assetUrlBuilder,
+    applicationLogger,
   );
 
   const imageAssetPromotionService: ImageAssetPromotionService = new ImageAssetPromotionService(
     imageStagingService,
     imageStagingStorage,
     imageFileStorage,
+    applicationLogger,
   );
 
   /*

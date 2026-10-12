@@ -10,6 +10,15 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 
 const FILES_RELATIVE_PREFIX: string = 'files/';
 
+type RemoveFile = (
+  filePath: string,
+  options: {
+    readonly force: boolean;
+  },
+) => Promise<void>;
+
+type RenameFile = (oldPath: string, newPath: string) => Promise<void>;
+
 /**
  * Gestiona las imágenes definitivas almacenadas
  * dentro del directorio de archivos de la aplicación.
@@ -18,7 +27,11 @@ export default class FilesystemImageFileStorage implements ImageFileStorage {
   /**
    * Crea el storage sobre el directorio físico de archivos.
    */
-  constructor(private readonly filesDirectory: string) {}
+  constructor(
+    private readonly filesDirectory: string,
+    private readonly removeFile: RemoveFile = rm,
+    private readonly renameFile: RenameFile = rename,
+  ) {}
 
   /**
    * Guarda atómicamente un WebP en la carpeta de su purpose.
@@ -47,11 +60,21 @@ export default class FilesystemImageFileStorage implements ImageFileStorage {
         flag: 'wx',
       });
 
-      await rename(temporaryPath, destinationPath);
+      await this.renameFile(temporaryPath, destinationPath);
     } catch (error: unknown) {
-      await rm(temporaryPath, {
-        force: true,
-      });
+      try {
+        await this.removeFile(temporaryPath, {
+          force: true,
+        });
+      } catch (cleanupError: unknown) {
+        throw new AggregateError(
+          [error, cleanupError],
+          'No se ha podido guardar la imagen definitiva ni limpiar su archivo provisional.',
+          {
+            cause: cleanupError,
+          },
+        );
+      }
 
       throw error;
     }
@@ -68,7 +91,7 @@ export default class FilesystemImageFileStorage implements ImageFileStorage {
   async delete(relativePath: string): Promise<void> {
     const absolutePath: string = this.resolveManagedPath(relativePath);
 
-    await rm(absolutePath, {
+    await this.removeFile(absolutePath, {
       force: true,
     });
   }
