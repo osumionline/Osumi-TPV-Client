@@ -21,6 +21,8 @@ export default class ApplicationLogTextSanitizer {
       .replace(/\bBearer\s+[^\s]+/gi, 'Bearer [REDACTED]')
       .replace(/(['"])(?:[A-Za-z]:\\|\\\\)[^'"\r\n]*\1/g, '[REDACTED_PATH]')
       .replace(/(?:[A-Za-z]:\\|\\\\)[^\s'"<>()[\]\r\n]+/g, '[REDACTED_PATH]')
+      .replace(/(['"])\/[^'"\r\n]*\1/g, '[REDACTED_PATH]')
+      .replace(/(^|[\s(=])\/(?!\/)[^\s'"<>()[\]\r\n]+/gm, '$1[REDACTED_PATH]')
       .replace(
         /\b(?:authorization|token|secret|secretApi|backupApiKey|password|pass|contraseña)\s*[:=]\s*[^\s,;]+/giu,
         (match: string): string => {

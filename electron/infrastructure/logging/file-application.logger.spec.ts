@@ -286,6 +286,46 @@ describe('FileApplicationLogger', (): void => {
     expect(records[0]?.error?.message).not.toContain(privatePath);
     expect(records[0]?.error?.stack).not.toContain(privatePath);
   });
+
+  it('oculta rutas POSIX sin eliminar referencias internas de Node', async (): Promise<void> => {
+    const logger: FileApplicationLogger = createLogger();
+
+    const privatePath: string = '/home/usuario privado/Osumi TPV/database.sqlite';
+    const stackPath: string = '/Users/usuario/OsumiTPV/restore.ts';
+
+    const filesystemError: Error = new Error(
+      `ENOENT: no such file or directory, open '${privatePath}'`,
+    );
+
+    filesystemError.stack = [
+      `Error: ENOENT: no such file or directory, open '${privatePath}'`,
+      `    at restore (${stackPath}:35:12)`,
+      '    at open (node:internal/fs/promises:600:10)',
+    ].join('\n');
+
+    logger.error({
+      area: 'backup',
+      operation: 'restore-database',
+      message: 'No se ha podido abrir la base de datos.',
+      error: filesystemError,
+    });
+
+    await logger.flush();
+
+    const content: string = await readCurrentLog();
+    const records: readonly ApplicationLogRecord[] = await readRecords();
+
+    expect(content).not.toContain(privatePath);
+    expect(content).not.toContain(stackPath);
+    expect(content).not.toContain('usuario privado');
+
+    expect(content).toContain('[REDACTED_PATH]');
+    expect(content).toContain('node:internal/fs/promises:600:10');
+
+    expect(records[0]?.error?.message).toContain('ENOENT');
+    expect(records[0]?.error?.message).not.toContain(privatePath);
+    expect(records[0]?.error?.stack).not.toContain(stackPath);
+  });
 });
 
 /**
