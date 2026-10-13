@@ -134,7 +134,7 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
     const secretStorage: TestSecretStorage = new TestSecretStorage(createSecrets());
     const crypto: NodeOtpvV3Crypto = new NodeOtpvV3Crypto();
     const databaseSnapshot: RecordingDatabaseSnapshot = new RecordingDatabaseSnapshot(
-      new BetterSqlite3DatabaseSnapshot(currentPaths.databaseFile),
+      new BetterSqlite3DatabaseSnapshot(currentPaths.databaseFile, applicationLogger),
     );
 
     const builder: YazlOtpvV3PayloadBuilder = new YazlOtpvV3PayloadBuilder(
@@ -273,7 +273,7 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
 
     const builder: YazlOtpvV3PayloadBuilder = new YazlOtpvV3PayloadBuilder(
       currentPaths,
-      new BetterSqlite3DatabaseSnapshot(currentPaths.databaseFile),
+      new BetterSqlite3DatabaseSnapshot(currentPaths.databaseFile, applicationLogger),
       new JsonAppDataRepository(currentPaths.appDataFile),
       new TestSecretStorage(createSecrets()),
       new TestBackupRemoteCredentialStorage({
@@ -334,7 +334,7 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
 
     const builder = new YazlOtpvV3PayloadBuilder(
       currentPaths,
-      new BetterSqlite3DatabaseSnapshot(currentPaths.databaseFile),
+      new BetterSqlite3DatabaseSnapshot(currentPaths.databaseFile, applicationLogger),
       new JsonAppDataRepository(currentPaths.appDataFile),
       new TestSecretStorage(createSecrets()),
       new TestBackupRemoteCredentialStorage({
@@ -379,7 +379,7 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
 
     const builder = new YazlOtpvV3PayloadBuilder(
       currentPaths,
-      new BetterSqlite3DatabaseSnapshot(currentPaths.databaseFile),
+      new BetterSqlite3DatabaseSnapshot(currentPaths.databaseFile, applicationLogger),
       new JsonAppDataRepository(currentPaths.appDataFile),
       new TestSecretStorage(createSecrets()),
       new TestBackupRemoteCredentialStorage({
@@ -411,7 +411,7 @@ describe('YazlOtpvV3PayloadBuilder', (): void => {
 
     const builder = new YazlOtpvV3PayloadBuilder(
       currentPaths,
-      new BetterSqlite3DatabaseSnapshot(currentPaths.databaseFile),
+      new BetterSqlite3DatabaseSnapshot(currentPaths.databaseFile, applicationLogger),
       new JsonAppDataRepository(currentPaths.appDataFile),
       new TestSecretStorage(createSecrets()),
       new TestBackupRemoteCredentialStorage({

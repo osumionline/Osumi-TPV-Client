@@ -1,3 +1,5 @@
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import BetterSqlite3DatabaseSnapshot from '@infrastructure/database/better-sqlite3/better-sqlite3-database-snapshot';
 import Database from 'better-sqlite3';
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -68,6 +70,7 @@ describe('BetterSqlite3DatabaseSnapshot', (): void => {
 
     const snapshot: BetterSqlite3DatabaseSnapshot = new BetterSqlite3DatabaseSnapshot(
       currentSourceFile,
+      new TestApplicationLogger(),
     );
 
     await snapshot.create(currentSnapshotFile);
@@ -116,6 +119,7 @@ describe('BetterSqlite3DatabaseSnapshot', (): void => {
   it('produce una copia independiente de cambios posteriores', async (): Promise<void> => {
     const snapshot: BetterSqlite3DatabaseSnapshot = new BetterSqlite3DatabaseSnapshot(
       requireSourceDatabaseFile(),
+      new TestApplicationLogger(),
     );
 
     await snapshot.create(requireSnapshotFile());
@@ -167,7 +171,10 @@ describe('BetterSqlite3DatabaseSnapshot', (): void => {
 
   it('no permite utilizar la base origen como destino', async (): Promise<void> => {
     const sourceFile: string = requireSourceDatabaseFile();
-    const snapshot: BetterSqlite3DatabaseSnapshot = new BetterSqlite3DatabaseSnapshot(sourceFile);
+    const snapshot: BetterSqlite3DatabaseSnapshot = new BetterSqlite3DatabaseSnapshot(
+      sourceFile,
+      new TestApplicationLogger(),
+    );
 
     await expect(snapshot.create(sourceFile)).rejects.toThrow('no puede utilizarse como destino');
   });
@@ -185,6 +192,7 @@ describe('BetterSqlite3DatabaseSnapshot', (): void => {
 
     const snapshot: BetterSqlite3DatabaseSnapshot = new BetterSqlite3DatabaseSnapshot(
       requireSourceDatabaseFile(),
+      new TestApplicationLogger(),
     );
 
     await expect(snapshot.create(destinationFile)).rejects.toThrow(
@@ -201,6 +209,7 @@ describe('BetterSqlite3DatabaseSnapshot', (): void => {
   it('propaga errores distintos de ENOENT al comprobar el destino', async (): Promise<void> => {
     const snapshot: BetterSqlite3DatabaseSnapshot = new BetterSqlite3DatabaseSnapshot(
       requireSourceDatabaseFile(),
+      new TestApplicationLogger(),
     );
 
     const invalidDestinationFile: string = `${requireSnapshotFile()}\0`;
@@ -214,6 +223,7 @@ describe('BetterSqlite3DatabaseSnapshot', (): void => {
 
     const snapshot: BetterSqlite3DatabaseSnapshot = new BetterSqlite3DatabaseSnapshot(
       missingSource,
+      new TestApplicationLogger(),
     );
 
     await expect(snapshot.create(destinationFile)).rejects.toThrow(
@@ -221,6 +231,71 @@ describe('BetterSqlite3DatabaseSnapshot', (): void => {
     );
 
     expect(await fileExists(destinationFile)).toBe(false);
+  });
+
+  it('registra un fallo de cleanup sin ocultar el error principal del snapshot', async (): Promise<void> => {
+    const missingSource: string = join(requireTempDirectory(), 'missing-cleanup.sqlite');
+    const destinationFile: string = join(requireTempDirectory(), 'failed-cleanup.sqlite');
+
+    const logger: TestApplicationLogger = new TestApplicationLogger();
+
+    const cleanupError: Error = new Error('Fallo simulado eliminando snapshot temporal.');
+
+    const removedFiles: string[] = [];
+
+    const removeFile = async (
+      filePath: string,
+      options: {
+        readonly force: boolean;
+      },
+    ): Promise<void> => {
+      removedFiles.push(filePath);
+
+      expect(options.force).toBe(true);
+
+      throw cleanupError;
+    };
+
+    const snapshot: BetterSqlite3DatabaseSnapshot = new BetterSqlite3DatabaseSnapshot(
+      missingSource,
+      logger,
+      removeFile,
+    );
+
+    let snapshotError: unknown;
+
+    try {
+      await snapshot.create(destinationFile);
+    } catch (error: unknown) {
+      snapshotError = error;
+    }
+
+    expect(snapshotError).toBeInstanceOf(Error);
+
+    if (!(snapshotError instanceof Error)) {
+      throw new Error('Se esperaba un error de creación del snapshot.');
+    }
+
+    expect(snapshotError.message).toBe(
+      'No se ha podido crear el snapshot SQLite de la copia de seguridad.',
+    );
+
+    expect(snapshotError.cause).toBeInstanceOf(Error);
+    expect(snapshotError.cause).not.toBe(cleanupError);
+
+    expect(removedFiles).toHaveLength(1);
+    expect(removedFiles[0]).toMatch(/\.sqlite-backup-[0-9a-f-]+\.tmp$/i);
+
+    expect(logger.warnEvents).toEqual([
+      {
+        area: 'backup',
+        operation: 'backup-sqlite-snapshot-temp-cleanup',
+        message: 'No se ha podido limpiar el snapshot SQLite temporal de una copia de seguridad.',
+        error: cleanupError,
+      },
+    ]);
+
+    expect(logger.warnEvents[0].context).toBeUndefined();
   });
 });
 
@@ -284,4 +359,47 @@ function requireTempDirectory(): string {
   }
 
   return tempDirectory;
+}
+
+/**
+ * Logger de pruebas que conserva los avisos
+ * producidos durante la creación de snapshots.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora entradas de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora entradas informativas.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva avisos para su verificación.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Ignora errores no utilizados en estas pruebas.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No mantiene escrituras pendientes.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
 }

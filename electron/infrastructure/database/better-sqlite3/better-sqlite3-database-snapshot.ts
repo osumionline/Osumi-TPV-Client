@@ -1,9 +1,17 @@
 import type DatabaseSnapshot from '@backend/contracts/backup/database-snapshot.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import hasFileSystemErrorCode from '@infrastructure/filesystem/filesystem-error.utils';
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { access, mkdir, rename, rm, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
+
+type RemoveTemporaryFile = (
+  filePath: string,
+  options: {
+    readonly force: boolean;
+  },
+) => Promise<void>;
 
 /**
  * Crea snapshots consistentes utilizando
@@ -11,10 +19,14 @@ import { dirname, join, resolve } from 'node:path';
  */
 export default class BetterSqlite3DatabaseSnapshot implements DatabaseSnapshot {
   /**
-   * Crea el proveedor sobre la base SQLite
-   * operativa de la aplicación.
+   * Crea el proveedor sobre la base SQLite operativa,
+   * con logging de incidencias de limpieza temporal.
    */
-  constructor(private readonly sourceDatabaseFile: string) {}
+  constructor(
+    private readonly sourceDatabaseFile: string,
+    private readonly applicationLogger: ApplicationLogger,
+    private readonly removeFile: RemoveTemporaryFile = rm,
+  ) {}
 
   /**
    * Crea una copia SQLite consistente y autocontenida
@@ -113,19 +125,24 @@ export default class BetterSqlite3DatabaseSnapshot implements DatabaseSnapshot {
   }
 
   /**
-   * Elimina un temporal sin ocultar
-   * el error original de la operación.
+   * Elimina el snapshot temporal sin ocultar
+   * el error principal de creación.
+   *
+   * Los fallos secundarios de cleanup quedan
+   * registrados sin incluir rutas físicas.
    */
   private async removeTemporaryFileSafely(temporaryFile: string): Promise<void> {
     try {
-      await rm(temporaryFile, {
+      await this.removeFile(temporaryFile, {
         force: true,
       });
     } catch (cleanupError: unknown) {
-      console.error(
-        ['No se ha podido limpiar', 'el snapshot SQLite temporal:'].join(' '),
-        cleanupError,
-      );
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'backup-sqlite-snapshot-temp-cleanup',
+        message: 'No se ha podido limpiar el snapshot SQLite temporal de una copia de seguridad.',
+        error: cleanupError,
+      });
     }
   }
 }

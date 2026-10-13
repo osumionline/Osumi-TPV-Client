@@ -285,6 +285,7 @@ export default function createApplicationComposition(
    */
   const databaseSnapshot: DatabaseSnapshot = new BetterSqlite3DatabaseSnapshot(
     applicationPaths.databaseFile,
+    applicationLogger,
   );
 
   const backupCrypto: OtpvV3Crypto = new NodeOtpvV3Crypto();
