@@ -307,6 +307,7 @@ export default function createApplicationComposition(
   const backupPackageBuilder: OtpvV3PackageBuilder = new YazlOtpvV3PackageBuilder(
     applicationVersion,
     backupPayloadBuilder,
+    applicationLogger,
   );
 
   const backupService: BackupService = new BackupService(

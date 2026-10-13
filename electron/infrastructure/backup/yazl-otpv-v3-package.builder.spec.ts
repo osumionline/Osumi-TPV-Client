@@ -5,6 +5,7 @@ import type {
   OtpvV3BuildPayloadCommand,
   OtpvV3PayloadBuilder,
 } from '@backend/contracts/backup/otpv-v3-payload-builder.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import {
   OTPV_V3_APPLICATION,
   OTPV_V3_CRYPTO_SUITE,
@@ -20,6 +21,7 @@ import {
   OTPV_V3_SCRYPT_PARALLELIZATION,
 } from '@backend/domain/backup/otpv-v3.constants';
 import { DATABASE_SCHEMA_VERSION } from '@backend/domain/database/database-schema.constants';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import YazlOtpvV3PackageBuilder from '@infrastructure/backup/yazl-otpv-v3-package.builder';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -49,7 +51,11 @@ describe('YazlOtpvV3PackageBuilder', (): void => {
 
   it('genera un .otpv v3 con exactamente manifest.json y payload.enc', async (): Promise<void> => {
     const payloadBuilder: TestPayloadBuilder = new TestPayloadBuilder();
-    const builder: YazlOtpvV3PackageBuilder = new YazlOtpvV3PackageBuilder('1.2.3', payloadBuilder);
+    const builder: YazlOtpvV3PackageBuilder = new YazlOtpvV3PackageBuilder(
+      '1.2.3',
+      payloadBuilder,
+      new TestApplicationLogger(),
+    );
 
     const destinationFile: string = getPath('backup.otpv');
 
@@ -103,6 +109,7 @@ describe('YazlOtpvV3PackageBuilder', (): void => {
     const builder: YazlOtpvV3PackageBuilder = new YazlOtpvV3PackageBuilder(
       '1.2.3',
       new TestPayloadBuilder(),
+      new TestApplicationLogger(),
     );
 
     await expect(
@@ -118,7 +125,11 @@ describe('YazlOtpvV3PackageBuilder', (): void => {
   it('propaga errores distintos de ENOENT al comprobar el destino', async (): Promise<void> => {
     const payloadBuilder: TestPayloadBuilder = new TestPayloadBuilder();
 
-    const builder: YazlOtpvV3PackageBuilder = new YazlOtpvV3PackageBuilder('1.2.3', payloadBuilder);
+    const builder: YazlOtpvV3PackageBuilder = new YazlOtpvV3PackageBuilder(
+      '1.2.3',
+      payloadBuilder,
+      new TestApplicationLogger(),
+    );
 
     const destinationFile: string = `${getPath('invalid.otpv')}\0`;
 
@@ -139,6 +150,7 @@ describe('YazlOtpvV3PackageBuilder', (): void => {
     const builder: YazlOtpvV3PackageBuilder = new YazlOtpvV3PackageBuilder(
       '1.2.3',
       new FailingPayloadBuilder(),
+      new TestApplicationLogger(),
     );
 
     const destinationFile: string = getPath('failed.otpv');
@@ -151,6 +163,74 @@ describe('YazlOtpvV3PackageBuilder', (): void => {
     ).rejects.toThrow('No se ha podido generar la copia de seguridad .otpv.');
 
     expect(await readdir(requireTempDirectory())).toEqual([]);
+  });
+
+  it('registra fallos de cleanup sin ocultar el error principal de generación', async (): Promise<void> => {
+    const logger: TestApplicationLogger = new TestApplicationLogger();
+    const cleanupError: Error = new Error('Fallo simulado eliminando temporal.');
+    const removedFiles: string[] = [];
+
+    const removeFile = async (
+      filePath: string,
+      options: {
+        readonly force: boolean;
+      },
+    ): Promise<void> => {
+      removedFiles.push(filePath);
+      expect(options.force).toBe(true);
+
+      throw cleanupError;
+    };
+
+    const builder: YazlOtpvV3PackageBuilder = new YazlOtpvV3PackageBuilder(
+      '1.2.3',
+      new FailingPayloadBuilder(),
+      logger,
+      removeFile,
+    );
+
+    const destinationFile: string = getPath('failed-cleanup.otpv');
+
+    let generationError: unknown;
+
+    try {
+      await builder.create({
+        backupApiKey: BACKUP_API_KEY,
+        destinationFile,
+      });
+    } catch (error: unknown) {
+      generationError = error;
+    }
+
+    expect(generationError).toBeInstanceOf(Error);
+
+    if (!(generationError instanceof Error)) {
+      throw new Error('Se esperaba un error de generación.');
+    }
+
+    expect(generationError.message).toBe('No se ha podido generar la copia de seguridad .otpv.');
+
+    expect(generationError.cause).toEqual(new Error('Fallo simulado creando payload.'));
+
+    expect(removedFiles).toHaveLength(2);
+
+    expect(logger.warnEvents).toEqual([
+      {
+        area: 'backup',
+        operation: 'backup-package-temp-cleanup',
+        message: 'No se ha podido limpiar un archivo temporal de generación de backup.',
+        error: cleanupError,
+      },
+      {
+        area: 'backup',
+        operation: 'backup-package-temp-cleanup',
+        message: 'No se ha podido limpiar un archivo temporal de generación de backup.',
+        error: cleanupError,
+      },
+    ]);
+
+    expect(logger.warnEvents[0].context).toBeUndefined();
+    expect(logger.warnEvents[1].context).toBeUndefined();
   });
 });
 
@@ -327,4 +407,48 @@ function requireTempDirectory(): string {
   }
 
   return tempDirectory;
+}
+
+/**
+ * Logger de pruebas que conserva las
+ * incidencias recuperables registradas.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora mensajes de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora eventos informativos.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva los avisos de cleanup.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Ignora errores principales,
+   * ajenos a este caso de prueba.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No mantiene escrituras pendientes.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
 }

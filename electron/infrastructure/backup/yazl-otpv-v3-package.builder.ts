@@ -14,6 +14,7 @@ import type {
   OtpvV3PackageBuildResult,
 } from '@backend/contracts/backup/otpv-v3-package-builder.interface';
 import type { OtpvV3PayloadBuilder } from '@backend/contracts/backup/otpv-v3-payload-builder.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type OtpvV3ArchiveEntry from '@backend/domain/backup/otpv-v3-archive-entry.interface';
 import serializeOtpvV3AuthenticatedMetadata from '@backend/domain/backup/otpv-v3-authenticated-metadata.serializer';
 import {
@@ -33,16 +34,26 @@ import { dirname, join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { ZipFile } from 'yazl';
 
+type RemoveTemporaryFile = (
+  filePath: string,
+  options: {
+    readonly force: boolean;
+  },
+) => Promise<void>;
+
 /**
  * Construye el contenedor exterior `.otpv` v3.
  */
 export default class YazlOtpvV3PackageBuilder implements OtpvV3PackageBuilder {
   /**
-   * Crea el builder para una versión concreta del Client.
+   * Crea el builder para una versión concreta del Client
+   * con logging de incidencias de limpieza temporal.
    */
   constructor(
     private readonly applicationVersion: string,
     private readonly payloadBuilder: OtpvV3PayloadBuilder,
+    private readonly applicationLogger: ApplicationLogger,
+    private readonly removeFile: RemoveTemporaryFile = rm,
   ) {
     this.assertApplicationVersion();
   }
@@ -218,14 +229,22 @@ export default class YazlOtpvV3PackageBuilder implements OtpvV3PackageBuilder {
   }
 
   /**
-   * Elimina un temporal sin ocultar
-   * el error principal de generación.
+   * Elimina un temporal sin alterar el resultado
+   * principal de la generación de la copia.
+   *
+   * Un fallo de cleanup queda registrado como aviso,
+   * sin exponer la ruta del archivo temporal.
    */
   private async removeTemporaryFileSafely(filePath: string): Promise<void> {
     try {
-      await rm(filePath, { force: true });
+      await this.removeFile(filePath, { force: true });
     } catch (cleanupError: unknown) {
-      console.error('No se ha podido limpiar un temporal del backup:', cleanupError);
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'backup-package-temp-cleanup',
+        message: 'No se ha podido limpiar un archivo temporal de generación de backup.',
+        error: cleanupError,
+      });
     }
   }
 }
