@@ -419,6 +419,99 @@ describe('OtpvV3RestoreFinalizeService', (): void => {
       clearSelectionSpy.mockRestore();
     }
   });
+
+  it('preserva el fallo principal y ejecuta la recuperación si falla la limpieza del estado preparado', async (): Promise<void> => {
+    const selectionStore = new InMemoryOtpvV3RestoreSelectionStore();
+    const preparedStore = new InMemoryOtpvV3PreparedRestoreStore();
+
+    const manifest: OtpvV3Manifest = createManifest();
+
+    const selectionId: string = selectionStore.save({
+      packagePath: 'C:\\backup.otpv',
+      manifest,
+    });
+
+    preparedStore.save({
+      selectionId,
+      backupId: manifest.backupId,
+      backupRemoteCredentials: REMOTE_CREDENTIALS,
+    });
+
+    const finalizeError: Error = new Error('Fallo simulado durante la promoción.');
+    const cleanupError: Error = new Error('Fallo simulado invalidando el estado preparado.');
+
+    const clearSpy = vi.spyOn(preparedStore, 'clear').mockImplementationOnce((): never => {
+      throw cleanupError;
+    });
+
+    try {
+      const finalizer = new TestInstallationFinalizer();
+      finalizer.finalizeError = finalizeError;
+
+      const credentials = new TestBackupRemoteCredentialStorage();
+
+      const service = new OtpvV3RestoreFinalizeService(
+        selectionStore,
+        preparedStore,
+        new TestAppDataRepository(),
+        new TestPrintingSettingsRepository(),
+        credentials,
+        finalizer,
+        applicationLogger,
+      );
+
+      let receivedError: unknown;
+
+      try {
+        await service.finalize(selectionId);
+      } catch (error: unknown) {
+        receivedError = error;
+      }
+
+      expect(receivedError).toBeInstanceOf(Error);
+
+      if (!(receivedError instanceof Error)) {
+        throw new Error('Se esperaba un error de finalización de restauración.');
+      }
+
+      expect(receivedError.message).toBe(
+        'No se ha podido completar la restauración de la copia de seguridad.',
+      );
+
+      expect(receivedError.cause).toBe(finalizeError);
+
+      expect(clearSpy).toHaveBeenCalledTimes(1);
+
+      expect(finalizer.finalizeCalls).toBe(1);
+      expect(finalizer.recoverCalls).toBe(1);
+
+      expect(credentials.saveCalls).toBe(1);
+      expect(credentials.deleteCalls).toBe(1);
+      expect(credentials.value).toBeNull();
+
+      expect(applicationLogger.errorEvents).toEqual([
+        {
+          area: 'backup',
+          operation: 'finalize-restore',
+          message: 'No se ha podido completar la restauración de la copia de seguridad.',
+          error: finalizeError,
+        },
+      ]);
+
+      expect(applicationLogger.warnEvents).toEqual([
+        {
+          area: 'backup',
+          operation: 'failed-restore-prepared-state-cleanup',
+          message: 'No se ha podido invalidar el estado temporal de una restauración fallida.',
+          error: cleanupError,
+        },
+      ]);
+
+      expect(applicationLogger.warnEvents[0].context).toBeUndefined();
+    } finally {
+      clearSpy.mockRestore();
+    }
+  });
 });
 
 /**

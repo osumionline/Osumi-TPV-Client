@@ -98,7 +98,7 @@ export default class OtpvV3RestoreFinalizeService {
         error,
       });
 
-      this.preparedRestoreStore.clear();
+      this.clearFailedRestoreStateSafely();
 
       await Promise.all([this.clearRemoteCredentialsSafely(), this.recoverSafely()]);
 
@@ -107,6 +107,26 @@ export default class OtpvV3RestoreFinalizeService {
       });
     } finally {
       this.activeSelectionId = null;
+    }
+  }
+
+  /**
+   * Invalida el estado preparado después de una
+   * finalización fallida sin ocultar el error original.
+   *
+   * La incidencia de cleanup es secundaria y no debe
+   * impedir la recuperación de archivos y credenciales.
+   */
+  private clearFailedRestoreStateSafely(): void {
+    try {
+      this.preparedRestoreStore.clear();
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'failed-restore-prepared-state-cleanup',
+        message: 'No se ha podido invalidar el estado temporal de una restauración fallida.',
+        error,
+      });
     }
   }
 
