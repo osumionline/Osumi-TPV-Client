@@ -79,9 +79,11 @@ export default class OtpvV3RestoreFinalizeService {
 
       await this.installationFinalizer.finalize();
 
-      this.preparedRestoreStore.clear();
-
-      this.selectionStore.clear();
+      /*
+       * La instalación ya está completada. Un error limpiando
+       * el estado temporal no debe activar la recuperación.
+       */
+      this.clearCompletedRestoreStateSafely();
 
       return {
         status: 'installed',
@@ -105,6 +107,36 @@ export default class OtpvV3RestoreFinalizeService {
       });
     } finally {
       this.activeSelectionId = null;
+    }
+  }
+
+  /**
+   * Invalida el estado temporal de una restauración completada.
+   *
+   * Ambos stores se limpian independientemente para que el
+   * fallo de uno no impida intentar limpiar el otro.
+   */
+  private clearCompletedRestoreStateSafely(): void {
+    try {
+      this.preparedRestoreStore.clear();
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'completed-restore-prepared-state-cleanup',
+        message: 'No se ha podido invalidar el estado temporal de la restauración completada.',
+        error,
+      });
+    }
+
+    try {
+      this.selectionStore.clear();
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'completed-restore-selection-cleanup',
+        message: 'No se ha podido invalidar la selección de la restauración completada.',
+        error,
+      });
     }
   }
 

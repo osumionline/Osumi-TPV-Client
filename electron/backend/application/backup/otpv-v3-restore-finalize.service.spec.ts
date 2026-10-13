@@ -14,7 +14,7 @@ import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type PrintingSettings from '@desktop-contracts/configuration/printing/printing-settings.interface';
 import InMemoryOtpvV3PreparedRestoreStore from '@infrastructure/backup/in-memory-otpv-v3-prepared-restore.store';
 import InMemoryOtpvV3RestoreSelectionStore from '@infrastructure/backup/in-memory-otpv-v3-restore-selection.store';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const REMOTE_CREDENTIALS: BackupRemoteCredentials = {
   keyId: 'remote-key-id',
@@ -346,6 +346,78 @@ describe('OtpvV3RestoreFinalizeService', (): void => {
         },
       ]),
     );
+  });
+
+  it('conserva la instalación completada si falla la limpieza del estado temporal', async (): Promise<void> => {
+    const selectionStore = new InMemoryOtpvV3RestoreSelectionStore();
+    const preparedStore = new InMemoryOtpvV3PreparedRestoreStore();
+
+    const manifest: OtpvV3Manifest = createManifest();
+
+    const selectionId: string = selectionStore.save({
+      packagePath: 'C:\\backup.otpv',
+      manifest,
+    });
+
+    preparedStore.save({
+      selectionId,
+      backupId: manifest.backupId,
+      backupRemoteCredentials: REMOTE_CREDENTIALS,
+    });
+
+    const cleanupError: Error = new Error('Fallo simulado limpiando estado preparado.');
+
+    const clearPreparedSpy = vi.spyOn(preparedStore, 'clear').mockImplementationOnce((): never => {
+      throw cleanupError;
+    });
+
+    const clearSelectionSpy = vi.spyOn(selectionStore, 'clear');
+
+    try {
+      const finalizer = new TestInstallationFinalizer();
+      const credentials = new TestBackupRemoteCredentialStorage();
+
+      const service = new OtpvV3RestoreFinalizeService(
+        selectionStore,
+        preparedStore,
+        new TestAppDataRepository(),
+        new TestPrintingSettingsRepository(),
+        credentials,
+        finalizer,
+        applicationLogger,
+      );
+
+      await expect(service.finalize(selectionId)).resolves.toEqual({
+        status: 'installed',
+        selectionId,
+        backupId: manifest.backupId,
+      });
+
+      expect(finalizer.finalizeCalls).toBe(1);
+      expect(finalizer.recoverCalls).toBe(0);
+
+      expect(credentials.value).toEqual(REMOTE_CREDENTIALS);
+      expect(credentials.deleteCalls).toBe(0);
+
+      expect(clearPreparedSpy).toHaveBeenCalledTimes(1);
+      expect(clearSelectionSpy).toHaveBeenCalledTimes(1);
+
+      expect(applicationLogger.errorEvents).toEqual([]);
+
+      expect(applicationLogger.warnEvents).toEqual([
+        {
+          area: 'backup',
+          operation: 'completed-restore-prepared-state-cleanup',
+          message: 'No se ha podido invalidar el estado temporal de la restauración completada.',
+          error: cleanupError,
+        },
+      ]);
+
+      expect(applicationLogger.warnEvents[0].context).toBeUndefined();
+    } finally {
+      clearPreparedSpy.mockRestore();
+      clearSelectionSpy.mockRestore();
+    }
   });
 });
 
