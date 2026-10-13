@@ -227,6 +227,9 @@ describe('FileApplicationLogger', (): void => {
     await expect(logger.flush()).resolves.toBeUndefined();
 
     expect(consoleError).toHaveBeenCalledOnce();
+    expect(consoleError).toHaveBeenCalledWith(
+      'No se ha podido persistir una entrada del log de Osumi TPV.',
+    );
   });
 
   it('limita el número de campos de contexto persistidos', async (): Promise<void> => {

@@ -398,9 +398,12 @@ export default class FileApplicationLogger implements ApplicationLogger {
    * Último recurso cuando el propio logger no puede
    * normalizar o persistir una entrada.
    *
-   * Nunca relanza el error.
+   * Evita imprimir errores originales, que podrían
+   * contener rutas físicas o datos sensibles.
    */
   private reportEmergencyFailure(error: unknown): void {
-    console.error('No se ha podido persistir una entrada del log de Osumi TPV:', error);
+    void error;
+
+    console.error('No se ha podido persistir una entrada del log de Osumi TPV.');
   }
 }
