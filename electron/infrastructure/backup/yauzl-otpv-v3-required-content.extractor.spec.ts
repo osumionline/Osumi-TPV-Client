@@ -1,5 +1,7 @@
 import type OtpvV3RequiredContentPaths from '@backend/contracts/backup/otpv-v3-required-content-paths.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import { OTPV_V3_MAX_APP_DATA_SIZE_BYTES } from '@backend/domain/backup/otpv-v3.constants';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import YauzlOtpvV3RequiredContentExtractor from '@infrastructure/backup/yauzl-otpv-v3-required-content.extractor';
 import { createWriteStream } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -66,7 +68,7 @@ describe('YauzlOtpvV3RequiredContentExtractor', (): void => {
       },
     ]);
 
-    const extractor = new YauzlOtpvV3RequiredContentExtractor();
+    const extractor = new YauzlOtpvV3RequiredContentExtractor(new TestApplicationLogger());
 
     await extractor.extract(payloadFile, destinations);
 
@@ -105,7 +107,7 @@ describe('YauzlOtpvV3RequiredContentExtractor', (): void => {
       },
     ]);
 
-    const extractor = new YauzlOtpvV3RequiredContentExtractor();
+    const extractor = new YauzlOtpvV3RequiredContentExtractor(new TestApplicationLogger());
 
     await expect(extractor.extract(payloadFile, createDestinations())).rejects.toThrow(
       'Falta el archivo obligatorio secrets/secrets.json.',
@@ -134,11 +136,44 @@ describe('YauzlOtpvV3RequiredContentExtractor', (): void => {
       },
     ]);
 
-    const extractor = new YauzlOtpvV3RequiredContentExtractor();
+    const extractor = new YauzlOtpvV3RequiredContentExtractor(new TestApplicationLogger());
 
     await expect(extractor.extract(payloadFile, createDestinations())).rejects.toThrow(
       'config/app_data.json tiene un tamaño no permitido.',
     );
+  });
+
+  it('registra fallos de cleanup sin propagarlos ni exponer rutas', async (): Promise<void> => {
+    const logger: TestApplicationLogger = new TestApplicationLogger();
+    const cleanupError: Error = new Error('Fallo simulado eliminando temporal.');
+    const temporaryFile: string = getPath('.restore-test.tmp');
+
+    const removeTemporaryFile = async (
+      filePath: string,
+      options: {
+        readonly force: boolean;
+      },
+    ): Promise<void> => {
+      expect(filePath).toBe(temporaryFile);
+      expect(options.force).toBe(true);
+
+      throw cleanupError;
+    };
+
+    const extractor = new YauzlOtpvV3RequiredContentExtractor(logger, removeTemporaryFile);
+
+    await expect(extractor['removeTemporaryFileSafely'](temporaryFile)).resolves.toBeUndefined();
+
+    expect(logger.warnEvents).toEqual([
+      {
+        area: 'backup',
+        operation: 'restore-required-content-temp-cleanup',
+        message: 'No se ha podido limpiar un recurso obligatorio temporal de restauración.',
+        error: cleanupError,
+      },
+    ]);
+
+    expect(logger.warnEvents[0].context).toBeUndefined();
   });
 });
 
@@ -197,4 +232,47 @@ function getPath(fileName: string): string {
   }
 
   return join(tempDirectory, fileName);
+}
+
+/**
+ * Logger de pruebas que conserva
+ * las incidencias recuperables.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora eventos de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora eventos informativos.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva los avisos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Ignora errores de otros niveles.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No mantiene escrituras pendientes.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
 }

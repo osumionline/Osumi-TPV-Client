@@ -1,5 +1,6 @@
 import type OtpvV3RequiredContentExtractor from '@backend/contracts/backup/otpv-v3-required-content-extractor.interface';
 import type OtpvV3RequiredContentPaths from '@backend/contracts/backup/otpv-v3-required-content-paths.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import {
   OTPV_V3_APP_DATA_ENTRY,
   OTPV_V3_DATABASE_ENTRY,
@@ -26,11 +27,27 @@ interface RequiredEntryDefinition {
   readonly maximumSize: number;
 }
 
+type RemoveTemporaryFile = (
+  filePath: string,
+  options: {
+    readonly force: boolean;
+  },
+) => Promise<void>;
+
 /**
  * Extrae únicamente los cuatro recursos obligatorios
  * del ZIP interior de una copia v3.
  */
 export default class YauzlOtpvV3RequiredContentExtractor implements OtpvV3RequiredContentExtractor {
+  /**
+   * Crea el extractor con logging de incidencias
+   * durante la limpieza de temporales.
+   */
+  constructor(
+    private readonly applicationLogger: ApplicationLogger,
+    private readonly removeTemporaryFile: RemoveTemporaryFile = rm,
+  ) {}
+
   /**
    * Materializa los recursos obligatorios
    * dentro del workspace de restauración.
@@ -234,11 +251,31 @@ export default class YauzlOtpvV3RequiredContentExtractor implements OtpvV3Requir
 
       await rename(temporaryFile, destinationFile);
     } catch (error: unknown) {
-      await rm(temporaryFile, {
-        force: true,
-      });
+      await this.removeTemporaryFileSafely(temporaryFile);
 
       throw error;
+    }
+  }
+
+  /**
+   * Elimina un recurso obligatorio temporal sin
+   * ocultar el error original de extracción.
+   *
+   * Un fallo secundario queda registrado como aviso,
+   * sin incluir rutas físicas en el evento.
+   */
+  private async removeTemporaryFileSafely(temporaryFile: string): Promise<void> {
+    try {
+      await this.removeTemporaryFile(temporaryFile, {
+        force: true,
+      });
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'restore-required-content-temp-cleanup',
+        message: 'No se ha podido limpiar un recurso obligatorio temporal de restauración.',
+        error,
+      });
     }
   }
 

@@ -447,7 +447,7 @@ export default function createApplicationComposition(
   const newInstallationDataService: NewInstallationDataService = new NewInstallationDataService();
 
   const otpvV3RequiredContentExtractor: YauzlOtpvV3RequiredContentExtractor =
-    new YauzlOtpvV3RequiredContentExtractor();
+    new YauzlOtpvV3RequiredContentExtractor(applicationLogger);
 
   const otpvV3RequiredContentValidator: FileOtpvV3RequiredContentValidator =
     new FileOtpvV3RequiredContentValidator(dataSourceFactory, databaseSchemaService);
