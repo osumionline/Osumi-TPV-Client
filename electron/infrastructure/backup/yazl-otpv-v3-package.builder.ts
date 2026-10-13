@@ -26,6 +26,7 @@ import {
 } from '@backend/domain/backup/otpv-v3.constants';
 import { DATABASE_SCHEMA_VERSION } from '@backend/domain/database/database-schema.constants';
 import hasFileSystemErrorCode from '@infrastructure/filesystem/filesystem-error.utils';
+import type RemoveTemporaryFile from '@infrastructure/filesystem/remove-temporary-file.type';
 import { randomUUID } from 'node:crypto';
 import type { Stats } from 'node:fs';
 import { createWriteStream } from 'node:fs';
@@ -33,13 +34,6 @@ import { access, mkdir, rename, rm, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { ZipFile } from 'yazl';
-
-type RemoveTemporaryFile = (
-  filePath: string,
-  options: {
-    readonly force: boolean;
-  },
-) => Promise<void>;
 
 /**
  * Construye el contenedor exterior `.otpv` v3.

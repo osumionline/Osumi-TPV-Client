@@ -11,6 +11,7 @@ import {
   OTPV_V3_MAX_SINGLE_ENTRY_SIZE_BYTES,
   OTPV_V3_SECRETS_ENTRY,
 } from '@backend/domain/backup/otpv-v3.constants';
+import type RemoveTemporaryFile from '@infrastructure/filesystem/remove-temporary-file.type';
 import { randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
 import { mkdir, rename, rm } from 'node:fs/promises';
@@ -26,13 +27,6 @@ interface RequiredEntryDefinition {
   readonly destinationFile: string;
   readonly maximumSize: number;
 }
-
-type RemoveTemporaryFile = (
-  filePath: string,
-  options: {
-    readonly force: boolean;
-  },
-) => Promise<void>;
 
 /**
  * Extrae únicamente los cuatro recursos obligatorios

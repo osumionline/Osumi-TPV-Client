@@ -6,6 +6,7 @@ import {
   OTPV_V3_FILES_PREFIX,
   OTPV_V3_MAX_SINGLE_ENTRY_SIZE_BYTES,
 } from '@backend/domain/backup/otpv-v3.constants';
+import type RemoveTemporaryFile from '@infrastructure/filesystem/remove-temporary-file.type';
 import { randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
 import { mkdir, rename, rm } from 'node:fs/promises';
@@ -20,13 +21,6 @@ type RemoveDirectory = (
   directory: string,
   options: {
     readonly recursive: boolean;
-    readonly force: boolean;
-  },
-) => Promise<void>;
-
-type RemoveTemporaryFile = (
-  filePath: string,
-  options: {
     readonly force: boolean;
   },
 ) => Promise<void>;

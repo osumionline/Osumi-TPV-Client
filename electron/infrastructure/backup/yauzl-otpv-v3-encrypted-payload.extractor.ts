@@ -7,6 +7,7 @@ import {
   OTPV_V3_PAYLOAD_ENTRY,
 } from '@backend/domain/backup/otpv-v3.constants';
 import hasFileSystemErrorCode from '@infrastructure/filesystem/filesystem-error.utils';
+import type RemoveTemporaryFile from '@infrastructure/filesystem/remove-temporary-file.type';
 import { randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
 import { access, mkdir, rename, rm } from 'node:fs/promises';
@@ -16,13 +17,6 @@ import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import type { Entry, Options, ZipFile } from 'yauzl';
 import { open } from 'yauzl';
-
-type RemoveTemporaryFile = (
-  filePath: string,
-  options: {
-    readonly force: boolean;
-  },
-) => Promise<void>;
 
 /**
  * Extrae payload.enc del ZIP exterior

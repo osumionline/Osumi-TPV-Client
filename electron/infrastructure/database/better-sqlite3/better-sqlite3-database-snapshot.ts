@@ -1,17 +1,11 @@
 import type DatabaseSnapshot from '@backend/contracts/backup/database-snapshot.interface';
 import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import hasFileSystemErrorCode from '@infrastructure/filesystem/filesystem-error.utils';
+import type RemoveTemporaryFile from '@infrastructure/filesystem/remove-temporary-file.type';
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { access, mkdir, rename, rm, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-
-type RemoveTemporaryFile = (
-  filePath: string,
-  options: {
-    readonly force: boolean;
-  },
-) => Promise<void>;
 
 /**
  * Crea snapshots consistentes utilizando
