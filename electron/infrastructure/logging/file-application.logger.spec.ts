@@ -329,6 +329,43 @@ describe('FileApplicationLogger', (): void => {
     expect(records[0]?.error?.message).not.toContain(privatePath);
     expect(records[0]?.error?.stack).not.toContain(stackPath);
   });
+
+  it('redacta claves sensibles del contexto aunque utilicen separadores', async (): Promise<void> => {
+    const logger: FileApplicationLogger = createLogger();
+
+    logger.info({
+      area: 'backup',
+      operation: 'context-redaction',
+      message: 'Comprobación de privacidad del contexto.',
+      context: {
+        api_key: 'credencial-privada-uno',
+        'backup-api-key': 'credencial-privada-dos',
+        'API KEY': 'credencial-privada-tres',
+        access_token: 'credencial-privada-cuatro',
+        operationId: 123,
+      },
+    });
+
+    await logger.flush();
+
+    const content: string = await readCurrentLog();
+    const records: readonly ApplicationLogRecord[] = await readRecords();
+
+    expect(records).toHaveLength(1);
+
+    expect(records[0]?.context).toEqual({
+      api_key: '[REDACTED]',
+      'backup-api-key': '[REDACTED]',
+      'API KEY': '[REDACTED]',
+      access_token: '[REDACTED]',
+      operationId: 123,
+    });
+
+    expect(content).not.toContain('credencial-privada-uno');
+    expect(content).not.toContain('credencial-privada-dos');
+    expect(content).not.toContain('credencial-privada-tres');
+    expect(content).not.toContain('credencial-privada-cuatro');
+  });
 });
 
 /**

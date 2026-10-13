@@ -264,11 +264,12 @@ export default class FileApplicationLogger implements ApplicationLogger {
   }
 
   /**
-   * Identifica nombres de contexto que no deben
-   * contener nunca su valor real en un log.
+   * Identifica nombres de contexto sensibles,
+   * independientemente del uso de separadores
+   * o diferencias entre mayúsculas y minúsculas.
    */
   private isSensitiveContextKey(key: string): boolean {
-    const normalized: string = key.toLocaleLowerCase('en-US');
+    const normalized: string = key.toLocaleLowerCase('en-US').replace(/[_\s-]/g, '');
 
     return (
       normalized === 'authorization' ||
