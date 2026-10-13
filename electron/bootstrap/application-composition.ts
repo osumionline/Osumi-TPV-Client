@@ -914,7 +914,9 @@ export default function createApplicationComposition(
 
   const otpvV3PayloadInspector: YauzlOtpvV3PayloadInspector = new YauzlOtpvV3PayloadInspector();
 
-  const otpvV3FilesExtractor: YauzlOtpvV3FilesExtractor = new YauzlOtpvV3FilesExtractor();
+  const otpvV3FilesExtractor: YauzlOtpvV3FilesExtractor = new YauzlOtpvV3FilesExtractor(
+    applicationLogger,
+  );
 
   const otpvV3RestoreStagingPreparer: FileOtpvV3RestoreStagingPreparer =
     new FileOtpvV3RestoreStagingPreparer(applicationPaths, stagingSecretStorage, applicationLogger);

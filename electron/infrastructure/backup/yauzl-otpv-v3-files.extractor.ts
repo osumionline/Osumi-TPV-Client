@@ -1,5 +1,6 @@
 import { validateOtpvV3PayloadEntries } from '@backend/application/backup/otpv-v3-package.validator';
 import type OtpvV3FilesExtractor from '@backend/contracts/backup/otpv-v3-files-extractor.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type OtpvV3ArchiveEntry from '@backend/domain/backup/otpv-v3-archive-entry.interface';
 import {
   OTPV_V3_FILES_PREFIX,
@@ -15,11 +16,28 @@ import { pipeline } from 'node:stream/promises';
 import type { Entry, Options, ZipFile } from 'yauzl';
 import { open } from 'yauzl';
 
+type RemoveDirectory = (
+  directory: string,
+  options: {
+    readonly recursive: boolean;
+    readonly force: boolean;
+  },
+) => Promise<void>;
+
 /**
  * Materializa la jerarquía files/**
  * del payload portable v3.
  */
 export default class YauzlOtpvV3FilesExtractor implements OtpvV3FilesExtractor {
+  /**
+   * Crea el extractor con logging de incidencias
+   * durante la limpieza del directorio de restauración.
+   */
+  constructor(
+    private readonly applicationLogger: ApplicationLogger,
+    private readonly removeDirectory: RemoveDirectory = rm,
+  ) {}
+
   /**
    * Extrae todos los ficheros pertenecientes
    * a la raíz lógica files/.
@@ -310,15 +328,23 @@ export default class YauzlOtpvV3FilesExtractor implements OtpvV3FilesExtractor {
   /**
    * Limpia una extracción incompleta sin
    * ocultar el error original.
+   *
+   * Registra como aviso cualquier fallo secundario
+   * sin incorporar rutas físicas al evento.
    */
   private async cleanDestinationSafely(destinationDirectory: string): Promise<void> {
     try {
-      await rm(destinationDirectory, {
+      await this.removeDirectory(destinationDirectory, {
         recursive: true,
         force: true,
       });
     } catch (error: unknown) {
-      console.error('No se han podido limpiar los files/** temporales:', error);
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'restore-files-directory-cleanup',
+        message: 'No se ha podido limpiar el directorio temporal de archivos restaurados.',
+        error,
+      });
     }
   }
 }

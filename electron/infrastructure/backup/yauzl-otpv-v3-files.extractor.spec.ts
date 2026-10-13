@@ -1,3 +1,5 @@
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import YauzlOtpvV3FilesExtractor from '@infrastructure/backup/yauzl-otpv-v3-files.extractor';
 import { createWriteStream } from 'node:fs';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
@@ -54,7 +56,7 @@ describe('YauzlOtpvV3FilesExtractor', (): void => {
       },
     ]);
 
-    const extractor = new YauzlOtpvV3FilesExtractor();
+    const extractor = new YauzlOtpvV3FilesExtractor(new TestApplicationLogger());
 
     await extractor.extract(payloadFile, destinationDirectory);
 
@@ -84,11 +86,50 @@ describe('YauzlOtpvV3FilesExtractor', (): void => {
 
     await writePayload(payloadFile, createRequiredEntries());
 
-    const extractor = new YauzlOtpvV3FilesExtractor();
+    const extractor = new YauzlOtpvV3FilesExtractor(new TestApplicationLogger());
 
     await extractor.extract(payloadFile, destinationDirectory);
 
     expect(await readdir(destinationDirectory)).toEqual([]);
+  });
+
+  it('registra un fallo de limpieza del directorio sin propagarlo', async (): Promise<void> => {
+    const logger: TestApplicationLogger = new TestApplicationLogger();
+    const cleanupError: Error = new Error('Fallo simulado eliminando el directorio.');
+    const destinationDirectory: string = getPath('files');
+
+    const removeDirectory = async (
+      directory: string,
+      options: {
+        readonly recursive: boolean;
+        readonly force: boolean;
+      },
+    ): Promise<void> => {
+      expect(directory).toBe(destinationDirectory);
+      expect(options).toEqual({
+        recursive: true,
+        force: true,
+      });
+
+      throw cleanupError;
+    };
+
+    const extractor = new YauzlOtpvV3FilesExtractor(logger, removeDirectory);
+
+    await expect(
+      extractor['cleanDestinationSafely'](destinationDirectory),
+    ).resolves.toBeUndefined();
+
+    expect(logger.warnEvents).toEqual([
+      {
+        area: 'backup',
+        operation: 'restore-files-directory-cleanup',
+        message: 'No se ha podido limpiar el directorio temporal de archivos restaurados.',
+        error: cleanupError,
+      },
+    ]);
+
+    expect(logger.warnEvents[0].context).toBeUndefined();
   });
 });
 
@@ -153,4 +194,47 @@ function getPath(fileName: string): string {
   }
 
   return join(tempDirectory, fileName);
+}
+
+/**
+ * Logger de pruebas que conserva
+ * las incidencias recuperables.
+ */
+class TestApplicationLogger implements ApplicationLogger {
+  readonly warnEvents: ApplicationLogEvent[] = [];
+
+  /**
+   * Ignora mensajes de diagnóstico.
+   */
+  debug(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Ignora mensajes informativos.
+   */
+  info(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * Conserva los avisos para comprobarlos.
+   */
+  warn(event: ApplicationLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  /**
+   * Ignora errores de otros niveles.
+   */
+  error(event: ApplicationLogEvent): void {
+    void event;
+  }
+
+  /**
+   * No mantiene escrituras pendientes.
+   */
+  flush(): Promise<void> {
+    return Promise.resolve();
+  }
 }
