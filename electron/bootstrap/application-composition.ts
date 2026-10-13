@@ -908,7 +908,7 @@ export default function createApplicationComposition(
   );
 
   const otpvV3EncryptedPayloadExtractor: YauzlOtpvV3EncryptedPayloadExtractor =
-    new YauzlOtpvV3EncryptedPayloadExtractor();
+    new YauzlOtpvV3EncryptedPayloadExtractor(applicationLogger);
 
   const otpvV3PayloadInspector: YauzlOtpvV3PayloadInspector = new YauzlOtpvV3PayloadInspector();
 

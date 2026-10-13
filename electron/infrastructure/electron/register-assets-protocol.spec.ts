@@ -2,7 +2,7 @@ import type ApplicationLogger from '@backend/contracts/logging/application-logge
 import type ApplicationPaths from '@backend/contracts/system/application-paths.interface';
 import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import registerAssetsProtocol from '@infrastructure/electron/register-assets-protocol';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -96,8 +96,9 @@ describe('registerAssetsProtocol', (): void => {
 
     expect(response.status).toBe(200);
 
-    expect(electronMocks.fetch).toHaveBeenCalledWith(pathToFileURL(filePath).toString());
+    const realFilePath: string = await realpath(filePath);
 
+    expect(electronMocks.fetch).toHaveBeenCalledWith(pathToFileURL(realFilePath).toString());
     expect(applicationLogger.warnEvents).toEqual([]);
   });
 

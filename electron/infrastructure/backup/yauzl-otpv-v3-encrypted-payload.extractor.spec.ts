@@ -1,10 +1,12 @@
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
+import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import YauzlOtpvV3EncryptedPayloadExtractor from '@infrastructure/backup/yauzl-otpv-v3-encrypted-payload.extractor';
 import { createWriteStream } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ZipFile } from 'yazl';
 
 let tempDirectory: string | null = null;
@@ -32,7 +34,7 @@ describe('YauzlOtpvV3EncryptedPayloadExtractor', (): void => {
 
     await createPackage(packagePath, payload, false);
 
-    const extractor = new YauzlOtpvV3EncryptedPayloadExtractor();
+    const extractor = new YauzlOtpvV3EncryptedPayloadExtractor(createLogger());
 
     await extractor.extract(packagePath, destinationFile);
 
@@ -44,7 +46,7 @@ describe('YauzlOtpvV3EncryptedPayloadExtractor', (): void => {
 
     await createPackage(packagePath, Buffer.alloc(10_000, 1), true);
 
-    const extractor = new YauzlOtpvV3EncryptedPayloadExtractor();
+    const extractor = new YauzlOtpvV3EncryptedPayloadExtractor(createLogger());
 
     await expect(extractor.extract(packagePath, getPath('payload.enc'))).rejects.toThrow(
       'payload.enc debe almacenarse sin compresión',
@@ -61,7 +63,7 @@ describe('YauzlOtpvV3EncryptedPayloadExtractor', (): void => {
       encoding: 'utf8',
     });
 
-    const extractor = new YauzlOtpvV3EncryptedPayloadExtractor();
+    const extractor = new YauzlOtpvV3EncryptedPayloadExtractor(createLogger());
 
     await expect(extractor.extract(packagePath, destinationFile)).rejects.toThrow(
       'destino de payload.enc ya existe',
@@ -75,11 +77,47 @@ describe('YauzlOtpvV3EncryptedPayloadExtractor', (): void => {
   });
 
   it('propaga errores distintos de ENOENT al comprobar el destino', async (): Promise<void> => {
-    const extractor = new YauzlOtpvV3EncryptedPayloadExtractor();
+    const extractor = new YauzlOtpvV3EncryptedPayloadExtractor(createLogger());
 
     await expect(extractor.extract('unused.otpv', 'invalid\0payload.enc')).rejects.toBeInstanceOf(
       Error,
     );
+  });
+
+  it('registra un fallo de cleanup sin propagarlo ni exponer la ruta temporal', async (): Promise<void> => {
+    const cleanupError: Error = new Error('No se ha podido eliminar el temporal.');
+    const logger: ApplicationLogger = createLogger();
+
+    const removeFile = async (
+      filePath: string,
+      options: {
+        readonly force: boolean;
+      },
+    ): Promise<void> => {
+      void filePath;
+      void options;
+
+      throw cleanupError;
+    };
+
+    const extractor = new YauzlOtpvV3EncryptedPayloadExtractor(logger, removeFile);
+
+    const temporaryFile: string = getPath('.extract-test.tmp');
+
+    await expect(extractor['removeTemporaryFileSafely'](temporaryFile)).resolves.toBeUndefined();
+
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+
+    expect(logger.warn).toHaveBeenCalledWith({
+      area: 'backup',
+      operation: 'restore-encrypted-payload-temp-cleanup',
+      message: 'No se ha podido limpiar un payload cifrado temporal de restauración.',
+      error: cleanupError,
+    });
+
+    const event: ApplicationLogEvent = vi.mocked(logger.warn).mock.calls[0][0];
+
+    expect(event.context).toBeUndefined();
   });
 });
 
@@ -118,4 +156,18 @@ function getPath(fileName: string): string {
   }
 
   return join(tempDirectory, fileName);
+}
+
+/**
+ * Crea un logger de pruebas con todos
+ * los niveles y operaciones simulados.
+ */
+function createLogger(): ApplicationLogger {
+  return {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    flush: vi.fn().mockResolvedValue(undefined),
+  };
 }

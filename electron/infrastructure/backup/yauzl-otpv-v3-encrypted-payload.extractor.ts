@@ -1,5 +1,6 @@
 import { validateOtpvV3OuterEntries } from '@backend/application/backup/otpv-v3-package.validator';
 import type OtpvV3EncryptedPayloadExtractor from '@backend/contracts/backup/otpv-v3-encrypted-payload-extractor.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type OtpvV3ArchiveEntry from '@backend/domain/backup/otpv-v3-archive-entry.interface';
 import {
   OTPV_V3_MAX_PACKAGE_SIZE_BYTES,
@@ -16,11 +17,27 @@ import { pipeline } from 'node:stream/promises';
 import type { Entry, Options, ZipFile } from 'yauzl';
 import { open } from 'yauzl';
 
+type RemoveTemporaryFile = (
+  filePath: string,
+  options: {
+    readonly force: boolean;
+  },
+) => Promise<void>;
+
 /**
  * Extrae payload.enc del ZIP exterior
  * mediante streaming y sin confiar en rutas.
  */
 export default class YauzlOtpvV3EncryptedPayloadExtractor implements OtpvV3EncryptedPayloadExtractor {
+  /**
+   * Crea el extractor con el logger y la operación
+   * de eliminación utilizada por el cleanup temporal.
+   */
+  constructor(
+    private readonly applicationLogger: ApplicationLogger,
+    private readonly removeFile: RemoveTemporaryFile = rm,
+  ) {}
+
   /**
    * Extrae payload.enc a un fichero nuevo.
    */
@@ -287,15 +304,24 @@ export default class YauzlOtpvV3EncryptedPayloadExtractor implements OtpvV3Encry
   }
 
   /**
-   * Limpia un temporal sin ocultar el error principal.
+   * Limpia el payload cifrado temporal sin modificar
+   * el resultado de la operación principal.
+   *
+   * Una incidencia de eliminación no debe ocultar
+   * un fallo anterior ni invalidar una extracción correcta.
    */
   private async removeTemporaryFileSafely(temporaryFile: string): Promise<void> {
     try {
-      await rm(temporaryFile, {
+      await this.removeFile(temporaryFile, {
         force: true,
       });
     } catch (error: unknown) {
-      console.error('No se ha podido limpiar un payload temporal:', error);
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'restore-encrypted-payload-temp-cleanup',
+        message: 'No se ha podido limpiar un payload cifrado temporal de restauración.',
+        error,
+      });
     }
   }
 }
