@@ -24,6 +24,13 @@ type RemoveDirectory = (
   },
 ) => Promise<void>;
 
+type RemoveTemporaryFile = (
+  filePath: string,
+  options: {
+    readonly force: boolean;
+  },
+) => Promise<void>;
+
 /**
  * Materializa la jerarquía files/**
  * del payload portable v3.
@@ -31,11 +38,12 @@ type RemoveDirectory = (
 export default class YauzlOtpvV3FilesExtractor implements OtpvV3FilesExtractor {
   /**
    * Crea el extractor con logging de incidencias
-   * durante la limpieza del directorio de restauración.
+   * durante las limpiezas de restauración.
    */
   constructor(
     private readonly applicationLogger: ApplicationLogger,
     private readonly removeDirectory: RemoveDirectory = rm,
+    private readonly removeTemporaryFile: RemoveTemporaryFile = rm,
   ) {}
 
   /**
@@ -240,9 +248,7 @@ export default class YauzlOtpvV3FilesExtractor implements OtpvV3FilesExtractor {
 
       await rename(temporaryFile, destinationFile);
     } catch (error: unknown) {
-      await rm(temporaryFile, {
-        force: true,
-      });
+      await this.removeTemporaryFileSafely(temporaryFile);
 
       throw error;
     }
@@ -323,6 +329,28 @@ export default class YauzlOtpvV3FilesExtractor implements OtpvV3FilesExtractor {
     const unixMode: number = (entry.externalFileAttributes >>> 16) & 0xffff;
 
     return (unixMode & 0o170000) === 0o120000;
+  }
+
+  /**
+   * Elimina un archivo temporal de restauración
+   * sin ocultar el fallo principal de extracción.
+   *
+   * Los problemas de limpieza se registran como
+   * incidencias secundarias sin incluir rutas físicas.
+   */
+  private async removeTemporaryFileSafely(temporaryFile: string): Promise<void> {
+    try {
+      await this.removeTemporaryFile(temporaryFile, {
+        force: true,
+      });
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'restore-files-entry-temp-cleanup',
+        message: 'No se ha podido limpiar un archivo temporal de la restauración.',
+        error,
+      });
+    }
   }
 
   /**

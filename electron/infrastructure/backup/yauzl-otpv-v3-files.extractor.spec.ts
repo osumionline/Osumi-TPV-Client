@@ -5,8 +5,10 @@ import { createWriteStream } from 'node:fs';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { Readable } from 'node:stream';
+import { PassThrough } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ZipFile } from 'yazl';
 
 interface PayloadEntry {
@@ -130,6 +132,81 @@ describe('YauzlOtpvV3FilesExtractor', (): void => {
     ]);
 
     expect(logger.warnEvents[0].context).toBeUndefined();
+  });
+
+  it('preserva el error de extracción aunque falle la limpieza del archivo temporal', async (): Promise<void> => {
+    const logger: TestApplicationLogger = new TestApplicationLogger();
+
+    const payloadFile: string = getPath('failed-entry.zip');
+    const destinationDirectory: string = getPath('files');
+
+    await writePayload(payloadFile, [
+      ...createRequiredEntries(),
+      {
+        path: 'files/foto.webp',
+        content: 'contenido-de-prueba',
+      },
+    ]);
+
+    const extractionError: Error = new Error('Fallo simulado leyendo el archivo.');
+    const cleanupError: Error = new Error('Fallo simulado eliminando el temporal.');
+
+    const removedFiles: string[] = [];
+
+    const removeTemporaryFile = async (
+      filePath: string,
+      options: {
+        readonly force: boolean;
+      },
+    ): Promise<void> => {
+      removedFiles.push(filePath);
+
+      expect(options.force).toBe(true);
+
+      throw cleanupError;
+    };
+
+    const extractor = new YauzlOtpvV3FilesExtractor(logger, rm, removeTemporaryFile);
+
+    const originalOpenEntryStream = extractor['openEntryStream'].bind(extractor);
+
+    const streamSpy = vi
+      .spyOn(extractor, 'openEntryStream')
+      .mockImplementation(async (zipFile, entry): Promise<Readable> => {
+        if (entry.fileName === 'files/foto.webp') {
+          const stream: PassThrough = new PassThrough();
+
+          queueMicrotask((): void => {
+            stream.destroy(extractionError);
+          });
+
+          return stream;
+        }
+
+        return originalOpenEntryStream(zipFile, entry);
+      });
+
+    try {
+      await expect(extractor.extract(payloadFile, destinationDirectory)).rejects.toBe(
+        extractionError,
+      );
+
+      expect(removedFiles).toHaveLength(1);
+      expect(removedFiles[0]).toMatch(/\.restore-[0-9a-f-]+\.tmp$/i);
+
+      expect(logger.warnEvents).toEqual([
+        {
+          area: 'backup',
+          operation: 'restore-files-entry-temp-cleanup',
+          message: 'No se ha podido limpiar un archivo temporal de la restauración.',
+          error: cleanupError,
+        },
+      ]);
+
+      expect(logger.warnEvents[0].context).toBeUndefined();
+    } finally {
+      streamSpy.mockRestore();
+    }
   });
 });
 
