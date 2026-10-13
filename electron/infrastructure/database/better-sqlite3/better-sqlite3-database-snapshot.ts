@@ -63,7 +63,7 @@ export default class BetterSqlite3DatabaseSnapshot implements DatabaseSnapshot {
       });
     } finally {
       if (sourceDatabase !== null) {
-        sourceDatabase.close();
+        this.closeSourceDatabaseSafely(sourceDatabase);
       }
     }
   }
@@ -80,6 +80,26 @@ export default class BetterSqlite3DatabaseSnapshot implements DatabaseSnapshot {
       readonly: true,
       fileMustExist: true,
     });
+  }
+
+  /**
+   * Cierra la conexión SQLite utilizada para el snapshot.
+   *
+   * Un fallo durante el cierre se registra como incidencia
+   * secundaria, sin ocultar un error anterior ni alterar
+   * el resultado de la operación principal.
+   */
+  private closeSourceDatabaseSafely(sourceDatabase: Database.Database): void {
+    try {
+      sourceDatabase.close();
+    } catch (error: unknown) {
+      this.applicationLogger.warn({
+        area: 'backup',
+        operation: 'backup-sqlite-snapshot-close',
+        message: 'No se ha podido cerrar la conexión SQLite utilizada para generar el snapshot.',
+        error,
+      });
+    }
   }
 
   /**

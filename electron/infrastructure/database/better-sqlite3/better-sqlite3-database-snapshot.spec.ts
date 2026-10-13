@@ -5,7 +5,7 @@ import Database from 'better-sqlite3';
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 let tempDirectory: string | null = null;
 let sourceDatabase: Database.Database | null = null;
@@ -296,6 +296,107 @@ describe('BetterSqlite3DatabaseSnapshot', (): void => {
     ]);
 
     expect(logger.warnEvents[0].context).toBeUndefined();
+  });
+
+  it('conserva el resultado correcto del snapshot cuando falla el cierre SQLite', async (): Promise<void> => {
+    const logger: TestApplicationLogger = new TestApplicationLogger();
+    const closeError: Error = new Error('Fallo simulado cerrando SQLite.');
+
+    const originalClose = Database.prototype.close;
+
+    const closeSpy = vi.spyOn(Database.prototype, 'close').mockImplementationOnce(function (
+      this: Database.Database,
+    ): Database.Database {
+      originalClose.call(this);
+
+      throw closeError;
+    });
+
+    try {
+      const snapshot: BetterSqlite3DatabaseSnapshot = new BetterSqlite3DatabaseSnapshot(
+        requireSourceDatabaseFile(),
+        logger,
+      );
+
+      const destinationFile: string = requireSnapshotFile();
+
+      await expect(snapshot.create(destinationFile)).resolves.toBeUndefined();
+
+      expect(await fileExists(destinationFile)).toBe(true);
+
+      expect(logger.warnEvents).toEqual([
+        {
+          area: 'backup',
+          operation: 'backup-sqlite-snapshot-close',
+          message: 'No se ha podido cerrar la conexión SQLite utilizada para generar el snapshot.',
+          error: closeError,
+        },
+      ]);
+
+      expect(logger.warnEvents[0].context).toBeUndefined();
+    } finally {
+      closeSpy.mockRestore();
+    }
+  });
+
+  it('preserva el error principal si fallan el backup y el cierre SQLite', async (): Promise<void> => {
+    const logger: TestApplicationLogger = new TestApplicationLogger();
+
+    const backupError: Error = new Error('Fallo simulado generando el snapshot.');
+    const closeError: Error = new Error('Fallo simulado cerrando SQLite.');
+
+    const backupSpy = vi.spyOn(Database.prototype, 'backup').mockRejectedValueOnce(backupError);
+
+    const originalClose = Database.prototype.close;
+
+    const closeSpy = vi.spyOn(Database.prototype, 'close').mockImplementationOnce(function (
+      this: Database.Database,
+    ): Database.Database {
+      originalClose.call(this);
+
+      throw closeError;
+    });
+
+    try {
+      const snapshot: BetterSqlite3DatabaseSnapshot = new BetterSqlite3DatabaseSnapshot(
+        requireSourceDatabaseFile(),
+        logger,
+      );
+
+      let snapshotError: unknown;
+
+      try {
+        await snapshot.create(requireSnapshotFile());
+      } catch (error: unknown) {
+        snapshotError = error;
+      }
+
+      expect(snapshotError).toBeInstanceOf(Error);
+
+      if (!(snapshotError instanceof Error)) {
+        throw new Error('Se esperaba el error principal de creación del snapshot.');
+      }
+
+      expect(snapshotError.message).toBe(
+        'No se ha podido crear el snapshot SQLite de la copia de seguridad.',
+      );
+
+      expect(snapshotError.cause).toBe(backupError);
+
+      expect(logger.warnEvents).toEqual([
+        {
+          area: 'backup',
+          operation: 'backup-sqlite-snapshot-close',
+          message: 'No se ha podido cerrar la conexión SQLite utilizada para generar el snapshot.',
+          error: closeError,
+        },
+      ]);
+
+      expect(logger.warnEvents[0].context).toBeUndefined();
+    } finally {
+      backupSpy.mockRestore();
+      closeSpy.mockRestore();
+    }
   });
 });
 
