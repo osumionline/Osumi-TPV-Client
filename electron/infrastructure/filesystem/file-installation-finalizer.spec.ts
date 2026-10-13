@@ -126,6 +126,32 @@ describe('FileInstallationFinalizer', (): void => {
     });
   });
 
+  it('rechaza un staging incompleto sin exponer rutas físicas', async (): Promise<void> => {
+    const expectedMessage: string = 'La instalación temporal está incompleta.';
+
+    await expect(finalizer.finalize()).rejects.toThrow(expectedMessage);
+
+    try {
+      await finalizer.finalize();
+
+      throw new Error('Se esperaba el rechazo de un staging incompleto.');
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(Error);
+
+      if (!(error instanceof Error)) {
+        throw new Error('Se esperaba un error de instalación.', { cause: error });
+      }
+
+      expect(error.message).toBe(expectedMessage);
+      expect(error.message).not.toContain(requireTempDirectory());
+      expect(error.message).not.toContain(paths.stagingDatabaseFile);
+    }
+
+    await expect(access(paths.appDataFile)).rejects.toThrow();
+
+    expect(applicationLogger.warnEvents).toEqual([]);
+  });
+
   /**
    * Construye todos los recursos necesarios
    * para que el staging pueda promocionarse.

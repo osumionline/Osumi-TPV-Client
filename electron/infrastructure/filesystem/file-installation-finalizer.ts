@@ -106,24 +106,19 @@ export default class FileInstallationFinalizer implements InstallationFinalizer 
     await this.cleanStagingSafely();
   }
 
+  /**
+   * Comprueba que todos los recursos necesarios
+   * están preparados antes de iniciar la promoción.
+   *
+   * No incorpora rutas físicas al error.
+   */
   private async assertStagingIsComplete(): Promise<void> {
-    const missingFiles: string[] = [];
-
     for (const promotion of this.promotions) {
       const exists: boolean = await this.fileExists(promotion.source);
 
       if (!exists) {
-        missingFiles.push(promotion.source);
+        throw new Error('La instalación temporal está incompleta.');
       }
-    }
-
-    if (missingFiles.length > 0) {
-      throw new Error(
-        [
-          'La instalación temporal está incompleta.',
-          ...missingFiles.map((filePath: string): string => `Falta el archivo: ${filePath}`),
-        ].join('\n'),
-      );
     }
   }
 
