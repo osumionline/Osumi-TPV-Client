@@ -366,6 +366,85 @@ describe('FileApplicationLogger', (): void => {
     expect(content).not.toContain('credencial-privada-tres');
     expect(content).not.toContain('credencial-privada-cuatro');
   });
+
+  it('reduce registros grandes y permite seguir escribiendo logs', async (): Promise<void> => {
+    const logger: FileApplicationLogger = createLogger();
+
+    const createLargeError = (): Error => {
+      const error: Error = new Error('Fallo secundario simulado.');
+
+      error.stack = `Error: Fallo secundario simulado.\n${'x'.repeat(16_000)}`;
+
+      return error;
+    };
+
+    const aggregateErrors: AggregateError[] = [];
+
+    for (let index: number = 0; index < 5; index++) {
+      const nestedErrors: Error[] = [];
+
+      for (let nestedIndex: number = 0; nestedIndex < 5; nestedIndex++) {
+        nestedErrors.push(createLargeError());
+      }
+
+      aggregateErrors.push(new AggregateError(nestedErrors, 'Fallos agrupados.'));
+    }
+
+    const mainError: AggregateError = new AggregateError(
+      aggregateErrors,
+      'Operación principal fallida.',
+    );
+
+    logger.error({
+      area: 'backup',
+      operation: 'large-error-tree',
+      message: 'No se ha podido completar la operación.',
+      error: mainError,
+      context: {
+        operationId: 123,
+      },
+    });
+
+    logger.info({
+      area: 'application',
+      operation: 'after-large-error',
+      message: 'El logger continúa funcionando.',
+    });
+
+    await logger.flush();
+
+    const content: string = await readCurrentLog();
+    const lines: string[] = content.trim().split('\n');
+    const records: readonly ApplicationLogRecord[] = await readRecords();
+
+    expect(lines).toHaveLength(2);
+
+    expect(Buffer.byteLength(lines[0], 'utf8')).toBeLessThanOrEqual(256 * 1024);
+
+    expect(records[0]).toMatchObject({
+      level: 'error',
+      operation: 'large-error-tree',
+      message: 'No se ha podido completar la operación.',
+      context: {
+        logRecordTruncated: true,
+      },
+      error: {
+        name: 'AggregateError',
+        message: 'Operación principal fallida.',
+        stack: null,
+        cause: null,
+        errors: null,
+      },
+    });
+
+    expect(records[1]).toMatchObject({
+      level: 'info',
+      operation: 'after-large-error',
+      message: 'El logger continúa funcionando.',
+    });
+
+    expect(records[1]?.context).toBeNull();
+  });
 });
 
 /**
