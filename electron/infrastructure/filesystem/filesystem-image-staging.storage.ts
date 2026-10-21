@@ -1,6 +1,7 @@
 import type { ProcessedImage } from '@backend/contracts/system/image-processor.interface';
 import type ImageStagingStorage from '@backend/contracts/system/image-staging-storage.interface';
 import type { StoredImageFile } from '@backend/domain/files/image-asset.interface';
+import hasFileSystemErrorCode from '@infrastructure/filesystem/filesystem-error.utils';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
@@ -46,14 +47,32 @@ export default class FilesystemImageStagingStorage implements ImageStagingStorag
     const destinationPath: string = join(destinationDirectory, internalName);
     const temporaryPath: string = `${destinationPath}.tmp`;
 
+    let temporaryFileCreated: boolean = false;
+
     try {
       await writeFile(temporaryPath, image.buffer, {
         mode: 0o600,
         flag: 'wx',
       });
 
+      temporaryFileCreated = true;
+
       await this.renameFile(temporaryPath, destinationPath);
     } catch (error: unknown) {
+      /*
+       * Si writeFile devuelve EEXIST, el temporal
+       * ya pertenecía a otra operación.
+       * No debemos eliminarlo.
+       */
+      if (!temporaryFileCreated && hasFileSystemErrorCode(error, 'EEXIST')) {
+        throw error;
+      }
+
+      /*
+       * Ante otros errores intentamos limpiar
+       * el archivo provisional, conservando
+       * siempre el error original.
+       */
       try {
         await this.removeFile(temporaryPath, {
           force: true,

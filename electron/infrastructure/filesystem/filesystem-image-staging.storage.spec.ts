@@ -1,7 +1,7 @@
 import type { ProcessedImage } from '@backend/contracts/system/image-processor.interface';
 import type { StoredImageFile } from '@backend/domain/files/image-asset.interface';
 import FilesystemImageStagingStorage from '@infrastructure/filesystem/filesystem-image-staging.storage';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -120,6 +120,31 @@ describe('FilesystemImageStagingStorage', (): void => {
 
     expect(aggregateError.errors).toEqual([promotionError, cleanupError]);
     expect(aggregateError.cause).toBe(cleanupError);
+  });
+
+  it('no elimina un temporal existente si writeFile devuelve EEXIST', async (): Promise<void> => {
+    tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-staging-'));
+
+    const directory: string = join(tempDirectory, 'draft-images');
+    const temporaryPath: string = join(directory, 'staging-id.webp.tmp');
+
+    await mkdir(directory, {
+      recursive: true,
+    });
+
+    const originalContent: Buffer = Buffer.from('temporal-de-otra-operacion');
+
+    await writeFile(temporaryPath, originalContent);
+
+    const storage = new FilesystemImageStagingStorage(tempDirectory);
+
+    await expect(storage.save('staging-id', createProcessedImage())).rejects.toMatchObject({
+      code: 'EEXIST',
+    });
+
+    await expect(readFile(temporaryPath)).resolves.toEqual(originalContent);
+
+    await expect(readFile(join(directory, 'staging-id.webp'))).rejects.toThrow();
   });
 });
 
