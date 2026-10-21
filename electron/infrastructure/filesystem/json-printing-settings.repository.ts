@@ -1,6 +1,7 @@
 import type PrintingSettingsRepository from '@backend/contracts/printing/printing-settings.repository.interface';
 import type PrintingSettings from '@desktop-contracts/configuration/printing/printing-settings.interface';
-import { readFile, rename, writeFile } from 'node:fs/promises';
+import writeAtomicTextFile from '@infrastructure/filesystem/write-atomic-text-file';
+import { readFile } from 'node:fs/promises';
 
 const DEFAULT_PRINTING_SETTINGS: PrintingSettings = {
   schemaVersion: 1,
@@ -50,16 +51,12 @@ export default class JsonPrintingSettingsRepository implements PrintingSettingsR
     }
   }
 
+  /**
+   * Guarda la configuración de impresión mediante escritura atómica.
+   */
   async save(settings: PrintingSettings): Promise<void> {
-    const temporaryFilePath: string = `${this.filePath}.tmp`;
-
     const content: string = `${JSON.stringify(settings, null, 2)}\n`;
 
-    await writeFile(temporaryFilePath, content, {
-      encoding: 'utf8',
-      mode: 0o600,
-    });
-
-    await rename(temporaryFilePath, this.filePath);
+    await writeAtomicTextFile(this.filePath, content);
   }
 }

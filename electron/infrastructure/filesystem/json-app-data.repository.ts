@@ -15,7 +15,8 @@ import {
   DEFAULT_TICKET_EMAIL_SUBJECT_TEMPLATE,
   type TicketEmailConfig,
 } from '@desktop-contracts/configuration/ticket-email-config.interface';
-import { readFile, rename, rm, writeFile } from 'node:fs/promises';
+import writeAtomicTextFile from '@infrastructure/filesystem/write-atomic-text-file';
+import { readFile, rm } from 'node:fs/promises';
 
 function isFileNotFoundError(error: unknown): boolean {
   return error instanceof Error && 'code' in error && error.code === 'ENOENT';
@@ -239,16 +240,13 @@ export default class JsonAppDataRepository implements AppDataRepository {
     }
   }
 
+  /**
+   * Guarda la configuración mediante escritura atómica.
+   */
   async save(appData: AppData): Promise<void> {
-    const temporaryFilePath: string = `${this.filePath}.tmp`;
     const content: string = `${JSON.stringify(appData, null, 2)}\n`;
 
-    await writeFile(temporaryFilePath, content, {
-      encoding: 'utf8',
-      mode: 0o600,
-    });
-
-    await rename(temporaryFilePath, this.filePath);
+    await writeAtomicTextFile(this.filePath, content);
   }
 
   async delete(): Promise<void> {

@@ -1,7 +1,8 @@
 import type BackupAutomaticStateRepository from '@backend/contracts/backup/backup-automatic-state.repository.interface';
 import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type BackupAutomaticState from '@backend/domain/backup/backup-automatic-state.interface';
-import { readFile, rename, rm, writeFile } from 'node:fs/promises';
+import writeAtomicTextFile from '@infrastructure/filesystem/write-atomic-text-file';
+import { readFile, rm } from 'node:fs/promises';
 
 /**
  * Comprueba si un error representa un fichero inexistente.
@@ -101,19 +102,13 @@ export default class JsonBackupAutomaticStateRepository implements BackupAutomat
   }
 
   /**
-   * Guarda el estado mediante fichero temporal
-   * y promoción atómica.
+   * Guarda el estado mediante escritura atómica
+   * con un temporal exclusivo para cada operación.
    */
   async save(state: BackupAutomaticState): Promise<void> {
-    const temporaryFilePath: string = `${this.filePath}.tmp`;
     const content: string = `${JSON.stringify(state, null, 2)}\n`;
 
-    await writeFile(temporaryFilePath, content, {
-      encoding: 'utf8',
-      mode: 0o600,
-    });
-
-    await rename(temporaryFilePath, this.filePath);
+    await writeAtomicTextFile(this.filePath, content);
   }
 
   /**
