@@ -34,10 +34,19 @@ if (testExitCode !== 0) {
   process.exitCode = electronRebuildExitCode;
 }
 
+/**
+ * Ejecuta npm conservando el entorno del proceso,
+ * excepto el override de scripts que antes se
+ * eliminaba mediante una instrucción de CMD.
+ */
 function runNpm(args) {
+  const npmEnvironment = { ...process.env };
+
+  delete npmEnvironment.npm_config_allow_scripts;
+
   const result = spawnSync(process.execPath, [npmExecPath, ...args], {
     stdio: 'inherit',
-    env: process.env,
+    env: npmEnvironment,
   });
 
   if (result.error !== undefined) {
