@@ -80,6 +80,7 @@ export default class FileVentaTicketPdfStorage implements VentaTicketPdfStorage 
     try {
       await writeFile(temporaryFilePath, pdf, {
         mode: 0o600,
+        flag: 'wx',
       });
 
       if (await this.fileExists(filePath)) {

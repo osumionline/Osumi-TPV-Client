@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { rename, rm, writeFile } from 'node:fs/promises';
+import type { FileHandle } from 'node:fs/promises';
+import { open, rename, rm } from 'node:fs/promises';
 
 /**
  * Escribe texto mediante un temporal exclusivo y lo
@@ -14,33 +15,35 @@ export default async function writeAtomicTextFile(
 ): Promise<void> {
   const temporaryFilePath: string = `${filePath}.${randomUUID()}.tmp`;
 
-  let temporaryFileCreated: boolean = false;
+  /*
+   * La apertura exclusiva determina cuándo
+   * adquirimos la propiedad del temporal.
+   */
+  const fileHandle: FileHandle = await open(temporaryFilePath, 'wx', 0o600);
 
   try {
-    await writeFile(temporaryFilePath, content, {
-      encoding: 'utf8',
-      mode: 0o600,
-      flag: 'wx',
-    });
-
-    temporaryFileCreated = true;
+    try {
+      await fileHandle.writeFile(content, {
+        encoding: 'utf8',
+      });
+    } finally {
+      await fileHandle.close();
+    }
 
     await rename(temporaryFilePath, filePath);
   } catch (error: unknown) {
-    if (temporaryFileCreated) {
-      try {
-        await rm(temporaryFilePath, {
-          force: true,
-        });
-      } catch (cleanupError: unknown) {
-        throw new AggregateError(
-          [error, cleanupError],
-          'No se ha podido guardar el archivo ni limpiar su temporal.',
-          {
-            cause: cleanupError,
-          },
-        );
-      }
+    try {
+      await rm(temporaryFilePath, {
+        force: true,
+      });
+    } catch (cleanupError: unknown) {
+      throw new AggregateError(
+        [error, cleanupError],
+        'No se ha podido guardar el archivo ni limpiar su temporal.',
+        {
+          cause: cleanupError,
+        },
+      );
     }
 
     throw error;

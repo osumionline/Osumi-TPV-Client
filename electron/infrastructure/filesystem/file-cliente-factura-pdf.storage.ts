@@ -1,8 +1,8 @@
 import type ClienteFacturaPdfStorage from '@backend/contracts/clientes/cliente-factura-pdf-storage.interface';
+import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import { randomUUID } from 'node:crypto';
 import { constants, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 
 const PDF_SIGNATURE: Uint8Array = new TextEncoder().encode('%PDF-');
 const MAX_FACTURA_PDF_SIZE: number = 25 * 1024 * 1024;
@@ -75,6 +75,7 @@ export default class FileClienteFacturaPdfStorage implements ClienteFacturaPdfSt
     try {
       await writeFile(temporaryFilePath, pdf, {
         mode: 0o600,
+        flag: 'wx',
       });
 
       try {

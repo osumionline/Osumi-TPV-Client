@@ -97,6 +97,25 @@ describe('writeAtomicTextFile', (): void => {
 
     expect(files).toEqual(['config.json']);
   });
+
+  it('permite recuperarse después de un error de escritura', async (): Promise<void> => {
+    const directory: string = requireTempDirectory();
+    const filePath: string = join(directory, 'config.json');
+
+    await writeAtomicTextFile(filePath, 'primera-version');
+
+    await expect(
+      writeAtomicTextFile(join(directory, 'missing', 'config.json'), 'fallo'),
+    ).rejects.toThrow();
+
+    await writeAtomicTextFile(filePath, 'segunda-version');
+
+    await expect(readFile(filePath, 'utf8')).resolves.toBe('segunda-version');
+
+    const files: string[] = await readdir(directory);
+
+    expect(files).toEqual(['config.json']);
+  });
 });
 
 /**
