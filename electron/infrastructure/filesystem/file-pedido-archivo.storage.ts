@@ -2,7 +2,7 @@ import type PedidoArchivoStorage from '@backend/contracts/compras/pedidos/pedido
 import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type PedidoArchivoStoredRecord from '@backend/domain/compras/pedidos/pedido-archivo-stored-record.interface';
 import { createHash, randomUUID } from 'node:crypto';
-import { constants, createReadStream, createWriteStream } from 'node:fs';
+import { constants, createReadStream, createWriteStream, type WriteStream } from 'node:fs';
 import { copyFile, mkdir, rm, stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { Transform } from 'node:stream';
@@ -33,6 +33,7 @@ export default class FilePedidoArchivoStorage implements PedidoArchivoStorage {
     private readonly filesDirectory: string,
     private readonly applicationLogger: ApplicationLogger,
     private readonly removeFile: RemoveFile = rm,
+    private readonly createTemporaryId: () => string = randomUUID,
   ) {}
 
   /**
@@ -68,7 +69,7 @@ export default class FilePedidoArchivoStorage implements PedidoArchivoStorage {
 
     const temporaryPath: string = join(
       targetDirectory,
-      `${normalizedPublicId}.${randomUUID()}.tmp`,
+      `${normalizedPublicId}.${this.createTemporaryId()}.tmp`,
     );
 
     const hash = createHash('sha256');
@@ -107,17 +108,23 @@ export default class FilePedidoArchivoStorage implements PedidoArchivoStorage {
       },
     });
 
-    let destinationCreated: boolean = false;
+    let temporaryFileCreated: boolean = false;
+
+    const destinationStream: WriteStream = createWriteStream(temporaryPath, {
+      mode: 0o600,
+      flags: 'wx',
+    });
+
+    /*
+     * El evento open confirma que nuestra operación
+     * ha adquirido correctamente el archivo temporal.
+     */
+    destinationStream.once('open', (): void => {
+      temporaryFileCreated = true;
+    });
 
     try {
-      await pipeline(
-        createReadStream(sourcePath),
-        verifier,
-        createWriteStream(temporaryPath, {
-          mode: 0o600,
-          flags: 'wx',
-        }),
-      );
+      await pipeline(createReadStream(sourcePath), verifier, destinationStream);
 
       if (actualSize < PDF_SIGNATURE.length || !signature.equals(PDF_SIGNATURE)) {
         throw new Error('El archivo seleccionado no contiene un PDF válido.');
@@ -131,8 +138,6 @@ export default class FilePedidoArchivoStorage implements PedidoArchivoStorage {
 
       await copyFile(temporaryPath, destinationPath, constants.COPYFILE_EXCL);
 
-      destinationCreated = true;
-
       return {
         originalName: basename(sourcePath),
         internalName,
@@ -141,14 +146,16 @@ export default class FilePedidoArchivoStorage implements PedidoArchivoStorage {
         sizeBytes: actualSize,
         sha256,
       };
-    } catch (error: unknown) {
-      if (destinationCreated) {
-        await this.removeFileSafely(destinationPath);
-      }
-
-      throw error;
     } finally {
-      await this.removeFileSafely(temporaryPath);
+      /*
+       * Solo limpiamos el temporal si el stream
+       * llegó a abrirlo correctamente.
+       *
+       * Si falló con EEXIST, el archivo no es nuestro.
+       */
+      if (temporaryFileCreated) {
+        await this.removeFileSafely(temporaryPath);
+      }
     }
   }
 

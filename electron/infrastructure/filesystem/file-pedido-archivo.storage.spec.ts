@@ -2,7 +2,7 @@ import type ApplicationLogger from '@backend/contracts/logging/application-logge
 import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import FilePedidoArchivoStorage from '@infrastructure/filesystem/file-pedido-archivo.storage';
 import { createHash } from 'node:crypto';
-import { access, mkdtemp, readFile, rm, truncate, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, rm, truncate, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -137,6 +137,39 @@ describe('FilePedidoArchivoStorage', (): void => {
         error: cleanupError,
       },
     ]);
+  });
+
+  it('no elimina un temporal ajeno cuando el stream devuelve EEXIST', async (): Promise<void> => {
+    const sourcePath: string = join(requireTempDirectory(), 'documento.pdf');
+
+    await writeFile(sourcePath, '%PDF-1.7\nDocumento válido\n%%EOF');
+
+    const ordersDirectory: string = join(requireFilesDirectory(), 'orders');
+
+    await mkdir(ordersDirectory, {
+      recursive: true,
+    });
+
+    const temporaryPath: string = join(ordersDirectory, 'pdf-colision.id-fijo.tmp');
+
+    await writeFile(temporaryPath, 'contenido-de-otra-operacion');
+
+    const collisionStorage = new FilePedidoArchivoStorage(
+      requireFilesDirectory(),
+      applicationLogger,
+      undefined,
+      (): string => 'id-fijo',
+    );
+
+    await expect(collisionStorage.save('pdf-colision', sourcePath)).rejects.toMatchObject({
+      code: 'EEXIST',
+    });
+
+    await expect(readFile(temporaryPath, 'utf8')).resolves.toBe('contenido-de-otra-operacion');
+
+    await expect(access(join(ordersDirectory, 'pdf-colision.pdf'))).rejects.toThrow();
+
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 });
 
