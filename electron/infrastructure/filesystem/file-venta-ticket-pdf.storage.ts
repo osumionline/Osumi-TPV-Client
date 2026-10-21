@@ -1,7 +1,7 @@
 import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type VentaTicketPdfStorage from '@backend/contracts/ventas/venta-ticket-pdf-storage.interface';
 import { randomUUID } from 'node:crypto';
-import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, open, readFile, rename, rm, type FileHandle } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const PDF_SIGNATURE: Uint8Array = new TextEncoder().encode('%PDF-');
@@ -26,6 +26,7 @@ export default class FileVentaTicketPdfStorage implements VentaTicketPdfStorage 
     private readonly applicationLogger: ApplicationLogger,
     private readonly removeFile: RemoveFile = rm,
     private readonly renameFile: RenameFile = rename,
+    private readonly createTemporaryId: () => string = randomUUID,
   ) {}
 
   /**
@@ -73,15 +74,21 @@ export default class FileVentaTicketPdfStorage implements VentaTicketPdfStorage 
 
     const filePath: string = this.getFilePath(idVenta);
 
-    const temporaryFilePath: string = join(this.directory, `${idVenta}.${randomUUID()}.tmp`);
+    const temporaryFilePath: string = join(
+      this.directory,
+      `${idVenta}.${this.createTemporaryId()}.tmp`,
+    );
+
+    const handle: FileHandle = await open(temporaryFilePath, 'wx', 0o600);
 
     let archivedFilePath: string | null = null;
 
     try {
-      await writeFile(temporaryFilePath, pdf, {
-        mode: 0o600,
-        flag: 'wx',
-      });
+      try {
+        await handle.writeFile(pdf);
+      } finally {
+        await handle.close();
+      }
 
       if (await this.fileExists(filePath)) {
         archivedFilePath = await this.getAvailableArchiveFilePath(idVenta);

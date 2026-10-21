@@ -1,7 +1,7 @@
 import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import FileVentaTicketPdfStorage from '@infrastructure/filesystem/file-venta-ticket-pdf.storage';
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -204,6 +204,32 @@ describe('FileVentaTicketPdfStorage', (): void => {
         error: cleanupError,
       },
     ]);
+  });
+
+  it('conserva un temporal ajeno cuando la apertura devuelve EEXIST', async (): Promise<void> => {
+    const directory: string = getTicketsDirectory();
+
+    await mkdir(directory, { recursive: true });
+
+    const temporaryPath: string = join(directory, '123.id-fijo.tmp');
+
+    await writeFile(temporaryPath, 'contenido-ajeno');
+
+    const storage = new FileVentaTicketPdfStorage(
+      directory,
+      applicationLogger,
+      undefined,
+      undefined,
+      (): string => 'id-fijo',
+    );
+
+    await expect(storage.save(123, createPdf('nuevo'))).rejects.toMatchObject({
+      code: 'EEXIST',
+    });
+
+    await expect(readFile(temporaryPath, 'utf8')).resolves.toBe('contenido-ajeno');
+    await expect(storage.exists(123)).resolves.toBe(false);
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 });
 

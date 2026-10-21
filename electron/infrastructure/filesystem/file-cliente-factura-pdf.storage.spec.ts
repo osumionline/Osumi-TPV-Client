@@ -1,7 +1,7 @@
 import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import FileClienteFacturaPdfStorage from '@infrastructure/filesystem/file-cliente-factura-pdf.storage';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -93,6 +93,29 @@ describe('FileClienteFacturaPdfStorage', (): void => {
         error: cleanupError,
       },
     ]);
+  });
+
+  it('conserva un temporal ajeno cuando la apertura devuelve EEXIST', async (): Promise<void> => {
+    const temporaryPath: string = join(directory, 'factura-colision.id-fijo.tmp');
+
+    await writeFile(temporaryPath, 'contenido-ajeno');
+
+    const collisionStorage = new FileClienteFacturaPdfStorage(
+      directory,
+      applicationLogger,
+      undefined,
+      (): string => 'id-fijo',
+    );
+
+    await expect(
+      collisionStorage.save('factura-colision', createPdf('nuevo')),
+    ).rejects.toMatchObject({
+      code: 'EEXIST',
+    });
+
+    await expect(readFile(temporaryPath, 'utf8')).resolves.toBe('contenido-ajeno');
+    await expect(collisionStorage.read('factura-colision')).resolves.toBeNull();
+    expect(applicationLogger.warnEvents).toEqual([]);
   });
 });
 

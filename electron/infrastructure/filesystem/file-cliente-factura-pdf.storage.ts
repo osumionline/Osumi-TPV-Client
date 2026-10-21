@@ -1,7 +1,7 @@
 import type ClienteFacturaPdfStorage from '@backend/contracts/clientes/cliente-factura-pdf-storage.interface';
 import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
 import { randomUUID } from 'node:crypto';
-import { constants, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { constants, copyFile, mkdir, open, readFile, rm, type FileHandle } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const PDF_SIGNATURE: Uint8Array = new TextEncoder().encode('%PDF-');
@@ -23,6 +23,7 @@ export default class FileClienteFacturaPdfStorage implements ClienteFacturaPdfSt
     private readonly directory: string,
     private readonly applicationLogger: ApplicationLogger,
     private readonly removeFile: RemoveFile = rm,
+    private readonly createTemporaryId: () => string = randomUUID,
   ) {}
 
   /**
@@ -48,17 +49,15 @@ export default class FileClienteFacturaPdfStorage implements ClienteFacturaPdfSt
   }
 
   /**
-   * Guarda el primer PDF válido sin permitir nunca
-   * sustituir unos bytes ya materializados.
+   * Guarda el primer PDF válido sin sustituir los bytes
+   * definitivos ya materializados.
    */
   async save(facturaPublicId: string, pdf: Uint8Array): Promise<void> {
     const normalizedPublicId: string = this.normalizePublicId(facturaPublicId);
 
     this.validatePdf(pdf);
 
-    await mkdir(this.directory, {
-      recursive: true,
-    });
+    await mkdir(this.directory, { recursive: true });
 
     const currentPdf: Uint8Array | null = await this.read(normalizedPublicId);
 
@@ -69,30 +68,25 @@ export default class FileClienteFacturaPdfStorage implements ClienteFacturaPdfSt
     const filePath: string = this.getFilePath(normalizedPublicId);
     const temporaryFilePath: string = join(
       this.directory,
-      `${normalizedPublicId}.${randomUUID()}.tmp`,
+      `${normalizedPublicId}.${this.createTemporaryId()}.tmp`,
     );
 
+    const handle: FileHandle = await open(temporaryFilePath, 'wx', 0o600);
+
     try {
-      await writeFile(temporaryFilePath, pdf, {
-        mode: 0o600,
-        flag: 'wx',
-      });
+      try {
+        await handle.writeFile(pdf);
+      } finally {
+        await handle.close();
+      }
 
       try {
-        /*
-         * COPYFILE_EXCL evita que una segunda
-         * materialización pueda sobrescribir la primera.
-         */
         await copyFile(temporaryFilePath, filePath, constants.COPYFILE_EXCL);
       } catch (error: unknown) {
         if (!this.hasErrorCode(error, 'EEXIST')) {
           throw error;
         }
 
-        /*
-         * Otra operación ganó la carrera.
-         * Validamos los bytes que han quedado fijados.
-         */
         const existingPdf: Uint8Array | null = await this.read(normalizedPublicId);
 
         if (existingPdf === null) {
