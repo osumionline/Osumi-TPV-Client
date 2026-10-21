@@ -5,6 +5,7 @@ import type {
   ImageAssetPurpose,
   StoredImageFile,
 } from '@backend/domain/files/image-asset.interface';
+import hasFileSystemErrorCode from '@infrastructure/filesystem/filesystem-error.utils';
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
@@ -54,14 +55,31 @@ export default class FilesystemImageFileStorage implements ImageFileStorage {
     const destinationPath: string = join(destinationDirectory, internalName);
     const temporaryPath: string = `${destinationPath}.tmp`;
 
+    let temporaryFileCreated: boolean = false;
+
     try {
       await writeFile(temporaryPath, image.buffer, {
         mode: 0o600,
         flag: 'wx',
       });
 
+      temporaryFileCreated = true;
+
       await this.renameFile(temporaryPath, destinationPath);
     } catch (error: unknown) {
+      /*
+       * Si writeFile devuelve EEXIST, el archivo temporal
+       * ya existía antes de esta operación.
+       * No debemos eliminar un archivo ajeno.
+       */
+      if (!temporaryFileCreated && hasFileSystemErrorCode(error, 'EEXIST')) {
+        throw error;
+      }
+
+      /*
+       * En el resto de errores intentamos limpiar
+       * el temporal para no dejar archivos residuales.
+       */
       try {
         await this.removeFile(temporaryPath, {
           force: true,
