@@ -84,4 +84,45 @@ describe('salesDatabaseSchema', (): void => {
       'ON linea_venta ( id_marca_snapshot, id_venta ) WHERE id_marca_snapshot IS NOT NULL',
     );
   });
+
+  it('define el origen de ventas y la idempotencia de pedidos online', (): void => {
+    const ventaStatement: string | undefined = salesDatabaseSchema.statements.find(
+      (statement: string): boolean => statement.includes('CREATE TABLE venta ('),
+    );
+
+    const uniqueIndexStatement: string | undefined = salesDatabaseSchema.statements.find(
+      (statement: string): boolean =>
+        statement.includes('CREATE UNIQUE INDEX uq_venta_origen_referencia_externa'),
+    );
+
+    expect(ventaStatement).toBeDefined();
+    expect(uniqueIndexStatement).toBeDefined();
+
+    const normalizedVentaStatement: string = (ventaStatement ?? '').replace(/\s+/g, ' ').trim();
+
+    const normalizedIndexStatement: string = (uniqueIndexStatement ?? '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    expect(normalizedVentaStatement).toContain("origen TEXT NOT NULL DEFAULT 'tpv'");
+
+    expect(normalizedVentaStatement).toContain("origen IN ( 'tpv', 'online' )");
+
+    expect(normalizedVentaStatement).toContain('referencia_externa TEXT');
+
+    expect(normalizedVentaStatement).toContain('id_caja INTEGER,');
+    expect(normalizedVentaStatement).not.toContain('id_caja INTEGER NOT NULL');
+
+    expect(normalizedVentaStatement).toContain(
+      "origen = 'tpv' AND id_caja IS NOT NULL AND referencia_externa IS NULL",
+    );
+
+    expect(normalizedVentaStatement).toContain(
+      "origen = 'online' AND id_caja IS NULL AND referencia_externa IS NOT NULL",
+    );
+
+    expect(normalizedIndexStatement).toContain(
+      'ON venta ( origen, referencia_externa ) WHERE referencia_externa IS NOT NULL',
+    );
+  });
 });

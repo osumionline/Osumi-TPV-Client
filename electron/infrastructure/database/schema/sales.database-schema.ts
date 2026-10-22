@@ -9,7 +9,33 @@ const statements: readonly string[] = [
       public_id TEXT NOT NULL
         UNIQUE,
 
-      id_caja INTEGER NOT NULL,
+      /*
+       * Identifica el canal en el que se ha
+       * originado la venta.
+       */
+      origen TEXT NOT NULL
+        DEFAULT 'tpv'
+        CHECK (
+          origen IN (
+            'tpv',
+            'online'
+          )
+        ),
+
+      /*
+       * Identificador del pedido en el sistema
+       * de origen. Solo se utiliza para ventas online.
+       */
+      referencia_externa TEXT
+        CHECK (
+          referencia_externa IS NULL
+          OR (
+            length(trim(referencia_externa)) BETWEEN 1 AND 200
+            AND referencia_externa = trim(referencia_externa)
+          )
+        ),
+
+      id_caja INTEGER,
       id_empleado INTEGER NOT NULL,
       id_cliente INTEGER,
 
@@ -78,6 +104,27 @@ const statements: readonly string[] = [
       CHECK (
         ticket_pdf_revision <= ticket_revision
       ),
+
+      /*
+       * Las ventas presenciales pertenecen siempre
+       * a una caja y no tienen referencia externa.
+       *
+       * Las ventas online tienen referencia externa
+       * y no pertenecen a ninguna caja.
+       */
+      CHECK (
+        (
+          origen = 'tpv'
+          AND id_caja IS NOT NULL
+          AND referencia_externa IS NULL
+        )
+        OR (
+          origen = 'online'
+          AND id_caja IS NULL
+          AND referencia_externa IS NOT NULL
+        )
+      ),
+
       UNIQUE (
         serie,
         numero
@@ -123,6 +170,19 @@ const statements: readonly string[] = [
         ON DELETE RESTRICT
         ON UPDATE CASCADE
     ) STRICT
+  `,
+
+  /*
+   * Un pedido de la tienda online solo puede originar
+   * una venta, incluso ante reintentos de sincronización.
+   */
+  `
+    CREATE UNIQUE INDEX uq_venta_origen_referencia_externa
+    ON venta (
+      origen,
+      referencia_externa
+    )
+    WHERE referencia_externa IS NOT NULL
   `,
 
   `
