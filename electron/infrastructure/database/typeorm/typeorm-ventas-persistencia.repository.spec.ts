@@ -320,6 +320,80 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
     expect(foreignKeyErrors).toEqual([]);
   });
 
+  it('identifica las ventas presenciales sin referencia externa', async (): Promise<void> => {
+    const result: VentaPersistidaRecord = await requireService().save(
+      createNormalSaleCommand('venta-presencial-origen-1'),
+    );
+
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const rows: readonly {
+      readonly origen: string;
+      readonly referencia_externa: string | null;
+      readonly id_caja: number | null;
+    }[] = await dataSource.query(
+      `
+        SELECT
+          origen,
+          referencia_externa,
+          id_caja
+        FROM venta
+        WHERE id = ?
+      `,
+      [result.id],
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.origen).toBe('tpv');
+    expect(rows[0]?.referencia_externa).toBeNull();
+    expect(rows[0]?.id_caja).not.toBeNull();
+  });
+
+  it('impide asociar una venta presencial a un empleado estructural', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+        INSERT INTO empleado (
+          public_id,
+          nombre,
+          password_hash,
+          password_algorithm,
+          color,
+          admin,
+          sistema,
+          activo
+        )
+        VALUES (
+          ?,
+          'Tienda online',
+          'hash-no-utilizable',
+          'scrypt',
+          '808080',
+          0,
+          1,
+          1
+        )
+      `,
+      ['empleado-online-test'],
+    );
+
+    const command: GuardarVentaCommand = {
+      ...createNormalSaleCommand('venta-empleado-sistema-1'),
+      empleadoPublicId: 'empleado-online-test',
+    };
+
+    await expect(requireService().save(command)).rejects.toThrow(
+      'El empleado asociado a la venta ya no está disponible.',
+    );
+
+    const rows: readonly { readonly total: number }[] = await dataSource.query(
+      'SELECT COUNT(*) AS total FROM venta',
+    );
+
+    expect(rows[0]?.total).toBe(0);
+  });
+
   it('recupera el snapshot persistido necesario para el ticket definitivo', async (): Promise<void> => {
     const result: VentaPersistidaRecord = await requireService().save(
       createNormalSaleCommand('venta-ticket-1'),

@@ -297,6 +297,7 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
           FROM empleado
           WHERE
             public_id = ?
+            AND sistema = 0
             AND activo = 1
             AND deleted_at IS NULL
           LIMIT 1
@@ -560,6 +561,12 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
     return numero;
   }
 
+  /**
+   * Persiste la cabecera de una venta presencial.
+   *
+   * El origen queda identificado explícitamente
+   * y no admite una referencia externa online.
+   */
   private async insertVenta(
     queryRunner: QueryRunner,
     command: GuardarVentaRecordCommand,
@@ -574,6 +581,8 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
       `
         INSERT INTO venta (
           public_id,
+          origen,
+          referencia_externa,
           id_caja,
           id_empleado,
           id_cliente,
@@ -585,7 +594,7 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
           updated_at
         )
         VALUES (
-          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          ?, 'tpv', NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
       `,
       [
