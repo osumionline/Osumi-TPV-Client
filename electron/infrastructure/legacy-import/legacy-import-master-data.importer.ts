@@ -9,6 +9,7 @@ import type PermissionId from '@desktop-contracts/configuration/permissions/perm
 import mapLegacyEmployeePermission from '@infrastructure/legacy-import/legacy-import-employee-permission.mapper';
 import LegacyImportPublicIdFactory from '@infrastructure/legacy-import/legacy-import-public-id.factory';
 import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value.reader';
+import DISABLED_LEGACY_PASSWORD_HASH from '@infrastructure/security/disabled-legacy-password-hash.constant';
 import type { QueryRunner } from 'typeorm';
 
 interface LegacyEmployeeRow {
@@ -111,6 +112,8 @@ interface MutableImportCounters {
 }
 
 const LEGACY_DEFAULT_EMPLOYEE_PASSWORD: string = '123456';
+const ONLINE_EMPLOYEE_NAME: string = 'Tienda online';
+const ONLINE_EMPLOYEE_COLOR: string = '808080';
 
 const MASTER_DATA_TABLES: readonly string[] = [
   'empleado',
@@ -177,6 +180,8 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
       );
 
       await this.insertEmployees(queryRunner, command, state, counters);
+
+      await this.insertOnlineEmployee(queryRunner, command);
 
       await this.insertEmployeePermissions(queryRunner, state, counters);
 
@@ -522,6 +527,57 @@ export default class LegacyImportMasterDataImporter implements LegacyImportPhase
 
       counters.importedRows++;
     }
+  }
+
+  /**
+   * Crea la identidad estructural de la tienda online
+   * después de importar los empleados humanos legacy.
+   *
+   * No conserva ni reutiliza identificadores internos
+   * procedentes del sistema anterior.
+   */
+  private async insertOnlineEmployee(
+    queryRunner: QueryRunner,
+    command: LegacyImportExecutionCommand,
+  ): Promise<void> {
+    await queryRunner.query(
+      `
+      INSERT INTO empleado (
+        public_id,
+        nombre,
+        password_hash,
+        password_algorithm,
+        color,
+        admin,
+        sistema,
+        activo,
+        created_at,
+        updated_at,
+        deleted_at
+      )
+      VALUES (
+        ?,
+        ?,
+        ?,
+        'bcrypt_legacy',
+        ?,
+        0,
+        1,
+        1,
+        ?,
+        ?,
+        NULL
+      )
+    `,
+      [
+        this.publicIdFactory.create(command.sourceHash, 'empleado_sistema', 1),
+        ONLINE_EMPLOYEE_NAME,
+        DISABLED_LEGACY_PASSWORD_HASH,
+        ONLINE_EMPLOYEE_COLOR,
+        command.startedAt,
+        command.startedAt,
+      ],
+    );
   }
 
   private async insertEmployeePermissions(

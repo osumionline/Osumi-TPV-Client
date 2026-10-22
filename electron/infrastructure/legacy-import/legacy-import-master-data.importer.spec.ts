@@ -9,8 +9,11 @@ import completeDatabaseSchema from '@infrastructure/database/schema/complete-dat
 import TypeOrmApplicationDatabase from '@infrastructure/database/typeorm/typeorm-application-database';
 import TypeOrmDataSourceFactory from '@infrastructure/database/typeorm/typeorm-data-source.factory';
 import LegacyImportMasterDataImporter from '@infrastructure/legacy-import/legacy-import-master-data.importer';
+import LegacyImportNumberConverter from '@infrastructure/legacy-import/legacy-import-number.converter';
 import LegacyImportPublicIdFactory from '@infrastructure/legacy-import/legacy-import-public-id.factory';
+import LegacyImportSalesDataImporter from '@infrastructure/legacy-import/legacy-import-sales-data.importer';
 import LegacySqlValueReader from '@infrastructure/legacy-import/legacy-sql-value.reader';
+import DISABLED_LEGACY_PASSWORD_HASH from '@infrastructure/security/disabled-legacy-password-hash.constant';
 import NodeScryptPasswordHasher from '@infrastructure/security/node-scrypt-password-hasher';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -328,6 +331,213 @@ describe('LegacyImportMasterDataImporter', (): void => {
 
     expect(await passwordHasher.verify('123456', employees[2]?.password_hash ?? '')).toBe(true);
   });
+
+  it('crea el empleado estructural al importar datos maestros legacy', async (): Promise<void> => {
+    const inserts: readonly LegacySqlInsert[] = [
+      createLegacyEmployeeInsert(1, null),
+      createLegacyEmployeeInsert(2, null),
+      createLegacyPermissionInsert(1, 18),
+    ];
+
+    const importer: LegacyImportMasterDataImporter = new LegacyImportMasterDataImporter(
+      new FakeLegacyImportDumpReader(inserts),
+      new LegacySqlValueReader(),
+      new LegacyImportPublicIdFactory(),
+      new NodeScryptPasswordHasher(),
+    );
+
+    const command: LegacyImportExecutionCommand = createExecutionCommand(inserts);
+
+    const result: LegacyImportPhaseResult = await importer.import(
+      requireQueryRunner(),
+      command,
+      (progress): void => {
+        void progress;
+      },
+    );
+
+    expect(result).toEqual({
+      importedRows: 3,
+      skippedRows: 0,
+      warningCount: 0,
+      defaultedEmployeePasswords: 0,
+    });
+
+    interface EmployeeRow {
+      readonly id: number;
+      readonly public_id: string;
+      readonly nombre: string;
+      readonly password_hash: string;
+      readonly password_algorithm: string;
+      readonly admin: number;
+      readonly sistema: number;
+      readonly activo: number;
+    }
+
+    const employees: readonly EmployeeRow[] = (await requireDataSource().query(
+      `
+        SELECT
+          id,
+          public_id,
+          nombre,
+          password_hash,
+          password_algorithm,
+          admin,
+          sistema,
+          activo
+        FROM empleado
+        ORDER BY id
+      `,
+    )) as readonly EmployeeRow[];
+
+    const humanEmployees: readonly EmployeeRow[] = employees.filter(
+      (employee: EmployeeRow): boolean => employee.sistema === 0,
+    );
+
+    expect(humanEmployees.map((employee: EmployeeRow): number => employee.id)).toEqual([1, 2]);
+
+    expect(humanEmployees.every((employee: EmployeeRow): boolean => employee.activo === 1)).toBe(
+      true,
+    );
+
+    const systemEmployees: readonly EmployeeRow[] = employees.filter(
+      (employee: EmployeeRow): boolean => employee.sistema === 1,
+    );
+
+    expect(systemEmployees).toHaveLength(1);
+
+    const onlineEmployee: EmployeeRow | undefined = systemEmployees[0];
+
+    expect(onlineEmployee).toBeDefined();
+    expect(onlineEmployee?.nombre).toBe('Tienda online');
+    expect(onlineEmployee?.admin).toBe(0);
+    expect(onlineEmployee?.activo).toBe(1);
+    expect(onlineEmployee?.password_algorithm).toBe('bcrypt_legacy');
+    expect(onlineEmployee?.password_hash).toBe(DISABLED_LEGACY_PASSWORD_HASH);
+
+    expect(onlineEmployee?.public_id).toBe(
+      new LegacyImportPublicIdFactory().create(command.sourceHash, 'empleado_sistema', 1),
+    );
+
+    const systemPermissions: readonly ImportedEmployeePermissionRow[] =
+      (await requireDataSource().query(
+        `
+          SELECT
+            id_empleado,
+            permiso
+          FROM empleado_permiso
+          WHERE id_empleado = ?
+        `,
+        [onlineEmployee?.id],
+      )) as readonly ImportedEmployeePermissionRow[];
+
+    expect(systemPermissions).toEqual([]);
+
+    expect(await readEmployeePermissions()).toEqual([
+      {
+        id_empleado: 1,
+        permiso: permissionKeys.gestion.ajustes,
+      },
+    ]);
+  });
+
+  it('asocia ventas legacy sin empleado válido a un empleado humano', async (): Promise<void> => {
+    const employeeInserts: readonly LegacySqlInsert[] = [createLegacyEmployeeInsert(10, null)];
+
+    const masterImporter: LegacyImportMasterDataImporter = new LegacyImportMasterDataImporter(
+      new FakeLegacyImportDumpReader(employeeInserts),
+      new LegacySqlValueReader(),
+      new LegacyImportPublicIdFactory(),
+      new NodeScryptPasswordHasher(),
+    );
+
+    await masterImporter.import(
+      requireQueryRunner(),
+      createExecutionCommand(employeeInserts),
+      (progress): void => {
+        void progress;
+      },
+    );
+
+    const dataSource: DataSource = requireDataSource();
+
+    await dataSource.query(
+      `
+        INSERT INTO caja (
+          public_id,
+          id_terminal,
+          id_empleado_apertura,
+          apertura
+        )
+        VALUES (?, ?, ?, ?)
+      `,
+      ['caja-legacy-test', 1, 10, '2025-01-01T00:00:00.000Z'],
+    );
+
+    const saleInserts: readonly LegacySqlInsert[] = [
+      {
+        tableName: 'venta',
+        values: new Map<string, string | null>([
+          ['id', '50'],
+          ['num_venta', '1'],
+          ['id_empleado', '999'],
+          ['id_cliente', null],
+          ['total', '10'],
+          ['created_at', '2025-01-02T10:00:00.000Z'],
+          ['updated_at', '2025-01-02T10:00:00.000Z'],
+          ['deleted_at', null],
+        ]),
+      },
+    ];
+
+    const salesImporter: LegacyImportSalesDataImporter = new LegacyImportSalesDataImporter(
+      new FakeLegacyImportDumpReader(saleInserts),
+      new LegacySqlValueReader(),
+      new LegacyImportNumberConverter(),
+      new LegacyImportPublicIdFactory(),
+    );
+
+    const result: LegacyImportPhaseResult = await salesImporter.import(
+      requireQueryRunner(),
+      createExecutionCommand(saleInserts),
+      (progress): void => {
+        void progress;
+      },
+    );
+
+    expect(result).toEqual({
+      importedRows: 1,
+      skippedRows: 0,
+      warningCount: 1,
+    });
+
+    interface ImportedSaleRow {
+      readonly id: number;
+      readonly id_empleado: number;
+      readonly sistema: number;
+    }
+
+    const sales: readonly ImportedSaleRow[] = (await dataSource.query(
+      `
+        SELECT
+          v.id,
+          v.id_empleado,
+          e.sistema
+        FROM venta v
+        INNER JOIN empleado e
+          ON e.id = v.id_empleado
+        WHERE v.id = 50
+      `,
+    )) as readonly ImportedSaleRow[];
+
+    expect(sales).toEqual([
+      {
+        id: 50,
+        id_empleado: 10,
+        sistema: 0,
+      },
+    ]);
+  });
 });
 
 function createLegacyEmployeeInsert(
@@ -435,6 +645,7 @@ async function readEmployees(): Promise<readonly ImportedEmployeeRow[]> {
         password_algorithm,
         admin
       FROM empleado
+      WHERE sistema = 0
       ORDER BY id
     `,
   )) as readonly ImportedEmployeeRow[];

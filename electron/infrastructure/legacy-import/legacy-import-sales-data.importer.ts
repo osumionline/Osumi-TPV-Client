@@ -506,11 +506,15 @@ export default class LegacyImportSalesDataImporter implements LegacyImportPhaseI
   private async readReferences(queryRunner: QueryRunner): Promise<SalesReferenceState> {
     const employeeRows: readonly IdRow[] = (await queryRunner.query(
       `
-            SELECT
-              id
-            FROM empleado
-            ORDER BY id
-          `,
+        SELECT
+          id
+        FROM empleado
+        WHERE
+          sistema = 0
+          AND activo = 1
+          AND deleted_at IS NULL
+        ORDER BY id
+      `,
     )) as readonly IdRow[];
 
     const fallbackEmployeeId: number | undefined = employeeRows[0]?.id;
