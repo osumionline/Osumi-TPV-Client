@@ -1616,7 +1616,7 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
     };
 
     await expect(repository.saveOnline(command)).rejects.toThrow(
-      'Uno de los artículos de la venta ya no está disponible.',
+      'Uno de los artículos de la venta online ya no está disponible.',
     );
 
     expect(await countRows(dataSource, 'venta')).toBe(0);
@@ -1933,6 +1933,103 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
     expect(validRetry).toEqual(saved);
     expect(await countRows(dataSource, 'venta')).toBe(1);
     expect(await countRows(dataSource, 'historico_articulo')).toBe(1);
+  });
+
+  it('rechaza artículos online con localizador incorrecto sin modificar la base de datos', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+        INSERT INTO empleado (
+          public_id,
+          nombre,
+          password_hash,
+          password_algorithm,
+          color,
+          sistema
+        )
+        VALUES (
+          'empleado-online-localizador',
+          'Tienda online',
+          'hash-test',
+          'scrypt',
+          '808080',
+          1
+        )
+      `,
+    );
+
+    const repository: TypeOrmVentasPersistenciaRepository = new TypeOrmVentasPersistenciaRepository(
+      requireDatabase(),
+    );
+
+    const base: GuardarVentaCommand = createNormalSaleCommand('base-online-localizador');
+
+    const command: GuardarVentaOnlineRecordCommand = {
+      publicId: 'venta-online-localizador',
+      referenciaExterna: 'pedido-online-localizador',
+      pagadaAt: '2026-10-20T10:30:00.000Z',
+      totalCents: base.totalCents,
+      lineas: base.lineas.map((linea, index) => ({
+        ...linea,
+        localizador: index === 0 ? 999 : linea.localizador,
+      })),
+      pagos: [...base.pagos],
+    };
+
+    await expect(repository.saveOnline(command)).rejects.toThrow(
+      'El localizador de una línea online no corresponde al artículo seleccionado.',
+    );
+
+    expect(await countRows(dataSource, 'venta')).toBe(0);
+    expect(await countRows(dataSource, 'linea_venta')).toBe(0);
+    expect(await countRows(dataSource, 'venta_pago')).toBe(0);
+    expect(await countRows(dataSource, 'historico_articulo')).toBe(0);
+    expect(await countRows(dataSource, 'secuencia_documento')).toBe(0);
+
+    const stock: StockRow = await queryOne<StockRow>(
+      dataSource,
+      `
+        SELECT stock
+        FROM articulo
+        WHERE public_id = 'articulo-1'
+      `,
+    );
+
+    expect(stock.stock).toBe(20);
+
+    /*
+     * Corregimos únicamente el localizador.
+     * La venta ahora debe importarse normalmente.
+     */
+    const validCommand: GuardarVentaOnlineRecordCommand = {
+      ...command,
+      lineas: base.lineas.map((linea) => ({
+        ...linea,
+      })),
+    };
+
+    const saved: VentaPersistidaRecord = await repository.saveOnline(validCommand);
+
+    expect(saved.publicId).toBe(command.publicId);
+    expect(saved.numero).toBe(1);
+
+    expect(await countRows(dataSource, 'venta')).toBe(1);
+    expect(await countRows(dataSource, 'linea_venta')).toBe(2);
+    expect(await countRows(dataSource, 'venta_pago')).toBe(2);
+    expect(await countRows(dataSource, 'historico_articulo')).toBe(1);
+    expect(await countRows(dataSource, 'secuencia_documento')).toBe(1);
+
+    const stockFinal: StockRow = await queryOne<StockRow>(
+      dataSource,
+      `
+        SELECT stock
+        FROM articulo
+        WHERE public_id = 'articulo-1'
+      `,
+    );
+
+    expect(stockFinal.stock).toBe(18);
   });
 });
 

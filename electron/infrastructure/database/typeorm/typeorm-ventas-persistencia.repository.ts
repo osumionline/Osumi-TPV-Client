@@ -343,6 +343,12 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
           recordCommand,
         );
 
+        /*
+         * Comprobamos los artículos antes de reservar
+         * numeración o persistir cualquier dato comercial.
+         */
+        await this.validateOnlineArticles(queryRunner, command.lineas);
+
         const numero: number = await this.nextVentaNumber(queryRunner, pagadaAt);
 
         await queryRunner.query(
@@ -1058,6 +1064,67 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
       idLineaVentaOrigen: null,
       idLineaReservaOrigen: null,
     };
+  }
+
+  /**
+   * Comprueba que cada artículo asociado a una línea online
+   * conserva el localizador esperado por el importador.
+   *
+   * Las líneas libres no tienen artículo canónico y
+   * se mantienen fuera de esta comprobación.
+   */
+  private async validateOnlineArticles(
+    queryRunner: QueryRunner,
+    lineas: readonly GuardarVentaLineaRecordCommand[],
+  ): Promise<void> {
+    interface OnlineArticleDatabaseRow {
+      readonly id: number;
+      readonly localizador: number;
+    }
+
+    const checkedArticles: Map<string, number> = new Map<string, number>();
+
+    for (const linea of lineas) {
+      const articuloPublicId: string | null = linea.articuloPublicId;
+
+      if (articuloPublicId === null) {
+        continue;
+      }
+
+      let localizador: number | undefined = checkedArticles.get(articuloPublicId);
+
+      if (localizador === undefined) {
+        const rows: readonly OnlineArticleDatabaseRow[] = (await queryRunner.query(
+          `
+              SELECT
+                id,
+                localizador
+              FROM articulo
+              WHERE
+                public_id = ?
+                AND deleted_at IS NULL
+              LIMIT 1
+            `,
+          [articuloPublicId],
+        )) as readonly OnlineArticleDatabaseRow[];
+
+        const article: OnlineArticleDatabaseRow | undefined = rows[0];
+
+        if (article === undefined) {
+          throw new Error('Uno de los artículos de la venta online ya no está disponible.');
+        }
+
+        localizador = article.localizador;
+
+        checkedArticles.set(articuloPublicId, localizador);
+      }
+
+      if (localizador !== linea.localizador) {
+        throw new Error(
+          'El localizador de una línea online no corresponde al artículo seleccionado.',
+        );
+      }
+    }
   }
 
   private async resolveArticuloId(
