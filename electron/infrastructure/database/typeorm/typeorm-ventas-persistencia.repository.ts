@@ -1,3 +1,4 @@
+import VentaOnlineCommandValidator from '@backend/application/ventas/venta-online-command.validator';
 import type GuardarVentaOnlineRecordCommand from '@backend/contracts/ventas/guardar-venta-online-record-command.interface';
 import type {
   GuardarVentaLineaRecordCommand,
@@ -263,13 +264,14 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
       throw new Error('La fecha de pago de la venta online no es válida.');
     }
 
-    if (
-      !Array.isArray(command.lineas) ||
-      command.lineas.length === 0 ||
-      !Array.isArray(command.pagos)
-    ) {
-      throw new Error('Las líneas o los pagos de la venta online no son válidos.');
-    }
+    /*
+     * Validamos antes de iniciar la transacción y, sobre
+     * todo, antes de comprobar si el pedido ya existe.
+     *
+     * Un reintento con datos corruptos no debe aceptarse
+     * simplemente porque su referencia ya esté registrada.
+     */
+    new VentaOnlineCommandValidator().validate(command);
 
     const dataSource: DataSource = await this.applicationDatabase.connect();
 

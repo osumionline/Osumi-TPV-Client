@@ -1555,6 +1555,18 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
         ...firstCommand,
         publicId: 'online-public-id-3',
         totalCents: 3_000,
+        lineas: firstCommand.lineas.map((linea, index) => ({
+          ...linea,
+          importeMicros: index === 0 ? linea.importeMicros + 8_000_000 : linea.importeMicros,
+        })),
+        pagos: [
+          {
+            tipoPagoPublicId: 'tipo-pago-tarjeta',
+            importeCents: 3_000,
+            entregadoCents: null,
+            cambioCents: 0,
+          },
+        ],
       }),
     ).rejects.toThrow('El pedido online ya existe con un importe diferente.');
 
@@ -1837,6 +1849,90 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
         importe_total_cents: 1_000,
       },
     ]);
+  });
+
+  it('rechaza un reintento online inconsistente sin duplicar efectos', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+        INSERT INTO empleado (
+          public_id,
+          nombre,
+          password_hash,
+          password_algorithm,
+          color,
+          sistema
+        )
+        VALUES (
+          'empleado-online-validacion',
+          'Tienda online',
+          'hash-test',
+          'scrypt',
+          '808080',
+          1
+        )
+      `,
+    );
+
+    const repository: TypeOrmVentasPersistenciaRepository = new TypeOrmVentasPersistenciaRepository(
+      requireDatabase(),
+    );
+
+    const base: GuardarVentaCommand = createNormalSaleCommand('base-validacion-online');
+
+    const command: GuardarVentaOnlineRecordCommand = {
+      publicId: 'venta-online-validacion',
+      referenciaExterna: 'pedido-online-validacion',
+      pagadaAt: '2026-10-20T10:30:00.000Z',
+      totalCents: base.totalCents,
+      lineas: [...base.lineas],
+      pagos: [...base.pagos],
+    };
+
+    const saved: VentaPersistidaRecord = await repository.saveOnline(command);
+
+    const invalidRetry: GuardarVentaOnlineRecordCommand = {
+      ...command,
+      publicId: 'venta-online-validacion-reintento',
+      pagos: [
+        {
+          tipoPagoPublicId: 'tipo-pago-tarjeta',
+          importeCents: 2_000,
+          entregadoCents: null,
+          cambioCents: 0,
+        },
+      ],
+    };
+
+    await expect(repository.saveOnline(invalidRetry)).rejects.toThrow(
+      'La suma de los pagos online no coincide con el total de la venta.',
+    );
+
+    expect(await countRows(dataSource, 'venta')).toBe(1);
+    expect(await countRows(dataSource, 'linea_venta')).toBe(2);
+    expect(await countRows(dataSource, 'venta_pago')).toBe(2);
+    expect(await countRows(dataSource, 'historico_articulo')).toBe(1);
+
+    const stock: StockRow = await queryOne<StockRow>(
+      dataSource,
+      `
+        SELECT stock
+        FROM articulo
+        WHERE public_id = 'articulo-1'
+      `,
+    );
+
+    expect(stock.stock).toBe(18);
+
+    const validRetry: VentaPersistidaRecord = await repository.saveOnline({
+      ...command,
+      publicId: 'venta-online-validacion-reintento-valido',
+    });
+
+    expect(validRetry).toEqual(saved);
+    expect(await countRows(dataSource, 'venta')).toBe(1);
+    expect(await countRows(dataSource, 'historico_articulo')).toBe(1);
   });
 });
 
