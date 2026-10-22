@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 interface InstalledEmployeeRow {
   readonly nombre: string;
   readonly admin: number;
+  readonly sistema: number;
   readonly activo: number;
 }
 
@@ -79,7 +80,8 @@ describe('NewInstallationDataService', (): void => {
         SELECT
           nombre,
           admin,
-          activo
+          activo,
+          sistema
         FROM empleado
         ORDER BY id
       `,
@@ -89,6 +91,13 @@ describe('NewInstallationDataService', (): void => {
       {
         nombre: 'Iñigo',
         admin: 1,
+        sistema: 0,
+        activo: 1,
+      },
+      {
+        nombre: 'Tienda online',
+        admin: 0,
+        sistema: 1,
         activo: 1,
       },
     ]);

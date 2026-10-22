@@ -1,4 +1,5 @@
 import type { InstallationCommand } from '@desktop-contracts/configuration/installation-command.interface';
+import DISABLED_LEGACY_PASSWORD_HASH from '@infrastructure/security/disabled-legacy-password-hash.constant';
 import { randomUUID } from 'node:crypto';
 import type { QueryRunner } from 'typeorm';
 
@@ -7,20 +8,15 @@ interface LastInsertIdRow {
 }
 
 const DEFAULT_TERMINAL_NAME: string = 'Terminal principal';
-
 const DEFAULT_TERMINAL_CODE: string = 'principal';
-
 const DEFAULT_BRAND_NAME: string = 'Sin marca';
-
 const CASH_PAYMENT_NAME: string = 'Efectivo';
-
 const CASH_PAYMENT_SLUG: string = 'efectivo';
-
 const SALE_SEQUENCE_TYPE: string = 'venta';
-
 const INVOICE_SEQUENCE_TYPE: string = 'factura';
-
 const DEFAULT_DOCUMENT_SERIES: string = '';
+const ONLINE_EMPLOYEE_NAME: string = 'Tienda online';
+const ONLINE_EMPLOYEE_COLOR: string = '808080';
 
 export default class NewInstallationDataService {
   async create(
@@ -40,6 +36,8 @@ export default class NewInstallationDataService {
         passwordHash,
         createdAt,
       );
+
+      await this.createOnlineEmployee(queryRunner, createdAt);
 
       const cashPaymentTypeId: number = await this.createCashPaymentType(queryRunner, createdAt);
 
@@ -146,6 +144,54 @@ export default class NewInstallationDataService {
     );
 
     return this.getLastInsertId(queryRunner);
+  }
+
+  /**
+   * Crea la identidad estructural utilizada para
+   * registrar las ventas procedentes de la tienda online.
+   *
+   * No dispone de credenciales utilizables y no
+   * representa a un empleado humano.
+   */
+  private async createOnlineEmployee(queryRunner: QueryRunner, createdAt: string): Promise<void> {
+    await queryRunner.query(
+      `
+        INSERT INTO empleado (
+          public_id,
+          nombre,
+          password_hash,
+          password_algorithm,
+          color,
+          admin,
+          sistema,
+          activo,
+          created_at,
+          updated_at,
+          deleted_at
+        )
+        VALUES (
+          ?,
+          ?,
+          ?,
+          'bcrypt_legacy',
+          ?,
+          0,
+          1,
+          1,
+          ?,
+          ?,
+          NULL
+        )
+      `,
+      [
+        randomUUID(),
+        ONLINE_EMPLOYEE_NAME,
+        DISABLED_LEGACY_PASSWORD_HASH,
+        ONLINE_EMPLOYEE_COLOR,
+        createdAt,
+        createdAt,
+      ],
+    );
   }
 
   private async createCashPaymentType(

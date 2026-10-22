@@ -305,6 +305,32 @@ describe('TypeOrmEmpleadoRepository', (): void => {
       password_algorithm: 'bcrypt_legacy',
     });
   });
+
+  it('oculta y protege a los empleados estructurales', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await insertEmpleado(dataSource, {
+      id: 1,
+      publicId: 'online-test',
+      nombre: 'Tienda online',
+    });
+
+    await dataSource.query('UPDATE empleado SET sistema = 1 WHERE id = 1');
+
+    expect(await requireRepository().findAll()).toEqual([]);
+    expect(await requireRepository().findById(1)).toBeNull();
+    expect(await requireRepository().findAuthenticationById(1)).toBeNull();
+
+    expect(await requireRepository().existsActiveByName('Tienda online', null)).toBe(true);
+
+    await requireRepository().deactivate(1);
+
+    const rows: readonly { readonly activo: number }[] = await dataSource.query(
+      'SELECT activo FROM empleado WHERE id = 1',
+    );
+
+    expect(rows[0]?.activo).toBe(1);
+  });
 });
 
 /**

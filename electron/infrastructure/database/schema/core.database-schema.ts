@@ -226,6 +226,14 @@ const statements: readonly string[] = [
         DEFAULT 0
         CHECK (admin IN (0, 1)),
 
+      /*
+       * Distingue empleados humanos de identidades
+       * internas utilizadas por la aplicación.
+       */
+      sistema INTEGER NOT NULL
+        DEFAULT 0
+        CHECK (sistema IN (0, 1)),
+
       activo INTEGER NOT NULL
         DEFAULT 1
         CHECK (activo IN (0, 1)),
@@ -246,6 +254,19 @@ const statements: readonly string[] = [
       nombre COLLATE NOCASE
     )
     WHERE deleted_at IS NULL
+  `,
+
+  /*
+   * Solo puede existir un empleado estructural activo.
+   */
+  `
+    CREATE UNIQUE INDEX uq_empleado_sistema_activo
+    ON empleado (
+      sistema
+    )
+    WHERE sistema = 1
+      AND activo = 1
+      AND deleted_at IS NULL
   `,
 
   `

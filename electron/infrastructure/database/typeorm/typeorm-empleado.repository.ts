@@ -123,6 +123,7 @@ export default class TypeOrmEmpleadoRepository implements EmpleadoRepository {
           admin = 1
           AND activo = 1
           AND deleted_at IS NULL
+          AND sistema = 0
       `)) as readonly CountRow[];
 
     return rows[0]?.total ?? 0;
@@ -240,6 +241,7 @@ export default class TypeOrmEmpleadoRepository implements EmpleadoRepository {
               id = ?
               AND activo = 1
               AND deleted_at IS NULL
+              AND sistema = 0
           `,
           [command.nombre, command.passwordHash, command.color, now, idEmpleado],
         );
@@ -312,6 +314,7 @@ export default class TypeOrmEmpleadoRepository implements EmpleadoRepository {
             id = ?
             AND activo = 1
             AND deleted_at IS NULL
+            AND sistema = 0
         `,
         [now, now, idEmpleado],
       );
@@ -361,6 +364,7 @@ export default class TypeOrmEmpleadoRepository implements EmpleadoRepository {
             e.id = ?
             AND e.activo = 1
             AND e.deleted_at IS NULL
+            AND e.sistema = 0
           LIMIT 1
         `,
       [DISABLED_LEGACY_PASSWORD_HASH, idEmpleado],
@@ -460,6 +464,7 @@ export default class TypeOrmEmpleadoRepository implements EmpleadoRepository {
         WHERE
           e.activo = 1
           AND e.deleted_at IS NULL
+          AND e.sistema = 0
         ORDER BY
           e.nombre COLLATE NOCASE,
           e.id
