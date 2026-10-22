@@ -1619,6 +1619,222 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
 
     expect(stock.stock).toBe(20);
   });
+
+  it('recupera una venta online en el histórico y su detalle sin caja', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+        INSERT INTO empleado (
+          public_id,
+          nombre,
+          password_hash,
+          password_algorithm,
+          color,
+          admin,
+          sistema,
+          activo
+        )
+        VALUES (
+          'empleado-online-historico',
+          'Tienda online',
+          'hash-test',
+          'scrypt',
+          '808080',
+          0,
+          1,
+          1
+        )
+      `,
+    );
+
+    const base: GuardarVentaCommand = createNormalSaleCommand('base-online-historico');
+
+    const command: GuardarVentaOnlineRecordCommand = {
+      publicId: 'venta-online-historico-1',
+      referenciaExterna: 'pedido-online-historico-1',
+      pagadaAt: '2026-10-20T10:30:00.000Z',
+      totalCents: base.totalCents,
+      lineas: [...base.lineas],
+      pagos: [...base.pagos],
+    };
+
+    const repository: TypeOrmVentasPersistenciaRepository = new TypeOrmVentasPersistenciaRepository(
+      requireDatabase(),
+    );
+
+    const persisted: VentaPersistidaRecord = await repository.saveOnline(command);
+
+    const historico = await requireHistoricoRepository().findByPeriod(
+      '2026-10-20T00:00:00.000Z',
+      '2026-10-21T00:00:00.000Z',
+    );
+
+    expect(historico.ventas).toHaveLength(1);
+
+    expect(historico.ventas[0]?.publicId).toBe('venta-online-historico-1');
+
+    expect(historico.ventas[0]?.fecha).toBe('2026-10-20T10:30:00.000Z');
+
+    expect(historico.ventas[0]?.pagos).toEqual([
+      {
+        tipoPagoPublicId: 'tipo-pago-efectivo',
+        nombre: 'Efectivo',
+        importeCents: 1_200,
+      },
+      {
+        tipoPagoPublicId: 'tipo-pago-tarjeta',
+        nombre: 'Tarjeta',
+        importeCents: 1_000,
+      },
+    ]);
+
+    expect(historico.resumen.numeroVentas).toBe(1);
+    expect(historico.resumen.totalCents).toBe(2_200);
+    expect(historico.resumen.beneficioCents).toBe(1_400);
+
+    const detalle = await requireHistoricoRepository().findDetalleByVentaId(persisted.id);
+
+    expect(detalle).not.toBeNull();
+    expect(detalle?.id).toBe(persisted.id);
+    expect(detalle?.publicId).toBe(command.publicId);
+    expect(detalle?.fecha).toBe(command.pagadaAt);
+    expect(detalle?.empleadoNombre).toBe('Tienda online');
+    expect(detalle?.cliente).toBeNull();
+    expect(detalle?.cajaAbierta).toBe(false);
+    expect(detalle?.numeroPagos).toBe(2);
+    expect(detalle?.lineas).toHaveLength(2);
+    expect(detalle?.pagos).toHaveLength(2);
+    expect(detalle?.totalCents).toBe(2_200);
+  });
+
+  it('incluye ventas online y presenciales en el histórico sin alterar los acumulados de caja online', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+        INSERT INTO empleado (
+          public_id,
+          nombre,
+          password_hash,
+          password_algorithm,
+          color,
+          admin,
+          sistema,
+          activo
+        )
+        VALUES (
+          'empleado-online-mixto',
+          'Tienda online',
+          'hash-test',
+          'scrypt',
+          '808080',
+          0,
+          1,
+          1
+        )
+      `,
+    );
+
+    const presencial: VentaPersistidaRecord = await requireService().save(
+      createNormalSaleCommand('venta-presencial-mixta'),
+    );
+
+    const repository: TypeOrmVentasPersistenciaRepository = new TypeOrmVentasPersistenciaRepository(
+      requireDatabase(),
+    );
+
+    const base: GuardarVentaCommand = createNormalSaleCommand('base-online-mixta');
+
+    const online: VentaPersistidaRecord = await repository.saveOnline({
+      publicId: 'venta-online-mixta',
+      referenciaExterna: 'pedido-online-mixto',
+      pagadaAt: '2026-10-20T10:30:00.000Z',
+      totalCents: base.totalCents,
+      lineas: [...base.lineas],
+      pagos: [...base.pagos],
+    });
+
+    const historico = await requireHistoricoRepository().findByPeriod(
+      '2026-01-01T00:00:00.000Z',
+      '2027-01-01T00:00:00.000Z',
+    );
+
+    expect(historico.ventas).toHaveLength(2);
+    expect(historico.resumen.numeroVentas).toBe(2);
+    expect(historico.resumen.totalCents).toBe(4_400);
+    expect(historico.resumen.beneficioCents).toBe(2_800);
+
+    expect(historico.ventas.map((venta): string => venta.publicId).sort()).toEqual([
+      'venta-online-mixta',
+      'venta-presencial-mixta',
+    ]);
+
+    const detallePresencial = await requireHistoricoRepository().findDetalleByVentaId(
+      presencial.id,
+    );
+
+    const detalleOnline = await requireHistoricoRepository().findDetalleByVentaId(online.id);
+
+    expect(detallePresencial?.cajaAbierta).toBe(true);
+    expect(detalleOnline?.cajaAbierta).toBe(false);
+
+    const caja: CajaRow = await queryOne<CajaRow>(
+      dataSource,
+      `
+        SELECT
+          ventas_cents,
+          beneficios_cents,
+          descuentos_cents,
+          importe_cierre_teorico_cents
+        FROM caja
+        WHERE public_id = 'caja-1'
+      `,
+    );
+
+    expect(caja).toEqual({
+      ventas_cents: 2_200,
+      beneficios_cents: 1_400,
+      descuentos_cents: 300,
+      importe_cierre_teorico_cents: 1_200,
+    });
+
+    const cajaTipos: readonly {
+      readonly slug: string;
+      readonly operaciones: number;
+      readonly importe_total_cents: number;
+    }[] = await queryRows(
+      dataSource,
+      `
+        SELECT
+          tp.slug,
+          ct.operaciones,
+          ct.importe_total_cents
+        FROM caja_tipo ct
+        INNER JOIN tipo_pago tp
+          ON tp.id = ct.id_tipo_pago
+        WHERE ct.id_caja = (
+          SELECT id
+          FROM caja
+          WHERE public_id = 'caja-1'
+        )
+        ORDER BY tp.slug
+      `,
+    );
+
+    expect(cajaTipos).toEqual([
+      {
+        slug: 'efectivo',
+        operaciones: 1,
+        importe_total_cents: 1_200,
+      },
+      {
+        slug: 'tarjeta',
+        operaciones: 1,
+        importe_total_cents: 1_000,
+      },
+    ]);
+  });
 });
 
 /**

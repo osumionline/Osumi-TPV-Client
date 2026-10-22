@@ -177,7 +177,9 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
             WHERE vp.id_venta = v.id
           ) AS numero_pagos,
           CASE
-            WHEN ca.cierre IS NULL THEN 1
+            WHEN ca.id IS NOT NULL
+              AND ca.cierre IS NULL
+            THEN 1
             ELSE 0
           END AS caja_abierta,
           CASE
@@ -207,10 +209,10 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
         INNER JOIN empleado e
           ON e.id = v.id_empleado
 
-        INNER JOIN caja ca
+        LEFT JOIN caja ca
           ON ca.id = v.id_caja
 
-         LEFT JOIN cliente c
+        LEFT JOIN cliente c
           ON c.id = v.id_cliente
 
         LEFT JOIN venta_ticketbai vtb
