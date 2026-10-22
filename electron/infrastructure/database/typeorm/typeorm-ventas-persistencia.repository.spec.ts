@@ -1,6 +1,7 @@
 import VentasPersistenciaService from '@backend/application/ventas/ventas-persistencia.service';
 import VentasTicketsService from '@backend/application/ventas/ventas-tickets.service';
 import type ApplicationLogger from '@backend/contracts/logging/application-logger.interface';
+import type GuardarVentaOnlineRecordCommand from '@backend/contracts/ventas/guardar-venta-online-record-command.interface';
 import type VentaTicketPdfStorage from '@backend/contracts/ventas/venta-ticket-pdf-storage.interface';
 import type { ApplicationLogEvent } from '@backend/domain/logging/application-log.types';
 import type VentaPersistidaRecord from '@backend/domain/ventas/venta-persistida-record.interface';
@@ -1372,6 +1373,251 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
     );
 
     expect(snapshot.marca_snapshot_public_id).toBe('marca-2');
+  });
+
+  it('guarda una venta online sin caja, conservando fecha, empleado y stock', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+        INSERT INTO empleado (
+          public_id,
+          nombre,
+          password_hash,
+          password_algorithm,
+          color,
+          sistema
+        )
+        VALUES (
+          'empleado-online-test',
+          'Tienda online',
+          'hash-test',
+          'scrypt',
+          '808080',
+          1
+        )
+      `,
+    );
+
+    const repository: TypeOrmVentasPersistenciaRepository = new TypeOrmVentasPersistenciaRepository(
+      requireDatabase(),
+    );
+
+    const normalSale: GuardarVentaCommand = createNormalSaleCommand('online-base-test');
+
+    const command: GuardarVentaOnlineRecordCommand = {
+      publicId: 'venta-online-1',
+      referenciaExterna: 'pedido-web-100',
+      pagadaAt: '2026-10-20T10:30:00.000Z',
+      totalCents: normalSale.totalCents,
+      lineas: normalSale.lineas.map((linea) => ({
+        ...linea,
+      })),
+      pagos: normalSale.pagos.map((pago) => ({
+        ...pago,
+      })),
+    };
+
+    const result: VentaPersistidaRecord = await repository.saveOnline(command);
+
+    expect(result.publicId).toBe('venta-online-1');
+    expect(result.fecha).toBe('2026-10-20T10:30:00.000Z');
+
+    const rows: readonly {
+      readonly origen: string;
+      readonly referencia_externa: string;
+      readonly id_caja: number | null;
+      readonly nombre: string;
+      readonly sistema: number;
+      readonly created_at: string;
+    }[] = await dataSource.query(
+      `
+        SELECT
+          v.origen,
+          v.referencia_externa,
+          v.id_caja,
+          e.nombre,
+          e.sistema,
+          v.created_at
+        FROM venta v
+        INNER JOIN empleado e
+          ON e.id = v.id_empleado
+        WHERE v.public_id = ?
+      `,
+      ['venta-online-1'],
+    );
+
+    expect(rows).toEqual([
+      {
+        origen: 'online',
+        referencia_externa: 'pedido-web-100',
+        id_caja: null,
+        nombre: 'Tienda online',
+        sistema: 1,
+        created_at: '2026-10-20T10:30:00.000Z',
+      },
+    ]);
+
+    const stock: StockRow = await queryOne<StockRow>(
+      dataSource,
+      'SELECT stock FROM articulo WHERE public_id = ?',
+      ['articulo-1'],
+    );
+
+    expect(stock.stock).toBe(18);
+
+    expect(await countRows(dataSource, 'linea_venta')).toBe(2);
+    expect(await countRows(dataSource, 'venta_pago')).toBe(2);
+
+    const caja: CajaRow = await queryOne<CajaRow>(
+      dataSource,
+      `
+        SELECT
+          ventas_cents,
+          beneficios_cents,
+          descuentos_cents,
+          importe_cierre_teorico_cents
+        FROM caja
+        WHERE public_id = 'caja-1'
+      `,
+    );
+
+    expect(caja).toEqual({
+      ventas_cents: 0,
+      beneficios_cents: 0,
+      descuentos_cents: 0,
+      importe_cierre_teorico_cents: 0,
+    });
+  });
+
+  it('no duplica una venta online al importar dos veces el mismo pedido', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+        INSERT INTO empleado (
+          public_id,
+          nombre,
+          password_hash,
+          password_algorithm,
+          color,
+          sistema
+        )
+        VALUES (
+          'empleado-online-idempotencia',
+          'Tienda online',
+          'hash-test',
+          'scrypt',
+          '808080',
+          1
+        )
+      `,
+    );
+
+    const repository: TypeOrmVentasPersistenciaRepository = new TypeOrmVentasPersistenciaRepository(
+      requireDatabase(),
+    );
+
+    const base: GuardarVentaCommand = createNormalSaleCommand('online-idempotencia-base');
+
+    const firstCommand: GuardarVentaOnlineRecordCommand = {
+      publicId: 'online-public-id-1',
+      referenciaExterna: 'pedido-web-duplicado',
+      pagadaAt: '2026-10-20T10:30:00.000Z',
+      totalCents: base.totalCents,
+      lineas: [...base.lineas],
+      pagos: [...base.pagos],
+    };
+
+    const first: VentaPersistidaRecord = await repository.saveOnline(firstCommand);
+
+    const second: VentaPersistidaRecord = await repository.saveOnline({
+      ...firstCommand,
+      publicId: 'online-public-id-2',
+    });
+
+    expect(second).toEqual(first);
+
+    expect(await countRows(dataSource, 'venta')).toBe(1);
+    expect(await countRows(dataSource, 'linea_venta')).toBe(2);
+    expect(await countRows(dataSource, 'venta_pago')).toBe(2);
+
+    const stock: StockRow = await queryOne<StockRow>(
+      dataSource,
+      'SELECT stock FROM articulo WHERE public_id = ?',
+      ['articulo-1'],
+    );
+
+    expect(stock.stock).toBe(18);
+
+    await expect(
+      repository.saveOnline({
+        ...firstCommand,
+        publicId: 'online-public-id-3',
+        totalCents: 3_000,
+      }),
+    ).rejects.toThrow('El pedido online ya existe con un importe diferente.');
+
+    expect(await countRows(dataSource, 'venta')).toBe(1);
+  });
+
+  it('revierte una venta online si no puede resolver el artículo', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    await dataSource.query(
+      `
+        INSERT INTO empleado (
+          public_id,
+          nombre,
+          password_hash,
+          password_algorithm,
+          color,
+          sistema
+        )
+        VALUES (
+          'empleado-online-rollback',
+          'Tienda online',
+          'hash-test',
+          'scrypt',
+          '808080',
+          1
+        )
+      `,
+    );
+
+    const repository: TypeOrmVentasPersistenciaRepository = new TypeOrmVentasPersistenciaRepository(
+      requireDatabase(),
+    );
+
+    const base: GuardarVentaCommand = createNormalSaleCommand('online-rollback-base');
+
+    const command: GuardarVentaOnlineRecordCommand = {
+      publicId: 'venta-online-rollback',
+      referenciaExterna: 'pedido-web-rollback',
+      pagadaAt: '2026-10-20T10:30:00.000Z',
+      totalCents: base.totalCents,
+      lineas: base.lineas.map((linea, index) => ({
+        ...linea,
+        articuloPublicId: index === 0 ? 'articulo-inexistente' : linea.articuloPublicId,
+      })),
+      pagos: [...base.pagos],
+    };
+
+    await expect(repository.saveOnline(command)).rejects.toThrow(
+      'Uno de los artículos de la venta ya no está disponible.',
+    );
+
+    expect(await countRows(dataSource, 'venta')).toBe(0);
+    expect(await countRows(dataSource, 'linea_venta')).toBe(0);
+    expect(await countRows(dataSource, 'venta_pago')).toBe(0);
+
+    const stock: StockRow = await queryOne<StockRow>(
+      dataSource,
+      'SELECT stock FROM articulo WHERE public_id = ?',
+      ['articulo-1'],
+    );
+
+    expect(stock.stock).toBe(20);
   });
 });
 

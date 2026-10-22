@@ -1,3 +1,4 @@
+import type GuardarVentaOnlineRecordCommand from '@backend/contracts/ventas/guardar-venta-online-record-command.interface';
 import type {
   GuardarVentaLineaRecordCommand,
   GuardarVentaPagoRecordCommand,
@@ -225,6 +226,250 @@ export default class TypeOrmVentasPersistenciaRepository implements VentasPersis
         },
       );
     }
+  }
+
+  /**
+   * Guarda una venta online dentro de una única transacción.
+   *
+   * No utiliza una caja abierta, conserva la fecha de pago
+   * de la tienda y evita duplicar pedidos importados.
+   */
+  async saveOnline(command: GuardarVentaOnlineRecordCommand): Promise<VentaPersistidaRecord> {
+    const referenciaExterna: string = command.referenciaExterna.trim();
+
+    if (
+      referenciaExterna.length === 0 ||
+      referenciaExterna.length > 200 ||
+      referenciaExterna !== command.referenciaExterna
+    ) {
+      throw new Error('La referencia externa de la venta online no es válida.');
+    }
+
+    if (!Number.isSafeInteger(command.totalCents) || command.totalCents < 0) {
+      throw new Error('El total de la venta online no es válido.');
+    }
+
+    if (typeof command.publicId !== 'string' || command.publicId.trim().length === 0) {
+      throw new Error('El identificador de la venta online no es válido.');
+    }
+
+    const pagadaAt: string = command.pagadaAt;
+
+    if (
+      typeof pagadaAt !== 'string' ||
+      !Number.isFinite(Date.parse(pagadaAt)) ||
+      new Date(pagadaAt).toISOString() !== pagadaAt
+    ) {
+      throw new Error('La fecha de pago de la venta online no es válida.');
+    }
+
+    if (
+      !Array.isArray(command.lineas) ||
+      command.lineas.length === 0 ||
+      !Array.isArray(command.pagos)
+    ) {
+      throw new Error('Las líneas o los pagos de la venta online no son válidos.');
+    }
+
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    return runDataSourceTransaction(
+      dataSource,
+      async (queryRunner: QueryRunner): Promise<VentaPersistidaRecord> => {
+        const existing: VentaPersistidaRecord | null = await this.findExistingOnlineVenta(
+          queryRunner,
+          referenciaExterna,
+        );
+
+        if (existing !== null) {
+          if (existing.totalCents !== command.totalCents) {
+            throw new Error('El pedido online ya existe con un importe diferente.');
+          }
+
+          return existing;
+        }
+
+        const existingPublicId: readonly DatabaseIdRow[] = (await queryRunner.query(
+          `
+              SELECT id
+              FROM venta
+              WHERE public_id = ?
+              LIMIT 1
+            `,
+          [command.publicId],
+        )) as readonly DatabaseIdRow[];
+
+        if (existingPublicId.length > 0) {
+          throw new Error('El identificador de la venta ya pertenece a otra operación.');
+        }
+
+        const employeeRows: readonly DatabaseIdRow[] = (await queryRunner.query(
+          `
+              SELECT id
+              FROM empleado
+              WHERE
+                sistema = 1
+                AND activo = 1
+                AND deleted_at IS NULL
+              LIMIT 1
+            `,
+        )) as readonly DatabaseIdRow[];
+
+        const idEmpleado: number = this.requireDatabaseId(
+          employeeRows[0]?.id,
+          'No existe el empleado estructural de tienda online.',
+        );
+
+        /*
+         * Adaptamos los datos al contrato de persistencia
+         * existente, sin abrir la operación presencial.
+         */
+        const recordCommand: GuardarVentaRecordCommand = {
+          publicId: command.publicId,
+          cajaPublicId: '',
+          empleadoPublicId: '',
+          clientePublicId: null,
+          devolucionVentaOrigenPublicId: null,
+          reservasOrigenPublicIds: [],
+          totalCents: command.totalCents,
+          lineas: command.lineas,
+          pagos: command.pagos,
+        };
+
+        const tiposPago: ReadonlyMap<string, TipoPagoDatabaseRow> = await this.resolveTiposPago(
+          queryRunner,
+          recordCommand,
+        );
+
+        const numero: number = await this.nextVentaNumber(queryRunner, pagadaAt);
+
+        await queryRunner.query(
+          `
+            INSERT INTO venta (
+              public_id,
+              origen,
+              referencia_externa,
+              id_caja,
+              id_empleado,
+              id_cliente,
+              serie,
+              numero,
+              total_cents,
+              created_at,
+              updated_at
+            )
+            VALUES (
+              ?, 'online', ?, NULL, ?, NULL, ?, ?, ?, ?, ?
+            )
+          `,
+          [
+            command.publicId,
+            referenciaExterna,
+            idEmpleado,
+            VENTA_SERIE,
+            numero,
+            command.totalCents,
+            pagadaAt,
+            pagadaAt,
+          ],
+        );
+
+        const idVenta: number = await getLastInsertId(
+          queryRunner,
+          'No se ha podido obtener el identificador de la venta online.',
+        );
+
+        const reservas: ReadonlyMap<string, ReservaDatabaseRow> = new Map<
+          string,
+          ReservaDatabaseRow
+        >();
+
+        for (const linea of command.lineas) {
+          await this.insertLinea(queryRunner, idVenta, null, reservas, linea, pagadaAt);
+        }
+
+        for (let index: number = 0; index < command.pagos.length; index += 1) {
+          const pago: GuardarVentaPagoRecordCommand | undefined = command.pagos[index];
+
+          if (pago === undefined) {
+            throw new Error('Uno de los pagos online no es válido.');
+          }
+
+          const tipoPago: TipoPagoDatabaseRow | undefined = tiposPago.get(pago.tipoPagoPublicId);
+
+          if (tipoPago === undefined) {
+            throw new Error('No se ha encontrado el tipo de pago online.');
+          }
+
+          await this.insertPago(queryRunner, idVenta, tipoPago.id, index, pago, pagadaAt);
+        }
+
+        await this.reconcileStockAndOrigins(
+          queryRunner,
+          idVenta,
+          null,
+          reservas,
+          recordCommand,
+          pagadaAt,
+        );
+
+        /*
+         * Deliberadamente no actualizamos caja,
+         * caja_tipo ni sus acumulados.
+         */
+
+        return {
+          id: idVenta,
+          publicId: command.publicId,
+          serie: VENTA_SERIE,
+          numero,
+          totalCents: command.totalCents,
+          fecha: pagadaAt,
+        };
+      },
+    );
+  }
+
+  /**
+   * Busca una venta ya importada por la identidad
+   * económica del pedido externo.
+   */
+  private async findExistingOnlineVenta(
+    queryRunner: QueryRunner,
+    referenciaExterna: string,
+  ): Promise<VentaPersistidaRecord | null> {
+    const rows: readonly ExistingVentaDatabaseRow[] = (await queryRunner.query(
+      `
+          SELECT
+            id,
+            public_id,
+            serie,
+            numero,
+            total_cents,
+            created_at
+          FROM venta
+          WHERE
+            origen = 'online'
+            AND referencia_externa = ?
+          LIMIT 1
+        `,
+      [referenciaExterna],
+    )) as readonly ExistingVentaDatabaseRow[];
+
+    const row: ExistingVentaDatabaseRow | undefined = rows[0];
+
+    if (row === undefined) {
+      return null;
+    }
+
+    return {
+      id: row.id,
+      publicId: row.public_id,
+      serie: row.serie,
+      numero: row.numero,
+      totalCents: row.total_cents,
+      fecha: row.created_at,
+    };
   }
 
   private async findExistingVenta(

@@ -107,6 +107,30 @@ class TestVentasPersistenciaRepository implements VentasPersistenciaRepository {
       fecha: '2026-10-08T20:00:00.000Z',
     });
   }
+
+  /**
+   * Simula la persistencia de una venta online.
+   *
+   * Este método completa el contrato del repositorio.
+   * Los tests de integración de ventas online se
+   * encuentran en el repositorio TypeORM.
+   */
+  saveOnline(
+    command: Parameters<VentasPersistenciaRepository['saveOnline']>[0],
+  ): Promise<VentaPersistidaRecord> {
+    if (this.error !== null) {
+      return Promise.reject(this.error);
+    }
+
+    return Promise.resolve({
+      id: 124,
+      publicId: command.publicId,
+      serie: '',
+      numero: 457,
+      totalCents: command.totalCents,
+      fecha: command.pagadaAt,
+    });
+  }
 }
 
 /**
