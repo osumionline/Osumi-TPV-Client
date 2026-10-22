@@ -366,6 +366,7 @@ function createDetalleRecord(
   return {
     id: 15,
     publicId: 'venta-15',
+    origen: 'tpv',
     serie: '',
     numero: 15,
     fecha: '2026-08-25T10:30:00.000Z',

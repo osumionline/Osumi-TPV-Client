@@ -69,6 +69,10 @@ export interface VentaHistoricoLineaRecord {
 export interface VentaHistoricoDetalleRecord {
   readonly id: number;
   readonly publicId: string;
+  /**
+   * Canal desde el que se originó la venta.
+   */
+  readonly origen: 'tpv' | 'online';
   readonly serie: string;
   readonly numero: number;
   readonly fecha: string;

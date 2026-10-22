@@ -1706,6 +1706,7 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
     expect(detalle?.lineas).toHaveLength(2);
     expect(detalle?.pagos).toHaveLength(2);
     expect(detalle?.totalCents).toBe(2_200);
+    expect(detalle?.origen).toBe('online');
   });
 
   it('incluye ventas online y presenciales en el histórico sin alterar los acumulados de caja online', async (): Promise<void> => {
@@ -1777,7 +1778,9 @@ describe('TypeOrmVentasPersistenciaRepository', (): void => {
     const detalleOnline = await requireHistoricoRepository().findDetalleByVentaId(online.id);
 
     expect(detallePresencial?.cajaAbierta).toBe(true);
+    expect(detallePresencial?.origen).toBe('tpv');
     expect(detalleOnline?.cajaAbierta).toBe(false);
+    expect(detalleOnline?.origen).toBe('online');
 
     const caja: CajaRow = await queryOne<CajaRow>(
       dataSource,

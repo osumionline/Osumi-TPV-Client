@@ -586,6 +586,79 @@ describe('TypeOrmVentasPostventaRepository', (): void => {
       },
     ]);
   });
+
+  it('impide cambiar cliente y medio de pago de una venta online', async (): Promise<void> => {
+    const dataSource: DataSource = await requireDatabase().connect();
+
+    const idVenta: number = await seedVenta(dataSource, {
+      publicId: 'venta-online-postventa',
+      clientePublicId: null,
+      totalCents: 1_800,
+      tipoPagoPublicId: 'tipo-pago-tarjeta',
+      entregadoCents: null,
+      cierreTeoricoCents: 0,
+    });
+
+    await dataSource.query(
+      `
+        UPDATE venta
+        SET
+          origen = 'online',
+          referencia_externa = 'pedido-web-postventa',
+          id_caja = NULL
+        WHERE id = ?
+      `,
+      [idVenta],
+    );
+
+    await expect(requireRepository().cambiarCliente(idVenta, 'cliente-1')).rejects.toThrow(
+      'No se puede cambiar el cliente de una venta procedente de la tienda online.',
+    );
+
+    await expect(
+      requireRepository().cambiarTipoPago(idVenta, 'tipo-pago-efectivo'),
+    ).rejects.toThrow(
+      'No se puede cambiar el medio de pago de una venta procedente de la tienda online.',
+    );
+
+    const venta: {
+      readonly origen: string;
+      readonly referencia_externa: string | null;
+      readonly id_caja: number | null;
+      readonly id_cliente: number | null;
+    } = await queryOne(
+      dataSource,
+      `
+        SELECT
+          origen,
+          referencia_externa,
+          id_caja,
+          id_cliente
+        FROM venta
+        WHERE id = ?
+      `,
+      [idVenta],
+    );
+
+    expect(venta).toEqual({
+      origen: 'online',
+      referencia_externa: 'pedido-web-postventa',
+      id_caja: null,
+      id_cliente: null,
+    });
+
+    expect(await getPago(dataSource, idVenta)).toEqual({
+      tipo_pago_public_id: 'tipo-pago-tarjeta',
+      importe_cents: 1_800,
+      entregado_cents: null,
+      cambio_cents: 0,
+    });
+
+    expect(await getTicketRevision(dataSource, idVenta)).toEqual({
+      ticket_revision: 1,
+      ticket_pdf_revision: 0,
+    });
+  });
 });
 
 /**

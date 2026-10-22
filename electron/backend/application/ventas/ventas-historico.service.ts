@@ -214,9 +214,12 @@ export default class VentasHistoricoService {
         ticketBaiEstado: record.ticketBaiEstado,
         ticketBaiUltimoError: record.ticketBaiUltimoError,
         capacidades: {
-          puedeCambiarCliente: true,
+          puedeCambiarCliente: record.origen === 'tpv',
           puedeCambiarTipoPago:
-            record.totalCents !== 0 && record.numeroPagos === 1 && record.cajaAbierta,
+            record.origen === 'tpv' &&
+            record.totalCents !== 0 &&
+            record.numeroPagos === 1 &&
+            record.cajaAbierta,
           puedeImprimirTicketRegalo: record.tieneLineasPositivas,
           puedeProcesarTicketBai: record.puedeProcesarTicketBai,
           puedeComprobarTicketBai: record.puedeComprobarTicketBai,

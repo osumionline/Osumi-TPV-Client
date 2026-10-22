@@ -208,6 +208,7 @@ describe('VentasHistoricoService', (): void => {
     repository.detalleResult = {
       id: 15,
       publicId: 'venta-historico-15',
+      origen: 'tpv',
       serie: '',
       numero: 15,
       fecha: '2026-08-25T10:30:00.000Z',
@@ -332,10 +333,66 @@ describe('VentasHistoricoService', (): void => {
     });
   });
 
+  it('deshabilita las correcciones comerciales de una venta online', async (): Promise<void> => {
+    repository.detalleResult = {
+      id: 50,
+      publicId: 'venta-online-50',
+      origen: 'online',
+      serie: '',
+      numero: 50,
+      fecha: '2026-10-20T10:30:00.000Z',
+      empleadoNombre: 'Tienda online',
+      cliente: null,
+      totalCents: 1_000,
+      pagos: [
+        {
+          tipoPagoPublicId: 'tipo-pago-tarjeta',
+          nombre: 'Tarjeta',
+          importeCents: 1_000,
+          entregadoCents: null,
+          cambioCents: 0,
+        },
+      ],
+      lineas: [
+        {
+          id: 100,
+          localizador: 1,
+          marca: 'Marca test',
+          descripcion: 'Artículo online',
+          unidades: 1,
+          pvpMicros: 10_000_000,
+          descuentoBps: 0,
+          importeDescuentoMicros: 0,
+          importeMicros: 10_000_000,
+          regalo: false,
+        },
+      ],
+      numeroPagos: 1,
+      cajaAbierta: false,
+      facturada: false,
+      tieneLineasPositivas: true,
+      ticketBaiEstado: 'no_aplica',
+      ticketBaiUltimoError: null,
+      tieneIncidenciaTicketBai: false,
+      puedeProcesarTicketBai: false,
+      puedeComprobarTicketBai: false,
+      puedeReintentarTicketBai: false,
+    };
+
+    const detalle: VentaHistoricoDetalle | null = await service.findDetalleByVentaId(50);
+
+    expect(detalle).not.toBeNull();
+
+    expect(detalle?.capacidades.puedeCambiarCliente).toBe(false);
+    expect(detalle?.capacidades.puedeCambiarTipoPago).toBe(false);
+    expect(detalle?.capacidades.puedeImprimirTicketRegalo).toBe(true);
+  });
+
   it('mantiene el cambio de cliente y bloquea las demás capacidades no permitidas', async (): Promise<void> => {
     repository.detalleResult = {
       id: 20,
       publicId: 'venta-historico-20',
+      origen: 'tpv',
       serie: '',
       numero: 20,
       fecha: '2026-08-25T11:00:00.000Z',

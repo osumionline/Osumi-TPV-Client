@@ -48,6 +48,7 @@ interface VentaHistoricoBeneficioDatabaseRow {
 interface VentaHistoricoDetalleDatabaseRow {
   readonly id: number;
   readonly public_id: string;
+  readonly origen: 'tpv' | 'online';
   readonly serie: string;
   readonly numero: number;
   readonly fecha: string;
@@ -163,6 +164,7 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
         SELECT
           v.id,
           v.public_id,
+          v.origen,
           v.serie,
           v.numero,
           v.created_at AS fecha,
@@ -265,6 +267,7 @@ export default class TypeOrmVentasHistoricoRepository implements VentasHistorico
     return {
       id: row.id,
       publicId: row.public_id,
+      origen: row.origen,
       serie: row.serie,
       numero: row.numero,
       fecha: row.fecha,

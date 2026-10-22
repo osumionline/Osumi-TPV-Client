@@ -9,14 +9,20 @@ const MICROS_PER_CENT: number = 10_000;
 interface VentaClienteDatabaseRow {
   readonly id: number;
   readonly id_cliente: number | null;
+  readonly origen: 'tpv' | 'online';
 }
 
 interface VentaPagoContextDatabaseRow {
   readonly id: number;
-  readonly id_caja: number;
+  readonly id_caja: number | null;
   readonly total_cents: number;
   readonly cierre: string | null;
+  readonly origen: 'tpv' | 'online';
 }
+
+type VentaPagoConCajaDatabaseRow = VentaPagoContextDatabaseRow & {
+  readonly id_caja: number;
+};
 
 interface VentaPagoDatabaseRow {
   readonly id: number;
@@ -99,7 +105,7 @@ export default class TypeOrmVentasPostventaRepository implements VentasPostventa
     const dataSource: DataSource = await this.applicationDatabase.connect();
 
     await runDataSourceTransaction(dataSource, async (queryRunner: QueryRunner): Promise<void> => {
-      const venta: VentaPagoContextDatabaseRow = await this.requireVentaPagoContext(
+      const venta: VentaPagoConCajaDatabaseRow = await this.requireVentaPagoContext(
         queryRunner,
         idVenta,
       );
@@ -207,7 +213,8 @@ export default class TypeOrmVentasPostventaRepository implements VentasPostventa
       `
         SELECT
           v.id,
-          v.id_cliente
+          v.id_cliente,
+          v.origen
         FROM venta v
         WHERE
           v.id = ?
@@ -223,6 +230,12 @@ export default class TypeOrmVentasPostventaRepository implements VentasPostventa
       throw new Error('La venta indicada ya no está disponible.');
     }
 
+    if (venta.origen === 'online') {
+      throw new Error(
+        'No se puede cambiar el cliente de una venta procedente de la tienda online.',
+      );
+    }
+
     return venta;
   }
 
@@ -233,17 +246,18 @@ export default class TypeOrmVentasPostventaRepository implements VentasPostventa
   private async requireVentaPagoContext(
     queryRunner: QueryRunner,
     idVenta: number,
-  ): Promise<VentaPagoContextDatabaseRow> {
+  ): Promise<VentaPagoConCajaDatabaseRow> {
     const rows: readonly VentaPagoContextDatabaseRow[] = (await queryRunner.query(
       `
           SELECT
             v.id,
             v.id_caja,
             v.total_cents,
+            v.origen,
             c.cierre
           FROM venta v
 
-          INNER JOIN caja c
+          LEFT JOIN caja c
             ON c.id = v.id_caja
 
           WHERE
@@ -261,7 +275,20 @@ export default class TypeOrmVentasPostventaRepository implements VentasPostventa
       throw new Error('La venta indicada ya no está disponible.');
     }
 
-    return venta;
+    if (venta.origen === 'online') {
+      throw new Error(
+        'No se puede cambiar el medio de pago de una venta procedente de la tienda online.',
+      );
+    }
+
+    if (venta.id_caja === null) {
+      throw new Error('La venta presencial no tiene una caja asociada.');
+    }
+
+    return {
+      ...venta,
+      id_caja: venta.id_caja,
+    };
   }
 
   /**
