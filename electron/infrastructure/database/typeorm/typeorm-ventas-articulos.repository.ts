@@ -1,3 +1,4 @@
+import type TiendaOnlineArticulosRepository from '@backend/contracts/tienda-online/tienda-online-articulos.repository.interface';
 import type VentasArticulosRepository from '@backend/contracts/ventas/ventas-articulos.repository.interface';
 import type {
   AccesoDirectoVentaRecord,
@@ -52,7 +53,9 @@ const ARTICLE_SELECT: string = `
 /**
  * Obtiene desde SQLite los artículos necesarios para la operativa de ventas.
  */
-export default class TypeOrmVentasArticulosRepository implements VentasArticulosRepository {
+export default class TypeOrmVentasArticulosRepository
+  implements VentasArticulosRepository, TiendaOnlineArticulosRepository
+{
   constructor(private readonly applicationDatabase: TypeOrmApplicationDatabase) {}
 
   /**
@@ -68,6 +71,38 @@ export default class TypeOrmVentasArticulosRepository implements VentasArticulos
       codigoNumerico === null
         ? await this.resolveBarcode(dataSource, codigo)
         : await this.resolveNumericCode(dataSource, codigo, codigoNumerico);
+
+    const row: ArticuloVentaDatabaseRow | undefined = rows[0];
+
+    return row === undefined ? null : this.mapArticulo(row);
+  }
+
+  /**
+   * Obtiene un artículo activo exclusivamente por su localizador.
+   *
+   * Esta búsqueda está destinada a pedidos online:
+   * nunca interpreta códigos de barras ni accesos directos.
+   *
+   * La base de datos garantiza la unicidad del localizador
+   * entre artículos activos.
+   */
+  async findByLocalizador(localizador: number): Promise<ArticuloVentaRecord | null> {
+    if (!Number.isSafeInteger(localizador) || localizador <= 0) {
+      throw new Error('El localizador solicitado no es válido.');
+    }
+
+    const dataSource: DataSource = await this.applicationDatabase.connect();
+
+    const rows: readonly ArticuloVentaDatabaseRow[] = (await dataSource.query(
+      `
+      ${ARTICLE_SELECT}
+      WHERE
+        a.localizador = ?
+        AND a.deleted_at IS NULL
+      LIMIT 1
+    `,
+      [localizador],
+    )) as readonly ArticuloVentaDatabaseRow[];
 
     const row: ArticuloVentaDatabaseRow | undefined = rows[0];
 
