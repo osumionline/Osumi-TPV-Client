@@ -40,6 +40,7 @@ function createOrder(): TiendaOnlinePedidoPendiente {
     shippingCents: 450,
     totalCents: 2_950,
     items: [createLine()],
+    shippingVatBps: null,
   };
 }
 
@@ -238,5 +239,18 @@ describe('TiendaOnlinePedidosPendientesParser', (): void => {
     expect((): void => {
       parser.parse(createResponse(orders));
     }).toThrow('La lista de pedidos');
+  });
+
+  it('conserva el IVA explícito del transporte', (): void => {
+    const result = parser.parse(
+      createResponse([
+        {
+          ...createOrder(),
+          shippingVatBps: 2_100,
+        },
+      ]),
+    );
+
+    expect(result.orders[0]?.shippingVatBps).toBe(2_100);
   });
 });

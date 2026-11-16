@@ -37,6 +37,14 @@ export interface TiendaOnlinePedidoPendiente {
   readonly totalCents: number;
 
   readonly items: readonly TiendaOnlineLineaPedido[];
+
+  /**
+   * IVA histórico del transporte.
+   *
+   * NULL cuando la tienda no puede acreditarlo.
+   * No debe deducirse del IVA de los artículos.
+   */
+  readonly shippingVatBps: number | null;
 }
 
 /**

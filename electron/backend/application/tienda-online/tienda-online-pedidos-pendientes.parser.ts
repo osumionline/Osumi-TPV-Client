@@ -81,6 +81,10 @@ export default class TiendaOnlinePedidosPendientesParser {
     );
 
     const shippingCents: number = this.requireInteger(data['shippingCents'], 'Gastos de envío', 0);
+    const shippingVatBps: number | null =
+      data['shippingVatBps'] === undefined
+        ? null
+        : this.nullableInteger(data['shippingVatBps'], 'IVA del envío', 0, 10_000);
 
     const totalCents: number = this.requireInteger(data['totalCents'], 'Total del pedido', 0);
 
@@ -116,6 +120,7 @@ export default class TiendaOnlinePedidosPendientesParser {
       shippingCents,
       totalCents,
       items,
+      shippingVatBps,
     };
   }
 

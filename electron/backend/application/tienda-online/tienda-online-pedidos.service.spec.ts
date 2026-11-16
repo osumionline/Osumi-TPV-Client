@@ -2,13 +2,16 @@ import TiendaOnlineArticuloResolver from '@backend/application/tienda-online/tie
 import TiendaOnlineLineasMapper from '@backend/application/tienda-online/tienda-online-lineas.mapper';
 import TiendaOnlinePedidosPendientesParser from '@backend/application/tienda-online/tienda-online-pedidos-pendientes.parser';
 import type { TiendaOnlinePaginaPreparada } from '@backend/application/tienda-online/tienda-online-pedidos.service';
-import TiendaOnlinePedidosService from '@backend/application/tienda-online/tienda-online-pedidos.service';
+import { TiendaOnlinePedidosService } from '@backend/application/tienda-online/tienda-online-pedidos.service';
+import TiendaOnlineVentaCommandBuilder from '@backend/application/tienda-online/tienda-online-venta-command.builder';
 import type TiendaOnlineArticulosRepository from '@backend/contracts/tienda-online/tienda-online-articulos.repository.interface';
 import type {
   TiendaOnlineLineaPedido,
   TiendaOnlinePedidoPendiente,
 } from '@backend/contracts/tienda-online/tienda-online-pedidos-pendientes.interface';
 import type TiendaOnlinePedidosClient from '@backend/contracts/tienda-online/tienda-online-pedidos.client.interface';
+import type TipoPagoRepository from '@backend/contracts/tipos-pago/tipo-pago.repository.interface';
+import type TipoPagoRecord from '@backend/domain/tipos-pago/tipo-pago-record.interface';
 import type { ArticuloVentaRecord } from '@backend/domain/ventas/articulo-venta-record.interface';
 import { describe, expect, it } from 'vitest';
 
@@ -89,6 +92,7 @@ function createOrder(
     shippingCents: 0,
     totalCents: item.lineTotalCents,
     items: [item],
+    shippingVatBps: null,
   };
 }
 
@@ -250,6 +254,72 @@ describe('TiendaOnlinePedidosService', (): void => {
     expect(result.pedidos).toHaveLength(20);
     expect(result.hasMore).toBe(true);
     expect(result.nextAfterId).toBe(20);
+    expect(client.acknowledgements).toEqual([]);
+  });
+
+  it('prepara comandos completos y bloquea pedidos no importables', async (): Promise<void> => {
+    const client = new FakePedidosClient();
+    const repository = new FakeArticulosRepository();
+
+    repository.articles.set(123, createArticle());
+
+    client.payload = createPayload([
+      createOrder(31),
+      {
+        ...createOrder(32),
+        shippingCents: 450,
+        totalCents: 2_950,
+      },
+    ]);
+
+    const tipoPago: TipoPagoRecord = {
+      id: 1,
+      publicId: 'tipo-pago-visa',
+      nombre: 'Visa',
+      slug: 'visa',
+      fotoRelativePath: null,
+      afectaCaja: false,
+      orden: 1,
+      fisico: true,
+    };
+
+    const pagosRepository: Pick<TipoPagoRepository, 'findAll'> = {
+      findAll(): Promise<readonly TipoPagoRecord[]> {
+        return Promise.resolve([tipoPago]);
+      },
+    };
+
+    const commandBuilder = new TiendaOnlineVentaCommandBuilder(pagosRepository, {
+      fuenteId: 'tienda-prueba-1',
+      zonaHoraria: 'Europe/Madrid',
+      metodosPago: { tarjeta: 'visa' },
+    });
+
+    const result = await createService(client, repository).prepareCommandsPage(commandBuilder, 30);
+
+    expect(result.afterId).toBe(30);
+    expect(result.nextAfterId).toBe(32);
+
+    expect(result.pedidos.map((pedido) => pedido.status)).toEqual(['command-ready', 'blocked']);
+
+    const ready = result.pedidos[0];
+
+    if (ready?.status !== 'command-ready') {
+      throw new Error('El primer pedido debería estar preparado.');
+    }
+
+    expect(ready.command.totalCents).toBe(2_500);
+    expect(ready.command.lineas).toHaveLength(1);
+    expect(ready.command.pagos[0]?.tipoPagoPublicId).toBe('tipo-pago-visa');
+
+    const blocked = result.pedidos[1];
+
+    if (blocked?.status !== 'blocked') {
+      throw new Error('El segundo pedido debería estar bloqueado.');
+    }
+
+    expect(blocked.error).toContain('Los gastos de envío no tienen un IVA histórico válido.');
+
     expect(client.acknowledgements).toEqual([]);
   });
 });
