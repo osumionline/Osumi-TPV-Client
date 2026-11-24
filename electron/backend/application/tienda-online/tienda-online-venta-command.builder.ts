@@ -33,7 +33,7 @@ export interface TiendaOnlineImportacionContexto {
  *
  * No escribe en SQLite ni realiza llamadas HTTP.
  */
-export default class TiendaOnlineVentaCommandBuilder {
+export class TiendaOnlineVentaCommandBuilder {
   private readonly validator: VentaOnlineCommandValidator = new VentaOnlineCommandValidator();
 
   constructor(

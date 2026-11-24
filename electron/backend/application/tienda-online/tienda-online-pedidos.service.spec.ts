@@ -3,7 +3,7 @@ import TiendaOnlineLineasMapper from '@backend/application/tienda-online/tienda-
 import TiendaOnlinePedidosPendientesParser from '@backend/application/tienda-online/tienda-online-pedidos-pendientes.parser';
 import type { TiendaOnlinePaginaPreparada } from '@backend/application/tienda-online/tienda-online-pedidos.service';
 import { TiendaOnlinePedidosService } from '@backend/application/tienda-online/tienda-online-pedidos.service';
-import TiendaOnlineVentaCommandBuilder from '@backend/application/tienda-online/tienda-online-venta-command.builder';
+import { TiendaOnlineVentaCommandBuilder } from '@backend/application/tienda-online/tienda-online-venta-command.builder';
 import type TiendaOnlineArticulosRepository from '@backend/contracts/tienda-online/tienda-online-articulos.repository.interface';
 import type {
   TiendaOnlineLineaPedido,

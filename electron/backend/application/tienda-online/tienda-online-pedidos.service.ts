@@ -1,6 +1,6 @@
 import TiendaOnlineLineasMapper from '@backend/application/tienda-online/tienda-online-lineas.mapper';
 import TiendaOnlinePedidosPendientesParser from '@backend/application/tienda-online/tienda-online-pedidos-pendientes.parser';
-import type TiendaOnlineVentaCommandBuilder from '@backend/application/tienda-online/tienda-online-venta-command.builder';
+import type { TiendaOnlineVentaCommandBuilder } from '@backend/application/tienda-online/tienda-online-venta-command.builder';
 import type { TiendaOnlinePedidoPendiente } from '@backend/contracts/tienda-online/tienda-online-pedidos-pendientes.interface';
 import type TiendaOnlinePedidosClient from '@backend/contracts/tienda-online/tienda-online-pedidos.client.interface';
 import type GuardarVentaOnlineRecordCommand from '@backend/contracts/ventas/guardar-venta-online-record-command.interface';
