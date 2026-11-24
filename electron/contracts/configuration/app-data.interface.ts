@@ -1,6 +1,7 @@
 import type EmailSmtpConfig from '@desktop-contracts/configuration/email-smtp-config.interface';
 import type TicketBaiConfig from '@desktop-contracts/configuration/ticket-bai-config.interface';
 import type { TicketEmailConfig } from '@desktop-contracts/configuration/ticket-email-config.interface';
+import type { TiendaOnlineSyncConfig } from '@desktop-contracts/configuration/tienda-online-sync-config';
 import type TipoIva from '@desktop-contracts/tipo-iva.type';
 
 export default interface AppData {
@@ -25,6 +26,13 @@ export default interface AppData {
   readonly marginList: readonly number[];
   readonly ventaOnline: boolean;
   readonly urlApi: string;
+
+  /**
+   * Perfil de sincronización opcional.
+   * Su ausencia nunca activa importaciones.
+   */
+  readonly tiendaOnlineSync?: TiendaOnlineSyncConfig | null;
+
   readonly emailSmtp: EmailSmtpConfig | null;
   readonly ticketBai: TicketBaiConfig | null;
   readonly backupAutomaticTime: string;

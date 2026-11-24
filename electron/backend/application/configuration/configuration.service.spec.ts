@@ -441,6 +441,49 @@ describe('ConfigurationService', (): void => {
 
     expect(appDataRepository.value?.backupAutomaticTime).toBe('04:30');
   });
+
+  it('guarda el perfil de sincronización sin alterar el secreto de API', async (): Promise<void> => {
+    const baseCommand: ConfigurationUpdateCommand = createCommand();
+    const integrations = baseCommand.integrations;
+
+    if (integrations === undefined) {
+      throw new Error('Falta la configuración de integraciones del test.');
+    }
+
+    const sync = {
+      fuenteId: 'tienda-principal',
+      zonaHoraria: 'Europe/Madrid',
+      metodosPago: { cards: 'visa' },
+      politicaAck: 'solo-aceptada' as const,
+    };
+
+    await service.update({
+      ...baseCommand,
+      integrations: {
+        ...integrations,
+        ventaOnline: {
+          ...integrations.ventaOnline,
+          sync,
+        },
+      },
+    });
+
+    expect(appDataRepository.value?.tiendaOnlineSync).toEqual(sync);
+    expect(secretStorage.value?.secretApi).toBe('old-api-secret');
+
+    await service.update({
+      ...baseCommand,
+      integrations: {
+        ...integrations,
+        ventaOnline: {
+          ...integrations.ventaOnline,
+          sync: null,
+        },
+      },
+    });
+
+    expect(appDataRepository.value?.tiendaOnlineSync).toBeNull();
+  });
 });
 
 function createAppData(): AppData {

@@ -1,6 +1,7 @@
 import type AppData from '@desktop-contracts/configuration/app-data.interface';
 import type EmailSmtpSecurity from '@desktop-contracts/configuration/email-smtp-security.type';
 import { DEFAULT_TICKET_BAI_ENVIRONMENT } from '@desktop-contracts/configuration/ticket-bai-environment.type';
+import { formatTiendaOnlineMetodosPago } from '@desktop-contracts/configuration/tienda-online-sync-config';
 import type {
   IvaOptionFormModel,
   MarginOptionFormModel,
@@ -30,6 +31,8 @@ const DEFAULT_MARGIN_OPTIONS: readonly number[] = [
 ];
 
 export default function createSettingsFormInitialValue(appData: AppData): SettingsFormModel {
+  const sync = appData.tiendaOnlineSync ?? null;
+
   return {
     negocio: {
       nombre: appData.nombre,
@@ -67,6 +70,12 @@ export default function createSettingsFormInitialValue(appData: AppData): Settin
       active: appData.ventaOnline,
       urlApi: appData.urlApi,
       secretApi: '',
+
+      syncConfigured: sync !== null,
+      fuenteId: sync?.fuenteId ?? '',
+      zonaHoraria: sync?.zonaHoraria ?? '',
+      metodosPago: sync === null ? '' : formatTiendaOnlineMetodosPago(sync.metodosPago),
+      politicaAck: sync?.politicaAck ?? '',
     },
 
     emailSmtp: {

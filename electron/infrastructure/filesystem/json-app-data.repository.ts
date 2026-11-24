@@ -15,6 +15,7 @@ import {
   DEFAULT_TICKET_EMAIL_SUBJECT_TEMPLATE,
   type TicketEmailConfig,
 } from '@desktop-contracts/configuration/ticket-email-config.interface';
+import { isTiendaOnlineSyncConfig } from '@desktop-contracts/configuration/tienda-online-sync-config';
 import writeAtomicTextFile from '@infrastructure/filesystem/write-atomic-text-file';
 import { readFile, rm } from 'node:fs/promises';
 
@@ -167,6 +168,11 @@ function isStoredAppData(value: unknown): value is StoredAppData {
   const validBackupAutomaticTime: boolean =
     data['backupAutomaticTime'] === undefined || isBackupAutomaticTime(data['backupAutomaticTime']);
 
+  const onlineSync: unknown = data['tiendaOnlineSync'];
+
+  const validOnlineSync: boolean =
+    onlineSync === undefined || onlineSync === null || isTiendaOnlineSyncConfig(onlineSync);
+
   return (
     validStrings &&
     validBooleans &&
@@ -176,6 +182,7 @@ function isStoredAppData(value: unknown): value is StoredAppData {
     validEmailSmtp &&
     validTicketBai &&
     validBackupAutomaticTime &&
+    validOnlineSync &&
     isNumberArray(data['ivaList']) &&
     isNumberArray(data['reList']) &&
     isNumberArray(data['marginList']) &&

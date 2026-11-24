@@ -109,6 +109,41 @@ describe('JsonAppDataRepository', (): void => {
       'El archivo app_data.json no tiene una estructura válida.',
     );
   });
+
+  it('carga una instalación antigua sin activar sincronización', async (): Promise<void> => {
+    const filePath: string = join(requireTempDirectory(), 'app_data.json');
+
+    await writeFile(filePath, JSON.stringify(createLegacyAppData()), 'utf8');
+
+    const repository = new JsonAppDataRepository(filePath);
+    const appData = await repository.load();
+
+    expect(appData?.tiendaOnlineSync).toBeNull();
+  });
+
+  it('rechaza un perfil persistido con política de ACK desconocida', async (): Promise<void> => {
+    const filePath: string = join(requireTempDirectory(), 'app_data.json');
+
+    await writeFile(
+      filePath,
+      JSON.stringify({
+        ...createLegacyAppData(),
+        tiendaOnlineSync: {
+          fuenteId: 'tienda-1',
+          zonaHoraria: 'Europe/Madrid',
+          metodosPago: { cards: 'visa' },
+          politicaAck: 'siempre',
+        },
+      }),
+      'utf8',
+    );
+
+    const repository = new JsonAppDataRepository(filePath);
+
+    await expect(repository.load()).rejects.toThrow(
+      'El archivo app_data.json no tiene una estructura válida.',
+    );
+  });
 });
 
 /**

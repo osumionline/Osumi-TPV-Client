@@ -9,6 +9,7 @@ import type {
   InstallationTicketEmailData,
 } from '@desktop-contracts/configuration/installation-command.interface';
 import type { TicketBaiEnvironment } from '@desktop-contracts/configuration/ticket-bai-environment.type';
+import type { TiendaOnlineSyncConfig } from '@desktop-contracts/configuration/tienda-online-sync-config';
 
 export interface ConfigurationOnlineStoreUpdateData {
   readonly active: boolean;
@@ -19,6 +20,15 @@ export interface ConfigurationOnlineStoreUpdateData {
    * null conserva el existente cuando la integración ya estaba activa.
    */
   readonly secretApi: string | null;
+
+  /**
+   * Perfil de sincronización.
+   *
+   * undefined: conservar el perfil anterior.
+   * null: eliminar el perfil.
+   * objeto: guardar un perfil explícito.
+   */
+  readonly sync?: TiendaOnlineSyncConfig | null;
 }
 
 export interface ConfigurationEmailSmtpUpdateData {

@@ -1,4 +1,8 @@
 import type ConfigurationUpdateCommand from '@desktop-contracts/configuration/configuration-update-command.interface';
+import {
+  parseTiendaOnlineMetodosPago,
+  type TiendaOnlineSyncConfig,
+} from '@desktop-contracts/configuration/tienda-online-sync-config';
 import type {
   IvaOptionFormModel,
   MarginOptionFormModel,
@@ -11,6 +15,30 @@ export default function createSettingsCommand(
   const selectedIvaOptions: readonly IvaOptionFormModel[] = model.fiscalidad.ivaOptions.filter(
     (option: IvaOptionFormModel): boolean => option.selected,
   );
+
+  let sync: TiendaOnlineSyncConfig | null = null;
+
+  if (model.ventaOnline.active && model.ventaOnline.syncConfigured) {
+    const methods = parseTiendaOnlineMetodosPago(model.ventaOnline.metodosPago);
+
+    const politicaAck = model.ventaOnline.politicaAck;
+
+    if (
+      methods === null ||
+      politicaAck === '' ||
+      model.ventaOnline.fuenteId.trim() === '' ||
+      model.ventaOnline.zonaHoraria.trim() === ''
+    ) {
+      throw new Error('La configuración de sincronización de tienda online está incompleta.');
+    }
+
+    sync = {
+      fuenteId: model.ventaOnline.fuenteId,
+      zonaHoraria: model.ventaOnline.zonaHoraria,
+      metodosPago: methods,
+      politicaAck,
+    };
+  }
 
   return {
     negocio: {
@@ -69,6 +97,7 @@ export default function createSettingsCommand(
         active: model.ventaOnline.active,
         urlApi: model.ventaOnline.urlApi,
         secretApi: toOptionalSecret(model.ventaOnline.secretApi),
+        sync,
       },
 
       emailSmtp: {

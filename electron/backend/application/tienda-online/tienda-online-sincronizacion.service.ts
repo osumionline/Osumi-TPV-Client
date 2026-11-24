@@ -10,12 +10,9 @@ import type {
   VentaTicketBaiEstado,
   VentaTicketBaiRecord,
 } from '@backend/domain/ventas/venta-ticket-bai-record.interface';
+import type { TiendaOnlineAckPolitica } from '@desktop-contracts/configuration/tienda-online-sync-config';
 
-/**
- * Política explícita que establece cuándo puede
- * confirmarse un pedido al backend de tienda online.
- */
-export type TiendaOnlineAckPolitica = 'solo-aceptada' | 'aceptada-o-no-aplica';
+export type { TiendaOnlineAckPolitica } from '@desktop-contracts/configuration/tienda-online-sync-config';
 
 /** Resultado final del procesamiento de un pedido. */
 export type TiendaOnlineSincronizacionEstado =

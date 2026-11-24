@@ -215,6 +215,12 @@ export default class ConfigurationService {
       ventaOnline: ventaOnline.active,
       urlApi: ventaOnline.active ? ventaOnline.urlApi : '',
 
+      tiendaOnlineSync: ventaOnline.active
+        ? ventaOnline.sync === undefined
+          ? (appData.tiendaOnlineSync ?? null)
+          : ventaOnline.sync
+        : null,
+
       emailSmtp: emailSmtp.active
         ? {
             host: emailSmtp.host,

@@ -1,6 +1,10 @@
 import { email, required, validate, type SchemaPathTree } from '@angular/forms/signals';
 import { isBackupAutomaticTime } from '@desktop-contracts/backup/backup-automatic-time';
 import { TICKET_EMAIL_TEMPLATE_VARIABLES } from '@desktop-contracts/configuration/ticket-email-config.interface';
+import {
+  isTiendaOnlineZonaHoraria,
+  parseTiendaOnlineMetodosPago,
+} from '@desktop-contracts/configuration/tienda-online-sync-config';
 import type {
   IvaOptionFormModel,
   MarginOptionFormModel,
@@ -121,6 +125,71 @@ export default function settingsFormSchema(path: SchemaPathTree<SettingsFormMode
         message: 'Introduce una URL válida para la API.',
       };
     }
+  });
+
+  required(path.ventaOnline.fuenteId, {
+    message: 'El identificador de la fuente es obligatorio.',
+    when: ({ valueOf }): boolean =>
+      valueOf(path.ventaOnline.active) && valueOf(path.ventaOnline.syncConfigured),
+  });
+
+  validate(path.ventaOnline.fuenteId, ({ value, valueOf }) => {
+    if (
+      !valueOf(path.ventaOnline.active) ||
+      !valueOf(path.ventaOnline.syncConfigured) ||
+      value() === ''
+    ) {
+      return null;
+    }
+
+    return /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,99}$/.test(value())
+      ? null
+      : {
+          kind: 'invalidOnlineSource',
+          message: 'Utiliza un identificador de 1 a 100 caracteres, sin espacios.',
+        };
+  });
+
+  required(path.ventaOnline.zonaHoraria, {
+    message: 'La zona horaria es obligatoria.',
+    when: ({ valueOf }): boolean =>
+      valueOf(path.ventaOnline.active) && valueOf(path.ventaOnline.syncConfigured),
+  });
+
+  validate(path.ventaOnline.zonaHoraria, ({ value, valueOf }) => {
+    if (
+      !valueOf(path.ventaOnline.active) ||
+      !valueOf(path.ventaOnline.syncConfigured) ||
+      value() === ''
+    ) {
+      return null;
+    }
+
+    return isTiendaOnlineZonaHoraria(value())
+      ? null
+      : {
+          kind: 'invalidOnlineTimeZone',
+          message: 'Introduce una zona horaria válida, por ejemplo Europe/Madrid.',
+        };
+  });
+
+  required(path.ventaOnline.politicaAck, {
+    message: 'Debes elegir una política de confirmación.',
+    when: ({ valueOf }): boolean =>
+      valueOf(path.ventaOnline.active) && valueOf(path.ventaOnline.syncConfigured),
+  });
+
+  validate(path.ventaOnline.metodosPago, ({ value, valueOf }) => {
+    if (!valueOf(path.ventaOnline.active) || !valueOf(path.ventaOnline.syncConfigured)) {
+      return null;
+    }
+
+    return parseTiendaOnlineMetodosPago(value()) !== null
+      ? null
+      : {
+          kind: 'invalidOnlinePaymentMappings',
+          message: 'Indica equivalencias en formato método_remoto=slug_local, una por línea.',
+        };
   });
 
   required(path.emailSmtp.host, {

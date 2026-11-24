@@ -1,5 +1,6 @@
 import type EmailSmtpSecurity from '@desktop-contracts/configuration/email-smtp-security.type';
 import type { TicketBaiEnvironment } from '@desktop-contracts/configuration/ticket-bai-environment.type';
+import type { TiendaOnlineAckPolitica } from '@desktop-contracts/configuration/tienda-online-sync-config';
 import type TipoIva from '@desktop-contracts/tipo-iva.type';
 import type {
   IvaOptionFormModel,
@@ -42,6 +43,12 @@ export interface SettingsOnlineStoreFormModel {
   active: boolean;
   urlApi: string;
   secretApi: string;
+
+  syncConfigured: boolean;
+  fuenteId: string;
+  zonaHoraria: string;
+  metodosPago: string;
+  politicaAck: TiendaOnlineAckPolitica | '';
 }
 
 export interface SettingsEmailSmtpFormModel {

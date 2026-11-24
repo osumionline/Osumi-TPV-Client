@@ -1,6 +1,7 @@
 import { isBackupAutomaticTime } from '@desktop-contracts/backup/backup-automatic-time';
 import type ConfigurationUpdateCommand from '@desktop-contracts/configuration/configuration-update-command.interface';
 import { TICKET_EMAIL_TEMPLATE_VARIABLES } from '@desktop-contracts/configuration/ticket-email-config.interface';
+import { isTiendaOnlineSyncConfig } from '@desktop-contracts/configuration/tienda-online-sync-config';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -65,10 +66,16 @@ function isIntegrationsData(value: unknown): boolean {
     return false;
   }
 
+  const onlineSync: unknown = ventaOnline['sync'];
+
+  const validOnlineSync: boolean =
+    onlineSync === undefined || onlineSync === null || isTiendaOnlineSyncConfig(onlineSync);
+
   const validOnlineStore: boolean =
     hasBoolean(ventaOnline, 'active') &&
     hasString(ventaOnline, 'urlApi') &&
-    hasNullableString(ventaOnline, 'secretApi');
+    hasNullableString(ventaOnline, 'secretApi') &&
+    validOnlineSync;
 
   const validEmailSmtp: boolean =
     hasBoolean(emailSmtp, 'active') &&

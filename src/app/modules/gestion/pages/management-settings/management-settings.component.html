@@ -487,6 +487,110 @@
                         </button>
                         }
                     </div>
+
+                    <mat-checkbox [formField]="settingsForm.ventaOnline.syncConfigured">
+                        Configurar sincronización de pedidos online
+                    </mat-checkbox>
+
+                    @if (settingsForm.ventaOnline.syncConfigured().value()) {
+                    <p class="section-help">
+                        Estos ajustes identifican el origen de los pedidos y
+                        permiten interpretar correctamente sus cobros y fechas.
+                        Configurarlos no activa todavía la ejecución automática.
+                    </p>
+
+                    <div class="form-row">
+                        <mat-form-field>
+                            <mat-label>Identificador estable de tienda</mat-label>
+
+                            <input matInput
+                                   placeholder="mi-tienda"
+                                   [formField]="settingsForm.ventaOnline.fuenteId">
+
+                            <mat-hint>
+                                No debe cambiar al modificar la URL de la misma tienda.
+                                Debe ser diferente para otra tienda.
+                            </mat-hint>
+
+                            @if (
+                            settingsForm.ventaOnline.fuenteId().touched() &&
+                            settingsForm.ventaOnline.fuenteId().invalid()
+                            ) {
+                            <mat-error>
+                                {{ settingsForm.ventaOnline.fuenteId().errors()[0]?.message }}
+                            </mat-error>
+                            }
+                        </mat-form-field>
+
+                        <mat-form-field>
+                            <mat-label>Zona horaria de la tienda</mat-label>
+
+                            <input matInput
+                                   placeholder="Europe/Madrid"
+                                   [formField]="settingsForm.ventaOnline.zonaHoraria">
+
+                            @if (
+                            settingsForm.ventaOnline.zonaHoraria().touched() &&
+                            settingsForm.ventaOnline.zonaHoraria().invalid()
+                            ) {
+                            <mat-error>
+                                {{ settingsForm.ventaOnline.zonaHoraria().errors()[0]?.message }}
+                            </mat-error>
+                            }
+                        </mat-form-field>
+                    </div>
+
+                    <mat-form-field class="full-width">
+                        <mat-label>Política de confirmación remota</mat-label>
+
+                        <mat-select [formField]="settingsForm.ventaOnline.politicaAck">
+                            <mat-option value="">
+                                Selecciona una política
+                            </mat-option>
+
+                            <mat-option value="solo-aceptada">
+                                Solo cuando TicketBAI esté aceptada
+                            </mat-option>
+
+                            <mat-option value="aceptada-o-no-aplica">
+                                Cuando esté aceptada o TicketBAI no aplique
+                            </mat-option>
+                        </mat-select>
+
+                        @if (
+                        settingsForm.ventaOnline.politicaAck().touched() &&
+                        settingsForm.ventaOnline.politicaAck().invalid()
+                        ) {
+                        <mat-error>
+                            {{ settingsForm.ventaOnline.politicaAck().errors()[0]?.message }}
+                        </mat-error>
+                        }
+                    </mat-form-field>
+
+                    <mat-form-field class="full-width">
+                        <mat-label>Equivalencias de métodos de pago</mat-label>
+
+                        <textarea matInput
+                                  rows="4"
+                                  placeholder="cards=visa&#10;paypal=paypal"
+                                  [formField]="settingsForm.ventaOnline.metodosPago">
+                        </textarea>
+
+                        <mat-hint>
+                            Una equivalencia por línea. A la izquierda, el método remoto;
+                            a la derecha, el slug del tipo de pago activo del TPV.
+                        </mat-hint>
+
+                        @if (
+                        settingsForm.ventaOnline.metodosPago().touched() &&
+                        settingsForm.ventaOnline.metodosPago().invalid()
+                        ) {
+                        <mat-error>
+                            {{ settingsForm.ventaOnline.metodosPago().errors()[0]?.message }}
+                        </mat-error>
+                        }
+                    </mat-form-field>
+                    }
                     }
                 </div>
 

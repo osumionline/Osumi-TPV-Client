@@ -56,6 +56,7 @@ type SensitiveSettingsField = RevealableConfigurationSecret | 'emailSmtpPassword
     MatRadioModule,
     MatSelectModule,
     MatTooltip,
+    MatSelectModule,
   ],
 })
 export default class ManagementSettingsComponent {
