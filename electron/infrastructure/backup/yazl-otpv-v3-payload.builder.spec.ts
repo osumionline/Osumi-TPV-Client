@@ -516,6 +516,7 @@ function createAppData(): AppData {
     marginList: [30],
     ventaOnline: false,
     urlApi: '',
+    tiendaOnlineSync: null,
     emailSmtp: null,
     ticketBai: null,
     backupAutomaticTime: '03:00',

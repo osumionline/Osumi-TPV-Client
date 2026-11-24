@@ -227,6 +227,7 @@ export default class JsonAppDataRepository implements AppDataRepository {
                 bodyTemplate: parsed.ticketEmail.bodyTemplate,
               },
 
+        tiendaOnlineSync: parsed.tiendaOnlineSync ?? null,
         emailSmtp: parsed.emailSmtp ?? null,
         ticketBai:
           parsed.ticketBai === undefined || parsed.ticketBai === null
