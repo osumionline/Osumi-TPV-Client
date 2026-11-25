@@ -114,6 +114,7 @@ import type ApplicationPaths from '@backend/contracts/system/application-paths.i
 import type AssetUrlBuilder from '@backend/contracts/system/asset-url-builder.interface';
 import type { ImageProcessor } from '@backend/contracts/system/image-processor.interface';
 import type { TicketBaiClient } from '@backend/contracts/ticket-bai/ticket-bai-client.interface';
+import type TiendaOnlineArticulosRepository from '@backend/contracts/tienda-online/tienda-online-articulos.repository.interface';
 import type TipoPagoRepository from '@backend/contracts/tipos-pago/tipo-pago.repository.interface';
 import type VentaTicketPdfStorage from '@backend/contracts/ventas/venta-ticket-pdf-storage.interface';
 import type VentasArticulosRepository from '@backend/contracts/ventas/ventas-articulos.repository.interface';
@@ -126,6 +127,7 @@ import type VentasTicketBaiRepository from '@backend/contracts/ventas/ventas-tic
 import type VentasTicketsRepository from '@backend/contracts/ventas/ventas-tickets.repository.interface';
 import DefaultLegacyImportReviewDecisionValidator from '@backend/domain/legacy-import/default-legacy-import-review-decision.validator';
 import type ApplicationComposition from '@bootstrap/application-composition.interface';
+import { TiendaOnlineEjecucionService } from '@bootstrap/tienda-online-ejecucion.service';
 import FileOtpvV3RequiredContentValidator from '@infrastructure/backup/file-otpv-v3-required-content.validator';
 import FileOtpvV3RestoreStagingPreparer from '@infrastructure/backup/file-otpv-v3-restore-staging.preparer';
 import FileOtpvV3RestoreWorkspace from '@infrastructure/backup/file-otpv-v3-restore-workspace';
@@ -729,9 +731,8 @@ export default function createApplicationComposition(
     cajaInformePrintWindow,
   );
 
-  const ventasArticulosRepository: VentasArticulosRepository = new TypeOrmVentasArticulosRepository(
-    operationalDatabase,
-  );
+  const ventasArticulosRepository: VentasArticulosRepository & TiendaOnlineArticulosRepository =
+    new TypeOrmVentasArticulosRepository(operationalDatabase);
 
   const ventasArticulosService: VentasArticulosService = new VentasArticulosService(
     ventasArticulosRepository,
@@ -814,6 +815,25 @@ export default function createApplicationComposition(
     ticketBaiClient,
     applicationLogger,
   );
+
+  /*
+   * Sincronización con tiendas online.
+   *
+   * El ejecutor construye los servicios dependientes
+   * de la configuración al solicitar cada pasada.
+   *
+   * Todavía no se programa ninguna ejecución automática.
+   */
+  const tiendaOnlineEjecucionService = new TiendaOnlineEjecucionService({
+    applicationStateReader: applicationStateService,
+    appDataRepository,
+    secretStorage: operationalSecretStorage,
+    articulosRepository: ventasArticulosRepository,
+    tiposPagoRepository: tipoPagoRepository,
+    ventasRepository: ventasPersistenciaRepository,
+    fiscalRepository: ventasTicketBaiRepository,
+    fiscalService: ventasTicketBaiService,
+  });
 
   const emailSender: EmailSender = new NodemailerEmailSender();
 
@@ -1100,5 +1120,6 @@ export default function createApplicationComposition(
     applicationDatabase: operationalDatabase,
     applicationLogger,
     backupAutomaticSchedulerService,
+    tiendaOnlineEjecucionService,
   };
 }

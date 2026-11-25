@@ -82,6 +82,57 @@ app
     );
 
     /*
+     * Ejecución manual de sincronización en desarrollo.
+     *
+     * Requiere indicar expresamente la URL de pruebas.
+     * El arranque normal no ejecuta esta operación.
+     */
+    const tiendaOnlineTestUrl: string | undefined = process.env['OSUMI_TPV_SYNC_TEST_URL'];
+
+    if (!app.isPackaged && tiendaOnlineTestUrl !== undefined) {
+      try {
+        const execution =
+          await applicationComposition.tiendaOnlineEjecucionService.execute(tiendaOnlineTestUrl);
+
+        if (execution.outcome === 'completed') {
+          const result = execution.result;
+
+          const acknowledged: number = result.pedidos.filter(
+            (pedido): boolean => pedido.estado === 'acknowledged',
+          ).length;
+
+          applicationComposition.applicationLogger.info({
+            area: 'tienda-online',
+            operation: 'manual-sync',
+            message: 'Finalizada la sincronización manual de tienda online.',
+            context: {
+              paginas: result.paginas,
+              pedidos: result.pedidos.length,
+              confirmados: acknowledged,
+              pendientes: result.pedidos.length - acknowledged,
+              limiteAlcanzado: result.limiteAlcanzado,
+            },
+          });
+        } else {
+          applicationComposition.applicationLogger.info({
+            area: 'tienda-online',
+            operation: 'manual-sync',
+            message: 'No se ha iniciado la sincronización manual.',
+            context: {
+              outcome: execution.outcome,
+            },
+          });
+        }
+      } catch {
+        applicationComposition.applicationLogger.error({
+          area: 'tienda-online',
+          operation: 'manual-sync',
+          message: 'No se ha podido completar la sincronización manual de pruebas.',
+        });
+      }
+    }
+
+    /*
      * Ventana principal.
      */
     await createMainWindow();
