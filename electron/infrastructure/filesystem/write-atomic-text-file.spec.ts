@@ -1,13 +1,23 @@
 import writeAtomicTextFile from '@infrastructure/filesystem/write-atomic-text-file';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+
+  return {
+    ...actual,
+    rename: vi.fn(actual.rename),
+  };
+});
 
 let tempDirectory: string | null = null;
 
 describe('writeAtomicTextFile', (): void => {
   beforeEach(async (): Promise<void> => {
+    vi.mocked(rename).mockReset();
     tempDirectory = await mkdtemp(join(tmpdir(), 'osumi-tpv-atomic-'));
   });
 
@@ -72,7 +82,7 @@ describe('writeAtomicTextFile', (): void => {
 
     const content: string = await readFile(filePath, 'utf8');
 
-    expect([firstContent, secondContent]).toContain(content);
+    expect(content).toBe(secondContent);
 
     const files: string[] = await readdir(directory);
 
@@ -115,6 +125,91 @@ describe('writeAtomicTextFile', (): void => {
     const files: string[] = await readdir(directory);
 
     expect(files).toEqual(['config.json']);
+  });
+
+  it('reintenta un bloqueo temporal durante la promoción', async (): Promise<void> => {
+    const directory: string = requireTempDirectory();
+    const filePath: string = join(directory, 'config.json');
+
+    await writeFile(filePath, 'contenido-original');
+
+    const error: Error = Object.assign(new Error('Bloqueo temporal'), { code: 'EPERM' });
+
+    vi.mocked(rename).mockRejectedValueOnce(error);
+
+    await writeAtomicTextFile(filePath, 'contenido-nuevo');
+
+    expect(rename).toHaveBeenCalledTimes(2);
+
+    await expect(readFile(filePath, 'utf8')).resolves.toBe('contenido-nuevo');
+
+    expect(await readdir(directory)).toEqual(['config.json']);
+  });
+
+  it('limita los reintentos y conserva el contenido anterior', async (): Promise<void> => {
+    const directory: string = requireTempDirectory();
+    const filePath: string = join(directory, 'config.json');
+
+    await writeFile(filePath, 'contenido-original');
+
+    const error: Error = Object.assign(new Error('Bloqueo persistente'), { code: 'EPERM' });
+
+    vi.mocked(rename).mockRejectedValue(error);
+
+    await expect(writeAtomicTextFile(filePath, 'contenido-nuevo')).rejects.toBe(error);
+
+    expect(rename).toHaveBeenCalledTimes(6);
+
+    await expect(readFile(filePath, 'utf8')).resolves.toBe('contenido-original');
+
+    expect(await readdir(directory)).toEqual(['config.json']);
+  });
+
+  it('no reintenta errores ajenos a bloqueos temporales', async (): Promise<void> => {
+    const directory: string = requireTempDirectory();
+    const filePath: string = join(directory, 'config.json');
+
+    await writeFile(filePath, 'contenido-original');
+
+    const error: Error = Object.assign(new Error('Error de entrada y salida'), { code: 'EIO' });
+
+    vi.mocked(rename).mockRejectedValueOnce(error);
+
+    await expect(writeAtomicTextFile(filePath, 'contenido-nuevo')).rejects.toBe(error);
+
+    expect(rename).toHaveBeenCalledTimes(1);
+
+    await expect(readFile(filePath, 'utf8')).resolves.toBe('contenido-original');
+
+    expect(await readdir(directory)).toEqual(['config.json']);
+  });
+
+  it('continúa las escrituras encoladas aunque falle la anterior', async (): Promise<void> => {
+    const directory: string = requireTempDirectory();
+    const filePath: string = join(directory, 'config.json');
+
+    const error: Error = Object.assign(new Error('Error de promoción'), { code: 'EIO' });
+
+    vi.mocked(rename).mockRejectedValueOnce(error);
+
+    const results = await Promise.allSettled([
+      writeAtomicTextFile(filePath, 'primera-escritura'),
+      writeAtomicTextFile(filePath, 'segunda-escritura'),
+    ]);
+
+    expect(results[0]).toEqual({
+      status: 'rejected',
+      reason: error,
+    });
+
+    expect(results[1]).toEqual({
+      status: 'fulfilled',
+      value: undefined,
+    });
+
+    await expect(readFile(filePath, 'utf8')).resolves.toBe('segunda-escritura');
+
+    expect(await readdir(directory)).toEqual(['config.json']);
   });
 });
 
